@@ -14,4 +14,5 @@ export 'src/job_logs.dart';
 export 'src/profile_edits.dart';
 export 'src/project.dart';
 export 'src/project_profile.dart';
+export 'src/test_run.dart';
 export 'src/version_response.dart';

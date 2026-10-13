@@ -123,7 +123,8 @@ edited once released: add a new one and a golden `test/src/sqlite/snapshots/v<N>
 seven days are pruned; their sequence numbers are never reused. Schema version 2 adds the scan
 columns of `project`; version 3 adds what the job runner records to `job` and `job_step`; version 4
 adds the tool versions of a job; version 5 adds the time and a unique path to `artifact`; version 6 adds
-`shorebird_release`, the Flutter version each Shorebird release was built with.
+`shorebird_release`, the Flutter version each Shorebird release was built with; version 7 gives `test_run` its
+project, app, time and the baseline index.
 
 Secrets (`packages/xp_secrets`) live on the engine machine behind the `SecretStore` interface of
 `xp_engine`; `createSecretStore` picks the implementation for the platform.
@@ -408,6 +409,55 @@ adapter parses is a fixture that follows the documented `--json` output.
   one `build.ios` stored (same name, same artifact id).
 
 `xpd serve` registers all five.
+
+## Tests and analyze
+
+Phase 9d adds the `test` and `analyze` steps (`packages/xp_engine/lib/src/testing`) and the endpoints that
+show a test run (D-21). Device integration tests are out of scope. Real Flutter is never run by the unit tests:
+the parsers read output captured from Flutter 3.47.6 on a throwaway app
+(`packages/xp_engine/test/src/testing/fixtures`, with the machine's own directory replaced by `/work/app`).
+
+- **`test`** runs `flutter test --machine` of the job's pinned SDK in the app (plus one `--tags` with the tags of its
+  input, which a test must all match, and its `paths`) and reads the JSON events as they arrive (`MachineTestParser`). Lines that
+  are not JSON objects are noise (Flutter prints blank lines and `[{"event":...}]` notices). A test is
+  identified by its file relative to the app and its full name with the names of its groups, so the identity
+  is the same in every worktree. It ends `passed`, `failed` (an expectation), `errored` (it threw) or
+  `skipped`. A test file that does not load, and a failing `setUpAll`, are tests of their own
+  (`loading test/x_test.dart`, `group (setUpAll)`) that errored, so they fail a run like any test. Two tests
+  of a file with the same full name count as one, and the worse outcome wins. Messages and stack traces are
+  kept, cut at 4,000 characters.
+- **The step fails only on new failures** against the baseline, not on failures the baseline has. It also
+  fails when the run was cancelled, printed no JSON, stopped before its `done` event (a crash) or ran no
+  test. Only a run that finished is stored.
+- **The run** is stored in `test_run`, one per job (a step that runs again replaces it): the tests in a compact
+  JSON document (per file, the names that passed or were skipped, and the failures with their message), the
+  diff against the baseline it was compared with, and `baseline`. A `test_run.completed` event goes out.
+- **The diff** (`diffTestRuns`): `newFailures` fail now and did not fail in the baseline, or are not in it;
+  `fixed` failed in the baseline and pass now; `missing` are in the baseline and not in the run; `stillFailing`
+  counts the failures the baseline has. A run of some `paths` expects only the files it ran; a run with `tags`
+  reports no missing tests. Without a baseline every failure is new.
+- **The baseline is the last green run on the base branch.** Green means no new failures against the baseline
+  before it, so failures a project has not fixed yet (27 of them, say) do not stop it from having a baseline;
+  a run that fixes some raises the baseline. Only a complete run (no `paths`, no `tags`) of the base branch
+  counts. The first run of the base branch has nothing to be green against, so it **seeds** the baseline as it
+  is, failures included, and passes (`seeded` in the step result); a run of any other branch with no baseline
+  fails on every failure and says to run the base branch first. Seeding is the one place where a red run
+  becomes the reference: to start over, run the tests on the base branch after fixing the failures that matter.
+  Housekeeping must keep the baseline row (Phase 12c): `test_run` is deleted with its job.
+- **`analyze`** runs `flutter pub get` and then `flutter analyze --no-pub --no-fatal-infos --no-fatal-warnings`.
+  Flutter's analyzer has no machine-readable output, so the text is parsed (`severity • message •
+  path:line:column • code`; the summary line goes to standard error). `--no-pub` alone analyzes a fresh worktree
+  against no packages and reports every import as an error, hence the `pub get`. There is no baseline for the
+  analyzer: the step fails on any issue of the input's `failOn` severity or worse, `error` by default, and
+  records the counts and the first 200 issues, the worst first, in its result. A run with no summary line, or
+  with fewer issues read than the summary announces, fails, since an error could be hiding in it.
+
+| Route | What it does |
+|---|---|
+| `GET /jobs/{id}/tests` | The run of the job with its counts and its diff, and a page of its tests: the failures unless `?status=passed,failed,errored,skipped` says otherwise, `?limit=` (default 200, at most 1000) and `?offset=`. `404` if the job ran no tests. |
+| `GET /projects/{id}/tests/baseline` | The current baseline of every app and branch of the project. |
+
+`xpd serve` registers both steps.
 
 ## Testing
 

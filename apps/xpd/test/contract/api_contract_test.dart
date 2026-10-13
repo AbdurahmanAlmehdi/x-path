@@ -9,6 +9,7 @@ import 'package:xp_api/xp_api.dart';
 import 'package:xp_engine/xp_engine.dart';
 
 import '../helpers/test_engine.dart';
+import '../helpers/test_run_fakes.dart';
 
 /// Every response the engine gives is checked against `openapi.yaml`.
 void main() {
@@ -499,6 +500,89 @@ void main() {
         );
       });
     }
+  });
+
+  group('tests', () {
+    Future<RawResponse> send(String path) => engine.request(path);
+
+    test('GET /jobs/{id}/tests', () async {
+      final job = await engine.createJob(['x']);
+      await engine.testRuns.save(sampleTestRun(job.id, baseline: true));
+
+      final response = await send('/jobs/${job.id}/tests');
+
+      expect(response.statusCode, 200);
+      expectContract(response, path: '/jobs/${job.id}/tests');
+      expect(
+        TestRunResponse.fromJson(response.json).run.diff.newFailures,
+        hasLength(1),
+      );
+    });
+
+    test('GET /jobs/{id}/tests with every status and a page', () async {
+      final job = await engine.createJob(['x']);
+      await engine.testRuns.save(sampleTestRun(job.id));
+
+      final response = await send(
+        '/jobs/${job.id}/tests?status=passed,failed,errored,skipped&limit=3',
+      );
+
+      expect(response.statusCode, 200);
+      expect(response.json['tests']! as List, hasLength(3));
+      expectContract(response, path: '/jobs/${job.id}/tests');
+    });
+
+    test('GET /jobs/{id}/tests 400, 401 and 404', () async {
+      final job = await engine.createJob(['x']);
+      final invalid = await send('/jobs/${job.id}/tests?limit=0');
+      final unauthorized = await engine.request('/jobs/job_x/tests', token: '');
+      final missing = await send('/jobs/job_nope/tests');
+      final noRun = await send('/jobs/${job.id}/tests');
+
+      expect([invalid, unauthorized, missing, noRun].map((r) => r.statusCode), [
+        400,
+        401,
+        404,
+        404,
+      ]);
+      expectContract(invalid, path: '/jobs/${job.id}/tests');
+      expectContract(unauthorized, path: '/jobs/job_x/tests');
+      expectContract(missing, path: '/jobs/job_nope/tests');
+      expectContract(noRun, path: '/jobs/${job.id}/tests');
+    });
+
+    test('GET /projects/{id}/tests/baseline', () async {
+      await engine.projectRepository.add(testRunProject());
+      final job = await engine.createJob(['x']);
+      await engine.testRuns.save(sampleTestRun(job.id, baseline: true));
+
+      final response = await send('/projects/prj_1/tests/baseline');
+
+      expect(response.statusCode, 200);
+      expect(response.json['baselines']! as List, hasLength(1));
+      expectContract(response, path: '/projects/prj_1/tests/baseline');
+    });
+
+    test('GET /projects/{id}/tests/baseline without a baseline', () async {
+      await engine.projectRepository.add(testRunProject());
+
+      final response = await send('/projects/prj_1/tests/baseline');
+
+      expect(response.json, {'baselines': <Object?>[]});
+      expectContract(response, path: '/projects/prj_1/tests/baseline');
+    });
+
+    test('GET /projects/{id}/tests/baseline 401 and 404', () async {
+      final unauthorized = await engine.request(
+        '/projects/prj_x/tests/baseline',
+        token: '',
+      );
+      final missing = await send('/projects/prj_nope/tests/baseline');
+
+      expect((unauthorized.statusCode, missing.statusCode), (401, 404));
+      expectContract(unauthorized, path: '/projects/prj_x/tests/baseline');
+      expectContract(missing, path: '/projects/prj_nope/tests/baseline');
+    });
   });
 
   group('jobs', () {
