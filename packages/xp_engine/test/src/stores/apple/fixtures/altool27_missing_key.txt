@@ -1,0 +1,3 @@
+Running altool at path '/Applications/Xcode-27.1.app/Contents/SharedFrameworks/ContentDelivery.framework/Resources/altool'...
+
+2026-10-13 20:22:59.430 ERROR: [altool.main] Failed to load AuthKey file. (-43) The file 'AuthKey_ABC123DEF4.p8' could not be found in any of these locations: '/work/job/private_keys', '~/private_keys', '~/.private_keys', '~/.appstoreconnect/private_keys'.

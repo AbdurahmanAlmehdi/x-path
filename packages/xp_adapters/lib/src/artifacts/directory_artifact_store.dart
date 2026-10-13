@@ -8,7 +8,7 @@ import 'package:xp_engine/xp_engine.dart';
 ///
 /// A file is written under a temporary name and renamed, so a reader never
 /// sees half of it.
-class DirectoryArtifactStore implements ArtifactStore {
+class DirectoryArtifactStore implements LocalArtifactStore {
   /// Creates a store in the directory [root], which is created when the first
   /// file is written.
   const new(this.root);
@@ -37,6 +37,9 @@ class DirectoryArtifactStore implements ArtifactStore {
       rethrow;
     }
   }
+
+  @override
+  String localPath(String path) => _resolve(path);
 
   @override
   Stream<List<int>> read(String path) => File(_resolve(path)).openRead();
