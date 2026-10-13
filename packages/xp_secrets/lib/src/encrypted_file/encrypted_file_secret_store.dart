@@ -1,18 +1,21 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:cryptography/cryptography.dart';
 import 'package:path/path.dart' as p;
 import 'package:xp_engine/xp_engine.dart';
 import 'package:xp_secrets/src/encrypted_file/master_key.dart';
 import 'package:xp_secrets/src/tracking_secret_store.dart';
+import 'package:xp_secrets/src/utf8_text.dart';
 
 /// Keeps secrets in one encrypted file, for machines without a Keychain.
 ///
 /// The file, `secrets.enc` in the data directory, holds a JSON object of all
 /// secrets, sealed with XChaCha20-Poly1305 under one master key (see
-/// [MasterKeySource]). Layout, all in one file:
+/// [MasterKeySource]). A text value is a JSON string; a value that is not
+/// valid UTF-8 is `{"base64": "..."}`. Layout, all in one file:
 ///
 /// | bytes | content                                              |
 /// |-------|------------------------------------------------------|
@@ -33,18 +36,22 @@ class EncryptedFileSecretStore extends TrackingSecretStore {
   /// Creates a store in `dataDir`.
   ///
   /// `credentialsDirectory` is `$CREDENTIALS_DIRECTORY`. `runner` sets file
-  /// permissions.
+  /// permissions. A `masterKey` replaces the source of the key that the
+  /// systemd credential or `master.key` in `dataDir` would be.
   new({
     required String dataDir,
     required ProcessRunner runner,
     String? credentialsDirectory,
+    MasterKeySource? masterKey,
   }) : _runner = runner,
        _path = p.join(dataDir, fileName),
-       _masterKey = MasterKeySource(
-         dataDir: dataDir,
-         runner: runner,
-         credentialsDirectory: credentialsDirectory,
-       );
+       _masterKey =
+           masterKey ??
+           FileMasterKeySource(
+             dataDir: dataDir,
+             runner: runner,
+             credentialsDirectory: credentialsDirectory,
+           );
 
   /// The name of the secrets file in the data directory.
   static const fileName = 'secrets.enc';
@@ -52,6 +59,7 @@ class EncryptedFileSecretStore extends TrackingSecretStore {
   static const _magic = 'XPSEC';
   static const _version = 1;
   static final List<int> _header = [...ascii.encode(_magic), _version];
+  static const _binaryField = 'base64';
   static const _nonceLength = 24;
   static const _macLength = 16;
 
@@ -59,20 +67,19 @@ class EncryptedFileSecretStore extends TrackingSecretStore {
   final String _path;
   final MasterKeySource _masterKey;
   final _algorithm = Xchacha20.poly1305Aead();
-  Future<void> _tail = Future.value();
 
   @override
-  Future<String?> read(String key) => track(() async {
+  Future<Uint8List?> readBytes(String key) => track(() async {
     checkKey(key);
-    return await _serialized(() async => (await _readAll())?[key]);
+    return await serialized(() async => (await _readAll())?[key]);
   });
 
   @override
-  Future<void> write(String key, String value) => track(() async {
+  Future<void> writeBytes(String key, List<int> value) => track(() async {
     checkKey(key);
-    await _serialized(() async {
+    await serialized(() async {
       final secrets = await _readAll() ?? {};
-      secrets[key] = value;
+      secrets[key] = Uint8List.fromList(value);
       await _save(secrets);
     });
   });
@@ -80,22 +87,15 @@ class EncryptedFileSecretStore extends TrackingSecretStore {
   @override
   Future<void> delete(String key) => track(() async {
     checkKey(key);
-    await _serialized(() async {
+    await serialized(() async {
       final secrets = await _readAll();
       if (secrets == null || secrets.remove(key) == null) return;
       await _save(secrets);
     });
   });
 
-  /// Runs [operation] after every earlier operation has finished.
-  Future<T> _serialized<T>(Future<T> Function() operation) {
-    final result = _tail.then((_) => operation());
-    _tail = result.then<void>((_) {}, onError: (_) {});
-    return result;
-  }
-
   /// Every secret, or `null` if nothing was ever written.
-  Future<Map<String, String>?> _readAll() async {
+  Future<Map<String, Uint8List>?> _readAll() async {
     final file = File(_path);
     if (!file.existsSync()) return null;
     final key = await _masterKey.load(createIfMissing: false);
@@ -141,20 +141,50 @@ class EncryptedFileSecretStore extends TrackingSecretStore {
     } on FormatException {
       throw const SecretStoreException('The secrets file is not valid.');
     }
-    if (decoded is! Map<String, dynamic> ||
-        decoded.values.any((value) => value is! String)) {
+    if (decoded is! Map<String, dynamic>) {
       throw const SecretStoreException('The secrets file is not valid.');
     }
-    return decoded.cast<String, String>();
+    return {
+      for (final MapEntry(:key, :value) in decoded.entries)
+        key: _decodeValue(value),
+    };
   }
 
-  Future<void> _save(Map<String, String> secrets) async {
+  Uint8List _decodeValue(Object? value) {
+    try {
+      if (value is String) return Uint8List.fromList(utf8.encode(value));
+      if (value is Map<String, dynamic> &&
+          value.length == 1 &&
+          value[_binaryField] is String) {
+        return base64.decode(value[_binaryField] as String);
+      }
+    } on FormatException {
+      // Falls through to the error below.
+    }
+    throw const SecretStoreException('The secrets file is not valid.');
+  }
+
+  /// A JSON string for text, `{"base64": ...}` for anything else.
+  Object _encodeValue(Uint8List value) {
+    try {
+      return decodeUtf8Exactly(value);
+    } on FormatException {
+      return {_binaryField: base64.encode(value)};
+    }
+  }
+
+  Future<void> _save(Map<String, Uint8List> secrets) async {
     final key = await _masterKey.load(
       createIfMissing: !File(_path).existsSync(),
     );
     final nonce = _algorithm.newNonce();
     final box = await _algorithm.encrypt(
-      utf8.encode(jsonEncode(secrets)),
+      utf8.encode(
+        jsonEncode({
+          for (final MapEntry(:key, :value) in secrets.entries)
+            key: _encodeValue(value),
+        }),
+      ),
       secretKey: SecretKey(key),
       nonce: nonce,
       aad: _header,

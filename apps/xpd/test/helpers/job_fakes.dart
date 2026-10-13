@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
 import 'package:xp_engine/xp_engine.dart';
 
 /// A [SecretStore] in memory.
@@ -16,6 +19,16 @@ class MemorySecretStore implements SecretStore {
 
   @override
   Future<void> write(String key, String value) async => values[key] = value;
+
+  @override
+  Future<Uint8List?> readBytes(String key) async {
+    final value = values[key];
+    return value == null ? null : Uint8List.fromList(utf8.encode(value));
+  }
+
+  @override
+  Future<void> writeBytes(String key, List<int> value) async =>
+      values[key] = utf8.decode(value);
 
   @override
   Future<void> delete(String key) async => values.remove(key);

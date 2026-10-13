@@ -281,7 +281,7 @@ Mataa dev builds through `xp` can start after Phase 13, before the desktop app e
 - **Scope:** `SecretStore` interface in `xp_engine`; `xp_secrets` with the Keychain store
   (`security -i` behind the process interface), the Linux encrypted file (XChaCha20-Poly1305,
   one master key from `$CREDENTIALS_DIRECTORY` or a 0600 file), "secrets locked" state, and the
-  log masker.
+  log masker. Large secrets on macOS go to the encrypted file, keyed from the Keychain (ADR 0008).
 - **Files touched:** `packages/xp_engine/lib/src/secrets/secret_store.dart`, `packages/xp_secrets/**`
 - **Acceptance criteria:** a test tagged `macos` writes, reads and deletes a test item and
   asserts the value never appears in `ps` output; masking tests cover multi-line and partial

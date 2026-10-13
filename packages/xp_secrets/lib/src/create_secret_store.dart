@@ -2,10 +2,19 @@ import 'dart:io';
 
 import 'package:xp_engine/xp_engine.dart';
 import 'package:xp_secrets/src/encrypted_file/encrypted_file_secret_store.dart';
+import 'package:xp_secrets/src/keychain/keychain_master_key.dart';
 import 'package:xp_secrets/src/keychain/keychain_secret_store.dart';
+import 'package:xp_secrets/src/size_routed_secret_store.dart';
 
-/// The secret store for this machine: the Keychain on macOS, the encrypted
-/// file in [dataDir] on Linux.
+/// The Keychain scope, and so service suffix, of the file key on macOS.
+const masterKeyKeychainScope = 'master';
+
+/// The secret store for this machine.
+///
+/// On macOS small secrets are in the Keychain and large ones, which do not
+/// fit a `security -i` command line, in the encrypted file in [dataDir],
+/// whose key is in the Keychain (ADR 0008). On Linux everything is in the
+/// encrypted file in [dataDir].
 ///
 /// [runner] runs `security` and `chmod`. [operatingSystem] and [environment]
 /// default to the real ones; they are parameters for tests. Throws an
@@ -18,7 +27,19 @@ SecretStore createSecretStore({
 }) {
   switch (operatingSystem ?? Platform.operatingSystem) {
     case 'macos':
-      return KeychainSecretStore(runner: runner);
+      return SizeRoutedSecretStore(
+        small: KeychainSecretStore(runner: runner),
+        large: EncryptedFileSecretStore(
+          dataDir: dataDir,
+          runner: runner,
+          masterKey: KeychainMasterKeySource(
+            store: KeychainSecretStore(
+              runner: runner,
+              scope: masterKeyKeychainScope,
+            ),
+          ),
+        ),
+      );
     case 'linux':
       return EncryptedFileSecretStore(
         dataDir: dataDir,
