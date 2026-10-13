@@ -1,0 +1,50 @@
+# Flutter 3.47.6 ships Dart 3.13.5; keep both in sync with .fvmrc. Dart packages
+# use the Flutter workflow too: the workspace has Flutter members, so even
+# `dart pub get` needs the Flutter SDK. The macOS job enforces the coverage
+# threshold; the Linux job runs the same tests without a gate.
+name: xp_client
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/xp_client.yaml"
+      - "packages/xp_client/**"
+      - "packages/xp_api/**"
+      - "pubspec.yaml"
+      - "pubspec.lock"
+      - ".fvmrc"
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/xp_client.yaml"
+      - "packages/xp_client/**"
+      - "packages/xp_api/**"
+      - "pubspec.yaml"
+      - "pubspec.lock"
+      - ".fvmrc"
+
+jobs:
+  macos:
+    uses: VeryGoodOpenSource/very_good_workflows/.github/workflows/flutter_package.yml@v1
+    with:
+      flutter_version: "3.47.6"
+      working_directory: packages/xp_client
+      runs_on: macos-latest
+      min_coverage: 100
+      coverage_excludes: "**/*.g.dart"
+      run_bloc_lint: false
+
+  linux:
+    uses: VeryGoodOpenSource/very_good_workflows/.github/workflows/flutter_package.yml@v1
+    with:
+      flutter_version: "3.47.6"
+      working_directory: packages/xp_client
+      runs_on: ubuntu-latest
+      min_coverage: 0
+      coverage_excludes: "**/*.g.dart"
+      run_bloc_lint: false

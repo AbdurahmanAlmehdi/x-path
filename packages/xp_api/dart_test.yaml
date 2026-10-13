@@ -1,0 +1,12 @@
+# Tags every test file may use. See the "Testing" section of the root README.
+tags:
+  # Checks API responses against openapi.yaml.
+  contract:
+  # Spawns real child processes.
+  process:
+  # Runs only on macOS (Keychain, SMAppService, ...).
+  macos:
+    test_on: mac-os
+  # Needs external tools or services. Skipped unless --run-skipped is given.
+  integration:
+    skip: "Needs external tools. Run with: dart test --run-skipped -t integration"

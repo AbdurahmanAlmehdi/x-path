@@ -242,7 +242,7 @@ Mataa dev builds through `xp` can start after Phase 13, before the desktop app e
 
 ### Phase 1: Workspace and CI
 
-- **Status:** Not started
+- **Status:** Done
 - **Scope:** Workspace root with Melos scripts, all packages and apps scaffolded (CLI from
   `very_good create dart_cli`, app from `very_good create flutter_app`) with per-package
   analysis options and test tags, `tool/check_layers.dart`, GitHub Actions using
