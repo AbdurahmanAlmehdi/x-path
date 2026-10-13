@@ -149,6 +149,32 @@ void main() {
     });
   });
 
+  group('verifyAccess', () {
+    test(
+      'exchanges the assertion for a token and calls nothing else',
+      () async {
+        await play().verifyAccess();
+
+        expect(server.tokensIssued, 1);
+        expect(api(), isEmpty);
+      },
+    );
+
+    test('is refused for a key the server does not know', () async {
+      final error = await failure(
+        play(
+          account: PlayServiceAccount.fromSecret(
+            server.serviceAccountJson(
+              privateKeyPem: fakePlayOtherPrivateKeyPem,
+            ),
+          ),
+        ).verifyAccess(),
+      );
+
+      expect(error, isA<PlayAuthException>());
+    });
+  });
+
   group('insertEdit', () {
     test('opens an edit that expires', () async {
       final edit = await play().insertEdit(_pkg);

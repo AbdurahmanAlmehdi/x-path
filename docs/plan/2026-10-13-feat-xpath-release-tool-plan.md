@@ -403,7 +403,7 @@ Mataa dev builds through `xp` can start after Phase 13, before the desktop app e
 
 ### Phase 10c: Firebase, Shorebird CLI and credentials
 
-- **Status:** Not started
+- **Status:** Done
 - **Scope:** Firebase App Distribution REST (`upload.firebase`), Shorebird CLI `--json`
   adapter, credential endpoints with verification on save and a daily health check that fails
   preflight on expiry.

@@ -74,14 +74,15 @@ void main() {
     expect(await source().forBundleId('com.mataa.app'), isNull);
   });
 
-  test('takes the oldest reference when there are two', () async {
+  test('takes the oldest reference when two flavors share the id', () async {
+    addFlavor('prod_b', 'com.mataa.app');
     secrets.values['asc.other'] = const AscKey(
       keyId: 'OTHER',
       issuerId: 'I',
       privateKey: 'p',
     ).toSecret();
     addCredential('cred_b', 'prod', 'asc_key', 'asc.prod');
-    addCredential('cred_a', 'prod', 'asc_key', 'asc.other');
+    addCredential('cred_a', 'prod_b', 'asc_key', 'asc.other');
 
     expect((await source().forBundleId('com.mataa.app'))!.keyId, 'ABC123DEF4');
   });

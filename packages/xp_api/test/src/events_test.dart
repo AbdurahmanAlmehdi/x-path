@@ -57,6 +57,29 @@ void main() {
           failures: 27,
           newFailures: 0,
         ),
+        const CredentialSaved(
+          credentialId: 'crd_1',
+          projectId: 'prj_1',
+          kind: CredentialKind.ascKey,
+          replaced: true,
+        ),
+        const CredentialVerified(
+          credentialId: 'crd_1',
+          projectId: 'prj_1',
+          kind: CredentialKind.playSa,
+          status: CredentialStatus.rejected,
+        ),
+        const CredentialExpired(
+          credentialId: 'crd_1',
+          projectId: 'prj_1',
+          kind: CredentialKind.appleId,
+          message: 'Revoked.',
+        ),
+        const CredentialRemoved(
+          credentialId: 'crd_1',
+          projectId: 'prj_1',
+          kind: CredentialKind.slack,
+        ),
       ]) {
         final sequenced = SequencedEvent(seq: 9, at: at, event: event);
 
@@ -92,6 +115,10 @@ void main() {
         JobStateChanged() => 'job',
         JobStepChanged() => 'step',
         TestRunCompleted() => 'tests',
+        CredentialSaved() => 'saved',
+        CredentialVerified() => 'verified',
+        CredentialExpired() => 'expired',
+        CredentialRemoved() => 'removed credential',
         UnknownEvent() => 'unknown',
       };
 
@@ -138,6 +165,49 @@ void main() {
           ),
         ),
         'tests',
+      );
+      expect(
+        describe(
+          const CredentialSaved(
+            credentialId: 'c',
+            projectId: 'p',
+            kind: CredentialKind.github,
+            replaced: false,
+          ),
+        ),
+        'saved',
+      );
+      expect(
+        describe(
+          const CredentialVerified(
+            credentialId: 'c',
+            projectId: 'p',
+            kind: CredentialKind.github,
+            status: CredentialStatus.verified,
+          ),
+        ),
+        'verified',
+      );
+      expect(
+        describe(
+          const CredentialExpired(
+            credentialId: 'c',
+            projectId: 'p',
+            kind: CredentialKind.github,
+            message: 'm',
+          ),
+        ),
+        'expired',
+      );
+      expect(
+        describe(
+          const CredentialRemoved(
+            credentialId: 'c',
+            projectId: 'p',
+            kind: CredentialKind.github,
+          ),
+        ),
+        'removed credential',
       );
       expect(
         describe(EngineEvent.fromJson('x', const <String, dynamic>{})),

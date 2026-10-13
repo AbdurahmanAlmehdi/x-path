@@ -1,4 +1,5 @@
 import 'package:equatable/equatable.dart';
+import 'package:xp_api/src/credential.dart';
 import 'package:xp_api/src/job.dart';
 
 /// WebSocket close code of an `/events` stream whose cursor can no longer be
@@ -50,6 +51,31 @@ sealed class EngineEvent extends Equatable {
       baseline: payload['baseline'] as bool,
       failures: payload['failures'] as int,
       newFailures: payload['newFailures'] as int,
+    ),
+    CredentialSaved.eventType => CredentialSaved(
+      credentialId: payload['credentialId'] as String,
+      projectId: payload['projectId'] as String,
+      kind: CredentialKind.fromWire(payload['kind'] as String)!,
+      replaced: payload['replaced'] as bool,
+    ),
+    CredentialVerified.eventType => CredentialVerified(
+      credentialId: payload['credentialId'] as String,
+      projectId: payload['projectId'] as String,
+      kind: CredentialKind.fromWire(payload['kind'] as String)!,
+      status: CredentialStatus.values.firstWhere(
+        (status) => status.wire == payload['status'],
+      ),
+    ),
+    CredentialExpired.eventType => CredentialExpired(
+      credentialId: payload['credentialId'] as String,
+      projectId: payload['projectId'] as String,
+      kind: CredentialKind.fromWire(payload['kind'] as String)!,
+      message: payload['message'] as String,
+    ),
+    CredentialRemoved.eventType => CredentialRemoved(
+      credentialId: payload['credentialId'] as String,
+      projectId: payload['projectId'] as String,
+      kind: CredentialKind.fromWire(payload['kind'] as String)!,
     ),
     _ => UnknownEvent(type: type, payload: payload),
   };
@@ -322,6 +348,163 @@ final class TestRunCompleted extends EngineEvent {
     failures,
     newFailures,
   ];
+}
+
+/// A credential was saved: verified and stored, new or replacing an earlier
+/// one.
+final class CredentialSaved extends EngineEvent {
+  /// Creates the event.
+  const new({
+    required this.credentialId,
+    required this.projectId,
+    required this.kind,
+    required this.replaced,
+  });
+
+  /// The wire name of this event.
+  static const eventType = 'credential.saved';
+
+  /// The credential.
+  final String credentialId;
+
+  /// The project of its flavor.
+  final String projectId;
+
+  /// What it is for.
+  final CredentialKind kind;
+
+  /// Whether it replaced a credential of the same flavor and kind.
+  final bool replaced;
+
+  @override
+  String get type => eventType;
+
+  @override
+  Map<String, dynamic> get payload => {
+    'credentialId': credentialId,
+    'projectId': projectId,
+    'kind': kind.wire,
+    'replaced': replaced,
+  };
+
+  @override
+  List<Object?> get props => [credentialId, projectId, kind, replaced];
+}
+
+/// A credential was checked again, on request or by the daily health check.
+final class CredentialVerified extends EngineEvent {
+  /// Creates the event.
+  const new({
+    required this.credentialId,
+    required this.projectId,
+    required this.kind,
+    required this.status,
+  });
+
+  /// The wire name of this event.
+  static const eventType = 'credential.verified';
+
+  /// The credential.
+  final String credentialId;
+
+  /// The project of its flavor.
+  final String projectId;
+
+  /// What it is for.
+  final CredentialKind kind;
+
+  /// What the check found.
+  final CredentialStatus status;
+
+  @override
+  String get type => eventType;
+
+  @override
+  Map<String, dynamic> get payload => {
+    'credentialId': credentialId,
+    'projectId': projectId,
+    'kind': kind.wire,
+    'status': status.wire,
+  };
+
+  @override
+  List<Object?> get props => [credentialId, projectId, kind, status];
+}
+
+/// A credential that was accepted before is refused now: it expired or was
+/// revoked. Jobs that need it fail preflight until it is replaced.
+final class CredentialExpired extends EngineEvent {
+  /// Creates the event.
+  const new({
+    required this.credentialId,
+    required this.projectId,
+    required this.kind,
+    required this.message,
+  });
+
+  /// The wire name of this event.
+  static const eventType = 'credential.expired';
+
+  /// The credential.
+  final String credentialId;
+
+  /// The project of its flavor.
+  final String projectId;
+
+  /// What it is for.
+  final CredentialKind kind;
+
+  /// What the store or tool said, with what to do about it.
+  final String message;
+
+  @override
+  String get type => eventType;
+
+  @override
+  Map<String, dynamic> get payload => {
+    'credentialId': credentialId,
+    'projectId': projectId,
+    'kind': kind.wire,
+    'message': message,
+  };
+
+  @override
+  List<Object?> get props => [credentialId, projectId, kind, message];
+}
+
+/// A credential was deleted, with its secret.
+final class CredentialRemoved extends EngineEvent {
+  /// Creates the event.
+  const new({
+    required this.credentialId,
+    required this.projectId,
+    required this.kind,
+  });
+
+  /// The wire name of this event.
+  static const eventType = 'credential.removed';
+
+  /// The credential.
+  final String credentialId;
+
+  /// The project of its flavor.
+  final String projectId;
+
+  /// What it was for.
+  final CredentialKind kind;
+
+  @override
+  String get type => eventType;
+
+  @override
+  Map<String, dynamic> get payload => {
+    'credentialId': credentialId,
+    'projectId': projectId,
+    'kind': kind.wire,
+  };
+
+  @override
+  List<Object?> get props => [credentialId, projectId, kind];
 }
 
 /// An event whose type this client does not know.

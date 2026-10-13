@@ -207,6 +207,11 @@ class HttpGooglePlay implements GooglePlay {
     ];
   }
 
+  @override
+  Future<void> verifyAccess() async {
+    await _tokens.token();
+  }
+
   Uri _edits(String packageName) => _apiBaseUrl.replace(
     path:
         '/androidpublisher/v3/applications/'

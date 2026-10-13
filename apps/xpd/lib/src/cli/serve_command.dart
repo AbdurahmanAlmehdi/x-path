@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:path/path.dart' as p;
@@ -5,8 +6,10 @@ import 'package:xp_adapters/xp_adapters.dart';
 import 'package:xp_engine/xp_engine.dart';
 import 'package:xp_secrets/xp_secrets.dart';
 import 'package:xpd/src/cli/xpd_command.dart';
+import 'package:xpd/src/credentials/credential_checks.dart';
 import 'package:xpd/src/server/xpd_server.dart';
 import 'package:xpd/src/stores/apple_stores.dart';
+import 'package:xpd/src/stores/firebase_stores.dart';
 import 'package:xpd/src/stores/play_stores.dart';
 import 'package:xpd/src/stores/store_guard_checks.dart';
 import 'package:xpd/src/version.dart';
@@ -120,6 +123,24 @@ class ServeCommand extends XpdCommand {
         clock: const SystemClock(),
         requiredTargetSdk: targetSdk,
       );
+      final firebase = FirebaseStores(clock: const SystemClock());
+      final credentialChecks = CredentialChecks(
+        database: database,
+        secrets: secrets,
+        projects: projectRepository,
+        runner: runner,
+        masker: masker,
+        events: events,
+        clock: const SystemClock(),
+        apple: apple,
+        play: play,
+        firebase: firebase,
+        dataDir: directory,
+        isMacOS: context.operatingSystem == 'macos',
+        onError: (error, stackTrace) =>
+            context.err.writeln('warning: credential check failed: $error'),
+      );
+      await credentialChecks.temporaryFiles.deleteAll();
       final shorebirdReleases = ShorebirdCliReleases(
         runner: runner,
         secrets: secrets,
@@ -226,6 +247,11 @@ class ServeCommand extends XpdCommand {
             store: artifactStore,
             secrets: secrets,
           ),
+          firebase.uploadStep(
+            repository: artifactRepository,
+            store: artifactStore,
+            secrets: secrets,
+          ),
           GuardStep(
             checks: [
               const SourceCheck(),
@@ -234,6 +260,7 @@ class ServeCommand extends XpdCommand {
               const NewReleaseNumberCheck(),
               const PatchNativeDiffCheck(),
               ...storeGuardChecks(apple: apple, play: play),
+              credentialChecks.guardCheck,
             ],
             git: git,
             workspaces: DirectoryWorkspace.new,
@@ -295,6 +322,7 @@ class ServeCommand extends XpdCommand {
           jobs: jobRepository,
           projects: projectRepository,
         ),
+        credentials: credentialChecks.service,
         clock: const SystemClock(),
         engineVersion: packageVersion,
         host: host,
@@ -303,6 +331,9 @@ class ServeCommand extends XpdCommand {
             context.err.writeln('error: $error\n$stackTrace'),
       );
       context.out.writeln('xpd listening on ${server.uri}');
+      // The first check of credentials that are due must not hold up the
+      // engine: each takes a call to a store.
+      unawaited(credentialChecks.health.start());
 
       await context.shutdown.first;
       context.out.writeln('xpd shutting down');
@@ -310,9 +341,11 @@ class ServeCommand extends XpdCommand {
       // and the next start resumes them.
       await jobs.interruptAll();
       await server.close();
+      credentialChecks.close();
       github.close();
       apple.close();
       play.close();
+      firebase.close();
       return 0;
     });
   }

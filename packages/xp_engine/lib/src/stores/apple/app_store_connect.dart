@@ -52,6 +52,11 @@ abstract interface class AppStoreConnect {
     String id,
     PhasedReleaseState state,
   );
+
+  /// Proves that Apple accepts the key: it reads one app (`GET /v1/apps` with
+  /// a limit of 1). Credential checks use it; a `401` is an expired or revoked
+  /// key.
+  Future<void> verifyAccess();
 }
 
 /// Makes the client for an API key.
@@ -184,6 +189,9 @@ class FakeAppStoreConnect implements AppStoreConnect {
       currentDayNumber: entry.value.currentDayNumber,
     );
   }
+
+  @override
+  Future<void> verifyAccess() async => _call('verifyAccess');
 
   AscReviewSubmission _submission(String id) =>
       [for (final list in submissionsOf.values) ...list]

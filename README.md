@@ -31,7 +31,7 @@ It writes nothing to the repo except release-model git changes.
 | `packages/xp_secrets` | Implements the secret store: Keychain, encrypted file, log masking. |
 | `packages/xp_repositories` | Repositories for the desktop app, built on `xp_client`. |
 | `packages/xp_macos_services` | Flutter package for macOS platform services. |
-| `tool` | Repository tooling (`xp_tool`): the layer check, and `tool/e2e` with the smoke test, the fixture repositories and the fake store servers (`tool/e2e/fake_stores`, one package each). |
+| `tool` | Repository tooling (`xp_tool`): the layer check, and `tool/e2e` with the smoke test, the fixture repositories and the fake store servers (`tool/e2e/fake_stores`, one package each: App Store Connect, Firebase, Google Play). |
 | `docs` | Plan, ADRs, research and design brief. |
 
 Everything is one [Dart pub workspace](https://dart.dev/tools/pub/workspaces) (ADR 0001) with
@@ -124,7 +124,8 @@ seven days are pruned; their sequence numbers are never reused. Schema version 2
 columns of `project`; version 3 adds what the job runner records to `job` and `job_step`; version 4
 adds the tool versions of a job; version 5 adds the time and a unique path to `artifact`; version 6 adds
 `shorebird_release`, the Flutter version each Shorebird release was built with; version 7 gives `test_run` its
-project, app, time and the baseline index.
+project, app, time and the baseline index; version 8 gives `credential_ref` the result of its last check and
+one credential per flavor and kind.
 
 Secrets (`packages/xp_secrets`) live on the engine machine behind the `SecretStore` interface of
 `xp_engine`; `createSecretStore` picks the implementation for the platform.
@@ -327,7 +328,7 @@ does.
   their versions for the job (`JobRepository.saveTools`). Signing inputs never go in the arguments: the
   step input names secrets (`secretEnvironment`: variable to secret key; `secretFiles`: variable to the
   path of a 0600 file that is deleted when the job ends), which the job runner reads from the secret store.
-  Which credential maps to which variable is a workflow matter (Phase 10c, Phase 11). `build.ios` fails
+  Which credential maps to which variable is a workflow matter (Phase 11; the secret keys are listed under Credentials). `build.ios` fails
   with "needs macOS (ios-sign)" on any machine that is not a Mac.
 - **Freshness marker** (`BuildFiles.markBuildStart`, `BuildOutputs`). `build/` is not cleaned between
   runs, so a failed build can leave the artifact of an earlier one. Right before the build the step asks
@@ -393,8 +394,8 @@ adapter parses is a fixture that follows the documented `--json` output.
   the patch builds is deleted afterwards (it carries the release's build number).
 - **The Shorebird key** is `SHOREBIRD_TOKEN` (an `sb_api_*` API key; `login:ci` tokens stopped working on
   2026-10-01). A step input names the secret (`tokenSecret`, a key in the secret store) and the job runner
-  puts the value in the environment of the process, never in the arguments. Where the key comes from is
-  Phase 10c.
+  puts the value in the environment of the process, never in the arguments. The key is a `shorebird`
+  credential (see Credentials).
 - **`symbols.archive`** keeps the R8 `mapping.txt` (`mapping`), the zipped dSYMs of the iOS archive (`dsym`)
   and the zipped debug info of an obfuscated build (`shorebird_symbols`, the only kind for it), each with
   its SHA-256. A symbol that is not there is a warning in the result, as in the reference script, not a
@@ -470,7 +471,7 @@ only ever faked or read from captured output.
 - **The ASC API key is one secret.** The `secret_key` of an `asc_key` credential reference names a secret in the
   secret store whose value is JSON (`AscKey.toSecret`):
   `{"keyId": "ABC123DEF4", "issuerId": "<uuid>", "keyKind": "team" | "individual", "privateKey": "<.p8 text>"}`.
-  `keyKind` defaults to `team`. The credential endpoints (Phase 10c) write it. An Apple ID flavor has an
+  `keyKind` defaults to `team`. The credential endpoints (see Credentials) write it. An Apple ID flavor has an
   `apple_id` reference instead, and no REST access.
 - **Tokens** (`AscTokenProvider`) are ES256 JWTs signed in pure Dart (`pointycastle`, RFC 6979 nonces, raw
   `r || s`): header `alg`, `kid`, `typ`; claims `iat`, `exp` (15 minutes, Apple's maximum is 20), `aud:
@@ -541,7 +542,7 @@ here calls Google in a test: the adapters run against `tool/e2e/fake_stores/play
 - **The service account is one secret.** The `secret_key` of a `play_sa` credential reference names a secret in the
   secret store whose value is the JSON key file Google Cloud gives out, as it is (`PlayServiceAccount`): it needs
   `client_email` and `private_key`, uses `token_uri` (default `https://oauth2.googleapis.com/token`) and
-  `private_key_id`, and ignores the rest. The credential endpoints (Phase 10c) write it. A flavor with no
+  `private_key_id`, and ignores the rest. The credential endpoints (see Credentials) write it. A flavor with no
   `play_sa` reference has no service account: XPath cannot upload for it, `upload.play` fails with "upload the
   bundle by hand", and the build numbers of Play are unknown (the desktop's "Play: live" button is Phase 12b/16b).
   Setting up the account: enable the Google Play Android Developer API in the Cloud project, create the service
@@ -615,6 +616,120 @@ without it; `commits` and `FakePlayApp.cancelledReviews` record which. A test AA
 reads the manifest. Tests fill it with `addApp` and `FakePlayApp.addRelease`, make it misbehave with `failNext`,
 `rateLimitNext` and `revokeTokens`, and read `requests`. The test key (made with `openssl genpkey`) signs nothing
 real. The layer rules let `xp_adapters` and `xpd` use it (as a dev dependency).
+
+## Firebase, Shorebird CLI and credentials
+
+Phase 10c adds Firebase App Distribution, the last store adapter (`upload.firebase`, D-16), consolidates the Shorebird
+CLI access, and gives the engine the credentials every upload needs: saved after the place they are for accepts them,
+checked every day, and checked again before a job builds. Interfaces and verifiers are in
+`packages/xp_engine/lib/src/{credentials,stores/firebase}`, the HTTP and CLI adapters in
+`packages/xp_adapters/lib/src/{credentials,stores/firebase,stores/shorebird,github,sqlite}`, the endpoints in
+`apps/xpd/lib/src/api/credentials`. Nothing here calls Google, Apple, Shorebird or GitHub in a test.
+
+### Firebase App Distribution
+
+- **`upload.firebase`** (side effect, always on the engine, D-09) uploads the APK, AAB or IPA of the job (it must still
+  have the SHA-256 recorded for it) with the REST API and a service account: no Node and no `firebase` CLI. Input:
+  `artifactName`, `appId` (`1:684690133351:android:...`; the project number the API addresses the app by is its
+  second part, so there is no separate field), `version` (`x.y.z+build`), `serviceAccountSecret`, and optionally
+  `testerEmails`, `groupAliases` and `releaseNotes`. Steps: `POST
+  https://firebaseappdistribution.googleapis.com/upload/v1/projects/{number}/apps/{appId}/releases:upload` with the raw
+  bytes streamed from the artifact store with a known length (`X-Goog-Upload-Protocol: raw`,
+  `X-Goog-Upload-File-Name`); poll the long-running operation every 3 s until it is done (at most 200 polls);
+  `releases.patch` with `updateMask=releaseNotes.text`; `releases:distribute`. Firebase reads the version from the
+  binary: if it is not the version of the job the step fails and names the release it made.
+- **`alreadyDone`** lists the newest 300 releases (`releases.list`, `orderBy=createTime desc`, three pages of 100) and is
+  done when one has the build number and version name of the input and, if the input has release notes, the same
+  notes. A release with other notes was not finished (the notes and the distribution come after the upload), so the
+  step runs again: the upload finds the same release (`RELEASE_UNMODIFIED` or `RELEASE_UPDATED`) and the rest is
+  repeated. A failure after the upload says so and names the release. Known limit: the API shows no testers, so a
+  release whose distribution failed but whose notes are set counts as done; a deterministic failure there (a group that
+  does not exist) needs a new job anyway.
+- **The service account** is the JSON key file, as `firebase_sa` (same convention as `play_sa`). The token is the same
+  OAuth2 JWT bearer flow as Google Play (`PlayTokenProvider`, now with a `scope`; Firebase asks for
+  `https://www.googleapis.com/auth/cloud-platform`), so `HttpFirebaseAppDistribution` reuses it and maps its failures to
+  `FirebaseException`s with a fix (`FirebaseAuthException` 401, `FirebaseForbiddenException` 403 with the role to give,
+  `FirebaseNotFoundException`, `FirebaseValidationException`, `FirebaseRateLimitedException`,
+  `FirebaseServerException`, `FirebaseOperationFailedException`). Retries are as for Play: a `429` is waited out up to
+  30 s; a `5xx` is retried for reads, release notes and distribution, **never for the upload**, which may have gone
+  through.
+- **The Firebase app id is a step input.** The scanner does not read `google-services.json` or `firebase.json` yet, so
+  workflows (Phase 11) take the app id from the project configuration; nothing here guesses it.
+
+### Fake Firebase App Distribution
+
+`tool/e2e/fake_stores/firebase` is the workspace package `xp_fake_firebase`: a `dart:io` server on a loopback port
+(`FakeFirebaseServer.start`) that is both the OAuth2 token endpoint and the REST API. It is a package of its own, not
+an extension of the Play fake: the two APIs share nothing but Google's token flow, so `xp_fake_firebase` depends on
+`xp_fake_play` for exactly that (`AssertionVerifier`, now with a `scope`, the test account and its key) and the layer
+rules allow nothing else. It checks the assertion and the access token like Google does, takes `releases:upload`
+(raw protocol and file name header required) and answers with an operation that is done after `pollsBeforeDone`
+polls, finds the release of the same version name and build (`RELEASE_UNMODIFIED` when the bytes are the same,
+`RELEASE_UPDATED` when not), lists releases newest first in pages, patches the notes, and distributes (a group that was
+not added with `addApp(groups:)` is a `400`). A test binary is any bytes that start with `fake-apk versionName=1.2.3
+versionCode=45` (`fakeBinary`). Tests fill it with `addApp` and `addRelease` and make it misbehave with `failNext`,
+`rateLimitNext` and `revokeTokens`.
+
+### The Shorebird CLI
+
+`ShorebirdCli` (`packages/xp_adapters/lib/src/stores/shorebird`) is the one place the CLI is run: always `CI=true`
+(no prompts), JSON in, the API key in `SHOREBIRD_TOKEN` and never in the arguments, a time limit, and the documented
+envelope `{"status": "success", "data": ...}` read into a result that is either a success or a failure that says
+whether the program is missing, too slow or failed. `ShorebirdCliReleases` (`releases list`, Phase 9c) now goes through
+it, and so does `ShorebirdCliVerifier`, which checks an API key with `shorebird account whoami --json`. The
+documentation shows the command, not the shape of its JSON, so the verifier only needs the envelope and reads `email`
+when it is there (the fixtures are reconstructed from the documentation and say so). A key that does not start with
+`sb_api_` is refused without asking Shorebird, with the reason that `login:ci` tokens stopped working on 2026-10-01.
+
+### Credentials
+
+A credential belongs to a flavor (an app path and a flavor name, `.` and `default` for an app without flavors) and has
+a kind (the `kind` of the `credential_ref` table). A flavor has one credential of each kind. `credential_ref` gained
+`account` (who it belongs to, never secret), `status`, `checked_at`, `message` and `fix` (migration 8, with a unique
+index on the flavor and kind). The secret itself is only in the secret store, under the `secret_key` of the reference
+(`credential.<id>`; the GitHub token, which the whole engine shares, stays under `github.token`, and a secret that
+another credential keeps is not deleted with this one). What each kind stores and how it is checked:
+
+| Kind | Secret store | Check (cheap, changes nothing) |
+|---|---|---|
+| `asc_key` | JSON `{keyId, issuerId, keyKind, privateKey}` | `GET /v1/apps?limit=1` with a signed token; a `401` is an expired or revoked key |
+| `apple_id` | the app-specific password; the Apple ID is the `account` | `xcrun altool --list-providers -u <id> -p @env:XPATH_ASC_APP_PASSWORD`; a password that is not shaped like `abcd-efgh-ijkl-mnop` is refused unasked |
+| `play_sa` | the JSON key file | token exchange, then `tracks.releases.list` of the internal track of the flavor's application id |
+| `firebase_sa` | the JSON key file | token exchange with the `cloud-platform` scope |
+| `keystore` | the bytes; `<key>.storePassword`, `<key>.keyPassword`; the alias is the `account` | `keytool -list -keystore <0600 temp file> -storepass:env XPATH_KEYSTORE_STOREPASS -alias <alias>` |
+| `shorebird` | the `sb_api_*` key | `shorebird account whoami --json` with `SHOREBIRD_TOKEN` |
+| `github` | the token | `GET /user` |
+| `slack` | the webhook URL | its shape only (`https://hooks.slack.com/services/T/B/X`); no message is sent |
+
+A check ends `verified`, `rejected` (the place said no: expired, revoked, wrong password, a missing role) or
+`unreachable` (no network, a missing tool: it says nothing about the credential). Only `rejected` blocks a job. The
+keytool check proves the store password and the alias; `keytool` has no check for the key password. The password of an
+Apple ID and of a keystore reach the program through the environment, never the arguments, and every secret value is
+given to the log masker as soon as it arrives.
+
+| Route | What it does |
+|---|---|
+| `GET /projects/{id}/credentials` | The credentials of the project, oldest first; `?flavor=` (and `?app=`, `.` by default) for one flavor. No secret is ever returned. |
+| `PUT /projects/{id}/credentials` | `{"app": ".", "flavor": "prod", "kind": "asc_key", ...}` with the secret fields of the kind (see `SaveCredentialRequest`; `packages/xp_api/openapi.yaml` has one schema per kind). Verifies, then stores the secret and the reference. `201` for a new credential, `200` for a replacement. `422 credential_rejected` says why and how to fix it and **stores nothing** (the old credential stays); `502 upstream_error` when the check could not be made, also stores nothing. |
+| `POST /projects/{id}/credentials/{credentialId}/verify` | Checks it again now and keeps the result. A credential that is refused now is still a `200` with `status: rejected`. |
+| `DELETE /projects/{id}/credentials/{credentialId}` | Deletes the reference and the secret. |
+
+Saving, verifying, expiring and deleting announce `credential.saved`, `credential.verified`, `credential.expired` (a
+credential that was `verified` and is `rejected` now, once) and `credential.removed` on `/events`; the events carry
+ids and kinds, never a secret. The server logs no request, and a failure names the field that is wrong, not its value.
+
+**The daily health check** (`CredentialHealthCheck`, started by `xpd serve`) checks every credential of every project
+every 24 hours and records the result. When the engine starts it also checks at once if any credential was last checked
+more than a day ago, so a Mac mini that was off catches up; this does not delay the engine, which is listening
+already. Checks never overlap, and a failed run (locked secrets, say) is reported to stderr and tried again at the
+next tick.
+
+**Preflight.** The `credentials` guard check reads the recorded results of the flavor named in the step input
+(`flavorId`; `credentialKinds` narrows it to what the job needs, and a kind that is listed but not saved fails). A
+`rejected` credential fails the `guard` step with the reason and the fix, so the job stops before any build step runs; an
+`unreachable` or never-checked one is a warning. The acceptance tests are `credentials_preflight_test.dart` in
+`xp_engine` (an expired ASC key and a revoked app-specific password, through `JobRunner` with the guard first and a
+build step that must stay `pending`) and `credential_checks_test.dart` in `xpd` (the same against the fake ASC server).
 
 ## Testing
 

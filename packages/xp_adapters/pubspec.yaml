@@ -20,4 +20,5 @@ dev_dependencies:
   test: ^1.31.0
   very_good_analysis: 11.0.0
   xp_fake_asc: any
+  xp_fake_firebase: any
   xp_fake_play: any

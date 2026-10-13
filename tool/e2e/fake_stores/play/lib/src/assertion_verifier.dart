@@ -33,6 +33,7 @@ class AssertionVerifier {
     required Iterable<FakePlayAccount> accounts,
     required this.audience,
     required this._now,
+    this.scope = fakePlayScope,
   }) : _accounts = {
          for (final account in accounts) account.clientEmail: account,
        };
@@ -42,6 +43,9 @@ class AssertionVerifier {
 
   /// The address of the token endpoint: the `aud` of valid assertions.
   final String audience;
+
+  /// The scope valid assertions ask for.
+  final String scope;
 
   final Map<String, FakePlayAccount> _accounts;
   final DateTime Function() _now;
@@ -89,11 +93,8 @@ class AssertionVerifier {
     )) {
       return const AssertionProblem('invalid_grant', 'Invalid JWT Signature.');
     }
-    if (claims['scope'] != fakePlayScope) {
-      return const AssertionProblem(
-        'invalid_scope',
-        'The scope must be $fakePlayScope.',
-      );
+    if (claims['scope'] != scope) {
+      return AssertionProblem('invalid_scope', 'The scope must be $scope.');
     }
     if (claims['aud'] != audience) {
       return AssertionProblem(

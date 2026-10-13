@@ -12,6 +12,7 @@ const engineMigrations = <Migration>[
   Migration(version: 5, sql: _v5),
   Migration(version: 6, sql: _v6),
   Migration(version: 7, sql: _v7),
+  Migration(version: 8, sql: _v8),
 ];
 
 // Timestamps are integer microseconds since the Unix epoch (UTC), so that
@@ -257,4 +258,20 @@ ALTER TABLE test_run ADD COLUMN app_path TEXT NOT NULL DEFAULT '.';
 ALTER TABLE test_run ADD COLUMN created_at INTEGER NOT NULL DEFAULT 0;
 CREATE INDEX idx_test_run_baseline
   ON test_run (project_id, app_path, branch, created_at) WHERE baseline = 1;
+''';
+
+// Phase 10c: what the checks of a credential found. `account` is who the
+// credential belongs to when that is not secret (the Apple ID, the key id, the
+// service account email, the keystore alias); `status` and `checked_at` are
+// the result of the last check, `message` and `fix` what it said when it did
+// not accept the credential. A flavor has one credential of each kind.
+const _v8 = '''
+ALTER TABLE credential_ref ADD COLUMN account TEXT;
+ALTER TABLE credential_ref ADD COLUMN status TEXT NOT NULL DEFAULT 'unverified'
+  CHECK (status IN ('unverified', 'verified', 'rejected', 'unreachable'));
+ALTER TABLE credential_ref ADD COLUMN checked_at INTEGER;
+ALTER TABLE credential_ref ADD COLUMN message TEXT;
+ALTER TABLE credential_ref ADD COLUMN fix TEXT;
+CREATE UNIQUE INDEX idx_credential_ref_flavor_kind
+  ON credential_ref (flavor_id, kind);
 ''';

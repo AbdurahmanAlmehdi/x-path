@@ -3,3 +3,4 @@ library;
 
 export 'src/github/github_token_importer.dart';
 export 'src/github/http_github_client.dart';
+export 'src/github/http_github_token_verifier.dart';

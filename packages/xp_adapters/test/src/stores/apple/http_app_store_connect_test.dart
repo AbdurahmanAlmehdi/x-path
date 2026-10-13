@@ -46,6 +46,33 @@ void main() {
     addTearDown(server.close);
   });
 
+  group('verifyAccess', () {
+    test('reads one app with the key', () async {
+      server
+        ..addApp('ly.example.app')
+        ..addApp('ly.example.other');
+
+      await client().verifyAccess();
+
+      final request = server.requests.single;
+      expect(request.uri.path, '/v1/apps');
+      expect(request.uri.queryParameters['limit'], '1');
+      expect(request.tokenProblem, isNull);
+    });
+
+    test('is a 401 for a key Apple does not know', () async {
+      final error = await client(
+        key: const AscKey(
+          keyId: 'OTHERKEY01',
+          issuerId: fakeAscIssuerId,
+          privateKey: fakeAscPrivateKeyPem,
+        ),
+      ).verifyAccess().then<Object?>((_) => null, onError: (Object e) => e);
+
+      expect(error, isA<AscAuthException>());
+    });
+  });
+
   group('the bearer token', () {
     test('is a valid team token on every call', () async {
       server.addApp('ly.example.app');
