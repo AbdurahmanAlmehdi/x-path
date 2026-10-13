@@ -115,7 +115,7 @@ database is migrated, `xpd` copies it to `xpath.db.bak-v<old version>`. A migrat
 edited once released: add a new one and a golden `test/src/sqlite/snapshots/v<N>.sql`
 (`UPDATE_GOLDENS=1 dart test test/src/sqlite/migrations_test.dart` writes it). Events older than
 seven days are pruned; their sequence numbers are never reused. Schema version 2 adds the scan
-columns of `project`.
+columns of `project`; version 3 adds what the job runner records to `job` and `job_step`.
 
 Secrets (`packages/xp_secrets`) live on the engine machine behind the `SecretStore` interface of
 `xp_engine`; `createSecretStore` picks the implementation for the platform.
@@ -190,6 +190,43 @@ profile and findings with `test/scan/goldens/<name>.json`
 
 `tool/e2e/smoke_bundle.sh` builds the `xpd` AOT bundle with `dart build cli`, starts it on a free
 port with a temporary data directory and checks `/health`, the database, the token guard and a clean shutdown.
+
+## Jobs and processes
+
+A job is a list of steps that run one after the other (D-18). Every step records its state, result and
+output as it goes, so a job survives a restart. Dispatching jobs from workflows comes in a later
+phase; for now the engine runs jobs created through `JobRunner` (the one built-in step is `command`,
+which runs a command the owner declares).
+
+| Route | What it does |
+|---|---|
+| `GET /jobs/{id}` | The job with its steps. |
+| `POST /jobs/{id}/cancel` | Stops the process group of the running step (`SIGTERM`, ten seconds of grace, `SIGKILL`) and returns the cancelled job. |
+| `POST /jobs/{id}/resume` | Runs a `failed`, `cancelled`, `interrupted` or `waiting_for_resume` job again at its first unfinished step; `{"fromStep": n}` re-runs from step `n`. Answers `202` while the job runs on. |
+| `GET /jobs/{id}/logs` | WebSocket: the log lines of the job, replayed from `?after=<seq>` and then live, ending with an `end` frame. |
+
+- **Process groups** (ADR 0003). Every step process starts through a `perl` trampoline that makes it a
+  process-group leader, so a cancel stops the whole tree, grandchildren included. `perl` is a runtime
+  requirement: `xpd serve` refuses to start without it (it ships with macOS and Debian/Ubuntu).
+- **Environment.** A step process gets only `PATH`, `HOME`, `LANG`, `LC_*`, `TMPDIR`, `USER` and
+  `SHELL` from the engine, plus what the step declares. Secrets reach a process by environment
+  variable name or as a 0600 file in a per-job folder under `<data-dir>/tmp`, deleted when the job
+  ends and on engine start; never in the arguments.
+- **Output.** Every line is masked against the known secret values (`xp_secrets`) before it is stored
+  or streamed, and gets a sequence number and a time. Lines are written to
+  `<data-dir>/logs/<jobId>/<ordinal>-<kind>.log`, one JSON object per line. The `seq` of the log
+  WebSocket counts the lines of the whole job, so a client reconnects with the last `seq` it saw.
+  The log file and the step parser never lose a line: a slow reader slows the process down. Live
+  views have a bounded queue that drops its oldest lines and says so with a `gap` frame.
+- **Resume and side effects.** A step with side effects (a store upload, a tag) is never repeated by
+  the engine on its own. After an interruption such a job is `waiting_for_resume`; an explicit resume
+  first asks the step whether its work exists already (`alreadyDone`) and skips it if so. A job whose
+  interrupted step has no side effects is resumed when the engine starts.
+- **Restart.** On start `xpd` stops the process groups it recorded for jobs left `running` (`SIGTERM`,
+  grace, `SIGKILL`) before it marks them interrupted. On `SIGTERM` or `SIGINT` it stops running jobs
+  the same way.
+- **Sleep.** While a job runs the machine is kept awake: `caffeinate -i -w <xpd pid>` on macOS,
+  `systemd-inhibit` on Linux. Without the tool `xpd` warns and carries on.
 
 ## Testing
 

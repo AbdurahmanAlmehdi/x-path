@@ -7,6 +7,7 @@ import 'package:xp_adapters/src/sqlite/migration.dart';
 const engineMigrations = <Migration>[
   Migration(version: 1, sql: _v1),
   Migration(version: 2, sql: _v2),
+  Migration(version: 3, sql: _v3),
 ];
 
 // Timestamps are integer microseconds since the Unix epoch (UTC), so that
@@ -188,4 +189,24 @@ ALTER TABLE project ADD COLUMN findings TEXT NOT NULL DEFAULT '[]'
 ALTER TABLE project ADD COLUMN scanned_at INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE project ADD COLUMN edits TEXT NOT NULL DEFAULT '{}'
   CHECK (json_valid(edits));
+''';
+
+// Phase 7: what the job runner records. A job keeps when it was created,
+// started and finished, and why it ended. A step keeps its input (so that a
+// job survives a restart), how often it was started, why it failed, the
+// process group it runs in (so that a restarted engine can stop it) and when
+// it ran.
+const _v3 = '''
+ALTER TABLE job ADD COLUMN created_at INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE job ADD COLUMN started_at INTEGER;
+ALTER TABLE job ADD COLUMN finished_at INTEGER;
+ALTER TABLE job ADD COLUMN message TEXT;
+ALTER TABLE job_step ADD COLUMN input TEXT NOT NULL DEFAULT '{}'
+  CHECK (json_valid(input));
+ALTER TABLE job_step ADD COLUMN attempts INTEGER NOT NULL DEFAULT 0
+  CHECK (attempts >= 0);
+ALTER TABLE job_step ADD COLUMN message TEXT;
+ALTER TABLE job_step ADD COLUMN pgid INTEGER;
+ALTER TABLE job_step ADD COLUMN started_at INTEGER;
+ALTER TABLE job_step ADD COLUMN finished_at INTEGER;
 ''';

@@ -8,6 +8,8 @@ export 'src/device_token_kind.dart';
 export 'src/events.dart';
 export 'src/finding.dart';
 export 'src/health_response.dart';
+export 'src/job.dart';
+export 'src/job_logs.dart';
 export 'src/profile_edits.dart';
 export 'src/project.dart';
 export 'src/project_profile.dart';

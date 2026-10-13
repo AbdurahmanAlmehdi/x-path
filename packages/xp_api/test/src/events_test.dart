@@ -38,6 +38,17 @@ void main() {
         const ProjectAdded(projectId: 'prj_1', fullName: 'o/r'),
         const ProjectScanned(projectId: 'prj_1', errors: 1, warnings: 2),
         const ProjectRemoved(projectId: 'prj_1'),
+        const JobStateChanged(
+          jobId: 'job_1',
+          projectId: 'prj_1',
+          state: JobState.waitingForResume,
+        ),
+        const JobStepChanged(
+          jobId: 'job_1',
+          ordinal: 2,
+          kind: 'command',
+          state: StepState.interrupted,
+        ),
       ]) {
         final sequenced = SequencedEvent(seq: 9, at: at, event: event);
 
@@ -49,15 +60,15 @@ void main() {
       final read = SequencedEvent.fromJson(const {
         'seq': 4,
         'at': '2026-10-13T09:30:00.000Z',
-        'type': 'job.updated',
+        'type': 'job.renamed',
         'payload': {'id': 'j1'},
       });
 
       expect(
         read.event,
-        const UnknownEvent(type: 'job.updated', payload: {'id': 'j1'}),
+        const UnknownEvent(type: 'job.renamed', payload: {'id': 'j1'}),
       );
-      expect(read.toJson()['type'], 'job.updated');
+      expect(read.toJson()['type'], 'job.renamed');
       expect(read.toJson()['payload'], {'id': 'j1'});
     });
   });
@@ -70,6 +81,8 @@ void main() {
         ProjectAdded() => 'added',
         ProjectScanned() => 'scanned',
         ProjectRemoved() => 'removed',
+        JobStateChanged() => 'job',
+        JobStepChanged() => 'step',
         UnknownEvent() => 'unknown',
       };
 
@@ -83,6 +96,27 @@ void main() {
         'scanned',
       );
       expect(describe(const ProjectRemoved(projectId: 'p')), 'removed');
+      expect(
+        describe(
+          const JobStateChanged(
+            jobId: 'j',
+            projectId: 'p',
+            state: JobState.running,
+          ),
+        ),
+        'job',
+      );
+      expect(
+        describe(
+          const JobStepChanged(
+            jobId: 'j',
+            ordinal: 0,
+            kind: 'command',
+            state: StepState.running,
+          ),
+        ),
+        'step',
+      );
       expect(
         describe(EngineEvent.fromJson('x', const <String, dynamic>{})),
         'unknown',

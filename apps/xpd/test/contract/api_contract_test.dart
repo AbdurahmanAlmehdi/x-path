@@ -366,4 +366,208 @@ void main() {
       expect(Project.fromJson(response.json).id, id);
     });
   });
+
+  group('jobs', () {
+    Future<RawResponse> send(String method, String path, [Object? body]) =>
+        engine.request(
+          path,
+          method: method,
+          body: body == null ? null : jsonEncode(body),
+        );
+
+    /// A job that failed at its second step, after logging a line.
+    Future<Job> failedJob() async {
+      engine.supervisor.handler = (process) async {
+        await process.emit('hello from ${process.spec.executable}');
+        return process.spec.executable == 'bad' ? 1 : 0;
+      };
+      final job = await engine.startJob(['good', 'bad']);
+      return await engine.jobs.whenFinished(job.id);
+    }
+
+    test('request and frame schemas accept what the engine sends', () async {
+      final job = await failedJob();
+
+      expect(
+        contract.validateSchema(
+          'Job',
+          (await engine.jobs.get(job.id)).toJson(),
+        ),
+        isEmpty,
+      );
+      expect(
+        contract.validateSchema('ResumeJobRequest', {'fromStep': 1}),
+        isEmpty,
+      );
+      expect(
+        contract.validateSchema('ResumeJobRequest', {'fromStep': -1}),
+        isNotEmpty,
+      );
+    });
+
+    test('GET /jobs/{id}', () async {
+      final job = await failedJob();
+
+      final response = await send('GET', '/jobs/${job.id}');
+
+      expect(response.statusCode, 200);
+      expectContract(response, path: '/jobs/${job.id}');
+    });
+
+    test('GET /jobs/{id} for a job that has not run', () async {
+      final job = await engine.createJob(['x']);
+
+      final response = await send('GET', '/jobs/${job.id}');
+
+      expectContract(response, path: '/jobs/${job.id}');
+    });
+
+    test('GET /jobs/{id} 401 and 404', () async {
+      final unauthorized = await engine.request('/jobs/job_x', token: '');
+      final missing = await send('GET', '/jobs/job_nope');
+
+      expect((unauthorized.statusCode, missing.statusCode), (401, 404));
+      expectContract(unauthorized, path: '/jobs/job_x');
+      expectContract(missing, path: '/jobs/job_nope');
+    });
+
+    test('POST /jobs/{id}/cancel', () async {
+      final job = await engine.createJob(['x']);
+
+      final response = await send('POST', '/jobs/${job.id}/cancel');
+
+      expect(response.statusCode, 200);
+      expectContract(response, path: '/jobs/${job.id}/cancel', method: 'POST');
+    });
+
+    test('POST /jobs/{id}/cancel 404 and 409', () async {
+      final failed = await failedJob();
+      final missing = await send('POST', '/jobs/job_nope/cancel');
+      final ended = await send('POST', '/jobs/${failed.id}/cancel');
+
+      expect((missing.statusCode, ended.statusCode), (404, 409));
+      expectContract(missing, path: '/jobs/job_nope/cancel', method: 'POST');
+      expectContract(ended, path: '/jobs/${failed.id}/cancel', method: 'POST');
+    });
+
+    test('POST /jobs/{id}/resume', () async {
+      final failed = await failedJob();
+      engine.supervisor.handler = (process) => 0;
+
+      final response = await send('POST', '/jobs/${failed.id}/resume');
+      await engine.jobs.whenFinished(failed.id);
+
+      expect(response.statusCode, 202);
+      expectContract(
+        response,
+        path: '/jobs/${failed.id}/resume',
+        method: 'POST',
+      );
+    });
+
+    test('POST /jobs/{id}/resume with fromStep', () async {
+      final failed = await failedJob();
+      engine.supervisor.handler = (process) => 0;
+
+      final response = await send('POST', '/jobs/${failed.id}/resume', {
+        'fromStep': 1,
+      });
+      await engine.jobs.whenFinished(failed.id);
+
+      expect(response.statusCode, 202);
+      expectContract(
+        response,
+        path: '/jobs/${failed.id}/resume',
+        method: 'POST',
+      );
+    });
+
+    test('POST /jobs/{id}/resume 400, 404 and 409', () async {
+      final failed = await failedJob();
+      final queued = await engine.createJob(['x']);
+      final bad = await send('POST', '/jobs/${failed.id}/resume', {
+        'fromStep': 'x',
+      });
+      final missing = await send('POST', '/jobs/job_nope/resume');
+      final conflict = await send('POST', '/jobs/${queued.id}/resume');
+
+      expect(
+        (bad.statusCode, missing.statusCode, conflict.statusCode),
+        (400, 404, 409),
+      );
+      expectContract(bad, path: '/jobs/${failed.id}/resume', method: 'POST');
+      expectContract(missing, path: '/jobs/job_nope/resume', method: 'POST');
+      expectContract(
+        conflict,
+        path: '/jobs/${queued.id}/resume',
+        method: 'POST',
+      );
+    });
+
+    group('GET /jobs/{id}/logs', () {
+      test('401 without a token', () async {
+        final response = await engine.handshake('/jobs/job_x/logs', token: '');
+
+        expect(response.statusCode, 401);
+        expectContract(response, path: '/jobs/job_x/logs');
+      });
+
+      test('400 for a bad cursor', () async {
+        final job = await failedJob();
+
+        final response = await engine.handshake(
+          '/jobs/${job.id}/logs?after=-1',
+        );
+
+        expect(response.statusCode, 400);
+        expectContract(response, path: '/jobs/${job.id}/logs');
+      });
+
+      test('404 for an unknown job', () async {
+        final response = await engine.handshake('/jobs/job_nope/logs');
+
+        expect(response.statusCode, 404);
+        expectContract(response, path: '/jobs/job_nope/logs');
+      });
+
+      test('409 for a cursor beyond the log', () async {
+        final job = await failedJob();
+
+        final response = await engine.handshake(
+          '/jobs/${job.id}/logs?after=99',
+        );
+
+        expect(response.statusCode, 409);
+        expectContract(response, path: '/jobs/${job.id}/logs');
+      });
+
+      test('426 for a plain request', () async {
+        final job = await failedJob();
+
+        final response = await engine.request('/jobs/${job.id}/logs');
+
+        expect(response.statusCode, 426);
+        expectContract(response, path: '/jobs/${job.id}/logs');
+      });
+
+      test('101 and frames that match LogFrame', () async {
+        final job = await failedJob();
+
+        final logs = await engine.connectLogs(job.id);
+        addTearDown(logs.close);
+
+        contract.expectResponse(
+          method: 'GET',
+          path: '/jobs/${job.id}/logs',
+          statusCode: 101,
+          body: '',
+        );
+        final frames = await logs.all();
+        expect(frames, hasLength(3));
+        for (final frame in frames) {
+          expect(contract.validateSchema('LogFrame', frame.toJson()), isEmpty);
+        }
+      });
+    });
+  });
 }

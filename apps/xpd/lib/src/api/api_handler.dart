@@ -3,6 +3,8 @@ import 'package:shelf_router/shelf_router.dart';
 import 'package:xp_api/xp_api.dart';
 import 'package:xp_engine/xp_engine.dart';
 import 'package:xpd/src/api/events_route.dart';
+import 'package:xpd/src/api/jobs/job_logs_route.dart';
+import 'package:xpd/src/api/jobs/jobs_routes.dart';
 import 'package:xpd/src/api/middleware.dart';
 import 'package:xpd/src/api/projects/projects_routes.dart';
 import 'package:xpd/src/api/responses.dart';
@@ -20,6 +22,8 @@ Handler buildApiHandler({
   required TokenService tokens,
   required EventsRoute events,
   required ProjectService projects,
+  required JobRunner jobs,
+  required JobLogsRoute jobLogs,
   required String engineVersion,
   void Function(Object error, StackTrace stackTrace)? onError,
 }) {
@@ -32,8 +36,10 @@ Handler buildApiHandler({
         )
         ..get('/health', health)
         ..get('/version', version(engineVersion))
-        ..get('/events', events.handle);
+        ..get('/events', events.handle)
+        ..get('/jobs/<id>/logs', jobLogs.handle);
   ProjectsRoutes(projects).addTo(router);
+  JobsRoutes(jobs).addTo(router);
   return const Pipeline()
       .addMiddleware(errorMiddleware(onError: onError))
       .addMiddleware(authMiddleware(tokens, publicPaths: publicPaths))

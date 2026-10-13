@@ -8,6 +8,7 @@ import 'package:xp_api/xp_api.dart';
 import 'package:xp_engine/xp_engine.dart';
 import 'package:xpd/xpd.dart';
 
+import 'job_fakes.dart';
 import 'project_fakes.dart';
 
 /// The files of a minimal Flutter app: the folder every test project is added
@@ -58,6 +59,11 @@ class TestEngine {
     required this.github,
     required this.git,
     required this.folders,
+    required this.jobs,
+    required this.jobRepository,
+    required this.supervisor,
+    required this.logStore,
+    required this.logs,
   });
 
   static Future<TestEngine> start({
@@ -65,6 +71,8 @@ class TestEngine {
     EventLog Function(EventLog log)? wrapLog,
     DeviceTokenRepository? repository,
     ProjectRepository? projectRepository,
+    JobLogStore? logStore,
+    int logLiveCapacity = 1024,
   }) async {
     const repo = GitHubRepo(
       id: 42,
@@ -82,8 +90,25 @@ class TestEngine {
       clock: clock,
     );
     final errors = <Object>[];
-    final issued = await tokens.issue(name: 'test', kind: DeviceTokenKind.app);
+    final jobRepository = InMemoryJobRepository();
+    final supervisor = FakeProcessSupervisor((process) => 0, clock: clock);
+    final store = logStore ?? InMemoryJobLogStore();
+    final logs = JobLogs(store: store, liveCapacity: logLiveCapacity);
     final events = wrapLog == null ? log : wrapLog(log);
+    final jobs = JobRunner(
+      jobs: jobRepository,
+      steps: StepRegistry([const CommandStep()]),
+      supervisor: supervisor,
+      logs: logs,
+      secrets: MemorySecretStore(),
+      secretFiles: InMemorySecretFileStore(),
+      power: NoPowerAssertion(),
+      events: events,
+      clock: clock,
+      hostEnvironment: const {'PATH': '/usr/bin'},
+      onError: (error, _) => errors.add(error),
+    );
+    final issued = await tokens.issue(name: 'test', kind: DeviceTokenKind.app);
     final server = await XpdServer.start(
       tokens: tokens,
       events: events,
@@ -108,6 +133,8 @@ class TestEngine {
         events: events,
         clock: clock,
       ),
+      jobs: jobs,
+      logs: logs,
       clock: clock,
       engineVersion: '9.9.9',
       onError: (error, _) => errors.add(error),
@@ -122,12 +149,22 @@ class TestEngine {
       github: github,
       git: git,
       folders: folders,
+      jobs: jobs,
+      jobRepository: jobRepository,
+      supervisor: supervisor,
+      logStore: store,
+      logs: logs,
     );
   }
 
   final XpdServer server;
   final FakeGitHub github;
   final FakeGit git;
+  final JobRunner jobs;
+  final InMemoryJobRepository jobRepository;
+  final FakeProcessSupervisor supervisor;
+  final JobLogStore logStore;
+  final JobLogs logs;
 
   /// The files of the folders a project can be added from, by path.
   final Map<String, Map<String, String>> folders;
@@ -190,6 +227,42 @@ class TestEngine {
     },
   );
 
+  /// Creates a job with one `command` step per executable and starts it.
+  Future<Job> startJob(List<String> executables) async {
+    final job = await createJob(executables);
+    await jobs.start(job.id);
+    return job;
+  }
+
+  /// Creates a queued job with one `command` step per executable.
+  Future<Job> createJob(List<String> executables, {bool sideEffect = false}) =>
+      jobs.create(
+        workflowVersionId: 'wfv_1',
+        projectId: 'prj_1',
+        steps: [
+          for (final executable in executables)
+            StepPlan.of(
+              const CommandStep(),
+              CommandInput(ProcessCommand(executable), sideEffect: sideEffect),
+            ),
+        ],
+      );
+
+  /// Opens the log stream of a job.
+  Future<JobLogStream> connectLogs(
+    String jobId, {
+    int? after,
+    String? token,
+  }) async {
+    final query = after == null ? '' : '?after=$after';
+    final bearer = token ?? secret;
+    final socket = await WebSocket.connect(
+      'ws://127.0.0.1:${uri.port}/jobs/$jobId/logs$query',
+      headers: {if (bearer.isNotEmpty) 'authorization': 'Bearer $bearer'},
+    );
+    return JobLogStream(socket);
+  }
+
   /// Opens the event stream.
   Future<EventStream> connect({int? after, String? token}) async {
     final query = after == null ? '' : '?after=$after';
@@ -234,6 +307,41 @@ class EventStream {
     );
     return socket.closeCode;
   }
+
+  Future<void> close() async {
+    await socket.close();
+    await _frames.cancel(immediate: true);
+  }
+}
+
+/// The frames of one `/jobs/{id}/logs` connection.
+class JobLogStream {
+  new(this.socket)
+    : _frames = StreamQueue(
+        socket.map(
+          (frame) => LogFrame.fromJson(
+            jsonDecode(frame as String) as Map<String, dynamic>,
+          ),
+        ),
+      );
+
+  final WebSocket socket;
+  final StreamQueue<LogFrame> _frames;
+
+  /// The next frame, failing the test if none arrives.
+  Future<LogFrame> next() => _frames.next.timeout(const Duration(seconds: 5));
+
+  /// Every frame up to the end of the stream.
+  Future<List<LogFrame>> all() async {
+    final frames = <LogFrame>[];
+    while (await _frames.hasNext.timeout(const Duration(seconds: 5))) {
+      frames.add(await _frames.next);
+    }
+    return frames;
+  }
+
+  /// The code the engine closed the socket with, once it did.
+  int? get closeCode => socket.closeCode;
 
   Future<void> close() async {
     await socket.close();

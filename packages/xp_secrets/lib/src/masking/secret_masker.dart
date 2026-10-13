@@ -1,4 +1,4 @@
-import 'dart:async';
+import 'package:xp_engine/xp_engine.dart';
 
 /// Hides known secret values in process output before it is stored or
 /// streamed.
@@ -17,7 +17,7 @@ import 'dart:async';
 ///   (after trimming) would match ordinary text, such as `true` or `1`, and
 ///   hide far more than it protects. A short secret is not protected by the
 ///   masker at all, so credentials must be longer than that.
-class SecretMasker {
+class SecretMasker implements OutputMasker {
   /// Creates a masker that knows [secrets].
   new({
     Iterable<String> secrets = const [],
@@ -42,6 +42,7 @@ class SecretMasker {
   List<String> _sorted = const [];
 
   /// Starts masking [secret], one pattern for each of its lines.
+  @override
   void add(String secret) {
     for (final line in secret.split(RegExp(r'\r\n|\r|\n'))) {
       final trimmed = line.trim();
@@ -49,6 +50,9 @@ class SecretMasker {
     }
     _sorted = _patterns.toList()..sort((a, b) => b.length - a.length);
   }
+
+  @override
+  StreamMasker newStream() => MaskingStream(this);
 
   /// Replaces every known secret in [text].
   String mask(String text) => _replace(text, _matches(text));
@@ -129,7 +133,7 @@ class SecretMasker {
 /// A piece may end in the middle of a secret. [add] holds back the end of the
 /// text for as long as it could still become a secret, and releases it with
 /// the next piece, or with [flush] when the stream ends.
-class MaskingStream {
+class MaskingStream implements StreamMasker {
   /// Creates a stream that masks with the secrets of [_masker].
   new(this._masker);
 
@@ -137,6 +141,7 @@ class MaskingStream {
   var _held = '';
 
   /// Adds [piece] and returns the text that is now safe to show.
+  @override
   String add(String piece) {
     final text = _held + piece;
     final matches = _masker._matches(text);
@@ -153,6 +158,7 @@ class MaskingStream {
   }
 
   /// Ends the stream: returns everything still held back, masked.
+  @override
   String flush() {
     final rest = _masker.mask(_held);
     _held = '';
