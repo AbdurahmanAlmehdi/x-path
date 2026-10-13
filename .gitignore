@@ -1,0 +1,8 @@
+.fvm/
+.dart_tool/
+build/
+coverage/
+*.iml
+.idea/
+.DS_Store
+pubspec_overrides.yaml
