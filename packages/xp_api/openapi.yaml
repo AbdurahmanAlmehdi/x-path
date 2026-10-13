@@ -1,0 +1,193 @@
+openapi: 3.1.0
+info:
+  title: XPath engine API
+  version: "1"
+  summary: HTTP/JSON plus one WebSocket, served by xpd.
+  description: |
+    Hand-maintained; it grows phase by phase. Every response in the test
+    suite is validated against this file (tests tagged `contract`).
+
+    Every route except `/health` and `/version` needs a device token:
+    `Authorization: Bearer <token>`. Errors are always
+    `{"error": {"code": "...", "message": "..."}}`.
+  license:
+    name: Apache-2.0
+    identifier: Apache-2.0
+servers:
+  - url: http://127.0.0.1:7480
+    description: Default loopback address of a local engine.
+security:
+  - bearerAuth: []
+paths:
+  /health:
+    get:
+      operationId: getHealth
+      summary: Liveness probe.
+      security: []
+      responses:
+        "200":
+          description: The engine is serving.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /version:
+    get:
+      operationId: getVersion
+      summary: Engine and API version, for compatibility checks before pairing.
+      security: []
+      responses:
+        "200":
+          description: The versions.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VersionResponse"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /events:
+    get:
+      operationId: streamEvents
+      summary: WebSocket stream of engine events.
+      description: |
+        Upgrade to a WebSocket (browsers are refused: any `Origin` header is
+        rejected). Every text frame is one JSON `SequencedEvent`.
+
+        The first frame is always `stream.opened`; its `seq` is the head of
+        the event log. With `after=<seq>` the engine then replays every
+        logged event with a greater `seq`, in order, and continues with live
+        events. Without `after` only live events follow. A client stores the
+        `seq` of the last event it handled and reconnects with that value.
+
+        When `after` is older than the retained window, or newer than the
+        head (the engine restarted), the response is `409 resync_required`:
+        reload state over HTTP and reconnect without `after`. If the window
+        is lost after the upgrade, the engine closes the socket with code
+        4409 instead.
+
+        On shutdown the engine closes the socket with code 1000 (normal
+        closure) and the reason `engine shutting down`.
+      parameters:
+        - name: after
+          in: query
+          required: false
+          description: Last `seq` the client has seen.
+          schema:
+            type: integer
+            minimum: 0
+      responses:
+        "101":
+          description: Switching Protocols. Frames follow `SequencedEvent`.
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "409":
+          $ref: "#/components/responses/ResyncRequired"
+        "426":
+          $ref: "#/components/responses/UpgradeRequired"
+        "500":
+          $ref: "#/components/responses/InternalError"
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: A device token created with `xpd token create`.
+  responses:
+    InvalidRequest:
+      description: The request is malformed.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Unauthorized:
+      description: The bearer token is missing, unknown or revoked.
+      headers:
+        WWW-Authenticate:
+          schema:
+            type: string
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    ResyncRequired:
+      description: The event cursor is outside the resume window.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    UpgradeRequired:
+      description: The route only speaks WebSocket.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    InternalError:
+      description: Something went wrong in the engine.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+  schemas:
+    ErrorCode:
+      type: string
+      enum:
+        - invalid_request
+        - unauthorized
+        - not_found
+        - resync_required
+        - upgrade_required
+        - internal
+    ErrorResponse:
+      type: object
+      required: [error]
+      additionalProperties: false
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          additionalProperties: false
+          properties:
+            code:
+              $ref: "#/components/schemas/ErrorCode"
+            message:
+              type: string
+    HealthResponse:
+      type: object
+      required: [status]
+      additionalProperties: false
+      properties:
+        status:
+          type: string
+          const: ok
+    VersionResponse:
+      type: object
+      required: [version, apiVersion]
+      additionalProperties: false
+      properties:
+        version:
+          type: string
+          description: The engine's own version.
+        apiVersion:
+          type: string
+          description: Major version of this API.
+    SequencedEvent:
+      type: object
+      required: [seq, at, type, payload]
+      properties:
+        seq:
+          type: integer
+          minimum: 0
+        at:
+          type: string
+          format: date-time
+        type:
+          type: string
+          description: |
+            `engine.started`, `stream.opened`, or a type added by a later
+            engine version, which a client must ignore.
+        payload:
+          type: object
