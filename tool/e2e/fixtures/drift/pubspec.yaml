@@ -1,0 +1,15 @@
+name: drift_app
+description: Synthetic fixture for the XPath scanner.
+publish_to: none
+
+version: 2.0.0+10
+
+environment:
+  sdk: ^3.8.1
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+flutter:
+  uses-material-design: true

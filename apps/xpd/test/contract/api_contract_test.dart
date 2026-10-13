@@ -1,9 +1,12 @@
 @Tags(['contract'])
 library;
 
+import 'dart:convert';
+
 import 'package:test/test.dart';
 import 'package:xp_api/testing.dart';
 import 'package:xp_api/xp_api.dart';
+import 'package:xp_engine/xp_engine.dart';
 
 import '../helpers/test_engine.dart';
 
@@ -119,5 +122,248 @@ void main() {
       ErrorResponse.fromJson(response.json).error.code,
       ApiErrorCode.notFound,
     );
+  });
+
+  group('projects', () {
+    Future<RawResponse> send(String method, String path, [Object? body]) =>
+        engine.request(
+          path,
+          method: method,
+          body: body == null ? null : jsonEncode(body),
+        );
+
+    Future<String> addProject() async {
+      engine.folders['/work/app'] = projectFiles;
+      final response = await send('POST', '/projects', {'path': '/work/app'});
+      return response.json['id']! as String;
+    }
+
+    test('request bodies match their schemas', () {
+      for (final (schema, body) in <(String, Object)>[
+        ('AddProjectRequest', {'path': '/work/app'}),
+        ('AddProjectRequest', {'remote': 'octo/app'}),
+        (
+          'ProfileEdits',
+          {
+            'defaultBaseBranch': 'dev',
+            'apps': [
+              {
+                'path': '.',
+                'storeCountry': 'ly',
+                'flavors': [
+                  {
+                    'name': 'prod',
+                    'prod': true,
+                    'shorebird': true,
+                    'entrypoint': 'lib/main_prod.dart',
+                    'iosBundleId': 'com.example',
+                    'androidAppId': 'com.example',
+                    'versionFiles': ['pubspec.yaml'],
+                  },
+                ],
+              },
+            ],
+          },
+        ),
+      ]) {
+        expect(contract.validateSchema(schema, body), isEmpty, reason: schema);
+      }
+      expect(
+        contract.validateSchema('AddProjectRequest', {
+          'path': '/a',
+          'remote': 'b/c',
+        }),
+        isNotEmpty,
+      );
+    });
+
+    test('POST /projects by path', () async {
+      engine.folders['/work/app'] = projectFiles;
+
+      final response = await send('POST', '/projects', {'path': '/work/app'});
+
+      expect(response.statusCode, 201);
+      expectContract(response, path: '/projects', method: 'POST');
+    });
+
+    test('POST /projects by remote', () async {
+      final response = await send('POST', '/projects', {'remote': 'octo/app'});
+
+      expect(response.statusCode, 201);
+      expectContract(response, path: '/projects', method: 'POST');
+    });
+
+    test('POST /projects 400 for a body that is not a request', () async {
+      final response = await send('POST', '/projects', {'path': 3});
+
+      expect(response.statusCode, 400);
+      expectContract(response, path: '/projects', method: 'POST');
+    });
+
+    test('POST /projects 401 without a token', () async {
+      final response = await engine.request(
+        '/projects',
+        method: 'POST',
+        token: '',
+        body: '{}',
+      );
+
+      expect(response.statusCode, 401);
+      expectContract(response, path: '/projects', method: 'POST');
+    });
+
+    test('POST /projects 404 for a repository GitHub does not know', () async {
+      final response = await send('POST', '/projects', {'remote': 'octo/gone'});
+
+      expect(response.statusCode, 404);
+      expectContract(response, path: '/projects', method: 'POST');
+    });
+
+    test('POST /projects 409 for a repository that is a project', () async {
+      await addProject();
+
+      final response = await send('POST', '/projects', {'remote': 'octo/app'});
+
+      expect(response.statusCode, 409);
+      expectContract(response, path: '/projects', method: 'POST');
+    });
+
+    test('POST /projects 502 when GitHub refuses', () async {
+      engine.github.failure = const GitHubAuthException('Bad credentials');
+
+      final response = await send('POST', '/projects', {'remote': 'octo/app'});
+
+      expect(response.statusCode, 502);
+      expectContract(response, path: '/projects', method: 'POST');
+    });
+
+    test('POST /projects 503 while the secrets are locked', () async {
+      engine.github.failure = const SecretsLockedException('locked');
+
+      final response = await send('POST', '/projects', {'remote': 'octo/app'});
+
+      expect(response.statusCode, 503);
+      expectContract(response, path: '/projects', method: 'POST');
+    });
+
+    test('GET /projects', () async {
+      await addProject();
+
+      final response = await send('GET', '/projects');
+
+      expect(response.statusCode, 200);
+      expect(response.json['projects']! as List, hasLength(1));
+      expectContract(response, path: '/projects');
+    });
+
+    test('GET /projects with none', () async {
+      final response = await send('GET', '/projects');
+
+      expect(response.json['projects'], isEmpty);
+      expectContract(response, path: '/projects');
+    });
+
+    test('GET /projects/{id}', () async {
+      final id = await addProject();
+
+      final response = await send('GET', '/projects/$id');
+
+      expect(response.statusCode, 200);
+      expectContract(response, path: '/projects/$id');
+    });
+
+    test('GET /projects/{id} 404', () async {
+      final response = await send('GET', '/projects/prj_nope');
+
+      expect(response.statusCode, 404);
+      expectContract(response, path: '/projects/prj_nope');
+    });
+
+    test('POST /projects/{id}/scan', () async {
+      final id = await addProject();
+
+      final response = await send('POST', '/projects/$id/scan');
+
+      expect(response.statusCode, 200);
+      expectContract(response, path: '/projects/$id/scan', method: 'POST');
+    });
+
+    test('POST /projects/{id}/scan 404', () async {
+      final response = await send('POST', '/projects/prj_nope/scan');
+
+      expect(response.statusCode, 404);
+      expectContract(response, path: '/projects/prj_nope/scan', method: 'POST');
+    });
+
+    test('POST /projects/{id}/scan 502 when git cannot fetch', () async {
+      final id = await addProject();
+      engine.folders.remove('/work/app');
+      engine.git.fetchFailure = const GitException('network down');
+
+      final response = await send('POST', '/projects/$id/scan');
+
+      expect(response.statusCode, 502);
+      expectContract(response, path: '/projects/$id/scan', method: 'POST');
+    });
+
+    test('PATCH /projects/{id}', () async {
+      final id = await addProject();
+
+      final response = await send('PATCH', '/projects/$id', {
+        'defaultBaseBranch': 'dev',
+        'apps': [
+          {'path': '.', 'storeCountry': 'LY'},
+        ],
+      });
+
+      expect(response.statusCode, 200);
+      expect(response.json['defaultBaseBranch'], 'dev');
+      expectContract(response, path: '/projects/$id', method: 'PATCH');
+    });
+
+    test('PATCH /projects/{id} 400 for an edit of something missing', () async {
+      final id = await addProject();
+
+      final response = await send('PATCH', '/projects/$id', {
+        'apps': [
+          {'path': 'apps/nope'},
+        ],
+      });
+
+      expect(response.statusCode, 400);
+      expectContract(response, path: '/projects/$id', method: 'PATCH');
+    });
+
+    test('PATCH /projects/{id} 404', () async {
+      final response = await send('PATCH', '/projects/prj_nope', {});
+
+      expect(response.statusCode, 404);
+      expectContract(response, path: '/projects/prj_nope', method: 'PATCH');
+    });
+
+    test('DELETE /projects/{id}', () async {
+      final id = await addProject();
+
+      final response = await send('DELETE', '/projects/$id');
+
+      expect(response.statusCode, 204);
+      expectContract(response, path: '/projects/$id', method: 'DELETE');
+    });
+
+    test('DELETE /projects/{id} 404', () async {
+      final response = await send('DELETE', '/projects/prj_nope');
+
+      expect(response.statusCode, 404);
+      expectContract(response, path: '/projects/prj_nope', method: 'DELETE');
+    });
+
+    test('every project response is a Project', () async {
+      final id = await addProject();
+
+      final response = await send('GET', '/projects/$id');
+
+      expect(contract.validateSchema('Project', response.json), isEmpty);
+      expect(Project.fromJson(response.json).id, id);
+    });
   });
 }

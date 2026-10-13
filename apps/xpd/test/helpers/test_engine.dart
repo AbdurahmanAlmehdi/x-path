@@ -8,6 +8,23 @@ import 'package:xp_api/xp_api.dart';
 import 'package:xp_engine/xp_engine.dart';
 import 'package:xpd/xpd.dart';
 
+import 'project_fakes.dart';
+
+/// The files of a minimal Flutter app: the folder every test project is added
+/// from.
+const projectFiles = {
+  'pubspec.yaml': '''
+name: demo
+version: 1.0.0+1
+dependencies:
+  flutter:
+    sdk: flutter
+''',
+  'lib/main.dart': '',
+  '.fvmrc': '{"flutter": "3.47.4"}',
+  'android/app/build.gradle': 'defaultConfig { applicationId "com.example" }',
+};
+
 /// A response read to the end.
 class RawResponse {
   const new(this.statusCode, this.contentType, this.body);
@@ -38,13 +55,26 @@ class TestEngine {
     required this.tokens,
     required this.secret,
     required this.errors,
+    required this.github,
+    required this.git,
+    required this.folders,
   });
 
   static Future<TestEngine> start({
     int eventCapacity = 100,
     EventLog Function(EventLog log)? wrapLog,
     DeviceTokenRepository? repository,
+    ProjectRepository? projectRepository,
   }) async {
+    const repo = GitHubRepo(
+      id: 42,
+      fullName: 'octo/app',
+      defaultBranch: 'main',
+      cloneUrl: 'https://github.com/octo/app.git',
+    );
+    final github = FakeGitHub({42: repo});
+    final git = FakeGit();
+    final folders = <String, Map<String, String>>{};
     final clock = ManualClock(DateTime.utc(2026, 10, 13, 9));
     final log = InMemoryEventLog(clock: clock, capacity: eventCapacity);
     final tokens = TokenService(
@@ -53,9 +83,31 @@ class TestEngine {
     );
     final errors = <Object>[];
     final issued = await tokens.issue(name: 'test', kind: DeviceTokenKind.app);
+    final events = wrapLog == null ? log : wrapLog(log);
     final server = await XpdServer.start(
       tokens: tokens,
-      events: wrapLog == null ? log : wrapLog(log),
+      events: events,
+      projects: ProjectService(
+        repository: projectRepository ?? InMemoryProjectRepository(),
+        github: github,
+        git: git,
+        scanner: const ProjectScanner(),
+        // A folder is its files in `folders`; a worktree is a plain app.
+        sources: (directory) => InMemoryScanSource(
+          directory.startsWith('/worktrees/')
+              ? projectFiles
+              : folders[directory] ?? {},
+        ),
+        // Every clone has the same `origin`.
+        runner: FakeProcessRunner(
+          (call) => const ProcessOutput(
+            exitCode: 0,
+            stdout: 'git@github.com:octo/app.git\n',
+          ),
+        ),
+        events: events,
+        clock: clock,
+      ),
       clock: clock,
       engineVersion: '9.9.9',
       onError: (error, _) => errors.add(error),
@@ -67,10 +119,18 @@ class TestEngine {
       tokens: tokens,
       secret: issued.secret,
       errors: errors,
+      github: github,
+      git: git,
+      folders: folders,
     );
   }
 
   final XpdServer server;
+  final FakeGitHub github;
+  final FakeGit git;
+
+  /// The files of the folders a project can be added from, by path.
+  final Map<String, Map<String, String>> folders;
   final InMemoryEventLog events;
   final ManualClock clock;
   final TokenService tokens;
@@ -92,6 +152,7 @@ class TestEngine {
     String method = 'GET',
     String? token,
     Map<String, String> headers = const {},
+    String? body,
   }) async {
     final client = HttpClient();
     try {
@@ -101,6 +162,10 @@ class TestEngine {
         request.headers.set('authorization', 'Bearer $bearer');
       }
       headers.forEach(request.headers.set);
+      if (body != null) {
+        request.headers.contentType = ContentType.json;
+        request.write(body);
+      }
       final response = await request.close();
       return RawResponse(
         response.statusCode,

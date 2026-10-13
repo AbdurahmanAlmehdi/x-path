@@ -46,7 +46,15 @@ const layerRules = <String, LayerRule>{
   ),
   'xp_engine': LayerRule(
     workspace: {'xp_api'},
-    external: {..._tooling, 'collection', 'crypto', 'equatable', 'meta'},
+    external: {
+      ..._tooling,
+      'collection',
+      'crypto',
+      'equatable',
+      'meta',
+      // The scanner reads pubspec, flavorizr, Shorebird and workflow YAML.
+      'yaml',
+    },
   ),
   'xp_client': LayerRule(workspace: {'xp_api'}),
   'xp_repositories': LayerRule(workspace: {'xp_api', 'xp_client'}),

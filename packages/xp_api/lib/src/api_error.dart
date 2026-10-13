@@ -22,6 +22,11 @@ enum ApiErrorCode {
   @JsonValue('not_found')
   notFound(404),
 
+  /// The request clashes with what the engine holds, for example a project
+  /// that was added already.
+  @JsonValue('conflict')
+  conflict(409),
+
   /// The requested event cursor is outside the resume window; the client
   /// must reload its state and reconnect without a cursor.
   @JsonValue('resync_required')
@@ -33,7 +38,17 @@ enum ApiErrorCode {
 
   /// Something went wrong in the engine.
   @JsonValue('internal')
-  internal(500);
+  internal(500),
+
+  /// A service the engine depends on, for example GitHub, refused the call or
+  /// could not be reached.
+  @JsonValue('upstream_error')
+  upstreamError(502),
+
+  /// The engine cannot read its secrets (D-10); try again once they are
+  /// unlocked.
+  @JsonValue('secrets_locked')
+  secretsLocked(503);
 
   new(this.statusCode);
 

@@ -4,10 +4,14 @@ import 'package:shelf/shelf.dart';
 import 'package:xp_api/xp_api.dart';
 
 /// A JSON response with [body] encoded as the body.
-Response jsonResponse(Object body, {int statusCode = 200}) => Response(
+Response jsonResponse(
+  Object body, {
+  int statusCode = 200,
+  Map<String, String> headers = const {},
+}) => Response(
   statusCode,
   body: jsonEncode(body),
-  headers: const {'content-type': 'application/json'},
+  headers: {'content-type': 'application/json', ...headers},
 );
 
 /// An error response: the status of [code] and the error envelope.

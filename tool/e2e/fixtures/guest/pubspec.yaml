@@ -1,0 +1,19 @@
+name: guest_workspace
+publish_to: none
+
+environment:
+  sdk: ^3.10.1
+
+workspace:
+  - apps/mobile_app
+  - apps/tablet_app
+  - packages/guest_exp_kernel
+
+dev_dependencies:
+  melos: ^7.4.0
+
+melos:
+  name: guest
+  packages:
+    - apps/*
+    - packages/*

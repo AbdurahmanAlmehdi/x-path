@@ -1,0 +1,17 @@
+platform :ios, '16.0'
+
+project 'Runner', {
+  'Debug-dev' => :debug,
+  'Profile-dev' => :release,
+  'Release-dev' => :release,
+  'Debug-seaview' => :debug,
+  'Profile-seaview' => :release,
+  'Release-seaview' => :release,
+  'Debug-harbor' => :debug,
+  'Profile-harbor' => :release,
+  'Release-harbor' => :release,
+}
+
+target 'Runner' do
+  use_frameworks!
+end

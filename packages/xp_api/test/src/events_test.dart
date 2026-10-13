@@ -35,6 +35,9 @@ void main() {
       for (final event in <EngineEvent>[
         const EngineStarted(version: '0.0.1', apiVersion: '1'),
         const StreamOpened(),
+        const ProjectAdded(projectId: 'prj_1', fullName: 'o/r'),
+        const ProjectScanned(projectId: 'prj_1', errors: 1, warnings: 2),
+        const ProjectRemoved(projectId: 'prj_1'),
       ]) {
         final sequenced = SequencedEvent(seq: 9, at: at, event: event);
 
@@ -64,10 +67,22 @@ void main() {
       String describe(EngineEvent event) => switch (event) {
         EngineStarted() => 'started',
         StreamOpened() => 'opened',
+        ProjectAdded() => 'added',
+        ProjectScanned() => 'scanned',
+        ProjectRemoved() => 'removed',
         UnknownEvent() => 'unknown',
       };
 
       expect(describe(const StreamOpened()), 'opened');
+      expect(
+        describe(const ProjectAdded(projectId: 'p', fullName: 'o/r')),
+        'added',
+      );
+      expect(
+        describe(const ProjectScanned(projectId: 'p', errors: 0, warnings: 0)),
+        'scanned',
+      );
+      expect(describe(const ProjectRemoved(projectId: 'p')), 'removed');
       expect(
         describe(EngineEvent.fromJson('x', const <String, dynamic>{})),
         'unknown',

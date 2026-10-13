@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Scheme
+   LastUpgradeVersion = "1600"
+   version = "1.3">
+   <BuildAction
+      parallelizeBuildables = "YES"
+      buildImplicitDependencies = "YES">
+   </BuildAction>
+   <LaunchAction
+      buildConfiguration = "Debug-harbor"
+      launchStyle = "0">
+   </LaunchAction>
+   <ProfileAction
+      buildConfiguration = "Release-harbor">
+   </ProfileAction>
+   <ArchiveAction
+      buildConfiguration = "Release-harbor"
+      revealArchiveInOrganizer = "YES">
+   </ArchiveAction>
+</Scheme>

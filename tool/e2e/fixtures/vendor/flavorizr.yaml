@@ -1,0 +1,15 @@
+flavors:
+  dev:
+    app:
+      name: "Orbit Partner Dev"
+    android:
+      applicationId: "com.orbitx.vendors.dev"
+    ios:
+      bundleId: "com.orbitx.vendors.dev"
+  prod:
+    app:
+      name: "Orbit Partner"
+    android:
+      applicationId: "com.orbitx.vendors"
+    ios:
+      bundleId: "com.orbitx.vendors"

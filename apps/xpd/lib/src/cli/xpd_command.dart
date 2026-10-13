@@ -25,18 +25,20 @@ abstract class XpdCommand extends Command<int> {
   @override
   void printUsage() => context.out.writeln(usage);
 
+  /// The data directory: `--data-dir`, else the environment, else the
+  /// platform default.
+  String get dataDirectory => resolveDataDirectory(
+    option: argResults!['data-dir'] as String?,
+    environment: context.environment,
+    operatingSystem: context.operatingSystem,
+  );
+
   /// Runs [action] on the engine database in the data directory and closes
   /// the database afterwards, whatever happens.
   Future<T> withDatabase<T>(
     Future<T> Function(SqliteDatabase database) action,
   ) async {
-    final database = await openEngineDatabase(
-      resolveDataDirectory(
-        option: argResults!['data-dir'] as String?,
-        environment: context.environment,
-        operatingSystem: context.operatingSystem,
-      ),
-    );
+    final database = await openEngineDatabase(dataDirectory);
     try {
       return await action(database);
     } finally {

@@ -1,0 +1,188 @@
+{
+  "profile": {
+    "layout": "single",
+    "apps": [
+      {
+        "name": "drift_app",
+        "path": ".",
+        "framework": "flutter",
+        "version": "2.0.0+10",
+        "storeCountry": "us",
+        "flutterVersion": "stable",
+        "flutterVersionSource": ".fvmrc",
+        "hasIos": true,
+        "hasAndroid": true,
+        "iosPackageManager": "none",
+        "flavors": [
+          {
+            "name": "staging",
+            "implicit": false,
+            "entrypoint": "lib/main_staging.dart",
+            "iosBundleId": "com.drift.staging",
+            "androidAppId": "com.drift.stagng",
+            "iosTeam": "FAKETEAM05",
+            "iosScheme": "staging",
+            "infoPlist": "ios/Runner/Info.plist",
+            "shorebird": false,
+            "prod": false,
+            "versionFiles": [
+              "pubspec.yaml",
+              "ios/Runner/Info.plist"
+            ],
+            "sources": [
+              "gradle",
+              "flavorizr",
+              "xcscheme",
+              "entrypoint"
+            ]
+          },
+          {
+            "name": "prod",
+            "implicit": false,
+            "entrypoint": "lib/main.dart",
+            "iosBundleId": "com.drift.app",
+            "androidAppId": "com.drift.app",
+            "iosScheme": "prod",
+            "shorebird": false,
+            "prod": true,
+            "versionFiles": [
+              "pubspec.yaml"
+            ],
+            "sources": [
+              "gradle",
+              "flavorizr",
+              "xcscheme"
+            ]
+          }
+        ],
+        "plists": [
+          {
+            "path": "ios/Runner/Info.plist",
+            "shortVersion": "2.0.0",
+            "buildNumber": "9",
+            "literal": true
+          }
+        ],
+        "shorebird": {
+          "appId": "00000000-0000-4000-8000-0000000000f1",
+          "flavorAppIds": {}
+        }
+      }
+    ],
+    "branches": {
+      "releaseBranches": []
+    },
+    "workflows": []
+  },
+  "findings": [
+    {
+      "severity": "error",
+      "code": "bundle_id_config_drift",
+      "message": "flutter_flavorizr says staging is com.drift.staging on Android, but Gradle builds com.drift.stagng.",
+      "fix": "Run flutter_flavorizr again, or make flavorizr.yaml and Gradle agree.",
+      "path": "flavorizr.yaml",
+      "app": ".",
+      "flavor": "staging"
+    },
+    {
+      "severity": "error",
+      "code": "version_files_out_of_sync",
+      "message": "ios/Runner/Info.plist says 2.0.0+9 but the pubspec says 2.0.0+10.",
+      "fix": "Set the plist to the pubspec version, or bump both together.",
+      "path": "ios/Runner/Info.plist",
+      "app": "."
+    },
+    {
+      "severity": "warning",
+      "code": "gradle_multiple_dimensions",
+      "message": "Gradle has several flavor dimensions (region, tier); XPath reads flavors one dimension deep.",
+      "fix": "Edit the flavors of the profile by hand.",
+      "path": "android/app",
+      "app": "."
+    },
+    {
+      "severity": "warning",
+      "code": "bundle_id_configs_differ",
+      "message": "The Debug, Profile and Release configurations of staging have different bundle ids.",
+      "fix": "Give the three configurations of staging the same PRODUCT_BUNDLE_IDENTIFIER.",
+      "path": "ios/Runner.xcodeproj/project.pbxproj",
+      "app": ".",
+      "flavor": "staging"
+    },
+    {
+      "severity": "warning",
+      "code": "bundle_id_platform_mismatch",
+      "message": "Flavor staging is com.drift.stagng on Android and com.drift.staging on iOS, which looks like a typo.",
+      "fix": "If the two should match, fix the one that is misspelled; otherwise ignore this.",
+      "app": ".",
+      "flavor": "staging"
+    },
+    {
+      "severity": "warning",
+      "code": "ios_bundle_id_unresolved",
+      "message": "The bundle id of prod is $(APP_BUNDLE_ID), a build variable.",
+      "fix": "Set PRODUCT_BUNDLE_IDENTIFIER to a literal in the target, or edit the bundle id in the profile.",
+      "path": "ios/Runner.xcodeproj/project.pbxproj",
+      "app": ".",
+      "flavor": "prod"
+    },
+    {
+      "severity": "warning",
+      "code": "ios_team_missing",
+      "message": "Flavor prod builds without a DEVELOPMENT_TEAM.",
+      "fix": "Select the team in Xcode, or keep one in the flavor's XPath credentials.",
+      "path": "ios/Runner.xcodeproj/project.pbxproj",
+      "app": ".",
+      "flavor": "prod"
+    },
+    {
+      "severity": "warning",
+      "code": "entrypoint_missing",
+      "message": "Flavor prod has no lib/main_prod.dart, so it would build lib/main.dart.",
+      "fix": "Add lib/main_prod.dart, or set the entrypoint in the profile.",
+      "path": "lib/main_prod.dart",
+      "app": ".",
+      "flavor": "prod"
+    },
+    {
+      "severity": "warning",
+      "code": "plist_missing",
+      "message": "The Info.plist of prod, ios/Runner/Info-Prod.plist, does not exist.",
+      "fix": "Create it or point INFOPLIST_FILE at the right file.",
+      "path": "ios/Runner/Info-Prod.plist",
+      "app": ".",
+      "flavor": "prod"
+    },
+    {
+      "severity": "warning",
+      "code": "shorebird_no_flavor_ids",
+      "message": "shorebird.yaml has an app_id but no flavors, while the app has flavors: every flavor would share one Shorebird app.",
+      "fix": "Add a flavors: map to shorebird.yaml with one app id per flavor.",
+      "path": "shorebird.yaml",
+      "app": "."
+    },
+    {
+      "severity": "warning",
+      "code": "plist_literal_version",
+      "message": "ios/Runner/Info.plist hard-codes its version, so flutter build --build-name and --build-number do not reach iOS.",
+      "fix": "Use $(FLUTTER_BUILD_NAME) and $(FLUTTER_BUILD_NUMBER) in the plist, or let XPath write the version into it: the plist is listed in the version files of its flavors.",
+      "path": "ios/Runner/Info.plist",
+      "app": "."
+    },
+    {
+      "severity": "warning",
+      "code": "fvmrc_not_exact",
+      "message": ".fvmrc pins \"stable\", which is not an exact Flutter version, so builds change when the channel moves.",
+      "fix": "Pin an exact version such as 3.47.4.",
+      "path": ".fvmrc"
+    },
+    {
+      "severity": "info",
+      "code": "keystore_not_referenced",
+      "message": "The Gradle scripts do not read a key.properties file, so release builds are not signed with a release keystore from there.",
+      "fix": "Ignore this if signing is configured another way; otherwise add a release signingConfig that reads key.properties.",
+      "path": "android/app",
+      "app": "."
+    }
+  ]
+}

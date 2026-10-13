@@ -1,0 +1,10 @@
+workflows:
+  guest-ios-harbor:
+    name: Guest iOS (Harbor)
+    scripts:
+      - name: Resolve workspace dependencies
+        script: dart pub get
+  guest-android-harbor:
+    scripts:
+      - name: Build
+        script: flutter build appbundle --flavor harbor

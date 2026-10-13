@@ -1,0 +1,15 @@
+flavors:
+  dev:
+    app:
+      name: "Orbit Captain Dev"
+    android:
+      applicationId: "com.orbit.captain.dev"
+    ios:
+      bundleId: "com.orbitx.captain.dev"
+  prod:
+    app:
+      name: "Orbit Captain"
+    android:
+      applicationId: "com.orbit.captain"
+    ios:
+      bundleId: "com.orbit.captain"

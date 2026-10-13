@@ -1,0 +1,15 @@
+flavors:
+  dev:
+    app:
+      name: "Dev"
+    android:
+      applicationId: "com.harbor.guestTablet.dev"
+    ios:
+      bundleId: "com.harbor.guestTablet.dev"
+  harbor:
+    app:
+      name: "Harbor"
+    android:
+      applicationId: "com.harbor.guestTablet"
+    ios:
+      bundleId: "com.harbor.guestTablet"

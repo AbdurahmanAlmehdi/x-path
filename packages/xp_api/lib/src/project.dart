@@ -1,0 +1,121 @@
+// `json_serializable` cannot parse `factory .name` constructors yet.
+// ignore_for_file: unnecessary_type_name_in_constructor
+
+import 'package:equatable/equatable.dart';
+import 'package:json_annotation/json_annotation.dart';
+import 'package:xp_api/src/finding.dart';
+import 'package:xp_api/src/project_profile.dart';
+
+part 'project.g.dart';
+
+/// A repository XPath releases, keyed by its GitHub repository id (D-05).
+@JsonSerializable(explicitToJson: true, includeIfNull: false)
+class Project extends Equatable {
+  /// Creates a project.
+  const new({
+    required this.id,
+    required this.githubRepoId,
+    required this.fullName,
+    required this.remote,
+    required this.defaultBaseBranch,
+    this.localPath,
+    this.profile = const ProjectProfile(),
+    this.findings = const [],
+    this.scannedAt,
+  });
+
+  /// Reads a project from its JSON form.
+  factory Project.fromJson(Map<String, dynamic> json) =>
+      _$ProjectFromJson(json);
+
+  /// The engine's id for the project, for example `prj_1a2b3c4d5e6f7a8b`.
+  final String id;
+
+  /// The id GitHub gave the repository. It survives renames and transfers.
+  final int githubRepoId;
+
+  /// `owner/name` as GitHub spells it.
+  final String fullName;
+
+  /// The URL the engine's mirror fetches from.
+  final String remote;
+
+  /// The folder the project was added from, when it was added by path. It
+  /// only seeds scans (D-05); builds never use it.
+  final String? localPath;
+
+  /// The branch releases are based on (M6).
+  final String defaultBaseBranch;
+
+  /// What the last scan found, with the owner's edits applied.
+  final ProjectProfile profile;
+
+  /// What the last scan noticed.
+  final List<Finding> findings;
+
+  /// When the last scan ran, in UTC.
+  final DateTime? scannedAt;
+
+  /// The JSON form.
+  Map<String, dynamic> toJson() => _$ProjectToJson(this);
+
+  @override
+  List<Object?> get props => [
+    id,
+    githubRepoId,
+    fullName,
+    remote,
+    localPath,
+    defaultBaseBranch,
+    profile,
+    findings,
+    scannedAt,
+  ];
+}
+
+/// The body of `GET /projects`.
+@JsonSerializable(explicitToJson: true)
+class ProjectsResponse extends Equatable {
+  /// Creates the list.
+  const new(this.projects);
+
+  /// Reads the list from its JSON form.
+  factory ProjectsResponse.fromJson(Map<String, dynamic> json) =>
+      _$ProjectsResponseFromJson(json);
+
+  /// Every project, oldest first.
+  final List<Project> projects;
+
+  /// The JSON form.
+  Map<String, dynamic> toJson() => _$ProjectsResponseToJson(this);
+
+  @override
+  List<Object?> get props => [projects];
+}
+
+/// The body of `POST /projects`: exactly one of [path] and [remote].
+///
+/// Reading a request from JSON fails with a `CheckedFromJsonException` for a
+/// field of the wrong type.
+@JsonSerializable(includeIfNull: false, checked: true)
+class AddProjectRequest extends Equatable {
+  /// Creates a request.
+  const new({this.path, this.remote});
+
+  /// Reads a request from its JSON form.
+  factory AddProjectRequest.fromJson(Map<String, dynamic> json) =>
+      _$AddProjectRequestFromJson(json);
+
+  /// An absolute folder on the engine's machine that holds a clone. Its
+  /// `origin` identifies the repository and its files seed the scan.
+  final String? path;
+
+  /// A GitHub repository: `owner/name`, or an HTTPS or SSH URL.
+  final String? remote;
+
+  /// The JSON form.
+  Map<String, dynamic> toJson() => _$AddProjectRequestToJson(this);
+
+  @override
+  List<Object?> get props => [path, remote];
+}

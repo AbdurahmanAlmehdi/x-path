@@ -1,0 +1,18 @@
+android {
+    flavorDimensions "tier", "region"
+
+    defaultConfig {
+        applicationId "com.drift.app"
+    }
+
+    productFlavors {
+        staging {
+            dimension "tier"
+            applicationId "com.drift.stagng"
+        }
+        prod {
+            dimension "region"
+            applicationId "com.drift.app"
+        }
+    }
+}

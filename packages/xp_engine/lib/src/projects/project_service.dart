@@ -1,0 +1,275 @@
+import 'dart:async';
+import 'dart:math';
+
+import 'package:xp_api/xp_api.dart';
+import 'package:xp_engine/src/clock/clock.dart';
+import 'package:xp_engine/src/git/git_models.dart';
+import 'package:xp_engine/src/git/git_service.dart';
+import 'package:xp_engine/src/git/github_client.dart';
+import 'package:xp_engine/src/git/github_exceptions.dart';
+import 'package:xp_engine/src/process/process_runner.dart';
+import 'package:xp_engine/src/projects/apply_edits.dart';
+import 'package:xp_engine/src/projects/github_remote.dart';
+import 'package:xp_engine/src/projects/project_exceptions.dart';
+import 'package:xp_engine/src/projects/project_record.dart';
+import 'package:xp_engine/src/projects/project_repository.dart';
+import 'package:xp_engine/src/repositories/event_log.dart';
+import 'package:xp_engine/src/scan/project_scanner.dart';
+import 'package:xp_engine/src/scan/scan_source.dart';
+import 'package:xp_engine/src/secrets/secret_store.dart';
+
+/// Opens a read-only [ScanSource] over the directory [directory] of the
+/// engine's machine.
+typedef ScanSourceFactory = ScanSource Function(String directory);
+
+/// Adds, scans, edits and removes projects (D-04, D-05).
+///
+/// A project is a GitHub repository, keyed by its id. Adding by path reads the
+/// `origin` of the folder, asks GitHub for the repository, sets up the
+/// engine's own mirror and scans the folder: the folder only identifies the
+/// repository and seeds the scan. Adding by remote scans a fresh worktree of
+/// the mirror instead. Nothing is ever written to the folder.
+///
+/// Operations that change projects run one at a time.
+class ProjectService {
+  /// Creates the service.
+  ///
+  /// [random] is for tests; it must be cryptographically secure otherwise.
+  new({
+    required this._repository,
+    required this._github,
+    required this._git,
+    required this._scanner,
+    required this._sources,
+    required this._runner,
+    required this._events,
+    required this._clock,
+    Random? random,
+    this.gitTimeout = const Duration(seconds: 30),
+  }) : _random = random ?? Random.secure();
+
+  /// How long `git remote get-url` may take.
+  final Duration gitTimeout;
+
+  final ProjectRepository _repository;
+  final GitHubClient _github;
+  final GitService _git;
+  final ProjectScanner _scanner;
+  final ScanSourceFactory _sources;
+  final ProcessRunner _runner;
+  final EventLog _events;
+  final Clock _clock;
+  final Random _random;
+  Future<void> _tail = Future.value();
+
+  /// Every project, oldest first.
+  Future<List<Project>> list() async => [
+    for (final record in await _repository.list()) record.toProject(),
+  ];
+
+  /// The project [id].
+  ///
+  /// Throws a [ProjectNotFoundException] if there is none.
+  Future<Project> get(String id) async => (await _require(id)).toProject();
+
+  /// Adds the repository that [request] names and scans it.
+  ///
+  /// Throws a [ProjectInvalidException] unless exactly one of path and remote
+  /// is given and it names a GitHub repository, a [ProjectExistsException] if
+  /// the repository is a project already, a `GitHubException` if GitHub
+  /// refuses and a `GitException` if the mirror cannot be filled.
+  Future<Project> add(AddProjectRequest request) => _exclusive(() async {
+    final path = request.path;
+    final remote = request.remote;
+    if ((path == null) == (remote == null)) {
+      throw const ProjectInvalidException(
+        'Give exactly one of "path" and "remote".',
+      );
+    }
+    if (path != null) return await _addFolder(path);
+    final parsed = GitHubRemote.parse(remote!);
+    if (parsed == null) {
+      throw ProjectInvalidException('"$remote" is not a GitHub repository.');
+    }
+    return await _register(parsed, localPath: null);
+  });
+
+  /// Scans the project [id] again and keeps the owner's edits.
+  ///
+  /// The folder it was added from is scanned if it still exists, else a fresh
+  /// worktree of the mirror. GitHub is asked for the repository first, so a
+  /// rename or a new default branch is followed (D-05); if GitHub cannot be
+  /// reached the stored values stay.
+  Future<Project> scan(String id) => _exclusive(() async {
+    var record = await _require(id);
+    try {
+      final repo = await _github.getRepoById(record.githubRepoId);
+      record = record.copyWith(
+        fullName: repo.fullName,
+        remote: repo.cloneUrl,
+        githubDefaultBranch: repo.defaultBranch,
+      );
+    } on GitHubException {
+      // Offline or unauthorized: scan with what is stored.
+    } on SecretStoreException {
+      // Secrets are locked: same.
+    }
+    final mirror = await _git.ensureMirror(
+      githubRepoId: record.githubRepoId,
+      remoteUrl: record.remote,
+    );
+    final localPath = record.localPath;
+    final result = localPath != null && await _sources(localPath).exists('')
+        ? await _scanner.scan(_sources(localPath))
+        : await _scanMirror(mirror, record.githubDefaultBranch, record.id);
+    record = record.copyWith(
+      scan: _withDefaultBranch(result.profile, record.githubDefaultBranch),
+      findings: result.findings,
+      scannedAt: _clock.now(),
+    );
+    await _repository.update(record);
+    _scanned(record);
+    return record.toProject();
+  });
+
+  /// Applies the owner's corrections [patch] to the profile of the project
+  /// [id]. They survive rescans.
+  ///
+  /// Throws a [ProjectInvalidException] for an edit of an app or flavor the
+  /// profile does not have, or a value that is not valid.
+  Future<Project> update(String id, ProfileEdits patch) => _exclusive(() async {
+    final record = await _require(id);
+    final valid = validateEdits(record.profile, patch);
+    final updated = record.copyWith(edits: record.edits.merge(valid));
+    await _repository.update(updated);
+    return updated.toProject();
+  });
+
+  /// Removes the project [id]. The mirror stays on disk and the folder is
+  /// never touched.
+  ///
+  /// Throws a [ProjectNotFoundException] if there is none.
+  Future<void> remove(String id) => _exclusive(() async {
+    if (!await _repository.remove(id)) throw ProjectNotFoundException(id);
+    _events.append(ProjectRemoved(projectId: id));
+  });
+
+  Future<ProjectRecord> _require(String id) async =>
+      await _repository.get(id) ?? (throw ProjectNotFoundException(id));
+
+  Future<T> _exclusive<T>(Future<T> Function() action) {
+    final result = _tail.then((_) => action());
+    _tail = result.then<void>((_) {}, onError: (_) {});
+    return result;
+  }
+
+  Future<Project> _addFolder(String path) async {
+    if (!path.startsWith('/')) {
+      throw ProjectInvalidException('"$path" is not an absolute path.');
+    }
+    if (!await _sources(path).exists('')) {
+      throw ProjectInvalidException('"$path" is not a folder.');
+    }
+    final url = await _originOf(path);
+    final remote = GitHubRemote.parse(url);
+    if (remote == null) {
+      throw ProjectInvalidException('The origin of $path is not on GitHub.');
+    }
+    return await _register(remote, localPath: path);
+  }
+
+  /// The URL of `origin` in the clone at [path]. Only reads its config.
+  Future<String> _originOf(String path) async {
+    final ProcessOutput output;
+    try {
+      output = await _runner.run(
+        'git',
+        ['-C', path, 'remote', 'get-url', 'origin'],
+        environment: {'GIT_OPTIONAL_LOCKS': '0', 'GIT_TERMINAL_PROMPT': '0'},
+        timeout: gitTimeout,
+      );
+    } on ProcessStartException catch (error) {
+      throw ProjectInvalidException('Cannot run git: ${error.message}');
+    } on TimeoutException {
+      throw ProjectInvalidException('git did not answer for $path.');
+    }
+    final url = output.stdout.trim();
+    if (output.exitCode != 0 || url.isEmpty) {
+      throw ProjectInvalidException('$path has no git remote called origin.');
+    }
+    return url;
+  }
+
+  Future<Project> _register(
+    GitHubRemote remote, {
+    required String? localPath,
+  }) async {
+    final repo = await _github.getRepo(remote.owner, remote.name);
+    final existing = await _repository.findByGithubRepoId(repo.id);
+    if (existing != null) {
+      throw ProjectExistsException(existing.id, existing.fullName);
+    }
+    final id = 'prj_${_hex(8)}';
+    final mirror = await _git.ensureMirror(
+      githubRepoId: repo.id,
+      remoteUrl: repo.cloneUrl,
+    );
+    final result = localPath != null
+        ? await _scanner.scan(_sources(localPath))
+        : await _scanMirror(mirror, repo.defaultBranch, id);
+    final record = ProjectRecord(
+      id: id,
+      githubRepoId: repo.id,
+      fullName: repo.fullName,
+      remote: repo.cloneUrl,
+      githubDefaultBranch: repo.defaultBranch,
+      localPath: localPath,
+      scan: _withDefaultBranch(result.profile, repo.defaultBranch),
+      findings: result.findings,
+      scannedAt: _clock.now(),
+    );
+    await _repository.add(record);
+    _events.append(ProjectAdded(projectId: id, fullName: repo.fullName));
+    _scanned(record);
+    return record.toProject();
+  }
+
+  /// Scans the default branch of the mirror in a worktree of its own.
+  Future<ScanResult> _scanMirror(
+    GitMirror mirror,
+    String branch,
+    String id,
+  ) async {
+    await _git.fetch(mirror);
+    final sha = await _git.resolveRef(mirror, branch);
+    final worktree = await _git.createWorktree(
+      mirror,
+      name: 'scan-$id',
+      sha: sha,
+    );
+    try {
+      return await _scanner.scan(_sources(worktree.path));
+    } finally {
+      await _git.removeWorktree(worktree);
+    }
+  }
+
+  ProjectProfile _withDefaultBranch(ProjectProfile profile, String branch) =>
+      profile.copyWith(branches: profile.branches.withDefaultBranch(branch));
+
+  void _scanned(ProjectRecord record) => _events.append(
+    ProjectScanned(
+      projectId: record.id,
+      errors: _count(record, FindingSeverity.error),
+      warnings: _count(record, FindingSeverity.warning),
+    ),
+  );
+
+  int _count(ProjectRecord record, FindingSeverity severity) =>
+      record.findings.where((finding) => finding.severity == severity).length;
+
+  String _hex(int bytes) => List.generate(
+    bytes,
+    (_) => _random.nextInt(256).toRadixString(16).padLeft(2, '0'),
+  ).join();
+}

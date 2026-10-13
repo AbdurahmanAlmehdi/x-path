@@ -1,0 +1,22 @@
+flavors:
+  dev:
+    app:
+      name: "Dev"
+    android:
+      applicationId: "com.harbor.guestExperience.dev"
+    ios:
+      bundleId: "com.harbor.guestExperience.dev"
+  seaview:
+    app:
+      name: "Seaview"
+    android:
+      applicationId: "com.harbor.guestExperience.seaview"
+    ios:
+      bundleId: "com.harbor.guestExperience.seaview"
+  harbor:
+    app:
+      name: "Harbor"
+    android:
+      applicationId: "com.harbor.guestExperience"
+    ios:
+      bundleId: "com.harbor.guestExperience"

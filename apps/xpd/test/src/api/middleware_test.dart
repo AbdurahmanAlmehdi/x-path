@@ -115,6 +115,16 @@ void main() {
       expect(await response.readAsString(), '{"a":1}');
     });
 
+    test('jsonResponse adds the headers it is given', () {
+      final response = jsonResponse(
+        {'a': 1},
+        headers: {'location': '/projects/p'},
+      );
+
+      expect(response.headers['location'], '/projects/p');
+      expect(response.headers['content-type'], 'application/json');
+    });
+
     test(
       'errorResponse uses the status of the code and adds headers',
       () async {

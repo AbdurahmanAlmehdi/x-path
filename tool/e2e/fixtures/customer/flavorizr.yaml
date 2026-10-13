@@ -1,0 +1,15 @@
+flavors:
+  dev:
+    app:
+      name: "Orbit Dev"
+    android:
+      applicationId: "com.orbitx.dev"
+    ios:
+      bundleId: "com.orbitx.dev"
+  prod:
+    app:
+      name: "Orbit"
+    android:
+      applicationId: "com.orbitx"
+    ios:
+      bundleId: "com.nimbus.orbit"

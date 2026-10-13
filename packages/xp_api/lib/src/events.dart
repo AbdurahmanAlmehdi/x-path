@@ -19,6 +19,18 @@ sealed class EngineEvent extends Equatable {
       apiVersion: payload['apiVersion'] as String,
     ),
     StreamOpened.eventType => const StreamOpened(),
+    ProjectAdded.eventType => ProjectAdded(
+      projectId: payload['projectId'] as String,
+      fullName: payload['fullName'] as String,
+    ),
+    ProjectScanned.eventType => ProjectScanned(
+      projectId: payload['projectId'] as String,
+      errors: payload['errors'] as int,
+      warnings: payload['warnings'] as int,
+    ),
+    ProjectRemoved.eventType => ProjectRemoved(
+      projectId: payload['projectId'] as String,
+    ),
     _ => UnknownEvent(type: type, payload: payload),
   };
 
@@ -75,6 +87,89 @@ final class StreamOpened extends EngineEvent {
 
   @override
   List<Object?> get props => const [];
+}
+
+/// A project was added.
+final class ProjectAdded extends EngineEvent {
+  /// Creates the event.
+  const new({required this.projectId, required this.fullName});
+
+  /// The wire name of this event.
+  static const eventType = 'project.added';
+
+  /// The project's id.
+  final String projectId;
+
+  /// The repository, `owner/name`.
+  final String fullName;
+
+  @override
+  String get type => eventType;
+
+  @override
+  Map<String, dynamic> get payload => {
+    'projectId': projectId,
+    'fullName': fullName,
+  };
+
+  @override
+  List<Object?> get props => [projectId, fullName];
+}
+
+/// A project was scanned, on being added or on request.
+final class ProjectScanned extends EngineEvent {
+  /// Creates the event.
+  const new({
+    required this.projectId,
+    required this.errors,
+    required this.warnings,
+  });
+
+  /// The wire name of this event.
+  static const eventType = 'project.scanned';
+
+  /// The project's id.
+  final String projectId;
+
+  /// How many findings of severity `error` the scan reported.
+  final int errors;
+
+  /// How many findings of severity `warning` the scan reported.
+  final int warnings;
+
+  @override
+  String get type => eventType;
+
+  @override
+  Map<String, dynamic> get payload => {
+    'projectId': projectId,
+    'errors': errors,
+    'warnings': warnings,
+  };
+
+  @override
+  List<Object?> get props => [projectId, errors, warnings];
+}
+
+/// A project was removed.
+final class ProjectRemoved extends EngineEvent {
+  /// Creates the event.
+  const new({required this.projectId});
+
+  /// The wire name of this event.
+  static const eventType = 'project.removed';
+
+  /// The project's id.
+  final String projectId;
+
+  @override
+  String get type => eventType;
+
+  @override
+  Map<String, dynamic> get payload => {'projectId': projectId};
+
+  @override
+  List<Object?> get props => [projectId];
 }
 
 /// An event whose type this client does not know.

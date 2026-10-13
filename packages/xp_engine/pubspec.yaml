@@ -11,6 +11,7 @@ dependencies:
   crypto: ^3.0.7
   equatable: ^2.1.0
   xp_api: any
+  yaml: ^3.1.4
 
 dev_dependencies:
   test: ^1.31.0

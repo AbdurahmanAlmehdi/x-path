@@ -1,0 +1,15 @@
+flavors:
+  staging:
+    app:
+      name: "Drift Staging"
+    android:
+      applicationId: "com.drift.staging"
+    ios:
+      bundleId: "com.drift.staging"
+  prod:
+    app:
+      name: "Drift"
+    android:
+      applicationId: "com.drift.app"
+    ios:
+      bundleId: "com.drift.app"

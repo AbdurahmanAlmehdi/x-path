@@ -267,6 +267,49 @@ void main() {
       },
     );
 
+    test('serves the projects API over the real database', () async {
+      final exit = run(['serve', '--port', '0', '--data-dir', dataDir]);
+      final uri = await startServing(exit);
+      final secret = await withDatabase(
+        (database) async => (await TokenService(
+          tokens: SqliteDeviceTokenRepository(database),
+          clock: const SystemClock(),
+        ).issue(name: 'late', kind: DeviceTokenKind.app)).secret,
+      );
+      final client = HttpClient();
+      addTearDown(() => client.close(force: true));
+
+      Future<(int, Map<String, dynamic>)> call(
+        String method,
+        String path, [
+        String? body,
+      ]) async {
+        final request = await client.openUrl(method, uri.resolve(path))
+          ..headers.set('authorization', 'Bearer $secret');
+        if (body != null) request.write(body);
+        final response = await request.close();
+        return (
+          response.statusCode,
+          jsonDecode(await utf8.decodeStream(response)) as Map<String, dynamic>,
+        );
+      }
+
+      final (listed, projects) = await call('GET', '/projects');
+      final (refused, _) = await call(
+        'POST',
+        '/projects',
+        '{"remote": "https://example.com/not/github"}',
+      );
+      final (missing, _) = await call('GET', '/projects/prj_nope');
+
+      expect(listed, 200);
+      expect(projects['projects'], isEmpty);
+      expect(refused, 400);
+      expect(missing, 404);
+      shutdown.add(null);
+      expect(await exit, 0);
+    });
+
     test('keeps the event log across a restart', () async {
       Directory(dataDir).createSync();
       final secret = await withDatabase(

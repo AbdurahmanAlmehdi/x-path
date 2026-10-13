@@ -4,6 +4,7 @@ library;
 export 'src/api/api_handler.dart';
 export 'src/api/events_route.dart';
 export 'src/api/middleware.dart';
+export 'src/api/projects/projects_routes.dart';
 export 'src/api/responses.dart';
 export 'src/api/system_routes.dart';
 export 'src/cli/serve_command.dart';
