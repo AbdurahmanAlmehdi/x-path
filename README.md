@@ -79,6 +79,10 @@ Run them from the repo root with `melos run <name>`.
 | `check:layers` | Runs `tool/check_layers.dart`. |
 | `test` | Runs every package's tests, no coverage. |
 | `test:coverage` | Runs every package's tests and enforces its coverage threshold. |
+| `test:contract` | Runs `dart test --tags contract test/contract` in the packages that have a `test/contract/` directory (`xp_api`, `xpd`). Put new contract tests there, so the script visits the package; plain `dart test --tags contract` exits 79 in a package without a match. |
+
+The root `analysis_options.yaml` excludes `docs/**` (the design reference files import packages the
+workspace does not install), so `dart analyze --fatal-infos` at the root covers the code only.
 
 The full local gate:
 
@@ -281,7 +285,7 @@ Every package's `dart_test.yaml` declares these tags.
 
 | Tag | Meaning | Default run |
 |---|---|---|
-| `contract` | Checks API responses against `openapi.yaml` with `package:xp_api/testing.dart`. | runs |
+| `contract` | Checks API responses against `openapi.yaml` with `package:xp_api/testing.dart`. Lives in `test/contract/`; run with `melos run test:contract`. | runs |
 | `process` | Spawns real child processes. | runs |
 | `macos` | Needs macOS (Keychain, SMAppService, ...). | runs on macOS only |
 | `integration` | Needs external tools or services. | skipped; run with `dart test --run-skipped -t integration` |
