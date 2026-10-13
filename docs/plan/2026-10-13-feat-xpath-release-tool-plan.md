@@ -436,7 +436,7 @@ Mataa dev builds through `xp` can start after Phase 13, before the desktop app e
 - **Status:** Not started
 - **Scope:** Release state machine (D-17) driven by store polling (10-minute cache, manual
   refresh) and manual buttons; "new build, same version"; release PR create and merge once both
-  stores are live; release endpoints.
+  stores are live; release endpoints. Release PRs are merged with a merge commit (ADR 0007).
 - **Files touched:** `packages/xp_engine/lib/src/releases/**`, `apps/xpd/lib/src/api/releases/**`
 - **Acceptance criteria:** `release_e2e.sh prod` walks a fixture release from draft to merged
   on a fake GitHub, tags `v<x.y.z>+<build>`, asserts the source folder is unchanged (git status
@@ -615,7 +615,7 @@ GOAL: XPath 1.0 lets one owner add any Flutter repo by folder, and build, test, 
 
 SUCCESS CRITERIA:
 - Analysis, formatting, layer rules and the coverage policy pass on macOS | verify: dart analyze --fatal-infos && dart format --set-exit-if-changed . && dart run tool/check_layers.dart && melos run test:coverage
-- Every API response in the test suite matches openapi.yaml | verify: melos exec -- dart test --tags contract
+- Every API response in the test suite matches openapi.yaml | verify: melos run test:contract
 - The engine AOT bundle builds and answers /health | verify: tool/e2e/smoke_bundle.sh
 - The scanner produces the expected profile for all six fixture repos | verify: cd packages/xp_engine && dart test test/scan/fixtures_test.dart
 - Cancelling a job kills its whole process tree | verify: cd packages/xp_adapters && dart test --tags process
@@ -635,7 +635,7 @@ NON-GOALS:
 - Windows engine or runners
 - Streamable HTTP MCP (follows dart_mcp 0.6, per D-12)
 
-VERIFICATION COMMAND: dart analyze --fatal-infos && dart format --set-exit-if-changed . && dart run tool/check_layers.dart && melos run test:coverage && melos exec -- dart test --tags contract && (cd packages/xp_engine && dart test test/scan/fixtures_test.dart) && (cd packages/xp_adapters && dart test --tags process) && tool/e2e/smoke_bundle.sh && tool/e2e/release_e2e.sh dev && tool/e2e/release_e2e.sh prod && tool/e2e/mcp_gate_e2e.sh && tool/e2e/runner_loss_e2e.sh
+VERIFICATION COMMAND: dart analyze --fatal-infos && dart format --set-exit-if-changed . && dart run tool/check_layers.dart && melos run test:coverage && melos run test:contract && (cd packages/xp_engine && dart test test/scan/fixtures_test.dart) && (cd packages/xp_adapters && dart test --tags process) && tool/e2e/smoke_bundle.sh && tool/e2e/release_e2e.sh dev && tool/e2e/release_e2e.sh prod && tool/e2e/mcp_gate_e2e.sh && tool/e2e/runner_loss_e2e.sh
 ```
 
 ## Success Metrics

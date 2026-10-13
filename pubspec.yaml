@@ -52,6 +52,19 @@ melos:
         - test:coverage:floor
         - test:coverage:flutter
 
+    test:contract:
+      description: >-
+        Run the contract tests (tag `contract`, API responses checked against
+        openapi.yaml). They live in `test/contract/` of the packages that have
+        any, so only those packages are visited; `dart test --tags contract`
+        exits 79 in a package without a match.
+      exec:
+        command: dart test --tags contract test/contract
+        concurrency: 1
+      packageFilters:
+        flutter: false
+        dirExists: test/contract
+
     # The three scripts below are the thresholds. A new package lands in
     # `floor` (Dart) or `flutter` (Flutter) at 90% unless it is added to the
     # `strict` scope. Generated code is excluded; integration tests are
