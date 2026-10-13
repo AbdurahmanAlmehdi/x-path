@@ -393,7 +393,7 @@ Mataa dev builds through `xp` can start after Phase 13, before the desktop app e
 
 ### Phase 10b: Google Play
 
-- **Status:** Not started
+- **Status:** Done
 - **Scope:** Service-account auth, edits, `bundles.upload`, `tracks.update`, commit with
   `ERROR_IF_IN_REVIEW`, `tracks.releases.list` for lifecycle state; `upload.play`.
 - **Files touched:** `packages/xp_engine/lib/src/stores/play/**`, `packages/xp_adapters/lib/src/stores/play/**`, `tool/e2e/fake_stores/play/**`

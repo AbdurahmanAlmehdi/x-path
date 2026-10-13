@@ -77,6 +77,7 @@
     "fvm",
     "fvmrc",
     "genkey",
+    "genpkey",
     "gitignored",
     "GOLDENS",
     "goldens",
