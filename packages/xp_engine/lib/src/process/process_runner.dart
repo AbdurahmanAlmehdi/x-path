@@ -62,13 +62,23 @@ abstract interface class RunningProcess {
 abstract interface class ProcessRunner {
   /// Starts [executable] with [arguments].
   ///
+  /// The process runs in [workingDirectory] (default: the engine's) and sees
+  /// the environment of the engine plus [environment], which wins on a clash.
+  ///
   /// Throws a [ProcessStartException] if it cannot be started.
-  Future<RunningProcess> start(String executable, List<String> arguments);
+  Future<RunningProcess> start(
+    String executable,
+    List<String> arguments, {
+    String? workingDirectory,
+    Map<String, String>? environment,
+  });
 }
 
 /// Conveniences over [ProcessRunner.start].
 extension ProcessRunnerRun on ProcessRunner {
   /// Runs [executable] to completion, feeding it [stdin] if given.
+  ///
+  /// [workingDirectory] and [environment] are as for [ProcessRunner.start].
   ///
   /// If the process takes longer than [timeout] it is killed and a
   /// [TimeoutException] is thrown.
@@ -77,8 +87,15 @@ extension ProcessRunnerRun on ProcessRunner {
     List<String> arguments, {
     String? stdin,
     Duration? timeout,
+    String? workingDirectory,
+    Map<String, String>? environment,
   }) async {
-    final process = await start(executable, arguments);
+    final process = await start(
+      executable,
+      arguments,
+      workingDirectory: workingDirectory,
+      environment: environment,
+    );
     if (stdin != null) await process.writeStdin(stdin);
     await process.closeStdin();
     if (timeout == null) return await process.result;

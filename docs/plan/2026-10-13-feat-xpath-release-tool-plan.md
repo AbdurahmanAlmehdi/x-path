@@ -290,7 +290,7 @@ Mataa dev builds through `xp` can start after Phase 13, before the desktop app e
 
 ### Phase 5: Git and GitHub
 
-- **Status:** Not started
+- **Status:** Done
 - **Scope:** Bare mirror per project keyed by GitHub repo ID, fetch, per-job worktrees, tag and
   branch operations (never force), push; GitHub client for repo lookup with redirect and PR
   create/read/merge, using a token imported from `gh auth token` into the secret store.

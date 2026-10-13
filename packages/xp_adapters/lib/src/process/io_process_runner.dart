@@ -14,10 +14,19 @@ class IoProcessRunner implements ProcessRunner {
   @override
   Future<RunningProcess> start(
     String executable,
-    List<String> arguments,
-  ) async {
+    List<String> arguments, {
+    String? workingDirectory,
+    Map<String, String>? environment,
+  }) async {
     try {
-      return _IoRunningProcess(await Process.start(executable, arguments));
+      return _IoRunningProcess(
+        await Process.start(
+          executable,
+          arguments,
+          workingDirectory: workingDirectory,
+          environment: environment,
+        ),
+      );
     } on ProcessException catch (error) {
       throw ProcessStartException(executable, error.message);
     }
