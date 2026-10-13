@@ -1,0 +1,53 @@
+import 'dart:io';
+
+import 'package:shelf/shelf_io.dart' as shelf_io;
+import 'package:xp_api/xp_api.dart';
+import 'package:xp_engine/xp_engine.dart';
+import 'package:xpd/src/api/api_handler.dart';
+import 'package:xpd/src/api/events_route.dart';
+
+/// A running engine HTTP server.
+class XpdServer {
+  new _(this._http, this._route)
+    : uri = Uri(scheme: 'http', host: _http.address.host, port: _http.port);
+
+  /// Binds [host]:[port] (port 0 picks a free one) and starts serving.
+  ///
+  /// Logs [EngineStarted] once the socket is bound. Loopback is the default:
+  /// binding another address exposes the engine to the network.
+  static Future<XpdServer> start({
+    required TokenService tokens,
+    required EventLog events,
+    required Clock clock,
+    required String engineVersion,
+    String host = '127.0.0.1',
+    int port = 0,
+    void Function(Object error, StackTrace stackTrace)? onError,
+  }) async {
+    final route = EventsRoute(events: events, clock: clock);
+    final handler = buildApiHandler(
+      tokens: tokens,
+      events: route,
+      engineVersion: engineVersion,
+      onError: onError,
+    );
+    final http = await shelf_io.serve(handler, host, port);
+    events.append(
+      EngineStarted(version: engineVersion, apiVersion: apiVersion),
+    );
+    return ._(http, route);
+  }
+
+  final HttpServer _http;
+  final EventsRoute _route;
+
+  /// The address clients connect to, for example `http://127.0.0.1:7480`.
+  final Uri uri;
+
+  /// Stops accepting connections and closes every event stream with code
+  /// 1000 (normal closure).
+  Future<void> close() async {
+    await _http.close();
+    await _route.closeSockets();
+  }
+}

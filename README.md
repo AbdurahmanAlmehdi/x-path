@@ -87,6 +87,30 @@ dart pub get && dart analyze --fatal-infos && dart format --set-exit-if-changed 
   && dart run tool/check_layers.dart && melos run test:coverage
 ```
 
+## Running the engine
+
+```sh
+dart run apps/xpd/bin/xpd.dart token create --name "My Mac" --kind app   # prints the token once
+dart run apps/xpd/bin/xpd.dart serve                                      # http://127.0.0.1:7480
+```
+
+- `xpd serve [--host 127.0.0.1] [--port 7480] [--data-dir <path>]` listens on loopback by default.
+  Any other `--host` exposes the engine to the network without encryption, and prints a warning.
+  SIGINT and SIGTERM close the server and its WebSocket connections cleanly.
+- `xpd token create --name <name> --kind app|cli|mcp|runner` creates a device token and prints it
+  once on stdout. Only its SHA-256 is stored. A running engine accepts it at once.
+- Every route except `GET /health` and `GET /version` needs `Authorization: Bearer <token>`.
+- `GET /events` is a WebSocket. Each frame carries a `seq`; reconnect with `?after=<last seq>` to
+  receive what was missed. [`packages/xp_api/openapi.yaml`](packages/xp_api/openapi.yaml)
+  documents the API.
+
+The data directory holds `tokens.json` for now (the database arrives in Phase 3). It is
+`--data-dir`, else `$XPATH_DATA_DIR`, else `~/Library/Application Support/XPath` on macOS or
+`$XDG_DATA_HOME/xpath` (`~/.local/share/xpath`) on Linux.
+
+`tool/e2e/smoke_bundle.sh` builds the `xpd` AOT bundle with `dart build cli`, starts it on a free
+port with a temporary data directory and checks `/health`, the token guard and a clean shutdown.
+
 ## Testing
 
 ### Coverage policy
@@ -114,7 +138,7 @@ Every package's `dart_test.yaml` declares these tags.
 
 | Tag | Meaning | Default run |
 |---|---|---|
-| `contract` | Checks API responses against `openapi.yaml`. | runs |
+| `contract` | Checks API responses against `openapi.yaml` with `package:xp_api/testing.dart`. | runs |
 | `process` | Spawns real child processes. | runs |
 | `macos` | Needs macOS (Keychain, SMAppService, ...). | runs on macOS only |
 | `integration` | Needs external tools or services. | skipped; run with `dart test --run-skipped -t integration` |

@@ -37,13 +37,16 @@ const layerRules = <String, LayerRule>{
       'collection',
       'equatable',
       'json_annotation',
+      'json_schema',
       'json_serializable',
       'meta',
+      // `package:xp_api/testing.dart` (contract-test helper) reads openapi.yaml.
+      'yaml',
     },
   ),
   'xp_engine': LayerRule(
     workspace: {'xp_api'},
-    external: {..._tooling, 'collection', 'equatable', 'meta'},
+    external: {..._tooling, 'collection', 'crypto', 'equatable', 'meta'},
   ),
   'xp_client': LayerRule(workspace: {'xp_api'}),
   'xp_repositories': LayerRule(workspace: {'xp_api', 'xp_client'}),

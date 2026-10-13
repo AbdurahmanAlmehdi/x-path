@@ -1,4 +1,11 @@
+import 'dart:io';
+
+import 'package:args/args.dart';
+import 'package:args/command_runner.dart';
 import 'package:xp_api/xp_api.dart';
+import 'package:xpd/src/cli/serve_command.dart';
+import 'package:xpd/src/cli/token_command.dart';
+import 'package:xpd/src/cli/xpd_context.dart';
 import 'package:xpd/src/version.dart';
 
 /// Exit code for a command line that `xpd` does not understand
@@ -6,15 +13,62 @@ import 'package:xpd/src/version.dart';
 const _usageExitCode = 64;
 
 /// Runs `xpd` with [args] and returns the process exit code.
-int runXpd(
+///
+/// Results go to [out], diagnostics to [err]. `xpd serve` runs until
+/// [shutdown] emits.
+Future<int> runXpd(
   List<String> args, {
   required StringSink out,
   required StringSink err,
-}) {
-  if (args.length == 1 && args.single == '--version') {
-    out.writeln('xpd $packageVersion (API v$apiVersion)');
-    return 0;
+  required Stream<void> shutdown,
+  required Map<String, String> environment,
+  required String operatingSystem,
+}) async {
+  final context = XpdContext(
+    out: out,
+    err: err,
+    shutdown: shutdown,
+    environment: environment,
+    operatingSystem: operatingSystem,
+  );
+  final runner = _XpdCommandRunner(context)
+    ..addCommand(ServeCommand(context))
+    ..addCommand(TokenCommand(context));
+  try {
+    return await runner.run(args) ?? 0;
+  } on UsageException catch (e) {
+    err.writeln(e);
+    return _usageExitCode;
+  } on IOException catch (e) {
+    err.writeln('xpd: $e');
+    return 1;
   }
-  err.writeln('Usage: xpd --version');
-  return _usageExitCode;
+}
+
+class _XpdCommandRunner extends CommandRunner<int> {
+  new(this._context) : super('xpd', 'The XPath engine daemon.') {
+    argParser.addFlag(
+      'version',
+      negatable: false,
+      help: 'Print the version and exit.',
+    );
+  }
+
+  final XpdContext _context;
+
+  @override
+  void printUsage() => _context.out.writeln(usage);
+
+  @override
+  Future<int?> runCommand(ArgResults topLevelResults) async {
+    if (topLevelResults.flag('version')) {
+      _context.out.writeln('xpd $packageVersion (API v$apiVersion)');
+      return 0;
+    }
+    if (topLevelResults.arguments.isEmpty) {
+      _context.err.writeln(usage);
+      return _usageExitCode;
+    }
+    return await super.runCommand(topLevelResults);
+  }
 }
