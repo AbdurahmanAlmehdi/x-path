@@ -1,6 +1,5 @@
-# Flutter 3.47.6 ships Dart 3.13.5; keep both in sync with .fvmrc. Dart packages
-# use the Flutter workflow too: the workspace has Flutter members, so even
-# `dart pub get` needs the Flutter SDK. The macOS job enforces the coverage
+# Uses the repo's dart_package workflow (the same test command as
+# `melos run test:coverage`). The macOS job enforces the coverage
 # threshold; the Linux job runs the same tests without a gate.
 name: xp
 
@@ -11,6 +10,7 @@ concurrency:
 on:
   pull_request:
     paths:
+      - ".github/workflows/dart_package.yaml"
       - ".github/workflows/xp.yaml"
       - "apps/xp/**"
       - "packages/xp_adapters/**"
@@ -25,6 +25,7 @@ on:
     branches:
       - main
     paths:
+      - ".github/workflows/dart_package.yaml"
       - ".github/workflows/xp.yaml"
       - "apps/xp/**"
       - "packages/xp_adapters/**"
@@ -38,27 +39,17 @@ on:
 
 jobs:
   macos:
-    uses: VeryGoodOpenSource/very_good_workflows/.github/workflows/flutter_package.yml@v1
+    uses: ./.github/workflows/dart_package.yaml
     with:
-      flutter_version: "3.47.6"
       working_directory: apps/xp
       runs_on: macos-latest
       min_coverage: 90
-      coverage_excludes: "**/*.g.dart"
-      run_bloc_lint: false
-      test_optimization: false
-      format_directories: "lib test bin"
-      analyze_directories: "lib test bin"
+      directories: "lib test bin"
 
   linux:
-    uses: VeryGoodOpenSource/very_good_workflows/.github/workflows/flutter_package.yml@v1
+    uses: ./.github/workflows/dart_package.yaml
     with:
-      flutter_version: "3.47.6"
       working_directory: apps/xp
       runs_on: ubuntu-latest
       min_coverage: 0
-      coverage_excludes: "**/*.g.dart"
-      run_bloc_lint: false
-      test_optimization: false
-      format_directories: "lib test bin"
-      analyze_directories: "lib test bin"
+      directories: "lib test bin"
