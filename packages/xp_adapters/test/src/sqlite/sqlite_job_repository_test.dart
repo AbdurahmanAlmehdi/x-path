@@ -118,6 +118,48 @@ void main() {
     expect(raw, 'waiting_for_resume');
   });
 
+  test('records the tool versions of a job, replacing earlier ones', () async {
+    await repository.create(_job('job_1'), const []);
+    expect(await repository.tools('job_1'), isNull);
+
+    await repository.saveTools('job_1', const JobTools(flutter: '3.47.5'));
+    await repository.saveTools(
+      'job_1',
+      const JobTools(
+        flutter: '3.47.6',
+        dart: '3.13.5',
+        shorebird: '1.6.128',
+        gh: '2.96.0',
+        xcode: '27.1',
+      ),
+    );
+
+    final tools = await repository.tools('job_1');
+    expect(tools?.flutter, '3.47.6');
+    expect(tools?.xcode, '27.1');
+    expect(tools?.toJson(), hasLength(5));
+    expect(await repository.get('job_1'), _job('job_1'));
+  });
+
+  test('stores tools as JSON and leaves out what is missing', () async {
+    await repository.create(_job('job_1'), const []);
+
+    await repository.saveTools('job_1', const JobTools(flutter: '3.47.6'));
+
+    expect(
+      database.connection.select('SELECT tools FROM job').single['tools'],
+      '{"flutter":"3.47.6"}',
+    );
+  });
+
+  test('has no tools for a job that is not there', () async {
+    expect(await repository.tools('job_x'), isNull);
+    await expectLater(
+      repository.saveTools('job_x', const JobTools()),
+      throwsStateError,
+    );
+  });
+
   test('cannot update a job that is not there', () async {
     await expectLater(repository.updateJob(_job('nope')), throwsStateError);
   });

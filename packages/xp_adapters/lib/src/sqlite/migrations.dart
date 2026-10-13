@@ -8,6 +8,7 @@ const engineMigrations = <Migration>[
   Migration(version: 1, sql: _v1),
   Migration(version: 2, sql: _v2),
   Migration(version: 3, sql: _v3),
+  Migration(version: 4, sql: _v4),
 ];
 
 // Timestamps are integer microseconds since the Unix epoch (UTC), so that
@@ -209,4 +210,11 @@ ALTER TABLE job_step ADD COLUMN message TEXT;
 ALTER TABLE job_step ADD COLUMN pgid INTEGER;
 ALTER TABLE job_step ADD COLUMN started_at INTEGER;
 ALTER TABLE job_step ADD COLUMN finished_at INTEGER;
+''';
+
+// Phase 9a: the versions of the tools a job ran with (Flutter, Dart,
+// Shorebird, gh, Xcode), as JSON, once they are known.
+const _v4 = '''
+ALTER TABLE job ADD COLUMN tools TEXT
+  CHECK (tools IS NULL OR json_valid(tools));
 ''';

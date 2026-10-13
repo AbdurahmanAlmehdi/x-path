@@ -1,0 +1,3 @@
+Shorebird 1.6.128 • git@github.com:shorebirdtech/shorebird.git
+Flutter 3.41.5 • revision 0123456789abcdef0123456789abcdef01234567
+Engine • revision 89abcdef0123456789abcdef0123456789abcdef
