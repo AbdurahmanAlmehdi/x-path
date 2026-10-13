@@ -8,6 +8,8 @@ environment:
   sdk: ^3.13.0
 
 dependencies:
+  cryptography: ^2.9.0
+  path: ^1.9.1
   xp_engine: any
 
 dev_dependencies:
