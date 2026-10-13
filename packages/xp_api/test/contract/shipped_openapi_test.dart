@@ -125,6 +125,92 @@ void main() {
       }
     });
 
+    test('documents the test endpoints and their error responses', () {
+      final unauthorized = jsonEncode(
+        ErrorResponse.of(ApiErrorCode.unauthorized, 'm').toJson(),
+      );
+
+      for (final path in [
+        '/jobs/job_1/tests',
+        '/projects/prj_1/tests/baseline',
+      ]) {
+        expect(
+          shipped.validateResponse(
+            method: 'GET',
+            path: path,
+            statusCode: 401,
+            body: unauthorized,
+            contentType: 'application/json',
+          ),
+          isEmpty,
+          reason: path,
+        );
+      }
+    });
+
+    test('describes test runs', () {
+      const counts = TestCounts(
+        total: 3,
+        passed: 1,
+        failed: 1,
+        errored: 1,
+        skipped: 0,
+      );
+      final run = TestRun(
+        id: 'tst_1',
+        jobId: 'job_1',
+        branch: 'main',
+        appPath: '.',
+        baseline: false,
+        createdAt: DateTime.utc(2026),
+        counts: counts,
+        diff: const TestRunDiff(
+          comparedTo: 'job_0',
+          newFailures: [TestRef(suite: 'test/a_test.dart', name: 'a')],
+          fixed: [],
+          missing: [],
+          stillFailing: 1,
+        ),
+      );
+      final response = TestRunResponse(
+        run: run,
+        total: 1,
+        offset: 0,
+        tests: const [
+          TestCase(
+            suite: 'test/a_test.dart',
+            name: 'a',
+            status: TestStatus.failed,
+            message: 'm',
+            stackTrace: 's',
+          ),
+        ],
+      );
+      final baselines = TestBaselinesResponse([
+        TestBaseline(
+          appPath: '.',
+          branch: 'main',
+          jobId: 'job_0',
+          createdAt: DateTime.utc(2026),
+          counts: counts,
+        ),
+      ]);
+
+      expect(shipped.validateSchema('TestRun', run.toJson()), isEmpty);
+      expect(
+        shipped.validateSchema('TestRunResponse', response.toJson()),
+        isEmpty,
+      );
+      expect(
+        shipped.validateSchema('TestBaselinesResponse', baselines.toJson()),
+        isEmpty,
+      );
+      expect(
+        shipped.validateSchema('TestRun', {...run.toJson(), 'diff': null}),
+        isNotEmpty,
+      );
+    });
+
     test('describes artifacts', () {
       final artifact = Artifact(
         id: 'art_1',
@@ -220,6 +306,14 @@ void main() {
           ordinal: 0,
           kind: 'command',
           state: StepState.running,
+        ),
+        const TestRunCompleted(
+          jobId: 'job_1',
+          projectId: 'prj_1',
+          branch: 'main',
+          baseline: false,
+          failures: 3,
+          newFailures: 1,
         ),
       ]) {
         final json = SequencedEvent(

@@ -12,3 +12,4 @@ export 'src/sqlite/sqlite_job_repository.dart';
 export 'src/sqlite/sqlite_project_repository.dart';
 export 'src/sqlite/sqlite_release_model_repository.dart';
 export 'src/sqlite/sqlite_shorebird_release_repository.dart';
+export 'src/sqlite/sqlite_test_run_repository.dart';

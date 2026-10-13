@@ -49,6 +49,14 @@ void main() {
           kind: 'command',
           state: StepState.interrupted,
         ),
+        const TestRunCompleted(
+          jobId: 'job_1',
+          projectId: 'prj_1',
+          branch: 'main',
+          baseline: true,
+          failures: 27,
+          newFailures: 0,
+        ),
       ]) {
         final sequenced = SequencedEvent(seq: 9, at: at, event: event);
 
@@ -83,6 +91,7 @@ void main() {
         ProjectRemoved() => 'removed',
         JobStateChanged() => 'job',
         JobStepChanged() => 'step',
+        TestRunCompleted() => 'tests',
         UnknownEvent() => 'unknown',
       };
 
@@ -116,6 +125,19 @@ void main() {
           ),
         ),
         'step',
+      );
+      expect(
+        describe(
+          const TestRunCompleted(
+            jobId: 'j',
+            projectId: 'p',
+            branch: 'main',
+            baseline: false,
+            failures: 1,
+            newFailures: 1,
+          ),
+        ),
+        'tests',
       );
       expect(
         describe(EngineEvent.fromJson('x', const <String, dynamic>{})),

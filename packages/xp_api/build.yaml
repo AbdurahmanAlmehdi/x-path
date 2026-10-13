@@ -12,4 +12,5 @@ targets:
           - lib/src/job.dart
           - lib/src/project.dart
           - lib/src/project_profile.dart
+          - lib/src/test_run.dart
           - lib/src/version_response.dart

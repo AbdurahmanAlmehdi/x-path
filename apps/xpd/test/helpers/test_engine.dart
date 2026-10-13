@@ -77,6 +77,8 @@ class TestEngine {
     required this.logs,
     required this.artifactRepository,
     required this.artifactStore,
+    required this.testRuns,
+    required this.projectRepository,
   });
 
   static Future<TestEngine> start({
@@ -106,6 +108,8 @@ class TestEngine {
     final jobRepository = InMemoryJobRepository();
     final artifactRepository = InMemoryArtifactRepository();
     final artifactStore = InMemoryArtifactStore();
+    final testRuns = InMemoryTestRunRepository();
+    final projects = projectRepository ?? InMemoryProjectRepository();
     final supervisor = FakeProcessSupervisor((process) => 0, clock: clock);
     final store = logStore ?? InMemoryJobLogStore();
     final logs = JobLogs(store: store, liveCapacity: logLiveCapacity);
@@ -128,7 +132,7 @@ class TestEngine {
       tokens: tokens,
       events: events,
       projects: ProjectService(
-        repository: projectRepository ?? InMemoryProjectRepository(),
+        repository: projects,
         github: github,
         git: git,
         scanner: const ProjectScanner(),
@@ -155,6 +159,11 @@ class TestEngine {
         store: artifactStore,
         jobs: jobRepository,
       ),
+      tests: TestRunService(
+        runs: testRuns,
+        jobs: jobRepository,
+        projects: projects,
+      ),
       clock: clock,
       engineVersion: '9.9.9',
       onError: (error, _) => errors.add(error),
@@ -176,6 +185,8 @@ class TestEngine {
       logs: logs,
       artifactRepository: artifactRepository,
       artifactStore: artifactStore,
+      testRuns: testRuns,
+      projectRepository: projects,
     );
   }
 
@@ -189,6 +200,8 @@ class TestEngine {
   final JobLogs logs;
   final InMemoryArtifactRepository artifactRepository;
   final InMemoryArtifactStore artifactStore;
+  final InMemoryTestRunRepository testRuns;
+  final ProjectRepository projectRepository;
 
   /// The files of the folders a project can be added from, by path.
   final Map<String, Map<String, String>> folders;

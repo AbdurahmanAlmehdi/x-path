@@ -372,7 +372,7 @@ Mataa dev builds through `xp` can start after Phase 13, before the desktop app e
 
 ### Phase 9d: Tests and analyze
 
-- **Status:** Not started
+- **Status:** Done
 - **Scope:** `test` step parsing `flutter test --machine`, `analyze` step, baselines,
   new-failure diff; test-run endpoints.
 - **Files touched:** `packages/xp_engine/lib/src/testing/**`, `apps/xpd/lib/src/api/tests/**`
