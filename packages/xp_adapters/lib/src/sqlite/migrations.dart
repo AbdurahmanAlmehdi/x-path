@@ -11,6 +11,7 @@ const engineMigrations = <Migration>[
   Migration(version: 4, sql: _v4),
   Migration(version: 5, sql: _v5),
   Migration(version: 6, sql: _v6),
+  Migration(version: 7, sql: _v7),
 ];
 
 // Timestamps are integer microseconds since the Unix epoch (UTC), so that
@@ -243,4 +244,17 @@ CREATE TABLE shorebird_release (
   recorded_at INTEGER NOT NULL,
   PRIMARY KEY (app_id, version, platform)
 ) STRICT;
+''';
+
+// Phase 9d: what a test run needs to be a baseline. A run keeps its project
+// and app (the baseline is per project, app and branch, and the project is
+// copied from the job so that the baseline does not depend on a join), when it
+// ended, and the diff against the baseline it was compared with inside
+// `results`. The partial index serves the baseline lookup.
+const _v7 = '''
+ALTER TABLE test_run ADD COLUMN project_id TEXT NOT NULL DEFAULT '';
+ALTER TABLE test_run ADD COLUMN app_path TEXT NOT NULL DEFAULT '.';
+ALTER TABLE test_run ADD COLUMN created_at INTEGER NOT NULL DEFAULT 0;
+CREATE INDEX idx_test_run_baseline
+  ON test_run (project_id, app_path, branch, created_at) WHERE baseline = 1;
 ''';

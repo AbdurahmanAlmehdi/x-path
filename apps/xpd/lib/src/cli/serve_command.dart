@@ -94,6 +94,8 @@ class ServeCommand extends XpdCommand {
         repository: artifactRepository,
         clock: const SystemClock(),
       );
+      final testRuns = SqliteTestRunRepository(database);
+      final projectRepository = SqliteProjectRepository(database);
       final shorebirdReleases = ShorebirdCliReleases(
         runner: runner,
         secrets: secrets,
@@ -180,6 +182,14 @@ class ServeCommand extends XpdCommand {
             jobs: jobRepository,
             clock: const SystemClock(),
           ),
+          TestStep(
+            toolchain: buildToolchain,
+            jobs: jobRepository,
+            runs: testRuns,
+            events: events,
+            clock: const SystemClock(),
+          ),
+          AnalyzeStep(toolchain: buildToolchain),
           // The checks that need a store (appStoreTrain, playTargetSdk,
           // buildNumberReuse) register with the store adapters (Phase 10).
           GuardStep(
@@ -229,7 +239,7 @@ class ServeCommand extends XpdCommand {
         ),
         events: events,
         projects: ProjectService(
-          repository: SqliteProjectRepository(database),
+          repository: projectRepository,
           github: github,
           git: git,
           scanner: const ProjectScanner(),
@@ -244,6 +254,11 @@ class ServeCommand extends XpdCommand {
           repository: artifactRepository,
           store: artifactStore,
           jobs: jobRepository,
+        ),
+        tests: TestRunService(
+          runs: testRuns,
+          jobs: jobRepository,
+          projects: projectRepository,
         ),
         clock: const SystemClock(),
         engineVersion: packageVersion,

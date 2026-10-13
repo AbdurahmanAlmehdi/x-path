@@ -496,6 +496,76 @@ paths:
           $ref: "#/components/responses/NotFound"
         "500":
           $ref: "#/components/responses/InternalError"
+  /jobs/{id}/tests:
+    parameters:
+      - $ref: "#/components/parameters/JobId"
+    get:
+      operationId: getJobTests
+      summary: The test run of a job, with what changed against the baseline.
+      description: |
+        The `test` step stores one run per job. `diff` says which tests fail
+        that did not fail in the baseline (`newFailures`), which were fixed and
+        which the baseline had and this run did not report. `tests` is a page
+        of the run's tests ordered by file and name; by default only the tests
+        that failed or threw.
+      parameters:
+        - name: status
+          in: query
+          description: |
+            Comma-separated statuses to list. Defaults to `failed,errored`.
+          schema:
+            type: string
+            example: failed,errored
+        - name: limit
+          in: query
+          description: How many tests to list at most. Defaults to 200.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 1000
+        - name: offset
+          in: query
+          description: How many matching tests to skip.
+          schema:
+            type: integer
+            minimum: 0
+      responses:
+        "200":
+          description: The run.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TestRunResponse"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /projects/{id}/tests/baseline:
+    parameters:
+      - $ref: "#/components/parameters/ProjectId"
+    get:
+      operationId: getProjectTestBaselines
+      summary: The runs that new test runs of a project are compared with.
+      description: |
+        One baseline per app and branch: the latest run of the base branch that
+        was green, or that seeded the baseline (see the README).
+      responses:
+        "200":
+          description: The baselines, empty if no run was a baseline yet.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TestBaselinesResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
 components:
   securitySchemes:
     bearerAuth:
@@ -527,8 +597,8 @@ components:
   responses:
     NotFound:
       description: |
-        There is no such project, job or artifact, or GitHub cannot find the
-        repository.
+        There is no such project, job, artifact or test run, or GitHub cannot
+        find the repository.
       content:
         application/json:
           schema:
@@ -649,8 +719,8 @@ components:
           description: |
             `engine.started`, `stream.opened`, `project.added`,
             `project.scanned`, `project.removed`, `job.state_changed`,
-            `job.step_changed`, or a type added by a later engine version,
-            which a client must ignore.
+            `job.step_changed`, `test_run.completed`, or a type added by a
+            later engine version, which a client must ignore.
         payload:
           type: object
     FindingSeverity:
@@ -1112,6 +1182,147 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/Artifact"
+    TestStatus:
+      type: string
+      enum: [passed, failed, errored, skipped]
+    TestRef:
+      type: object
+      required: [suite, name]
+      additionalProperties: false
+      properties:
+        suite:
+          type: string
+          description: The test file relative to the app.
+        name:
+          type: string
+          description: The full test name with the names of its groups.
+    TestCase:
+      type: object
+      required: [suite, name, status]
+      additionalProperties: false
+      properties:
+        suite:
+          type: string
+        name:
+          type: string
+        status:
+          $ref: "#/components/schemas/TestStatus"
+        message:
+          type: string
+        stackTrace:
+          type: string
+    TestCounts:
+      type: object
+      required: [total, passed, failed, errored, skipped]
+      additionalProperties: false
+      properties:
+        total:
+          type: integer
+          minimum: 0
+        passed:
+          type: integer
+          minimum: 0
+        failed:
+          type: integer
+          minimum: 0
+        errored:
+          type: integer
+          minimum: 0
+        skipped:
+          type: integer
+          minimum: 0
+    TestRunDiff:
+      type: object
+      required: [newFailures, fixed, missing, stillFailing]
+      additionalProperties: false
+      properties:
+        comparedTo:
+          type: string
+          description: |
+            The job of the baseline this was compared with. Absent if there was
+            no baseline, so that every failure is new.
+        newFailures:
+          type: array
+          items:
+            $ref: "#/components/schemas/TestRef"
+        fixed:
+          type: array
+          items:
+            $ref: "#/components/schemas/TestRef"
+        missing:
+          type: array
+          items:
+            $ref: "#/components/schemas/TestRef"
+        stillFailing:
+          type: integer
+          minimum: 0
+    TestRun:
+      type: object
+      required:
+        [id, jobId, branch, appPath, baseline, createdAt, counts, diff]
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+        jobId:
+          type: string
+        branch:
+          type: string
+        appPath:
+          type: string
+        baseline:
+          type: boolean
+          description: Whether this run became the baseline of its app and branch.
+        createdAt:
+          type: string
+          format: date-time
+        counts:
+          $ref: "#/components/schemas/TestCounts"
+        diff:
+          $ref: "#/components/schemas/TestRunDiff"
+    TestRunResponse:
+      type: object
+      required: [run, total, offset, tests]
+      additionalProperties: false
+      properties:
+        run:
+          $ref: "#/components/schemas/TestRun"
+        total:
+          type: integer
+          minimum: 0
+          description: How many tests match the request, over all pages.
+        offset:
+          type: integer
+          minimum: 0
+        tests:
+          type: array
+          items:
+            $ref: "#/components/schemas/TestCase"
+    TestBaseline:
+      type: object
+      required: [appPath, branch, jobId, createdAt, counts]
+      additionalProperties: false
+      properties:
+        appPath:
+          type: string
+        branch:
+          type: string
+        jobId:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        counts:
+          $ref: "#/components/schemas/TestCounts"
+    TestBaselinesResponse:
+      type: object
+      required: [baselines]
+      additionalProperties: false
+      properties:
+        baselines:
+          type: array
+          items:
+            $ref: "#/components/schemas/TestBaseline"
     LogLineFrame:
       type: object
       required: [type, seq, step, at, stream, text]

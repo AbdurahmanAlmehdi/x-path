@@ -10,6 +10,7 @@ import 'package:xpd/src/api/middleware.dart';
 import 'package:xpd/src/api/projects/projects_routes.dart';
 import 'package:xpd/src/api/responses.dart';
 import 'package:xpd/src/api/system_routes.dart';
+import 'package:xpd/src/api/tests/tests_routes.dart';
 
 /// Routes that need no device token: a client can probe an engine, and read
 /// its version, before it has been paired.
@@ -26,6 +27,7 @@ Handler buildApiHandler({
   required JobRunner jobs,
   required JobLogsRoute jobLogs,
   required ArtifactService artifacts,
+  required TestRunService tests,
   required String engineVersion,
   void Function(Object error, StackTrace stackTrace)? onError,
 }) {
@@ -43,6 +45,7 @@ Handler buildApiHandler({
   ProjectsRoutes(projects).addTo(router);
   JobsRoutes(jobs).addTo(router);
   ArtifactsRoutes(artifacts).addTo(router);
+  TestsRoutes(tests).addTo(router);
   return const Pipeline()
       .addMiddleware(errorMiddleware(onError: onError))
       .addMiddleware(authMiddleware(tokens, publicPaths: publicPaths))

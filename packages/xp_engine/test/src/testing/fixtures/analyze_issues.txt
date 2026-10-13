@@ -1,0 +1,8 @@
+Analyzing an...                                                 
+
+warning • The value of the local variable 'unused' isn't used. Try removing the variable or using it • lib/main.dart:5:7 • unused_local_variable
+  error • Undefined name 'undefinedName'. Try correcting the name to one that is defined, or defining the name • lib/main.dart:6:10 • undefined_identifier
+   info • Don't invoke 'print' in production code. Try using a logging framework • lib/main.dart:12:17 • avoid_print
+  error • A value of type 'int' can't be returned from the function 'takesInt' because it has a return type of 'String' • lib/main.dart:15:27 • return_of_invalid_type
+
+4 issues found. (ran in 3.9s)

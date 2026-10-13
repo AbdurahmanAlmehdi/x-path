@@ -1,0 +1,168 @@
+{"protocolVersion":"0.1.1","runnerVersion":null,"pid":90667,"type":"start","time":0}
+{"suite":{"id":0,"platform":"vm","path":"/work/app/test/strings_test.dart"},"type":"suite","time":0}
+{"test":{"id":1,"name":"loading /work/app/test/strings_test.dart","suiteID":0,"groupIDs":[],"metadata":{"skip":false,"skipReason":null},"line":null,"column":null,"url":null},"type":"testStart","time":0}
+{"suite":{"id":2,"platform":"vm","path":"/work/app/test/async_test.dart"},"type":"suite","time":3}
+{"test":{"id":3,"name":"loading /work/app/test/async_test.dart","suiteID":2,"groupIDs":[],"metadata":{"skip":false,"skipReason":null},"line":null,"column":null,"url":null},"type":"testStart","time":4}
+{"suite":{"id":4,"platform":"vm","path":"/work/app/test/math_test.dart"},"type":"suite","time":4}
+{"test":{"id":5,"name":"loading /work/app/test/math_test.dart","suiteID":4,"groupIDs":[],"metadata":{"skip":false,"skipReason":null},"line":null,"column":null,"url":null},"type":"testStart","time":4}
+{"count":3,"time":5,"type":"allSuites"}
+
+[{"event":"test.startedProcess","params":{"vmServiceUri":null}}]
+
+[{"event":"test.startedProcess","params":{"vmServiceUri":null}}]
+
+[{"event":"test.startedProcess","params":{"vmServiceUri":null}}]
+{"testID":3,"result":"success","skipped":false,"hidden":true,"type":"testDone","time":1841}
+{"group":{"id":6,"suiteID":2,"parentID":null,"name":"","metadata":{"skip":false,"skipReason":null},"testCount":12,"line":null,"column":null,"url":null},"type":"group","time":1842}
+{"test":{"id":7,"name":"async failure 1","suiteID":2,"groupIDs":[6],"metadata":{"skip":false,"skipReason":null},"line":5,"column":5,"url":"file:///work/app/test/async_test.dart"},"type":"testStart","time":1843}
+{"testID":1,"result":"success","skipped":false,"hidden":true,"type":"testDone","time":1853}
+{"group":{"id":8,"suiteID":0,"parentID":null,"name":"","metadata":{"skip":false,"skipReason":null},"testCount":17,"line":null,"column":null,"url":null},"type":"group","time":1853}
+{"group":{"id":9,"suiteID":0,"parentID":8,"name":"strings","metadata":{"skip":false,"skipReason":null},"testCount":17,"line":4,"column":3,"url":"file:///work/app/test/strings_test.dart"},"type":"group","time":1854}
+{"test":{"id":10,"name":"strings pads 1","suiteID":0,"groupIDs":[8,9],"metadata":{"skip":false,"skipReason":null},"line":6,"column":7,"url":"file:///work/app/test/strings_test.dart"},"type":"testStart","time":1854}
+{"testID":7,"messageType":"print","message":"about to fail 1","type":"print","time":1858}
+{"testID":5,"result":"success","skipped":false,"hidden":true,"type":"testDone","time":1869}
+{"group":{"id":11,"suiteID":4,"parentID":null,"name":"","metadata":{"skip":false,"skipReason":null},"testCount":24,"line":null,"column":null,"url":null},"type":"group","time":1869}
+{"group":{"id":12,"suiteID":4,"parentID":11,"name":"arithmetic","metadata":{"skip":false,"skipReason":null},"testCount":20,"line":4,"column":3,"url":"file:///work/app/test/math_test.dart"},"type":"group","time":1870}
+{"test":{"id":13,"name":"arithmetic adds 1","suiteID":4,"groupIDs":[11,12],"metadata":{"skip":false,"skipReason":null},"line":7,"column":7,"url":"file:///work/app/test/math_test.dart"},"type":"testStart","time":1870}
+{"testID":7,"error":"Expected: <2>\n  Actual: <1>\n","stackTrace":"package:matcher                                     expect\npackage:flutter_test/src/widget_tester.dart 473:18  expect\ntest/async_test.dart 8:7                            main.<fn>\n","isFailure":true,"type":"error","time":1879}
+{"testID":7,"result":"failure","skipped":false,"hidden":false,"type":"testDone","time":1879}
+{"test":{"id":14,"name":"async failure 2","suiteID":2,"groupIDs":[6],"metadata":{"skip":false,"skipReason":null},"line":5,"column":5,"url":"file:///work/app/test/async_test.dart"},"type":"testStart","time":1879}
+{"testID":14,"messageType":"print","message":"about to fail 2","type":"print","time":1883}
+{"testID":10,"error":"Expected: '1'\n  Actual: 'x'\n   Which: is different.\n          Expected: 1\n            Actual: x\n                    ^\n           Differ at offset 0\n","stackTrace":"package:matcher                                     expect\npackage:flutter_test/src/widget_tester.dart 473:18  expect\ntest/strings_test.dart 6:29                         main.<fn>.<fn>\n","isFailure":true,"type":"error","time":1884}
+{"testID":10,"result":"failure","skipped":false,"hidden":false,"type":"testDone","time":1884}
+{"test":{"id":15,"name":"strings pads 2","suiteID":0,"groupIDs":[8,9],"metadata":{"skip":false,"skipReason":null},"line":6,"column":7,"url":"file:///work/app/test/strings_test.dart"},"type":"testStart","time":1884}
+{"testID":14,"error":"Expected: <3>\n  Actual: <2>\n","stackTrace":"package:matcher                                     expect\npackage:flutter_test/src/widget_tester.dart 473:18  expect\ntest/async_test.dart 8:7                            main.<fn>\n","isFailure":true,"type":"error","time":1891}
+{"testID":14,"result":"failure","skipped":false,"hidden":false,"type":"testDone","time":1892}
+{"test":{"id":16,"name":"async failure 3","suiteID":2,"groupIDs":[6],"metadata":{"skip":false,"skipReason":null},"line":5,"column":5,"url":"file:///work/app/test/async_test.dart"},"type":"testStart","time":1892}
+{"testID":15,"error":"Expected: '2'\n  Actual: ' x'\n   Which: is different.\n          Expected: 2\n            Actual:  x\n                    ^\n           Differ at offset 0\n","stackTrace":"package:matcher                                     expect\npackage:flutter_test/src/widget_tester.dart 473:18  expect\ntest/strings_test.dart 6:29                         main.<fn>.<fn>\n","isFailure":true,"type":"error","time":1894}
+{"testID":15,"result":"failure","skipped":false,"hidden":false,"type":"testDone","time":1894}
+{"testID":16,"messageType":"print","message":"about to fail 3","type":"print","time":1894}
+{"test":{"id":17,"name":"strings pads 3","suiteID":0,"groupIDs":[8,9],"metadata":{"skip":false,"skipReason":null},"line":6,"column":7,"url":"file:///work/app/test/strings_test.dart"},"type":"testStart","time":1895}
+{"testID":13,"error":"Expected: <3>\n  Actual: <2>\n","stackTrace":"package:matcher                                     expect\npackage:flutter_test/src/widget_tester.dart 473:18  expect\ntest/math_test.dart 7:29                            main.<fn>.<fn>\n","isFailure":true,"type":"error","time":1897}
+{"testID":13,"result":"failure","skipped":false,"hidden":false,"type":"testDone","time":1898}
+{"test":{"id":18,"name":"arithmetic adds 2","suiteID":4,"groupIDs":[11,12],"metadata":{"skip":false,"skipReason":null},"line":7,"column":7,"url":"file:///work/app/test/math_test.dart"},"type":"testStart","time":1898}
+{"testID":16,"error":"Expected: <4>\n  Actual: <3>\n","stackTrace":"package:matcher                                     expect\npackage:flutter_test/src/widget_tester.dart 473:18  expect\ntest/async_test.dart 8:7                            main.<fn>\n","isFailure":true,"type":"error","time":1903}
+{"testID":16,"result":"failure","skipped":false,"hidden":false,"type":"testDone","time":1903}
+{"testID":17,"error":"Expected: '3'\n  Actual: '  x'\n   Which: is different.\n          Expected: 3\n            Actual:   x\n                    ^\n           Differ at offset 0\n","stackTrace":"package:matcher                                     expect\npackage:flutter_test/src/widget_tester.dart 473:18  expect\ntest/strings_test.dart 6:29                         main.<fn>.<fn>\n","isFailure":true,"type":"error","time":1903}
+{"test":{"id":19,"name":"async failure 4","suiteID":2,"groupIDs":[6],"metadata":{"skip":false,"skipReason":null},"line":5,"column":5,"url":"file:///work/app/test/async_test.dart"},"type":"testStart","time":1903}
+{"testID":17,"result":"failure","skipped":false,"hidden":false,"type":"testDone","time":1904}
+{"test":{"id":20,"name":"strings pads 4","suiteID":0,"groupIDs":[8,9],"metadata":{"skip":false,"skipReason":null},"line":6,"column":7,"url":"file:///work/app/test/strings_test.dart"},"type":"testStart","time":1904}
+{"testID":18,"error":"Expected: <4>\n  Actual: <3>\n","stackTrace":"package:matcher                                     expect\npackage:flutter_test/src/widget_tester.dart 473:18  expect\ntest/math_test.dart 7:29                            main.<fn>.<fn>\n","isFailure":true,"type":"error","time":1907}
+{"testID":18,"result":"failure","skipped":false,"hidden":false,"type":"testDone","time":1907}
+{"testID":19,"messageType":"print","message":"about to fail 4","type":"print","time":1907}
+{"test":{"id":21,"name":"arithmetic adds 3","suiteID":4,"groupIDs":[11,12],"metadata":{"skip":false,"skipReason":null},"line":7,"column":7,"url":"file:///work/app/test/math_test.dart"},"type":"testStart","time":1907}
+{"testID":21,"result":"success","skipped":false,"hidden":false,"type":"testDone","time":1909}
+{"test":{"id":22,"name":"arithmetic adds 4","suiteID":4,"groupIDs":[11,12],"metadata":{"skip":false,"skipReason":null},"line":7,"column":7,"url":"file:///work/app/test/math_test.dart"},"type":"testStart","time":1909}
+{"testID":20,"error":"Expected: '4'\n  Actual: '   x'\n   Which: is different.\n          Expected: 4\n            Actual:    x\n                    ^\n           Differ at offset 0\n","stackTrace":"package:matcher                                     expect\npackage:flutter_test/src/widget_tester.dart 473:18  expect\ntest/strings_test.dart 6:29                         main.<fn>.<fn>\n","isFailure":true,"type":"error","time":1912}
+{"testID":20,"result":"failure","skipped":false,"hidden":false,"type":"testDone","time":1912}
+{"test":{"id":23,"name":"strings pads 5","suiteID":0,"groupIDs":[8,9],"metadata":{"skip":false,"skipReason":null},"line":6,"column":7,"url":"file:///work/app/test/strings_test.dart"},"type":"testStart","time":1913}
+{"testID":19,"error":"Expected: <5>\n  Actual: <4>\n","stackTrace":"package:matcher                                     expect\npackage:flutter_test/src/widget_tester.dart 473:18  expect\ntest/async_test.dart 8:7                            main.<fn>\n","isFailure":true,"type":"error","time":1915}
+{"testID":19,"result":"failure","skipped":false,"hidden":false,"type":"testDone","time":1915}
+{"test":{"id":24,"name":"async failure 5","suiteID":2,"groupIDs":[6],"metadata":{"skip":false,"skipReason":null},"line":5,"column":5,"url":"file:///work/app/test/async_test.dart"},"type":"testStart","time":1915}
+{"testID":22,"error":"Expected: <6>\n  Actual: <5>\n","stackTrace":"package:matcher                                     expect\npackage:flutter_test/src/widget_tester.dart 473:18  expect\ntest/math_test.dart 7:29                            main.<fn>.<fn>\n","isFailure":true,"type":"error","time":1918}
+{"testID":22,"result":"failure","skipped":false,"hidden":false,"type":"testDone","time":1918}
+{"test":{"id":25,"name":"arithmetic adds 5","suiteID":4,"groupIDs":[11,12],"metadata":{"skip":false,"skipReason":null},"line":7,"column":7,"url":"file:///work/app/test/math_test.dart"},"type":"testStart","time":1918}
+{"testID":24,"messageType":"print","message":"about to fail 5","type":"print","time":1919}
+{"testID":23,"error":"Expected: '5'\n  Actual: '    x'\n   Which: is different.\n          Expected: 5\n            Actual:     x\n                    ^\n           Differ at offset 0\n","stackTrace":"package:matcher                                     expect\npackage:flutter_test/src/widget_tester.dart 473:18  expect\ntest/strings_test.dart 6:29                         main.<fn>.<fn>\n","isFailure":true,"type":"error","time":1921}
+{"testID":23,"result":"failure","skipped":false,"hidden":false,"type":"testDone","time":1921}
+{"test":{"id":26,"name":"strings pads 6","suiteID":0,"groupIDs":[8,9],"metadata":{"skip":false,"skipReason":null},"line":6,"column":7,"url":"file:///work/app/test/strings_test.dart"},"type":"testStart","time":1922}
+{"testID":25,"error":"Expected: <7>\n  Actual: <6>\n","stackTrace":"package:matcher                                     expect\npackage:flutter_test/src/widget_tester.dart 473:18  expect\ntest/math_test.dart 7:29                            main.<fn>.<fn>\n","isFailure":true,"type":"error","time":1927}
+{"testID":24,"error":"Expected: <6>\n  Actual: <5>\n","stackTrace":"package:matcher                                     expect\npackage:flutter_test/src/widget_tester.dart 473:18  expect\ntest/async_test.dart 8:7                            main.<fn>\n","isFailure":true,"type":"error","time":1927}
+{"testID":24,"result":"failure","skipped":false,"hidden":false,"type":"testDone","time":1927}
+{"testID":25,"result":"failure","skipped":false,"hidden":false,"type":"testDone","time":1927}
+{"test":{"id":27,"name":"async failure 6","suiteID":2,"groupIDs":[6],"metadata":{"skip":false,"skipReason":null},"line":5,"column":5,"url":"file:///work/app/test/async_test.dart"},"type":"testStart","time":1928}
+{"test":{"id":28,"name":"arithmetic adds 6","suiteID":4,"groupIDs":[11,12],"metadata":{"skip":false,"skipReason":null},"line":7,"column":7,"url":"file:///work/app/test/math_test.dart"},"type":"testStart","time":1928}
+{"testID":26,"error":"Expected: '6'\n  Actual: '     x'\n   Which: is different.\n          Expected: 6\n            Actual:      x\n                    ^\n           Differ at offset 0\n","stackTrace":"package:matcher                                     expect\npackage:flutter_test/src/widget_tester.dart 473:18  expect\ntest/strings_test.dart 6:29                         main.<fn>.<fn>\n","isFailure":true,"type":"error","time":1930}
+{"testID":26,"result":"failure","skipped":false,"hidden":false,"type":"testDone","time":1930}
+{"test":{"id":29,"name":"strings pads 7","suiteID":0,"groupIDs":[8,9],"metadata":{"skip":false,"skipReason":null},"line":6,"column":7,"url":"file:///work/app/test/strings_test.dart"},"type":"testStart","time":1931}
+{"testID":27,"messageType":"print","message":"about to fail 6","type":"print","time":1931}
+{"testID":28,"error":"Expected: <8>\n  Actual: <7>\n","stackTrace":"package:matcher                                     expect\npackage:flutter_test/src/widget_tester.dart 473:18  expect\ntest/math_test.dart 7:29                            main.<fn>.<fn>\n","isFailure":true,"type":"error","time":1936}
+{"testID":28,"result":"failure","skipped":false,"hidden":false,"type":"testDone","time":1936}
+{"test":{"id":30,"name":"arithmetic adds 7","suiteID":4,"groupIDs":[11,12],"metadata":{"skip":false,"skipReason":null},"line":7,"column":7,"url":"file:///work/app/test/math_test.dart"},"type":"testStart","time":1936}
+{"testID":27,"error":"Expected: <7>\n  Actual: <6>\n","stackTrace":"package:matcher                                     expect\npackage:flutter_test/src/widget_tester.dart 473:18  expect\ntest/async_test.dart 8:7                            main.<fn>\n","isFailure":true,"type":"error","time":1939}
+{"testID":29,"error":"Expected: '7'\n  Actual: '      x'\n   Which: is different.\n          Expected: 7\n            Actual:       x\n                    ^\n           Differ at offset 0\n","stackTrace":"package:matcher                                     expect\npackage:flutter_test/src/widget_tester.dart 473:18  expect\ntest/strings_test.dart 6:29                         main.<fn>.<fn>\n","isFailure":true,"type":"error","time":1939}
+{"testID":29,"result":"failure","skipped":false,"hidden":false,"type":"testDone","time":1939}
+{"testID":27,"result":"failure","skipped":false,"hidden":false,"type":"testDone","time":1939}
+{"test":{"id":31,"name":"strings trims 1","suiteID":0,"groupIDs":[8,9],"metadata":{"skip":false,"skipReason":null},"line":9,"column":7,"url":"file:///work/app/test/strings_test.dart"},"type":"testStart","time":1940}
+{"test":{"id":32,"name":"async failure 7","suiteID":2,"groupIDs":[6],"metadata":{"skip":false,"skipReason":null},"line":5,"column":5,"url":"file:///work/app/test/async_test.dart"},"type":"testStart","time":1940}
+{"testID":31,"result":"success","skipped":false,"hidden":false,"type":"testDone","time":1941}
+{"test":{"id":33,"name":"strings trims 2","suiteID":0,"groupIDs":[8,9],"metadata":{"skip":false,"skipReason":null},"line":9,"column":7,"url":"file:///work/app/test/strings_test.dart"},"type":"testStart","time":1942}
+{"testID":32,"messageType":"print","message":"about to fail 7","type":"print","time":1942}
+{"testID":33,"result":"success","skipped":false,"hidden":false,"type":"testDone","time":1943}
+{"test":{"id":34,"name":"strings trims 3","suiteID":0,"groupIDs":[8,9],"metadata":{"skip":false,"skipReason":null},"line":9,"column":7,"url":"file:///work/app/test/strings_test.dart"},"type":"testStart","time":1943}
+{"testID":34,"result":"success","skipped":false,"hidden":false,"type":"testDone","time":1944}
+{"testID":30,"error":"Expected: <9>\n  Actual: <8>\n","stackTrace":"package:matcher                                     expect\npackage:flutter_test/src/widget_tester.dart 473:18  expect\ntest/math_test.dart 7:29                            main.<fn>.<fn>\n","isFailure":true,"type":"error","time":1945}
+{"test":{"id":35,"name":"strings trims 4","suiteID":0,"groupIDs":[8,9],"metadata":{"skip":false,"skipReason":null},"line":9,"column":7,"url":"file:///work/app/test/strings_test.dart"},"type":"testStart","time":1945}
+{"testID":30,"result":"failure","skipped":false,"hidden":false,"type":"testDone","time":1945}
+{"test":{"id":36,"name":"arithmetic adds 8","suiteID":4,"groupIDs":[11,12],"metadata":{"skip":false,"skipReason":null},"line":7,"column":7,"url":"file:///work/app/test/math_test.dart"},"type":"testStart","time":1945}
+{"testID":35,"result":"success","skipped":false,"hidden":false,"type":"testDone","time":1946}
+{"test":{"id":37,"name":"strings trims 5","suiteID":0,"groupIDs":[8,9],"metadata":{"skip":false,"skipReason":null},"line":9,"column":7,"url":"file:///work/app/test/strings_test.dart"},"type":"testStart","time":1947}
+{"testID":37,"result":"success","skipped":false,"hidden":false,"type":"testDone","time":1948}
+{"test":{"id":38,"name":"strings multi-line mismatch","suiteID":0,"groupIDs":[8,9],"metadata":{"skip":false,"skipReason":null},"line":11,"column":5,"url":"file:///work/app/test/strings_test.dart"},"type":"testStart","time":1948}
+{"testID":32,"error":"Expected: <8>\n  Actual: <7>\n","stackTrace":"package:matcher                                     expect\npackage:flutter_test/src/widget_tester.dart 473:18  expect\ntest/async_test.dart 8:7                            main.<fn>\n","isFailure":true,"type":"error","time":1950}
+{"testID":32,"result":"failure","skipped":false,"hidden":false,"type":"testDone","time":1950}
+{"test":{"id":39,"name":"async success 1","suiteID":2,"groupIDs":[6],"metadata":{"skip":false,"skipReason":null},"line":12,"column":5,"url":"file:///work/app/test/async_test.dart"},"type":"testStart","time":1950}
+{"testID":36,"error":"Expected: <10>\n  Actual: <9>\n","stackTrace":"package:matcher                                     expect\npackage:flutter_test/src/widget_tester.dart 473:18  expect\ntest/math_test.dart 7:29                            main.<fn>.<fn>\n","isFailure":true,"type":"error","time":1954}
+{"testID":36,"result":"failure","skipped":false,"hidden":false,"type":"testDone","time":1954}
+{"test":{"id":40,"name":"arithmetic adds 9","suiteID":4,"groupIDs":[11,12],"metadata":{"skip":false,"skipReason":null},"line":7,"column":7,"url":"file:///work/app/test/math_test.dart"},"type":"testStart","time":1954}
+{"testID":39,"result":"success","skipped":false,"hidden":false,"type":"testDone","time":1954}
+{"test":{"id":41,"name":"async success 2","suiteID":2,"groupIDs":[6],"metadata":{"skip":false,"skipReason":null},"line":12,"column":5,"url":"file:///work/app/test/async_test.dart"},"type":"testStart","time":1954}
+{"testID":41,"result":"success","skipped":false,"hidden":false,"type":"testDone","time":1958}
+{"testID":38,"error":"Expected: [1, 2, 4]\n  Actual: [1, 2, 3]\n   Which: at location [2] is <3> instead of <4>\n","stackTrace":"package:matcher                                     expect\npackage:flutter_test/src/widget_tester.dart 473:18  expect\ntest/strings_test.dart 11:39                        main.<fn>.<fn>\n","isFailure":true,"type":"error","time":1959}
+{"testID":38,"result":"failure","skipped":false,"hidden":false,"type":"testDone","time":1959}
+{"test":{"id":42,"name":"async success 3","suiteID":2,"groupIDs":[6],"metadata":{"skip":false,"skipReason":null},"line":12,"column":5,"url":"file:///work/app/test/async_test.dart"},"type":"testStart","time":1959}
+{"test":{"id":43,"name":"strings skipped for now","suiteID":0,"groupIDs":[8,9],"metadata":{"skip":true,"skipReason":"not ready"},"line":13,"column":5,"url":"file:///work/app/test/strings_test.dart"},"type":"testStart","time":1960}
+{"testID":43,"messageType":"skip","message":"Skip: not ready","type":"print","time":1960}
+{"testID":43,"result":"success","skipped":true,"hidden":false,"type":"testDone","time":1960}
+{"test":{"id":44,"name":"strings skipped too","suiteID":0,"groupIDs":[8,9],"metadata":{"skip":true,"skipReason":null},"line":14,"column":5,"url":"file:///work/app/test/strings_test.dart"},"type":"testStart","time":1960}
+{"testID":44,"result":"success","skipped":true,"hidden":false,"type":"testDone","time":1960}
+{"test":{"id":45,"name":"strings ünïcode ✓ name","suiteID":0,"groupIDs":[8,9],"metadata":{"skip":false,"skipReason":null},"line":15,"column":5,"url":"file:///work/app/test/strings_test.dart"},"type":"testStart","time":1960}
+{"testID":45,"result":"success","skipped":false,"hidden":false,"type":"testDone","time":1962}
+{"test":{"id":46,"name":"strings is new and passes","suiteID":0,"groupIDs":[8,9],"metadata":{"skip":false,"skipReason":null},"line":16,"column":5,"url":"file:///work/app/test/strings_test.dart"},"type":"testStart","time":1962}
+{"testID":40,"error":"Expected: <11>\n  Actual: <10>\n","stackTrace":"package:matcher                                     expect\npackage:flutter_test/src/widget_tester.dart 473:18  expect\ntest/math_test.dart 7:29                            main.<fn>.<fn>\n","isFailure":true,"type":"error","time":1963}
+{"testID":40,"result":"failure","skipped":false,"hidden":false,"type":"testDone","time":1963}
+{"testID":42,"result":"success","skipped":false,"hidden":false,"type":"testDone","time":1963}
+{"test":{"id":47,"name":"arithmetic adds 10","suiteID":4,"groupIDs":[11,12],"metadata":{"skip":false,"skipReason":null},"line":7,"column":7,"url":"file:///work/app/test/math_test.dart"},"type":"testStart","time":1963}
+{"testID":46,"result":"success","skipped":false,"hidden":false,"type":"testDone","time":1964}
+{"test":{"id":48,"name":"async success 4","suiteID":2,"groupIDs":[6],"metadata":{"skip":false,"skipReason":null},"line":12,"column":5,"url":"file:///work/app/test/async_test.dart"},"type":"testStart","time":1964}
+{"testID":48,"result":"success","skipped":false,"hidden":false,"type":"testDone","time":1969}
+{"test":{"id":49,"name":"async success 5","suiteID":2,"groupIDs":[6],"metadata":{"skip":false,"skipReason":null},"line":17,"column":3,"url":"file:///work/app/test/async_test.dart"},"type":"testStart","time":1969}
+{"testID":47,"error":"Expected: <12>\n  Actual: <11>\n","stackTrace":"package:matcher                                     expect\npackage:flutter_test/src/widget_tester.dart 473:18  expect\ntest/math_test.dart 7:29                            main.<fn>.<fn>\n","isFailure":true,"type":"error","time":1972}
+{"testID":47,"result":"failure","skipped":false,"hidden":false,"type":"testDone","time":1972}
+{"test":{"id":50,"name":"arithmetic multiplies 1","suiteID":4,"groupIDs":[11,12],"metadata":{"skip":false,"skipReason":null},"line":10,"column":7,"url":"file:///work/app/test/math_test.dart"},"type":"testStart","time":1972}
+{"testID":50,"result":"success","skipped":false,"hidden":false,"type":"testDone","time":1977}
+{"test":{"id":51,"name":"arithmetic multiplies 2","suiteID":4,"groupIDs":[11,12],"metadata":{"skip":false,"skipReason":null},"line":10,"column":7,"url":"file:///work/app/test/math_test.dart"},"type":"testStart","time":1977}
+{"testID":49,"error":"Expected: <6>\n  Actual: <5>\n","stackTrace":"package:matcher                                     expect\npackage:flutter_test/src/widget_tester.dart 473:18  expect\ntest/async_test.dart 17:39                          main.<fn>\n","isFailure":true,"type":"error","time":1978}
+{"testID":49,"result":"failure","skipped":false,"hidden":false,"type":"testDone","time":1979}
+{"testID":51,"result":"success","skipped":false,"hidden":false,"type":"testDone","time":1979}
+{"test":{"id":52,"name":"arithmetic multiplies 3","suiteID":4,"groupIDs":[11,12],"metadata":{"skip":false,"skipReason":null},"line":10,"column":7,"url":"file:///work/app/test/math_test.dart"},"type":"testStart","time":1979}
+{"testID":52,"result":"success","skipped":false,"hidden":false,"type":"testDone","time":1981}
+{"test":{"id":53,"name":"arithmetic multiplies 4","suiteID":4,"groupIDs":[11,12],"metadata":{"skip":false,"skipReason":null},"line":10,"column":7,"url":"file:///work/app/test/math_test.dart"},"type":"testStart","time":1981}
+{"testID":53,"result":"success","skipped":false,"hidden":false,"type":"testDone","time":1982}
+{"test":{"id":54,"name":"arithmetic multiplies 5","suiteID":4,"groupIDs":[11,12],"metadata":{"skip":false,"skipReason":null},"line":10,"column":7,"url":"file:///work/app/test/math_test.dart"},"type":"testStart","time":1982}
+{"testID":54,"result":"success","skipped":false,"hidden":false,"type":"testDone","time":1983}
+{"group":{"id":55,"suiteID":4,"parentID":12,"name":"arithmetic division","metadata":{"skip":false,"skipReason":null},"testCount":5,"line":12,"column":5,"url":"file:///work/app/test/math_test.dart"},"type":"group","time":1983}
+{"test":{"id":56,"name":"arithmetic division divides by zero","suiteID":4,"groupIDs":[11,12,55],"metadata":{"skip":false,"skipReason":null},"line":13,"column":7,"url":"file:///work/app/test/math_test.dart"},"type":"testStart","time":1983}
+{"testID":56,"error":"Bad state: division by zero","stackTrace":"test/math_test.dart 13:37  main.<fn>.<fn>.<fn>\n","isFailure":false,"type":"error","time":1993}
+{"testID":56,"result":"error","skipped":false,"hidden":false,"type":"testDone","time":1993}
+{"test":{"id":57,"name":"arithmetic division divides evenly","suiteID":4,"groupIDs":[11,12,55],"metadata":{"skip":false,"skipReason":null},"line":14,"column":7,"url":"file:///work/app/test/math_test.dart"},"type":"testStart","time":1993}
+{"testID":57,"result":"success","skipped":false,"hidden":false,"type":"testDone","time":1995}
+{"test":{"id":58,"name":"arithmetic division rounds down","suiteID":4,"groupIDs":[11,12,55],"metadata":{"skip":false,"skipReason":null},"line":15,"column":7,"url":"file:///work/app/test/math_test.dart"},"type":"testStart","time":1995}
+{"testID":58,"result":"success","skipped":false,"hidden":false,"type":"testDone","time":1996}
+{"test":{"id":59,"name":"arithmetic division keeps the sign","suiteID":4,"groupIDs":[11,12,55],"metadata":{"skip":false,"skipReason":null},"line":16,"column":7,"url":"file:///work/app/test/math_test.dart"},"type":"testStart","time":1996}
+{"testID":59,"result":"success","skipped":false,"hidden":false,"type":"testDone","time":1997}
+{"test":{"id":60,"name":"arithmetic division rejects text","suiteID":4,"groupIDs":[11,12,55],"metadata":{"skip":false,"skipReason":null},"line":17,"column":7,"url":"file:///work/app/test/math_test.dart"},"type":"testStart","time":1997}
+{"testID":60,"error":"Invalid argument(s): not a number","stackTrace":"test/math_test.dart 17:34  main.<fn>.<fn>.<fn>\n","isFailure":false,"type":"error","time":2005}
+{"testID":60,"result":"error","skipped":false,"hidden":false,"type":"testDone","time":2006}
+{"group":{"id":61,"suiteID":4,"parentID":11,"name":"subtraction","metadata":{"skip":false,"skipReason":null},"testCount":4,"line":20,"column":3,"url":"file:///work/app/test/math_test.dart"},"type":"group","time":2006}
+{"test":{"id":62,"name":"subtraction subtracts one","suiteID":4,"groupIDs":[11,61],"metadata":{"skip":false,"skipReason":null},"line":21,"column":5,"url":"file:///work/app/test/math_test.dart"},"type":"testStart","time":2006}
+{"testID":62,"error":"Expected: <5>\n  Actual: <4>\n","stackTrace":"package:matcher                                     expect\npackage:flutter_test/src/widget_tester.dart 473:18  expect\ntest/math_test.dart 21:33                           main.<fn>.<fn>\n","isFailure":true,"type":"error","time":2015}
+{"testID":62,"result":"failure","skipped":false,"hidden":false,"type":"testDone","time":2015}
+{"test":{"id":63,"name":"subtraction subtracts two","suiteID":4,"groupIDs":[11,61],"metadata":{"skip":false,"skipReason":null},"line":22,"column":5,"url":"file:///work/app/test/math_test.dart"},"type":"testStart","time":2015}
+{"testID":63,"error":"Expected: <4>\n  Actual: <3>\n","stackTrace":"package:matcher                                     expect\npackage:flutter_test/src/widget_tester.dart 473:18  expect\ntest/math_test.dart 22:33                           main.<fn>.<fn>\n","isFailure":true,"type":"error","time":2023}
+{"testID":63,"result":"failure","skipped":false,"hidden":false,"type":"testDone","time":2023}
+{"test":{"id":64,"name":"subtraction subtracts zero","suiteID":4,"groupIDs":[11,61],"metadata":{"skip":false,"skipReason":null},"line":23,"column":5,"url":"file:///work/app/test/math_test.dart"},"type":"testStart","time":2023}
+{"testID":64,"result":"success","skipped":false,"hidden":false,"type":"testDone","time":2025}
+{"test":{"id":65,"name":"subtraction subtracts itself","suiteID":4,"groupIDs":[11,61],"metadata":{"skip":false,"skipReason":null},"line":24,"column":5,"url":"file:///work/app/test/math_test.dart"},"type":"testStart","time":2025}
+{"testID":65,"result":"success","skipped":false,"hidden":false,"type":"testDone","time":2026}
+{"success":false,"type":"done","time":2034}

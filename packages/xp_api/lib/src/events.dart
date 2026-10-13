@@ -43,6 +43,14 @@ sealed class EngineEvent extends Equatable {
       kind: payload['kind'] as String,
       state: StepState.values.byName(payload['state'] as String),
     ),
+    TestRunCompleted.eventType => TestRunCompleted(
+      jobId: payload['jobId'] as String,
+      projectId: payload['projectId'] as String,
+      branch: payload['branch'] as String,
+      baseline: payload['baseline'] as bool,
+      failures: payload['failures'] as int,
+      newFailures: payload['newFailures'] as int,
+    ),
     _ => UnknownEvent(type: type, payload: payload),
   };
 
@@ -257,6 +265,63 @@ final class JobStepChanged extends EngineEvent {
 
   @override
   List<Object?> get props => [jobId, ordinal, kind, state];
+}
+
+/// A job's `test` step finished a run of the tests.
+final class TestRunCompleted extends EngineEvent {
+  /// Creates the event.
+  const new({
+    required this.jobId,
+    required this.projectId,
+    required this.branch,
+    required this.baseline,
+    required this.failures,
+    required this.newFailures,
+  });
+
+  /// The wire name of this event.
+  static const eventType = 'test_run.completed';
+
+  /// The job that ran the tests.
+  final String jobId;
+
+  /// The project the job runs for.
+  final String projectId;
+
+  /// The branch that was tested.
+  final String branch;
+
+  /// Whether the run became the baseline of its app and branch.
+  final bool baseline;
+
+  /// How many tests failed or threw.
+  final int failures;
+
+  /// How many of them are new against the baseline.
+  final int newFailures;
+
+  @override
+  String get type => eventType;
+
+  @override
+  Map<String, dynamic> get payload => {
+    'jobId': jobId,
+    'projectId': projectId,
+    'branch': branch,
+    'baseline': baseline,
+    'failures': failures,
+    'newFailures': newFailures,
+  };
+
+  @override
+  List<Object?> get props => [
+    jobId,
+    projectId,
+    branch,
+    baseline,
+    failures,
+    newFailures,
+  ];
 }
 
 /// An event whose type this client does not know.

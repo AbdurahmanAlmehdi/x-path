@@ -23,6 +23,7 @@ class XpdServer {
     required JobRunner jobs,
     required JobLogs logs,
     required ArtifactService artifacts,
+    required TestRunService tests,
     required Clock clock,
     required String engineVersion,
     String host = '127.0.0.1',
@@ -38,6 +39,7 @@ class XpdServer {
       jobs: jobs,
       jobLogs: logRoute,
       artifacts: artifacts,
+      tests: tests,
       engineVersion: engineVersion,
       onError: onError,
     );
