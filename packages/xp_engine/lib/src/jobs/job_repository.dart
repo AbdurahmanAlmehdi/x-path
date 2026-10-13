@@ -1,5 +1,6 @@
 import 'package:xp_api/xp_api.dart';
 import 'package:xp_engine/src/jobs/job_record.dart';
+import 'package:xp_engine/src/toolchain/job_tools.dart';
 
 /// Where jobs and their steps are kept.
 ///
@@ -20,6 +21,16 @@ abstract interface class JobRepository {
   /// Replaces the stored job that has the id of [job].
   Future<void> updateJob(JobRecord job);
 
+  /// Records the versions of the tools the job [jobId] runs with (D-20),
+  /// replacing any recorded before.
+  ///
+  /// Throws a `StateError` if there is no such job.
+  Future<void> saveTools(String jobId, JobTools tools);
+
+  /// The tool versions recorded for the job [jobId], or `null` if none were,
+  /// or there is no such job.
+  Future<JobTools?> tools(String jobId);
+
   /// Replaces the stored step with the job and ordinal of [step].
   Future<void> updateStep(StepRecord step);
 }
@@ -28,6 +39,7 @@ abstract interface class JobRepository {
 class InMemoryJobRepository implements JobRepository {
   final _jobs = <String, JobRecord>{};
   final _steps = <String, List<StepRecord>>{};
+  final _tools = <String, JobTools>{};
 
   @override
   Future<void> create(JobRecord job, List<StepRecord> steps) async {
@@ -54,6 +66,15 @@ class InMemoryJobRepository implements JobRepository {
     if (!_jobs.containsKey(job.id)) throw StateError('No job ${job.id}.');
     _jobs[job.id] = job;
   }
+
+  @override
+  Future<void> saveTools(String jobId, JobTools tools) async {
+    if (!_jobs.containsKey(jobId)) throw StateError('No job $jobId.');
+    _tools[jobId] = tools;
+  }
+
+  @override
+  Future<JobTools?> tools(String jobId) async => _tools[jobId];
 
   @override
   Future<void> updateStep(StepRecord step) async {

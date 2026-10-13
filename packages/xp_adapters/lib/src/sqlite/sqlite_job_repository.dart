@@ -100,6 +100,24 @@ class SqliteJobRepository implements JobRepository {
   }
 
   @override
+  Future<void> saveTools(String jobId, JobTools tools) async {
+    _db.execute('UPDATE job SET tools = ? WHERE id = ?', [
+      jsonEncode(tools.toJson()),
+      jobId,
+    ]);
+    if (_db.updatedRows == 0) throw StateError('There is no job $jobId.');
+  }
+
+  @override
+  Future<JobTools?> tools(String jobId) async {
+    final rows = _db.select('SELECT tools FROM job WHERE id = ?', [jobId]);
+    final json = rows.isEmpty ? null : rows.single['tools'] as String?;
+    return json == null
+        ? null
+        : JobTools.fromJson(jsonDecode(json) as Map<String, dynamic>);
+  }
+
+  @override
   Future<void> updateStep(StepRecord step) async {
     _db.execute(
       'UPDATE job_step SET state = ?, attempts = ?, result = ?, message = ?, '

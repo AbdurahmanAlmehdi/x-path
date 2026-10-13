@@ -62,6 +62,24 @@ void main() {
     await expectLater(repository.updateJob(job('x')), throwsStateError);
   });
 
+  test('records the tool versions of a job, replacing earlier ones', () async {
+    await repository.create(job('a'), const []);
+    expect(await repository.tools('a'), isNull);
+
+    await repository.saveTools('a', const JobTools(flutter: '3.47.5'));
+    await repository.saveTools('a', const JobTools(flutter: '3.47.6'));
+
+    expect(await repository.tools('a'), const JobTools(flutter: '3.47.6'));
+    expect(await repository.tools('b'), isNull);
+  });
+
+  test('cannot record tools for a job it does not have', () async {
+    await expectLater(
+      repository.saveTools('x', const JobTools()),
+      throwsStateError,
+    );
+  });
+
   test('updates a step', () async {
     await repository.create(job('a'), [step('a', 0)]);
 
