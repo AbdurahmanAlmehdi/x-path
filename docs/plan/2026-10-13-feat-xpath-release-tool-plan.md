@@ -230,7 +230,7 @@ Mataa dev builds through `xp` can start after Phase 13, before the desktop app e
 
 ### Phase 0: Spikes and ADRs
 
-- **Status:** Not started
+- **Status:** Done
 - **Scope:** Prove four unknowns and record each as an ADR: (1) workspace and build: Flutter
   app in the same pub workspace, `very_good test` coverage in a workspace, `dart build cli`
   cross-compiling to linux-x64/arm64 with the `sqlite3` hook; (2) drift vs raw `sqlite3` in an
