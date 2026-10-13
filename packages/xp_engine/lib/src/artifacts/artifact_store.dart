@@ -21,6 +21,16 @@ abstract interface class ArtifactStore {
   Future<bool> exists(String path);
 }
 
+/// An [ArtifactStore] whose files are ordinary files on the engine machine,
+/// for programs that need a path (altool uploads an IPA from a path).
+abstract interface class LocalArtifactStore implements ArtifactStore {
+  /// The absolute path of the file at [path] in the store.
+  ///
+  /// Throws an [ArgumentError] like [write] if [path] is not
+  /// `<folder>/<name>`. The file may not exist; check [exists].
+  String localPath(String path);
+}
+
 /// An [ArtifactStore] in memory, for tests.
 class InMemoryArtifactStore implements ArtifactStore {
   /// The files, by path.

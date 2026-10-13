@@ -29,6 +29,11 @@ void main() {
     expect(await readAll('job_1/dev.apk'), 'abc');
   });
 
+  test('says where the file is on disk, for programs that need a path', () {
+    expect(store.localPath('job_1/dev.ipa'), '${root.path}/job_1/dev.ipa');
+    expect(() => store.localPath('../x'), throwsArgumentError);
+  });
+
   test('replaces a file and leaves no temporary one', () async {
     await store.write('job_1/dev.apk', Stream.value(utf8.encode('one')));
     await store.write('job_1/dev.apk', Stream.value(utf8.encode('two')));

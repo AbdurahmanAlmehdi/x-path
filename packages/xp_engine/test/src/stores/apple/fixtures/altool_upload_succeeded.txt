@@ -1,0 +1,7 @@
+Running altool at path '/Applications/Xcode.app/Contents/SharedFrameworks/ContentDelivery.framework/Resources/altool'...
+
+2026-10-13 20:30:01.234 INFO: [altool.4F3A2B1C0] Uploading package 'prod-5.4.1+3283.ipa'...
+WARNING ITMS-90725: "SDK Version Issue. This app was built with the iOS 18.5 SDK. Starting April 2026, all iOS apps must be built with the iOS 26 SDK or later."
+2026-10-13 20:30:44.512 INFO: [altool.4F3A2B1C0] Package 'prod-5.4.1+3283.ipa' upload complete.
+Delivery UUID: 3d6a9d4a-8f0e-4a62-9d8b-1c2f5b7e9a10
+Transferred 84123456 bytes in 43.278 seconds (1.9MB/s)

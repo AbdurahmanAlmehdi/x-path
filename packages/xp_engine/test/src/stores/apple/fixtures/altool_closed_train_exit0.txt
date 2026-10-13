@@ -1,0 +1,6 @@
+Running altool at path '/Applications/Xcode.app/Contents/SharedFrameworks/ContentDelivery.framework/Resources/altool'...
+
+2026-10-13 20:31:12.044 altool[41872:1302981] Uploading 'prod-5.4.1+3283.ipa'
+*** Error: Validation failed (409)
+Asset validation failed (90186) Invalid Pre-Release Train. The train version '5.4.1' is closed for new build submissions (ID: 5d7a0c5c-8e57-4c8b-a8f1-4e3a7c1f2b90)
+ERROR ITMS-90186: "Invalid Pre-Release Train. The train version '5.4.1' is closed for new build submissions"

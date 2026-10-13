@@ -1,0 +1,4 @@
+Running altool at path '/Applications/Xcode.app/Contents/SharedFrameworks/ContentDelivery.framework/Resources/altool'...
+
+2026-10-13 20:33:40.871 ERROR: [altool.5A19C2D70] Validation failed (409) Redundant Binary Upload. You've already uploaded a build with build number '3283' for version number '5.4.1'. (ID: 91c0cdb0-bb0d-4b3b-9a37-8a1d4c6a1d2e) (90189)
+2026-10-13 20:33:40.873 ERROR: [altool.main] ExitFailure (31)

@@ -22,4 +22,5 @@ export 'src/run_xpd.dart';
 export 'src/server/xpd_server.dart';
 export 'src/storage/data_directory.dart';
 export 'src/storage/engine_database.dart';
+export 'src/stores/apple_stores.dart';
 export 'src/version.dart';

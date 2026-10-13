@@ -6,6 +6,7 @@ import 'package:xp_engine/xp_engine.dart';
 import 'package:xp_secrets/xp_secrets.dart';
 import 'package:xpd/src/cli/xpd_command.dart';
 import 'package:xpd/src/server/xpd_server.dart';
+import 'package:xpd/src/stores/apple_stores.dart';
 import 'package:xpd/src/version.dart';
 
 /// The port `xpd serve` listens on unless told otherwise.
@@ -96,6 +97,11 @@ class ServeCommand extends XpdCommand {
       );
       final testRuns = SqliteTestRunRepository(database);
       final projectRepository = SqliteProjectRepository(database);
+      final apple = AppleStores(
+        database: database,
+        secrets: secrets,
+        clock: const SystemClock(),
+      );
       final shorebirdReleases = ShorebirdCliReleases(
         runner: runner,
         secrets: secrets,
@@ -190,15 +196,23 @@ class ServeCommand extends XpdCommand {
             clock: const SystemClock(),
           ),
           AnalyzeStep(toolchain: buildToolchain),
-          // The checks that need a store (appStoreTrain, playTargetSdk,
-          // buildNumberReuse) register with the store adapters (Phase 10).
+          apple.uploadStep(
+            repository: artifactRepository,
+            store: artifactStore,
+            secrets: secrets,
+            secretFiles: secretFiles,
+            isMacOS: isMacOS,
+          ),
+          // playTargetSdk, and the Play half of buildNumberReuse, register
+          // with the Play adapter (Phase 10b).
           GuardStep(
-            checks: const [
-              SourceCheck(),
-              VersionSyncCheck(),
-              PatchTargetCheck(),
-              NewReleaseNumberCheck(),
-              PatchNativeDiffCheck(),
+            checks: [
+              const SourceCheck(),
+              const VersionSyncCheck(),
+              const PatchTargetCheck(),
+              const NewReleaseNumberCheck(),
+              const PatchNativeDiffCheck(),
+              ...apple.guardChecks,
             ],
             git: git,
             workspaces: DirectoryWorkspace.new,
@@ -276,6 +290,7 @@ class ServeCommand extends XpdCommand {
       await jobs.interruptAll();
       await server.close();
       github.close();
+      apple.close();
       return 0;
     });
   }

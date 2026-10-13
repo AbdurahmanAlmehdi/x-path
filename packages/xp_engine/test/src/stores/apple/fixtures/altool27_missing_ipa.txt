@@ -1,0 +1,6 @@
+Running altool at path '/Applications/Xcode-27.1.app/Contents/SharedFrameworks/ContentDelivery.framework/Resources/altool'...
+
+2026-10-13 20:23:11.740 ERROR: [altool.B7F0850C0] IPA file not found at path: ./nonexistent.ipa
+
+Verify the file path is correct and the file exists. (20)
+2026-10-13 20:23:11.742 ERROR: [altool.main] ExitFailure (31)

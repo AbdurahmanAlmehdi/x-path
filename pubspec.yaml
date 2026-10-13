@@ -17,6 +17,7 @@ workspace:
   - packages/xp_repositories
   - packages/xp_secrets
   - tool
+  - tool/e2e/fake_stores/asc
 
 dev_dependencies:
   melos: ^8.0.0
