@@ -1,10 +1,8 @@
-import 'dart:convert';
-
-import 'package:json_annotation/json_annotation.dart';
 import 'package:shelf/shelf.dart';
 import 'package:shelf_router/shelf_router.dart';
 import 'package:xp_api/xp_api.dart';
 import 'package:xp_engine/xp_engine.dart';
+import 'package:xpd/src/api/request_body.dart';
 import 'package:xpd/src/api/responses.dart';
 
 /// The `/projects` endpoints: add a repository by path or remote, scan it,
@@ -27,7 +25,7 @@ class ProjectsRoutes {
   }
 
   Future<Response> _add(Request request) => _guard(() async {
-    final body = await _body(request, AddProjectRequest.fromJson);
+    final body = await readJsonBody(request, AddProjectRequest.fromJson);
     final project = await _projects.add(body);
     return jsonResponse(
       project.toJson(),
@@ -49,7 +47,7 @@ class ProjectsRoutes {
   });
 
   Future<Response> _update(Request request, String id) => _guard(() async {
-    final edits = await _body(request, ProfileEdits.fromJson);
+    final edits = await readJsonBody(request, ProfileEdits.fromJson);
     return jsonResponse((await _projects.update(id, edits)).toJson());
   });
 
@@ -59,44 +57,12 @@ class ProjectsRoutes {
   });
 }
 
-/// The JSON object in the body of [request], read with [fromJson].
-///
-/// Throws a [_BadRequest] if the body is not a JSON object of the right shape.
-Future<T> _body<T>(
-  Request request,
-  T Function(Map<String, dynamic> json) fromJson,
-) async {
-  final Object? decoded;
-  try {
-    decoded = jsonDecode(await request.readAsString());
-  } on FormatException {
-    throw const _BadRequest('The body is not valid JSON.');
-  }
-  if (decoded is! Map<String, dynamic>) {
-    throw const _BadRequest('The body must be a JSON object.');
-  }
-  try {
-    return fromJson(decoded);
-  } on CheckedFromJsonException catch (error) {
-    throw _BadRequest(
-      'The body has a field that is missing or of the wrong type'
-      '${error.key == null ? '' : ': ${error.key}'}.',
-    );
-  }
-}
-
-class _BadRequest implements Exception {
-  const new(this.message);
-
-  final String message;
-}
-
 /// Runs [action] and turns the failures a client can cause or fix into error
 /// responses. Anything else is left to the error middleware (`500`).
 Future<Response> _guard(Future<Response> Function() action) async {
   try {
     return await action();
-  } on _BadRequest catch (error) {
+  } on BadRequestException catch (error) {
     return errorResponse(ApiErrorCode.invalidRequest, error.message);
   } on ProjectNotFoundException catch (error) {
     return errorResponse(ApiErrorCode.notFound, error.message);

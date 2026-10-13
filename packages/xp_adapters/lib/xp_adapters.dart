@@ -3,6 +3,7 @@ library;
 
 export 'git.dart';
 export 'github.dart';
+export 'process.dart';
 export 'scan.dart';
 export 'sqlite.dart';
 export 'src/adapters_summary.dart';
