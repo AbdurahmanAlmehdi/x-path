@@ -21,4 +21,81 @@ void main() {
     expect(await fake.lookup(), isNull);
     expect(fake.lookups, ['com.orbit.app com.orbit', 'null null']);
   });
+
+  group('CombinedStoreBuildNumbers', () {
+    late FakeStoreBuildNumbers apple;
+    late FakeStoreBuildNumbers play;
+    late CombinedStoreBuildNumbers combined;
+
+    setUp(() {
+      apple = FakeStoreBuildNumbers(const StoreBuilds({3280, 3282}));
+      play = FakeStoreBuildNumbers(const StoreBuilds({3281, 3282}));
+      combined = CombinedStoreBuildNumbers(apple: apple, play: play);
+    });
+
+    test(
+      'joins the builds of both stores, each asked for its own app',
+      () async {
+        final builds = await combined.lookup(
+          iosBundleId: 'com.orbit.app',
+          androidAppId: 'com.orbit.android',
+        );
+
+        expect(builds, const StoreBuilds({3280, 3281, 3282}));
+        expect(apple.lookups, ['com.orbit.app null']);
+        expect(play.lookups, ['null com.orbit.android']);
+      },
+    );
+
+    test('asks only the store the app is on', () async {
+      expect(
+        await combined.lookup(iosBundleId: 'com.orbit.app'),
+        const StoreBuilds({3280, 3282}),
+      );
+      expect(
+        await combined.lookup(androidAppId: 'com.orbit.android'),
+        const StoreBuilds({3281, 3282}),
+      );
+      expect(apple.lookups, hasLength(1));
+      expect(play.lookups, hasLength(1));
+    });
+
+    test('names the store it could not read and keeps the other', () async {
+      play.builds = null;
+
+      final builds = await combined.lookup(
+        iosBundleId: 'com.orbit.app',
+        androidAppId: 'com.orbit.android',
+      );
+
+      expect(
+        builds,
+        const StoreBuilds({3280, 3282}, unreadable: {'Google Play'}),
+      );
+
+      apple.builds = null;
+      play.builds = const StoreBuilds({1});
+      expect(
+        await combined.lookup(
+          iosBundleId: 'com.orbit.app',
+          androidAppId: 'com.orbit.android',
+        ),
+        const StoreBuilds({1}, unreadable: {'App Store Connect'}),
+      );
+    });
+
+    test('is null when no store could be read or the app is on none', () async {
+      apple.builds = null;
+      play.builds = null;
+
+      expect(
+        await combined.lookup(
+          iosBundleId: 'com.orbit.app',
+          androidAppId: 'com.orbit.android',
+        ),
+        isNull,
+      );
+      expect(await combined.lookup(), isNull);
+    });
+  });
 }

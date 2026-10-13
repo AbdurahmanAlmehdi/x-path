@@ -7,6 +7,8 @@ import 'package:xp_secrets/xp_secrets.dart';
 import 'package:xpd/src/cli/xpd_command.dart';
 import 'package:xpd/src/server/xpd_server.dart';
 import 'package:xpd/src/stores/apple_stores.dart';
+import 'package:xpd/src/stores/play_stores.dart';
+import 'package:xpd/src/stores/store_guard_checks.dart';
 import 'package:xpd/src/version.dart';
 
 /// The port `xpd serve` listens on unless told otherwise.
@@ -52,6 +54,16 @@ class ServeCommand extends XpdCommand {
         'warning: $host is not a loopback address; anyone who can reach it '
         'can try device tokens, and traffic is not encrypted.',
       );
+    }
+
+    final int targetSdk;
+    try {
+      targetSdk = PlayStores.targetSdkFrom(
+        context.environment[playTargetSdkVariable],
+      );
+    } on FormatException catch (error) {
+      context.err.writeln('xpd: ${error.message}');
+      return 1;
     }
 
     final directory = dataDirectory;
@@ -101,6 +113,12 @@ class ServeCommand extends XpdCommand {
         database: database,
         secrets: secrets,
         clock: const SystemClock(),
+      );
+      final play = PlayStores(
+        database: database,
+        secrets: secrets,
+        clock: const SystemClock(),
+        requiredTargetSdk: targetSdk,
       );
       final shorebirdReleases = ShorebirdCliReleases(
         runner: runner,
@@ -203,8 +221,11 @@ class ServeCommand extends XpdCommand {
             secretFiles: secretFiles,
             isMacOS: isMacOS,
           ),
-          // playTargetSdk, and the Play half of buildNumberReuse, register
-          // with the Play adapter (Phase 10b).
+          play.uploadStep(
+            repository: artifactRepository,
+            store: artifactStore,
+            secrets: secrets,
+          ),
           GuardStep(
             checks: [
               const SourceCheck(),
@@ -212,7 +233,7 @@ class ServeCommand extends XpdCommand {
               const PatchTargetCheck(),
               const NewReleaseNumberCheck(),
               const PatchNativeDiffCheck(),
-              ...apple.guardChecks,
+              ...storeGuardChecks(apple: apple, play: play),
             ],
             git: git,
             workspaces: DirectoryWorkspace.new,
@@ -291,6 +312,7 @@ class ServeCommand extends XpdCommand {
       await server.close();
       github.close();
       apple.close();
+      play.close();
       return 0;
     });
   }

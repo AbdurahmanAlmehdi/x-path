@@ -58,22 +58,26 @@ const layerRules = <String, LayerRule>{
   ),
   'xp_client': LayerRule(workspace: {'xp_api'}),
   'xp_repositories': LayerRule(workspace: {'xp_api', 'xp_client'}),
-  // `xp_fake_asc` is a fake store server: tests of the store adapters run
-  // against it.
-  'xp_adapters': LayerRule(workspace: {'xp_api', 'xp_engine', 'xp_fake_asc'}),
+  // `xp_fake_asc` and `xp_fake_play` are fake store servers: tests of the
+  // store adapters run against them.
+  'xp_adapters': LayerRule(
+    workspace: {'xp_api', 'xp_engine', 'xp_fake_asc', 'xp_fake_play'},
+  ),
   'xp_secrets': LayerRule(workspace: {'xp_api', 'xp_engine'}),
   'xp_macos_services': LayerRule(workspace: {}),
   // Fake store servers for tests and the end-to-end scripts (tool/e2e). They
   // know nothing of the engine.
   'xp_fake_asc': LayerRule(workspace: {}),
+  'xp_fake_play': LayerRule(workspace: {}),
   // The engine entrypoint wires every implementation.
-  // `xp_fake_asc` is for the tests of the store wiring.
+  // `xp_fake_asc` and `xp_fake_play` are for the tests of the store wiring.
   'xpd': LayerRule(
     workspace: {
       'xp_adapters',
       'xp_api',
       'xp_engine',
       'xp_fake_asc',
+      'xp_fake_play',
       'xp_secrets',
     },
   ),

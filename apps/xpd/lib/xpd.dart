@@ -23,4 +23,6 @@ export 'src/server/xpd_server.dart';
 export 'src/storage/data_directory.dart';
 export 'src/storage/engine_database.dart';
 export 'src/stores/apple_stores.dart';
+export 'src/stores/play_stores.dart';
+export 'src/stores/store_guard_checks.dart';
 export 'src/version.dart';

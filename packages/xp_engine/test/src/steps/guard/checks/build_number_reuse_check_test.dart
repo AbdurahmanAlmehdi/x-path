@@ -55,6 +55,24 @@ void main() {
     expect(stores.lookups, isEmpty);
   });
 
+  test('warns, naming the store, when only one store was readable', () async {
+    stores.builds = const StoreBuilds({3280}, unreadable: {'Google Play'});
+
+    final result = await check.run(request());
+
+    expect(result.status, GuardStatus.warned);
+    expect(result.message, contains('Google Play'));
+    expect(result.message, contains('build 3283'));
+  });
+
+  test('still fails for a build the readable store has', () async {
+    stores.builds = const StoreBuilds({3283}, unreadable: {'Google Play'});
+
+    final result = await check.run(request());
+
+    expect(result.status, GuardStatus.failed);
+  });
+
   test('passes for the tag of this very release on this commit', () async {
     stores.builds = const StoreBuilds({3283});
 

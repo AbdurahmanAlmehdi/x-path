@@ -62,6 +62,13 @@ class BuildNumberReuseCheck extends GuardCheck {
         fix: 'Allocate a new build number; the stores reject a reused one.',
       );
     }
+    if (store.unreadable.isNotEmpty) {
+      final unreadable = store.unreadable.join(' and ');
+      return warned(
+        'Could not read the build numbers from $unreadable; build $build is '
+        'not used by the tags or by the store that could be read.',
+      );
+    }
     return passed('Build $build is not used by the stores or the tags.');
   }
 }

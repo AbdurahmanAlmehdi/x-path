@@ -128,10 +128,9 @@ void main() {
     });
   });
 
-  test('wires the appStoreTrain and buildNumberReuse checks', () {
+  test('wires the appStoreTrain check', () {
     expect(apple.guardChecks.map((check) => check.name), [
       GuardCheckName.appStoreTrain,
-      GuardCheckName.buildNumberReuse,
     ]);
   });
 

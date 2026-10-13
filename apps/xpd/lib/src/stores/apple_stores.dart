@@ -2,8 +2,9 @@ import 'package:xp_adapters/xp_adapters.dart';
 import 'package:xp_engine/xp_engine.dart';
 
 /// The Apple side of the stores, wired for `xpd serve`: the iTunes lookup, an
-/// App Store Connect client per API key, the `appStoreTrain` and
-/// `buildNumberReuse` guard checks, and the `upload.appStore` step.
+/// App Store Connect client per API key, the `appStoreTrain` guard check, the
+/// Apple build numbers (for `buildNumberReuse`, which `storeGuardChecks`
+/// composes with Google Play's) and the `upload.appStore` step.
 ///
 /// The API key of an app is found through the `asc_key` credential reference of
 /// the flavor with its iOS bundle id (`SqliteAscCredentialSource`); an app
@@ -55,11 +56,8 @@ class AppleStores {
     () => HttpAppStoreConnect(key: key, clock: _clock, baseUrl: _ascBaseUrl),
   );
 
-  /// The guard checks that need Apple: `appStoreTrain` and `buildNumberReuse`.
-  List<GuardCheck> get guardChecks => [
-    AppStoreTrainCheck(trains),
-    BuildNumberReuseCheck(buildNumbers),
-  ];
+  /// The guard checks that need Apple alone: `appStoreTrain`.
+  List<GuardCheck> get guardChecks => [AppStoreTrainCheck(trains)];
 
   /// The `upload.appStore` step, uploading from the artifact [store].
   UploadAppStoreStep uploadStep({
