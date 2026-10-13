@@ -1,0 +1,15 @@
+name: xp_engine
+description: XPath engine domain and application logic. Depends on xp_api only.
+version: 0.0.1
+publish_to: none
+resolution: workspace
+
+environment:
+  sdk: ^3.13.0
+
+dependencies:
+  xp_api: any
+
+dev_dependencies:
+  test: ^1.31.0
+  very_good_analysis: 11.0.0

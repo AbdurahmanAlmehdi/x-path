@@ -1,0 +1,45 @@
+# Flutter 3.47.6 ships Dart 3.13.5; keep both in sync with .fvmrc. The workspace
+# has Flutter members, so this package needs the Flutter workflow too.
+# macOS only: this package is part of the macOS app.
+name: xp_desktop
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/xp_desktop.yaml"
+      - "apps/xp_desktop/**"
+      - "packages/xp_api/**"
+      - "packages/xp_client/**"
+      - "packages/xp_macos_services/**"
+      - "packages/xp_repositories/**"
+      - "pubspec.yaml"
+      - "pubspec.lock"
+      - ".fvmrc"
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/xp_desktop.yaml"
+      - "apps/xp_desktop/**"
+      - "packages/xp_api/**"
+      - "packages/xp_client/**"
+      - "packages/xp_macos_services/**"
+      - "packages/xp_repositories/**"
+      - "pubspec.yaml"
+      - "pubspec.lock"
+      - ".fvmrc"
+
+jobs:
+  macos:
+    uses: VeryGoodOpenSource/very_good_workflows/.github/workflows/flutter_package.yml@v1
+    with:
+      flutter_version: "3.47.6"
+      working_directory: apps/xp_desktop
+      runs_on: macos-latest
+      min_coverage: 90
+      coverage_excludes: "**/*.g.dart"
+      run_bloc_lint: false

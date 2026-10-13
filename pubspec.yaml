@@ -1,0 +1,116 @@
+name: x_path_workspace
+description: Workspace root for XPath, a self-hosted release tool for Flutter apps.
+publish_to: none
+
+environment:
+  sdk: ^3.13.0
+
+workspace:
+  - apps/xp
+  - apps/xp_desktop
+  - apps/xpd
+  - packages/xp_adapters
+  - packages/xp_api
+  - packages/xp_client
+  - packages/xp_engine
+  - packages/xp_macos_services
+  - packages/xp_repositories
+  - packages/xp_secrets
+  - tool
+
+dev_dependencies:
+  melos: ^8.0.0
+
+melos:
+  name: x_path
+  scripts:
+    analyze:
+      description: Analyze the whole workspace. Infos are fatal.
+      run: dart analyze --fatal-infos .
+
+    format:
+      description: Fail if any file needs formatting. Writes nothing.
+      run: dart format --set-exit-if-changed .
+
+    check:layers:
+      description: Fail if a package depends on something its layer may not.
+      run: dart run tool/check_layers.dart
+
+    test:
+      description: Run every package's tests, without coverage.
+      steps:
+        - test:dart
+        - test:flutter
+
+    test:coverage:
+      description: >-
+        Run every package's tests and fail if any package is below its
+        coverage threshold: 100% for xp_api, xp_client, xp_engine and
+        xp_repositories; 90% for everything else.
+      steps:
+        - test:coverage:strict
+        - test:coverage:floor
+        - test:coverage:flutter
+
+    # The three scripts below are the thresholds. A new package lands in
+    # `floor` (Dart) or `flutter` (Flutter) at 90% unless it is added to the
+    # `strict` scope. Generated code is excluded; integration tests are
+    # skipped by dart_test.yaml; macos-tagged tests only run on macOS.
+    test:coverage:strict:
+      private: true
+      exec:
+        command: >-
+          very_good dart test --coverage --min-coverage 100
+          --exclude-coverage '**/*.g.dart' --show-uncovered
+        concurrency: 1
+      packageFilters:
+        scope:
+          - xp_api
+          - xp_client
+          - xp_engine
+          - xp_repositories
+
+    test:coverage:floor:
+      private: true
+      exec:
+        command: >-
+          very_good dart test --coverage --min-coverage 90
+          --exclude-coverage '**/*.g.dart' --show-uncovered
+        concurrency: 1
+      packageFilters:
+        flutter: false
+        dirExists: test
+        ignore:
+          - xp_api
+          - xp_client
+          - xp_engine
+          - xp_repositories
+
+    test:coverage:flutter:
+      private: true
+      exec:
+        command: >-
+          very_good test --coverage --min-coverage 90
+          --exclude-coverage '**/*.g.dart' --show-uncovered
+        concurrency: 1
+      packageFilters:
+        flutter: true
+        dirExists: test
+
+    test:dart:
+      private: true
+      exec:
+        command: dart test
+        concurrency: 1
+      packageFilters:
+        flutter: false
+        dirExists: test
+
+    test:flutter:
+      private: true
+      exec:
+        command: flutter test
+        concurrency: 1
+      packageFilters:
+        flutter: true
+        dirExists: test
