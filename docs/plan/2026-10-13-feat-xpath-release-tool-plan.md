@@ -266,7 +266,7 @@ Mataa dev builds through `xp` can start after Phase 13, before the desktop app e
 
 ### Phase 3: Database
 
-- **Status:** Not started
+- **Status:** Done
 - **Scope:** Repository interfaces in `xp_engine`; SQLite implementation in
   `xp_adapters/sqlite.dart` per ADR 0002: schema from the ERD, migrations with a snapshot test
   per version, WAL, `busy_timeout`, foreign keys, single writer, backup before migrate, event

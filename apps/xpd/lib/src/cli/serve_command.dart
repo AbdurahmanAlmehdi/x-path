@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:xp_adapters/xp_adapters.dart';
 import 'package:xp_engine/xp_engine.dart';
 import 'package:xpd/src/cli/xpd_command.dart';
 import 'package:xpd/src/server/xpd_server.dart';
@@ -50,21 +51,26 @@ class ServeCommand extends XpdCommand {
       );
     }
 
-    final server = await XpdServer.start(
-      tokens: openTokens(),
-      events: InMemoryEventLog(clock: const SystemClock()),
-      clock: const SystemClock(),
-      engineVersion: packageVersion,
-      host: host,
-      port: port,
-      onError: (error, stackTrace) =>
-          context.err.writeln('error: $error\n$stackTrace'),
-    );
-    context.out.writeln('xpd listening on ${server.uri}');
+    return await withDatabase((database) async {
+      final server = await XpdServer.start(
+        tokens: TokenService(
+          tokens: SqliteDeviceTokenRepository(database),
+          clock: const SystemClock(),
+        ),
+        events: SqliteEventLog(database: database, clock: const SystemClock()),
+        clock: const SystemClock(),
+        engineVersion: packageVersion,
+        host: host,
+        port: port,
+        onError: (error, stackTrace) =>
+            context.err.writeln('error: $error\n$stackTrace'),
+      );
+      context.out.writeln('xpd listening on ${server.uri}');
 
-    await context.shutdown.first;
-    context.out.writeln('xpd shutting down');
-    await server.close();
-    return 0;
+      await context.shutdown.first;
+      context.out.writeln('xpd shutting down');
+      await server.close();
+      return 0;
+    });
   }
 }
