@@ -1,0 +1,30 @@
+# Checks the licenses of every package in the workspace lock file. Runs from
+# the workspace root: member packages have no lock file of their own.
+name: license_check
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/license_check.yaml"
+      - "**/pubspec.yaml"
+      - "pubspec.lock"
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/license_check.yaml"
+      - "**/pubspec.yaml"
+      - "pubspec.lock"
+
+jobs:
+  license-check:
+    uses: VeryGoodOpenSource/very_good_workflows/.github/workflows/license_check.yml@v1
+    with:
+      flutter_version: "3.47.6"
+      # pubspec_lock_parse is Apache-2.0, but its LICENSE file opens with a
+      # copyright line, so the detector reports it as unknown.
+      skip_packages: pubspec_lock_parse
