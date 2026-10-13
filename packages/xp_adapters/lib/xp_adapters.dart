@@ -1,6 +1,7 @@
 /// Engine adapters: SQLite, git, GitHub, stores, toolchain and processes.
 library;
 
+export 'artifacts.dart';
 export 'git.dart';
 export 'github.dart';
 export 'process.dart';

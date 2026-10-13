@@ -1,6 +1,14 @@
 /// XPath engine domain and application logic. Framework-free.
 library;
 
+export 'src/artifacts/artifact_exceptions.dart';
+export 'src/artifacts/artifact_record.dart';
+export 'src/artifacts/artifact_recorder.dart';
+export 'src/artifacts/artifact_repository.dart';
+export 'src/artifacts/artifact_service.dart';
+export 'src/artifacts/artifact_store.dart';
+export 'src/artifacts/artifact_summary.dart';
+export 'src/artifacts/digest.dart';
 export 'src/clock/clock.dart';
 export 'src/engine_summary.dart';
 export 'src/git/git_exceptions.dart';
@@ -37,6 +45,15 @@ export 'src/repositories/event_log.dart';
 export 'src/scan/project_scanner.dart';
 export 'src/scan/scan_source.dart';
 export 'src/secrets/secret_store.dart';
+export 'src/steps/build/build_android.dart';
+export 'src/steps/build/build_files.dart';
+export 'src/steps/build/build_ios.dart';
+export 'src/steps/build/build_outputs.dart';
+export 'src/steps/build/build_result.dart';
+export 'src/steps/build/build_settings.dart';
+export 'src/steps/build/build_toolchain.dart';
+export 'src/steps/build/flutter_build_step.dart';
+export 'src/steps/build/record_manifest.dart';
 export 'src/steps/command_step.dart';
 export 'src/steps/guard/checks/app_store_train_check.dart';
 export 'src/steps/guard/checks/build_number_reuse_check.dart';

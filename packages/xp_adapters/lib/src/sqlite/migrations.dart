@@ -9,6 +9,7 @@ const engineMigrations = <Migration>[
   Migration(version: 2, sql: _v2),
   Migration(version: 3, sql: _v3),
   Migration(version: 4, sql: _v4),
+  Migration(version: 5, sql: _v5),
 ];
 
 // Timestamps are integer microseconds since the Unix epoch (UTC), so that
@@ -217,4 +218,12 @@ ALTER TABLE job_step ADD COLUMN finished_at INTEGER;
 const _v4 = '''
 ALTER TABLE job ADD COLUMN tools TEXT
   CHECK (tools IS NULL OR json_valid(tools));
+''';
+
+// Phase 9b: when an artifact was stored, and one file per path for a job, so
+// that a step that runs again replaces its artifact instead of adding another.
+// `path` is relative to the artifact store: `<job id>/<file name>`.
+const _v5 = '''
+ALTER TABLE artifact ADD COLUMN created_at INTEGER NOT NULL DEFAULT 0;
+CREATE UNIQUE INDEX idx_artifact_job_path ON artifact (job_id, path);
 ''';

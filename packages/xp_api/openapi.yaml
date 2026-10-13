@@ -381,6 +381,121 @@ paths:
           $ref: "#/components/responses/UpgradeRequired"
         "500":
           $ref: "#/components/responses/InternalError"
+  /jobs/{id}/artifacts:
+    parameters:
+      - $ref: "#/components/parameters/JobId"
+    get:
+      operationId: listJobArtifacts
+      summary: The files a job produced.
+      description: |
+        The builds (`apk`, `aab`, `ipa`) and the manifest the job stored, oldest
+        first. A job that produced nothing answers an empty list.
+      responses:
+        "200":
+          description: The artifacts.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ArtifactsResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /artifacts/{id}:
+    parameters:
+      - $ref: "#/components/parameters/ArtifactId"
+    get:
+      operationId: getArtifact
+      summary: One artifact's metadata.
+      responses:
+        "200":
+          description: The artifact.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Artifact"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /artifacts/{id}/download:
+    parameters:
+      - $ref: "#/components/parameters/ArtifactId"
+    get:
+      operationId: downloadArtifact
+      summary: The content of an artifact.
+      description: |
+        Streams the stored file. `Content-Length` is its size and
+        `X-Content-SHA256` its SHA-256 in lowercase hexadecimal, so a client
+        can verify what it saved.
+      responses:
+        "200":
+          description: The file.
+          headers:
+            Content-Length:
+              schema:
+                type: integer
+            X-Content-SHA256:
+              schema:
+                type: string
+            Content-Disposition:
+              schema:
+                type: string
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /artifacts/{id}/pin:
+    parameters:
+      - $ref: "#/components/parameters/ArtifactId"
+    post:
+      operationId: pinArtifact
+      summary: Keep an artifact when the engine frees up space.
+      description: Pinning a pinned artifact changes nothing.
+      responses:
+        "200":
+          description: The artifact, pinned.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Artifact"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /artifacts/{id}/unpin:
+    parameters:
+      - $ref: "#/components/parameters/ArtifactId"
+    post:
+      operationId: unpinArtifact
+      summary: Let the engine remove an artifact when it frees up space.
+      description: Unpinning an artifact that is not pinned changes nothing.
+      responses:
+        "200":
+          description: The artifact, not pinned.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Artifact"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
 components:
   securitySchemes:
     bearerAuth:
@@ -395,6 +510,13 @@ components:
       description: The job id, for example `job_1a2b3c4d5e6f7a8b`.
       schema:
         type: string
+    ArtifactId:
+      name: id
+      in: path
+      required: true
+      description: The artifact id, for example `art_1a2b3c4d5e6f7a8b`.
+      schema:
+        type: string
     ProjectId:
       name: id
       in: path
@@ -405,7 +527,7 @@ components:
   responses:
     NotFound:
       description: |
-        There is no such project or job, or GitHub cannot find the
+        There is no such project, job or artifact, or GitHub cannot find the
         repository.
       content:
         application/json:
@@ -944,6 +1066,52 @@ components:
           description: |
             Re-run from the step with this ordinal. Without it the job resumes
             at its first unfinished step.
+    ArtifactKind:
+      type: string
+      enum:
+        - ipa
+        - aab
+        - apk
+        - mapping
+        - dsym
+        - manifest
+        - shorebird_symbols
+    Artifact:
+      type: object
+      required: [id, jobId, kind, name, size, sha256, pinned, createdAt]
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+        jobId:
+          type: string
+        kind:
+          $ref: "#/components/schemas/ArtifactKind"
+        name:
+          type: string
+          description: The file name, such as `dev-1.0.0+7.apk`.
+        size:
+          type: integer
+          minimum: 0
+          description: Bytes.
+        sha256:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+        pinned:
+          type: boolean
+          description: A pinned artifact is kept when the engine frees up space.
+        createdAt:
+          type: string
+          format: date-time
+    ArtifactsResponse:
+      type: object
+      required: [artifacts]
+      additionalProperties: false
+      properties:
+        artifacts:
+          type: array
+          items:
+            $ref: "#/components/schemas/Artifact"
     LogLineFrame:
       type: object
       required: [type, seq, step, at, stream, text]
