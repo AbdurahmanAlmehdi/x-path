@@ -1,7 +1,9 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:test/test.dart';
+import 'package:xp_adapters/xp_adapters.dart';
 import 'package:xp_api/xp_api.dart';
 import 'package:xp_engine/xp_engine.dart';
 import 'package:xpd/xpd.dart';
@@ -27,6 +29,18 @@ void main() {
     environment: environment,
     operatingSystem: operatingSystem,
   );
+
+  // The engine database as another process would open it.
+  Future<T> withDatabase<T>(
+    Future<T> Function(SqliteDatabase database) action,
+  ) async {
+    final database = SqliteDatabase.open('$dataDir/$databaseFileName');
+    try {
+      return await action(database);
+    } finally {
+      database.close();
+    }
+  }
 
   setUp(() {
     root = Directory.systemTemp.createTempSync('xpd_cli_');
@@ -89,18 +103,33 @@ void main() {
       await create(['-n', 'laptop', '-k', 'cli']);
       final secret = out.toString().trim();
 
-      final tokens = TokenService(
-        tokens: FileDeviceTokenRepository(dataDir),
-        clock: const SystemClock(),
+      final token = await withDatabase(
+        (database) => TokenService(
+          tokens: SqliteDeviceTokenRepository(database),
+          clock: const SystemClock(),
+        ).authenticate(secret),
       );
-      final token = await tokens.authenticate(secret);
 
       expect(token?.name, 'laptop');
       expect(token?.kind, DeviceTokenKind.cli);
-      expect(
-        File('$dataDir/tokens.json').readAsStringSync(),
-        isNot(contains(secret)),
+      for (final file in Directory(dataDir).listSync().whereType<File>()) {
+        expect(
+          latin1.decode(file.readAsBytesSync()),
+          isNot(contains(secret)),
+          reason: file.path,
+        );
+      }
+    });
+
+    test('keeps working on a data directory that already has tokens', () async {
+      await create(['--name', 'first', '--kind', 'app']);
+      await create(['--name', 'second', '--kind', 'cli']);
+
+      final names = await withDatabase(
+        (database) => SqliteDeviceTokenRepository(database).list(),
       );
+
+      expect(names.map((token) => token.name), ['first', 'second']);
     });
 
     test('takes the data directory from the environment', () async {
@@ -110,7 +139,7 @@ void main() {
       );
 
       expect(code, 0);
-      expect(File('$dataDir/tokens.json').existsSync(), isTrue);
+      expect(File('$dataDir/$databaseFileName').existsSync(), isTrue);
     });
 
     test('xpd token --help lists create', () async {
@@ -151,6 +180,23 @@ void main() {
 
       expect(code, 1);
       expect(err.toString(), startsWith('xpd: '));
+      expect(out.toString(), isEmpty);
+    });
+
+    test('reports a database written by a newer xpd', () async {
+      Directory(dataDir).createSync();
+      SqliteDatabase.open(
+        '$dataDir/$databaseFileName',
+        migrations: [
+          ...engineMigrations,
+          Migration(version: engineMigrations.length + 1, sql: 'SELECT 1;'),
+        ],
+      ).close();
+
+      final code = await create(['--name', 'n', '--kind', 'app']);
+
+      expect(code, 1);
+      expect(err.toString(), contains('newer than the'));
       expect(out.toString(), isEmpty);
     });
 
@@ -199,14 +245,17 @@ void main() {
       () async {
         final exit = run(['serve', '--port', '0', '--data-dir', dataDir]);
         final uri = await startServing(exit);
-        final secret = TokenService(
-          tokens: FileDeviceTokenRepository(dataDir),
-          clock: const SystemClock(),
-        ).issue(name: 'late', kind: DeviceTokenKind.app).then((i) => i.secret);
+        // Another connection, as `xpd token create` would be.
+        final secret = await withDatabase(
+          (database) async => (await TokenService(
+            tokens: SqliteDeviceTokenRepository(database),
+            clock: const SystemClock(),
+          ).issue(name: 'late', kind: DeviceTokenKind.app)).secret,
+        );
 
         final socket = await WebSocket.connect(
           'ws://127.0.0.1:${uri.port}/events',
-          headers: {'authorization': 'Bearer ${await secret}'},
+          headers: {'authorization': 'Bearer $secret'},
         );
         final closed = Completer<int?>();
         socket.listen((_) {}, onDone: () => closed.complete(socket.closeCode));
@@ -217,6 +266,56 @@ void main() {
         expect(await exit, 0);
       },
     );
+
+    test('keeps the event log across a restart', () async {
+      Directory(dataDir).createSync();
+      final secret = await withDatabase(
+        (database) async => (await TokenService(
+          tokens: SqliteDeviceTokenRepository(database),
+          clock: const SystemClock(),
+        ).issue(name: 'late', kind: DeviceTokenKind.app)).secret,
+      );
+
+      Future<List<Map<String, dynamic>>> frames(
+        Uri uri,
+        String query,
+        int count,
+      ) async {
+        final socket = await WebSocket.connect(
+          'ws://127.0.0.1:${uri.port}/events$query',
+          headers: {'authorization': 'Bearer $secret'},
+        );
+        final received = await socket
+            .map((frame) => jsonDecode(frame as String) as Map<String, dynamic>)
+            .take(count)
+            .toList();
+        await socket.close();
+        return received;
+      }
+
+      var exit = run(['serve', '--port', '0', '--data-dir', dataDir]);
+      final first = await frames(await startServing(exit), '', 1);
+      shutdown.add(null);
+      await exit;
+
+      out = WatchedSink();
+      exit = run(['serve', '--port', '0', '--data-dir', dataDir]);
+      final second = await frames(
+        await startServing(exit),
+        '?after=${first.single['seq']}',
+        2,
+      );
+      shutdown.add(null);
+      await exit;
+
+      expect(first.single['type'], 'stream.opened');
+      expect(first.single['seq'], 1);
+      // The second run's frames: stream.opened at the new head, then what the
+      // client missed: the second engine.started.
+      expect(second.first['seq'], 2);
+      expect(second.last['type'], 'engine.started');
+      expect(second.last['seq'], 2);
+    });
 
     test('warns when the address is not loopback', () async {
       final exit = run([
@@ -239,9 +338,11 @@ void main() {
     test('reports 500s on err with the details', () async {
       final exit = run(['serve', '--port', '0', '--data-dir', dataDir]);
       final uri = await startServing(exit);
-      File('$dataDir/tokens.json')
-        ..createSync(recursive: true)
-        ..writeAsStringSync('not json');
+      // Another connection breaks the database under the running engine.
+      await withDatabase(
+        (database) async =>
+            database.connection.execute('DROP TABLE device_token'),
+      );
 
       final client = HttpClient();
       final request = await client.getUrl(uri.resolve('/events'));
@@ -250,7 +351,7 @@ void main() {
       client.close(force: true);
 
       expect(response.statusCode, 500);
-      expect(err.toString(), contains('error: FormatException'));
+      expect(err.toString(), contains('error: SqliteException'));
 
       shutdown.add(null);
       await exit;

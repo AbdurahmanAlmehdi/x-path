@@ -1,8 +1,8 @@
 import 'package:args/command_runner.dart';
-import 'package:xp_engine/xp_engine.dart';
+import 'package:xp_adapters/xp_adapters.dart';
 import 'package:xpd/src/cli/xpd_context.dart';
 import 'package:xpd/src/storage/data_directory.dart';
-import 'package:xpd/src/storage/file_device_token_repository.dart';
+import 'package:xpd/src/storage/engine_database.dart';
 
 /// A command of `xpd` that works with the engine's data directory.
 abstract class XpdCommand extends Command<int> {
@@ -25,15 +25,22 @@ abstract class XpdCommand extends Command<int> {
   @override
   void printUsage() => context.out.writeln(usage);
 
-  /// The token service over the files in the data directory.
-  TokenService openTokens() => TokenService(
-    tokens: FileDeviceTokenRepository(
+  /// Runs [action] on the engine database in the data directory and closes
+  /// the database afterwards, whatever happens.
+  Future<T> withDatabase<T>(
+    Future<T> Function(SqliteDatabase database) action,
+  ) async {
+    final database = await openEngineDatabase(
       resolveDataDirectory(
         option: argResults!['data-dir'] as String?,
         environment: context.environment,
         operatingSystem: context.operatingSystem,
       ),
-    ),
-    clock: const SystemClock(),
-  );
+    );
+    try {
+      return await action(database);
+    } finally {
+      database.close();
+    }
+  }
 }

@@ -2,7 +2,7 @@ import 'package:xp_engine/src/tokens/device_token.dart';
 
 /// Where device tokens are kept.
 ///
-/// Phase 3 adds a SQLite implementation.
+/// `xp_adapters` has the SQLite implementation.
 abstract interface class DeviceTokenRepository {
   /// Every token, revoked ones included.
   Future<List<DeviceToken>> list();

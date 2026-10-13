@@ -23,7 +23,7 @@ class DataDirectoryException implements IOException {
 /// default: `~/Library/Application Support/XPath` on macOS and
 /// `$XDG_DATA_HOME/xpath` (`~/.local/share/xpath`) elsewhere.
 ///
-/// Phase 3 keeps the database here; for now it holds the device tokens.
+/// It holds the database, `xpath.db`.
 String resolveDataDirectory({
   required Map<String, String> environment,
   required String operatingSystem,

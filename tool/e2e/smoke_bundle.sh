@@ -3,8 +3,10 @@
 # throwaway data directory and checks that it works end to end:
 #
 #   - GET /health answers 200 {"status":"ok"} without a token,
-#   - `xpd token create` prints a token,
+#   - the SQLite database (the sqlite3 build hook) opens in the bundle,
 #   - GET /events without a token answers 401,
+#   - `xpd token create` prints a token that the running engine accepts
+#     (426: authenticated, but not a WebSocket upgrade),
 #   - SIGTERM stops it cleanly (exit 0).
 #
 # Needs the repo's Dart (3.13) first on PATH, and curl. Works on macOS and
@@ -63,9 +65,15 @@ status="$(curl -sS --max-time 5 -o /dev/null -w '%{http_code}' "$url/events")"
 
 token="$("$xpd" token create --name smoke --kind cli --data-dir "$data" 2>/dev/null)"
 [[ "$token" =~ ^xpt_[A-Za-z0-9_-]{43}$ ]] || fail "xpd token create printed an unexpected token"
-if grep -qF "$token" "$data/tokens.json"; then
+[[ -s "$data/xpath.db" ]] || fail "no database at $data/xpath.db"
+if grep -qaF "$token" "$data"/xpath.db*; then
   fail "the token is stored in clear text"
 fi
+
+status="$(curl -sS --max-time 5 -o /dev/null -w '%{http_code}' \
+  -H "Authorization: Bearer $token" "$url/events")"
+[[ "$status" == "426" ]] \
+  || fail "GET /events with a fresh token answered $status, not 426"
 
 kill -TERM "$server_pid"
 if wait "$server_pid"; then

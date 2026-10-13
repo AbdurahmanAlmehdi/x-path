@@ -13,5 +13,5 @@ export 'src/cli/xpd_context.dart';
 export 'src/run_xpd.dart';
 export 'src/server/xpd_server.dart';
 export 'src/storage/data_directory.dart';
-export 'src/storage/file_device_token_repository.dart';
+export 'src/storage/engine_database.dart';
 export 'src/version.dart';

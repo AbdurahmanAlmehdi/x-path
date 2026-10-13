@@ -23,8 +23,8 @@ class EventGapException implements Exception {
 /// Append-only log of engine events with sequence numbers, so that a client
 /// can reconnect and receive what it missed.
 ///
-/// The window of retained events is bounded. Phase 3 adds a SQLite
-/// implementation that survives restarts.
+/// The window of retained events is bounded. [InMemoryEventLog] forgets
+/// everything on exit; `xp_adapters` has a SQLite log that survives restarts.
 abstract interface class EventLog {
   /// The sequence number of the newest event, or 0 when none was logged.
   int get head;
