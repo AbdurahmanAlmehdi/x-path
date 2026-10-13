@@ -246,6 +246,141 @@ paths:
           $ref: "#/components/responses/SecretsLocked"
         "500":
           $ref: "#/components/responses/InternalError"
+  /jobs/{id}:
+    parameters:
+      - $ref: "#/components/parameters/JobId"
+    get:
+      operationId: getJob
+      summary: One job, with its steps.
+      responses:
+        "200":
+          description: The job.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Job"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /jobs/{id}/cancel:
+    parameters:
+      - $ref: "#/components/parameters/JobId"
+    post:
+      operationId: cancelJob
+      summary: Cancel a job.
+      description: |
+        Stops the process tree of the running step: `SIGTERM` to its process
+        group, ten seconds of grace, then `SIGKILL` (ADR 0003). The response
+        comes once the job has ended, so it can take up to ten seconds. A job
+        that is not running (queued, interrupted, waiting for a resume) is
+        cancelled at once. A job that has ended answers `409 conflict`.
+      responses:
+        "200":
+          description: The cancelled job.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Job"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /jobs/{id}/resume:
+    parameters:
+      - $ref: "#/components/parameters/JobId"
+    post:
+      operationId: resumeJob
+      summary: Resume a job at its first unfinished step.
+      description: |
+        Valid for a job that is `failed`, `cancelled`, `interrupted` or
+        `waiting_for_resume`. Steps that succeeded or were skipped are not run
+        again (D-18). A step with side effects that was started before asks
+        its store whether the work exists already (`alreadyDone`) and is
+        skipped if so; only a resume ever runs it again. The job runs in the
+        background: follow `job.state_changed` on `/events` or the log
+        WebSocket.
+
+        With `fromStep` the job re-runs from that step even if it and later
+        steps succeeded; every earlier step must be done.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ResumeJobRequest"
+      responses:
+        "202":
+          description: The job is running again.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Job"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /jobs/{id}/logs:
+    parameters:
+      - $ref: "#/components/parameters/JobId"
+    get:
+      operationId: streamJobLogs
+      summary: WebSocket stream of a job's log lines.
+      description: |
+        Upgrade to a WebSocket (browsers are refused, as for `/events`). Every
+        text frame is one JSON `LogFrame`. Lines are masked before they are
+        stored or sent: known secret values read `***`.
+
+        The engine replays the lines of the job with a `seq` greater than
+        `after` (default 0, the whole log), then follows the job live. `seq`
+        counts the lines of the whole job from 1, across its steps, and
+        survives a resume. A client stores the `seq` of the last line it
+        handled and reconnects with that value.
+
+        A frame queue is bounded: a client that falls behind, for example
+        while it replays a long log of a job that keeps writing, gets a `gap`
+        frame in place of the lines it missed (they are in the log; reconnect
+        with `after` to read them). When the job is not running (it ended, or
+        is interrupted or waiting for a resume) and everything was sent, the
+        last frame is `end`, with the state the job is in, and the engine
+        closes the socket with code 1000.
+
+        An `after` greater than the newest line answers `409 resync_required`.
+      parameters:
+        - name: after
+          in: query
+          required: false
+          description: Last `seq` the client has seen.
+          schema:
+            type: integer
+            minimum: 0
+      responses:
+        "101":
+          description: Switching Protocols. Frames follow `LogFrame`.
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/ResyncRequired"
+        "426":
+          $ref: "#/components/responses/UpgradeRequired"
+        "500":
+          $ref: "#/components/responses/InternalError"
 components:
   securitySchemes:
     bearerAuth:
@@ -253,6 +388,13 @@ components:
       scheme: bearer
       description: A device token created with `xpd token create`.
   parameters:
+    JobId:
+      name: id
+      in: path
+      required: true
+      description: The job id, for example `job_1a2b3c4d5e6f7a8b`.
+      schema:
+        type: string
     ProjectId:
       name: id
       in: path
@@ -263,7 +405,8 @@ components:
   responses:
     NotFound:
       description: |
-        There is no such project, or GitHub cannot find the repository.
+        There is no such project or job, or GitHub cannot find the
+        repository.
       content:
         application/json:
           schema:
@@ -271,7 +414,8 @@ components:
     Conflict:
       description: |
         The request clashes with what the engine holds: the repository is a
-        project already, or the project has releases or jobs.
+        project already, the project has releases or jobs, or the job is not
+        in a state that allows the request.
       content:
         application/json:
           schema:
@@ -382,8 +526,9 @@ components:
           type: string
           description: |
             `engine.started`, `stream.opened`, `project.added`,
-            `project.scanned`, `project.removed`, or a type added by a later
-            engine version, which a client must ignore.
+            `project.scanned`, `project.removed`, `job.state_changed`,
+            `job.step_changed`, or a type added by a later engine version,
+            which a client must ignore.
         payload:
           type: object
     FindingSeverity:
@@ -704,3 +849,153 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/AppEdit"
+    JobState:
+      type: string
+      enum:
+        - queued
+        - running
+        - succeeded
+        - failed
+        - cancelled
+        - interrupted
+        - waiting_for_resume
+    StepState:
+      type: string
+      enum:
+        - pending
+        - running
+        - succeeded
+        - failed
+        - skipped
+        - cancelled
+        - interrupted
+    JobStep:
+      type: object
+      required: [ordinal, kind, state, sideEffect, attempts]
+      additionalProperties: false
+      properties:
+        ordinal:
+          type: integer
+          minimum: 0
+        kind:
+          type: string
+          description: The step type, for example `command`.
+        state:
+          $ref: "#/components/schemas/StepState"
+        sideEffect:
+          type: boolean
+          description: |
+            Whether the step changes something outside the engine. The engine
+            never repeats such a step by itself (D-18).
+        attempts:
+          type: integer
+          minimum: 0
+        result:
+          type: object
+        message:
+          type: string
+        startedAt:
+          type: string
+          format: date-time
+        finishedAt:
+          type: string
+          format: date-time
+    Job:
+      type: object
+      required: [id, projectId, workflowVersionId, state, createdAt, steps]
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+        projectId:
+          type: string
+        workflowVersionId:
+          type: string
+        releaseId:
+          type: string
+        sha:
+          type: string
+        state:
+          $ref: "#/components/schemas/JobState"
+        runnerId:
+          type: string
+        message:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        startedAt:
+          type: string
+          format: date-time
+        finishedAt:
+          type: string
+          format: date-time
+        steps:
+          type: array
+          items:
+            $ref: "#/components/schemas/JobStep"
+    ResumeJobRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        fromStep:
+          type: integer
+          minimum: 0
+          description: |
+            Re-run from the step with this ordinal. Without it the job resumes
+            at its first unfinished step.
+    LogLineFrame:
+      type: object
+      required: [type, seq, step, at, stream, text]
+      additionalProperties: false
+      properties:
+        type:
+          type: string
+          const: line
+        seq:
+          type: integer
+          minimum: 1
+        step:
+          type: integer
+          minimum: 0
+          description: The ordinal of the step that wrote the line.
+        at:
+          type: string
+          format: date-time
+        stream:
+          type: string
+          enum: [stdout, stderr]
+        text:
+          type: string
+    LogGapFrame:
+      type: object
+      required: [type, fromSeq, toSeq, count]
+      additionalProperties: false
+      properties:
+        type:
+          type: string
+          const: gap
+        fromSeq:
+          type: integer
+          minimum: 1
+        toSeq:
+          type: integer
+          minimum: 1
+        count:
+          type: integer
+          minimum: 1
+    LogEndFrame:
+      type: object
+      required: [type, state]
+      additionalProperties: false
+      properties:
+        type:
+          type: string
+          const: end
+        state:
+          $ref: "#/components/schemas/JobState"
+    LogFrame:
+      oneOf:
+        - $ref: "#/components/schemas/LogLineFrame"
+        - $ref: "#/components/schemas/LogGapFrame"
+        - $ref: "#/components/schemas/LogEndFrame"

@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:path/path.dart' as p;
 import 'package:xp_adapters/xp_adapters.dart';
 import 'package:xp_engine/xp_engine.dart';
 import 'package:xp_secrets/xp_secrets.dart';
@@ -53,6 +54,18 @@ class ServeCommand extends XpdCommand {
     }
 
     final directory = dataDirectory;
+    final masker = SecretMasker();
+    final supervisor = IoProcessSupervisor(
+      masker: masker,
+      clock: const SystemClock(),
+      path: context.environment['PATH'],
+    );
+    try {
+      supervisor.requirePerl();
+    } on ToolchainException catch (error) {
+      context.err.writeln('xpd: ${error.message}');
+      return 1;
+    }
     return await withDatabase((database) async {
       const runner = IoProcessRunner();
       final secrets = createSecretStore(
@@ -65,6 +78,40 @@ class ServeCommand extends XpdCommand {
       final events = SqliteEventLog(
         database: database,
         clock: const SystemClock(),
+      );
+      final jobRepository = SqliteJobRepository(database);
+      final secretFiles = DirectorySecretFileStore(p.join(directory, 'tmp'));
+      final logs = JobLogs(store: FileJobLogStore(p.join(directory, 'logs')));
+      final jobs = JobRunner(
+        jobs: jobRepository,
+        steps: StepRegistry([const CommandStep()]),
+        supervisor: supervisor,
+        logs: logs,
+        secrets: secrets,
+        secretFiles: secretFiles,
+        power: ReferenceCountedPowerAssertion(
+          createPowerAssertion(
+            runner: runner,
+            operatingSystem: context.operatingSystem,
+            pid: pid,
+            onWarning: (message) => context.err.writeln('warning: $message'),
+          ),
+        ),
+        events: events,
+        clock: const SystemClock(),
+        hostEnvironment: context.environment,
+        onError: (error, stackTrace) =>
+            context.err.writeln('error: $error\n$stackTrace'),
+      );
+      await _recoverJobs(
+        JobRecovery(
+          jobs: jobRepository,
+          killer: ProcessGroupKiller(control: const IoProcessGroupControl()),
+          secretFiles: secretFiles,
+          events: events,
+          clock: const SystemClock(),
+        ),
+        jobs,
       );
       final server = await XpdServer.start(
         tokens: TokenService(
@@ -86,6 +133,8 @@ class ServeCommand extends XpdCommand {
           events: events,
           clock: const SystemClock(),
         ),
+        jobs: jobs,
+        logs: logs,
         clock: const SystemClock(),
         engineVersion: packageVersion,
         host: host,
@@ -97,9 +146,29 @@ class ServeCommand extends XpdCommand {
 
       await context.shutdown.first;
       context.out.writeln('xpd shutting down');
+      // Stop the jobs the way a crash would, but cleanly: their processes end
+      // and the next start resumes them.
+      await jobs.interruptAll();
       await server.close();
       github.close();
       return 0;
     });
+  }
+
+  /// Cleans up after an engine that stopped while jobs ran (ADR 0003, D-18):
+  /// stops what they left running, and runs the jobs that can simply go on.
+  /// Jobs with an interrupted side-effect step wait for an explicit resume.
+  Future<void> _recoverJobs(JobRecovery recovery, JobRunner jobs) async {
+    final report = await recovery.recover();
+    for (final id in report.waiting) {
+      context.err.writeln(
+        'warning: job $id was interrupted in a step with side effects; it '
+        'waits for an explicit resume.',
+      );
+    }
+    for (final id in report.resumable) {
+      context.out.writeln('resuming interrupted job $id');
+      await jobs.resume(id);
+    }
   }
 }

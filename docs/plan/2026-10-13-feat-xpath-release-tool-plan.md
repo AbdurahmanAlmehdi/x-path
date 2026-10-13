@@ -315,7 +315,7 @@ Mataa dev builds through `xp` can start after Phase 13, before the desktop app e
 
 ### Phase 7: Process runner and steps
 
-- **Status:** Not started
+- **Status:** Done
 - **Scope:** Process runner per ADR 0003 (groups, cancellation, line streaming with sequence
   and timestamp, bounded fan-out, log files, masking); `Step<I, R>` contract and `JobRunner`
   with resume and idempotency; power assertion (`caffeinate -w` on macOS, `systemd-inhibit` on
