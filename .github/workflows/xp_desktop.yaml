@@ -43,3 +43,4 @@ jobs:
       min_coverage: 90
       coverage_excludes: "**/*.g.dart"
       run_bloc_lint: false
+      test_optimization: false

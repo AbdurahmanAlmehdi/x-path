@@ -19,6 +19,7 @@
     }
   ],
   "useGitignore": true,
+  "globRoot": "${cwd}",
   "ignorePaths": [
     ".fvm/**",
     "**/pubspec.lock",
@@ -68,6 +69,8 @@
     "fvm",
     "fvmrc",
     "gitignored",
+    "goldens",
+    "GOLDENS",
     "googleapis",
     "gradle",
     "handoff",
