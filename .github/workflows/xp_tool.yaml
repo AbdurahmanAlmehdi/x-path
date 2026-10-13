@@ -36,6 +36,7 @@ jobs:
       min_coverage: 90
       coverage_excludes: "**/*.g.dart"
       run_bloc_lint: false
+      test_optimization: false
       format_directories: "lib test check_layers.dart"
       analyze_directories: "lib test check_layers.dart"
 
@@ -48,5 +49,6 @@ jobs:
       min_coverage: 0
       coverage_excludes: "**/*.g.dart"
       run_bloc_lint: false
+      test_optimization: false
       format_directories: "lib test check_layers.dart"
       analyze_directories: "lib test check_layers.dart"

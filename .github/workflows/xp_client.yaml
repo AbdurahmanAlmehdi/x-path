@@ -38,6 +38,7 @@ jobs:
       min_coverage: 100
       coverage_excludes: "**/*.g.dart"
       run_bloc_lint: false
+      test_optimization: false
 
   linux:
     uses: VeryGoodOpenSource/very_good_workflows/.github/workflows/flutter_package.yml@v1
@@ -48,3 +49,4 @@ jobs:
       min_coverage: 0
       coverage_excludes: "**/*.g.dart"
       run_bloc_lint: false
+      test_optimization: false
