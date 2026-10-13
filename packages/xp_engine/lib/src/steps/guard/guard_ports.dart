@@ -42,25 +42,39 @@ abstract interface class PlayRequirements {
 /// A Shorebird release of an app.
 class ShorebirdRelease extends Equatable {
   /// Creates a release record.
-  const new({required this.version, required this.flutterVersion});
+  const new({
+    required this.version,
+    required this.flutterVersion,
+    this.activePlatforms = const {},
+  });
 
   /// The release version as Shorebird names it, `x.y.z+build`.
   final AppVersion version;
 
   /// The Flutter version the release was built with. A patch uses it (D-20).
-  final String flutterVersion;
+  /// `null` for a release that Shorebird has no Flutter version for (releases
+  /// made by old CLI versions).
+  final String? flutterVersion;
+
+  /// The platforms (`android`, `ios`) the release is complete for. A platform
+  /// whose release was started and never finished is not in it.
+  final Set<String> activePlatforms;
 
   @override
-  List<Object?> get props => [version, flutterVersion];
+  List<Object?> get props => [version, flutterVersion, activePlatforms];
 }
 
 /// What Shorebird knows about the releases of an app.
 ///
-/// The Shorebird CLI implements it in Phase 10c.
+/// `xp_adapters` implements it over `shorebird releases list --json`.
 abstract interface class ShorebirdReleases {
   /// The releases of the Shorebird app [appId], or `null` if they cannot be
   /// listed.
-  Future<List<ShorebirdRelease>?> releases(String appId);
+  ///
+  /// [tokenSecret] is the key in the secret store of the Shorebird API key
+  /// (`SHOREBIRD_TOKEN`); without it the CLI uses whatever login the machine
+  /// has.
+  Future<List<ShorebirdRelease>?> releases(String appId, {String? tokenSecret});
 }
 
 /// An [AppStoreTrains] with the answer the test gives it.
@@ -107,9 +121,16 @@ class FakeShorebirdReleases implements ShorebirdReleases {
   /// The app id of every call, oldest first.
   final lookups = <String>[];
 
+  /// The `tokenSecret` of every call, oldest first.
+  final tokenSecrets = <String?>[];
+
   @override
-  Future<List<ShorebirdRelease>?> releases(String appId) async {
+  Future<List<ShorebirdRelease>?> releases(
+    String appId, {
+    String? tokenSecret,
+  }) async {
     lookups.add(appId);
+    tokenSecrets.add(tokenSecret);
     return answer;
   }
 }

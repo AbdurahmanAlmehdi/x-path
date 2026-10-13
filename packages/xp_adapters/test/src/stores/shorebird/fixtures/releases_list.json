@@ -1,0 +1,40 @@
+{
+  "status": "success",
+  "data": {
+    "releases": [
+      {
+        "id": 4411,
+        "app_id": "8b7e4a52-3c7e-4d57-bd3b-1f2b1b6c9c11",
+        "version": "1.2.3+45",
+        "flutter_revision": "ff900e7fbab20fdeb40905ee631baa8d49bd0fa1",
+        "flutter_version": "3.35.4",
+        "display_name": null,
+        "platform_statuses": { "android": "active", "ios": "draft" },
+        "created_at": "2026-10-01T09:30:00.000Z",
+        "updated_at": "2026-10-01T09:45:00.000Z",
+        "notes": null
+      },
+      {
+        "id": 4390,
+        "app_id": "8b7e4a52-3c7e-4d57-bd3b-1f2b1b6c9c11",
+        "version": "1.2.2+44",
+        "flutter_revision": "0f1e2d3c4b5a69788796a5b4c3d2e1f001122334",
+        "platform_statuses": { "android": "active", "ios": "active" },
+        "created_at": "2026-09-20T09:30:00.000Z",
+        "updated_at": "2026-09-20T09:45:00.000Z"
+      },
+      {
+        "id": 4001,
+        "app_id": "8b7e4a52-3c7e-4d57-bd3b-1f2b1b6c9c11",
+        "version": "not a version",
+        "flutter_revision": "aa",
+        "platform_statuses": {},
+        "created_at": "2026-01-01T00:00:00.000Z",
+        "updated_at": "2026-01-01T00:00:00.000Z"
+      },
+      "not a release",
+      { "id": 1, "platform_statuses": {} }
+    ]
+  },
+  "meta": { "version": "1.6.123", "command": "releases list" }
+}

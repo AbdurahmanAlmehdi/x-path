@@ -122,7 +122,8 @@ edited once released: add a new one and a golden `test/src/sqlite/snapshots/v<N>
 (`UPDATE_GOLDENS=1 dart test test/src/sqlite/migrations_test.dart` writes it). Events older than
 seven days are pruned; their sequence numbers are never reused. Schema version 2 adds the scan
 columns of `project`; version 3 adds what the job runner records to `job` and `job_step`; version 4
-adds the tool versions of a job; version 5 adds the time and a unique path to `artifact`.
+adds the tool versions of a job; version 5 adds the time and a unique path to `artifact`; version 6 adds
+`shorebird_release`, the Flutter version each Shorebird release was built with.
 
 Secrets (`packages/xp_secrets`) live on the engine machine behind the `SecretStore` interface of
 `xp_engine`; `createSecretStore` picks the implementation for the platform.
@@ -367,6 +368,46 @@ and that the manifest lists it. It needs the Android SDK (`ANDROID_HOME`, `ANDRO
 Android Studio location) and the pinned Flutter first on `PATH`. Set `XPATH_E2E_FLUTTER_SDK` to use an SDK
 folder that already is the pinned version instead of letting the resolver find it. On Linux the machine
 must be x86-64: Flutter ships no Android release compiler (`gen_snapshot`) for Linux on ARM.
+
+## Shorebird, symbols and post-build checks
+
+Phase 9c adds five steps next to the build steps (`packages/xp_engine/lib/src/steps/{shorebird,symbols,build}`).
+Real Shorebird is never run by the tests: a fake process context asserts the command line, and the JSON the
+adapter parses is a fixture that follows the documented `--json` output.
+
+- **`shorebird.release`** runs `shorebird release android|ios` in the app, with `--flavor`, `--target`,
+  `--build-name`, `--build-number`, `--flutter-version=<resolved pin>`, `--artifact apk|aab` (Android),
+  `--export-options-plist` (iOS) and `--split-debug-info` (obfuscated builds). The app's own flags
+  (`--dart-define-from-file`, `--obfuscate`) go after `--`, which is where Shorebird forwards them to
+  `flutter build`. It stores the APK, the AAB (an APK release also stores the AAB that Shorebird builds with
+  it) or the IPA as artifacts, and saves the Flutter version of the release (`ShorebirdReleaseRepository`,
+  table `shorebird_release`, keyed by Shorebird app id, version and platform). It has a side effect;
+  `alreadyDone` asks `ShorebirdReleases` (`shorebird --json releases list --app-id <id>`) whether the
+  version is complete for the platform. `CI=true` keeps the CLI from prompting.
+- **`shorebird.patch`** looks up the Flutter version of the release it patches, first in that record, then in
+  the release data Shorebird lists, and fails with a fix hint if neither knows it. It resolves that exact SDK
+  (`FlutterResolver`, so the job's recorded Flutter is the release's, not the app's current pin) and runs
+  `shorebird patch android|ios --release-version=<x.y.z+build>`. `shorebird patch` has no `--flutter-version`
+  option: the CLI builds with the Flutter revision of the release by itself, so none is passed. On iOS the IPA
+  the patch builds is deleted afterwards (it carries the release's build number).
+- **The Shorebird key** is `SHOREBIRD_TOKEN` (an `sb_api_*` API key; `login:ci` tokens stopped working on
+  2026-10-01). A step input names the secret (`tokenSecret`, a key in the secret store) and the job runner
+  puts the value in the environment of the process, never in the arguments. Where the key comes from is
+  Phase 10c.
+- **`symbols.archive`** keeps the R8 `mapping.txt` (`mapping`), the zipped dSYMs of the iOS archive (`dsym`)
+  and the zipped debug info of an obfuscated build (`shorebird_symbols`, the only kind for it), each with
+  its SHA-256. A symbol that is not there is a warning in the result, as in the reference script, not a
+  failure. `alreadyDone` holds when everything that can be found is stored and still has its SHA-256.
+- **`build.verifyCompiledConfig`** proves that the configuration reached the binary. It reads the AOT snapshot
+  (`lib/*/libapp.so` of an APK, `base/lib/*/libapp.so` of an AAB, `App.framework/App` of an IPA) of a stored
+  package and looks for the expected strings: literal `needles`, and the values of `keys` of the
+  `--dart-define-from-file` file (a URL is reduced to its host). A string that is missing fails the step with
+  a message that says what was dropped; a package without a snapshot is skipped.
+- **`ios.stripAndReexport`** deletes named frameworks from `build/ios/archive/Runner.xcarchive`, runs
+  `xcodebuild -exportArchive` again so that Xcode signs the smaller bundle, and stores the new IPA over the
+  one `build.ios` stored (same name, same artifact id).
+
+`xpd serve` registers all five.
 
 ## Testing
 
