@@ -1,0 +1,6 @@
+# Applies to files outside the packages, which each have their own options.
+analyzer:
+  exclude:
+    # Design reference files (docs/design/**) import packages the workspace
+    # does not install, so they cannot be analyzed.
+    - "docs/**"
