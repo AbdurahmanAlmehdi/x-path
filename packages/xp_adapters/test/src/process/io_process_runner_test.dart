@@ -2,6 +2,7 @@
 library;
 
 import 'dart:async';
+import 'dart:io';
 
 import 'package:test/test.dart';
 import 'package:xp_adapters/xp_adapters.dart';
@@ -30,6 +31,23 @@ void main() {
     ], stdin: 'multi\nline é');
 
     expect(output.stdout, 'multi\nline é\$HOME "quoted"\n');
+  });
+
+  test('runs in the working directory with the added environment', () async {
+    final dir = Directory.systemTemp.createTempSync('xp_runner_');
+    addTearDown(() => dir.deleteSync(recursive: true));
+
+    final output = await runner.run(
+      'sh',
+      ['-c', r'pwd -P; echo "$XP_TEST_VALUE"; echo "$PATH" | wc -c'],
+      workingDirectory: dir.path,
+      environment: {'XP_TEST_VALUE': 'added'},
+    );
+
+    final lines = output.stdout.trim().split('\n');
+    expect(lines[0], dir.resolveSymbolicLinksSync());
+    expect(lines[1], 'added');
+    expect(int.parse(lines[2].trim()), greaterThan(1));
   });
 
   test('throws a ProcessStartException for a missing program', () async {

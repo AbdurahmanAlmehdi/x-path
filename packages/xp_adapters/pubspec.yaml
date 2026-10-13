@@ -8,6 +8,7 @@ environment:
   sdk: ^3.13.0
 
 dependencies:
+  http: ^1.6.0
   path: ^1.9.1
   sqlite3: ^3.7.0
   xp_api: any

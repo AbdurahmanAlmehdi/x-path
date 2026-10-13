@@ -3,6 +3,12 @@ library;
 
 export 'src/clock/clock.dart';
 export 'src/engine_summary.dart';
+export 'src/git/git_exceptions.dart';
+export 'src/git/git_models.dart';
+export 'src/git/git_service.dart';
+export 'src/git/github_client.dart';
+export 'src/git/github_exceptions.dart';
+export 'src/git/github_models.dart';
 export 'src/process/fake_process_runner.dart';
 export 'src/process/process_runner.dart';
 export 'src/repositories/device_token_repository.dart';
