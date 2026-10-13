@@ -1,0 +1,33 @@
+{
+  "size": "5.65 GB",
+  "versions": [
+    {
+      "name": "3.47.6",
+      "directory": "/Users/dev/fvm/versions/3.47.6",
+      "releaseFromChannel": null,
+      "type": "release",
+      "binPath": "/Users/dev/fvm/versions/3.47.6/bin",
+      "hasOldBinPath": false,
+      "dartBinPath": "/Users/dev/fvm/versions/3.47.6/bin",
+      "dartExec": "/Users/dev/fvm/versions/3.47.6/bin/dart",
+      "flutterExec": "/Users/dev/fvm/versions/3.47.6/bin/flutter",
+      "flutterSdkVersion": null,
+      "dartSdkVersion": "3.13.5",
+      "isSetup": false
+    },
+    {
+      "name": "3.47.4",
+      "directory": "/Users/dev/fvm/versions/3.47.4",
+      "releaseFromChannel": null,
+      "type": "release",
+      "binPath": "/Users/dev/fvm/versions/3.47.4/bin",
+      "hasOldBinPath": false,
+      "dartBinPath": "/Users/dev/fvm/versions/3.47.4/bin",
+      "dartExec": "/Users/dev/fvm/versions/3.47.4/bin/dart",
+      "flutterExec": "/Users/dev/fvm/versions/3.47.4/bin/flutter",
+      "flutterSdkVersion": null,
+      "dartSdkVersion": "3.13.3",
+      "isSetup": false
+    }
+  ]
+}

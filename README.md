@@ -121,7 +121,8 @@ database is migrated, `xpd` copies it to `xpath.db.bak-v<old version>`. A migrat
 edited once released: add a new one and a golden `test/src/sqlite/snapshots/v<N>.sql`
 (`UPDATE_GOLDENS=1 dart test test/src/sqlite/migrations_test.dart` writes it). Events older than
 seven days are pruned; their sequence numbers are never reused. Schema version 2 adds the scan
-columns of `project`; version 3 adds what the job runner records to `job` and `job_step`.
+columns of `project`; version 3 adds what the job runner records to `job` and `job_step`; version 4
+adds the tool versions of a job.
 
 Secrets (`packages/xp_secrets`) live on the engine machine behind the `SecretStore` interface of
 `xp_engine`; `createSecretStore` picks the implementation for the platform.
@@ -272,6 +273,39 @@ endpoint exposes it yet; workflows call it from Phase 11.
   from a store (train state, Play's target API level, build numbers, Shorebird releases) comes from
   an interface; `xpd` registers the checks that need none and adds the others with the store
   adapters (Phase 10).
+
+## Toolchain
+
+Phase 9a decides which tools a job runs with (D-20). Nothing runs them yet: the build steps of Phase 9b
+are the first callers, and no endpoint exposes this.
+
+- **Flutter** (`FlutterResolver`, `packages/xp_engine/lib/src/toolchain`). Flutter is pinned per app by
+  its `.fvmrc`, which the scan reads into the profile (`flutterVersion`). `resolve(version)` returns a
+  concrete SDK folder, its Flutter and Dart versions and where it came from:
+  1. **fvm**, if it is installed: `fvm api list` (JSON, fvm 3 and 4) gives the SDK it has cached, at
+     whatever path fvm's cache is; a missing version is installed with `fvm install`. Pass
+     `fvmExecutable` a full path when the engine runs with a short `PATH` (a LaunchAgent).
+  2. **XPath's cache**, `<data-dir>/toolchains/flutter/<version>`, when there is no fvm or fvm cannot
+     install the version. A hit is used as it is; a miss goes to the `FlutterInstaller` port. Only exact
+     versions (`3.47.6`) are downloaded.
+  `GitFlutterInstaller` (`xp_adapters`) runs `git clone --depth 1 --branch <version>` of the Flutter
+  repository into a temporary folder of the cache, renames it to the version, then runs `flutter
+  --version --machine` there to precache the Dart SDK. A failure leaves nothing in the cache.
+  A pin that is missing, unreadable, not a version, or not exact when fvm is absent, a failed download
+  and a cached SDK that does not run are `FlutterResolutionException`s (a `ToolchainException`) with
+  a `failure` code and a fix. A Shorebird patch calls `resolve` with the Flutter version recorded for
+  the release instead of the current pin.
+- **Shorebird, gh and Xcode** (`ToolProber`). Managed per machine, never installed or updated by XPath:
+  `shorebird --version`, `gh --version`, and `xcode-select -p` followed by `xcodebuild -version`
+  (`xcodebuild` is only run once an Xcode is selected, because macOS answers it with a dialog on a Mac
+  without developer tools). On Linux Xcode is reported as `unsupported`. No minimum version is enforced;
+  the versions are recorded. Each `ToolReport` is `available`, `missing`, `failed` or `unsupported`, with
+  a message that says how to fix it. The parsers (`version_parsers.dart`) are tested against output
+  captured from real runs, kept in `packages/xp_engine/test/src/toolchain/fixtures`.
+- **Recorded per job** (`JobTools`). The Flutter, Dart, Shorebird, gh and Xcode versions of a job are
+  saved with `JobRepository.saveTools` into the `tools` JSON column of `job` (schema version 4) and read
+  back with `tools`. `JobTools.from(flutter:, reports:)` builds the record from a resolution and the
+  probes.
 
 ## Testing
 

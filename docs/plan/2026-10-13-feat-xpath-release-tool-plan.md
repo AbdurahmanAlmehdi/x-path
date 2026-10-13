@@ -343,7 +343,7 @@ Mataa dev builds through `xp` can start after Phase 13, before the desktop app e
 
 ### Phase 9a: Toolchain
 
-- **Status:** Not started
+- **Status:** Done
 - **Scope:** Flutter resolution (`.fvmrc` → fvm → XPath cache download), Shorebird and gh
   presence and version checks, Xcode detection, recorded tool versions per job.
 - **Files touched:** `packages/xp_engine/lib/src/toolchain/**`, `packages/xp_adapters/lib/src/toolchain/**`
