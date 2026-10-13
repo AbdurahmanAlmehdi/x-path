@@ -10,6 +10,8 @@ export 'src/api/projects/projects_routes.dart';
 export 'src/api/request_body.dart';
 export 'src/api/responses.dart';
 export 'src/api/system_routes.dart';
+export 'src/cli/gh_executable.dart';
+export 'src/cli/secrets_command.dart';
 export 'src/cli/serve_command.dart';
 export 'src/cli/token_command.dart';
 export 'src/cli/xpd_command.dart';

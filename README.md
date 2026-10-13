@@ -103,6 +103,8 @@ dart run apps/xpd/bin/xpd.dart serve                                      # http
   SIGINT and SIGTERM close the server and its WebSocket connections cleanly.
 - `xpd token create --name <name> --kind app|cli|mcp|runner` creates a device token and prints it
   once on stdout. Only its SHA-256 is stored. A running engine accepts it at once.
+- `xpd secrets import-gh [--data-dir <path>] [--gh <path>]` stores the token of the GitHub CLI in
+  the engine's secret store (see Projects and scans).
 - Every route except `GET /health` and `GET /version` needs `Authorization: Bearer <token>`.
 - `GET /events` is a WebSocket. Each frame carries a `seq`; reconnect with `?after=<last seq>` to
   receive what was missed. [`packages/xp_api/openapi.yaml`](packages/xp_api/openapi.yaml)
@@ -162,9 +164,14 @@ All routes need a device token.
 | `PATCH /projects/{id}` | Edits the profile (production flavor, store country, base branch, Shorebird, ids, version files). Edits are kept apart from the scan and applied on top of every scan, so a rescan never undoes them. |
 | `DELETE /projects/{id}` | Removes the project. The mirror stays on disk; the folder is never touched. `409` once it has releases or jobs. |
 
-GitHub calls use the token under `github.token` in the secret store (see Secrets above). Nothing
-imports the token of the GitHub CLI from the command line yet: `GitHubTokenImporter` exists but no
-command runs it. Without a token, adding a project answers `502`. Failures
+GitHub calls use the token under `github.token` in the secret store (see Secrets above).
+`xpd secrets import-gh [--data-dir <path>] [--gh <path>]` puts it there: it runs `gh auth token`
+(`GitHubTokenImporter`) and stores the result in the same secret store `xpd serve` opens (the
+Keychain on macOS, the encrypted file on Linux), replacing any earlier token. It never prints the
+token, only `Imported the GitHub token.`. It exits non-zero with a message when `gh` is not
+found, fails or is not logged in (`gh auth login`), or when the secrets are locked. `gh` is
+looked up on `PATH`, then at `/opt/homebrew/bin/gh` and `/usr/local/bin/gh` (a `launchd` `PATH`
+has neither); `--gh` names it directly. Without a token, adding a project answers `502`. Failures
 of GitHub or git answer `502 upstream_error`, a locked secret store `503 secrets_locked`.
 Adding, scanning and removing announce `project.added`, `project.scanned` and `project.removed` on
 `/events`.
