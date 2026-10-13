@@ -254,7 +254,7 @@ Mataa dev builds through `xp` can start after Phase 13, before the desktop app e
 
 ### Phase 2: Engine skeleton
 
-- **Status:** Not started
+- **Status:** Done
 - **Scope:** `xp_api` base models (error envelope, version, health, sealed events) and the first
   `openapi.yaml` entries; `apps/xpd` with shelf router, hashed device-token auth, `/health`,
   `/version`, WebSocket `/events` with sequence numbers and resume, `xpd token create`,

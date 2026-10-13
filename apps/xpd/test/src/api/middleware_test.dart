@@ -1,0 +1,137 @@
+import 'dart:convert';
+
+import 'package:shelf/shelf.dart';
+import 'package:test/test.dart';
+import 'package:xp_api/xp_api.dart';
+import 'package:xp_engine/xp_engine.dart';
+import 'package:xpd/xpd.dart';
+
+Request _request(String path, {Map<String, String>? headers}) =>
+    Request('GET', Uri.parse('http://localhost$path'), headers: headers);
+
+void main() {
+  group('errorMiddleware', () {
+    test('lets a response through', () async {
+      final handler = const Pipeline()
+          .addMiddleware(errorMiddleware())
+          .addHandler((_) => Response.ok('fine'));
+
+      final response = await handler(_request('/'));
+
+      expect(response.statusCode, 200);
+    });
+
+    test('turns a thrown error into a generic 500 and reports it', () async {
+      final seen = <Object>[];
+      final handler = const Pipeline()
+          .addMiddleware(errorMiddleware(onError: (e, _) => seen.add(e)))
+          .addHandler((_) => throw StateError('secret detail'));
+
+      final response = await handler(_request('/'));
+
+      expect(response.statusCode, 500);
+      final body = await response.readAsString();
+      expect(body, isNot(contains('secret detail')));
+      expect(
+        ErrorResponse.fromJson(jsonDecode(body) as Map<String, dynamic>)
+            .error
+            .code,
+        ApiErrorCode.internal,
+      );
+      expect(seen, [isA<StateError>()]);
+    });
+
+    test('works without an error listener', () async {
+      final handler = const Pipeline()
+          .addMiddleware(errorMiddleware())
+          .addHandler((_) => throw StateError('x'));
+
+      expect((await handler(_request('/'))).statusCode, 500);
+    });
+
+    test('lets a hijack through: the socket is no longer ours', () {
+      final handler = const Pipeline()
+          .addMiddleware(errorMiddleware(onError: (e, _) => fail('reported')))
+          .addHandler((_) => throw const HijackException());
+
+      expect(handler(_request('/')), throwsA(isA<HijackException>()));
+    });
+  });
+
+  group('authMiddleware', () {
+    late TokenService tokens;
+    late String secret;
+    late Handler handler;
+
+    setUp(() async {
+      tokens = TokenService(
+        tokens: InMemoryDeviceTokenRepository(),
+        clock: const SystemClock(),
+      );
+      secret = (await tokens.issue(
+        name: 'n',
+        kind: DeviceTokenKind.app,
+      )).secret;
+      handler = const Pipeline()
+          .addMiddleware(authMiddleware(tokens, publicPaths: {'/open'}))
+          .addHandler((_) => Response.ok('in'));
+    });
+
+    test('lets a valid bearer token through', () async {
+      final response = await handler(
+        _request('/closed', headers: {'authorization': 'Bearer $secret'}),
+      );
+
+      expect(response.statusCode, 200);
+    });
+
+    test('lets public paths through without a token', () async {
+      expect((await handler(_request('/open'))).statusCode, 200);
+    });
+
+    test('refuses everything else with 401 and a challenge', () async {
+      for (final headers in <Map<String, String>>[
+        {},
+        {'authorization': secret},
+        {'authorization': 'Bearer'},
+        {'authorization': 'Bearer a b'},
+        {'authorization': 'Token $secret'},
+        {'authorization': 'Bearer ${secret}x'},
+      ]) {
+        final response = await handler(_request('/closed', headers: headers));
+
+        expect(response.statusCode, 401, reason: '$headers');
+        expect(response.headers['www-authenticate'], 'Bearer');
+      }
+    });
+  });
+
+  group('responses', () {
+    test('jsonResponse encodes the body as JSON', () async {
+      final response = jsonResponse({'a': 1}, statusCode: 201);
+
+      expect(response.statusCode, 201);
+      expect(response.headers['content-type'], 'application/json');
+      expect(await response.readAsString(), '{"a":1}');
+    });
+
+    test(
+      'errorResponse uses the status of the code and adds headers',
+      () async {
+        final response = errorResponse(
+          ApiErrorCode.notFound,
+          'gone',
+          headers: {'x-extra': 'yes'},
+        );
+
+        expect(response.statusCode, 404);
+        expect(response.headers['x-extra'], 'yes');
+        expect(response.headers['content-type'], 'application/json');
+        expect(
+          await response.readAsString(),
+          '{"error":{"code":"not_found","message":"gone"}}',
+        );
+      },
+    );
+  });
+}
