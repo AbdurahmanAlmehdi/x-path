@@ -1,3 +1,4 @@
+import 'package:xp_api/xp_api.dart';
 import 'package:xp_engine/xp_engine.dart';
 
 import 'stub_git.dart';
@@ -48,6 +49,8 @@ guardRequest({
   String? androidAppId = 'com.mataa.app',
   String? shorebirdAppId,
   List<GuardCheckName> checks = const [],
+  String? flavorId,
+  List<CredentialKind> credentialKinds = const [],
 }) {
   final workspace = InMemoryWorkspace(files ?? customerApp('5.4.1+3283'));
   final stub = git ?? StubGit();
@@ -67,6 +70,8 @@ guardRequest({
       iosBundleId: iosBundleId,
       androidAppId: androidAppId,
       shorebirdAppId: shorebirdAppId,
+      flavorId: flavorId,
+      credentialKinds: credentialKinds,
     ),
     workspace: workspace,
     git: stub,

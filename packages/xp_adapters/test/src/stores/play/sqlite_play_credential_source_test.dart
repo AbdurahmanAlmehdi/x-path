@@ -76,13 +76,14 @@ void main() {
     expect(await source().forAndroidAppId('com.mataa.app'), isNull);
   });
 
-  test('takes the oldest reference when there are two', () async {
+  test('takes the oldest reference when two flavors share the id', () async {
+    addFlavor('prod_b', 'com.mataa.app');
     secrets.values['play.other'] = const PlayServiceAccount(
       clientEmail: 'other@x',
       privateKey: 'k',
     ).toSecret();
     addCredential('cred_b', 'prod', 'play_sa', 'play.prod');
-    addCredential('cred_a', 'prod', 'play_sa', 'play.other');
+    addCredential('cred_a', 'prod_b', 'play_sa', 'play.other');
 
     expect(
       (await source().forAndroidAppId('com.mataa.app'))!.clientEmail,

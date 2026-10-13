@@ -52,6 +52,10 @@ abstract interface class GooglePlay {
   /// The committed releases of the track [track], with their review state
   /// (`tracks.releases.list`: at most 20, no edit needed).
   Future<List<PlayReleaseSummary>> releases(String packageName, String track);
+
+  /// Proves that Google accepts the service account: it exchanges the signed
+  /// assertion for an access token. Credential checks use it.
+  Future<void> verifyAccess();
 }
 
 /// Makes the client for a service account.
@@ -175,4 +179,7 @@ class FakeGooglePlay implements GooglePlay {
     _call('releases', 'releases $packageName $track');
     return releasesOf[track] ?? const [];
   }
+
+  @override
+  Future<void> verifyAccess() async => _call('verifyAccess', 'verifyAccess');
 }

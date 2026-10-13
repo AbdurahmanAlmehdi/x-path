@@ -53,6 +53,19 @@ void main() {
     }
   });
 
+  test('asks for the scope it was made for', () {
+    const cloud = 'https://www.googleapis.com/auth/cloud-platform';
+    final other = AssertionVerifier(
+      accounts: const [fakePlayTestAccount],
+      audience: '$audience',
+      now: () => testNow,
+      scope: cloud,
+    );
+
+    expect(other.problem(mint(audience, claims: {'scope': cloud})), isNull);
+    expect(other.problem(mint(audience))!.description, contains(cloud));
+  });
+
   test('rejects what is not a JWT', () {
     expect(verifier.problem(null)!.error, 'invalid_request');
     expect(problem('a.b'), contains('Not a JWT'));

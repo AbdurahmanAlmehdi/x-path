@@ -289,6 +289,104 @@ void main() {
       }
     });
 
+    test('documents the credential endpoints and their error responses', () {
+      final unauthorized = jsonEncode(
+        ErrorResponse.of(ApiErrorCode.unauthorized, 'm').toJson(),
+      );
+      final rejected = jsonEncode(
+        ErrorResponse.of(ApiErrorCode.credentialRejected, 'm').toJson(),
+      );
+
+      for (final (method, path) in [
+        ('GET', '/projects/prj_1/credentials'),
+        ('PUT', '/projects/prj_1/credentials'),
+        ('POST', '/projects/prj_1/credentials/crd_1/verify'),
+        ('DELETE', '/projects/prj_1/credentials/crd_1'),
+      ]) {
+        expect(
+          shipped.validateResponse(
+            method: method,
+            path: path,
+            statusCode: 401,
+            body: unauthorized,
+            contentType: 'application/json',
+          ),
+          isEmpty,
+          reason: '$method $path',
+        );
+      }
+      expect(
+        shipped.validateResponse(
+          method: 'PUT',
+          path: '/projects/prj_1/credentials',
+          statusCode: 422,
+          body: rejected,
+          contentType: 'application/json',
+        ),
+        isEmpty,
+      );
+    });
+
+    test('describes every kind of credential request', () {
+      const requests = <Map<String, Object?>>[
+        {
+          'flavor': 'prod',
+          'kind': 'asc_key',
+          'keyId': 'ABC123DEF4',
+          'issuerId': 'uuid',
+          'privateKey': 'p8',
+          'keyKind': 'individual',
+        },
+        {
+          'flavor': 'prod',
+          'kind': 'apple_id',
+          'appleId': 'a@b.co',
+          'password': 'abcd-efgh-ijkl-mnop',
+        },
+        {'flavor': 'prod', 'kind': 'play_sa', 'serviceAccount': '{}'},
+        {
+          'app': '.',
+          'flavor': 'prod',
+          'kind': 'firebase_sa',
+          'serviceAccount': '{}',
+        },
+        {
+          'flavor': 'prod',
+          'kind': 'keystore',
+          'keystore': 'AQID',
+          'storePassword': 'x',
+          'keyAlias': 'upload',
+          'keyPassword': 'y',
+        },
+        {'flavor': 'prod', 'kind': 'shorebird', 'token': 'sb_api_x'},
+        {'flavor': 'prod', 'kind': 'github', 'token': 'ghp_x'},
+        {
+          'flavor': 'prod',
+          'kind': 'slack',
+          'webhookUrl': 'https://hooks.slack.com/services/T/B/X',
+        },
+      ];
+      for (final request in requests) {
+        expect(
+          shipped.validateSchema('SaveCredentialRequest', request),
+          isEmpty,
+          reason: '$request',
+        );
+      }
+      for (final request in <Map<String, Object?>>[
+        {'flavor': 'prod', 'kind': 'asc_key', 'keyId': 'x'},
+        {'flavor': 'prod', 'kind': 'dropbox', 'token': 'x'},
+        {'flavor': 'prod', 'kind': 'github', 'token': 'x', 'extra': 1},
+        {'kind': 'github', 'token': 'x'},
+      ]) {
+        expect(
+          shipped.validateSchema('SaveCredentialRequest', request),
+          isNotEmpty,
+          reason: '$request',
+        );
+      }
+    });
+
     test('describes every event the engine can send', () {
       for (final event in <EngineEvent>[
         const EngineStarted(version: '0.0.1', apiVersion: '1'),
@@ -314,6 +412,29 @@ void main() {
           baseline: false,
           failures: 3,
           newFailures: 1,
+        ),
+        const CredentialSaved(
+          credentialId: 'crd_1',
+          projectId: 'prj_1',
+          kind: CredentialKind.ascKey,
+          replaced: false,
+        ),
+        const CredentialVerified(
+          credentialId: 'crd_1',
+          projectId: 'prj_1',
+          kind: CredentialKind.ascKey,
+          status: CredentialStatus.verified,
+        ),
+        const CredentialExpired(
+          credentialId: 'crd_1',
+          projectId: 'prj_1',
+          kind: CredentialKind.ascKey,
+          message: 'Revoked.',
+        ),
+        const CredentialRemoved(
+          credentialId: 'crd_1',
+          projectId: 'prj_1',
+          kind: CredentialKind.ascKey,
         ),
       ]) {
         final json = SequencedEvent(

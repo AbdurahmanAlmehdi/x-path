@@ -585,6 +585,189 @@ void main() {
     });
   });
 
+  group('credentials', () {
+    late String projectId;
+
+    Future<RawResponse> send(
+      String method,
+      String path, {
+      Object? body,
+      String? token,
+    }) => engine.request(
+      '/projects/$projectId/credentials$path',
+      method: method,
+      token: token,
+      body: body == null ? null : jsonEncode(body),
+    );
+
+    Map<String, Object?> github([String token = 'ghp_x']) => {
+      'flavor': 'default',
+      'kind': 'github',
+      'token': token,
+    };
+
+    Future<String> saveGithub() async =>
+        (await send('PUT', '', body: github())).json['id']! as String;
+
+    setUp(() async {
+      engine.folders['/work/app'] = projectFiles;
+      final added = await engine.request(
+        '/projects',
+        method: 'POST',
+        body: jsonEncode({'path': '/work/app'}),
+      );
+      projectId = added.json['id']! as String;
+      engine.credentialRepository.flavors.add(
+        CredentialFlavor(
+          id: 'flv_1',
+          projectId: projectId,
+          appPath: '.',
+          name: 'default',
+        ),
+      );
+    });
+
+    test('PUT 201 and 200', () async {
+      final created = await send('PUT', '', body: github());
+      final replaced = await send('PUT', '', body: github('ghp_y'));
+
+      expect(created.statusCode, 201);
+      expect(replaced.statusCode, 200);
+      for (final response in [created, replaced]) {
+        expectContract(
+          response,
+          path: '/projects/$projectId/credentials',
+          method: 'PUT',
+        );
+      }
+    });
+
+    test('PUT 200 for a credential that was refused before', () async {
+      final id = await saveGithub();
+      engine.credentialVerifiers[CredentialKind.github]!.answers.add(
+        const VerificationResult.rejected('Revoked.', fix: 'Replace it.'),
+      );
+      final verified = await send('POST', '/$id/verify');
+
+      expect(verified.json['status'], 'rejected');
+      expectContract(
+        verified,
+        path: '/projects/$projectId/credentials/$id/verify',
+        method: 'POST',
+      );
+    });
+
+    test('PUT 400, 401, 404, 422, 502 and 503', () async {
+      engine.credentialVerifiers[CredentialKind.slack]!.answers.addAll([
+        const VerificationResult.rejected('No.', fix: 'Fix it.'),
+        const VerificationResult.unreachable('Offline.'),
+      ]);
+      final slack = {
+        'flavor': 'default',
+        'kind': 'slack',
+        'webhookUrl': 'https://hooks.slack.com/services/T/B/X',
+      };
+      final responses = <int, RawResponse>{
+        400: await send('PUT', '', body: {'flavor': 'default'}),
+        401: await send('PUT', '', body: github(), token: ''),
+        404: await send('PUT', '', body: {...github(), 'flavor': 'nope'}),
+        422: await send('PUT', '', body: slack),
+        502: await send('PUT', '', body: slack),
+      };
+      engine.credentialSecrets.failure = const SecretsLockedException('locked');
+      responses[503] = await send('PUT', '', body: github());
+
+      for (final MapEntry(key: status, value: response) in responses.entries) {
+        expect(response.statusCode, status);
+        expectContract(
+          response,
+          path: '/projects/$projectId/credentials',
+          method: 'PUT',
+        );
+      }
+    });
+
+    test('request bodies match their schema', () {
+      expect(
+        contract.validateSchema('SaveCredentialRequest', github()),
+        isEmpty,
+      );
+    });
+
+    test('GET lists, narrows and fails', () async {
+      await saveGithub();
+
+      final all = await send('GET', '');
+      final one = await send('GET', '?flavor=default');
+      final bad = await send('GET', '?app=apps/x');
+      final missing = await send('GET', '?flavor=nope');
+      final unauthorized = await send('GET', '', token: '');
+
+      expect(all.statusCode, 200);
+      expect(bad.statusCode, 400);
+      expect(missing.statusCode, 404);
+      expect(unauthorized.statusCode, 401);
+      for (final response in [all, one, bad, missing, unauthorized]) {
+        expectContract(response, path: '/projects/$projectId/credentials');
+      }
+    });
+
+    test('POST verify 503 when the secrets are locked', () async {
+      // A listing reads no secret; the status comes from a check.
+      final id = await saveGithub();
+      engine.credentialSecrets.failure = const SecretsLockedException('locked');
+
+      final response = await send('POST', '/$id/verify');
+
+      expect(response.statusCode, 503);
+      expectContract(
+        response,
+        path: '/projects/$projectId/credentials/$id/verify',
+        method: 'POST',
+      );
+    });
+
+    test('POST verify 200, 401 and 404', () async {
+      final id = await saveGithub();
+
+      final ok = await send('POST', '/$id/verify');
+      final unauthorized = await send('POST', '/$id/verify', token: '');
+      final missing = await send('POST', '/crd_nope/verify');
+
+      expect(
+        [ok.statusCode, unauthorized.statusCode, missing.statusCode],
+        [200, 401, 404],
+      );
+      for (final response in [ok, unauthorized, missing]) {
+        expectContract(
+          response,
+          path: '/projects/$projectId/credentials/$id/verify',
+          method: 'POST',
+        );
+      }
+    });
+
+    test('DELETE 204, 401 and 404', () async {
+      final id = await saveGithub();
+
+      final unauthorized = await send('DELETE', '/$id', token: '');
+      final deleted = await send('DELETE', '/$id');
+      final missing = await send('DELETE', '/$id');
+
+      expect(
+        [unauthorized.statusCode, deleted.statusCode, missing.statusCode],
+        [401, 204, 404],
+      );
+      for (final response in [unauthorized, deleted, missing]) {
+        expectContract(
+          response,
+          path: '/projects/$projectId/credentials/$id',
+          method: 'DELETE',
+        );
+      }
+    });
+  });
+
   group('jobs', () {
     Future<RawResponse> send(String method, String path, [Object? body]) =>
         engine.request(

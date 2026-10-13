@@ -1,6 +1,4 @@
-import 'dart:async';
-import 'dart:convert';
-
+import 'package:xp_adapters/src/stores/shorebird/shorebird_cli.dart';
 import 'package:xp_engine/xp_engine.dart';
 
 /// The releases of a Shorebird app, read with `shorebird --json releases
@@ -13,20 +11,18 @@ import 'package:xp_engine/xp_engine.dart';
 /// and handed to the CLI in `SHOREBIRD_TOKEN`, never as an argument.
 class ShorebirdCliReleases implements ShorebirdReleases {
   /// Creates the adapter. The CLI is [executable]; it has [timeout] to answer.
-  const new({
-    required this._runner,
+  new({
+    required ProcessRunner runner,
     required this._secrets,
-    this.executable = 'shorebird',
-    this.timeout = const Duration(minutes: 2),
-  });
+    String executable = 'shorebird',
+    Duration timeout = const Duration(minutes: 2),
+  }) : _cli = ShorebirdCli(
+         runner: runner,
+         executable: executable,
+         timeout: timeout,
+       );
 
-  /// The Shorebird CLI.
-  final String executable;
-
-  /// How long the CLI has to answer.
-  final Duration timeout;
-
-  final ProcessRunner _runner;
+  final ShorebirdCli _cli;
   final SecretStore _secrets;
 
   /// The releases, or `null` if the CLI is missing, too slow, fails, or says
@@ -37,46 +33,24 @@ class ShorebirdCliReleases implements ShorebirdReleases {
     String appId, {
     String? tokenSecret,
   }) async {
-    final environment = <String, String>{'CI': 'true'};
+    String? token;
     if (tokenSecret != null) {
-      final String? token;
       try {
         token = await _secrets.read(tokenSecret);
       } on SecretStoreException {
         return null;
       }
       if (token == null) return null;
-      environment['SHOREBIRD_TOKEN'] = token;
     }
-    final ProcessOutput output;
-    try {
-      output = await _runner.run(
-        executable,
-        ['--json', 'releases', 'list', '--app-id', appId],
-        environment: environment,
-        timeout: timeout,
-      );
-    } on ProcessStartException {
-      return null;
-    } on TimeoutException {
-      return null;
-    }
-    if (output.exitCode != 0) return null;
-    return _parse(output.stdout);
-  }
-
-  static List<ShorebirdRelease>? _parse(String stdout) {
-    final Object? json;
-    try {
-      json = jsonDecode(stdout);
-    } on FormatException {
-      return null;
-    }
-    if (json is! Map<String, dynamic> || json['status'] != 'success') {
-      return null;
-    }
-    final data = json['data'];
-    final listed = data is Map<String, dynamic> ? data['releases'] : null;
+    final result = await _cli.run([
+      '--json',
+      'releases',
+      'list',
+      '--app-id',
+      appId,
+    ], token: token);
+    if (result is! ShorebirdCliSuccess) return null;
+    final listed = result.data['releases'];
     if (listed is! List) return null;
     return [
       for (final entry in listed)

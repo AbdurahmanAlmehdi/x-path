@@ -205,6 +205,11 @@ class HttpAppStoreConnect implements AppStoreConnect {
     ),
   );
 
+  @override
+  Future<void> verifyAccess() async {
+    await _send('GET', _url('/v1/apps', {'limit': '1'}));
+  }
+
   Uri _url(String path, [Map<String, String>? query]) => _baseUrl.replace(
     path: path,
     queryParameters: query == null || query.isEmpty ? null : query,

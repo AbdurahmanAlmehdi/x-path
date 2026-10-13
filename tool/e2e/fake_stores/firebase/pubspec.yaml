@@ -1,0 +1,20 @@
+name: xp_fake_firebase
+description: >-
+  A fake Firebase App Distribution REST API (v1) and OAuth2 token server for
+  tests and the end-to-end scripts. It checks the service account assertion
+  like Google does.
+version: 0.0.1
+publish_to: none
+resolution: workspace
+
+environment:
+  sdk: ^3.13.0
+
+dependencies:
+  pointycastle: ^4.0.0
+  xp_fake_play: any
+
+dev_dependencies:
+  http: ^1.6.0
+  test: ^1.31.0
+  very_good_analysis: 11.0.0
