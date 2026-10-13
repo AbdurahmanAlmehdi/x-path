@@ -1,0 +1,2018 @@
+{
+  "name": "XPath tokens",
+  "version": "1.0.0",
+  "naming": {
+    "path": "color.surface.raised",
+    "css": "--xp-color-surface-raised",
+    "flutter": "XpColors.surfaceRaised",
+    "rule": "css = '--xp-' + path with dots as hyphens; flutter = <FamilyClass>.<camelCase of the path after the family>; if that starts with a digit the family word leads (space.12 → XpSpacing.space12).",
+    "families": {
+      "color": "XpColors",
+      "type": "XpTypography",
+      "space": "XpSpacing",
+      "radius": "XpRadii",
+      "border": "XpBorders",
+      "elevation": "XpElevation",
+      "size": "XpSizes",
+      "motion": "XpMotion",
+      "window": "XpWindow"
+    }
+  },
+  "themes": [
+    "light",
+    "dark"
+  ],
+  "tokens": {
+    "color.surface.window": {
+      "type": "color",
+      "css": "--xp-color-surface-window",
+      "flutter": "XpColors.surfaceWindow",
+      "light": "#F6F5F1",
+      "dark": "#141412",
+      "usage": "Content area behind panels: the paper the run sheet sits on."
+    },
+    "color.surface.sidebar": {
+      "type": "color",
+      "css": "--xp-color-surface-sidebar",
+      "flutter": "XpColors.surfaceSidebar",
+      "light": "#EDECE6",
+      "dark": "#191917",
+      "usage": "Sidebar and the collapsed console strip. Flutter may make it translucent on macOS; this is the opaque fallback and the web value."
+    },
+    "color.surface.base": {
+      "type": "color",
+      "css": "--xp-color-surface-base",
+      "flutter": "XpColors.surfaceBase",
+      "light": "#FBFAF7",
+      "dark": "#1A1A18",
+      "usage": "Toolbar / window title area and pane headers."
+    },
+    "color.surface.raised": {
+      "type": "color",
+      "css": "--xp-color-surface-raised",
+      "flutter": "XpColors.surfaceRaised",
+      "light": "#FFFFFF",
+      "dark": "#1E1E1B",
+      "usage": "Panels on the window: pipeline rail, ledger, cards, table bodies. Dark: one tint step up, no shadow."
+    },
+    "color.surface.sunken": {
+      "type": "color",
+      "css": "--xp-color-surface-sunken",
+      "flutter": "XpColors.surfaceSunken",
+      "light": "#EFEEE8",
+      "dark": "#121210",
+      "usage": "Wells inside a raised panel: text fields, code blocks, meter tracks, skeleton base."
+    },
+    "color.surface.overlay": {
+      "type": "color",
+      "css": "--xp-color-surface-overlay",
+      "flutter": "XpColors.surfaceOverlay",
+      "light": "#FFFFFF",
+      "dark": "#262623",
+      "usage": "Menus, popovers, command palette, sheets, dialogs, toasts. Dark: two tint steps up, no shadow."
+    },
+    "color.surface.hover": {
+      "type": "color",
+      "css": "--xp-color-surface-hover",
+      "flutter": "XpColors.surfaceHover",
+      "light": "#F1F0EB",
+      "dark": "#262622",
+      "usage": "Hover fill for rows, sidebar items and tertiary buttons on base, raised or sidebar."
+    },
+    "color.surface.pressed": {
+      "type": "color",
+      "css": "--xp-color-surface-pressed",
+      "flutter": "XpColors.surfacePressed",
+      "light": "#E6E5DE",
+      "dark": "#2E2D29",
+      "usage": "Pressed fill for the same."
+    },
+    "color.surface.inverse": {
+      "type": "color",
+      "css": "--xp-color-surface-inverse",
+      "flutter": "XpColors.surfaceInverse",
+      "light": "#1B1B18",
+      "dark": "#ECEAE3",
+      "usage": "Inverse fill: selected segment, tooltips, the copied-SHA confirmation."
+    },
+    "color.surface.selected": {
+      "type": "color",
+      "css": "--xp-color-surface-selected",
+      "flutter": "XpColors.surfaceSelected",
+      "light": "#FFFFFF",
+      "dark": "#2A2A25",
+      "usage": "Selected sidebar item: sheet plus an inset strong border (see Sidebar)."
+    },
+    "color.text.primary": {
+      "type": "color",
+      "css": "--xp-color-text-primary",
+      "flutter": "XpColors.textPrimary",
+      "light": "#1B1B18",
+      "dark": "#ECEAE3",
+      "usage": "Body copy, names, values. Reads on every surface and every status container."
+    },
+    "color.text.secondary": {
+      "type": "color",
+      "css": "--xp-color-text-secondary",
+      "flutter": "XpColors.textSecondary",
+      "light": "#5C5B54",
+      "dark": "#A8A59B",
+      "usage": "Metadata, column heads, runner names, timestamps in chrome. Reads on every surface."
+    },
+    "color.text.tertiary": {
+      "type": "color",
+      "css": "--xp-color-text-tertiary",
+      "flutter": "XpColors.textTertiary",
+      "light": "#64625B",
+      "dark": "#97948A",
+      "usage": "Placeholders, separators set as text, shortcut hints, line numbers in chrome. Reads 4.5:1 on every surface."
+    },
+    "color.text.on-accent": {
+      "type": "color",
+      "css": "--xp-color-text-on-accent",
+      "flutter": "XpColors.textOnAccent",
+      "light": "#FFFFFF",
+      "dark": "#0F1424",
+      "usage": "Label on an accent fill (primary button, selected segmented item in accent)."
+    },
+    "color.text.on-inverse": {
+      "type": "color",
+      "css": "--xp-color-text-on-inverse",
+      "flutter": "XpColors.textOnInverse",
+      "light": "#FFFFFF",
+      "dark": "#141412",
+      "usage": "Text and icons on surface.inverse."
+    },
+    "color.text.disabled": {
+      "type": "color",
+      "css": "--xp-color-text-disabled",
+      "flutter": "XpColors.textDisabled",
+      "light": "#A6A49C",
+      "dark": "#5E5C55",
+      "usage": "Disabled control labels only. Exempt from 4.5:1 (WCAG 1.4.3 incidental); never used for information."
+    },
+    "color.text.link": {
+      "type": "color",
+      "css": "--xp-color-text-link",
+      "flutter": "XpColors.textLink",
+      "light": "#2449B8",
+      "dark": "#8FB0FF",
+      "usage": "Inline links and 'All jobs' style text buttons."
+    },
+    "color.border.subtle": {
+      "type": "color",
+      "css": "--xp-color-border-subtle",
+      "flutter": "XpColors.borderSubtle",
+      "light": "#EDEBE5",
+      "dark": "#262622",
+      "usage": "Row dividers inside a table or list."
+    },
+    "color.border.default": {
+      "type": "color",
+      "css": "--xp-color-border-default",
+      "flutter": "XpColors.borderDefault",
+      "light": "#E3E1DA",
+      "dark": "#33322D",
+      "usage": "Panel hairlines, pane separators, button outlines (labels identify buttons)."
+    },
+    "color.border.strong": {
+      "type": "color",
+      "css": "--xp-color-border-strong",
+      "flutter": "XpColors.borderStrong",
+      "light": "#8C897F",
+      "dark": "#7A776D",
+      "usage": "Boundaries that alone identify a control: text fields, checkboxes, toggles off, selected sidebar item. 3:1 on raised, window and sunken."
+    },
+    "color.accent.default": {
+      "type": "color",
+      "css": "--xp-color-accent-default",
+      "flutter": "XpColors.accentDefault",
+      "light": "#2449B8",
+      "dark": "#7EA2FF",
+      "usage": "The one primary action per screen (Dispatch…, Approve), focused segmented item, links. Never a status."
+    },
+    "color.accent.hover": {
+      "type": "color",
+      "css": "--xp-color-accent-hover",
+      "flutter": "XpColors.accentHover",
+      "light": "#1E3E9E",
+      "dark": "#97B5FF",
+      "usage": "Primary button hover."
+    },
+    "color.accent.pressed": {
+      "type": "color",
+      "css": "--xp-color-accent-pressed",
+      "flutter": "XpColors.accentPressed",
+      "light": "#183284",
+      "dark": "#6A8DEB",
+      "usage": "Primary button pressed."
+    },
+    "color.accent.container": {
+      "type": "color",
+      "css": "--xp-color-accent-container",
+      "flutter": "XpColors.accentContainer",
+      "light": "#E6ECFB",
+      "dark": "#1D2742",
+      "usage": "Selected text range and selected table rows; accent-tinted wells."
+    },
+    "color.accent.on-container": {
+      "type": "color",
+      "css": "--xp-color-accent-on-container",
+      "flutter": "XpColors.accentOnContainer",
+      "light": "#163A9E",
+      "dark": "#B5CAFF",
+      "usage": "Text on accent.container."
+    },
+    "color.accent.on-accent": {
+      "type": "color",
+      "css": "--xp-color-accent-on-accent",
+      "flutter": "XpColors.accentOnAccent",
+      "light": "{xp-color-text-on-accent}",
+      "dark": "{xp-color-text-on-accent}",
+      "usage": "Alias of text.on-accent, kept so accent has its own pair."
+    },
+    "color.positive.default": {
+      "type": "color",
+      "css": "--xp-color-positive-default",
+      "flutter": "XpColors.positiveDefault",
+      "light": "#1E7A4C",
+      "dark": "#4CC38A",
+      "usage": "Success strokes and fills (meters, rollout bars, diff '+'). As text: raised, window, base."
+    },
+    "color.positive.on-positive": {
+      "type": "color",
+      "css": "--xp-color-positive-on-positive",
+      "flutter": "XpColors.positiveOnPositive",
+      "light": "#FFFFFF",
+      "dark": "#0B1F14",
+      "usage": "Text on a positive fill."
+    },
+    "color.negative.default": {
+      "type": "color",
+      "css": "--xp-color-negative-default",
+      "flutter": "XpColors.negativeDefault",
+      "light": "#B42318",
+      "dark": "#F97066",
+      "usage": "Destructive button fill, failure strokes, error underline in the YAML editor."
+    },
+    "color.negative.hover": {
+      "type": "color",
+      "css": "--xp-color-negative-hover",
+      "flutter": "XpColors.negativeHover",
+      "light": "#9A1D13",
+      "dark": "#FF8A80",
+      "usage": "Destructive button hover."
+    },
+    "color.negative.pressed": {
+      "type": "color",
+      "css": "--xp-color-negative-pressed",
+      "flutter": "XpColors.negativePressed",
+      "light": "#821910",
+      "dark": "#E85D53",
+      "usage": "Destructive button pressed."
+    },
+    "color.negative.on-negative": {
+      "type": "color",
+      "css": "--xp-color-negative-on-negative",
+      "flutter": "XpColors.negativeOnNegative",
+      "light": "#FFFFFF",
+      "dark": "#1F0806",
+      "usage": "Text on a negative fill."
+    },
+    "color.warning.default": {
+      "type": "color",
+      "css": "--xp-color-warning-default",
+      "flutter": "XpColors.warningDefault",
+      "light": "#F0B44C",
+      "dark": "#F0B44C",
+      "usage": "The single loud fill: needs-you count badge and Review… button. Same in both themes."
+    },
+    "color.warning.hover": {
+      "type": "color",
+      "css": "--xp-color-warning-hover",
+      "flutter": "XpColors.warningHover",
+      "light": "#E5A63C",
+      "dark": "#F5C26A",
+      "usage": "Review… button hover."
+    },
+    "color.warning.pressed": {
+      "type": "color",
+      "css": "--xp-color-warning-pressed",
+      "flutter": "XpColors.warningPressed",
+      "light": "#D4972F",
+      "dark": "#E0A443",
+      "usage": "Review… button pressed."
+    },
+    "color.warning.on-warning": {
+      "type": "color",
+      "css": "--xp-color-warning-on-warning",
+      "flutter": "XpColors.warningOnWarning",
+      "light": "#1B1408",
+      "dark": "#1B1408",
+      "usage": "Text on the warning fill."
+    },
+    "color.info.default": {
+      "type": "color",
+      "css": "--xp-color-info-default",
+      "flutter": "XpColors.infoDefault",
+      "light": "#2459C2",
+      "dark": "#6FA8FF",
+      "usage": "Running strokes: running node border, progress bars, follow-tail caret."
+    },
+    "color.info.on-info": {
+      "type": "color",
+      "css": "--xp-color-info-on-info",
+      "flutter": "XpColors.infoOnInfo",
+      "light": "#FFFFFF",
+      "dark": "#0D1729",
+      "usage": "Text on an info fill."
+    },
+    "color.focus.ring": {
+      "type": "color",
+      "css": "--xp-color-focus-ring",
+      "flutter": "XpColors.focusRing",
+      "light": "#2449B8",
+      "dark": "#8FB0FF",
+      "usage": "Keyboard focus: 2px solid ring, 2px offset in the surface colour. 3:1 on every surface in both themes."
+    },
+    "color.selection.default": {
+      "type": "color",
+      "css": "--xp-color-selection-default",
+      "flutter": "XpColors.selectionDefault",
+      "light": "#CFDBF6",
+      "dark": "#2B3B63",
+      "usage": "Text selection highlight and multi-select rows. Primary text stays legible on it."
+    },
+    "color.scrim.default": {
+      "type": "color",
+      "css": "--xp-color-scrim-default",
+      "flutter": "XpColors.scrimDefault",
+      "light": "rgba(27, 27, 24, 0.32)",
+      "dark": "rgba(0, 0, 0, 0.56)",
+      "usage": "Behind sheets and dialogs."
+    },
+    "color.agent.ink": {
+      "type": "color",
+      "css": "--xp-color-agent-ink",
+      "flutter": "XpColors.agentInk",
+      "light": "#1B1B18",
+      "dark": "#ECEAE3",
+      "usage": "Agent marker border (1px dashed), robot icon and label. Deliberately colourless: it says who, not how things are going."
+    },
+    "color.agent.container": {
+      "type": "color",
+      "css": "--xp-color-agent-container",
+      "flutter": "XpColors.agentContainer",
+      "light": "#F3F1EA",
+      "dark": "#22221F",
+      "usage": "Agent marker fill when it sits on a status container or in a dense table; transparent elsewhere."
+    },
+    "color.status.neutral.container": {
+      "type": "color",
+      "css": "--xp-color-status-neutral-container",
+      "flutter": "XpColors.statusNeutralContainer",
+      "light": "#ECEBE5",
+      "dark": "#2A2925",
+      "usage": "Status container (neutral). Nothing to do and nothing wrong: queued, waiting, skipped, cancelled, draft, offline, unknown."
+    },
+    "color.status.neutral.on-container": {
+      "type": "color",
+      "css": "--xp-color-status-neutral-on-container",
+      "flutter": "XpColors.statusNeutralOnContainer",
+      "light": "#4A4943",
+      "dark": "#CFCBBF",
+      "usage": "Status icon + label on status.neutral.container, and inline on raised, window, base and overlay."
+    },
+    "color.status.info.container": {
+      "type": "color",
+      "css": "--xp-color-status-info-container",
+      "flutter": "XpColors.statusInfoContainer",
+      "light": "#E4EBFA",
+      "dark": "#172238",
+      "usage": "Status container (info). Something is moving: running, building, in review, processing, busy, updating, scan info."
+    },
+    "color.status.info.on-container": {
+      "type": "color",
+      "css": "--xp-color-status-info-on-container",
+      "flutter": "XpColors.statusInfoOnContainer",
+      "light": "#1F4FB0",
+      "dark": "#8FBBFF",
+      "usage": "Status icon + label on status.info.container, and inline on raised, window, base and overlay."
+    },
+    "color.status.attention.container": {
+      "type": "color",
+      "css": "--xp-color-status-attention-container",
+      "flutter": "XpColors.statusAttentionContainer",
+      "light": "#FFF0D1",
+      "dark": "#2D2310",
+      "usage": "Status container (attention). A human must act: waiting for approval, ready to submit, pending developer release, secrets locked."
+    },
+    "color.status.attention.on-container": {
+      "type": "color",
+      "css": "--xp-color-status-attention-on-container",
+      "flutter": "XpColors.statusAttentionOnContainer",
+      "light": "#6E3C00",
+      "dark": "#F5C873",
+      "usage": "Status icon + label on status.attention.container, and inline on raised, window, base and overlay."
+    },
+    "color.status.positive.container": {
+      "type": "color",
+      "css": "--xp-color-status-positive-container",
+      "flutter": "XpColors.statusPositiveContainer",
+      "light": "#E3F3EA",
+      "dark": "#12291D",
+      "usage": "Status container (positive). Done and good: succeeded, approved, live, published, verified, connected, idle runner."
+    },
+    "color.status.positive.on-container": {
+      "type": "color",
+      "css": "--xp-color-status-positive-on-container",
+      "flutter": "XpColors.statusPositiveOnContainer",
+      "light": "#17663F",
+      "dark": "#5CCB94",
+      "usage": "Status icon + label on status.positive.container, and inline on raised, window, base and overlay."
+    },
+    "color.status.negative.container": {
+      "type": "color",
+      "css": "--xp-color-status-negative-container",
+      "flutter": "XpColors.statusNegativeContainer",
+      "light": "#FDE8E6",
+      "dark": "#3A1614",
+      "usage": "Status container (negative). Broken or refused: failed, rejected, denied, not approved, expired credential, unreachable, scan error."
+    },
+    "color.status.negative.on-container": {
+      "type": "color",
+      "css": "--xp-color-status-negative-on-container",
+      "flutter": "XpColors.statusNegativeOnContainer",
+      "light": "#A11F14",
+      "dark": "#FF8A80",
+      "usage": "Status icon + label on status.negative.container, and inline on raised, window, base and overlay."
+    },
+    "color.status.caution.container": {
+      "type": "color",
+      "css": "--xp-color-status-caution-container",
+      "flutter": "XpColors.statusCautionContainer",
+      "light": "#FCEBDD",
+      "dark": "#33200F",
+      "usage": "Status container (caution). Degraded but not blocked: interrupted, reconnecting, expiring soon, missing credential, scan warning."
+    },
+    "color.status.caution.on-container": {
+      "type": "color",
+      "css": "--xp-color-status-caution-on-container",
+      "flutter": "XpColors.statusCautionOnContainer",
+      "light": "#8A3606",
+      "dark": "#F6A35C",
+      "usage": "Status icon + label on status.caution.container, and inline on raised, window, base and overlay."
+    },
+    "color.status.merged.container": {
+      "type": "color",
+      "css": "--xp-color-status-merged-container",
+      "flutter": "XpColors.statusMergedContainer",
+      "light": "#EEE9FA",
+      "dark": "#241C3A",
+      "usage": "Status container (merged). Terminal success of a release: merged into main."
+    },
+    "color.status.merged.on-container": {
+      "type": "color",
+      "css": "--xp-color-status-merged-on-container",
+      "flutter": "XpColors.statusMergedOnContainer",
+      "light": "#4B2FA0",
+      "dark": "#BBA6FF",
+      "usage": "Status icon + label on status.merged.container, and inline on raised, window, base and overlay."
+    },
+    "color.log.surface": {
+      "type": "color",
+      "css": "--xp-color-log-surface",
+      "flutter": "XpColors.logSurface",
+      "light": "#FCFBF8",
+      "dark": "#10100E",
+      "usage": "Console / log viewer background. Only surface where ANSI colour may appear."
+    },
+    "color.log.gutter": {
+      "type": "color",
+      "css": "--xp-color-log-gutter",
+      "flutter": "XpColors.logGutter",
+      "light": "#F3F2EC",
+      "dark": "#151513",
+      "usage": "Line-number gutter and sticky step header."
+    },
+    "color.log.text": {
+      "type": "color",
+      "css": "--xp-color-log-text",
+      "flutter": "XpColors.logText",
+      "light": "#22221E",
+      "dark": "#DAD7CE",
+      "usage": "Default log text (ANSI default foreground)."
+    },
+    "color.log.dim": {
+      "type": "color",
+      "css": "--xp-color-log-dim",
+      "flutter": "XpColors.logDim",
+      "light": "#66645D",
+      "dark": "#8F8C83",
+      "usage": "Line numbers, timestamps, ANSI dim on default text."
+    },
+    "color.log.stderr-row": {
+      "type": "color",
+      "css": "--xp-color-log-stderr-row",
+      "flutter": "XpColors.logStderrRow",
+      "light": "#FFF6E0",
+      "dark": "#241D10",
+      "usage": "Row tint for stderr lines when 'stderr only' is off."
+    },
+    "color.log.error-row": {
+      "type": "color",
+      "css": "--xp-color-log-error-row",
+      "flutter": "XpColors.logErrorRow",
+      "light": "#FDECEA",
+      "dark": "#2C1513",
+      "usage": "Row tint for the line 'Jump to error' lands on and lines matched as errors."
+    },
+    "color.log.match": {
+      "type": "color",
+      "css": "--xp-color-log-match",
+      "flutter": "XpColors.logMatch",
+      "light": "#FCE7A6",
+      "dark": "#5A4713",
+      "usage": "Search match highlight."
+    },
+    "color.log.match-active": {
+      "type": "color",
+      "css": "--xp-color-log-match-active",
+      "flutter": "XpColors.logMatchActive",
+      "light": "#F0B44C",
+      "dark": "#F0B44C",
+      "usage": "Current search match (text stays log.text in light, #141412 in dark via log.match-active-text)."
+    },
+    "color.log.match-active-text": {
+      "type": "color",
+      "css": "--xp-color-log-match-active-text",
+      "flutter": "XpColors.logMatchActiveText",
+      "light": "#1B1408",
+      "dark": "#1B1408",
+      "usage": "Text on the current search match."
+    },
+    "color.log.current-row": {
+      "type": "color",
+      "css": "--xp-color-log-current-row",
+      "flutter": "XpColors.logCurrentRow",
+      "light": "#EEF2FC",
+      "dark": "#1A2232",
+      "usage": "The streaming tail line while following."
+    },
+    "color.code.surface": {
+      "type": "color",
+      "css": "--xp-color-code-surface",
+      "flutter": "XpColors.codeSurface",
+      "light": "{xp-color-log-surface}",
+      "dark": "{xp-color-log-surface}",
+      "usage": "YAML editor background (same as the log)."
+    },
+    "color.code.text": {
+      "type": "color",
+      "css": "--xp-color-code-text",
+      "flutter": "XpColors.codeText",
+      "light": "{xp-color-log-text}",
+      "dark": "{xp-color-log-text}",
+      "usage": "Plain YAML text."
+    },
+    "color.code.gutter": {
+      "type": "color",
+      "css": "--xp-color-code-gutter",
+      "flutter": "XpColors.codeGutter",
+      "light": "{xp-color-log-gutter}",
+      "dark": "{xp-color-log-gutter}",
+      "usage": "Line-number gutter in the YAML editor."
+    },
+    "color.log.ansi.black": {
+      "type": "color",
+      "css": "--xp-color-log-ansi-black",
+      "flutter": "XpColors.logAnsiBlack",
+      "light": "#1B1B18",
+      "dark": "#8F8C83",
+      "usage": "ANSI black (SGR 30) on log.surface. Remapped in dark so it stays legible."
+    },
+    "color.log.ansi.red": {
+      "type": "color",
+      "css": "--xp-color-log-ansi-red",
+      "flutter": "XpColors.logAnsiRed",
+      "light": "#B42318",
+      "dark": "#F97066",
+      "usage": "ANSI red (SGR 31) on log.surface."
+    },
+    "color.log.ansi.green": {
+      "type": "color",
+      "css": "--xp-color-log-ansi-green",
+      "flutter": "XpColors.logAnsiGreen",
+      "light": "#1B6E44",
+      "dark": "#4CC38A",
+      "usage": "ANSI green (SGR 32) on log.surface."
+    },
+    "color.log.ansi.yellow": {
+      "type": "color",
+      "css": "--xp-color-log-ansi-yellow",
+      "flutter": "XpColors.logAnsiYellow",
+      "light": "#8A5300",
+      "dark": "#F5C873",
+      "usage": "ANSI yellow (SGR 33) on log.surface."
+    },
+    "color.log.ansi.blue": {
+      "type": "color",
+      "css": "--xp-color-log-ansi-blue",
+      "flutter": "XpColors.logAnsiBlue",
+      "light": "#2449B8",
+      "dark": "#7EA2FF",
+      "usage": "ANSI blue (SGR 34) on log.surface."
+    },
+    "color.log.ansi.magenta": {
+      "type": "color",
+      "css": "--xp-color-log-ansi-magenta",
+      "flutter": "XpColors.logAnsiMagenta",
+      "light": "#8E2A86",
+      "dark": "#E08BE0",
+      "usage": "ANSI magenta (SGR 35) on log.surface."
+    },
+    "color.log.ansi.cyan": {
+      "type": "color",
+      "css": "--xp-color-log-ansi-cyan",
+      "flutter": "XpColors.logAnsiCyan",
+      "light": "#0B6874",
+      "dark": "#5CC8D6",
+      "usage": "ANSI cyan (SGR 36) on log.surface."
+    },
+    "color.log.ansi.white": {
+      "type": "color",
+      "css": "--xp-color-log-ansi-white",
+      "flutter": "XpColors.logAnsiWhite",
+      "light": "#5C5B54",
+      "dark": "#DAD7CE",
+      "usage": "ANSI white (SGR 37) on log.surface. Remapped in light so it stays legible."
+    },
+    "color.log.ansi.bright-black": {
+      "type": "color",
+      "css": "--xp-color-log-ansi-bright-black",
+      "flutter": "XpColors.logAnsiBrightBlack",
+      "light": "#66645D",
+      "dark": "#A8A59B",
+      "usage": "ANSI bright-black (SGR 90) on log.surface."
+    },
+    "color.log.ansi.bright-red": {
+      "type": "color",
+      "css": "--xp-color-log-ansi-bright-red",
+      "flutter": "XpColors.logAnsiBrightRed",
+      "light": "#C2300F",
+      "dark": "#FF968E",
+      "usage": "ANSI bright-red (SGR 91) on log.surface."
+    },
+    "color.log.ansi.bright-green": {
+      "type": "color",
+      "css": "--xp-color-log-ansi-bright-green",
+      "flutter": "XpColors.logAnsiBrightGreen",
+      "light": "#227A4E",
+      "dark": "#78DAA9",
+      "usage": "ANSI bright-green (SGR 92) on log.surface."
+    },
+    "color.log.ansi.bright-yellow": {
+      "type": "color",
+      "css": "--xp-color-log-ansi-bright-yellow",
+      "flutter": "XpColors.logAnsiBrightYellow",
+      "light": "#9A5B00",
+      "dark": "#FFDC8F",
+      "usage": "ANSI bright-yellow (SGR 93) on log.surface."
+    },
+    "color.log.ansi.bright-blue": {
+      "type": "color",
+      "css": "--xp-color-log-ansi-bright-blue",
+      "flutter": "XpColors.logAnsiBrightBlue",
+      "light": "#2D5BD6",
+      "dark": "#A6C0FF",
+      "usage": "ANSI bright-blue (SGR 94) on log.surface."
+    },
+    "color.log.ansi.bright-magenta": {
+      "type": "color",
+      "css": "--xp-color-log-ansi-bright-magenta",
+      "flutter": "XpColors.logAnsiBrightMagenta",
+      "light": "#A2349A",
+      "dark": "#F2B2F2",
+      "usage": "ANSI bright-magenta (SGR 95) on log.surface."
+    },
+    "color.log.ansi.bright-cyan": {
+      "type": "color",
+      "css": "--xp-color-log-ansi-bright-cyan",
+      "flutter": "XpColors.logAnsiBrightCyan",
+      "light": "#0D7684",
+      "dark": "#8FE1EB",
+      "usage": "ANSI bright-cyan (SGR 96) on log.surface."
+    },
+    "color.log.ansi.bright-white": {
+      "type": "color",
+      "css": "--xp-color-log-ansi-bright-white",
+      "flutter": "XpColors.logAnsiBrightWhite",
+      "light": "#3B3A35",
+      "dark": "#FFFFFF",
+      "usage": "ANSI bright-white (SGR 97) on log.surface. Remapped in light so it stays legible."
+    },
+    "color.code.key": {
+      "type": "color",
+      "css": "--xp-color-code-key",
+      "flutter": "XpColors.codeKey",
+      "light": "{xp-color-log-ansi-blue}",
+      "dark": "{xp-color-log-ansi-blue}",
+      "usage": "YAML keys."
+    },
+    "color.code.string": {
+      "type": "color",
+      "css": "--xp-color-code-string",
+      "flutter": "XpColors.codeString",
+      "light": "{xp-color-log-ansi-green}",
+      "dark": "{xp-color-log-ansi-green}",
+      "usage": "YAML strings."
+    },
+    "color.code.number": {
+      "type": "color",
+      "css": "--xp-color-code-number",
+      "flutter": "XpColors.codeNumber",
+      "light": "{xp-color-log-ansi-magenta}",
+      "dark": "{xp-color-log-ansi-magenta}",
+      "usage": "Numbers and versions in YAML."
+    },
+    "color.code.keyword": {
+      "type": "color",
+      "css": "--xp-color-code-keyword",
+      "flutter": "XpColors.codeKeyword",
+      "light": "{xp-color-log-ansi-cyan}",
+      "dark": "{xp-color-log-ansi-cyan}",
+      "usage": "Booleans, null, anchors and aliases."
+    },
+    "color.code.comment": {
+      "type": "color",
+      "css": "--xp-color-code-comment",
+      "flutter": "XpColors.codeComment",
+      "light": "{xp-color-log-dim}",
+      "dark": "{xp-color-log-dim}",
+      "usage": "Comments."
+    },
+    "color.code.error": {
+      "type": "color",
+      "css": "--xp-color-code-error",
+      "flutter": "XpColors.codeError",
+      "light": "{xp-color-negative-default}",
+      "dark": "{xp-color-negative-default}",
+      "usage": "Wavy error underline and gutter marker."
+    },
+    "type.hero": {
+      "type": "typography",
+      "css": "--xp-type-hero",
+      "flutter": "XpTypography.hero",
+      "value": {
+        "family": "sans",
+        "fontFamily": "\"IBM Plex Sans\", -apple-system, \"Helvetica Neue\", sans-serif",
+        "fontSize": 28,
+        "lineHeight": 34,
+        "fontWeight": 600,
+        "letterSpacing": "-0.01em",
+        "tabularFigures": false
+      },
+      "usage": "The one big thing a screen is for: a release's state, a job's result, a pending approval's action. One per screen. Versions inside it switch to type.hero-code."
+    },
+    "type.hero-code": {
+      "type": "typography",
+      "css": "--xp-type-hero-code",
+      "flutter": "XpTypography.heroCode",
+      "value": {
+        "family": "mono",
+        "fontFamily": "\"IBM Plex Mono\", ui-monospace, Menlo, monospace",
+        "fontSize": 26,
+        "lineHeight": 34,
+        "fontWeight": 600,
+        "letterSpacing": "0",
+        "tabularFigures": true
+      },
+      "usage": "Version or build inside a hero line. Tabular figures."
+    },
+    "type.display": {
+      "type": "typography",
+      "css": "--xp-type-display",
+      "flutter": "XpTypography.display",
+      "value": {
+        "family": "sans",
+        "fontFamily": "\"IBM Plex Sans\", -apple-system, \"Helvetica Neue\", sans-serif",
+        "fontSize": 34,
+        "lineHeight": 40,
+        "fontWeight": 700,
+        "letterSpacing": "-0.02em",
+        "tabularFigures": false
+      },
+      "usage": "Onboarding and empty-state headlines only."
+    },
+    "type.headline": {
+      "type": "typography",
+      "css": "--xp-type-headline",
+      "flutter": "XpTypography.headline",
+      "value": {
+        "family": "sans",
+        "fontFamily": "\"IBM Plex Sans\", -apple-system, \"Helvetica Neue\", sans-serif",
+        "fontSize": 20,
+        "lineHeight": 26,
+        "fontWeight": 600,
+        "letterSpacing": "-0.01em",
+        "tabularFigures": false
+      },
+      "usage": "Screen titles inside the content area (app header, sheet title)."
+    },
+    "type.title": {
+      "type": "typography",
+      "css": "--xp-type-title",
+      "flutter": "XpTypography.title",
+      "value": {
+        "family": "sans",
+        "fontFamily": "\"IBM Plex Sans\", -apple-system, \"Helvetica Neue\", sans-serif",
+        "fontSize": 15,
+        "lineHeight": 20,
+        "fontWeight": 600,
+        "letterSpacing": "0",
+        "tabularFigures": false
+      },
+      "usage": "Panel titles, toolbar title, card titles."
+    },
+    "type.title-sm": {
+      "type": "typography",
+      "css": "--xp-type-title-sm",
+      "flutter": "XpTypography.titleSm",
+      "value": {
+        "family": "sans",
+        "fontFamily": "\"IBM Plex Sans\", -apple-system, \"Helvetica Neue\", sans-serif",
+        "fontSize": 13,
+        "lineHeight": 18,
+        "fontWeight": 600,
+        "letterSpacing": "0",
+        "tabularFigures": false
+      },
+      "usage": "Row titles, sidebar selected project, flavor names."
+    },
+    "type.body": {
+      "type": "typography",
+      "css": "--xp-type-body",
+      "flutter": "XpTypography.body",
+      "value": {
+        "family": "sans",
+        "fontFamily": "\"IBM Plex Sans\", -apple-system, \"Helvetica Neue\", sans-serif",
+        "fontSize": 13,
+        "lineHeight": 20,
+        "fontWeight": 400,
+        "letterSpacing": "0",
+        "tabularFigures": false
+      },
+      "usage": "Default UI text."
+    },
+    "type.body-strong": {
+      "type": "typography",
+      "css": "--xp-type-body-strong",
+      "flutter": "XpTypography.bodyStrong",
+      "value": {
+        "family": "sans",
+        "fontFamily": "\"IBM Plex Sans\", -apple-system, \"Helvetica Neue\", sans-serif",
+        "fontSize": 13,
+        "lineHeight": 20,
+        "fontWeight": 500,
+        "letterSpacing": "0",
+        "tabularFigures": false
+      },
+      "usage": "Emphasis inside body and button labels."
+    },
+    "type.caption": {
+      "type": "typography",
+      "css": "--xp-type-caption",
+      "flutter": "XpTypography.caption",
+      "value": {
+        "family": "sans",
+        "fontFamily": "\"IBM Plex Sans\", -apple-system, \"Helvetica Neue\", sans-serif",
+        "fontSize": 12,
+        "lineHeight": 16,
+        "fontWeight": 400,
+        "letterSpacing": "0",
+        "tabularFigures": false
+      },
+      "usage": "Metadata under a row title, helper text, timestamps in prose."
+    },
+    "type.label": {
+      "type": "typography",
+      "css": "--xp-type-label",
+      "flutter": "XpTypography.label",
+      "value": {
+        "family": "mono",
+        "fontFamily": "\"IBM Plex Mono\", ui-monospace, Menlo, monospace",
+        "fontSize": 11,
+        "lineHeight": 14,
+        "fontWeight": 500,
+        "letterSpacing": "0.06em",
+        "tabularFigures": true
+      },
+      "usage": "Section and column labels, set in mono caps. Never for sentences."
+    },
+    "type.code": {
+      "type": "typography",
+      "css": "--xp-type-code",
+      "flutter": "XpTypography.code",
+      "value": {
+        "family": "mono",
+        "fontFamily": "\"IBM Plex Mono\", ui-monospace, Menlo, monospace",
+        "fontSize": 12,
+        "lineHeight": 16,
+        "fontWeight": 500,
+        "letterSpacing": "0",
+        "tabularFigures": true
+      },
+      "usage": "Versions, build numbers, SHAs, bundle IDs, tags, durations, sizes. Tabular figures, copyable."
+    },
+    "type.code-lg": {
+      "type": "typography",
+      "css": "--xp-type-code-lg",
+      "flutter": "XpTypography.codeLg",
+      "value": {
+        "family": "mono",
+        "fontFamily": "\"IBM Plex Mono\", ui-monospace, Menlo, monospace",
+        "fontSize": 15,
+        "lineHeight": 20,
+        "fontWeight": 500,
+        "letterSpacing": "0",
+        "tabularFigures": true
+      },
+      "usage": "Versions in the ledger's cells and card headers."
+    },
+    "type.mono": {
+      "type": "typography",
+      "css": "--xp-type-mono",
+      "flutter": "XpTypography.mono",
+      "value": {
+        "family": "mono",
+        "fontFamily": "\"IBM Plex Mono\", ui-monospace, Menlo, monospace",
+        "fontSize": 12.5,
+        "lineHeight": 21,
+        "fontWeight": 400,
+        "letterSpacing": "0",
+        "tabularFigures": true
+      },
+      "usage": "Log lines. ANSI bold = weight 600; dim = log.dim colour."
+    },
+    "space.2": {
+      "type": "dimension",
+      "css": "--xp-space-2",
+      "flutter": "XpSpacing.space2",
+      "value": 2,
+      "usage": "Icon-to-count gap, badge inner padding."
+    },
+    "space.4": {
+      "type": "dimension",
+      "css": "--xp-space-4",
+      "flutter": "XpSpacing.space4",
+      "value": 4,
+      "usage": "Icon to label in badges and chips."
+    },
+    "space.6": {
+      "type": "dimension",
+      "css": "--xp-space-6",
+      "flutter": "XpSpacing.space6",
+      "value": 6,
+      "usage": "Icon to label in rows and buttons; stacked label + value."
+    },
+    "space.8": {
+      "type": "dimension",
+      "css": "--xp-space-8",
+      "flutter": "XpSpacing.space8",
+      "value": 8,
+      "usage": "Gap between controls in a toolbar group, between chips."
+    },
+    "space.10": {
+      "type": "dimension",
+      "css": "--xp-space-10",
+      "flutter": "XpSpacing.space10",
+      "value": 10,
+      "usage": "Row inline padding (sidebar, lists), node padding."
+    },
+    "space.12": {
+      "type": "dimension",
+      "css": "--xp-space-12",
+      "flutter": "XpSpacing.space12",
+      "value": 12,
+      "usage": "Table cell padding, card inner gaps."
+    },
+    "space.16": {
+      "type": "dimension",
+      "css": "--xp-space-16",
+      "flutter": "XpSpacing.space16",
+      "value": 16,
+      "usage": "Panel padding, gap between toolbar groups."
+    },
+    "space.20": {
+      "type": "dimension",
+      "css": "--xp-space-20",
+      "flutter": "XpSpacing.space20",
+      "value": 20,
+      "usage": "Content-area side padding, pane header inset."
+    },
+    "space.24": {
+      "type": "dimension",
+      "css": "--xp-space-24",
+      "flutter": "XpSpacing.space24",
+      "value": 24,
+      "usage": "Gap between stacked panels at comfortable size."
+    },
+    "space.32": {
+      "type": "dimension",
+      "css": "--xp-space-32",
+      "flutter": "XpSpacing.space32",
+      "value": 32,
+      "usage": "Sheet padding, empty-state stacks."
+    },
+    "space.40": {
+      "type": "dimension",
+      "css": "--xp-space-40",
+      "flutter": "XpSpacing.space40",
+      "value": 40,
+      "usage": "Dialog padding top."
+    },
+    "space.48": {
+      "type": "dimension",
+      "css": "--xp-space-48",
+      "flutter": "XpSpacing.space48",
+      "value": 48,
+      "usage": "Empty-state and onboarding outer spacing."
+    },
+    "radius.xs": {
+      "type": "dimension",
+      "css": "--xp-radius-xs",
+      "flutter": "XpRadii.xs",
+      "value": 2,
+      "usage": "Checkbox, meter fills, skeleton bars."
+    },
+    "radius.sm": {
+      "type": "dimension",
+      "css": "--xp-radius-sm",
+      "flutter": "XpRadii.sm",
+      "value": 3,
+      "usage": "Badges, chips, agent marker, keycaps."
+    },
+    "radius.md": {
+      "type": "dimension",
+      "css": "--xp-radius-md",
+      "flutter": "XpRadii.md",
+      "value": 4,
+      "usage": "Buttons, fields, rows, panels, pipeline nodes."
+    },
+    "radius.lg": {
+      "type": "dimension",
+      "css": "--xp-radius-lg",
+      "flutter": "XpRadii.lg",
+      "value": 8,
+      "usage": "Popovers, menus, sheets, dialogs, toasts, command palette."
+    },
+    "radius.full": {
+      "type": "dimension",
+      "css": "--xp-radius-full",
+      "flutter": "XpRadii.full",
+      "value": 999,
+      "usage": "Toggles, slot dots, progress tracks."
+    },
+    "border.width.hairline": {
+      "type": "dimension",
+      "css": "--xp-border-width-hairline",
+      "flutter": "XpBorders.widthHairline",
+      "value": 1.0,
+      "usage": "Every panel and divider."
+    },
+    "border.width.emphasis": {
+      "type": "dimension",
+      "css": "--xp-border-width-emphasis",
+      "flutter": "XpBorders.widthEmphasis",
+      "value": 1.5,
+      "usage": "Pipeline wires; dashed for not-yet-reached edges."
+    },
+    "border.width.focus": {
+      "type": "dimension",
+      "css": "--xp-border-width-focus",
+      "flutter": "XpBorders.widthFocus",
+      "value": 2.0,
+      "usage": "Focus ring width."
+    },
+    "border.focus-offset": {
+      "type": "dimension",
+      "css": "--xp-border-focus-offset",
+      "flutter": "XpBorders.focusOffset",
+      "value": 2.0,
+      "usage": "Gap between control and focus ring, painted in the surface colour."
+    },
+    "border.running": {
+      "type": "dimension",
+      "css": "--xp-border-running",
+      "flutter": "XpBorders.running",
+      "value": 1.0,
+      "usage": "Extra inset ring on a running node (2px total, info.default)."
+    },
+    "size.row.default": {
+      "type": "dimension",
+      "css": "--xp-size-row-default",
+      "flutter": "XpSizes.rowDefault",
+      "value": 32.0,
+      "usage": "Default list and table row height (sidebar project rows 40px: two lines)."
+    },
+    "size.row.compact": {
+      "type": "dimension",
+      "css": "--xp-size-row-compact",
+      "flutter": "XpSizes.rowCompact",
+      "value": 26.0,
+      "usage": "Compact density (View ▸ Compact Rows, ⌃⌘=). Tables, log groups, runner lists; never the sidebar."
+    },
+    "size.row.sidebar": {
+      "type": "dimension",
+      "css": "--xp-size-row-sidebar",
+      "flutter": "XpSizes.rowSidebar",
+      "value": 28.0,
+      "usage": "Sidebar section rows."
+    },
+    "size.control.sm": {
+      "type": "dimension",
+      "css": "--xp-size-control-sm",
+      "flutter": "XpSizes.controlSm",
+      "value": 24.0,
+      "usage": "Inline buttons in rows, keycaps rows, chips."
+    },
+    "size.control.md": {
+      "type": "dimension",
+      "css": "--xp-size-control-md",
+      "flutter": "XpSizes.controlMd",
+      "value": 28.0,
+      "usage": "Default buttons, fields, segmented controls, search."
+    },
+    "size.control.lg": {
+      "type": "dimension",
+      "css": "--xp-size-control-lg",
+      "flutter": "XpSizes.controlLg",
+      "value": 32.0,
+      "usage": "Sheet and dialog footer buttons, the approval hero buttons."
+    },
+    "size.node.height": {
+      "type": "dimension",
+      "css": "--xp-size-node-height",
+      "flutter": "XpSizes.nodeHeight",
+      "value": 34.0,
+      "usage": "Pipeline job node."
+    },
+    "size.toolbar.height": {
+      "type": "dimension",
+      "css": "--xp-size-toolbar-height",
+      "flutter": "XpSizes.toolbarHeight",
+      "value": 52.0,
+      "usage": "Window title area + toolbar (traffic lights live in it)."
+    },
+    "size.sidebar.width": {
+      "type": "dimension",
+      "css": "--xp-size-sidebar-width",
+      "flutter": "XpSizes.sidebarWidth",
+      "value": 232.0,
+      "usage": "Sidebar default width; resizable 200–320px."
+    },
+    "size.console.height": {
+      "type": "dimension",
+      "css": "--xp-size-console-height",
+      "flutter": "XpSizes.consoleHeight",
+      "value": 268.0,
+      "usage": "Console default height; min 160px; collapsed strip 34px."
+    },
+    "size.icon.xs": {
+      "type": "dimension",
+      "css": "--xp-size-icon-xs",
+      "flutter": "XpSizes.iconXs",
+      "value": 12.0,
+      "usage": "Icons inside type.code and type.label runs."
+    },
+    "size.icon.sm": {
+      "type": "dimension",
+      "css": "--xp-size-icon-sm",
+      "flutter": "XpSizes.iconSm",
+      "value": 14.0,
+      "usage": "Status icons in badges, rows, nodes."
+    },
+    "size.icon.md": {
+      "type": "dimension",
+      "css": "--xp-size-icon-md",
+      "flutter": "XpSizes.iconMd",
+      "value": 16.0,
+      "usage": "Sidebar, toolbar, buttons."
+    },
+    "size.icon.lg": {
+      "type": "dimension",
+      "css": "--xp-size-icon-lg",
+      "flutter": "XpSizes.iconLg",
+      "value": 20.0,
+      "usage": "Hero status, sheet headers."
+    },
+    "size.icon.xl": {
+      "type": "dimension",
+      "css": "--xp-size-icon-xl",
+      "flutter": "XpSizes.iconXl",
+      "value": 32.0,
+      "usage": "Empty and error states."
+    },
+    "window.min.width": {
+      "type": "dimension",
+      "css": "--xp-window-min-width",
+      "flutter": "XpWindow.minWidth",
+      "value": 1100.0,
+      "usage": "Minimum window width. Sidebar 200px, console collapsed to its strip by default, ledger drops Patches column into the row menu."
+    },
+    "window.min.height": {
+      "type": "dimension",
+      "css": "--xp-window-min-height",
+      "flutter": "XpWindow.minHeight",
+      "value": 700.0,
+      "usage": "Minimum window height. Console max 40% of height."
+    },
+    "window.comfortable.width": {
+      "type": "dimension",
+      "css": "--xp-window-comfortable-width",
+      "flutter": "XpWindow.comfortableWidth",
+      "value": 1440.0,
+      "usage": "Design reference width. Sidebar 232px, horizontal pipeline, console 268px."
+    },
+    "window.comfortable.height": {
+      "type": "dimension",
+      "css": "--xp-window-comfortable-height",
+      "flutter": "XpWindow.comfortableHeight",
+      "value": 900.0,
+      "usage": "Design reference height."
+    },
+    "window.large.width": {
+      "type": "dimension",
+      "css": "--xp-window-large-width",
+      "flutter": "XpWindow.largeWidth",
+      "value": 1728.0,
+      "usage": "Large (16-inch MBP default). Content grows; a job view adds the step list beside the log."
+    },
+    "window.large.height": {
+      "type": "dimension",
+      "css": "--xp-window-large-height",
+      "flutter": "XpWindow.largeHeight",
+      "value": 1117.0,
+      "usage": "Large height. Console 320px."
+    },
+    "window.breakpoint.pipeline-vertical": {
+      "type": "dimension",
+      "css": "--xp-window-breakpoint-pipeline-vertical",
+      "flutter": "XpWindow.breakpointPipelineVertical",
+      "value": 760.0,
+      "usage": "Content width below which the pipeline graph switches to its vertical layout (also the menu bar extra and narrow web)."
+    },
+    "window.breakpoint.sidebar-collapse": {
+      "type": "dimension",
+      "css": "--xp-window-breakpoint-sidebar-collapse",
+      "flutter": "XpWindow.breakpointSidebarCollapse",
+      "value": 1180.0,
+      "usage": "Window width below which the sidebar starts hidden (⌃⌘S to show as overlay)."
+    },
+    "elevation.0": {
+      "type": "shadow",
+      "css": "--xp-elevation-0",
+      "flutter": "XpElevation.elevation0",
+      "light": "none",
+      "dark": "none",
+      "usage": "Everything on the window: panels are flat with hairlines. No cards inside cards."
+    },
+    "elevation.1": {
+      "type": "shadow",
+      "css": "--xp-elevation-1",
+      "flutter": "XpElevation.elevation1",
+      "light": "0 1px 2px rgba(27, 27, 24, 0.06)",
+      "dark": "none",
+      "usage": "Light only: the selected segmented item and toolbar buttons pressed. Dark: surface.selected tint."
+    },
+    "elevation.2": {
+      "type": "shadow",
+      "css": "--xp-elevation-2",
+      "flutter": "XpElevation.elevation2",
+      "light": "0 2px 6px rgba(27, 27, 24, 0.08), 0 8px 24px rgba(27, 27, 24, 0.10)",
+      "dark": "none",
+      "usage": "Popovers, menus, toasts, tooltips. Dark: surface.overlay tint + border.default."
+    },
+    "elevation.3": {
+      "type": "shadow",
+      "css": "--xp-elevation-3",
+      "flutter": "XpElevation.elevation3",
+      "light": "0 4px 12px rgba(27, 27, 24, 0.10), 0 24px 48px rgba(27, 27, 24, 0.16)",
+      "dark": "none",
+      "usage": "Sheets, dialogs, command palette. Dark: surface.overlay + border.strong at 1px + scrim behind."
+    },
+    "motion.duration.instant": {
+      "type": "duration",
+      "css": "--xp-motion-duration-instant",
+      "flutter": "XpMotion.durationInstant",
+      "value": "0ms",
+      "usage": "Reduce Motion replacement for every non-essential transition."
+    },
+    "motion.duration.fast": {
+      "type": "duration",
+      "css": "--xp-motion-duration-fast",
+      "flutter": "XpMotion.durationFast",
+      "value": "120ms",
+      "usage": "Hover and press fills, toggle thumb, checkbox mark."
+    },
+    "motion.duration.base": {
+      "type": "duration",
+      "css": "--xp-motion-duration-base",
+      "flutter": "XpMotion.durationBase",
+      "value": "180ms",
+      "usage": "Sidebar selection, segmented control thumb, status crossfade."
+    },
+    "motion.duration.moderate": {
+      "type": "duration",
+      "css": "--xp-motion-duration-moderate",
+      "flutter": "XpMotion.durationModerate",
+      "value": "240ms",
+      "usage": "Popover, menu, toast enter; sheet exit."
+    },
+    "motion.duration.slow": {
+      "type": "duration",
+      "css": "--xp-motion-duration-slow",
+      "flutter": "XpMotion.durationSlow",
+      "value": "320ms",
+      "usage": "Sheet enter, pipeline progress fill, pane collapse."
+    },
+    "motion.duration.spin": {
+      "type": "duration",
+      "css": "--xp-motion-duration-spin",
+      "flutter": "XpMotion.durationSpin",
+      "value": "1000ms",
+      "usage": "One turn of the running arc (linear, infinite)."
+    },
+    "motion.duration.pulse": {
+      "type": "duration",
+      "css": "--xp-motion-duration-pulse",
+      "flutter": "XpMotion.durationPulse",
+      "value": "1600ms",
+      "usage": "Reconnecting / updating rotation (slower than running so they read differently)."
+    },
+    "motion.easing.standard": {
+      "type": "easing",
+      "css": "--xp-motion-easing-standard",
+      "flutter": "XpMotion.easingStandard",
+      "value": "cubic-bezier(0.2, 0, 0, 1)",
+      "usage": "Default for moves inside the window. Flutter: Cubic(0.2, 0, 0, 1)."
+    },
+    "motion.easing.enter": {
+      "type": "easing",
+      "css": "--xp-motion-easing-enter",
+      "flutter": "XpMotion.easingEnter",
+      "value": "cubic-bezier(0.05, 0.7, 0.1, 1)",
+      "usage": "Things arriving: sheet, popover, toast. Flutter: Cubic(0.05, 0.7, 0.1, 1)."
+    },
+    "motion.easing.exit": {
+      "type": "easing",
+      "css": "--xp-motion-easing-exit",
+      "flutter": "XpMotion.easingExit",
+      "value": "cubic-bezier(0.3, 0, 1, 1)",
+      "usage": "Things leaving. Flutter: Cubic(0.3, 0, 1, 1)."
+    },
+    "motion.easing.linear": {
+      "type": "easing",
+      "css": "--xp-motion-easing-linear",
+      "flutter": "XpMotion.easingLinear",
+      "value": "linear",
+      "usage": "Spinners and progress that tracks real time. Flutter: Curves.linear."
+    }
+  },
+  "status": {
+    "job.queued": {
+      "group": "Job and step",
+      "label": "Queued",
+      "pair": "neutral",
+      "container": "color.status.neutral.container",
+      "onContainer": "color.status.neutral.on-container",
+      "icon": "phosphor:regular/circle-dashed",
+      "motion": null,
+      "reduceMotion": null,
+      "note": "Accepted, not yet scheduled."
+    },
+    "job.waiting-runner": {
+      "group": "Job and step",
+      "label": "Waiting for runner",
+      "pair": "neutral",
+      "container": "color.status.neutral.container",
+      "onContainer": "color.status.neutral.on-container",
+      "icon": "phosphor:regular/hourglass-medium",
+      "motion": null,
+      "reduceMotion": null,
+      "note": "No runner with the capability and a free slot. Says which capability."
+    },
+    "job.waiting-approval": {
+      "group": "Job and step",
+      "label": "Waiting for approval",
+      "pair": "attention",
+      "container": "color.status.attention.container",
+      "onContainer": "color.status.attention.on-container",
+      "icon": "phosphor:regular/hand-palm",
+      "motion": null,
+      "reduceMotion": null,
+      "note": "Same pair as approval.pending: the job is blocked on a human."
+    },
+    "job.running": {
+      "group": "Job and step",
+      "label": "Running",
+      "pair": "info",
+      "container": "color.status.info.container",
+      "onContainer": "color.status.info.on-container",
+      "icon": "phosphor:regular/circle-notch",
+      "motion": "spin",
+      "reduceMotion": "static arc + centre dot",
+      "note": "The only state with the running arc. Shows elapsed time."
+    },
+    "job.succeeded": {
+      "group": "Job and step",
+      "label": "Succeeded",
+      "pair": "positive",
+      "container": "color.status.positive.container",
+      "onContainer": "color.status.positive.on-container",
+      "icon": "phosphor:regular/check-circle",
+      "motion": null,
+      "reduceMotion": null,
+      "note": ""
+    },
+    "job.failed": {
+      "group": "Job and step",
+      "label": "Failed",
+      "pair": "negative",
+      "container": "color.status.negative.container",
+      "onContainer": "color.status.negative.on-container",
+      "icon": "phosphor:regular/x-circle",
+      "motion": null,
+      "reduceMotion": null,
+      "note": "Row offers Jump to error and Re-run (⌘R)."
+    },
+    "job.cancelled": {
+      "group": "Job and step",
+      "label": "Cancelled",
+      "pair": "neutral",
+      "container": "color.status.neutral.container",
+      "onContainer": "color.status.neutral.on-container",
+      "icon": "phosphor:regular/stop-circle",
+      "motion": null,
+      "reduceMotion": null,
+      "note": "Says who cancelled."
+    },
+    "job.skipped": {
+      "group": "Job and step",
+      "label": "Skipped · already done",
+      "pair": "neutral",
+      "container": "color.status.neutral.container",
+      "onContainer": "color.status.neutral.on-container",
+      "icon": "phosphor:regular/skip-forward-circle",
+      "motion": null,
+      "reduceMotion": null,
+      "note": "Resume-from-step skipped it; the label always carries the reason."
+    },
+    "job.interrupted": {
+      "group": "Job and step",
+      "label": "Interrupted",
+      "pair": "caution",
+      "container": "color.status.caution.container",
+      "onContainer": "color.status.caution.on-container",
+      "icon": "phosphor:regular/pause-circle",
+      "motion": null,
+      "reduceMotion": null,
+      "note": "Engine restarted mid-job. Offers Resume from step."
+    },
+    "release.draft": {
+      "group": "Release",
+      "label": "Draft",
+      "pair": "neutral",
+      "container": "color.status.neutral.container",
+      "onContainer": "color.status.neutral.on-container",
+      "icon": "phosphor:regular/pencil-simple",
+      "motion": null,
+      "reduceMotion": null,
+      "note": ""
+    },
+    "release.building": {
+      "group": "Release",
+      "label": "Building",
+      "pair": "info",
+      "container": "color.status.info.container",
+      "onContainer": "color.status.info.on-container",
+      "icon": "phosphor:regular/circle-notch",
+      "motion": "spin",
+      "reduceMotion": "static arc + centre dot",
+      "note": "A job for this release is running: same treatment as job.running."
+    },
+    "release.uploaded": {
+      "group": "Release",
+      "label": "Uploaded",
+      "pair": "neutral",
+      "container": "color.status.neutral.container",
+      "onContainer": "color.status.neutral.on-container",
+      "icon": "phosphor:regular/upload-simple",
+      "motion": null,
+      "reduceMotion": null,
+      "note": "Builds are in the stores, not yet submitted."
+    },
+    "release.in-review": {
+      "group": "Release",
+      "label": "In review",
+      "pair": "info",
+      "container": "color.status.info.container",
+      "onContainer": "color.status.info.on-container",
+      "icon": "phosphor:regular/eye",
+      "motion": null,
+      "reduceMotion": null,
+      "note": "At least one store is reviewing. External wait: never animated."
+    },
+    "release.rejected": {
+      "group": "Release",
+      "label": "Rejected",
+      "pair": "negative",
+      "container": "color.status.negative.container",
+      "onContainer": "color.status.negative.on-container",
+      "icon": "phosphor:regular/x-circle",
+      "motion": null,
+      "reduceMotion": null,
+      "note": ""
+    },
+    "release.approved": {
+      "group": "Release",
+      "label": "Approved",
+      "pair": "positive",
+      "container": "color.status.positive.container",
+      "onContainer": "color.status.positive.on-container",
+      "icon": "phosphor:regular/check",
+      "motion": null,
+      "reduceMotion": null,
+      "note": "Approved by both stores, not yet live."
+    },
+    "release.live": {
+      "group": "Release",
+      "label": "Live",
+      "pair": "positive",
+      "container": "color.status.positive.container",
+      "onContainer": "color.status.positive.on-container",
+      "icon": "phosphor:regular/radio-button",
+      "motion": null,
+      "reduceMotion": null,
+      "note": "Both stores live. The Merge button unlocks."
+    },
+    "release.merged": {
+      "group": "Release",
+      "label": "Merged",
+      "pair": "merged",
+      "container": "color.status.merged.container",
+      "onContainer": "color.status.merged.on-container",
+      "icon": "phosphor:regular/git-merge",
+      "motion": null,
+      "reduceMotion": null,
+      "note": "Merged into main. Terminal."
+    },
+    "release.abandoned": {
+      "group": "Release",
+      "label": "Abandoned",
+      "pair": "neutral",
+      "container": "color.status.neutral.container",
+      "onContainer": "color.status.neutral.on-container",
+      "icon": "phosphor:regular/archive",
+      "motion": null,
+      "reduceMotion": null,
+      "note": "Terminal. Kept for history."
+    },
+    "appstore.processing": {
+      "group": "App Store lane",
+      "label": "Processing",
+      "pair": "neutral",
+      "container": "color.status.neutral.container",
+      "onContainer": "color.status.neutral.on-container",
+      "icon": "phosphor:regular/hourglass-medium",
+      "motion": null,
+      "reduceMotion": null,
+      "note": "Apple is processing the build."
+    },
+    "appstore.ready-to-submit": {
+      "group": "App Store lane",
+      "label": "Ready to submit",
+      "pair": "attention",
+      "container": "color.status.attention.container",
+      "onContainer": "color.status.attention.on-container",
+      "icon": "phosphor:regular/paper-plane-tilt",
+      "motion": null,
+      "reduceMotion": null,
+      "note": "Needs a human (or an approved agent request) to submit."
+    },
+    "appstore.waiting-review": {
+      "group": "App Store lane",
+      "label": "Waiting for review",
+      "pair": "neutral",
+      "container": "color.status.neutral.container",
+      "onContainer": "color.status.neutral.on-container",
+      "icon": "phosphor:regular/clock",
+      "motion": null,
+      "reduceMotion": null,
+      "note": "Queued at Apple. Not ours to act on."
+    },
+    "appstore.in-review": {
+      "group": "App Store lane",
+      "label": "In review",
+      "pair": "info",
+      "container": "color.status.info.container",
+      "onContainer": "color.status.info.on-container",
+      "icon": "phosphor:regular/eye",
+      "motion": null,
+      "reduceMotion": null,
+      "note": ""
+    },
+    "appstore.pending-release": {
+      "group": "App Store lane",
+      "label": "Pending developer release",
+      "pair": "attention",
+      "container": "color.status.attention.container",
+      "onContainer": "color.status.attention.on-container",
+      "icon": "phosphor:regular/hand-palm",
+      "motion": null,
+      "reduceMotion": null,
+      "note": "Approved, waiting for you to release."
+    },
+    "appstore.rejected": {
+      "group": "App Store lane",
+      "label": "Rejected",
+      "pair": "negative",
+      "container": "color.status.negative.container",
+      "onContainer": "color.status.negative.on-container",
+      "icon": "phosphor:regular/x-circle",
+      "motion": null,
+      "reduceMotion": null,
+      "note": "Shows the resolution centre reason when the API returns it."
+    },
+    "appstore.live": {
+      "group": "App Store lane",
+      "label": "Ready for sale",
+      "pair": "positive",
+      "container": "color.status.positive.container",
+      "onContainer": "color.status.positive.on-container",
+      "icon": "phosphor:regular/radio-button",
+      "motion": null,
+      "reduceMotion": null,
+      "note": "Live."
+    },
+    "appstore.phased": {
+      "group": "App Store lane",
+      "label": "Phased rollout · day 3 of 7",
+      "pair": "positive",
+      "container": "color.status.positive.container",
+      "onContainer": "color.status.positive.on-container",
+      "icon": "phosphor:regular/radio-button",
+      "motion": null,
+      "reduceMotion": null,
+      "note": "Live to a share of users; lane shows the 7-day meter."
+    },
+    "appstore.unknown": {
+      "group": "App Store lane",
+      "label": "Unknown · live 5.3.6",
+      "pair": "neutral",
+      "container": "color.status.neutral.container",
+      "onContainer": "color.status.neutral.on-container",
+      "icon": "phosphor:regular/question",
+      "motion": null,
+      "reduceMotion": null,
+      "note": "No App Store Connect key: only the public live version is known. Manual buttons appear."
+    },
+    "play.draft": {
+      "group": "Google Play lane",
+      "label": "Draft",
+      "pair": "neutral",
+      "container": "color.status.neutral.container",
+      "onContainer": "color.status.neutral.on-container",
+      "icon": "phosphor:regular/pencil-simple",
+      "motion": null,
+      "reduceMotion": null,
+      "note": ""
+    },
+    "play.not-sent": {
+      "group": "Google Play lane",
+      "label": "Not sent for review",
+      "pair": "attention",
+      "container": "color.status.attention.container",
+      "onContainer": "color.status.attention.on-container",
+      "icon": "phosphor:regular/paper-plane-tilt",
+      "motion": null,
+      "reduceMotion": null,
+      "note": "Same meaning as App Store 'Ready to submit'."
+    },
+    "play.in-review": {
+      "group": "Google Play lane",
+      "label": "In review",
+      "pair": "info",
+      "container": "color.status.info.container",
+      "onContainer": "color.status.info.on-container",
+      "icon": "phosphor:regular/eye",
+      "motion": null,
+      "reduceMotion": null,
+      "note": ""
+    },
+    "play.approved-unpublished": {
+      "group": "Google Play lane",
+      "label": "Approved · not published",
+      "pair": "attention",
+      "container": "color.status.attention.container",
+      "onContainer": "color.status.attention.on-container",
+      "icon": "phosphor:regular/hand-palm",
+      "motion": null,
+      "reduceMotion": null,
+      "note": "Same meaning as App Store 'Pending developer release'."
+    },
+    "play.not-approved": {
+      "group": "Google Play lane",
+      "label": "Not approved",
+      "pair": "negative",
+      "container": "color.status.negative.container",
+      "onContainer": "color.status.negative.on-container",
+      "icon": "phosphor:regular/x-circle",
+      "motion": null,
+      "reduceMotion": null,
+      "note": ""
+    },
+    "play.live": {
+      "group": "Google Play lane",
+      "label": "Published",
+      "pair": "positive",
+      "container": "color.status.positive.container",
+      "onContainer": "color.status.positive.on-container",
+      "icon": "phosphor:regular/radio-button",
+      "motion": null,
+      "reduceMotion": null,
+      "note": "Live."
+    },
+    "play.rolling-out": {
+      "group": "Google Play lane",
+      "label": "Rolling out · 20%",
+      "pair": "positive",
+      "container": "color.status.positive.container",
+      "onContainer": "color.status.positive.on-container",
+      "icon": "phosphor:regular/radio-button",
+      "motion": null,
+      "reduceMotion": null,
+      "note": "Lane shows the percentage meter."
+    },
+    "play.unknown": {
+      "group": "Google Play lane",
+      "label": "Unknown · live 5.3.7",
+      "pair": "neutral",
+      "container": "color.status.neutral.container",
+      "onContainer": "color.status.neutral.on-container",
+      "icon": "phosphor:regular/question",
+      "motion": null,
+      "reduceMotion": null,
+      "note": "No service account."
+    },
+    "firebase.uploaded": {
+      "group": "Firebase (testers)",
+      "label": "Uploaded",
+      "pair": "neutral",
+      "container": "color.status.neutral.container",
+      "onContainer": "color.status.neutral.on-container",
+      "icon": "phosphor:regular/upload-simple",
+      "motion": null,
+      "reduceMotion": null,
+      "note": ""
+    },
+    "firebase.distributed": {
+      "group": "Firebase (testers)",
+      "label": "Distributed · 2 groups",
+      "pair": "positive",
+      "container": "color.status.positive.container",
+      "onContainer": "color.status.positive.on-container",
+      "icon": "phosphor:regular/users-three",
+      "motion": null,
+      "reduceMotion": null,
+      "note": ""
+    },
+    "approval.pending": {
+      "group": "Approval",
+      "label": "Pending",
+      "pair": "attention",
+      "container": "color.status.attention.container",
+      "onContainer": "color.status.attention.on-container",
+      "icon": "phosphor:regular/hand-palm",
+      "motion": null,
+      "reduceMotion": null,
+      "note": "The only status allowed the loud warning fill (in the needs-you bar and badge)."
+    },
+    "approval.approved": {
+      "group": "Approval",
+      "label": "Approved",
+      "pair": "positive",
+      "container": "color.status.positive.container",
+      "onContainer": "color.status.positive.on-container",
+      "icon": "phosphor:regular/check",
+      "motion": null,
+      "reduceMotion": null,
+      "note": "Shows who decided."
+    },
+    "approval.denied": {
+      "group": "Approval",
+      "label": "Denied",
+      "pair": "negative",
+      "container": "color.status.negative.container",
+      "onContainer": "color.status.negative.on-container",
+      "icon": "phosphor:regular/prohibit",
+      "motion": null,
+      "reduceMotion": null,
+      "note": "Shows who decided."
+    },
+    "approval.expired": {
+      "group": "Approval",
+      "label": "Expired",
+      "pair": "neutral",
+      "container": "color.status.neutral.container",
+      "onContainer": "color.status.neutral.on-container",
+      "icon": "phosphor:regular/clock-countdown",
+      "motion": null,
+      "reduceMotion": null,
+      "note": "Nobody decided in time; the requester must ask again."
+    },
+    "runner.idle": {
+      "group": "Runner",
+      "label": "Online · idle",
+      "pair": "positive",
+      "container": "color.status.positive.container",
+      "onContainer": "color.status.positive.on-container",
+      "icon": "phosphor:regular/check-circle",
+      "motion": null,
+      "reduceMotion": null,
+      "note": ""
+    },
+    "runner.busy": {
+      "group": "Runner",
+      "label": "Online · busy 2/3",
+      "pair": "info",
+      "container": "color.status.info.container",
+      "onContainer": "color.status.info.on-container",
+      "icon": "phosphor:regular/circle-notch",
+      "motion": "spin",
+      "reduceMotion": "static arc + centre dot",
+      "note": "Spins only while a job runs on it; slot meter shows load."
+    },
+    "runner.offline": {
+      "group": "Runner",
+      "label": "Offline",
+      "pair": "neutral",
+      "container": "color.status.neutral.container",
+      "onContainer": "color.status.neutral.on-container",
+      "icon": "phosphor:regular/circle-dashed",
+      "motion": null,
+      "reduceMotion": null,
+      "note": "Last heartbeat shown as relative time."
+    },
+    "runner.lost": {
+      "group": "Runner",
+      "label": "Lost mid-job",
+      "pair": "negative",
+      "container": "color.status.negative.container",
+      "onContainer": "color.status.negative.on-container",
+      "icon": "phosphor:regular/warning-circle",
+      "motion": null,
+      "reduceMotion": null,
+      "note": "Heartbeat stopped while a job was running."
+    },
+    "runner.updating": {
+      "group": "Runner",
+      "label": "Updating",
+      "pair": "info",
+      "container": "color.status.info.container",
+      "onContainer": "color.status.info.on-container",
+      "icon": "phosphor:regular/arrows-clockwise",
+      "motion": "turn",
+      "reduceMotion": "static icon",
+      "note": ""
+    },
+    "engine.connected": {
+      "group": "Engine connection",
+      "label": "Connected",
+      "pair": "positive",
+      "container": "color.status.positive.container",
+      "onContainer": "color.status.positive.on-container",
+      "icon": "phosphor:regular/plugs-connected",
+      "motion": null,
+      "reduceMotion": null,
+      "note": ""
+    },
+    "engine.reconnecting": {
+      "group": "Engine connection",
+      "label": "Reconnecting",
+      "pair": "caution",
+      "container": "color.status.caution.container",
+      "onContainer": "color.status.caution.on-container",
+      "icon": "phosphor:regular/arrows-clockwise",
+      "motion": "turn",
+      "reduceMotion": "static icon",
+      "note": "Banner after 3 s; data stays visible."
+    },
+    "engine.unreachable": {
+      "group": "Engine connection",
+      "label": "Unreachable · cached",
+      "pair": "negative",
+      "container": "color.status.negative.container",
+      "onContainer": "color.status.negative.on-container",
+      "icon": "phosphor:regular/cloud-slash",
+      "motion": null,
+      "reduceMotion": null,
+      "note": "Data is the last snapshot; every action is disabled and says why."
+    },
+    "engine.secrets-locked": {
+      "group": "Engine connection",
+      "label": "Secrets locked",
+      "pair": "attention",
+      "container": "color.status.attention.container",
+      "onContainer": "color.status.attention.on-container",
+      "icon": "phosphor:regular/lock-simple",
+      "motion": null,
+      "reduceMotion": null,
+      "note": "Builds that sign or upload wait until unlocked."
+    },
+    "scan.error": {
+      "group": "Scan finding",
+      "label": "Error",
+      "pair": "negative",
+      "container": "color.status.negative.container",
+      "onContainer": "color.status.negative.on-container",
+      "icon": "phosphor:regular/x-circle",
+      "motion": null,
+      "reduceMotion": null,
+      "note": "Always with a fix."
+    },
+    "scan.warning": {
+      "group": "Scan finding",
+      "label": "Warning",
+      "pair": "caution",
+      "container": "color.status.caution.container",
+      "onContainer": "color.status.caution.on-container",
+      "icon": "phosphor:regular/warning",
+      "motion": null,
+      "reduceMotion": null,
+      "note": "Always with a fix."
+    },
+    "scan.info": {
+      "group": "Scan finding",
+      "label": "Info",
+      "pair": "info",
+      "container": "color.status.info.container",
+      "onContainer": "color.status.info.on-container",
+      "icon": "phosphor:regular/info",
+      "motion": null,
+      "reduceMotion": null,
+      "note": "Always with a fix or 'Nothing to do'."
+    },
+    "credential.verified": {
+      "group": "Credential",
+      "label": "Verified",
+      "pair": "positive",
+      "container": "color.status.positive.container",
+      "onContainer": "color.status.positive.on-container",
+      "icon": "phosphor:regular/seal-check",
+      "motion": null,
+      "reduceMotion": null,
+      "note": "Shows last verified time."
+    },
+    "credential.expiring": {
+      "group": "Credential",
+      "label": "Expiring in 12 days",
+      "pair": "caution",
+      "container": "color.status.caution.container",
+      "onContainer": "color.status.caution.on-container",
+      "icon": "phosphor:regular/clock-countdown",
+      "motion": null,
+      "reduceMotion": null,
+      "note": "Within 30 days."
+    },
+    "credential.expired": {
+      "group": "Credential",
+      "label": "Expired",
+      "pair": "negative",
+      "container": "color.status.negative.container",
+      "onContainer": "color.status.negative.on-container",
+      "icon": "phosphor:regular/seal-warning",
+      "motion": null,
+      "reduceMotion": null,
+      "note": "Covers 'rejected by Apple/Google' with the reason."
+    },
+    "credential.missing": {
+      "group": "Credential",
+      "label": "Missing",
+      "pair": "caution",
+      "container": "color.status.caution.container",
+      "onContainer": "color.status.caution.on-container",
+      "icon": "phosphor:regular/key",
+      "motion": null,
+      "reduceMotion": null,
+      "note": "Becomes a blocking error only in a dispatch that needs it."
+    }
+  },
+  "agentMarker": {
+    "border": "color.agent.ink, 1px dashed",
+    "fill": "color.agent.container (in tables) or transparent",
+    "icon": "phosphor:regular/robot",
+    "label": "AGENT · <agent name>",
+    "labelStyle": "type.label (mono caps) for AGENT, type.body-strong for the name"
+  }
+}

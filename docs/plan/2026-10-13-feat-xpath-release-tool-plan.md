@@ -500,7 +500,7 @@ Mataa dev builds through `xp` can start after Phase 13, before the desktop app e
 ### Phase 15: Desktop foundation
 
 - **Status:** Not started
-- **Scope:** `xp_repositories` (engines, projects, jobs, releases, approvals, runners; streams
+- **Scope:** UI per `docs/design/DECISIONS.md` and the Run Sheet tokens (`docs/design/system/project/assets/Handoff/xp_tokens.dart`, IBM Plex fonts, Phosphor icons). `xp_repositories` (engines, projects, jobs, releases, approvals, runners; streams
   plus offline cached snapshot), `xp_macos_services` (SMAppService registration of the bundled
   `xpd` LaunchAgent), app shell with `lib/<feature>/{bloc,view,widgets}`, l10n ARB, light and
   dark themes, `test/helpers/pump_app.dart`. App-level `EngineConnectionBloc` owns the active
@@ -517,8 +517,8 @@ Mataa dev builds through `xp` can start after Phase 13, before the desktop app e
 ### Phase 16a: Desktop jobs
 
 - **Status:** Not started
-- **Scope:** Project overview (flavors with local, TestFlight/Play and live versions), dispatch
-  sheet, live job view (steps, logs with resume, cancel, resume-from-step).
+- **Scope:** Concepts 1A (`Main.dc.html`) and 2A (`Job-A-*.dc.html`) from `docs/design/screens/project/`. Project overview (flavors with local, TestFlight/Play and live versions), dispatch
+  sheet (`Dispatch-Sheet.dc.html`), live job view (steps, logs with resume, cancel, resume-from-step).
 - **Files touched:** `apps/xp_desktop/lib/project_overview/**`, `apps/xp_desktop/lib/dispatch/**`, `apps/xp_desktop/lib/job/**`
 - **Acceptance criteria:** goldens for the job view in light and dark.
 - **Validation:** `melos run test:coverage`
@@ -526,7 +526,7 @@ Mataa dev builds through `xp` can start after Phase 13, before the desktop app e
 ### Phase 16b: Desktop releases and approvals
 
 - **Status:** Not started
-- **Scope:** Releases board with store status, manual approved/live buttons and merge;
+- **Scope:** Concept 3A (`Release-A-*.dc.html`), `Approvals-Inbox.dc.html`, `Approval-Notification.dc.html`, `MenuBar-Extra.dc.html`. Releases board with store status, manual approved/live buttons and merge;
   approvals inbox with macOS notifications.
 - **Files touched:** `apps/xp_desktop/lib/releases/**`, `apps/xp_desktop/lib/approvals/**`
 - **Acceptance criteria:** goldens for the releases board in light and dark; approve flow bloc
@@ -563,7 +563,7 @@ Mataa dev builds through `xp` can start after Phase 13, before the desktop app e
 ### Phase 18b: Mac signing and DMG
 
 - **Status:** Not started
-- **Scope:** Embed `xpd` and `xp` in the app, sign inner binaries then the app with Developer
+- **Scope:** App icon from `docs/design/brand/` (light and dark; derive the transparent symbol and Icon Composer layers first). Embed `xpd` and `xp` in the app, sign inner binaries then the app with Developer
   ID and Hardened Runtime, build the DMG, notarize and staple.
 - **Files touched:** `tool/release/build_mac.sh`, `apps/xp_desktop/macos/**`
 - **Acceptance criteria:** Gatekeeper accepts the DMG.
