@@ -5,6 +5,7 @@ export 'src/sqlite/migration.dart';
 export 'src/sqlite/migrations.dart';
 export 'src/sqlite/sqlite_artifact_repository.dart';
 export 'src/sqlite/sqlite_build_counter_repository.dart';
+export 'src/sqlite/sqlite_credential_repository.dart';
 export 'src/sqlite/sqlite_database.dart';
 export 'src/sqlite/sqlite_device_token_repository.dart';
 export 'src/sqlite/sqlite_event_log.dart';

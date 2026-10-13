@@ -6,6 +6,7 @@ targets:
         generate_for:
           - lib/src/api_error.dart
           - lib/src/artifact.dart
+          - lib/src/credential.dart
           - lib/src/finding.dart
           - lib/src/profile_edits.dart
           - lib/src/health_response.dart

@@ -1,4 +1,5 @@
 import 'package:equatable/equatable.dart';
+import 'package:xp_api/xp_api.dart';
 import 'package:xp_engine/src/json_fields.dart';
 import 'package:xp_engine/src/steps/guard/guard_check.dart';
 import 'package:xp_engine/src/versioning/release_worktree.dart';
@@ -16,6 +17,8 @@ class GuardInput extends Equatable {
     this.androidAppId,
     this.shorebirdAppId,
     this.storeCountry = 'us',
+    this.flavorId,
+    this.credentialKinds = const [],
   });
 
   /// Reads the input from its stored form.
@@ -36,6 +39,12 @@ class GuardInput extends Equatable {
       androidAppId: optionalString(json, 'androidAppId'),
       shorebirdAppId: optionalString(json, 'shorebirdAppId'),
       storeCountry: optionalString(json, 'storeCountry') ?? 'us',
+      flavorId: optionalString(json, 'flavorId'),
+      credentialKinds: [
+        for (final name in stringList(json, 'credentialKinds'))
+          CredentialKind.fromWire(name) ??
+              (throw FormatException('"$name" is not a credential kind.')),
+      ],
     );
   }
 
@@ -62,6 +71,14 @@ class GuardInput extends Equatable {
   /// The App Store storefront.
   final String storeCountry;
 
+  /// The engine's id of the flavor the job is for. The `credentials` check
+  /// looks at the credentials of this flavor.
+  final String? flavorId;
+
+  /// The kinds of credential the job needs. Empty: every credential the
+  /// flavor has. A kind listed here that the flavor lacks fails the check.
+  final List<CredentialKind> credentialKinds;
+
   /// The stored form.
   Map<String, dynamic> toJson() => {
     'checks': [for (final check in checks) check.name],
@@ -71,6 +88,9 @@ class GuardInput extends Equatable {
     if (androidAppId != null) 'androidAppId': androidAppId,
     if (shorebirdAppId != null) 'shorebirdAppId': shorebirdAppId,
     'storeCountry': storeCountry,
+    'flavorId': ?flavorId,
+    if (credentialKinds.isNotEmpty)
+      'credentialKinds': [for (final kind in credentialKinds) kind.wire],
   };
 
   @override
@@ -82,6 +102,8 @@ class GuardInput extends Equatable {
     androidAppId,
     shorebirdAppId,
     storeCountry,
+    flavorId,
+    credentialKinds,
   ];
 }
 

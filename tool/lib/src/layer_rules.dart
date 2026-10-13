@@ -58,10 +58,16 @@ const layerRules = <String, LayerRule>{
   ),
   'xp_client': LayerRule(workspace: {'xp_api'}),
   'xp_repositories': LayerRule(workspace: {'xp_api', 'xp_client'}),
-  // `xp_fake_asc` and `xp_fake_play` are fake store servers: tests of the
-  // store adapters run against them.
+  // The fake store servers (`xp_fake_asc`, `xp_fake_firebase`,
+  // `xp_fake_play`): tests of the store adapters run against them.
   'xp_adapters': LayerRule(
-    workspace: {'xp_api', 'xp_engine', 'xp_fake_asc', 'xp_fake_play'},
+    workspace: {
+      'xp_api',
+      'xp_engine',
+      'xp_fake_asc',
+      'xp_fake_firebase',
+      'xp_fake_play',
+    },
   ),
   'xp_secrets': LayerRule(workspace: {'xp_api', 'xp_engine'}),
   'xp_macos_services': LayerRule(workspace: {}),
@@ -69,14 +75,18 @@ const layerRules = <String, LayerRule>{
   // know nothing of the engine.
   'xp_fake_asc': LayerRule(workspace: {}),
   'xp_fake_play': LayerRule(workspace: {}),
+  // The Firebase fake reuses the service account assertion check of the Play
+  // fake (both are Google's JWT bearer flow).
+  'xp_fake_firebase': LayerRule(workspace: {'xp_fake_play'}),
   // The engine entrypoint wires every implementation.
-  // `xp_fake_asc` and `xp_fake_play` are for the tests of the store wiring.
+  // The fake store servers are for the tests of the store wiring.
   'xpd': LayerRule(
     workspace: {
       'xp_adapters',
       'xp_api',
       'xp_engine',
       'xp_fake_asc',
+      'xp_fake_firebase',
       'xp_fake_play',
       'xp_secrets',
     },

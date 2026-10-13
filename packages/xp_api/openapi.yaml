@@ -566,6 +566,155 @@ paths:
           $ref: "#/components/responses/NotFound"
         "500":
           $ref: "#/components/responses/InternalError"
+  /projects/{id}/credentials:
+    parameters:
+      - $ref: "#/components/parameters/ProjectId"
+    get:
+      operationId: listCredentials
+      summary: The credentials of the flavors of a project.
+      description: |
+        Oldest first. A credential never shows its secret: only who it belongs
+        to (`account`, when that is not secret), what the last check found
+        (`status`, `checkedAt`, `verifiedAt`) and, if the check did not accept
+        it, why (`message`) and what to do (`fix`).
+
+        With `flavor` (and `app`, `.` unless given) only the credentials of
+        that flavor.
+      parameters:
+        - name: app
+          in: query
+          required: false
+          description: The path of the app; needs `flavor`.
+          schema:
+            type: string
+        - name: flavor
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: The credentials.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CredentialsResponse"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "503":
+          $ref: "#/components/responses/SecretsLocked"
+        "500":
+          $ref: "#/components/responses/InternalError"
+    put:
+      operationId: saveCredential
+      summary: Verify a credential and store it, new or replacing.
+      description: |
+        The store or tool the credential is for must accept it, else nothing
+        is stored: `422 credential_rejected` says why and what to do (an
+        expired ASC key, a revoked app-specific password, a service account
+        Google does not know, a wrong keystore password, a Shorebird key
+        without the `sb_api_` prefix). If the check cannot be made (the store
+        is not reachable, a tool is missing) the answer is `502
+        upstream_error` and nothing is stored either.
+
+        A flavor has one credential of each kind: saving again replaces it
+        (`200`); the first save answers `201`. The secret goes to the engine's
+        secret store (D-07) and is never returned, logged or sent in an event.
+
+        The body names the flavor (`app`, default `.`, and `flavor`), the
+        `kind` and the secret fields of that kind.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SaveCredentialRequest"
+      responses:
+        "200":
+          description: The credential replaced an earlier one and was accepted.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Credential"
+        "201":
+          description: The credential was accepted and stored.
+          headers:
+            Location:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Credential"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/CredentialRejected"
+        "502":
+          $ref: "#/components/responses/UpstreamError"
+        "503":
+          $ref: "#/components/responses/SecretsLocked"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /projects/{id}/credentials/{credentialId}/verify:
+    parameters:
+      - $ref: "#/components/parameters/ProjectId"
+      - $ref: "#/components/parameters/CredentialId"
+    post:
+      operationId: verifyCredential
+      summary: Check a credential again now.
+      description: |
+        Runs the check of the credential's kind with the stored secret and
+        keeps the result, like the daily health check. A credential that the
+        store now refuses is still a `200`: the body has `status: rejected`
+        with `message` and `fix`. A credential that was accepted before and is
+        refused now is announced as `credential.expired`, and a job that needs
+        it fails preflight (the `credentials` guard check) until it is
+        replaced.
+      responses:
+        "200":
+          description: The credential with the result of the check.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Credential"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "503":
+          $ref: "#/components/responses/SecretsLocked"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /projects/{id}/credentials/{credentialId}:
+    parameters:
+      - $ref: "#/components/parameters/ProjectId"
+      - $ref: "#/components/parameters/CredentialId"
+    delete:
+      operationId: deleteCredential
+      summary: Delete a credential and its secret.
+      description: |
+        The secret goes too, unless another credential keeps it under the same
+        key (the engine has one GitHub token).
+      responses:
+        "204":
+          description: The credential is gone.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "503":
+          $ref: "#/components/responses/SecretsLocked"
+        "500":
+          $ref: "#/components/responses/InternalError"
 components:
   securitySchemes:
     bearerAuth:
@@ -594,7 +743,22 @@ components:
       description: The project id, for example `prj_1a2b3c4d5e6f7a8b`.
       schema:
         type: string
+    CredentialId:
+      name: credentialId
+      in: path
+      required: true
+      description: The credential id, for example `crd_1a2b3c4d5e6f7a8b`.
+      schema:
+        type: string
   responses:
+    CredentialRejected:
+      description: |
+        The credential was not stored: the store or tool it is for refused it,
+        or it is not usable. The message says why and what to do.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
     NotFound:
       description: |
         There is no such project, job, artifact or test run, or GitHub cannot
@@ -667,6 +831,7 @@ components:
         - not_found
         - conflict
         - resync_required
+        - credential_rejected
         - upgrade_required
         - internal
         - upstream_error
@@ -719,7 +884,9 @@ components:
           description: |
             `engine.started`, `stream.opened`, `project.added`,
             `project.scanned`, `project.removed`, `job.state_changed`,
-            `job.step_changed`, `test_run.completed`, or a type added by a
+            `job.step_changed`, `test_run.completed`, `credential.saved`,
+            `credential.verified`, `credential.expired`, `credential.removed`,
+            or a type added by a
             later engine version, which a client must ignore.
         payload:
           type: object
@@ -1378,3 +1545,184 @@ components:
         - $ref: "#/components/schemas/LogLineFrame"
         - $ref: "#/components/schemas/LogGapFrame"
         - $ref: "#/components/schemas/LogEndFrame"
+    CredentialKind:
+      type: string
+      enum:
+        - asc_key
+        - apple_id
+        - play_sa
+        - firebase_sa
+        - keystore
+        - shorebird
+        - github
+        - slack
+    CredentialStatus:
+      type: string
+      description: |
+        `unverified`: never checked. `verified`: accepted at the last check.
+        `rejected`: refused at the last check (expired, revoked, wrong); a job
+        that needs it fails preflight. `unreachable`: the last check could not
+        be made, so it says nothing about the credential.
+      enum: [unverified, verified, rejected, unreachable]
+    Credential:
+      type: object
+      description: A credential of a flavor. It never carries the secret.
+      required: [id, projectId, app, flavor, kind, status]
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+        projectId:
+          type: string
+        app:
+          type: string
+          description: The path of the app of the flavor; `.` for the root.
+        flavor:
+          type: string
+        kind:
+          $ref: "#/components/schemas/CredentialKind"
+        status:
+          $ref: "#/components/schemas/CredentialStatus"
+        account:
+          type: string
+          description: |
+            Who it belongs to, when that is not secret: the Apple ID, the key
+            id, the service account email, the keystore alias, the GitHub
+            login.
+        verifiedAt:
+          type: string
+          format: date-time
+          description: When a check last accepted it.
+        checkedAt:
+          type: string
+          format: date-time
+          description: When it was last checked.
+        message:
+          type: string
+          description: Why the last check did not accept it.
+        fix:
+          type: string
+          description: What to do about `message`.
+    CredentialsResponse:
+      type: object
+      required: [credentials]
+      additionalProperties: false
+      properties:
+        credentials:
+          type: array
+          items:
+            $ref: "#/components/schemas/Credential"
+    AscKeyCredentialRequest:
+      type: object
+      required: [flavor, kind, keyId, issuerId, privateKey]
+      additionalProperties: false
+      properties:
+        app:
+          type: string
+        flavor:
+          type: string
+        kind:
+          const: asc_key
+        keyId:
+          type: string
+        issuerId:
+          type: string
+        privateKey:
+          type: string
+          description: The text of the `.p8` file.
+        keyKind:
+          type: string
+          enum: [team, individual]
+          description: "`team` unless told otherwise."
+    AppleIdCredentialRequest:
+      type: object
+      required: [flavor, kind, appleId, password]
+      additionalProperties: false
+      properties:
+        app:
+          type: string
+        flavor:
+          type: string
+        kind:
+          const: apple_id
+        appleId:
+          type: string
+        password:
+          type: string
+          description: |
+            An app-specific password (`abcd-efgh-ijkl-mnop`), not the password
+            of the Apple ID.
+    ServiceAccountCredentialRequest:
+      type: object
+      required: [flavor, kind, serviceAccount]
+      additionalProperties: false
+      properties:
+        app:
+          type: string
+        flavor:
+          type: string
+        kind:
+          enum: [play_sa, firebase_sa]
+        serviceAccount:
+          type: string
+          description: The text of the JSON key file of the service account.
+    KeystoreCredentialRequest:
+      type: object
+      required: [flavor, kind, keystore, storePassword, keyAlias]
+      additionalProperties: false
+      properties:
+        app:
+          type: string
+        flavor:
+          type: string
+        kind:
+          const: keystore
+        keystore:
+          type: string
+          description: The keystore file, base64 encoded.
+        storePassword:
+          type: string
+        keyAlias:
+          type: string
+        keyPassword:
+          type: string
+          description: The store password unless given.
+    TokenCredentialRequest:
+      type: object
+      required: [flavor, kind, token]
+      additionalProperties: false
+      properties:
+        app:
+          type: string
+        flavor:
+          type: string
+        kind:
+          enum: [shorebird, github]
+        token:
+          type: string
+          description: |
+            A Shorebird API key (`sb_api_*`) or a GitHub token. The engine has
+            one GitHub token, shared by every project.
+    SlackCredentialRequest:
+      type: object
+      required: [flavor, kind, webhookUrl]
+      additionalProperties: false
+      properties:
+        app:
+          type: string
+        flavor:
+          type: string
+        kind:
+          const: slack
+        webhookUrl:
+          type: string
+    SaveCredentialRequest:
+      description: |
+        Which flavor and kind, and the secret fields of that kind.
+      oneOf:
+        - $ref: "#/components/schemas/AscKeyCredentialRequest"
+        - $ref: "#/components/schemas/AppleIdCredentialRequest"
+        - $ref: "#/components/schemas/ServiceAccountCredentialRequest"
+        - $ref: "#/components/schemas/KeystoreCredentialRequest"
+        - $ref: "#/components/schemas/TokenCredentialRequest"
+        - $ref: "#/components/schemas/SlackCredentialRequest"

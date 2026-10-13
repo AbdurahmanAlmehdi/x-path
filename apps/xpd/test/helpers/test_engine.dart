@@ -8,6 +8,7 @@ import 'package:xp_api/xp_api.dart';
 import 'package:xp_engine/xp_engine.dart';
 import 'package:xpd/xpd.dart';
 
+import 'credential_fakes.dart';
 import 'job_fakes.dart';
 import 'project_fakes.dart';
 
@@ -79,6 +80,10 @@ class TestEngine {
     required this.artifactStore,
     required this.testRuns,
     required this.projectRepository,
+    required this.credentialRepository,
+    required this.credentialSecrets,
+    required this.credentialVerifiers,
+    required this.masker,
   });
 
   static Future<TestEngine> start({
@@ -114,6 +119,13 @@ class TestEngine {
     final store = logStore ?? InMemoryJobLogStore();
     final logs = JobLogs(store: store, liveCapacity: logLiveCapacity);
     final events = wrapLog == null ? log : wrapLog(log);
+    final credentialRepository = InMemoryCredentialRepository();
+    final credentialSecrets = BytesSecretStore();
+    final credentialVerifiers = {
+      for (final kind in CredentialKind.values)
+        kind: FakeCredentialVerifier(kind),
+    };
+    final masker = RecordingMasker();
     final jobs = JobRunner(
       jobs: jobRepository,
       steps: StepRegistry([const CommandStep()]),
@@ -164,6 +176,15 @@ class TestEngine {
         jobs: jobRepository,
         projects: projects,
       ),
+      credentials: CredentialService(
+        repository: credentialRepository,
+        projects: projects,
+        secrets: credentialSecrets,
+        verifiers: credentialVerifiers.values,
+        masker: masker,
+        events: events,
+        clock: clock,
+      ),
       clock: clock,
       engineVersion: '9.9.9',
       onError: (error, _) => errors.add(error),
@@ -187,6 +208,10 @@ class TestEngine {
       artifactStore: artifactStore,
       testRuns: testRuns,
       projectRepository: projects,
+      credentialRepository: credentialRepository,
+      credentialSecrets: credentialSecrets,
+      credentialVerifiers: credentialVerifiers,
+      masker: masker,
     );
   }
 
@@ -202,6 +227,18 @@ class TestEngine {
   final InMemoryArtifactStore artifactStore;
   final InMemoryTestRunRepository testRuns;
   final ProjectRepository projectRepository;
+
+  /// The credential references; add the flavors credentials can be saved for.
+  final InMemoryCredentialRepository credentialRepository;
+
+  /// The secrets of the credentials.
+  final BytesSecretStore credentialSecrets;
+
+  /// The check of each kind of credential; they accept everything by default.
+  final Map<CredentialKind, FakeCredentialVerifier> credentialVerifiers;
+
+  /// What the engine was told to hide in logs.
+  final RecordingMasker masker;
 
   /// The files of the folders a project can be added from, by path.
   final Map<String, Map<String, String>> folders;

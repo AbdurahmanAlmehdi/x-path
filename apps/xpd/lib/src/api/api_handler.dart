@@ -3,6 +3,7 @@ import 'package:shelf_router/shelf_router.dart';
 import 'package:xp_api/xp_api.dart';
 import 'package:xp_engine/xp_engine.dart';
 import 'package:xpd/src/api/artifacts/artifacts_routes.dart';
+import 'package:xpd/src/api/credentials/credentials_routes.dart';
 import 'package:xpd/src/api/events_route.dart';
 import 'package:xpd/src/api/jobs/job_logs_route.dart';
 import 'package:xpd/src/api/jobs/jobs_routes.dart';
@@ -28,6 +29,7 @@ Handler buildApiHandler({
   required JobLogsRoute jobLogs,
   required ArtifactService artifacts,
   required TestRunService tests,
+  required CredentialService credentials,
   required String engineVersion,
   void Function(Object error, StackTrace stackTrace)? onError,
 }) {
@@ -46,6 +48,7 @@ Handler buildApiHandler({
   JobsRoutes(jobs).addTo(router);
   ArtifactsRoutes(artifacts).addTo(router);
   TestsRoutes(tests).addTo(router);
+  CredentialsRoutes(credentials).addTo(router);
   return const Pipeline()
       .addMiddleware(errorMiddleware(onError: onError))
       .addMiddleware(authMiddleware(tokens, publicPaths: publicPaths))

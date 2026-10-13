@@ -2,6 +2,7 @@
 library;
 
 export 'artifacts.dart';
+export 'credentials.dart';
 export 'git.dart';
 export 'github.dart';
 export 'process.dart';

@@ -31,6 +31,10 @@ enum GuardCheckName {
 
   /// The build number is not used already.
   buildNumberReuse,
+
+  /// The credentials the job needs were accepted at their last check: no
+  /// expired key, no revoked password.
+  credentials,
 }
 
 /// How a check ended.

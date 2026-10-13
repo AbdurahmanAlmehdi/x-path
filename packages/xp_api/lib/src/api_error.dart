@@ -32,6 +32,12 @@ enum ApiErrorCode {
   @JsonValue('resync_required')
   resyncRequired(409),
 
+  /// A credential was not stored because the store or tool it is for refused
+  /// it, or it is not usable (malformed key, wrong prefix). The message says
+  /// what to do.
+  @JsonValue('credential_rejected')
+  credentialRejected(422),
+
   /// The route only speaks WebSocket.
   @JsonValue('upgrade_required')
   upgradeRequired(426),

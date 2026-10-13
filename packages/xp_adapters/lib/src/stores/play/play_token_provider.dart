@@ -8,8 +8,12 @@ import 'package:xp_engine/xp_engine.dart';
 /// The OAuth2 scope of the Google Play Developer API.
 const playScope = 'https://www.googleapis.com/auth/androidpublisher';
 
-/// Makes the access tokens for the Google Play Developer API and keeps one
-/// until it is nearly expired.
+/// The OAuth2 scope of Firebase App Distribution (and most Google Cloud APIs).
+const cloudPlatformScope = 'https://www.googleapis.com/auth/cloud-platform';
+
+/// Makes the access tokens for a Google API and keeps one until it is nearly
+/// expired. Google Play uses [playScope]; Firebase App Distribution uses
+/// [cloudPlatformScope].
 ///
 /// This is the OAuth2 JWT bearer flow (RFC 7523) of a service account: an
 /// assertion signed RS256 with the private key, with `iss` the service
@@ -24,6 +28,7 @@ class PlayTokenProvider {
   new({
     required this._account,
     required this._clock,
+    this.scope = playScope,
     http.Client? client,
     this.assertionLifetime = const Duration(minutes: 30),
     this.refreshMargin = const Duration(minutes: 2),
@@ -33,6 +38,9 @@ class PlayTokenProvider {
          assertionLifetime <= maxAssertionLifetime,
          'Google refuses an assertion that lives longer than an hour.',
        );
+
+  /// The scope the assertion asks for.
+  final String scope;
 
   /// The longest Google accepts: one hour.
   static const maxAssertionLifetime = Duration(hours: 1);
@@ -141,7 +149,7 @@ class PlayTokenProvider {
     };
     final claims = {
       'iss': _account.clientEmail,
-      'scope': playScope,
+      'scope': scope,
       'aud': _account.tokenUri,
       'iat': issuedAt,
       'exp': issuedAt + assertionLifetime.inSeconds,

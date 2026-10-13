@@ -420,4 +420,7 @@ class _FailingDelete implements GooglePlay {
   @override
   Future<List<PlayReleaseSummary>> releases(String packageName, String track) =>
       _inner.releases(packageName, track);
+
+  @override
+  Future<void> verifyAccess() => _inner.verifyAccess();
 }

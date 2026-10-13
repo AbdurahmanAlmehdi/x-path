@@ -1,4 +1,5 @@
 import 'package:test/test.dart';
+import 'package:xp_api/xp_api.dart';
 import 'package:xp_engine/xp_engine.dart';
 
 import '../../../helpers/guard_harness.dart';
@@ -12,6 +13,24 @@ void main() {
 
   test('round-trips through JSON', () {
     expect(GuardInput.fromJson(full.toJson()), full);
+  });
+
+  test('round-trips the flavor and the credential kinds', () {
+    final input = guardRequest(
+      checks: [GuardCheckName.credentials],
+      flavorId: 'flv_1',
+      credentialKinds: [CredentialKind.ascKey, CredentialKind.firebaseSa],
+    ).request.input;
+
+    expect(input.toJson()['flavorId'], 'flv_1');
+    expect(input.toJson()['credentialKinds'], ['asc_key', 'firebase_sa']);
+    expect(GuardInput.fromJson(input.toJson()), input);
+  });
+
+  test('refuses a credential kind that does not exist', () {
+    final json = full.toJson()..['credentialKinds'] = ['dropbox'];
+
+    expect(() => GuardInput.fromJson(json), throwsFormatException);
   });
 
   test('keeps the store countries', () {
@@ -34,6 +53,10 @@ void main() {
     expect(input.shorebirdAppId, isNull);
     expect(input.storeCountry, 'us');
     expect(input.toJson(), isNot(contains('releaseVersion')));
+    expect(input.flavorId, isNull);
+    expect(input.credentialKinds, isEmpty);
+    expect(input.toJson(), isNot(contains('flavorId')));
+    expect(input.toJson(), isNot(contains('credentialKinds')));
   });
 
   test('names every check of the step library', () {
@@ -46,6 +69,7 @@ void main() {
       'patchNativeDiff',
       'playTargetSdk',
       'buildNumberReuse',
+      'credentials',
     ]);
   });
 

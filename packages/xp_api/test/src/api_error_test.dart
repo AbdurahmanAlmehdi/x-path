@@ -12,6 +12,7 @@ void main() {
           ApiErrorCode.notFound: 404,
           ApiErrorCode.conflict: 409,
           ApiErrorCode.resyncRequired: 409,
+          ApiErrorCode.credentialRejected: 422,
           ApiErrorCode.upgradeRequired: 426,
           ApiErrorCode.internal: 500,
           ApiErrorCode.upstreamError: 502,

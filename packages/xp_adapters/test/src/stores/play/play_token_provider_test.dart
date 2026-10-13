@@ -53,6 +53,48 @@ void main() {
   Future<Object?> failure(Future<Object?> future) =>
       future.then<Object?>((_) => null, onError: (Object e) => e);
 
+  group('the scope', () {
+    test('is the Play scope unless told otherwise', () async {
+      final scopes = <String>[];
+      final tokens = PlayTokenProvider(
+        account: account(),
+        clock: clock,
+        client: MockClient((request) async {
+          scopes.add(
+            _part(request.bodyFields['assertion']!, 1)['scope']! as String,
+          );
+          return http.Response('{"access_token": "t"}', 200);
+        }),
+      );
+      addTearDown(tokens.close);
+
+      await tokens.token();
+
+      expect(scopes, [playScope]);
+      expect(tokens.scope, playScope);
+    });
+
+    test('can be the cloud-platform scope of Firebase', () async {
+      final scopes = <String>[];
+      final tokens = PlayTokenProvider(
+        account: account(),
+        clock: clock,
+        scope: cloudPlatformScope,
+        client: MockClient((request) async {
+          scopes.add(
+            _part(request.bodyFields['assertion']!, 1)['scope']! as String,
+          );
+          return http.Response('{"access_token": "t"}', 200);
+        }),
+      );
+      addTearDown(tokens.close);
+
+      await tokens.token();
+
+      expect(scopes, ['https://www.googleapis.com/auth/cloud-platform']);
+    });
+  });
+
   group('the assertion', () {
     test('has the header and the claims Google documents', () async {
       final bodies = <Map<String, String>>[];
