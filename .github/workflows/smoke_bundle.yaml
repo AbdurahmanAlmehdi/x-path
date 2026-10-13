@@ -1,0 +1,50 @@
+# Linux only: GitHub-hosted macOS runners are not used (cost). The macOS run is
+# local. Builds the xpd AOT bundle (`dart build cli`) and runs it: /health, the
+# SQLite hook, token auth and a clean shutdown (tool/e2e/smoke_bundle.sh).
+# Flutter 3.47.6 ships Dart 3.13.5; keep both in sync with .fvmrc. The
+# workspace has Flutter members, so even `dart pub get` needs the Flutter SDK.
+name: smoke_bundle
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/smoke_bundle.yaml"
+      - "apps/xpd/**"
+      - "packages/**"
+      - "tool/e2e/**"
+      - "pubspec.yaml"
+      - "pubspec.lock"
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/smoke_bundle.yaml"
+      - "apps/xpd/**"
+      - "packages/**"
+      - "tool/e2e/**"
+      - "pubspec.yaml"
+      - "pubspec.lock"
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Git Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2.23.0
+        with:
+          flutter-version: "3.47.6"
+          cache: true
+
+      - name: Install Dependencies
+        run: dart pub get
+
+      - name: Smoke Test the xpd Bundle
+        run: tool/e2e/smoke_bundle.sh
