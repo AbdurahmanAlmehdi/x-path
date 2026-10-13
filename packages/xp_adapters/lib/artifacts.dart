@@ -3,4 +3,6 @@
 library;
 
 export 'src/artifacts/directory_artifact_store.dart';
+export 'src/artifacts/directory_build_directories.dart';
 export 'src/artifacts/directory_build_files.dart';
+export 'src/artifacts/zip_snapshot_reader.dart';

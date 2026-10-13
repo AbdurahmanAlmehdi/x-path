@@ -10,6 +10,7 @@ const engineMigrations = <Migration>[
   Migration(version: 3, sql: _v3),
   Migration(version: 4, sql: _v4),
   Migration(version: 5, sql: _v5),
+  Migration(version: 6, sql: _v6),
 ];
 
 // Timestamps are integer microseconds since the Unix epoch (UTC), so that
@@ -226,4 +227,20 @@ ALTER TABLE job ADD COLUMN tools TEXT
 const _v5 = '''
 ALTER TABLE artifact ADD COLUMN created_at INTEGER NOT NULL DEFAULT 0;
 CREATE UNIQUE INDEX idx_artifact_job_path ON artifact (job_id, path);
+''';
+
+// Phase 9c: the Flutter version each Shorebird release was built with, which
+// every patch of it must use (D-20). A release is one app id, version and
+// platform; `job_id` is the job that made it (no foreign key: the record
+// outlives the job's housekeeping).
+const _v6 = '''
+CREATE TABLE shorebird_release (
+  app_id TEXT NOT NULL,
+  version TEXT NOT NULL,
+  platform TEXT NOT NULL CHECK (platform IN ('android', 'ios')),
+  flutter_version TEXT NOT NULL,
+  job_id TEXT NOT NULL,
+  recorded_at INTEGER NOT NULL,
+  PRIMARY KEY (app_id, version, platform)
+) STRICT;
 ''';

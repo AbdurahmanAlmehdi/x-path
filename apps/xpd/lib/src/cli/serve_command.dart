@@ -94,6 +94,13 @@ class ServeCommand extends XpdCommand {
         repository: artifactRepository,
         clock: const SystemClock(),
       );
+      final shorebirdReleases = ShorebirdCliReleases(
+        runner: runner,
+        secrets: secrets,
+      );
+      final shorebirdRecords = SqliteShorebirdReleaseRepository(database);
+      const buildFiles = DirectoryBuildFiles();
+      const buildDirectories = DirectoryBuildDirectories();
       final isMacOS = context.operatingSystem == 'macos';
       final buildToolchain = BuildToolchain(
         resolver: FlutterResolver(
@@ -115,17 +122,54 @@ class ServeCommand extends XpdCommand {
           VersionBumpStep(git: git, workspaces: DirectoryWorkspace.new),
           BuildAndroidStep(
             toolchain: buildToolchain,
-            files: const DirectoryBuildFiles(),
+            files: buildFiles,
             recorder: artifactRecorder,
             repository: artifactRepository,
             store: artifactStore,
           ),
           BuildIosStep(
             toolchain: buildToolchain,
-            files: const DirectoryBuildFiles(),
+            files: buildFiles,
             recorder: artifactRecorder,
             repository: artifactRepository,
             store: artifactStore,
+            isMacOS: isMacOS,
+          ),
+          ShorebirdReleaseStep(
+            toolchain: buildToolchain,
+            files: buildFiles,
+            recorder: artifactRecorder,
+            repository: artifactRepository,
+            store: artifactStore,
+            releases: shorebirdReleases,
+            records: shorebirdRecords,
+            clock: const SystemClock(),
+            isMacOS: isMacOS,
+          ),
+          ShorebirdPatchStep(
+            toolchain: buildToolchain,
+            files: buildFiles,
+            releases: shorebirdReleases,
+            records: shorebirdRecords,
+            isMacOS: isMacOS,
+          ),
+          SymbolsArchiveStep(
+            directories: buildDirectories,
+            files: buildFiles,
+            recorder: artifactRecorder,
+            repository: artifactRepository,
+            store: artifactStore,
+          ),
+          VerifyCompiledConfigStep(
+            workspaces: DirectoryWorkspace.new,
+            repository: artifactRepository,
+            store: artifactStore,
+            snapshots: const ZipSnapshotReader(),
+          ),
+          StripAndReexportStep(
+            directories: buildDirectories,
+            files: buildFiles,
+            recorder: artifactRecorder,
             isMacOS: isMacOS,
           ),
           RecordManifestStep(
