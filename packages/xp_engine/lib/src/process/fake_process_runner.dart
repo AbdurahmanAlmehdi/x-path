@@ -5,13 +5,24 @@ import 'package:xp_engine/src/process/process_runner.dart';
 /// One process started on a [FakeProcessRunner].
 class FakeProcessCall {
   /// Creates a record of a started process.
-  new(this.executable, this.arguments);
+  new(
+    this.executable,
+    this.arguments, {
+    this.workingDirectory,
+    this.environment,
+  });
 
   /// The program that was started.
   final String executable;
 
   /// The arguments it was started with.
   final List<String> arguments;
+
+  /// The directory it was started in, or `null` for the engine's.
+  final String? workingDirectory;
+
+  /// The environment added to the engine's for it, or `null`.
+  final Map<String, String>? environment;
 
   /// Everything written to its standard input.
   String get stdin => _stdin.toString();
@@ -47,11 +58,18 @@ class FakeProcessRunner implements ProcessRunner {
   @override
   Future<RunningProcess> start(
     String executable,
-    List<String> arguments,
-  ) async {
+    List<String> arguments, {
+    String? workingDirectory,
+    Map<String, String>? environment,
+  }) async {
     final error = startError;
     if (error != null) throw error;
-    final call = FakeProcessCall(executable, arguments);
+    final call = FakeProcessCall(
+      executable,
+      arguments,
+      workingDirectory: workingDirectory,
+      environment: environment,
+    );
     calls.add(call);
     return _FakeRunningProcess(call, handler);
   }

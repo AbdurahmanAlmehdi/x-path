@@ -43,6 +43,23 @@ void main() {
       expect(runner.calls.single.arguments, ['a', 'b']);
     });
 
+    test('passes the working directory and environment on', () async {
+      final runner = FakeProcessRunner((_) => const ProcessOutput(exitCode: 0));
+
+      await runner.run(
+        'tool',
+        [],
+        workingDirectory: '/work',
+        environment: {'A': 'b'},
+      );
+      await runner.run('tool', []);
+
+      expect(runner.calls.first.workingDirectory, '/work');
+      expect(runner.calls.first.environment, {'A': 'b'});
+      expect(runner.calls.last.workingDirectory, isNull);
+      expect(runner.calls.last.environment, isNull);
+    });
+
     test('closes stdin even when there is nothing to write', () async {
       final runner = FakeProcessRunner(
         (call) => ProcessOutput(exitCode: 0, stdout: '[${call.stdin}]'),
