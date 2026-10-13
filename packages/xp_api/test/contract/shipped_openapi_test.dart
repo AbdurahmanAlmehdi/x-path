@@ -99,6 +99,61 @@ void main() {
       }
     });
 
+    test('documents the artifact endpoints and their error responses', () {
+      final unauthorized = jsonEncode(
+        ErrorResponse.of(ApiErrorCode.unauthorized, 'm').toJson(),
+      );
+
+      for (final (method, path) in [
+        ('GET', '/jobs/job_1/artifacts'),
+        ('GET', '/artifacts/art_1'),
+        ('GET', '/artifacts/art_1/download'),
+        ('POST', '/artifacts/art_1/pin'),
+        ('POST', '/artifacts/art_1/unpin'),
+      ]) {
+        expect(
+          shipped.validateResponse(
+            method: method,
+            path: path,
+            statusCode: 401,
+            body: unauthorized,
+            contentType: 'application/json',
+          ),
+          isEmpty,
+          reason: '$method $path',
+        );
+      }
+    });
+
+    test('describes artifacts', () {
+      final artifact = Artifact(
+        id: 'art_1',
+        jobId: 'job_1',
+        kind: ArtifactKind.shorebirdSymbols,
+        name: 'symbols.zip',
+        size: 0,
+        sha256: 'f' * 64,
+        pinned: false,
+        createdAt: DateTime.utc(2026),
+      );
+
+      expect(shipped.validateSchema('Artifact', artifact.toJson()), isEmpty);
+      expect(
+        shipped.validateSchema(
+          'ArtifactsResponse',
+          ArtifactsResponse([artifact]).toJson(),
+        ),
+        isEmpty,
+      );
+      expect(
+        shipped.validateSchema('Artifact', {
+          ...artifact.toJson(),
+          'sha256': 'not a digest',
+        }),
+        isNotEmpty,
+      );
+    });
+
     test('describes jobs and log frames', () {
       final job = Job(
         id: 'job_1',

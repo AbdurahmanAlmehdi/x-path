@@ -37,6 +37,17 @@ class RawResponse {
   Map<String, dynamic> get json => jsonDecode(body) as Map<String, dynamic>;
 }
 
+/// A response read to the end as bytes.
+class RawBytes {
+  const new(this.statusCode, this.headers, this.bytes);
+
+  final int statusCode;
+  final HttpHeaders headers;
+  final List<int> bytes;
+
+  String get text => utf8.decode(bytes);
+}
+
 /// A repository that cannot be read, so that every authenticated request
 /// fails inside the engine.
 class ThrowingDeviceTokenRepository implements DeviceTokenRepository {
@@ -64,6 +75,8 @@ class TestEngine {
     required this.supervisor,
     required this.logStore,
     required this.logs,
+    required this.artifactRepository,
+    required this.artifactStore,
   });
 
   static Future<TestEngine> start({
@@ -91,6 +104,8 @@ class TestEngine {
     );
     final errors = <Object>[];
     final jobRepository = InMemoryJobRepository();
+    final artifactRepository = InMemoryArtifactRepository();
+    final artifactStore = InMemoryArtifactStore();
     final supervisor = FakeProcessSupervisor((process) => 0, clock: clock);
     final store = logStore ?? InMemoryJobLogStore();
     final logs = JobLogs(store: store, liveCapacity: logLiveCapacity);
@@ -135,6 +150,11 @@ class TestEngine {
       ),
       jobs: jobs,
       logs: logs,
+      artifacts: ArtifactService(
+        repository: artifactRepository,
+        store: artifactStore,
+        jobs: jobRepository,
+      ),
       clock: clock,
       engineVersion: '9.9.9',
       onError: (error, _) => errors.add(error),
@@ -154,6 +174,8 @@ class TestEngine {
       supervisor: supervisor,
       logStore: store,
       logs: logs,
+      artifactRepository: artifactRepository,
+      artifactStore: artifactStore,
     );
   }
 
@@ -165,6 +187,8 @@ class TestEngine {
   final FakeProcessSupervisor supervisor;
   final JobLogStore logStore;
   final JobLogs logs;
+  final InMemoryArtifactRepository artifactRepository;
+  final InMemoryArtifactStore artifactStore;
 
   /// The files of the folders a project can be added from, by path.
   final Map<String, Map<String, String>> folders;
@@ -212,6 +236,46 @@ class TestEngine {
     } finally {
       client.close(force: true);
     }
+  }
+
+  /// Downloads [path] as bytes, with the headers of the response.
+  Future<RawBytes> download(String path, {String? token}) async {
+    final client = HttpClient();
+    try {
+      final request = await client.getUrl(uri.resolve(path));
+      final bearer = token ?? secret;
+      if (bearer.isNotEmpty) {
+        request.headers.set('authorization', 'Bearer $bearer');
+      }
+      final response = await request.close();
+      return RawBytes(
+        response.statusCode,
+        response.headers,
+        await response.expand((chunk) => chunk).toList(),
+      );
+    } finally {
+      client.close(force: true);
+    }
+  }
+
+  /// Stores an artifact of [jobId] with [content], the way a build step does.
+  Future<ArtifactRecord> addArtifact(
+    String jobId, {
+    String name = 'dev-1.0.0+1.apk',
+    ArtifactKind kind = ArtifactKind.apk,
+    String content = 'apk bytes',
+  }) async {
+    final recorder = ArtifactRecorder(
+      store: artifactStore,
+      repository: artifactRepository,
+      clock: clock,
+    );
+    return await recorder.record(
+      jobId: jobId,
+      kind: kind,
+      name: name,
+      content: Stream.value(utf8.encode(content)),
+    );
   }
 
   /// Like [request] but with the headers of a WebSocket handshake, so that the

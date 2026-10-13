@@ -4,3 +4,5 @@ analyzer:
     - "**/*.g.dart"
     # Synthetic repositories for the scanner tests; not code of this package.
     - "e2e/fixtures/**"
+    # A Flutter app that the build e2e builds; its packages are not installed here.
+    - "e2e/build_app/**"

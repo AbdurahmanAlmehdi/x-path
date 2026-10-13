@@ -1,0 +1,11 @@
+name: build_app
+description: The smallest Flutter app with dev and prod flavors, which the build e2e of XPath builds (tool/e2e/build_fixture_apk.sh).
+publish_to: none
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.13.0
+
+dependencies:
+  flutter:
+    sdk: flutter

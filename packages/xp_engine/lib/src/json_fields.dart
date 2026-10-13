@@ -26,6 +26,24 @@ List<String> stringList(Map<String, dynamic> json, String field) {
   throw FormatException('"$field" must be a list of strings.');
 }
 
+/// The map from strings to strings at [field]; empty if it is absent.
+Map<String, String> stringMap(Map<String, dynamic> json, String field) {
+  final value = json[field];
+  if (value == null) return const {};
+  if (value is Map && value.values.every((item) => item is String)) {
+    return value.cast<String, String>();
+  }
+  throw FormatException('"$field" must be an object of strings.');
+}
+
+/// The boolean at [field]; `false` if it is absent.
+bool optionalFlag(Map<String, dynamic> json, String field) {
+  final value = json[field];
+  if (value == null) return false;
+  if (value is bool) return value;
+  throw FormatException('"$field" must be a boolean.');
+}
+
 /// The object at [field], or a [FormatException].
 Map<String, dynamic> requiredObject(Map<String, dynamic> json, String field) =>
     optionalObject(json, field) ??

@@ -85,6 +85,27 @@ class ServeCommand extends XpdCommand {
         dataDir: directory,
       );
       final jobRepository = SqliteJobRepository(database);
+      final artifactRepository = SqliteArtifactRepository(database);
+      final artifactStore = DirectoryArtifactStore(
+        p.join(directory, 'artifacts'),
+      );
+      final artifactRecorder = ArtifactRecorder(
+        store: artifactStore,
+        repository: artifactRepository,
+        clock: const SystemClock(),
+      );
+      final isMacOS = context.operatingSystem == 'macos';
+      final buildToolchain = BuildToolchain(
+        resolver: FlutterResolver(
+          runner: runner,
+          installer: GitFlutterInstaller(
+            root: p.join(directory, 'toolchains', 'flutter'),
+            runner: runner,
+          ),
+        ),
+        prober: ToolProber(runner: runner, isMacOS: isMacOS),
+        jobs: jobRepository,
+      );
       final secretFiles = DirectorySecretFileStore(p.join(directory, 'tmp'));
       final logs = JobLogs(store: FileJobLogStore(p.join(directory, 'logs')));
       final jobs = JobRunner(
@@ -92,6 +113,29 @@ class ServeCommand extends XpdCommand {
         steps: StepRegistry([
           const CommandStep(),
           VersionBumpStep(git: git, workspaces: DirectoryWorkspace.new),
+          BuildAndroidStep(
+            toolchain: buildToolchain,
+            files: const DirectoryBuildFiles(),
+            recorder: artifactRecorder,
+            repository: artifactRepository,
+            store: artifactStore,
+          ),
+          BuildIosStep(
+            toolchain: buildToolchain,
+            files: const DirectoryBuildFiles(),
+            recorder: artifactRecorder,
+            repository: artifactRepository,
+            store: artifactStore,
+            isMacOS: isMacOS,
+          ),
+          RecordManifestStep(
+            git: git,
+            workspaces: DirectoryWorkspace.new,
+            artifacts: artifactRepository,
+            recorder: artifactRecorder,
+            jobs: jobRepository,
+            clock: const SystemClock(),
+          ),
           // The checks that need a store (appStoreTrain, playTargetSdk,
           // buildNumberReuse) register with the store adapters (Phase 10).
           GuardStep(
@@ -152,6 +196,11 @@ class ServeCommand extends XpdCommand {
         ),
         jobs: jobs,
         logs: logs,
+        artifacts: ArtifactService(
+          repository: artifactRepository,
+          store: artifactStore,
+          jobs: jobRepository,
+        ),
         clock: const SystemClock(),
         engineVersion: packageVersion,
         host: host,

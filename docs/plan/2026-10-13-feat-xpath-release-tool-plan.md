@@ -352,7 +352,7 @@ Mataa dev builds through `xp` can start after Phase 13, before the desktop app e
 
 ### Phase 9b: Builds and artifacts
 
-- **Status:** Not started
+- **Status:** Done
 - **Scope:** `build.android`, `build.ios`, freshness marker, artifact discovery, artifact store
   with sha256, `record.manifest`; artifacts endpoints.
 - **Files touched:** `packages/xp_engine/lib/src/steps/build/**`, `packages/xp_engine/lib/src/artifacts/**`, `apps/xpd/lib/src/api/artifacts/**`, `tool/e2e/build_fixture_apk.sh`

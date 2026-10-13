@@ -4,3 +4,5 @@ analyzer:
     # Design reference files (docs/design/**) import packages the workspace
     # does not install, so they cannot be analyzed.
     - "docs/**"
+    # The app that tool/e2e/build_fixture_apk.sh builds has its own packages.
+    - "tool/e2e/build_app/**"
