@@ -271,7 +271,9 @@ packages) in each package with `--min-coverage <threshold>`. It exits non-zero i
 below its threshold. The thresholds are the three `test:coverage:*` scripts in the root
 `pubspec.yaml`: a package not named in `test:coverage:strict` gets the 90% floor.
 
-CI enforces the same thresholds on macOS. Linux CI runs the same tests without the gate.
+GitHub CI runs on Linux only (no GitHub-hosted macOS runners) and enforces the same
+thresholds there. `macos`-tagged tests and the macOS gate run locally: run
+`melos run test:coverage` on a Mac before merging to `main`.
 Coverage counts the files that tests import, so keep each package's barrel (`lib/<name>.dart`)
 exporting everything.
 

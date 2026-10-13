@@ -1,6 +1,5 @@
-# Flutter 3.47.6 ships Dart 3.13.5; keep both in sync with .fvmrc. The workspace
-# has Flutter members, so this package needs the Flutter workflow too.
-# macOS only: this package is part of the macOS app.
+# Flutter package on a GitHub-hosted Linux runner (no macOS runners: they are
+# billed at 10x). macOS-only checks run locally with `melos run test:coverage`.
 name: xp_macos_services
 
 concurrency:
@@ -26,12 +25,12 @@ on:
       - ".fvmrc"
 
 jobs:
-  macos:
+  linux:
     uses: VeryGoodOpenSource/very_good_workflows/.github/workflows/flutter_package.yml@v1
     with:
       flutter_version: "3.47.6"
       working_directory: packages/xp_macos_services
-      runs_on: macos-latest
+      runs_on: ubuntu-latest
       min_coverage: 90
       coverage_excludes: "**/*.g.dart"
       run_bloc_lint: false
