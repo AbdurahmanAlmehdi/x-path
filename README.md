@@ -320,6 +320,10 @@ has Flutter members, so even `dart pub get` needs the Flutter SDK; every package
 - Dart packages run on macOS (with the coverage gate) and on Linux (same tests, no gate).
 - `xp_desktop` and `xp_macos_services` run on macOS only.
 - `layers.yaml` runs the layer check.
+- `smoke_bundle.yaml` runs `tool/e2e/smoke_bundle.sh` on Ubuntu (run it locally on macOS): it builds the `xpd` AOT
+  bundle, starts it and checks `/health`, the SQLite build hook, token authentication and a clean
+  shutdown. It runs when `apps/xpd`, `packages`, `tool/e2e` or the root `pubspec` files change, and
+  needs `dart` 3.13, `curl` and `perl`.
 - `semantic_pull_request.yaml`, `spell_check.yaml` and `license_check.yaml` cover the rest. The
   spell check reads `README.md` and `docs/adr`; the planning documents are ignored in
   `.github/cspell.json`.
