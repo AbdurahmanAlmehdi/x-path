@@ -290,7 +290,9 @@ packages) in each package with `--min-coverage <threshold>`. It exits non-zero i
 below its threshold. The thresholds are the three `test:coverage:*` scripts in the root
 `pubspec.yaml`: a package not named in `test:coverage:strict` gets the 90% floor.
 
-CI enforces the same thresholds on macOS. Linux CI runs the same tests without the gate.
+GitHub CI runs on Linux only (no GitHub-hosted macOS runners) and enforces the same
+thresholds there. `macos`-tagged tests and the macOS gate run locally: run
+`melos run test:coverage` on a Mac before merging to `main`.
 Coverage counts the files that tests import, so keep each package's barrel (`lib/<name>.dart`)
 exporting everything.
 
@@ -313,12 +315,11 @@ Because `integration` tests are skipped by default, they are not part of the cov
 (the package, the packages it may depend on, the root `pubspec.yaml` and `.fvmrc`). They call the
 reusable workflows of
 [very_good_workflows](https://github.com/VeryGoodOpenSource/very_good_workflows). The workspace
-has Flutter members, so even `dart pub get` needs the Flutter SDK; every package therefore uses the
-`flutter_package` workflow, pinned to Flutter 3.47.6, instead of `dart_package`. CI therefore runs
-`very_good test` for Dart packages too; locally `melos run test:coverage` uses `very_good dart test`.
+has Flutter members, so even `dart pub get` needs the Flutter SDK; every job installs Flutter 3.47.6.
 
-- Dart packages run on macOS (with the coverage gate) and on Linux (same tests, no gate).
-- `xp_desktop` and `xp_macos_services` run on macOS only.
+- Every package runs on Linux only, with its coverage gate: Dart packages through the repo's
+  `dart_package.yaml` (`very_good dart test`, as locally), Flutter packages through the VGV
+  `flutter_package` workflow. No GitHub-hosted macOS runners.
 - `layers.yaml` runs the layer check.
 - `smoke_bundle.yaml` runs `tool/e2e/smoke_bundle.sh` on Ubuntu (run it locally on macOS): it builds the `xpd` AOT
   bundle, starts it and checks `/health`, the SQLite build hook, token authentication and a clean

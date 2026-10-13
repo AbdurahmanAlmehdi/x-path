@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:test/test.dart';
 import 'package:xp_api/testing.dart';
 
@@ -182,5 +184,14 @@ void main() {
         ),
       );
     });
+  });
+
+  test('load fails outside a resolved workspace', () async {
+    final dir = await Directory.systemTemp.createTemp('xp_api_contract');
+    addTearDown(() => dir.delete(recursive: true));
+    await expectLater(
+      OpenApiContract.load(from: dir),
+      throwsA(isA<StateError>()),
+    );
   });
 }

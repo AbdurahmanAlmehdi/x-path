@@ -4,7 +4,6 @@
 
 import 'dart:convert';
 import 'dart:io';
-import 'dart:isolate';
 
 import 'package:json_schema/json_schema.dart';
 import 'package:test/test.dart';
@@ -35,12 +34,32 @@ class OpenApiContract {
     : _document = _toPlain(loadYaml(source))! as Map<String, dynamic>;
 
   /// Reads the `openapi.yaml` that ships with this package.
-  static Future<OpenApiContract> load() async {
-    final library = await Isolate.resolvePackageUri(
-      Uri.parse('package:xp_api/xp_api.dart'),
-    );
-    final file = File.fromUri(library!.resolve('../openapi.yaml'));
+  ///
+  /// The package is found through the nearest `.dart_tool/package_config.json`
+  /// above [from] (the current directory by default), because `flutter test`,
+  /// which CI uses, cannot resolve `package:` URIs through `Isolate`.
+  static Future<OpenApiContract> load({Directory? from}) async {
+    final root = _packageRoot(from ?? Directory.current);
+    final file = File.fromUri(root.resolve('openapi.yaml'));
     return OpenApiContract.parse(await file.readAsString());
+  }
+
+  static Uri _packageRoot(Directory from) {
+    for (var dir = from.absolute; ; dir = dir.parent) {
+      final config = File('${dir.path}/.dart_tool/package_config.json');
+      if (config.existsSync()) {
+        final json =
+            jsonDecode(config.readAsStringSync()) as Map<String, dynamic>;
+        final package = (json['packages'] as List<dynamic>)
+            .cast<Map<String, dynamic>>()
+            .firstWhere((p) => p['name'] == 'xp_api');
+        final root = '${config.uri.resolve(package['rootUri'] as String)}';
+        return Uri.parse(root.endsWith('/') ? root : '$root/');
+      }
+      if (dir.parent.path == dir.path) {
+        throw StateError('No .dart_tool/package_config.json above $from');
+      }
+    }
   }
 
   final Map<String, dynamic> _document;
