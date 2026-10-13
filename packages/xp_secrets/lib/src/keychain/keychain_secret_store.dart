@@ -10,7 +10,8 @@ import 'package:xp_secrets/src/tracking_secret_store.dart';
 /// line to its standard input, so a secret is never in the arguments or the
 /// environment of a process, where `ps` could show it. Each argument is
 /// double-quoted, with `\` written as `\\` and `"` as `\"`. Secrets are kept
-/// under the service `dev.xpath.<scope>`, with the key as the account.
+/// under the service `ly.abdurahman.xpath.<scope>`, with the key as the
+/// account.
 ///
 /// Values are stored as base64 of their UTF-8 bytes. `security -i` reads one
 /// line, so a raw newline would end the command, and `find-generic-password
@@ -25,7 +26,7 @@ import 'package:xp_secrets/src/tracking_secret_store.dart';
 class KeychainSecretStore extends TrackingSecretStore {
   /// Creates a store that runs `security` through `runner`.
   ///
-  /// `scope` becomes the service name `dev.xpath.<scope>`. Without a
+  /// `scope` becomes the service name `ly.abdurahman.xpath.<scope>`. Without a
   /// `keychainPath` the default Keychain is used; tests pass a temporary one.
   new({
     required this._runner,
@@ -56,7 +57,7 @@ class KeychainSecretStore extends TrackingSecretStore {
   final Duration _timeout;
   final String _securityExecutable;
 
-  String get _service => 'dev.xpath.$scope';
+  String get _service => 'ly.abdurahman.xpath.$scope';
 
   @override
   Future<String?> read(String key) => track(() async {

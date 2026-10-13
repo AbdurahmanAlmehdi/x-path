@@ -492,7 +492,8 @@ Mataa dev builds through `xp` can start after Phase 13, before the desktop app e
 
 - **Status:** Not started
 - **Scope:** Runner self-update to the engine's version between jobs; macOS LaunchAgent and
-  Linux systemd units for runners and the engine; `xpd install-service`.
+  Linux systemd units for runners and the engine; `xpd install-service`. LaunchAgent labels are
+  `ly.abdurahman.xpath.xpd` (engine) and `ly.abdurahman.xpath.runner` (runner), per ADR 0005.
 - **Files touched:** `apps/xp/lib/src/runner/update/**`, `apps/xpd/lib/src/service/**`, `tool/release/linux/*.service`
 - **Acceptance criteria:** an outdated runner updates after its current job and reconnects.
 - **Validation:** `melos run test:coverage`
@@ -509,7 +510,7 @@ Mataa dev builds through `xp` can start after Phase 13, before the desktop app e
   connection banner with cached read-only view, add project by folder with scan review,
   credentials editor. Feature blocs use `bloc_concurrency`: `restartable` for streams,
   `droppable` for commands.
-- **Files touched:** `packages/xp_repositories/**`, `packages/xp_macos_services/**`, `apps/xp_desktop/lib/**`, `apps/xp_desktop/macos/Runner/**`, `apps/xp_desktop/macos/Runner/Library/LaunchAgents/dev.xpath.xpd.plist`
+- **Files touched:** `packages/xp_repositories/**`, `packages/xp_macos_services/**`, `apps/xp_desktop/lib/**`, `apps/xp_desktop/macos/Runner/**`, `apps/xp_desktop/macos/Runner/Library/LaunchAgents/ly.abdurahman.xpath.xpd.plist`
 - **Acceptance criteria:** switching engines tears down and rebuilds streams (bloc test);
   `flutter build macos` succeeds in CI.
 - **Validation:** `melos run test:coverage && (cd apps/xp_desktop && flutter build macos --debug)`
@@ -555,7 +556,8 @@ Mataa dev builds through `xp` can start after Phase 13, before the desktop app e
 
 - **Status:** Not started
 - **Scope:** Engine and `xp` bundles for macOS arm64/x64 and Linux x64/arm64, Linux tarball,
-  `install.sh`, Docker image, release workflow for XPath itself.
+  `install.sh` (served at `https://xpath.abdurahman.ly/install`), Docker image, release
+  workflow for XPath itself.
 - **Files touched:** `tool/release/bundles.sh`, `tool/release/linux/**`, `Dockerfile`, `.github/workflows/release.yml`
 - **Acceptance criteria:** the Docker image starts `xpd` and answers `/health`.
 - **Validation:** `tool/release/bundles.sh && docker build -t xpath:test . && docker run --rm xpath:test xpd --version`
@@ -572,7 +574,8 @@ Mataa dev builds through `xp` can start after Phase 13, before the desktop app e
 ### Phase 18c: Sparkle, cask and uninstall
 
 - **Status:** Not started
-- **Scope:** Sparkle 2 behind `xp_macos_services` with an appcast on GitHub Releases, Homebrew
+- **Scope:** Sparkle 2 behind `xp_macos_services` with an appcast at
+  `https://xpath.abdurahman.ly/appcast.xml` (enclosures on GitHub Releases), Homebrew
   cask in `AbdurahmanAlmehdi/homebrew-tap` with a `zap` stanza, "Remove XPath" in the app
   (unload agent, revoke runner tokens, optional data and Keychain wipe).
 - **Files touched:** `packages/xp_macos_services/**`, `tool/release/appcast.sh`, `tool/release/cask/xpath.rb`, `apps/xp_desktop/lib/settings/**`
