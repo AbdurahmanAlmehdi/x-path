@@ -116,6 +116,24 @@ edited once released: add a new one and a golden `test/src/sqlite/snapshots/v<N>
 (`UPDATE_GOLDENS=1 dart test test/src/sqlite/migrations_test.dart` writes it). Events older than
 seven days are pruned; their sequence numbers are never reused.
 
+Secrets (`packages/xp_secrets`) live on the engine machine behind the `SecretStore` interface of
+`xp_engine`; `createSecretStore` picks the implementation for the platform.
+
+- **macOS: Keychain** (ADR 0004). Each operation runs one `security -i` and sends one quoted command
+  line on stdin, so a value never appears in `ps`. Values are stored as base64 of their UTF-8 bytes,
+  because `security -i` reads one line and prints non-ASCII passwords as hex; one command line is
+  limited to 4094 bytes, so a secret can be about 3 KB (less with a long key name). The service is `dev.xpath.<scope>`.
+- **Linux: encrypted file.** `secrets.enc` in the data directory, sealed with XChaCha20-Poly1305
+  under a 32-byte master key: `$CREDENTIALS_DIRECTORY/xpath-master-key` (systemd
+  `LoadCredentialEncrypted=`) if set, else `master.key` in the data directory (mode 0600, created on
+  first use, refused if group or world can read it).
+- **Secrets locked** (D-10). A locked Keychain, a missing or unreadable master key, or a key that does
+  not open the file makes the store throw `SecretsLockedException` and set `status` to
+  `SecretsStatus.locked` (`statusChanges` announces it). The engine never prompts.
+- **Log masking.** `SecretMasker` replaces known secret values with `***` in process output. A
+  multi-line secret is masked line by line, overlapping secrets are merged, lines shorter than 6
+  characters are ignored, and `MaskingStream` masks a secret split between two chunks.
+
 `tool/e2e/smoke_bundle.sh` builds the `xpd` AOT bundle with `dart build cli`, starts it on a free
 port with a temporary data directory and checks `/health`, the database, the token guard and a clean shutdown.
 

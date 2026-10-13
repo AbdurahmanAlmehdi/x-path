@@ -277,7 +277,7 @@ Mataa dev builds through `xp` can start after Phase 13, before the desktop app e
 
 ### Phase 4: Secrets
 
-- **Status:** Not started
+- **Status:** Done
 - **Scope:** `SecretStore` interface in `xp_engine`; `xp_secrets` with the Keychain store
   (`security -i` behind the process interface), the Linux encrypted file (XChaCha20-Poly1305,
   one master key from `$CREDENTIALS_DIRECTORY` or a 0600 file), "secrets locked" state, and the
