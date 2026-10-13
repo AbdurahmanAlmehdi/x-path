@@ -6,3 +6,7 @@ coverage/
 .idea/
 .DS_Store
 pubspec_overrides.yaml
+
+# The build steps live in directories called build.
+!packages/xp_engine/lib/src/steps/build/
+!packages/xp_engine/test/src/steps/build/

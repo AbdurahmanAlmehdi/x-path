@@ -367,6 +367,140 @@ void main() {
     });
   });
 
+  group('artifacts', () {
+    Future<RawResponse> send(String method, String path) =>
+        engine.request(path, method: method);
+
+    Future<(Job, ArtifactRecord)> jobWithApk() async {
+      final job = await engine.createJob(['x']);
+      return (job, await engine.addArtifact(job.id));
+    }
+
+    test('GET /jobs/{id}/artifacts', () async {
+      final (job, apk) = await jobWithApk();
+      await engine.addArtifact(
+        job.id,
+        name: 'manifest.json',
+        kind: ArtifactKind.manifest,
+        content: '{}',
+      );
+
+      final response = await send('GET', '/jobs/${job.id}/artifacts');
+
+      expect(response.statusCode, 200);
+      expect(response.json['artifacts']! as List, hasLength(2));
+      expectContract(response, path: '/jobs/${job.id}/artifacts');
+      expect(
+        contract.validateSchema('Artifact', apk.toArtifact().toJson()),
+        isEmpty,
+      );
+    });
+
+    test('GET /jobs/{id}/artifacts for a job without any', () async {
+      final job = await engine.createJob(['x']);
+
+      final response = await send('GET', '/jobs/${job.id}/artifacts');
+
+      expectContract(response, path: '/jobs/${job.id}/artifacts');
+    });
+
+    test('GET /jobs/{id}/artifacts 401 and 404', () async {
+      final unauthorized = await engine.request(
+        '/jobs/job_x/artifacts',
+        token: '',
+      );
+      final missing = await send('GET', '/jobs/job_nope/artifacts');
+
+      expect((unauthorized.statusCode, missing.statusCode), (401, 404));
+      expectContract(unauthorized, path: '/jobs/job_x/artifacts');
+      expectContract(missing, path: '/jobs/job_nope/artifacts');
+    });
+
+    test('GET /artifacts/{id}', () async {
+      final (_, apk) = await jobWithApk();
+
+      final response = await send('GET', '/artifacts/${apk.id}');
+
+      expect(response.statusCode, 200);
+      expectContract(response, path: '/artifacts/${apk.id}');
+    });
+
+    test('GET /artifacts/{id} 401 and 404', () async {
+      final unauthorized = await engine.request('/artifacts/art_x', token: '');
+      final missing = await send('GET', '/artifacts/art_nope');
+
+      expect((unauthorized.statusCode, missing.statusCode), (401, 404));
+      expectContract(unauthorized, path: '/artifacts/art_x');
+      expectContract(missing, path: '/artifacts/art_nope');
+    });
+
+    test('GET /artifacts/{id}/download', () async {
+      final (_, apk) = await jobWithApk();
+
+      final response = await engine.download('/artifacts/${apk.id}/download');
+
+      expect(response.statusCode, 200);
+      expect(response.headers.contentLength, apk.size);
+      expect(response.headers.value('x-content-sha256'), apk.sha256);
+      contract.expectResponse(
+        method: 'GET',
+        path: '/artifacts/${apk.id}/download',
+        statusCode: response.statusCode,
+        contentType: response.headers.contentType?.toString(),
+        body: response.text,
+      );
+    });
+
+    test('GET /artifacts/{id}/download 401 and 404', () async {
+      final unauthorized = await engine.request(
+        '/artifacts/art_x/download',
+        token: '',
+      );
+      final missing = await send('GET', '/artifacts/art_nope/download');
+
+      expect((unauthorized.statusCode, missing.statusCode), (401, 404));
+      expectContract(unauthorized, path: '/artifacts/art_x/download');
+      expectContract(missing, path: '/artifacts/art_nope/download');
+    });
+
+    for (final action in ['pin', 'unpin']) {
+      test('POST /artifacts/{id}/$action', () async {
+        final (_, apk) = await jobWithApk();
+
+        final response = await send('POST', '/artifacts/${apk.id}/$action');
+
+        expect(response.statusCode, 200);
+        expect(Artifact.fromJson(response.json).pinned, action == 'pin');
+        expectContract(
+          response,
+          path: '/artifacts/${apk.id}/$action',
+          method: 'POST',
+        );
+      });
+
+      test('POST /artifacts/{id}/$action 401 and 404', () async {
+        final unauthorized = await engine.request(
+          '/artifacts/art_x/$action',
+          method: 'POST',
+          token: '',
+        );
+        final missing = await send('POST', '/artifacts/art_nope/$action');
+
+        expect((unauthorized.statusCode, missing.statusCode), (401, 404));
+        expectContract(
+          unauthorized,
+          path: '/artifacts/art_x/$action',
+          method: 'POST',
+        );
+        expectContract(
+          missing,
+          path: '/artifacts/art_nope/$action',
+          method: 'POST',
+        );
+      });
+    }
+  });
+
   group('jobs', () {
     Future<RawResponse> send(String method, String path, [Object? body]) =>
         engine.request(

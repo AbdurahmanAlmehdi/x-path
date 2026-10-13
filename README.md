@@ -122,7 +122,7 @@ edited once released: add a new one and a golden `test/src/sqlite/snapshots/v<N>
 (`UPDATE_GOLDENS=1 dart test test/src/sqlite/migrations_test.dart` writes it). Events older than
 seven days are pruned; their sequence numbers are never reused. Schema version 2 adds the scan
 columns of `project`; version 3 adds what the job runner records to `job` and `job_step`; version 4
-adds the tool versions of a job.
+adds the tool versions of a job; version 5 adds the time and a unique path to `artifact`.
 
 Secrets (`packages/xp_secrets`) live on the engine machine behind the `SecretStore` interface of
 `xp_engine`; `createSecretStore` picks the implementation for the platform.
@@ -217,7 +217,8 @@ port with a temporary data directory and checks `/health`, the database, the tok
 A job is a list of steps that run one after the other (D-18). Every step records its state, result and
 output as it goes, so a job survives a restart. Dispatching jobs from workflows comes in a later
 phase; for now the engine runs jobs created through `JobRunner` (the built-in steps are `command`,
-which runs a command the owner declares, `version.bump` and `guard`; see Versions and guards).
+which runs a command the owner declares, `version.bump` and `guard`, see Versions and guards, and
+`build.android`, `build.ios` and `record.manifest`, see Builds and artifacts).
 
 | Route | What it does |
 |---|---|
@@ -276,8 +277,8 @@ endpoint exposes it yet; workflows call it from Phase 11.
 
 ## Toolchain
 
-Phase 9a decides which tools a job runs with (D-20). Nothing runs them yet: the build steps of Phase 9b
-are the first callers, and no endpoint exposes this.
+Phase 9a decides which tools a job runs with (D-20). The build steps of Phase 9b are the first callers
+(see Builds and artifacts); no endpoint exposes this.
 
 - **Flutter** (`FlutterResolver`, `packages/xp_engine/lib/src/toolchain`). Flutter is pinned per app by
   its `.fvmrc`, which the scan reads into the profile (`flutterVersion`). `resolve(version)` returns a
@@ -306,6 +307,66 @@ are the first callers, and no endpoint exposes this.
   saved with `JobRepository.saveTools` into the `tools` JSON column of `job` (schema version 4) and read
   back with `tools`. `JobTools.from(flutter:, reports:)` builds the record from a resolution and the
   probes.
+
+## Builds and artifacts
+
+Phase 9b adds the steps that build an app and the store that keeps what they produce. Workflows start
+them from Phase 11; until then a job is created through `JobRunner`, as `tool/e2e/build_fixture_apk.sh`
+does.
+
+- **`build.android` / `build.ios`** (`packages/xp_engine/lib/src/steps/build`). Each runs `flutter build
+  apk|appbundle|ipa --release` of the Flutter SDK that `FlutterResolver` resolves for the app's `.fvmrc`
+  pin, in the app directory of the job's worktree, through the process supervisor (own process group,
+  masked and logged output, cancellation). The flags are the ones of the reference scripts:
+  `--flavor`, `--target` (`lib/main_<flavor>.dart`), `--build-name` and `--build-number` from the job's
+  version, `--dart-define-from-file`, `--obfuscate --split-debug-info` (the debug info goes to
+  `build/xpath/debug-info/<platform>` of the app, for the symbols step of Phase 9c) and, for iOS,
+  `--export-options-plist`. Before it builds, a step resolves Flutter, probes the other tools and saves
+  their versions for the job (`JobRepository.saveTools`). Signing inputs never go in the arguments: the
+  step input names secrets (`secretEnvironment`: variable to secret key; `secretFiles`: variable to the
+  path of a 0600 file that is deleted when the job ends), which the job runner reads from the secret store.
+  Which credential maps to which variable is a workflow matter (Phase 10c, Phase 11). `build.ios` fails
+  with "needs macOS (ios-sign)" on any machine that is not a Mac.
+- **Freshness marker** (`BuildFiles.markBuildStart`, `BuildOutputs`). `build/` is not cleaned between
+  runs, so a failed build can leave the artifact of an earlier one. Right before the build the step asks
+  the file system for the current time (it writes and stats a temporary file, so the time is in the same
+  clock as the modification times of the outputs). Only a file written after that time is taken; one that
+  is older fails the step with a message that names it. The IPA folder is also emptied first, because
+  `flutter build ipa` names the IPA after the app, not the flavor.
+- **Discovery.** An APK is looked for at `build/app/outputs/flutter-apk/app-<flavor>-release.apk` and
+  `.../apk/<flavor>/release/`, an AAB at `.../bundle/<flavor>Release/app-<flavor>-release.aab` (no
+  flavor: `app-release.*` and `bundle/release`), with the same file name anywhere below
+  `build/app/outputs` as the fallback if a Gradle upgrade moves them. The name always carries the flavor:
+  a loose `*.apk` would return the dev APK for a prod build. An IPA is the one in `build/ios/ipa`.
+- **Artifact store** (`ArtifactRecorder`, `DirectoryArtifactStore`, `SqliteArtifactRepository`). The file is
+  copied to `<data-dir>/artifacts/<jobId>/<flavor>-<version>.<ext>` (`dev-1.2.3+45.apk`) under a
+  temporary name and renamed, and one pass over the bytes gives its size and SHA-256. The record goes to
+  the `artifact` table (schema version 5 adds `created_at` and one row per job and path), so a step that
+  runs again replaces its artifact and keeps its id and its pin. `alreadyDone` of a build step is true
+  when the job has an artifact of that name whose file still has the recorded SHA-256.
+- **`record.manifest`.** Stores `manifest.json` as an artifact of kind `manifest`: version, build and
+  tag, the built commit (head of the worktree) and the dispatched one, whether the worktree was dirty,
+  flavors, the tool versions of the job, the SHA-256 of `pubspec.lock` and of the dart-define file, every
+  artifact of the job with its SHA-256, and when the job started and the manifest was written.
+
+| Route | What it does |
+|---|---|
+| `GET /jobs/{id}/artifacts` | The artifacts of a job, oldest first. `404` for a job that does not exist. |
+| `GET /artifacts/{id}` | One artifact: id, job, kind, name, size, SHA-256, pinned, creation time. The place in the store is not shown. |
+| `GET /artifacts/{id}/download` | Streams the file with `Content-Length`, `X-Content-SHA256` and a `Content-Disposition` with its name. `404` if the file left the store. |
+| `POST /artifacts/{id}/pin`, `POST /artifacts/{id}/unpin` | Pins an artifact so that the housekeeping of Phase 12c keeps it, or lets it go. Idempotent. |
+
+`tool/e2e/build_app` is a minimal Flutter app (`dev` and `prod` Gradle flavors, `lib/main_<flavor>.dart`,
+`.fvmrc` pinned to 3.47.6, release builds signed with the debug key so that no secret is needed). It is not
+one of the scanner fixtures. `tool/e2e/build_fixture_apk.sh` builds its dev APK through the engine: the Dart
+program `apps/xpd/tool/build_fixture_apk.dart` wires what `xpd serve` wires and runs one job
+(`version.bump`, `build.android`, `record.manifest`) in a worktree of a throwaway repository made from the
+fixture, with a throwaway data directory and no secret store; the script then checks, with `wc` and
+`sha256sum`/`shasum`, that the APK is where the engine says, has the size and SHA-256 it recorded, is a zip,
+and that the manifest lists it. It needs the Android SDK (`ANDROID_HOME`, `ANDROID_SDK_ROOT` or the default
+Android Studio location) and the pinned Flutter first on `PATH`. Set `XPATH_E2E_FLUTTER_SDK` to use an SDK
+folder that already is the pinned version instead of letting the resolver find it. On Linux the machine
+must be x86-64: Flutter ships no Android release compiler (`gen_snapshot`) for Linux on ARM.
 
 ## Testing
 
