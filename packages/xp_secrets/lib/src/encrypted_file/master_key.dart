@@ -17,6 +17,19 @@ const masterKeyFileName = 'master.key';
 
 /// Finds the key that encrypts the secrets file.
 ///
+/// The key is [masterKeyLength] raw bytes. An implementation throws a
+/// [SecretsLockedException] for a key it cannot reach, and never makes a new
+/// key when [load] is not allowed to (see there).
+abstract interface class MasterKeySource {
+  /// Loads the key.
+  ///
+  /// A new key is only created when [createIfMissing] is set; a missing key
+  /// next to existing secrets is an error, never a reason for a new key.
+  Future<List<int>> load({required bool createIfMissing});
+}
+
+/// A [MasterKeySource] that reads the key from a file.
+///
 /// The key is 32 raw bytes, from one of two places:
 ///
 /// 1. `$CREDENTIALS_DIRECTORY/xpath-master-key`, when systemd runs the engine
@@ -26,7 +39,7 @@ const masterKeyFileName = 'master.key';
 ///
 /// A key that is missing, unreadable, of the wrong size, or in a file other
 /// users can read, is never used: it throws a [SecretsLockedException].
-class MasterKeySource {
+class FileMasterKeySource implements MasterKeySource {
   /// Creates a source over `dataDir`.
   ///
   /// `credentialsDirectory` is `$CREDENTIALS_DIRECTORY`, or `null` outside
@@ -47,10 +60,7 @@ class MasterKeySource {
   /// The path of the key file in the data directory.
   String get keyFilePath => p.join(_dataDir, masterKeyFileName);
 
-  /// Loads the key.
-  ///
-  /// A new key file is only created when [createIfMissing] is set; a missing
-  /// key next to existing secrets is an error, never a reason for a new key.
+  @override
   Future<List<int>> load({required bool createIfMissing}) async {
     final cached = _cached;
     if (cached != null) return cached;

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:test/test.dart';
 import 'package:xp_engine/xp_engine.dart';
@@ -215,6 +216,44 @@ void main() {
             isNot(contains('not base64!!')),
           ),
         ),
+      );
+    });
+  });
+
+  group('bytes', () {
+    // Not UTF-8: no text decoder could return these bytes unchanged.
+    final binary = Uint8List.fromList([0, 0xff, 0xfe, 0x80, 0x0a, 0x22, 0x5c]);
+
+    test('writeBytes stores the base64 of the raw bytes', () async {
+      await store.writeBytes('k', binary);
+
+      expect(onlyCall().stdin, contains('"-w" "${base64.encode(binary)}"'));
+    });
+
+    test('readBytes returns the raw bytes', () async {
+      reply = ProcessOutput(exitCode: 0, stdout: '${base64.encode(binary)}\n');
+
+      expect(await store.readBytes('k'), binary);
+    });
+
+    test('readBytes is null when the item is not found', () async {
+      reply = _notFound;
+
+      expect(await store.readBytes('k'), isNull);
+    });
+
+    test('read refuses a value that is not text', () async {
+      reply = ProcessOutput(exitCode: 0, stdout: '${base64.encode(binary)}\n');
+
+      await expectLater(store.read('k'), throwsA(isA<SecretStoreException>()));
+    });
+
+    test('a text write and a bytes read agree', () async {
+      await store.write('k', 'é✓');
+
+      expect(
+        onlyCall().stdin,
+        contains('"-w" "${base64.encode(utf8.encode('é✓'))}"'),
       );
     });
   });

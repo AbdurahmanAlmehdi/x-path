@@ -124,15 +124,23 @@ columns of `project`; version 3 adds what the job runner records to `job` and `j
 Secrets (`packages/xp_secrets`) live on the engine machine behind the `SecretStore` interface of
 `xp_engine`; `createSecretStore` picks the implementation for the platform.
 
-- **macOS: Keychain** (ADR 0004). Each operation runs one `security -i` and sends one quoted command
-  line on stdin, so a value never appears in `ps`. Values are stored as base64 of their UTF-8 bytes,
-  because `security -i` reads one line and prints non-ASCII passwords as hex; one command line is
-  limited to 4094 bytes, so a secret can be about 3 KB (less with a long key name). The service is
-  `ly.abdurahman.xpath.<scope>` (ADR 0005).
+- **macOS: Keychain, plus a file for large secrets** (ADR 0004, ADR 0008). Each Keychain operation
+  runs one `security -i` and sends one quoted command line on stdin, so a value never appears in
+  `ps`. Values are stored as base64 of their bytes, because `security -i` reads one line and prints
+  non-ASCII passwords as hex. One command line is limited to 4094 bytes, so the Keychain only takes
+  values whose base64 form is at most 2,048 characters (1,536 bytes). A larger secret, such as an
+  Android keystore, goes to `secrets.enc` in the data directory (the file described under Linux),
+  whose 32-byte key is a random item in the Keychain, created on first use. A key lives in one
+  place only: writing a secret that grew or shrank moves it. Services are
+  `ly.abdurahman.xpath.credentials` for the secrets and `ly.abdurahman.xpath.master` for the file
+  key (ADR 0005). A locked Keychain locks the whole store, large secrets included.
 - **Linux: encrypted file.** `secrets.enc` in the data directory, sealed with XChaCha20-Poly1305
   under a 32-byte master key: `$CREDENTIALS_DIRECTORY/xpath-master-key` (systemd
   `LoadCredentialEncrypted=`) if set, else `master.key` in the data directory (mode 0600, created on
   first use, refused if group or world can read it).
+- **Text and bytes.** `SecretStore` has `read`/`write` for text (UTF-8) and `readBytes`/`writeBytes`
+  for binary values such as keystores; both use the same keys. `read` of a value that is not UTF-8
+  is an error.
 - **Secrets locked** (D-10). A locked Keychain, a missing or unreadable master key, or a key that does
   not open the file makes the store throw `SecretsLockedException` and set `status` to
   `SecretsStatus.locked` (`statusChanges` announces it). The engine never prompts.

@@ -8,14 +8,14 @@ import 'package:xp_secrets/xp_secrets.dart';
 void main() {
   final runner = FakeProcessRunner((_) => const ProcessOutput(exitCode: 0));
 
-  test('uses the Keychain on macOS', () {
+  test('uses the Keychain and, for large secrets, a file on macOS', () {
     final store = createSecretStore(
       runner: runner,
       dataDir: '/unused',
       operatingSystem: 'macos',
     );
 
-    expect(store, isA<KeychainSecretStore>());
+    expect(store, isA<SizeRoutedSecretStore>());
   });
 
   test('uses the encrypted file on Linux', () {
@@ -70,7 +70,7 @@ void main() {
     expect(
       store,
       Platform.isMacOS
-          ? isA<KeychainSecretStore>()
+          ? isA<SizeRoutedSecretStore>()
           : isA<EncryptedFileSecretStore>(),
     );
   });
