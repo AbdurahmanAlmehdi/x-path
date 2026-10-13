@@ -4,7 +4,10 @@ import 'package:xp_adapters/src/sqlite/migration.dart';
 ///
 /// A released migration is never edited: a later change is a new migration.
 /// Each one needs a golden file in `test/src/sqlite/snapshots`.
-const engineMigrations = <Migration>[Migration(version: 1, sql: _v1)];
+const engineMigrations = <Migration>[
+  Migration(version: 1, sql: _v1),
+  Migration(version: 2, sql: _v2),
+];
 
 // Timestamps are integer microseconds since the Unix epoch (UTC), so that
 // they sort and compare as numbers. Booleans are 0 or 1. JSON columns are
@@ -169,4 +172,20 @@ CREATE TABLE event (
   at INTEGER NOT NULL
 ) STRICT;
 CREATE INDEX idx_event_at ON event (at);
+''';
+
+// Phase 6: what a scan found. `scan` is the raw result and `edits` the owner's
+// corrections on top of it; the app and flavor rows are rewritten from the two
+// each time (they carry the ids and counters that later phases refer to).
+const _v2 = '''
+ALTER TABLE project ADD COLUMN full_name TEXT NOT NULL DEFAULT '';
+ALTER TABLE project ADD COLUMN local_path TEXT;
+ALTER TABLE project ADD COLUMN github_default_branch TEXT NOT NULL DEFAULT '';
+ALTER TABLE project ADD COLUMN scan TEXT NOT NULL DEFAULT '{}'
+  CHECK (json_valid(scan));
+ALTER TABLE project ADD COLUMN findings TEXT NOT NULL DEFAULT '[]'
+  CHECK (json_valid(findings));
+ALTER TABLE project ADD COLUMN scanned_at INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE project ADD COLUMN edits TEXT NOT NULL DEFAULT '{}'
+  CHECK (json_valid(edits));
 ''';

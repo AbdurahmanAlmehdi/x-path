@@ -1,0 +1,15 @@
+name: mataa_captain
+description: Synthetic fixture for the XPath scanner.
+publish_to: none
+
+version: 1.3.6+29
+
+environment:
+  sdk: ^3.8.1
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+flutter:
+  uses-material-design: true

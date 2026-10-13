@@ -1,0 +1,114 @@
+{
+  "profile": {
+    "layout": "single",
+    "apps": [
+      {
+        "name": "mataa_captain",
+        "path": ".",
+        "framework": "flutter",
+        "version": "1.3.6+29",
+        "storeCountry": "us",
+        "flutterVersion": "3.38.3",
+        "flutterVersionSource": ".fvmrc",
+        "hasIos": true,
+        "hasAndroid": true,
+        "iosPackageManager": "cocoapods",
+        "flavors": [
+          {
+            "name": "dev",
+            "implicit": false,
+            "entrypoint": "lib/main_dev.dart",
+            "iosBundleId": "com.mataaa.captain.dev",
+            "androidAppId": "com.mataa.captain.dev",
+            "iosTeam": "FAKETEAM02",
+            "iosScheme": "dev",
+            "infoPlist": "ios/Runner/Info.plist",
+            "shorebird": true,
+            "shorebirdAppId": "00000000-0000-4000-8000-0000000000b1",
+            "prod": false,
+            "versionFiles": [
+              "pubspec.yaml"
+            ],
+            "sources": [
+              "gradle",
+              "flavorizr",
+              "xcscheme",
+              "entrypoint"
+            ]
+          },
+          {
+            "name": "prod",
+            "implicit": false,
+            "entrypoint": "lib/main_prod.dart",
+            "iosBundleId": "com.mataa.captain",
+            "androidAppId": "com.mataa.captain",
+            "iosTeam": "FAKETEAM01",
+            "iosScheme": "prod",
+            "infoPlist": "ios/Runner/Info.plist",
+            "shorebird": true,
+            "shorebirdAppId": "00000000-0000-4000-8000-0000000000b2",
+            "prod": true,
+            "versionFiles": [
+              "pubspec.yaml"
+            ],
+            "sources": [
+              "gradle",
+              "flavorizr",
+              "xcscheme",
+              "entrypoint"
+            ]
+          }
+        ],
+        "plists": [
+          {
+            "path": "ios/Runner/Info.plist",
+            "shortVersion": "$(FLUTTER_BUILD_NAME)",
+            "buildNumber": "$(FLUTTER_BUILD_NUMBER)",
+            "literal": false
+          }
+        ],
+        "keystore": {
+          "propertiesPath": "android/key.properties",
+          "propertiesPresent": false
+        },
+        "shorebird": {
+          "appId": "00000000-0000-4000-8000-0000000000b1",
+          "flavorAppIds": {
+            "dev": "00000000-0000-4000-8000-0000000000b1",
+            "prod": "00000000-0000-4000-8000-0000000000b2"
+          }
+        }
+      }
+    ],
+    "branches": {
+      "releaseBranches": []
+    },
+    "workflows": [
+      {
+        "path": ".github/workflows/ci.yml",
+        "provider": "github_actions",
+        "names": [
+          "CI"
+        ]
+      }
+    ]
+  },
+  "findings": [
+    {
+      "severity": "warning",
+      "code": "bundle_id_platform_mismatch",
+      "message": "Flavor dev is com.mataa.captain.dev on Android and com.mataaa.captain.dev on iOS, which looks like a typo.",
+      "fix": "If the two should match, fix the one that is misspelled; otherwise ignore this.",
+      "app": ".",
+      "flavor": "dev"
+    },
+    {
+      "severity": "warning",
+      "code": "keystore_properties_missing",
+      "message": "Gradle reads android/key.properties for the release keystore, but the scanned folder has none (it is normally ignored by git).",
+      "fix": "Store the keystore and its passwords in XPath; it writes key.properties into each job's own checkout, never into the repository.",
+      "path": "android/key.properties",
+      "app": "."
+    }
+  ]
+}

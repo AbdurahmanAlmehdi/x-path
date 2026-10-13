@@ -1,0 +1,14 @@
+platform :ios, '14.0'
+
+project 'Runner', {
+  'Debug-dev' => :debug,
+  'Profile-dev' => :release,
+  'Release-dev' => :release,
+  'Debug-prod' => :debug,
+  'Profile-prod' => :release,
+  'Release-prod' => :release,
+}
+
+target 'Runner' do
+  use_frameworks!
+end

@@ -1,0 +1,15 @@
+flavors:
+  dev:
+    app:
+      name: "Mataa Partner Dev"
+    android:
+      applicationId: "com.mataaa.vendors.dev"
+    ios:
+      bundleId: "com.mataaa.vendors.dev"
+  prod:
+    app:
+      name: "Mataa Partner"
+    android:
+      applicationId: "com.mataaa.vendors"
+    ios:
+      bundleId: "com.mataaa.vendors"

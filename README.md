@@ -31,7 +31,7 @@ It writes nothing to the repo except release-model git changes.
 | `packages/xp_secrets` | Implements the secret store: Keychain, encrypted file, log masking. |
 | `packages/xp_repositories` | Repositories for the desktop app, built on `xp_client`. |
 | `packages/xp_macos_services` | Flutter package for macOS platform services. |
-| `tool` | Repository tooling (`xp_tool`): the layer check. |
+| `tool` | Repository tooling (`xp_tool`): the layer check, and `tool/e2e` with the smoke test and the fixture repositories. |
 | `docs` | Plan, ADRs, research and design brief. |
 
 Everything is one [Dart pub workspace](https://dart.dev/tools/pub/workspaces) (ADR 0001) with
@@ -114,7 +114,8 @@ tracked by `PRAGMA user_version`; each migration runs in a transaction. Before a
 database is migrated, `xpd` copies it to `xpath.db.bak-v<old version>`. A migration is never
 edited once released: add a new one and a golden `test/src/sqlite/snapshots/v<N>.sql`
 (`UPDATE_GOLDENS=1 dart test test/src/sqlite/migrations_test.dart` writes it). Events older than
-seven days are pruned; their sequence numbers are never reused.
+seven days are pruned; their sequence numbers are never reused. Schema version 2 adds the scan
+columns of `project`.
 
 Secrets (`packages/xp_secrets`) live on the engine machine behind the `SecretStore` interface of
 `xp_engine`; `createSecretStore` picks the implementation for the platform.
@@ -133,6 +134,59 @@ Secrets (`packages/xp_secrets`) live on the engine machine behind the `SecretSto
 - **Log masking.** `SecretMasker` replaces known secret values with `***` in process output. A
   multi-line secret is masked line by line, overlapping secrets are merged, lines shorter than 6
   characters are ignored, and `MaskingStream` masks a secret split between two chunks.
+
+## Projects and scans
+
+A project is a GitHub repository, keyed by its GitHub repository id (D-05). The folder you pick only
+identifies the repository and seeds the first scan; builds run from the engine's own bare mirror.
+All routes need a device token.
+
+| Route | What it does |
+|---|---|
+| `POST /projects` | Adds a project from `{"path": "/abs/clone"}` (reads its `origin`) or `{"remote": "owner/name"}` (or a GitHub URL), asks GitHub for the repository, sets up the mirror and scans. `409` if it is a project already. |
+| `GET /projects`, `GET /projects/{id}` | The projects, each with its profile and the findings of the last scan. |
+| `POST /projects/{id}/scan` | Scans again: the folder it was added from if it still exists, else a fresh worktree of the mirror. Follows a GitHub rename or a new default branch. |
+| `PATCH /projects/{id}` | Edits the profile (production flavor, store country, base branch, Shorebird, ids, version files). Edits are kept apart from the scan and applied on top of every scan, so a rescan never undoes them. |
+| `DELETE /projects/{id}` | Removes the project. The mirror stays on disk; the folder is never touched. `409` once it has releases or jobs. |
+
+GitHub calls use the token under `github.token` in the secret store (see Secrets above). Nothing
+imports the token of the GitHub CLI from the command line yet: `GitHubTokenImporter` exists but no
+command runs it. Without a token, adding a project answers `502`. Failures
+of GitHub or git answer `502 upstream_error`, a locked secret store `503 secrets_locked`.
+Adding, scanning and removing announce `project.added`, `project.scanned` and `project.removed` on
+`/events`.
+
+The scanner (`packages/xp_engine/lib/src/scan`) is read-only (D-04). It reads the repository only
+through the `ScanSource` interface (`list`, `read`, `exists`); `DirectoryScanSource` in `xp_adapters`
+is the `dart:io` implementation, and it refuses absolute paths, `..` and symbolic links that leave
+the folder. Gradle, Xcode `project.pbxproj`, plists and schemes are read as text, with no tool
+installed. The scan finds:
+
+- the apps: one at the root, or the members of a pub workspace or Melos monorepo that have a Flutter
+  dependency and an `android/` or `ios/` project;
+- the flavors, from Gradle `productFlavors`, `flavorizr.yaml`, Xcode schemes that archive with
+  `Release-<flavor>`, and `lib/main_<flavor>.dart` (an app without flavors gets one implicit
+  `default` flavor);
+- per flavor: the Android application id, the iOS bundle id and signing team, the `Info.plist` and
+  whether its versions are literal or `$(FLUTTER_BUILD_*)`, the Shorebird app id, the entrypoint and
+  the files a version bump writes;
+- per app: CocoaPods or Swift Package Manager, the keystore reference (`key.properties`, never its
+  passwords), the `.fvmrc` pin (D-20) and `shorebird.yaml`;
+- per repository: the `release/*` branches and default branch of a clone's `.git`, and the GitHub
+  Actions and Codemagic workflow files.
+
+Everything suspicious becomes a finding with a severity (`error`, `warning`, `info`), a stable
+`code`, a message and a fix. Examples: `bundle_id_platform_mismatch` (Android and iOS differ, "looks
+like a typo" when they are one or two characters apart), `bundle_id_config_drift` (flavorizr and the
+build files disagree), `plist_literal_version`, `version_files_out_of_sync`, `fvmrc_missing`,
+`keystore_properties_missing`, `shorebird_no_flavor_ids`.
+
+The fixtures in `tool/e2e/fixtures` are synthetic repositories shaped like the Mataa customer,
+captain and vendor apps, the oneavant companion app, the guest monorepo and the room spike, plus one
+that disagrees with itself (`drift`). They hold only the files the scanner reads, with made-up team
+and Shorebird ids. `packages/xp_engine/test/scan/fixtures_test.dart` scans each and compares the
+profile and findings with `test/scan/goldens/<name>.json`
+(`UPDATE_GOLDENS=1 dart test test/scan/fixtures_test.dart` rewrites them; review the diff).
 
 `tool/e2e/smoke_bundle.sh` builds the `xpd` AOT bundle with `dart build cli`, starts it on a free
 port with a temporary data directory and checks `/health`, the database, the token guard and a clean shutdown.

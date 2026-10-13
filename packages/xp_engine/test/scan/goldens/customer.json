@@ -1,0 +1,147 @@
+{
+  "profile": {
+    "layout": "single",
+    "apps": [
+      {
+        "name": "mataa_app",
+        "path": ".",
+        "framework": "flutter",
+        "version": "5.5.0+3284",
+        "storeCountry": "us",
+        "flutterVersion": "3.47.4",
+        "flutterVersionSource": ".fvmrc",
+        "hasIos": true,
+        "hasAndroid": true,
+        "iosPackageManager": "cocoapods",
+        "flavors": [
+          {
+            "name": "dev",
+            "implicit": false,
+            "entrypoint": "lib/main_dev.dart",
+            "iosBundleId": "com.mataaa.dev",
+            "androidAppId": "com.mataaa.dev",
+            "iosTeam": "FAKETEAM02",
+            "iosScheme": "dev",
+            "infoPlist": "ios/Runner/Info-Dev.plist",
+            "shorebird": true,
+            "shorebirdAppId": "00000000-0000-4000-8000-0000000000a1",
+            "prod": false,
+            "versionFiles": [
+              "pubspec.yaml",
+              "ios/Runner/Info-Dev.plist"
+            ],
+            "sources": [
+              "gradle",
+              "flavorizr",
+              "xcscheme",
+              "entrypoint"
+            ]
+          },
+          {
+            "name": "prod",
+            "implicit": false,
+            "entrypoint": "lib/main_prod.dart",
+            "iosBundleId": "com.sixdtec.mata",
+            "androidAppId": "com.mataaa",
+            "iosTeam": "FAKETEAM01",
+            "iosScheme": "prod",
+            "infoPlist": "ios/Runner/Info.plist",
+            "shorebird": true,
+            "shorebirdAppId": "00000000-0000-4000-8000-0000000000a2",
+            "prod": true,
+            "versionFiles": [
+              "pubspec.yaml",
+              "ios/Runner/Info.plist"
+            ],
+            "sources": [
+              "gradle",
+              "flavorizr",
+              "xcscheme",
+              "entrypoint"
+            ]
+          }
+        ],
+        "plists": [
+          {
+            "path": "ios/Runner/Info-Dev.plist",
+            "shortVersion": "5.5.0",
+            "buildNumber": "3284",
+            "literal": true
+          },
+          {
+            "path": "ios/Runner/Info.plist",
+            "shortVersion": "5.5.0",
+            "buildNumber": "3284",
+            "literal": true
+          }
+        ],
+        "keystore": {
+          "propertiesPath": "android/key.properties",
+          "propertiesPresent": true,
+          "storeFile": "fixture-release.jks"
+        },
+        "shorebird": {
+          "appId": "00000000-0000-4000-8000-0000000000a1",
+          "flavorAppIds": {
+            "dev": "00000000-0000-4000-8000-0000000000a1",
+            "prod": "00000000-0000-4000-8000-0000000000a2"
+          }
+        }
+      }
+    ],
+    "branches": {
+      "releaseBranches": []
+    },
+    "workflows": [
+      {
+        "path": ".github/workflows/ci.yml",
+        "provider": "github_actions",
+        "names": [
+          "CI"
+        ]
+      },
+      {
+        "path": "codemagic.yaml",
+        "provider": "codemagic",
+        "names": [
+          "Customer iOS prod",
+          "customer-android-prod"
+        ]
+      }
+    ]
+  },
+  "findings": [
+    {
+      "severity": "warning",
+      "code": "bundle_id_platform_mismatch",
+      "message": "Flavor prod is com.mataaa on Android and com.sixdtec.mata on iOS.",
+      "fix": "Ignore this if the apps are meant to have different ids; otherwise make them agree.",
+      "app": ".",
+      "flavor": "prod"
+    },
+    {
+      "severity": "warning",
+      "code": "plist_literal_version",
+      "message": "ios/Runner/Info-Dev.plist hard-codes its version, so flutter build --build-name and --build-number do not reach iOS.",
+      "fix": "Use $(FLUTTER_BUILD_NAME) and $(FLUTTER_BUILD_NUMBER) in the plist, or let XPath write the version into it: the plist is listed in the version files of its flavors.",
+      "path": "ios/Runner/Info-Dev.plist",
+      "app": "."
+    },
+    {
+      "severity": "warning",
+      "code": "plist_literal_version",
+      "message": "ios/Runner/Info.plist hard-codes its version, so flutter build --build-name and --build-number do not reach iOS.",
+      "fix": "Use $(FLUTTER_BUILD_NAME) and $(FLUTTER_BUILD_NUMBER) in the plist, or let XPath write the version into it: the plist is listed in the version files of its flavors.",
+      "path": "ios/Runner/Info.plist",
+      "app": "."
+    },
+    {
+      "severity": "info",
+      "code": "entrypoint_without_flavor",
+      "message": "lib/main_preview.dart has no flavor of that name in Gradle, flutter_flavorizr or Xcode, so it is not treated as a flavor.",
+      "fix": "Ignore this if it is a special build of another flavor; otherwise add the flavor to the Android and iOS projects.",
+      "path": "lib/main_preview.dart",
+      "app": "."
+    }
+  ]
+}

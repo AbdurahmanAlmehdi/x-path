@@ -1,0 +1,15 @@
+name: room_scene_spike
+description: Synthetic fixture for the XPath scanner.
+publish_to: none
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.13.3
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+flutter:
+  uses-material-design: true
