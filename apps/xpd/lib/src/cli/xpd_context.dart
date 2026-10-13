@@ -8,7 +8,15 @@ class XpdContext {
     required this.shutdown,
     required this.environment,
     required this.operatingSystem,
+    this.ghFallbackPaths = defaultGhFallbackPaths,
   });
+
+  /// Where Homebrew puts `gh` on Apple Silicon and on Intel Macs. `launchd`
+  /// starts the engine with a `PATH` that has neither directory.
+  static const defaultGhFallbackPaths = [
+    '/opt/homebrew/bin/gh',
+    '/usr/local/bin/gh',
+  ];
 
   /// Where results go.
   final StringSink out;
@@ -24,4 +32,7 @@ class XpdContext {
 
   /// `macos`, `linux`, ... as in `Platform.operatingSystem`.
   final String operatingSystem;
+
+  /// Where to look for the GitHub CLI when it is not on `PATH`.
+  final List<String> ghFallbackPaths;
 }

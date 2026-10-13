@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:args/args.dart';
 import 'package:args/command_runner.dart';
 import 'package:xp_api/xp_api.dart';
+import 'package:xpd/src/cli/secrets_command.dart';
 import 'package:xpd/src/cli/serve_command.dart';
 import 'package:xpd/src/cli/token_command.dart';
 import 'package:xpd/src/cli/xpd_context.dart';
@@ -15,7 +16,8 @@ const _usageExitCode = 64;
 /// Runs `xpd` with [args] and returns the process exit code.
 ///
 /// Results go to [out], diagnostics to [err]. `xpd serve` runs until
-/// [shutdown] emits.
+/// [shutdown] emits. [ghFallbackPaths] is where `xpd secrets import-gh` looks
+/// for `gh` when it is not on `PATH`.
 Future<int> runXpd(
   List<String> args, {
   required StringSink out,
@@ -23,6 +25,7 @@ Future<int> runXpd(
   required Stream<void> shutdown,
   required Map<String, String> environment,
   required String operatingSystem,
+  List<String> ghFallbackPaths = XpdContext.defaultGhFallbackPaths,
 }) async {
   final context = XpdContext(
     out: out,
@@ -30,8 +33,10 @@ Future<int> runXpd(
     shutdown: shutdown,
     environment: environment,
     operatingSystem: operatingSystem,
+    ghFallbackPaths: ghFallbackPaths,
   );
   final runner = _XpdCommandRunner(context)
+    ..addCommand(SecretsCommand(context))
     ..addCommand(ServeCommand(context))
     ..addCommand(TokenCommand(context));
   try {
