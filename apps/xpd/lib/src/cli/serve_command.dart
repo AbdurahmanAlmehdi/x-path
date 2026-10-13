@@ -79,12 +79,33 @@ class ServeCommand extends XpdCommand {
         database: database,
         clock: const SystemClock(),
       );
+      final git = CliGitService(
+        runner: runner,
+        secrets: secrets,
+        dataDir: directory,
+      );
       final jobRepository = SqliteJobRepository(database);
       final secretFiles = DirectorySecretFileStore(p.join(directory, 'tmp'));
       final logs = JobLogs(store: FileJobLogStore(p.join(directory, 'logs')));
       final jobs = JobRunner(
         jobs: jobRepository,
-        steps: StepRegistry([const CommandStep()]),
+        steps: StepRegistry([
+          const CommandStep(),
+          VersionBumpStep(git: git, workspaces: DirectoryWorkspace.new),
+          // The checks that need a store (appStoreTrain, playTargetSdk,
+          // buildNumberReuse) register with the store adapters (Phase 10).
+          GuardStep(
+            checks: const [
+              SourceCheck(),
+              VersionSyncCheck(),
+              PatchTargetCheck(),
+              NewReleaseNumberCheck(),
+              PatchNativeDiffCheck(),
+            ],
+            git: git,
+            workspaces: DirectoryWorkspace.new,
+          ),
+        ]),
         supervisor: supervisor,
         logs: logs,
         secrets: secrets,
@@ -122,11 +143,7 @@ class ServeCommand extends XpdCommand {
         projects: ProjectService(
           repository: SqliteProjectRepository(database),
           github: github,
-          git: CliGitService(
-            runner: runner,
-            secrets: secrets,
-            dataDir: directory,
-          ),
+          git: git,
           scanner: const ProjectScanner(),
           sources: DirectoryScanSource.new,
           runner: runner,

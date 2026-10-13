@@ -538,4 +538,319 @@ void main() {
       expect(fixture.originRef('refs/heads/main'), second);
     });
   });
+
+  group('listTags', () {
+    test('is empty for a mirror without tags', () async {
+      expect(await service.listTags(mirror), isEmpty);
+    });
+
+    test('names the commit of annotated and lightweight tags', () async {
+      fixture
+        ..git(['tag', 'v5.4.1+3283', second])
+        ..git(['tag', '-a', '-m', 'm', 'mobile/prod/v1.0.0+7', first])
+        ..git(['push', '--quiet', 'origin', '--tags']);
+      await service.fetch(mirror);
+      await service.createTag(
+        mirror,
+        name: 'v5.4.0+3282',
+        sha: first,
+        message: 'Release',
+      );
+
+      expect(await service.listTags(mirror), [
+        GitTagInfo(name: 'mobile/prod/v1.0.0+7', commit: first),
+        GitTagInfo(name: 'v5.4.0+3282', commit: first),
+        GitTagInfo(name: 'v5.4.1+3283', commit: second),
+      ]);
+    });
+  });
+
+  group('changedFiles', () {
+    test('lists what differs between two commits, sorted', () async {
+      fixture.commit('lib/z.dart', 'z');
+      final third = fixture.commit('android/app/build.gradle', 'g');
+      fixture.push('main');
+      await service.fetch(mirror);
+
+      expect(await service.changedFiles(mirror, from: first, to: third), [
+        'android/app/build.gradle',
+        'b.txt',
+        'lib/z.dart',
+      ]);
+      expect(
+        await service.changedFiles(mirror, from: first, to: first),
+        isEmpty,
+      );
+    });
+
+    test(
+      'resolves tags and branches, and names both sides of a rename',
+      () async {
+        await service.createTag(mirror, name: 'v1', sha: second, message: 'm');
+        fixture
+          ..git(['mv', 'a.txt', 'c.txt'])
+          ..git(['commit', '--quiet', '-m', 'rename'])
+          ..push('main');
+        await service.fetch(mirror);
+        await service.createTag(
+          mirror,
+          name: 'v1',
+          sha: second,
+          message: 'again',
+        );
+
+        expect(await service.changedFiles(mirror, from: 'v1', to: 'main'), [
+          'a.txt',
+          'c.txt',
+        ]);
+      },
+    );
+
+    test('reads a name with spaces and quotes as it is', () async {
+      final odd = fixture.commit('lib/a "b" é.dart', 'x');
+      fixture.push('main');
+      await service.fetch(mirror);
+
+      expect(await service.changedFiles(mirror, from: second, to: odd), [
+        'lib/a "b" é.dart',
+      ]);
+    });
+
+    test('fails for a commit that does not exist', () {
+      expect(
+        service.changedFiles(mirror, from: 'v404', to: second),
+        throwsA(isA<GitRefNotFoundException>()),
+      );
+      expect(
+        service.changedFiles(mirror, from: first, to: 'nope'),
+        throwsA(isA<GitRefNotFoundException>()),
+      );
+    });
+  });
+
+  group('status and commit', () {
+    late GitWorktree worktree;
+
+    String inWorktree(List<String> arguments) =>
+        fixture.git(arguments, cwd: worktree.path);
+
+    void write(String path, String content) {
+      final file = File(p.join(worktree.path, path));
+      file.parent.createSync(recursive: true);
+      file.writeAsStringSync(content);
+    }
+
+    setUp(() async {
+      worktree = await service.createWorktree(mirror, name: 'job', sha: second);
+    });
+
+    test('a fresh worktree is clean and on its commit', () async {
+      final status = await service.status(worktree);
+
+      expect(status.headSha, second);
+      expect(status.isClean, isTrue);
+    });
+
+    test('reports changed, deleted and untracked files', () async {
+      write('a.txt', 'changed');
+      File(p.join(worktree.path, 'b.txt')).deleteSync();
+      write('lib/debug/flags.dart', 'untracked');
+      write('lib/other.dart', 'untracked');
+      write('notes with space.txt', 'untracked');
+      write('staged.txt', 's');
+      inWorktree(['add', 'staged.txt']);
+
+      final status = await service.status(worktree);
+
+      expect(status.changed, ['a.txt', 'b.txt', 'staged.txt']);
+      expect(status.untracked, [
+        'lib/debug/flags.dart',
+        'lib/other.dart',
+        'notes with space.txt',
+      ]);
+      expect(status.isClean, isFalse);
+    });
+
+    test('does not report ignored files', () async {
+      fixture
+        ..commit('.gitignore', 'build/\n*.log\n')
+        ..push('main');
+      await service.fetch(mirror);
+      final ignoring = await service.createWorktree(
+        mirror,
+        name: 'ignoring',
+        sha: 'main',
+      );
+      Directory(p.join(ignoring.path, 'build')).createSync();
+      File(p.join(ignoring.path, 'build', 'out.bin')).writeAsStringSync('x');
+      File(p.join(ignoring.path, 'run.log')).writeAsStringSync('x');
+
+      final status = await service.status(ignoring);
+
+      expect(status.untracked, isEmpty);
+      expect(status.changed, isEmpty);
+    });
+
+    test('is a GitException where there is no repository', () async {
+      final empty = Directory.systemTemp.createTempSync('xp_not_git_');
+      addTearDown(() => empty.deleteSync(recursive: true));
+
+      await expectLater(
+        service.status(
+          GitWorktree(mirror: mirror, path: empty.path, sha: first),
+        ),
+        throwsA(isA<GitException>()),
+      );
+      await expectLater(
+        service.status(
+          GitWorktree(
+            mirror: mirror,
+            path: p.join(empty.path, 'gone'),
+            sha: first,
+          ),
+        ),
+        throwsA(isA<GitException>()),
+      );
+    });
+
+    test(
+      'commits the paths as the engine identity and moves the head',
+      () async {
+        write('pubspec.yaml', 'version: 1.0.0+1\n');
+        write('ios/Runner/Info.plist', '<plist/>');
+
+        final result = await service.commit(
+          worktree,
+          message: 'chore(release): 1.0.0+1',
+          paths: ['pubspec.yaml', 'ios/Runner/Info.plist'],
+        );
+
+        expect(result.created, isTrue);
+        expect(result.sha, isNot(second));
+        expect(result.sha, inWorktree(['rev-parse', 'HEAD']));
+        expect(result.tree, inWorktree(['rev-parse', 'HEAD^{tree}']));
+        expect(inWorktree(['rev-parse', 'HEAD^']), second);
+        expect(
+          inWorktree(['log', '-1', '--format=%an <%ae>|%cn|%s']),
+          'XPath <xpath@localhost>|XPath|chore(release): 1.0.0+1',
+        );
+        expect(
+          inWorktree(['show', '--name-only', '--format=', 'HEAD']).split('\n')
+            ..sort(),
+          ['ios/Runner/Info.plist', 'pubspec.yaml'],
+        );
+        expect((await service.status(worktree)).headSha, result.sha);
+        expect((await service.status(worktree)).isClean, isTrue);
+      },
+    );
+
+    test('leaves other changes out of the commit', () async {
+      write('pubspec.yaml', 'version: 1.0.0+1\n');
+      write('a.txt', 'edited by hand');
+      write('scratch.txt', 'untracked');
+
+      await service.commit(worktree, message: 'm', paths: ['pubspec.yaml']);
+
+      final status = await service.status(worktree);
+      expect(status.changed, ['a.txt']);
+      expect(status.untracked, ['scratch.txt']);
+      expect(inWorktree(['show', 'HEAD:a.txt']), 'one');
+    });
+
+    test('commits nothing when the paths are as the head has them', () async {
+      write('pubspec.yaml', 'v1');
+      final made = await service.commit(
+        worktree,
+        message: 'bump',
+        paths: ['pubspec.yaml'],
+      );
+
+      final again = await service.commit(
+        worktree,
+        message: 'bump',
+        paths: ['pubspec.yaml', 'a.txt'],
+      );
+
+      expect(again.created, isFalse);
+      expect(again.sha, made.sha);
+      expect(again.tree, made.tree);
+      expect(inWorktree(['rev-list', '--count', 'HEAD']), '3');
+    });
+
+    test('makes a commit that a release branch can point at', () async {
+      write('pubspec.yaml', 'v1');
+      final made = await service.commit(
+        worktree,
+        message: 'bump',
+        paths: ['pubspec.yaml'],
+      );
+
+      final outcome = await service.upsertBranch(
+        mirror,
+        name: 'release/1.0.0',
+        sha: made.sha,
+      );
+
+      expect(outcome, BranchOutcome.created);
+      expect(inMirror(['rev-parse', 'refs/heads/release/1.0.0']), made.sha);
+      expect(fixture.originRef('refs/heads/release/1.0.0'), isNull);
+    });
+
+    test(
+      'refuses arguments that could be options or leave the worktree',
+      () async {
+        write('pubspec.yaml', 'v1');
+        for (final path in [
+          '',
+          '-x',
+          '/etc/passwd',
+          '../outside',
+          'a/../../b',
+        ]) {
+          await expectLater(
+            service.commit(worktree, message: 'm', paths: [path]),
+            throwsArgumentError,
+            reason: path,
+          );
+        }
+        await expectLater(
+          service.commit(worktree, message: '  ', paths: ['pubspec.yaml']),
+          throwsArgumentError,
+        );
+        await expectLater(
+          service.commit(worktree, message: 'm', paths: []),
+          throwsArgumentError,
+        );
+        expect((await service.status(worktree)).headSha, second);
+      },
+    );
+
+    test("fails with git's message for a path that does not exist", () async {
+      await expectLater(
+        service.commit(worktree, message: 'm', paths: ['nope.txt']),
+        throwsA(
+          isA<GitException>().having(
+            (e) => e.message,
+            'message',
+            startsWith('git add failed'),
+          ),
+        ),
+      );
+    });
+
+    test('is a GitException where there is no repository', () async {
+      final empty = Directory.systemTemp.createTempSync('xp_not_git_');
+      addTearDown(() => empty.deleteSync(recursive: true));
+      File(p.join(empty.path, 'x')).writeAsStringSync('x');
+
+      await expectLater(
+        service.commit(
+          GitWorktree(mirror: mirror, path: empty.path, sha: first),
+          message: 'm',
+          paths: ['x'],
+        ),
+        throwsA(isA<GitException>()),
+      );
+    });
+  });
 }

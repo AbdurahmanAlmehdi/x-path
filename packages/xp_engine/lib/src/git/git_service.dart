@@ -3,7 +3,8 @@ import 'package:xp_engine/src/git/git_models.dart';
 /// Git operations on the engine's bare mirrors (D-04, D-05, D-11).
 ///
 /// The engine writes to a repository only through this interface, and only
-/// release-model changes: tags, `release/*` branches and pushes. Nothing here
+/// release-model changes: version commits in a job's worktree, tags,
+/// `release/*` branches and pushes. Nothing here
 /// forces: a tag never moves, a branch only moves forward, a push never starts
 /// with `+`. The picked folder of a project is never touched.
 ///
@@ -33,6 +34,21 @@ abstract interface class GitService {
   /// such commit.
   Future<String> resolveRef(GitMirror mirror, String ref);
 
+  /// Every tag of [mirror] with the commit it names, sorted by name.
+  Future<List<GitTagInfo>> listTags(GitMirror mirror);
+
+  /// The files whose content differs between the commits [from] and [to] of
+  /// [mirror] (the two refs are resolved like [resolveRef] does), as paths
+  /// relative to the repository root. A renamed file is both: its old and its
+  /// new path. Sorted.
+  ///
+  /// Throws a `GitRefNotFoundException` if either does not exist.
+  Future<List<String>> changedFiles(
+    GitMirror mirror, {
+    required String from,
+    required String to,
+  });
+
   /// Checks out the commit [sha] of [mirror] in a fresh directory for [name],
   /// typically a job id. The head is detached.
   ///
@@ -42,6 +58,24 @@ abstract interface class GitService {
     GitMirror mirror, {
     required String name,
     required String sha,
+  });
+
+  /// What differs between [worktree] and the commit it has checked out.
+  Future<GitWorktreeStatus> status(GitWorktree worktree);
+
+  /// Commits the current content of [paths] (relative to the worktree) to the
+  /// head of [worktree], with [message], as the engine's identity.
+  ///
+  /// If [paths] already are as the head has them, nothing is committed and the
+  /// result says so: a version bump that ran before is not repeated (D-18).
+  /// Other changes in the worktree stay out of the commit. The head of the
+  /// worktree moves to the new commit; it stays detached. Throws an
+  /// `ArgumentError` for an empty list, a blank message or a path that is
+  /// absolute, starts with `-` or climbs with `..`.
+  Future<GitCommitResult> commit(
+    GitWorktree worktree, {
+    required String message,
+    required List<String> paths,
   });
 
   /// Deletes [worktree] and its directory. Does nothing if it is gone.
