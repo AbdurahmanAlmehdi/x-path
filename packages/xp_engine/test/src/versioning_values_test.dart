@@ -59,6 +59,19 @@ void main() {
         flutterVersion: '3.35.4',
       ),
     );
+    expect(
+      ShorebirdRelease(
+        version: AppVersion.parse('5.4.1+3283'),
+        flutterVersion: null,
+        activePlatforms: const {'android'},
+      ),
+      isNot(
+        ShorebirdRelease(
+          version: AppVersion.parse('5.4.1+3283'),
+          flutterVersion: null,
+        ),
+      ),
+    );
     expect(StoreBuilds(builds()), StoreBuilds(builds()));
     expect(
       VersionFilesState(

@@ -56,10 +56,13 @@ class PatchTargetCheck extends GuardCheck {
             fix: 'Patch a release that was made with shorebird release.',
           );
         }
-        facts.add(
-          'The patch will use Flutter ${match.flutterVersion}, the version '
-          'of the release.',
-        );
+        final flutter = match.flutterVersion;
+        if (flutter != null) {
+          facts.add(
+            'The patch will use Flutter $flutter, the version of the '
+            'release.',
+          );
+        }
       }
     }
 

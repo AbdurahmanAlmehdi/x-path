@@ -9,7 +9,8 @@ import 'fake_flutter_installer.dart';
 /// The commit every build test dispatches.
 const buildSha = 'a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1';
 
-const _machine = '{"frameworkVersion": "3.47.6", "dartSdkVersion": "3.13.5"}';
+String _machine(String flutter) =>
+    '{"frameworkVersion": "$flutter", "dartSdkVersion": "3.13.5"}';
 
 /// The worktree of a job that builds the app at `apps/mobile`.
 const buildWorktree = ReleaseWorktree(
@@ -52,12 +53,14 @@ class BuildContext implements StepContext {
 }
 
 /// Everything a build step needs, on fakes: a machine without fvm whose cache
-/// holds Flutter 3.47.6 and has neither Shorebird nor `gh`.
+/// holds the Flutter versions `flutterVersions` (3.47.6 by default) and has
+/// neither Shorebird nor `gh`.
 class BuildHarness {
-  new({bool isMacOS = false}) {
+  new({bool isMacOS = false, Set<String> flutterVersions = const {'3.47.6'}}) {
     runner = FakeProcessRunner((call) {
       if (call.executable.endsWith('/bin/flutter')) {
-        return const ProcessOutput(exitCode: 0, stdout: _machine);
+        final version = call.executable.split('/').reversed.elementAt(2);
+        return ProcessOutput(exitCode: 0, stdout: _machine(version));
       }
       if (call.executable == 'xcode-select') {
         return const ProcessOutput(exitCode: 0, stdout: '/Xcode/Developer\n');
@@ -73,7 +76,7 @@ class BuildHarness {
     toolchain = BuildToolchain(
       resolver: FlutterResolver(
         runner: runner,
-        installer: FakeFlutterInstaller(installed: {'3.47.6'}),
+        installer: installer = FakeFlutterInstaller(installed: flutterVersions),
       ),
       prober: ToolProber(runner: runner, isMacOS: isMacOS),
       jobs: jobs,
@@ -87,6 +90,7 @@ class BuildHarness {
   }
 
   late final FakeProcessRunner runner;
+  late final FakeFlutterInstaller installer;
   final jobs = InMemoryJobRepository();
   final artifacts = InMemoryArtifactRepository();
   final store = InMemoryArtifactStore();

@@ -361,7 +361,7 @@ Mataa dev builds through `xp` can start after Phase 13, before the desktop app e
 
 ### Phase 9c: Shorebird, symbols and post-build checks
 
-- **Status:** Not started
+- **Status:** Done
 - **Scope:** `shorebird.release`, `shorebird.patch` (records and reuses the release's Flutter
   version), `symbols.archive` (R8 mappings, dSYMs, Shorebird symbols),
   `build.verifyCompiledConfig`, `ios.stripAndReexport`.

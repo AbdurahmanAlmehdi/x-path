@@ -122,6 +122,20 @@ void main() {
       expect(shorebird.lookups, ['sb-1234']);
     });
 
+    test('passes without a Flutter version for an old release', () async {
+      shorebird.answer = [
+        ShorebirdRelease(
+          version: AppVersion.parse('5.4.1+3283'),
+          flutterVersion: null,
+        ),
+      ];
+
+      final result = await run();
+
+      expect(result.status, GuardStatus.passed);
+      expect(result.message, isNot(contains('Flutter')));
+    });
+
     test('fails for a release Shorebird does not have', () async {
       final result = await run(version: '5.4.1+3290');
 
