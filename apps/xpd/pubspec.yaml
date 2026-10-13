@@ -24,6 +24,7 @@ dev_dependencies:
   async: ^2.13.0
   test: ^1.31.0
   very_good_analysis: 11.0.0
+  xp_fake_asc: any
 
 executables:
   xpd:

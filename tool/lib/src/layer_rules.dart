@@ -58,12 +58,24 @@ const layerRules = <String, LayerRule>{
   ),
   'xp_client': LayerRule(workspace: {'xp_api'}),
   'xp_repositories': LayerRule(workspace: {'xp_api', 'xp_client'}),
-  'xp_adapters': LayerRule(workspace: {'xp_api', 'xp_engine'}),
+  // `xp_fake_asc` is a fake store server: tests of the store adapters run
+  // against it.
+  'xp_adapters': LayerRule(workspace: {'xp_api', 'xp_engine', 'xp_fake_asc'}),
   'xp_secrets': LayerRule(workspace: {'xp_api', 'xp_engine'}),
   'xp_macos_services': LayerRule(workspace: {}),
+  // Fake store servers for tests and the end-to-end scripts (tool/e2e). They
+  // know nothing of the engine.
+  'xp_fake_asc': LayerRule(workspace: {}),
   // The engine entrypoint wires every implementation.
+  // `xp_fake_asc` is for the tests of the store wiring.
   'xpd': LayerRule(
-    workspace: {'xp_adapters', 'xp_api', 'xp_engine', 'xp_secrets'},
+    workspace: {
+      'xp_adapters',
+      'xp_api',
+      'xp_engine',
+      'xp_fake_asc',
+      'xp_secrets',
+    },
   ),
   // `xp runner` executes jobs with the shared step runner (Phase 14b).
   'xp': LayerRule(

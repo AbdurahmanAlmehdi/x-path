@@ -382,7 +382,7 @@ Mataa dev builds through `xp` can start after Phase 13, before the desktop app e
 
 ### Phase 10a: App Store Connect and Apple
 
-- **Status:** Not started
+- **Status:** Done
 - **Scope:** ASC JWT (team and individual keys), builds, `appVersionState`, review submissions,
   phased release, rate-limit handling; iTunes lookup with per-app storefront; `upload.appStore`
   via `altool --upload-package` with `-p @env:` and rejection parsing.

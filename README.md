@@ -31,7 +31,7 @@ It writes nothing to the repo except release-model git changes.
 | `packages/xp_secrets` | Implements the secret store: Keychain, encrypted file, log masking. |
 | `packages/xp_repositories` | Repositories for the desktop app, built on `xp_client`. |
 | `packages/xp_macos_services` | Flutter package for macOS platform services. |
-| `tool` | Repository tooling (`xp_tool`): the layer check, and `tool/e2e` with the smoke test and the fixture repositories. |
+| `tool` | Repository tooling (`xp_tool`): the layer check, and `tool/e2e` with the smoke test, the fixture repositories and the fake store servers (`tool/e2e/fake_stores`, one package each). |
 | `docs` | Plan, ADRs, research and design brief. |
 
 Everything is one [Dart pub workspace](https://dart.dev/tools/pub/workspaces) (ADR 0001) with
@@ -458,6 +458,78 @@ the parsers read output captured from Flutter 3.47.6 on a throwaway app
 | `GET /projects/{id}/tests/baseline` | The current baseline of every app and branch of the project. |
 
 `xpd serve` registers both steps.
+
+## App Store Connect and Apple
+
+Phase 10a adds the Apple side of the stores (D-14): the App Store Connect REST client, the iTunes lookup,
+`upload.appStore` and the two guard checks that ask Apple. Interfaces and the parser are in
+`packages/xp_engine/lib/src/stores/apple`, the HTTP adapters in `packages/xp_adapters/lib/src/stores/apple`.
+Nothing here calls Apple in a test: the adapters run against `tool/e2e/fake_stores/asc` (below) and altool is
+only ever faked or read from captured output.
+
+- **The ASC API key is one secret.** The `secret_key` of an `asc_key` credential reference names a secret in the
+  secret store whose value is JSON (`AscKey.toSecret`):
+  `{"keyId": "ABC123DEF4", "issuerId": "<uuid>", "keyKind": "team" | "individual", "privateKey": "<.p8 text>"}`.
+  `keyKind` defaults to `team`. The credential endpoints (Phase 10c) write it. An Apple ID flavor has an
+  `apple_id` reference instead, and no REST access.
+- **Tokens** (`AscTokenProvider`) are ES256 JWTs signed in pure Dart (`pointycastle`, RFC 6979 nonces, raw
+  `r || s`): header `alg`, `kid`, `typ`; claims `iat`, `exp` (15 minutes, Apple's maximum is 20), `aud:
+  appstoreconnect-v1`, and `iss` for a team key or `sub: user` with no `iss` for an individual key. One token is
+  kept until two minutes before it expires. The signer is checked against the RFC 6979 test vector, against
+  `openssl dgst -verify` (`process` tag), and the fake server verifies the tokens it receives like Apple does.
+- **The REST client** (`HttpAppStoreConnect`) reads apps by bundle id, builds (by app, marketing version and build
+  number, with their processing state), App Store versions with **`appVersionState`** (`appStoreState` is
+  deprecated and never read), review submissions (create with the version, submit, read) and phased releases
+  (read, pause, resume, complete). Lists follow `links.next`, but only to the host of the base URL: the token is
+  never sent anywhere else. Errors are typed by status (`AscAuthException` 401, `AscForbiddenException` 403,
+  `AscNotFoundException` 404, `AscConflictException` 409, `AscValidationException` 422,
+  `AscRateLimitedException` 429, `AscServerException` otherwise), each with Apple's message and code and a fix.
+  A `429` is waited out when Apple's `Retry-After` (else 1 s, 2 s, ... backoff) is at most 30 s, up to three
+  attempts; a longer wait (the hourly quota is spent) is thrown at once with `retryAfter`, because a job must not
+  sleep for an hour. A `5xx` on a read is retried the same way. The quota left comes from `X-Rate-Limit` after
+  each answer (`rateLimit`).
+- **The iTunes lookup** (`HttpItunesLookup`) asks `itunes.apple.com/lookup` for the app's own storefront
+  (`store_country` of the profile) with a changing `_` parameter to get past Apple's CDN. It needs no key, so it
+  is the only Apple source for an Apple ID flavor. It is "live somewhere", not precise.
+- **`AppStoreTrains`** (the `appStoreTrain` guard check, ITMS-90186) takes the live version from the iTunes lookup
+  and, with an API key, from `appVersionState` too; the versions that are approved and not live yet
+  (`PENDING_DEVELOPER_RELEASE`, `PENDING_APPLE_RELEASE`, `PROCESSING_FOR_APP_STORE`, ...) are the closed trains.
+  **`StoreBuildNumbers`** (the `buildNumberReuse` guard check) is every build number App Store Connect has for the
+  app, expired builds included; it needs an API key, and answers for iOS only (Play is Phase 10b).
+  `SqliteAscCredentialSource` finds the key through the `asc_key` reference of the flavor with the bundle id.
+  `xpd serve` wires all of it in `apps/xpd/lib/src/stores/apple_stores.dart`; the two checks and the step are
+  registered there.
+- **`upload.appStore`** (side effect, macOS only, always on the engine, D-09) runs `xcrun altool --upload-package
+  <ipa> --type ios --apple-id <id> --bundle-id <id> --bundle-version <build> --bundle-short-version-string
+  <version>` on the IPA of the job (it must still have the SHA-256 recorded for it). With an API key it adds
+  `--apiKey --apiIssuer` and writes the `.p8` as `AuthKey_<id>.p8` (`ApiKey_<id>.p8` for an individual key,
+  which is how altool tells them apart) into the job's private secret folder, pointing `API_PRIVATE_KEYS_DIR`
+  at it: never `~/.appstoreconnect`. The folder is deleted when the job ends and when the engine starts. With an
+  Apple ID it adds `-u <apple id> -p @env:XPATH_ASC_APP_PASSWORD`, so the app-specific password is in the
+  environment of altool only, masked in the log, never in `ps`.
+- **altool's output decides, not its exit code** (`AltoolOutput`). altool can exit 0 after Apple rejected the
+  build (a closed version train, for example). The step fails on any line with `ERROR:`, `ERROR ITMS-`, `*** Error:`,
+  `validation failed`, `upload failed`, `VALIDATION_ERROR`, `failed to upload|validate package` or `unable to
+  authenticate`, and tells the first three. Known codes get a fix: 90186 and 90062 (bump the version), 90189
+  (allocate a new build number), authentication. A success line (`UPLOAD SUCCEEDED`, `No errors uploading`,
+  `upload complete`) and altool's delivery UUID are recorded when present; an output with neither errors nor
+  success is a success that is not `confirmed`, as in the reference scripts. The fixtures are in
+  `packages/xp_engine/test/src/stores/apple/fixtures` (its README says which are captured from altool 27.0.5
+  and which are reconstructed).
+- **`alreadyDone`** asks whether App Store Connect has the build: the builds API for an API key (by app,
+  version and build number); for an Apple ID `altool --build-status`, which counts only if its output names the
+  build number. When it cannot ask, the step runs, and Apple refuses a build number it has seen.
+
+### Fake App Store Connect
+
+`tool/e2e/fake_stores/asc` is the workspace package `xp_fake_asc`: a `dart:io` server on a loopback port
+(`FakeAscServer.start`) with apps, builds, App Store versions, review submissions, phased releases and the iTunes
+lookup in memory, in JSON:API shape. It verifies every bearer token (signature with the registered public key,
+`kid`, `aud`, `exp`, at most 20 minutes, `iss` or `sub` per key kind) and says what is wrong in the 401. Tests fill
+it with `addApp`, `addBuild`, `addVersion`, `addPhasedRelease` and `addItunes`, make it misbehave with
+`failNext` and `rateLimitNext`, and read `requests`. The test key (`fakeAscTestKey`, made with `openssl`) signs
+nothing real. `release_e2e.sh` (Phases 11 and 12b) will reuse it. The layer rules let `xp_adapters` and `xpd` use it
+(as a dev dependency).
 
 ## Testing
 
