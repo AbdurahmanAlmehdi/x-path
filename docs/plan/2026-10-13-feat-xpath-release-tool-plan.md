@@ -146,6 +146,11 @@ fakes and the real-OS tests are tagged `process` / `macos` / `integration`. The 
 runs on macOS CI; Linux CI runs the same tests without the gate. (Chosen by the owner on
 2026-10-13.)
 
+**Update (owner, 2026-10-13): no GitHub-hosted macOS runners** (billed at 10x). GitHub CI runs
+on Linux only and enforces each package's threshold there. The macOS gate, including
+`macos`-tagged tests, runs locally with `melos run test:coverage` before every merge to `main`.
+Wherever a phase below says "macOS CI", read "a local macOS run".
+
 ### Data model
 
 ```mermaid

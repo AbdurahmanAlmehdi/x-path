@@ -8,6 +8,10 @@ on:
       - edited
       - synchronize
 
+# The private repo's default token cannot read pull requests without this.
+permissions:
+  pull-requests: read
+
 jobs:
   semantic-pull-request:
     uses: VeryGoodOpenSource/very_good_workflows/.github/workflows/semantic_pull_request.yml@v1
