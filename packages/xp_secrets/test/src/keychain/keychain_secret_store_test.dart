@@ -46,7 +46,7 @@ void main() {
       expect(
         onlyCall().stdin,
         '"add-generic-password" "-U" "-a" "asc.key" '
-        '"-s" "dev.xpath.credentials" "-w" "${_b64('hunter2!')}"\n',
+        '"-s" "ly.abdurahman.xpath.credentials" "-w" "${_b64('hunter2!')}"\n',
       );
     });
 
@@ -71,7 +71,7 @@ void main() {
       expect(
         onlyCall().stdin,
         r'"add-generic-password" "-U" "-a" "a\"b\\c" '
-        r'"-s" "dev.xpath.sc\"ope" "-w" "dmFsdWU=" '
+        r'"-s" "ly.abdurahman.xpath.sc\"ope" "-w" "dmFsdWU=" '
         r'"/tmp/my \"kc\"\\x.keychain-db"'
         '\n',
       );
@@ -102,7 +102,7 @@ void main() {
 
       await custom.write('k', 'v');
 
-      expect(onlyCall().stdin, contains('"-s" "dev.xpath.github"'));
+      expect(onlyCall().stdin, contains('"-s" "ly.abdurahman.xpath.github"'));
       expect(onlyCall().stdin, endsWith('"/tmp/test.keychain-db"\n'));
     });
 
@@ -178,7 +178,7 @@ void main() {
       expect(
         onlyCall().stdin,
         '"find-generic-password" "-a" "k" '
-        '"-s" "dev.xpath.credentials" "-w"\n',
+        '"-s" "ly.abdurahman.xpath.credentials" "-w"\n',
       );
     });
 
@@ -225,7 +225,8 @@ void main() {
 
       expect(
         onlyCall().stdin,
-        '"delete-generic-password" "-a" "k" "-s" "dev.xpath.credentials"\n',
+        '"delete-generic-password" "-a" "k" '
+        '"-s" "ly.abdurahman.xpath.credentials"\n',
       );
     });
 

@@ -20,9 +20,11 @@ interface) and writes a single command line to its stdin:
 - delete: `delete-generic-password -a <account> -s <service> [keychain]`
 
 Every argument is double-quoted, with `\` escaped as `\\` and `"` as `\"`. The service name is
-`dev.xpath.<scope>`. Tests use a temporary keychain created with `security create-keychain`
-so they never touch the login keychain. The engine never passes a value through argv or the
+`dev.xpath.<scope>`. Tests use a temporary keychain created with `security create-keychain` so
+they never touch the login keychain. The engine never passes a value through argv or the
 environment of `security`.
+
+Identifier prefix superseded by ADR 0005.
 
 ## Proof
 
