@@ -495,10 +495,10 @@ only ever faked or read from captured output.
   and, with an API key, from `appVersionState` too; the versions that are approved and not live yet
   (`PENDING_DEVELOPER_RELEASE`, `PENDING_APPLE_RELEASE`, `PROCESSING_FOR_APP_STORE`, ...) are the closed trains.
   **`StoreBuildNumbers`** (the `buildNumberReuse` guard check) is every build number App Store Connect has for the
-  app, expired builds included; it needs an API key, and answers for iOS only (Play is Phase 10b).
+  app, expired builds included; it needs an API key, and answers for iOS only (Google Play's half is in the next section).
   `SqliteAscCredentialSource` finds the key through the `asc_key` reference of the flavor with the bundle id.
-  `xpd serve` wires all of it in `apps/xpd/lib/src/stores/apple_stores.dart`; the two checks and the step are
-  registered there.
+  `xpd serve` wires all of it in `apps/xpd/lib/src/stores/apple_stores.dart`; the `appStoreTrain` check and the
+  step are registered there, and `buildNumberReuse` over both stores' numbers in `store_guard_checks.dart`.
 - **`upload.appStore`** (side effect, macOS only, always on the engine, D-09) runs `xcrun altool --upload-package
   <ipa> --type ios --apple-id <id> --bundle-id <id> --bundle-version <build> --bundle-short-version-string
   <version>` on the IPA of the job (it must still have the SHA-256 recorded for it). With an API key it adds
@@ -530,6 +530,91 @@ it with `addApp`, `addBuild`, `addVersion`, `addPhasedRelease` and `addItunes`, 
 `failNext` and `rateLimitNext`, and read `requests`. The test key (`fakeAscTestKey`, made with `openssl`) signs
 nothing real. `release_e2e.sh` (Phases 11 and 12b) will reuse it. The layer rules let `xp_adapters` and `xpd` use it
 (as a dev dependency).
+
+## Google Play
+
+Phase 10b adds the Google Play side of the stores (D-15): the Developer API client, `upload.play`, the Play half
+of the `buildNumberReuse` guard check and the `playTargetSdk` guard check. Interfaces are in
+`packages/xp_engine/lib/src/stores/play`, the HTTP adapters in `packages/xp_adapters/lib/src/stores/play`. Nothing
+here calls Google in a test: the adapters run against `tool/e2e/fake_stores/play` (below).
+
+- **The service account is one secret.** The `secret_key` of a `play_sa` credential reference names a secret in the
+  secret store whose value is the JSON key file Google Cloud gives out, as it is (`PlayServiceAccount`): it needs
+  `client_email` and `private_key`, uses `token_uri` (default `https://oauth2.googleapis.com/token`) and
+  `private_key_id`, and ignores the rest. The credential endpoints (Phase 10c) write it. A flavor with no
+  `play_sa` reference has no service account: XPath cannot upload for it, `upload.play` fails with "upload the
+  bundle by hand", and the build numbers of Play are unknown (the desktop's "Play: live" button is Phase 12b/16b).
+  Setting up the account: enable the Google Play Android Developer API in the Cloud project, create the service
+  account and a JSON key, and invite its email in the Play Console (Users and permissions) with permission to
+  release the app.
+- **Auth is the OAuth2 JWT bearer flow, in pure Dart** (`PlayTokenProvider`, `Rs256Signer`). The assertion is an
+  RS256 JWT (header `alg`, `typ`, `kid`; claims `iss` the service account email, `scope`
+  `https://www.googleapis.com/auth/androidpublisher`, `aud` the `token_uri`, `iat`, `exp` 30 minutes later; Google's
+  maximum is an hour) posted as `grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer`. The access token is kept
+  until two minutes before it expires; calls that overlap share one request; a `401` drops the token and the call
+  is tried once more with a new one. **Why `pointycastle` and not `googleapis_auth`:** `googleapis_auth` hardcodes
+  the token endpoint, so the fake server could not stand in for it; the `token_uri` of the key file is the one
+  address the flow needs, and the signer is 30 lines on a package already used for ES256 (Phase 10a). The signer is
+  checked byte for byte against `openssl dgst -sha256 -sign`, and against `openssl dgst -verify` (`process` tag).
+- **The Developer API client** (`HttpGooglePlay`, `package:http`, base URLs of the API and of the upload host
+  injectable) does `edits.insert`, `edits.delete`, `edits.bundles.upload` and `list`, `edits.tracks.get` and
+  `update`, `edits.commit` and `tracks.releases.list`. Bundles go up with the simple media upload
+  (`uploadType=media`), **streamed from the artifact store with a known length**, never held in memory; the stream
+  is opened again if the upload has to be repeated. Errors are typed, each with Google's message, reason and a fix:
+  `PlayAuthException` (401, or the token endpoint), `PlayForbiddenException` (403: invite the service account),
+  `PlayNotFoundException` (404), `PlayVersionCodeUsedException` (a version code seen before),
+  `PlayConflictException` (409), `PlayValidationException` (other 4xx), `PlayRateLimitedException` (429),
+  `PlayServerException`. A `429` is waited out when `Retry-After` (else 1 s, 2 s, ...) is at most 30 s, up to three
+  attempts; a longer wait is thrown at once with `retryAfter`. A `5xx` is retried for reads, track updates and
+  deletes; **not for an upload or a commit**, which may have gone through: `alreadyDone` finds out.
+- **A review in progress is never cancelled.** `GooglePlay.commitEdit` has no option: it always sends
+  `changesInReviewBehavior=ERROR_IF_IN_REVIEW` (`edits.commit` defaults to cancelling the review). When changes
+  are in review Google answers `400 FAILED_PRECONDITION` with `CHANGES_ALREADY_IN_REVIEW`, the edit stays valid and
+  the review is untouched; the client throws `PlayReviewInProgressException`. The fake server implements both
+  behaviors and records the parameter and any cancelled review, so the acceptance test asserts the parameter was
+  sent and the review survived (`http_google_play_test.dart`, "while a review is in progress fails without
+  cancelling it").
+- **`upload.play`** (side effect, always on the engine, D-09) streams the AAB of the job (it must still have the
+  SHA-256 recorded for it), opens an edit, uploads, checks that the bundle's version code is the build number of
+  the input, sets the release of the track and commits. Input: `artifactName`, `packageName`, `version`
+  (`x.y.z+build`, the build is the version code), `serviceAccountSecret`, and optionally `track` (default
+  `internal`), `status` (`completed` by default, `inProgress` with a `userFraction` above 0 and below 1, or
+  `draft`), `releaseName` and `releaseNotes` (language tag to text). Whatever fails after the edit was opened, the
+  edit is deleted, so nothing is left half done. A review in progress fails the step with "Play has a review in
+  progress; the release was not committed and the review was not cancelled". The result carries the version code,
+  the track and the `releaseLifecycleState` of the new release when Play can say.
+- **`alreadyDone`** lists the releases of the track (`tracks.releases.list`: committed releases, at most 20, no edit
+  needed, state `DRAFT`, `NOT_SENT_FOR_REVIEW`, `IN_REVIEW`, `APPROVED_NOT_PUBLISHED`, `NOT_APPROVED` or
+  `PUBLISHED`) and is done when one holds the version code. Google's `googleapis` Dart package has no
+  `tracks.releases.list`, which is one more reason the client is hand-written against the REST shapes in the
+  discovery document.
+- **Build numbers.** `PlayStoreBuildNumbers` reads every bundle of the app (`edits.bundles.list` in a short edit
+  that is deleted again): Play refuses a version code it has seen on any track. It needs a service account and
+  covers bundles only (XPath uploads bundles). `CombinedStoreBuildNumbers` asks App Store Connect for the iOS
+  bundle id and Play for the Android application id, adds the numbers up and names a store it could not read in
+  `StoreBuilds.unreadable`; `buildNumberReuse` then warns instead of passing, but still fails for a number the
+  other store has. `xpd serve` composes it in `apps/xpd/lib/src/stores/store_guard_checks.dart`.
+- **`playTargetSdk`** compares the `targetSdk` in the Gradle scripts with the level Play asks for. Google publishes
+  no API for that policy value, so it is a setting (`ConfiguredPlayRequirements`): the default is **36**, what Play
+  has asked of new apps and updates since 2026-08-31 (Android 16). Play raises it every August; set
+  `XPD_PLAY_TARGET_SDK` for `xpd serve` (a whole number from 21 to 99; anything else stops the engine at start).
+
+### Fake Google Play
+
+`tool/e2e/fake_stores/play` is the workspace package `xp_fake_play`: a `dart:io` server on a loopback port
+(`FakePlayServer.start`) that is both the OAuth2 token endpoint (`/token`) and the Developer API. It verifies the
+signed assertion like Google does (RS256 against the public key of the registered account, `iss`, `scope`, `aud`
+the token endpoint, `exp`, at most an hour) and says what is wrong in the `invalid_grant`; it issues access tokens
+that expire by the fake clock and checks one on every API call. `serviceAccountJson()` makes the key file for the
+test account with `token_uri` pointing at the server. It keeps apps, edits, bundles, tracks and releases in memory,
+validates what Play validates (the bundle must be an AAB, a version code is used once, a release can only name
+uploaded bundles, `userFraction` only with `inProgress`) and answers with Google's error bodies. A commit while a
+release is `IN_REVIEW` answers `400 CHANGES_ALREADY_IN_REVIEW` with `ERROR_IF_IN_REVIEW` and cancels the review
+without it; `commits` and `FakePlayApp.cancelledReviews` record which. A test AAB is any bytes that start with
+`fake-aab versionCode=<n>` (`fakeAab(n)`), because the fake reads the version code from the first line where Play
+reads the manifest. Tests fill it with `addApp` and `FakePlayApp.addRelease`, make it misbehave with `failNext`,
+`rateLimitNext` and `revokeTokens`, and read `requests`. The test key (made with `openssl genpkey`) signs nothing
+real. The layer rules let `xp_adapters` and `xpd` use it (as a dev dependency).
 
 ## Testing
 

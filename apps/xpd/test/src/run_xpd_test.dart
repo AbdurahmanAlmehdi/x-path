@@ -360,6 +360,17 @@ void main() {
       expect(second.last['seq'], 2);
     });
 
+    test('refuses a Play target API level it cannot read', () async {
+      final code = await run(
+        ['serve', '--port', '0', '--data-dir', dataDir],
+        environment: {'XPD_PLAY_TARGET_SDK': 'latest'},
+      );
+
+      expect(code, 1);
+      expect(err.toString(), contains('XPD_PLAY_TARGET_SDK must be an API'));
+      expect(out.toString(), isNot(contains('listening')));
+    });
+
     test('warns when the address is not loopback', () async {
       final exit = run([
         'serve',
