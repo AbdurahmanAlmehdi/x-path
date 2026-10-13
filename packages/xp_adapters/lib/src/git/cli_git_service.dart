@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:path/path.dart' as p;
@@ -136,6 +137,51 @@ class CliGitService implements GitService {
   }
 
   @override
+  Future<List<GitTagInfo>> listTags(GitMirror mirror) async {
+    final output = await _git([
+      'for-each-ref',
+      // The second object is set only for an annotated tag: the commit it
+      // names.
+      '--format=%(refname:strip=2)%09%(objectname)%09%(*objectname)',
+      'refs/tags',
+    ], cwd: mirror.path);
+    if (output.exitCode != 0) throw _failure('for-each-ref', output);
+    return [
+      for (final line in const LineSplitter().convert(output.stdout))
+        if (line.isNotEmpty) _tagOf(line),
+    ];
+  }
+
+  GitTagInfo _tagOf(String line) {
+    final fields = line.split('\t');
+    final peeled = fields[2];
+    return GitTagInfo(
+      name: fields[0],
+      commit: peeled.isEmpty ? fields[1] : peeled,
+    );
+  }
+
+  @override
+  Future<List<String>> changedFiles(
+    GitMirror mirror, {
+    required String from,
+    required String to,
+  }) async {
+    final before = await resolveRef(mirror, from);
+    final after = await resolveRef(mirror, to);
+    final output = await _git([
+      'diff',
+      '--name-only',
+      '-z',
+      '--no-renames',
+      before,
+      after,
+    ], cwd: mirror.path);
+    if (output.exitCode != 0) throw _failure('diff', output);
+    return _nulSeparated(output.stdout)..sort();
+  }
+
+  @override
   Future<GitWorktree> createWorktree(
     GitMirror mirror, {
     required String name,
@@ -161,6 +207,87 @@ class CliGitService implements GitService {
   @override
   Future<void> removeWorktree(GitWorktree worktree) =>
       _discardWorktree(worktree.mirror, worktree.path);
+
+  @override
+  Future<GitWorktreeStatus> status(GitWorktree worktree) async {
+    final head = await _head(worktree);
+    final output = await _git([
+      'status',
+      '--porcelain=v1',
+      '-z',
+      '--untracked-files=all',
+      '--no-renames',
+    ], cwd: worktree.path);
+    if (output.exitCode != 0) throw _failure('status', output);
+    final changed = <String>[];
+    final untracked = <String>[];
+    for (final entry in _nulSeparated(output.stdout)) {
+      // `XY path`: two status letters, a space, the path.
+      final path = entry.substring(3);
+      (entry.startsWith('??') ? untracked : changed).add(path);
+    }
+    return GitWorktreeStatus(
+      headSha: head,
+      changed: changed..sort(),
+      untracked: untracked..sort(),
+    );
+  }
+
+  @override
+  Future<GitCommitResult> commit(
+    GitWorktree worktree, {
+    required String message,
+    required List<String> paths,
+  }) async {
+    if (message.trim().isEmpty) {
+      throw ArgumentError.value(message, 'message', 'is blank');
+    }
+    if (paths.isEmpty) {
+      throw ArgumentError.value(paths, 'paths', 'is empty');
+    }
+    for (final path in paths) {
+      if (path.isEmpty ||
+          path.startsWith('-') ||
+          path.startsWith('/') ||
+          path.split('/').contains('..')) {
+        throw ArgumentError.value(path, 'paths', 'is not a safe path');
+      }
+    }
+    final cwd = worktree.path;
+    await _ok('add', ['add', '--', ...paths], cwd: cwd);
+    // Exit code 1 means the staged paths differ from the head.
+    final diff = await _git([
+      'diff',
+      '--cached',
+      '--quiet',
+      '--',
+      ...paths,
+    ], cwd: cwd);
+    if (diff.exitCode != 0 && diff.exitCode != 1) {
+      throw _failure('diff', diff);
+    }
+    if (diff.exitCode == 0) {
+      return GitCommitResult(
+        sha: await _head(worktree),
+        tree: await _revParse(cwd, 'HEAD^{tree}'),
+        created: false,
+      );
+    }
+    await _ok('commit', [
+      'commit',
+      '--quiet',
+      '--no-verify',
+      '-m',
+      message,
+      '--',
+      ...paths,
+    ], cwd: cwd);
+    return GitCommitResult(
+      sha: await _head(worktree),
+      tree: await _revParse(cwd, 'HEAD^{tree}'),
+      created: true,
+    );
+  }
 
   @override
   Future<TagOutcome> createTag(
@@ -251,6 +378,21 @@ class CliGitService implements GitService {
     final message = 'git push failed (exit ${output.exitCode}): $stderr';
     throw rejected ? GitPushRejectedException(message) : GitException(message);
   }
+
+  Future<String> _head(GitWorktree worktree) =>
+      _revParse(worktree.path, 'HEAD');
+
+  Future<String> _revParse(String cwd, String ref) async {
+    final output = await _git(['rev-parse', '--verify', ref], cwd: cwd);
+    if (output.exitCode != 0) throw _failure('rev-parse', output);
+    return output.stdout.trim();
+  }
+
+  /// The non-empty entries of NUL-separated [text].
+  List<String> _nulSeparated(String text) => [
+    for (final entry in text.split('\x00'))
+      if (entry.isNotEmpty) entry,
+  ];
 
   /// Forgets the worktree at [path] and deletes its directory, whatever state
   /// it is in.

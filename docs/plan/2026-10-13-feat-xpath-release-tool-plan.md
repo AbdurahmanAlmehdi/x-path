@@ -327,7 +327,7 @@ Mataa dev builds through `xp` can start after Phase 13, before the desktop app e
 
 ### Phase 8: Versioning and guards
 
-- **Status:** Not started
+- **Status:** Done
 - **Scope:** Version file read/write (pubspec plus listed plists, exactly one match), build
   counter allocation, release-model config (branch and tag patterns, defaults from D-11), the
   `guard` step and its checks, release-branch cut, `version.bump`.

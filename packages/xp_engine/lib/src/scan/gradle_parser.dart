@@ -113,7 +113,7 @@ class GradleInfo extends Equatable {
 /// `flutter_flavorizr` and the Flutter templates write, and gives up
 /// quietly on anything cleverer.
 GradleInfo parseGradle(String script) {
-  final text = _withoutComments(script);
+  final text = withoutGradleComments(script);
   final flavorsBody = _blockAfter(text, RegExp(r'\bproductFlavors\s*\{'));
   final defaultConfig = _blockAfter(text, RegExp(r'\bdefaultConfig\s*\{'));
   return GradleInfo(
@@ -222,7 +222,7 @@ String _withoutNestedBlocks(String text) {
 }
 
 /// [script] with `//` and `/* */` comments blanked out, leaving strings alone.
-String _withoutComments(String script) {
+String withoutGradleComments(String script) {
   final out = StringBuffer();
   String? quote;
   var i = 0;
