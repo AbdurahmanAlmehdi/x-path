@@ -59,7 +59,9 @@ class GitFixture {
   /// Commits [content] to [file] on the current branch of the seed clone and
   /// returns the new commit.
   String commit(String file, String content, {String message = 'commit'}) {
-    File(p.join(seed, file)).writeAsStringSync(content);
+    File(p.join(seed, file))
+      ..parent.createSync(recursive: true)
+      ..writeAsStringSync(content);
     git(['add', '--', file]);
     git(['commit', '--quiet', '-m', message]);
     return git(['rev-parse', 'HEAD']);

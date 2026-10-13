@@ -195,8 +195,8 @@ port with a temporary data directory and checks `/health`, the database, the tok
 
 A job is a list of steps that run one after the other (D-18). Every step records its state, result and
 output as it goes, so a job survives a restart. Dispatching jobs from workflows comes in a later
-phase; for now the engine runs jobs created through `JobRunner` (the one built-in step is `command`,
-which runs a command the owner declares).
+phase; for now the engine runs jobs created through `JobRunner` (the built-in steps are `command`,
+which runs a command the owner declares, `version.bump` and `guard`; see Versions and guards).
 
 | Route | What it does |
 |---|---|
@@ -227,6 +227,31 @@ which runs a command the owner declares).
   the same way.
 - **Sleep.** While a job runs the machine is kept awake: `caffeinate -i -w <xpd pid>` on macOS,
   `systemd-inhibit` on Linux. Without the tool `xpd` warns and carries on.
+
+## Versions and guards
+
+Phase 8 adds the release model: how versions, build numbers, branches and tags are handled. No
+endpoint exposes it yet; workflows call it from Phase 11.
+
+- **Version files.** A version is `x.y.z+build`. `version.bump` writes it into the app's `pubspec.yaml`
+  and every plist the flavor lists in `versionFiles`, by text replacement so the diff stays one line
+  per key, and commits them in the job's worktree as `chore(release): x.y.z+build`. A plist key
+  must match exactly once; `$(FLUTTER_BUILD_NAME)` and `$(FLUTTER_BUILD_NUMBER)` are left alone.
+  Nothing is pushed. The step is done when the head already holds the version.
+- **Build numbers** (D-11). One counter per app in `app.build_counter`. `BuildNumberAllocator`
+  allocates at dispatch: one more than the largest of the store's builds, the build numbers in the
+  tags and the counter, in one atomic `UPDATE ... RETURNING`. A number is never handed back.
+- **Release model** (`project.release_model`). Branch and tag names are patterns with `{version}`,
+  `{build}`, `{n}` (OTA patch), `{app}` and `{flavor}`. Defaults: `release/{version}`,
+  `v{version}+{build}` and `v{version}+{build}-p{n}`. `ReleaseBranchCutter` cuts
+  `release/<x.y.z>` at the dispatched commit and never forces.
+- **Guards.** The `guard` step runs the checks a workflow lists and fails if any fails, naming each
+  problem and its fix: `source` (clean worktree on the dispatched commit, no `pubspec_overrides.yaml`,
+  no local path dependency), `appStoreTrain` (ITMS-90186 closed train), `versionSync`, `patchTarget`,
+  `newReleaseNumber`, `patchNativeDiff`, `playTargetSdk` and `buildNumberReuse`. What a check needs
+  from a store (train state, Play's target API level, build numbers, Shorebird releases) comes from
+  an interface; `xpd` registers the checks that need none and adds the others with the store
+  adapters (Phase 10).
 
 ## Testing
 

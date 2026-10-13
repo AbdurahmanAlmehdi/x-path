@@ -287,6 +287,33 @@ void main() {
       expect(runner.calls, isEmpty);
     });
   });
+
+  group('commit', () {
+    test('fails when git cannot compare the staged paths', () async {
+      final failing = serviceOn(
+        FakeProcessRunner(
+          (call) => call.arguments.contains('diff')
+              ? const ProcessOutput(exitCode: 129, stderr: 'usage')
+              : const ProcessOutput(exitCode: 0),
+        ),
+      );
+
+      await expectLater(
+        failing.commit(
+          const GitWorktree(mirror: mirror, path: '/w', sha: 'abc'),
+          message: 'm',
+          paths: ['pubspec.yaml'],
+        ),
+        throwsA(
+          isA<GitException>().having(
+            (e) => e.message,
+            'message',
+            startsWith('git diff failed (exit 129)'),
+          ),
+        ),
+      );
+    });
+  });
 }
 
 class _LockedSecretStore extends MemorySecretStore {

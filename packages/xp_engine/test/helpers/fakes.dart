@@ -133,6 +133,28 @@ class FakeGitService implements GitService {
   }
 
   @override
+  Future<List<GitTagInfo>> listTags(GitMirror mirror) =>
+      throw UnimplementedError();
+
+  @override
+  Future<List<String>> changedFiles(
+    GitMirror mirror, {
+    required String from,
+    required String to,
+  }) => throw UnimplementedError();
+
+  @override
+  Future<GitWorktreeStatus> status(GitWorktree worktree) =>
+      throw UnimplementedError();
+
+  @override
+  Future<GitCommitResult> commit(
+    GitWorktree worktree, {
+    required String message,
+    required List<String> paths,
+  }) => throw UnimplementedError();
+
+  @override
   Future<TagOutcome> createTag(
     GitMirror mirror, {
     required String name,
