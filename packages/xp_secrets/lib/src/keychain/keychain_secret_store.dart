@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:xp_engine/xp_engine.dart';
 import 'package:xp_secrets/src/tracking_secret_store.dart';
@@ -13,9 +14,11 @@ import 'package:xp_secrets/src/tracking_secret_store.dart';
 /// under the service `ly.abdurahman.xpath.<scope>`, with the key as the
 /// account.
 ///
-/// Values are stored as base64 of their UTF-8 bytes. `security -i` reads one
-/// line, so a raw newline would end the command, and `find-generic-password
-/// -w` prints a value that is not plain ASCII as hex.
+/// Values are stored as base64 of their bytes (text is UTF-8). `security -i`
+/// reads one line, so a raw newline would end the command, and
+/// `find-generic-password -w` prints a value that is not plain ASCII as hex.
+/// A command line is at most [maxCommandLength] bytes, so a value can be about
+/// 3 KB; `SizeRoutedSecretStore` keeps larger ones elsewhere.
 ///
 /// The engine never prompts. A locked Keychain, or no Keychain at all, throws
 /// a [SecretsLockedException]. When a Keychain is locked inside a graphical
@@ -60,7 +63,7 @@ class KeychainSecretStore extends TrackingSecretStore {
   String get _service => 'ly.abdurahman.xpath.$scope';
 
   @override
-  Future<String?> read(String key) => track(() async {
+  Future<Uint8List?> readBytes(String key) => track(() async {
     checkKey(key);
     final output = await _run('find-generic-password', [
       '-a',
@@ -71,7 +74,7 @@ class KeychainSecretStore extends TrackingSecretStore {
     ]);
     if (output == null) return null;
     try {
-      return utf8.decode(base64.decode(output.stdout.trim()));
+      return base64.decode(output.stdout.trim());
     } on FormatException {
       throw const SecretStoreException(
         'The Keychain item was not written by XPath: its value is not base64.',
@@ -80,7 +83,7 @@ class KeychainSecretStore extends TrackingSecretStore {
   });
 
   @override
-  Future<void> write(String key, String value) => track(() async {
+  Future<void> writeBytes(String key, List<int> value) => track(() async {
     checkKey(key);
     await _run('add-generic-password', [
       '-U',
@@ -89,7 +92,7 @@ class KeychainSecretStore extends TrackingSecretStore {
       '-s',
       _service,
       '-w',
-      base64.encode(utf8.encode(value)),
+      base64.encode(value),
     ]);
   });
 

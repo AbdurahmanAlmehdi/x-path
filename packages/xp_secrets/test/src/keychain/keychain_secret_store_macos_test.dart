@@ -4,7 +4,9 @@ library;
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
+import 'dart:typed_data';
 
+import 'package:path/path.dart' as p;
 import 'package:test/test.dart';
 import 'package:xp_engine/xp_engine.dart';
 import 'package:xp_secrets/xp_secrets.dart';
@@ -120,5 +122,102 @@ void main() {
     expect(await store.read('missing'), isNull);
     await store.delete('missing');
     expect(store.status, SecretsStatus.unlocked);
+  });
+
+  group('large secrets', () {
+    late String dataDir;
+    late FakeProcessRunner plain;
+
+    SecretStore newComposite() => SizeRoutedSecretStore(
+      small: KeychainSecretStore(runner: plain, keychainPath: keychain),
+      large: EncryptedFileSecretStore(
+        dataDir: dataDir,
+        runner: plain,
+        masterKey: KeychainMasterKeySource(
+          store: KeychainSecretStore(
+            runner: plain,
+            scope: masterKeyKeychainScope,
+            keychainPath: keychain,
+          ),
+        ),
+      ),
+    );
+
+    bool inKeychain(String service, String account) =>
+        Process.runSync('/usr/bin/security', [
+          'find-generic-password',
+          '-s',
+          service,
+          '-a',
+          account,
+          keychain,
+        ]).exitCode ==
+        0;
+
+    Uint8List randomBytes(int count) {
+      final random = Random.secure();
+      return Uint8List.fromList(
+        List.generate(count, (_) => random.nextInt(256)),
+      );
+    }
+
+    setUp(() {
+      dataDir = p.join(directory.path, 'data');
+      plain = FakeProcessRunner(runForReal);
+    });
+
+    test('a 16 KB random binary secret round-trips byte for byte', () async {
+      final keystore = randomBytes(16 * 1024);
+      final store = newComposite();
+
+      await store.writeBytes('android.keystore', keystore);
+
+      expect(await store.readBytes('android.keystore'), keystore);
+      expect(await newComposite().readBytes('android.keystore'), keystore);
+      expect(File(p.join(dataDir, 'secrets.enc')).existsSync(), isTrue);
+      expect(
+        inKeychain('ly.abdurahman.xpath.master', 'secrets-file-key'),
+        isTrue,
+        reason: 'the key of the file is in the Keychain',
+      );
+      expect(
+        inKeychain('ly.abdurahman.xpath.credentials', 'android.keystore'),
+        isFalse,
+        reason: 'the secret itself is not',
+      );
+    });
+
+    test('the largest Keychain value still fits a security command', () async {
+      final value = randomBytes(1536); // 2,048 characters of base64
+      final key = 'k' * 200;
+      final store = newComposite();
+
+      await store.writeBytes(key, value);
+
+      expect(await store.readBytes(key), value);
+      expect(inKeychain('ly.abdurahman.xpath.credentials', key), isTrue);
+      expect(File(p.join(dataDir, 'secrets.enc')).existsSync(), isFalse);
+    });
+
+    test('moves a secret between the Keychain and the file', () async {
+      final store = newComposite();
+      const service = 'ly.abdurahman.xpath.credentials';
+
+      await store.write('k', 'small');
+      expect(inKeychain(service, 'k'), isTrue);
+
+      final big = randomBytes(4000);
+      await store.writeBytes('k', big);
+      expect(inKeychain(service, 'k'), isFalse);
+      expect(await store.readBytes('k'), big);
+
+      await store.write('k', 'small again');
+      expect(inKeychain(service, 'k'), isTrue);
+      expect(await newComposite().read('k'), 'small again');
+
+      await store.delete('k');
+      expect(await store.readBytes('k'), isNull);
+      expect(inKeychain(service, 'k'), isFalse);
+    });
   });
 }

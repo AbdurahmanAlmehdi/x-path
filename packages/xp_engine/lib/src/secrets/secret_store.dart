@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 /// Whether the engine can currently reach its secrets.
 enum SecretsStatus {
   /// Secrets can be read and written.
@@ -36,7 +38,12 @@ class SecretsLockedException extends SecretStoreException {
 ///
 /// `xp_secrets` has the macOS Keychain and the Linux encrypted-file
 /// implementations. Keys are opaque names, for example the `secret_key` of a
-/// credential reference. Values are any text, including multi-line text.
+/// credential reference. Values are any text, including multi-line text, or
+/// any bytes (a binary Android keystore, for example).
+///
+/// Text and bytes share one key space: [write] stores the UTF-8 bytes of the
+/// text, and [read] decodes the stored bytes as UTF-8. Reading a binary value
+/// that is not UTF-8 with [read] is a [SecretStoreException]; use [readBytes].
 abstract interface class SecretStore {
   /// Whether the last operation could reach the secrets.
   ///
@@ -57,6 +64,16 @@ abstract interface class SecretStore {
   ///
   /// Throws like [read].
   Future<void> write(String key, String value);
+
+  /// The bytes stored under [key], or `null` if there is none.
+  ///
+  /// Throws like [read].
+  Future<Uint8List?> readBytes(String key);
+
+  /// Stores [value] under [key], replacing any previous value.
+  ///
+  /// Throws like [read].
+  Future<void> writeBytes(String key, List<int> value);
 
   /// Removes the value stored under [key]. Does nothing if there is none.
   ///

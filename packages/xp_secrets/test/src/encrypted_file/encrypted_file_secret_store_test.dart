@@ -4,6 +4,7 @@ library;
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
+import 'dart:typed_data';
 
 import 'package:cryptography/cryptography.dart';
 import 'package:path/path.dart' as p;
@@ -27,6 +28,28 @@ Future<List<int>> _seal(
     aad: header,
   );
   return [...header, ...box.nonce, ...box.cipherText, ...box.mac.bytes];
+}
+
+/// The box of a secrets file, for tests that look inside it.
+SecretBox _box(List<int> file) => SecretBox(
+  file.sublist(_header.length + 24, file.length - 16),
+  nonce: file.sublist(_header.length, _header.length + 24),
+  mac: Mac(file.sublist(file.length - 16)),
+);
+
+class _FixedKey implements MasterKeySource {
+  new(this.key);
+
+  final List<int> key;
+
+  /// The `createIfMissing` of every request.
+  final requests = <bool>[];
+
+  @override
+  Future<List<int>> load({required bool createIfMissing}) async {
+    requests.add(createIfMissing);
+    return key;
+  }
 }
 
 void main() {
@@ -133,6 +156,107 @@ void main() {
       await store.write('k', 'v');
 
       expect(await store.read('k'), 'v');
+    });
+  });
+
+  group('bytes', () {
+    // Not UTF-8: a text store could not return these unchanged.
+    final binary = Uint8List.fromList([0, 0xff, 0xfe, 0x80, 0x0a, 0x22, 0x5c]);
+
+    Uint8List randomBytes(int count) {
+      final random = Random(7);
+      return Uint8List.fromList(
+        List.generate(count, (_) => random.nextInt(256)),
+      );
+    }
+
+    test('round-trips a binary value', () async {
+      await store.writeBytes('k', binary);
+
+      expect(await store.readBytes('k'), binary);
+      expect(await newStore().readBytes('k'), binary);
+    });
+
+    test('round-trips 16 KB of random bytes', () async {
+      final keystore = randomBytes(16 * 1024);
+
+      await store.writeBytes('keystore', keystore);
+
+      expect(await newStore().readBytes('keystore'), keystore);
+    });
+
+    test('keeps text and binary values apart in one file', () async {
+      await store.write('text', 'é✓');
+      await store.writeBytes('binary', binary);
+
+      expect(await store.read('text'), 'é✓');
+      expect(await store.readBytes('text'), utf8.encode('é✓'));
+      expect(await store.readBytes('binary'), binary);
+    });
+
+    test('read refuses a binary value', () async {
+      await store.writeBytes('k', binary);
+
+      await expectLater(store.read('k'), throwsA(isA<SecretStoreException>()));
+    });
+
+    test('keeps bytes that start with a byte order mark', () async {
+      final bom = Uint8List.fromList([0xEF, 0xBB, 0xBF, 0x41]);
+
+      await store.writeBytes('k', bom);
+
+      expect(await newStore().readBytes('k'), bom);
+      expect(await store.read('k'), '\uFEFFA');
+    });
+
+    test('stores text as a JSON string and binary as base64', () async {
+      await store.write('text', 'plain');
+      await store.writeBytes('binary', binary);
+      final key = File(keyPath).readAsBytesSync();
+
+      final plain = await Xchacha20.poly1305Aead().decrypt(
+        _box(File(secretsPath).readAsBytesSync()),
+        secretKey: SecretKey(key),
+        aad: _header,
+      );
+
+      expect(jsonDecode(utf8.decode(plain)), {
+        'text': 'plain',
+        'binary': {'base64': base64.encode(binary)},
+      });
+    });
+
+    test('reads a file written by an engine that only knew text', () async {
+      await store.write('old', 'value');
+      final master = File(keyPath).readAsBytesSync();
+      File(secretsPath).writeAsBytesSync(
+        await _seal(master, utf8.encode('{"old":"value","n":""}')),
+      );
+
+      expect(await newStore().read('old'), 'value');
+      expect(await newStore().read('n'), '');
+    });
+
+    test('uses the master key source it is given', () async {
+      final given = _FixedKey(List.filled(masterKeyLength, 9));
+      final custom = EncryptedFileSecretStore(
+        dataDir: dataDir,
+        runner: chmodRunner(),
+        masterKey: given,
+      );
+
+      await custom.writeBytes('k', binary);
+
+      expect(given.requests, [true]);
+      expect(File(keyPath).existsSync(), isFalse);
+      expect(
+        await EncryptedFileSecretStore(
+          dataDir: dataDir,
+          runner: chmodRunner(),
+          masterKey: _FixedKey(List.filled(masterKeyLength, 9)),
+        ).readBytes('k'),
+        binary,
+      );
     });
   });
 
@@ -426,7 +550,7 @@ void main() {
     });
 
     test('is generated from the given random source', () async {
-      final source = MasterKeySource(
+      final source = FileMasterKeySource(
         dataDir: dataDir,
         runner: chmodRunner(),
         random: _Counting(),
@@ -535,6 +659,13 @@ void main() {
       ('is not JSON', 'not json'),
       ('is not a JSON object', '["a"]'),
       ('has a value that is not text', '{"k": 5}'),
+      ('has a binary value of another shape', '{"k": {"b64": "AA=="}}'),
+      (
+        'has a binary value with more fields',
+        '{"k": {"base64": "AA==", "x": 1}}',
+      ),
+      ('has a binary value that is not text', '{"k": {"base64": 5}}'),
+      ('has a binary value that is not base64', '{"k": {"base64": "!!"}}'),
     ]) {
       test('whose content $name is invalid', () async {
         File(secretsPath)
