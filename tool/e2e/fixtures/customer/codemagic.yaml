@@ -1,0 +1,12 @@
+workflows:
+  customer-ios-prod:
+    name: Customer iOS prod
+    instance_type: mac_mini_m2
+    scripts:
+      - name: Build
+        script: flutter build ipa --flavor prod
+  customer-android-prod:
+    instance_type: linux_x2
+    scripts:
+      - name: Build
+        script: flutter build appbundle --flavor prod

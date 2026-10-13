@@ -90,13 +90,204 @@ paths:
           $ref: "#/components/responses/UpgradeRequired"
         "500":
           $ref: "#/components/responses/InternalError"
+  /projects:
+    get:
+      operationId: listProjects
+      summary: Every project, oldest first.
+      responses:
+        "200":
+          description: The projects.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectsResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+    post:
+      operationId: addProject
+      summary: Add a GitHub repository as a project, and scan it.
+      description: |
+        Give exactly one of `path` and `remote`.
+
+        With `path` (an absolute folder on the engine's machine), the engine
+        reads the `origin` of the clone to find the repository, asks GitHub
+        for it, sets up its own mirror and scans the folder. The folder only
+        identifies the repository and seeds the scan (D-05); nothing is
+        written to it (D-04).
+
+        With `remote` (`owner/name` or a GitHub URL), the engine fetches the
+        repository into its mirror and scans the default branch there.
+
+        Projects are keyed by the GitHub repository id: a repository that is a
+        project already answers `409 conflict`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddProjectRequest"
+      responses:
+        "201":
+          description: The project was added.
+          headers:
+            Location:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "502":
+          $ref: "#/components/responses/UpstreamError"
+        "503":
+          $ref: "#/components/responses/SecretsLocked"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /projects/{id}:
+    parameters:
+      - $ref: "#/components/parameters/ProjectId"
+    get:
+      operationId: getProject
+      summary: One project, with its profile and the findings of the last scan.
+      responses:
+        "200":
+          description: The project.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+    patch:
+      operationId: updateProject
+      summary: Edit the profile of a project.
+      description: |
+        The edits are kept apart from the scan and applied again after every
+        scan, so a rescan never undoes them. Fields that are left out keep
+        their value; edits merge with earlier ones.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProfileEdits"
+      responses:
+        "200":
+          description: The project with the edits applied.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+    delete:
+      operationId: removeProject
+      summary: Remove a project.
+      description: |
+        The engine's mirror stays on disk and the folder the project was added
+        from is never touched. A project with releases or jobs cannot be
+        removed.
+      responses:
+        "204":
+          description: The project is gone.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /projects/{id}/scan:
+    parameters:
+      - $ref: "#/components/parameters/ProjectId"
+    post:
+      operationId: scanProject
+      summary: Scan a project again.
+      description: |
+        Scans the folder the project was added from if it still exists, else a
+        fresh worktree of the engine's mirror at the default branch. GitHub is
+        asked for the repository first, so a rename or a new default branch is
+        followed; if GitHub cannot be reached the stored values stay.
+      responses:
+        "200":
+          description: The project with the new scan.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "502":
+          $ref: "#/components/responses/UpstreamError"
+        "503":
+          $ref: "#/components/responses/SecretsLocked"
+        "500":
+          $ref: "#/components/responses/InternalError"
 components:
   securitySchemes:
     bearerAuth:
       type: http
       scheme: bearer
       description: A device token created with `xpd token create`.
+  parameters:
+    ProjectId:
+      name: id
+      in: path
+      required: true
+      description: The project id, for example `prj_1a2b3c4d5e6f7a8b`.
+      schema:
+        type: string
   responses:
+    NotFound:
+      description: |
+        There is no such project, or GitHub cannot find the repository.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Conflict:
+      description: |
+        The request clashes with what the engine holds: the repository is a
+        project already, or the project has releases or jobs.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    UpstreamError:
+      description: GitHub or git refused the call or could not be reached.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    SecretsLocked:
+      description: The engine cannot read its secrets right now (D-10).
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
     InvalidRequest:
       description: The request is malformed.
       content:
@@ -138,9 +329,12 @@ components:
         - invalid_request
         - unauthorized
         - not_found
+        - conflict
         - resync_required
         - upgrade_required
         - internal
+        - upstream_error
+        - secrets_locked
     ErrorResponse:
       type: object
       required: [error]
@@ -187,7 +381,326 @@ components:
         type:
           type: string
           description: |
-            `engine.started`, `stream.opened`, or a type added by a later
+            `engine.started`, `stream.opened`, `project.added`,
+            `project.scanned`, `project.removed`, or a type added by a later
             engine version, which a client must ignore.
         payload:
           type: object
+    FindingSeverity:
+      type: string
+      enum: [error, warning, info]
+    Finding:
+      type: object
+      description: |
+        Something a scan noticed, with what to change to resolve it.
+      required: [severity, code, message, fix]
+      additionalProperties: false
+      properties:
+        severity:
+          $ref: "#/components/schemas/FindingSeverity"
+        code:
+          type: string
+          description: A stable snake_case identifier.
+        message:
+          type: string
+        fix:
+          type: string
+        path:
+          type: string
+          description: The file it is about, relative to the repository root.
+        app:
+          type: string
+          description: The path of the app it is about.
+        flavor:
+          type: string
+    PlistVersion:
+      type: object
+      required: [path, literal]
+      additionalProperties: false
+      properties:
+        path:
+          type: string
+        shortVersion:
+          type: string
+          description: CFBundleShortVersionString as written.
+        buildNumber:
+          type: string
+          description: CFBundleVersion as written.
+        literal:
+          type: boolean
+          description: |
+            Whether either key is a literal rather than a build variable such
+            as `$(FLUTTER_BUILD_NUMBER)`.
+    KeystoreProfile:
+      type: object
+      required: [propertiesPath, propertiesPresent]
+      additionalProperties: false
+      properties:
+        propertiesPath:
+          type: string
+        propertiesPresent:
+          type: boolean
+        storeFile:
+          type: string
+          description: Passwords are never read.
+    ShorebirdProfile:
+      type: object
+      required: [flavorAppIds]
+      additionalProperties: false
+      properties:
+        appId:
+          type: string
+        flavorAppIds:
+          type: object
+          additionalProperties:
+            type: string
+    FlavorProfile:
+      type: object
+      required:
+        - name
+        - implicit
+        - entrypoint
+        - shorebird
+        - prod
+        - versionFiles
+        - sources
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+          description: |
+            The flavor name; `default` for an implicit flavor, which stands
+            for the only build of an app without flavors.
+        implicit:
+          type: boolean
+        entrypoint:
+          type: string
+          description: Relative to the app.
+        iosBundleId:
+          type: string
+        androidAppId:
+          type: string
+        iosTeam:
+          type: string
+        iosScheme:
+          type: string
+        infoPlist:
+          type: string
+          description: Relative to the repository root.
+        shorebird:
+          type: boolean
+        shorebirdAppId:
+          type: string
+        prod:
+          type: boolean
+        versionFiles:
+          type: array
+          description: |
+            The files a version bump writes, relative to the repository root.
+          items:
+            type: string
+        sources:
+          type: array
+          items:
+            type: string
+            enum: [gradle, flavorizr, xcscheme, entrypoint]
+    IosPackageManager:
+      type: string
+      enum: [cocoapods, spm, both, none]
+    AppProfile:
+      type: object
+      required:
+        - name
+        - path
+        - framework
+        - storeCountry
+        - hasIos
+        - hasAndroid
+        - iosPackageManager
+        - flavors
+        - plists
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+        path:
+          type: string
+          description: Relative to the repository root; `.` for the root.
+        framework:
+          type: string
+          const: flutter
+        version:
+          type: string
+        storeCountry:
+          type: string
+          description: Two-letter App Store storefront, lower case.
+        flutterVersion:
+          type: string
+          description: The pin of `.fvmrc` (D-20).
+        flutterVersionSource:
+          type: string
+        hasIos:
+          type: boolean
+        hasAndroid:
+          type: boolean
+        iosPackageManager:
+          $ref: "#/components/schemas/IosPackageManager"
+        flavors:
+          type: array
+          items:
+            $ref: "#/components/schemas/FlavorProfile"
+        plists:
+          type: array
+          items:
+            $ref: "#/components/schemas/PlistVersion"
+        keystore:
+          $ref: "#/components/schemas/KeystoreProfile"
+        shorebird:
+          $ref: "#/components/schemas/ShorebirdProfile"
+    BranchLayout:
+      type: object
+      required: [releaseBranches]
+      additionalProperties: false
+      properties:
+        defaultBranch:
+          type: string
+        releaseBranches:
+          type: array
+          description: Existing branches that match `release/*`.
+          items:
+            type: string
+    RepoWorkflow:
+      type: object
+      required: [path, provider, names]
+      additionalProperties: false
+      properties:
+        path:
+          type: string
+        provider:
+          type: string
+          enum: [github_actions, codemagic]
+        names:
+          type: array
+          items:
+            type: string
+    ProjectProfile:
+      type: object
+      required: [layout, apps, branches, workflows]
+      additionalProperties: false
+      properties:
+        layout:
+          type: string
+          enum: [single, melos]
+        apps:
+          type: array
+          items:
+            $ref: "#/components/schemas/AppProfile"
+        branches:
+          $ref: "#/components/schemas/BranchLayout"
+        workflows:
+          type: array
+          items:
+            $ref: "#/components/schemas/RepoWorkflow"
+    Project:
+      type: object
+      required:
+        - id
+        - githubRepoId
+        - fullName
+        - remote
+        - defaultBaseBranch
+        - profile
+        - findings
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+        githubRepoId:
+          type: integer
+          description: Survives renames and transfers; keys the project (D-05).
+        fullName:
+          type: string
+          description: "`owner/name` as GitHub spells it."
+        remote:
+          type: string
+        localPath:
+          type: string
+          description: |
+            The folder the project was added from. It only seeds scans.
+        defaultBaseBranch:
+          type: string
+        profile:
+          $ref: "#/components/schemas/ProjectProfile"
+        findings:
+          type: array
+          items:
+            $ref: "#/components/schemas/Finding"
+        scannedAt:
+          type: string
+          format: date-time
+    ProjectsResponse:
+      type: object
+      required: [projects]
+      additionalProperties: false
+      properties:
+        projects:
+          type: array
+          items:
+            $ref: "#/components/schemas/Project"
+    AddProjectRequest:
+      type: object
+      description: Exactly one of `path` and `remote`.
+      additionalProperties: false
+      properties:
+        path:
+          type: string
+        remote:
+          type: string
+      oneOf:
+        - required: [path]
+        - required: [remote]
+    FlavorEdit:
+      type: object
+      required: [name]
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+        prod:
+          type: boolean
+        shorebird:
+          type: boolean
+        entrypoint:
+          type: string
+        iosBundleId:
+          type: string
+        androidAppId:
+          type: string
+        versionFiles:
+          type: array
+          items:
+            type: string
+    AppEdit:
+      type: object
+      required: [path]
+      additionalProperties: false
+      properties:
+        path:
+          type: string
+        storeCountry:
+          type: string
+          pattern: "^[A-Za-z]{2}$"
+        flavors:
+          type: array
+          items:
+            $ref: "#/components/schemas/FlavorEdit"
+    ProfileEdits:
+      type: object
+      additionalProperties: false
+      properties:
+        defaultBaseBranch:
+          type: string
+        apps:
+          type: array
+          items:
+            $ref: "#/components/schemas/AppEdit"

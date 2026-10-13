@@ -1,0 +1,15 @@
+name: mataa_app
+description: Synthetic fixture for the XPath scanner.
+publish_to: none
+
+version: 5.5.0+3284
+
+environment:
+  sdk: ^3.8.1
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+flutter:
+  uses-material-design: true

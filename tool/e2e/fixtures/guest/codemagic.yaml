@@ -1,0 +1,10 @@
+workflows:
+  guest-ios-oneavant:
+    name: Guest iOS (OneAvant)
+    scripts:
+      - name: Resolve workspace dependencies
+        script: dart pub get
+  guest-android-oneavant:
+    scripts:
+      - name: Build
+        script: flutter build appbundle --flavor oneavant

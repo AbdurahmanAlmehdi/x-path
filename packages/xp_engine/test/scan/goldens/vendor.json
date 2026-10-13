@@ -1,0 +1,97 @@
+{
+  "profile": {
+    "layout": "single",
+    "apps": [
+      {
+        "name": "mataa_vender",
+        "path": ".",
+        "framework": "flutter",
+        "version": "1.5.5+26",
+        "storeCountry": "us",
+        "hasIos": true,
+        "hasAndroid": true,
+        "iosPackageManager": "cocoapods",
+        "flavors": [
+          {
+            "name": "dev",
+            "implicit": false,
+            "entrypoint": "lib/main_dev.dart",
+            "iosBundleId": "com.mataaa.vendors.dev",
+            "androidAppId": "com.mataaa.vendors.dev",
+            "iosTeam": "FAKETEAM01",
+            "iosScheme": "dev",
+            "infoPlist": "ios/Runner/Info.plist",
+            "shorebird": true,
+            "shorebirdAppId": "00000000-0000-4000-8000-0000000000c1",
+            "prod": false,
+            "versionFiles": [
+              "pubspec.yaml"
+            ],
+            "sources": [
+              "gradle",
+              "flavorizr",
+              "xcscheme",
+              "entrypoint"
+            ]
+          },
+          {
+            "name": "prod",
+            "implicit": false,
+            "entrypoint": "lib/main_prod.dart",
+            "iosBundleId": "com.mataaa.vendors",
+            "androidAppId": "com.mataaa.vendors",
+            "iosTeam": "FAKETEAM01",
+            "iosScheme": "prod",
+            "infoPlist": "ios/Runner/Info.plist",
+            "shorebird": true,
+            "shorebirdAppId": "00000000-0000-4000-8000-0000000000c2",
+            "prod": true,
+            "versionFiles": [
+              "pubspec.yaml"
+            ],
+            "sources": [
+              "gradle",
+              "flavorizr",
+              "xcscheme",
+              "entrypoint"
+            ]
+          }
+        ],
+        "plists": [
+          {
+            "path": "ios/Runner/Info.plist",
+            "shortVersion": "$(FLUTTER_BUILD_NAME)",
+            "buildNumber": "$(FLUTTER_BUILD_NUMBER)",
+            "literal": false
+          }
+        ],
+        "keystore": {
+          "propertiesPath": "android/key.properties",
+          "propertiesPresent": true,
+          "storeFile": "fixture-release.jks"
+        },
+        "shorebird": {
+          "appId": "00000000-0000-4000-8000-0000000000c1",
+          "flavorAppIds": {
+            "dev": "00000000-0000-4000-8000-0000000000c1",
+            "prod": "00000000-0000-4000-8000-0000000000c2"
+          }
+        }
+      }
+    ],
+    "branches": {
+      "releaseBranches": []
+    },
+    "workflows": []
+  },
+  "findings": [
+    {
+      "severity": "warning",
+      "code": "fvmrc_missing",
+      "message": "There is no .fvmrc, so XPath does not know which Flutter version to build with.",
+      "fix": "Add a .fvmrc with {\"flutter\": \"x.y.z\"} to the app or to the repository root.",
+      "path": ".fvmrc",
+      "app": "."
+    }
+  ]
+}

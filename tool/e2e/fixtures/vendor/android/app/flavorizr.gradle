@@ -1,0 +1,16 @@
+android {
+    flavorDimensions += "flavor-type"
+
+    productFlavors {
+        dev {
+            dimension "flavor-type"
+            applicationId "com.mataaa.vendors.dev"
+            resValue "string", "app_name", "Mataa Partner Dev"
+        }
+        prod {
+            dimension "flavor-type"
+            applicationId "com.mataaa.vendors"
+            resValue "string", "app_name", "Mataa Partner"
+        }
+    }
+}

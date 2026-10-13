@@ -1,0 +1,15 @@
+flavors:
+  dev:
+    app:
+      name: "Mataa Captain Dev"
+    android:
+      applicationId: "com.mataa.captain.dev"
+    ios:
+      bundleId: "com.mataaa.captain.dev"
+  prod:
+    app:
+      name: "Mataa Captain"
+    android:
+      applicationId: "com.mataa.captain"
+    ios:
+      bundleId: "com.mataa.captain"

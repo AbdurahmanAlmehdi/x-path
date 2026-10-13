@@ -1,0 +1,262 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 54;
+	objects = {
+
+/* Begin PBXNativeTarget section */
+		0000000000000000A0000001 /* Runner */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 0000000000000000A0000002;
+			buildPhases = (
+			);
+			name = Runner;
+			productName = Runner;
+			productType = "com.apple.product-type.application";
+		};
+		0000000000000000A0000009 /* RunnerTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 0000000000000000A000000A;
+			buildPhases = (
+			);
+			name = RunnerTests;
+			productName = RunnerTests;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		0000000000000000A000001B /* Project object */ = {
+			isa = PBXProject;
+			buildConfigurationList = 0000000000000000A0000011;
+			targets = (
+				0000000000000000A0000001 /* Runner */,
+				0000000000000000A0000009 /* RunnerTests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin XCBuildConfiguration section */
+		0000000000000000A0000003 /* Debug-dev */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				INFOPLIST_FILE = Runner/Info.plist;
+				PRODUCT_BUNDLE_IDENTIFIER = com.oneavant.guestTablet.dev;
+				DEVELOPMENT_TEAM = FAKETEAM04;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = "Debug-dev";
+		};
+		0000000000000000A0000004 /* Profile-dev */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				INFOPLIST_FILE = Runner/Info.plist;
+				PRODUCT_BUNDLE_IDENTIFIER = com.oneavant.guestTablet.dev;
+				DEVELOPMENT_TEAM = FAKETEAM04;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = "Profile-dev";
+		};
+		0000000000000000A0000005 /* Release-dev */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				INFOPLIST_FILE = Runner/Info.plist;
+				PRODUCT_BUNDLE_IDENTIFIER = com.oneavant.guestTablet.dev;
+				DEVELOPMENT_TEAM = FAKETEAM04;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = "Release-dev";
+		};
+		0000000000000000A0000006 /* Debug-oneavant */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				INFOPLIST_FILE = Runner/Info.plist;
+				PRODUCT_BUNDLE_IDENTIFIER = com.oneavant.guestTablet;
+				DEVELOPMENT_TEAM = FAKETEAM04;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = "Debug-oneavant";
+		};
+		0000000000000000A0000007 /* Profile-oneavant */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				INFOPLIST_FILE = Runner/Info.plist;
+				PRODUCT_BUNDLE_IDENTIFIER = com.oneavant.guestTablet;
+				DEVELOPMENT_TEAM = FAKETEAM04;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = "Profile-oneavant";
+		};
+		0000000000000000A0000008 /* Release-oneavant */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				INFOPLIST_FILE = Runner/Info.plist;
+				PRODUCT_BUNDLE_IDENTIFIER = com.oneavant.guestTablet;
+				DEVELOPMENT_TEAM = FAKETEAM04;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = "Release-oneavant";
+		};
+		0000000000000000A000000B /* Debug-dev */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				PRODUCT_BUNDLE_IDENTIFIER = com.oneavant.guestExperience.RunnerTests;
+				PRODUCT_NAME = RunnerTests;
+			};
+			name = "Debug-dev";
+		};
+		0000000000000000A000000C /* Profile-dev */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				PRODUCT_BUNDLE_IDENTIFIER = com.oneavant.guestExperience.RunnerTests;
+				PRODUCT_NAME = RunnerTests;
+			};
+			name = "Profile-dev";
+		};
+		0000000000000000A000000D /* Release-dev */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				PRODUCT_BUNDLE_IDENTIFIER = com.oneavant.guestExperience.RunnerTests;
+				PRODUCT_NAME = RunnerTests;
+			};
+			name = "Release-dev";
+		};
+		0000000000000000A000000E /* Debug-oneavant */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				PRODUCT_BUNDLE_IDENTIFIER = com.oneavant.guestExperience.RunnerTests;
+				PRODUCT_NAME = RunnerTests;
+			};
+			name = "Debug-oneavant";
+		};
+		0000000000000000A000000F /* Profile-oneavant */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				PRODUCT_BUNDLE_IDENTIFIER = com.oneavant.guestExperience.RunnerTests;
+				PRODUCT_NAME = RunnerTests;
+			};
+			name = "Profile-oneavant";
+		};
+		0000000000000000A0000010 /* Release-oneavant */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				PRODUCT_BUNDLE_IDENTIFIER = com.oneavant.guestExperience.RunnerTests;
+				PRODUCT_NAME = RunnerTests;
+			};
+			name = "Release-oneavant";
+		};
+		0000000000000000A0000012 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+			};
+			name = Debug;
+		};
+		0000000000000000A0000013 /* Profile */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+			};
+			name = Profile;
+		};
+		0000000000000000A0000014 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+			};
+			name = Release;
+		};
+		0000000000000000A0000015 /* Debug-dev */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+			};
+			name = "Debug-dev";
+		};
+		0000000000000000A0000016 /* Profile-dev */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+			};
+			name = "Profile-dev";
+		};
+		0000000000000000A0000017 /* Release-dev */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+			};
+			name = "Release-dev";
+		};
+		0000000000000000A0000018 /* Debug-oneavant */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+			};
+			name = "Debug-oneavant";
+		};
+		0000000000000000A0000019 /* Profile-oneavant */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+			};
+			name = "Profile-oneavant";
+		};
+		0000000000000000A000001A /* Release-oneavant */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+			};
+			name = "Release-oneavant";
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		0000000000000000A0000002 /* Build configuration list for PBXNativeTarget "Runner" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				0000000000000000A0000003 /* Debug-dev */,
+				0000000000000000A0000004 /* Profile-dev */,
+				0000000000000000A0000005 /* Release-dev */,
+				0000000000000000A0000006 /* Debug-oneavant */,
+				0000000000000000A0000007 /* Profile-oneavant */,
+				0000000000000000A0000008 /* Release-oneavant */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		0000000000000000A000000A /* Build configuration list for PBXNativeTarget "RunnerTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				0000000000000000A000000B /* Debug-dev */,
+				0000000000000000A000000C /* Profile-dev */,
+				0000000000000000A000000D /* Release-dev */,
+				0000000000000000A000000E /* Debug-oneavant */,
+				0000000000000000A000000F /* Profile-oneavant */,
+				0000000000000000A0000010 /* Release-oneavant */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		0000000000000000A0000011 /* Build configuration list for PBXProject "Runner" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				0000000000000000A0000012 /* Debug */,
+				0000000000000000A0000013 /* Profile */,
+				0000000000000000A0000014 /* Release */,
+				0000000000000000A0000015 /* Debug-dev */,
+				0000000000000000A0000016 /* Profile-dev */,
+				0000000000000000A0000017 /* Release-dev */,
+				0000000000000000A0000018 /* Debug-oneavant */,
+				0000000000000000A0000019 /* Profile-oneavant */,
+				0000000000000000A000001A /* Release-oneavant */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+
+	};
+	rootObject = 0000000000000000A000001B /* Project object */;
+}

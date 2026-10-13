@@ -50,6 +50,7 @@
     "buildkite",
     "caffeinate",
     "chacha",
+    "cocoapods",
     "codemagic",
     "crashlytics",
     "cspell",
@@ -97,6 +98,7 @@
     "oneavant",
     "openapi",
     "outl",
+    "pbxproj",
     "pgid",
     "plist",
     "plists",
@@ -146,6 +148,7 @@
     "xcode",
     "xcodebuild",
     "xcrun",
+    "xcscheme",
     "xcschemes",
     "xpath",
     "xpd"

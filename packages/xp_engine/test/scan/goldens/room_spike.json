@@ -1,0 +1,66 @@
+{
+  "profile": {
+    "layout": "single",
+    "apps": [
+      {
+        "name": "room_scene_spike",
+        "path": ".",
+        "framework": "flutter",
+        "version": "1.0.0+1",
+        "storeCountry": "us",
+        "flutterVersion": "3.47.4",
+        "flutterVersionSource": ".fvmrc",
+        "hasIos": true,
+        "hasAndroid": true,
+        "iosPackageManager": "spm",
+        "flavors": [
+          {
+            "name": "default",
+            "implicit": true,
+            "entrypoint": "lib/main.dart",
+            "iosBundleId": "com.oneavant.spike.roomSceneSpike",
+            "androidAppId": "com.oneavant.spike.room_scene_spike",
+            "iosTeam": "FAKETEAM04",
+            "infoPlist": "ios/Runner/Info.plist",
+            "shorebird": false,
+            "prod": true,
+            "versionFiles": [
+              "pubspec.yaml"
+            ],
+            "sources": []
+          }
+        ],
+        "plists": [
+          {
+            "path": "ios/Runner/Info.plist",
+            "shortVersion": "$(FLUTTER_BUILD_NAME)",
+            "buildNumber": "$(FLUTTER_BUILD_NUMBER)",
+            "literal": false
+          }
+        ]
+      }
+    ],
+    "branches": {
+      "releaseBranches": []
+    },
+    "workflows": []
+  },
+  "findings": [
+    {
+      "severity": "warning",
+      "code": "bundle_id_platform_mismatch",
+      "message": "Flavor default is com.oneavant.spike.room_scene_spike on Android and com.oneavant.spike.roomSceneSpike on iOS.",
+      "fix": "Ignore this if the apps are meant to have different ids; otherwise make them agree.",
+      "app": ".",
+      "flavor": "default"
+    },
+    {
+      "severity": "info",
+      "code": "keystore_not_referenced",
+      "message": "The Gradle scripts do not read a key.properties file, so release builds are not signed with a release keystore from there.",
+      "fix": "Ignore this if signing is configured another way; otherwise add a release signingConfig that reads key.properties.",
+      "path": "android/app",
+      "app": "."
+    }
+  ]
+}

@@ -226,6 +226,33 @@ void main() {
       );
     }, tags: 'contract');
 
+    test('documents the project endpoints and their error responses', () {
+      final unauthorized = jsonEncode(
+        ErrorResponse.of(ApiErrorCode.unauthorized, 'm').toJson(),
+      );
+
+      for (final (method, path) in [
+        ('GET', '/projects'),
+        ('POST', '/projects'),
+        ('GET', '/projects/prj_1'),
+        ('PATCH', '/projects/prj_1'),
+        ('DELETE', '/projects/prj_1'),
+        ('POST', '/projects/prj_1/scan'),
+      ]) {
+        expect(
+          shipped.validateResponse(
+            method: method,
+            path: path,
+            statusCode: 401,
+            body: unauthorized,
+            contentType: 'application/json',
+          ),
+          isEmpty,
+          reason: '$method $path',
+        );
+      }
+    }, tags: 'contract');
+
     test('has an error code for every ApiErrorCode', () {
       for (final code in ApiErrorCode.values) {
         final body = ErrorResponse.of(code, 'm').toJson();
@@ -238,6 +265,9 @@ void main() {
       for (final event in <EngineEvent>[
         const EngineStarted(version: '0.0.1', apiVersion: '1'),
         const StreamOpened(),
+        const ProjectAdded(projectId: 'prj_1', fullName: 'o/r'),
+        const ProjectScanned(projectId: 'prj_1', errors: 0, warnings: 1),
+        const ProjectRemoved(projectId: 'prj_1'),
       ]) {
         final json = SequencedEvent(
           seq: 1,

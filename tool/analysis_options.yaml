@@ -2,3 +2,5 @@ include: package:very_good_analysis/analysis_options.11.0.0.yaml
 analyzer:
   exclude:
     - "**/*.g.dart"
+    # Synthetic repositories for the scanner tests; not code of this package.
+    - "e2e/fixtures/**"

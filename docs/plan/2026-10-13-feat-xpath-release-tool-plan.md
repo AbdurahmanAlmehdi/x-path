@@ -301,7 +301,7 @@ Mataa dev builds through `xp` can start after Phase 13, before the desktop app e
 
 ### Phase 6: Scanner and projects
 
-- **Status:** Not started
+- **Status:** Done
 - **Scope:** Detect Flutter apps (single and melos), flavors (Gradle productFlavors, flavorizr,
   xcschemes, `lib/main_*.dart`), bundle/application IDs per flavor (including mismatches such as
   `com.mataaa.captain.dev`), literal vs `$(FLUTTER_BUILD_*)` plist versions, Shorebird app IDs,

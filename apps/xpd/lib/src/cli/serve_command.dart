@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:xp_adapters/xp_adapters.dart';
 import 'package:xp_engine/xp_engine.dart';
+import 'package:xp_secrets/xp_secrets.dart';
 import 'package:xpd/src/cli/xpd_command.dart';
 import 'package:xpd/src/server/xpd_server.dart';
 import 'package:xpd/src/version.dart';
@@ -51,13 +52,40 @@ class ServeCommand extends XpdCommand {
       );
     }
 
+    final directory = dataDirectory;
     return await withDatabase((database) async {
+      const runner = IoProcessRunner();
+      final secrets = createSecretStore(
+        runner: runner,
+        dataDir: directory,
+        operatingSystem: context.operatingSystem,
+        environment: context.environment,
+      );
+      final github = HttpGitHubClient(secrets: secrets);
+      final events = SqliteEventLog(
+        database: database,
+        clock: const SystemClock(),
+      );
       final server = await XpdServer.start(
         tokens: TokenService(
           tokens: SqliteDeviceTokenRepository(database),
           clock: const SystemClock(),
         ),
-        events: SqliteEventLog(database: database, clock: const SystemClock()),
+        events: events,
+        projects: ProjectService(
+          repository: SqliteProjectRepository(database),
+          github: github,
+          git: CliGitService(
+            runner: runner,
+            secrets: secrets,
+            dataDir: directory,
+          ),
+          scanner: const ProjectScanner(),
+          sources: DirectoryScanSource.new,
+          runner: runner,
+          events: events,
+          clock: const SystemClock(),
+        ),
         clock: const SystemClock(),
         engineVersion: packageVersion,
         host: host,
@@ -70,6 +98,7 @@ class ServeCommand extends XpdCommand {
       await context.shutdown.first;
       context.out.writeln('xpd shutting down');
       await server.close();
+      github.close();
       return 0;
     });
   }

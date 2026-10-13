@@ -1,0 +1,230 @@
+{
+  "profile": {
+    "layout": "melos",
+    "apps": [
+      {
+        "name": "oneavant_guest_experience",
+        "path": "apps/mobile_app",
+        "framework": "flutter",
+        "version": "1.0.3+33",
+        "storeCountry": "us",
+        "hasIos": true,
+        "hasAndroid": true,
+        "iosPackageManager": "cocoapods",
+        "flavors": [
+          {
+            "name": "dev",
+            "implicit": false,
+            "entrypoint": "lib/main.dart",
+            "iosBundleId": "com.oneavant.guestExperience.dev",
+            "androidAppId": "com.oneavant.guestExperience.dev",
+            "iosTeam": "FAKETEAM04",
+            "iosScheme": "dev",
+            "infoPlist": "apps/mobile_app/ios/Runner/Info.plist",
+            "shorebird": true,
+            "shorebirdAppId": "00000000-0000-4000-8000-0000000000d1",
+            "prod": false,
+            "versionFiles": [
+              "apps/mobile_app/pubspec.yaml"
+            ],
+            "sources": [
+              "gradle",
+              "flavorizr",
+              "xcscheme"
+            ]
+          },
+          {
+            "name": "iniala",
+            "implicit": false,
+            "entrypoint": "lib/main.dart",
+            "iosBundleId": "com.oneavant.guestExperience.iniala",
+            "androidAppId": "com.oneavant.guestExperience.iniala",
+            "iosTeam": "FAKETEAM04",
+            "iosScheme": "iniala",
+            "infoPlist": "apps/mobile_app/ios/Runner/Info.plist",
+            "shorebird": true,
+            "shorebirdAppId": "00000000-0000-4000-8000-0000000000d2",
+            "prod": false,
+            "versionFiles": [
+              "apps/mobile_app/pubspec.yaml"
+            ],
+            "sources": [
+              "gradle",
+              "flavorizr",
+              "xcscheme"
+            ]
+          },
+          {
+            "name": "oneavant",
+            "implicit": false,
+            "entrypoint": "lib/main.dart",
+            "iosBundleId": "com.oneavant.guestExperience",
+            "androidAppId": "com.oneavant.guestExperience",
+            "iosTeam": "FAKETEAM04",
+            "iosScheme": "oneavant",
+            "infoPlist": "apps/mobile_app/ios/Runner/Info.plist",
+            "shorebird": true,
+            "shorebirdAppId": "00000000-0000-4000-8000-0000000000d3",
+            "prod": false,
+            "versionFiles": [
+              "apps/mobile_app/pubspec.yaml"
+            ],
+            "sources": [
+              "gradle",
+              "flavorizr",
+              "xcscheme"
+            ]
+          }
+        ],
+        "plists": [
+          {
+            "path": "apps/mobile_app/ios/Runner/Info.plist",
+            "shortVersion": "$(FLUTTER_BUILD_NAME)",
+            "buildNumber": "$(FLUTTER_BUILD_NUMBER)",
+            "literal": false
+          }
+        ],
+        "keystore": {
+          "propertiesPath": "apps/mobile_app/android/key.properties",
+          "propertiesPresent": false
+        },
+        "shorebird": {
+          "appId": "00000000-0000-4000-8000-0000000000d1",
+          "flavorAppIds": {
+            "dev": "00000000-0000-4000-8000-0000000000d1",
+            "iniala": "00000000-0000-4000-8000-0000000000d2",
+            "oneavant": "00000000-0000-4000-8000-0000000000d3"
+          }
+        }
+      },
+      {
+        "name": "oneavant_guest_tablet",
+        "path": "apps/tablet_app",
+        "framework": "flutter",
+        "version": "0.4.0+7",
+        "storeCountry": "us",
+        "flutterVersion": "3.38.3",
+        "flutterVersionSource": "apps/tablet_app/.fvmrc",
+        "hasIos": true,
+        "hasAndroid": true,
+        "iosPackageManager": "cocoapods",
+        "flavors": [
+          {
+            "name": "dev",
+            "implicit": false,
+            "entrypoint": "lib/main.dart",
+            "iosBundleId": "com.oneavant.guestTablet.dev",
+            "androidAppId": "com.oneavant.guestTablet.dev",
+            "iosTeam": "FAKETEAM04",
+            "iosScheme": "dev",
+            "infoPlist": "apps/tablet_app/ios/Runner/Info.plist",
+            "shorebird": true,
+            "shorebirdAppId": "00000000-0000-4000-8000-0000000000e1",
+            "prod": false,
+            "versionFiles": [
+              "apps/tablet_app/pubspec.yaml"
+            ],
+            "sources": [
+              "gradle",
+              "flavorizr",
+              "xcscheme"
+            ]
+          },
+          {
+            "name": "oneavant",
+            "implicit": false,
+            "entrypoint": "lib/main.dart",
+            "iosBundleId": "com.oneavant.guestTablet",
+            "androidAppId": "com.oneavant.guestTablet",
+            "iosTeam": "FAKETEAM04",
+            "iosScheme": "oneavant",
+            "infoPlist": "apps/tablet_app/ios/Runner/Info.plist",
+            "shorebird": true,
+            "shorebirdAppId": "00000000-0000-4000-8000-0000000000e2",
+            "prod": false,
+            "versionFiles": [
+              "apps/tablet_app/pubspec.yaml"
+            ],
+            "sources": [
+              "gradle",
+              "flavorizr",
+              "xcscheme"
+            ]
+          }
+        ],
+        "plists": [
+          {
+            "path": "apps/tablet_app/ios/Runner/Info.plist",
+            "shortVersion": "$(FLUTTER_BUILD_NAME)",
+            "buildNumber": "$(FLUTTER_BUILD_NUMBER)",
+            "literal": false
+          }
+        ],
+        "keystore": {
+          "propertiesPath": "apps/tablet_app/android/key.properties",
+          "propertiesPresent": false
+        },
+        "shorebird": {
+          "appId": "00000000-0000-4000-8000-0000000000e1",
+          "flavorAppIds": {
+            "dev": "00000000-0000-4000-8000-0000000000e1",
+            "oneavant": "00000000-0000-4000-8000-0000000000e2"
+          }
+        }
+      }
+    ],
+    "branches": {
+      "releaseBranches": []
+    },
+    "workflows": [
+      {
+        "path": "codemagic.yaml",
+        "provider": "codemagic",
+        "names": [
+          "Guest iOS (OneAvant)",
+          "guest-android-oneavant"
+        ]
+      }
+    ]
+  },
+  "findings": [
+    {
+      "severity": "warning",
+      "code": "fvmrc_missing",
+      "message": "There is no .fvmrc, so XPath does not know which Flutter version to build with.",
+      "fix": "Add a .fvmrc with {\"flutter\": \"x.y.z\"} to the app or to the repository root.",
+      "path": "apps/mobile_app/.fvmrc",
+      "app": "apps/mobile_app"
+    },
+    {
+      "severity": "warning",
+      "code": "keystore_properties_missing",
+      "message": "Gradle reads apps/mobile_app/android/key.properties for the release keystore, but the scanned folder has none (it is normally ignored by git).",
+      "fix": "Store the keystore and its passwords in XPath; it writes key.properties into each job's own checkout, never into the repository.",
+      "path": "apps/mobile_app/android/key.properties",
+      "app": "apps/mobile_app"
+    },
+    {
+      "severity": "warning",
+      "code": "keystore_properties_missing",
+      "message": "Gradle reads apps/tablet_app/android/key.properties for the release keystore, but the scanned folder has none (it is normally ignored by git).",
+      "fix": "Store the keystore and its passwords in XPath; it writes key.properties into each job's own checkout, never into the repository.",
+      "path": "apps/tablet_app/android/key.properties",
+      "app": "apps/tablet_app"
+    },
+    {
+      "severity": "info",
+      "code": "no_prod_flavor",
+      "message": "None of the flavors looks like production.",
+      "fix": "Mark the production flavor in the profile.",
+      "app": "apps/mobile_app"
+    },
+    {
+      "severity": "info",
+      "code": "no_prod_flavor",
+      "message": "None of the flavors looks like production.",
+      "fix": "Mark the production flavor in the profile.",
+      "app": "apps/tablet_app"
+    }
+  ]
+}
