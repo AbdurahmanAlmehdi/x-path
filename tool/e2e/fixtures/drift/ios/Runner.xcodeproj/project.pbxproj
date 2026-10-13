@@ -1,0 +1,188 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 54;
+	objects = {
+
+/* Begin PBXNativeTarget section */
+		0000000000000000A0000001 /* Runner */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 0000000000000000A0000002;
+			buildPhases = (
+			);
+			name = Runner;
+			productName = Runner;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		0000000000000000A0000013 /* Project object */ = {
+			isa = PBXProject;
+			buildConfigurationList = 0000000000000000A0000009;
+			targets = (
+				0000000000000000A0000001 /* Runner */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin XCBuildConfiguration section */
+		0000000000000000A0000003 /* Debug-staging */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				INFOPLIST_FILE = Runner/Info.plist;
+				PRODUCT_BUNDLE_IDENTIFIER = com.drift.staging.debug;
+				DEVELOPMENT_TEAM = FAKETEAM05;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = "Debug-staging";
+		};
+		0000000000000000A0000004 /* Profile-staging */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				INFOPLIST_FILE = Runner/Info.plist;
+				PRODUCT_BUNDLE_IDENTIFIER = com.drift.staging;
+				DEVELOPMENT_TEAM = FAKETEAM05;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = "Profile-staging";
+		};
+		0000000000000000A0000005 /* Release-staging */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				INFOPLIST_FILE = Runner/Info.plist;
+				PRODUCT_BUNDLE_IDENTIFIER = com.drift.staging;
+				DEVELOPMENT_TEAM = FAKETEAM05;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = "Release-staging";
+		};
+		0000000000000000A0000006 /* Debug-prod */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				INFOPLIST_FILE = "Runner/Info-Prod.plist";
+				PRODUCT_BUNDLE_IDENTIFIER = "$(APP_BUNDLE_ID)";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = "Debug-prod";
+		};
+		0000000000000000A0000007 /* Profile-prod */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				INFOPLIST_FILE = "Runner/Info-Prod.plist";
+				PRODUCT_BUNDLE_IDENTIFIER = "$(APP_BUNDLE_ID)";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = "Profile-prod";
+		};
+		0000000000000000A0000008 /* Release-prod */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				INFOPLIST_FILE = "Runner/Info-Prod.plist";
+				PRODUCT_BUNDLE_IDENTIFIER = "$(APP_BUNDLE_ID)";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = "Release-prod";
+		};
+		0000000000000000A000000A /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+			};
+			name = Debug;
+		};
+		0000000000000000A000000B /* Profile */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+			};
+			name = Profile;
+		};
+		0000000000000000A000000C /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+			};
+			name = Release;
+		};
+		0000000000000000A000000D /* Debug-staging */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+			};
+			name = "Debug-staging";
+		};
+		0000000000000000A000000E /* Profile-staging */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+			};
+			name = "Profile-staging";
+		};
+		0000000000000000A000000F /* Release-staging */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+			};
+			name = "Release-staging";
+		};
+		0000000000000000A0000010 /* Debug-prod */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+			};
+			name = "Debug-prod";
+		};
+		0000000000000000A0000011 /* Profile-prod */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+			};
+			name = "Profile-prod";
+		};
+		0000000000000000A0000012 /* Release-prod */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+			};
+			name = "Release-prod";
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		0000000000000000A0000002 /* Build configuration list for PBXNativeTarget "Runner" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				0000000000000000A0000003 /* Debug-staging */,
+				0000000000000000A0000004 /* Profile-staging */,
+				0000000000000000A0000005 /* Release-staging */,
+				0000000000000000A0000006 /* Debug-prod */,
+				0000000000000000A0000007 /* Profile-prod */,
+				0000000000000000A0000008 /* Release-prod */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		0000000000000000A0000009 /* Build configuration list for PBXProject "Runner" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				0000000000000000A000000A /* Debug */,
+				0000000000000000A000000B /* Profile */,
+				0000000000000000A000000C /* Release */,
+				0000000000000000A000000D /* Debug-staging */,
+				0000000000000000A000000E /* Profile-staging */,
+				0000000000000000A000000F /* Release-staging */,
+				0000000000000000A0000010 /* Debug-prod */,
+				0000000000000000A0000011 /* Profile-prod */,
+				0000000000000000A0000012 /* Release-prod */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+
+	};
+	rootObject = 0000000000000000A0000013 /* Project object */;
+}

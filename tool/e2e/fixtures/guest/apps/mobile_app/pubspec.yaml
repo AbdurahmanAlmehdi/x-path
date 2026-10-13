@@ -1,0 +1,17 @@
+name: oneavant_guest_experience
+description: Synthetic fixture for the XPath scanner.
+publish_to: none
+
+version: 1.0.3+33
+
+resolution: workspace
+
+environment:
+  sdk: ^3.8.1
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+flutter:
+  uses-material-design: true

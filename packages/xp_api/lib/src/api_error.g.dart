@@ -20,9 +20,12 @@ const _$ApiErrorCodeEnumMap = {
   ApiErrorCode.invalidRequest: 'invalid_request',
   ApiErrorCode.unauthorized: 'unauthorized',
   ApiErrorCode.notFound: 'not_found',
+  ApiErrorCode.conflict: 'conflict',
   ApiErrorCode.resyncRequired: 'resync_required',
   ApiErrorCode.upgradeRequired: 'upgrade_required',
   ApiErrorCode.internal: 'internal',
+  ApiErrorCode.upstreamError: 'upstream_error',
+  ApiErrorCode.secretsLocked: 'secrets_locked',
 };
 
 ErrorResponse _$ErrorResponseFromJson(Map<String, dynamic> json) =>

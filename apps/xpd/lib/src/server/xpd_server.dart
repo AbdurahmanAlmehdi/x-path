@@ -18,6 +18,7 @@ class XpdServer {
   static Future<XpdServer> start({
     required TokenService tokens,
     required EventLog events,
+    required ProjectService projects,
     required Clock clock,
     required String engineVersion,
     String host = '127.0.0.1',
@@ -28,6 +29,7 @@ class XpdServer {
     final handler = buildApiHandler(
       tokens: tokens,
       events: route,
+      projects: projects,
       engineVersion: engineVersion,
       onError: onError,
     );

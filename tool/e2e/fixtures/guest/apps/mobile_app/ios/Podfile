@@ -1,0 +1,17 @@
+platform :ios, '16.0'
+
+project 'Runner', {
+  'Debug-dev' => :debug,
+  'Profile-dev' => :release,
+  'Release-dev' => :release,
+  'Debug-iniala' => :debug,
+  'Profile-iniala' => :release,
+  'Release-iniala' => :release,
+  'Debug-oneavant' => :debug,
+  'Profile-oneavant' => :release,
+  'Release-oneavant' => :release,
+}
+
+target 'Runner' do
+  use_frameworks!
+end

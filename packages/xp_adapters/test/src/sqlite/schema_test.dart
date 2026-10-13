@@ -186,6 +186,28 @@ void main() {
     );
   });
 
+  test('the scan columns of version 2 default to an empty scan', () {
+    insertProject();
+
+    expect(
+      db
+          .select(
+            'SELECT full_name, local_path, github_default_branch, scan, '
+            'findings, scanned_at, edits FROM project',
+          )
+          .single
+          .values,
+      ['', null, '', '{}', '[]', 0, '{}'],
+    );
+    for (final column in ['scan', 'findings', 'edits']) {
+      expect(
+        () => db.execute("UPDATE project SET $column = 'nope'"),
+        throwsA(isA<SqliteException>()),
+        reason: column,
+      );
+    }
+  });
+
   test('enumerated columns refuse unknown values', () {
     expect(
       () => db.execute(

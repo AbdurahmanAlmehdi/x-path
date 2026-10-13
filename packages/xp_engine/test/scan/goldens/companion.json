@@ -1,0 +1,61 @@
+{
+  "profile": {
+    "layout": "single",
+    "apps": [
+      {
+        "name": "logstock_companion_app",
+        "path": ".",
+        "framework": "flutter",
+        "version": "1.3.2+61",
+        "storeCountry": "us",
+        "hasIos": true,
+        "hasAndroid": true,
+        "iosPackageManager": "cocoapods",
+        "flavors": [
+          {
+            "name": "default",
+            "implicit": true,
+            "entrypoint": "lib/main.dart",
+            "iosBundleId": "com.oneavant.logstockCompanionApp",
+            "androidAppId": "com.oneavant.logstockCompanionApp",
+            "iosTeam": "FAKETEAM03",
+            "infoPlist": "ios/Runner/Info.plist",
+            "shorebird": false,
+            "prod": true,
+            "versionFiles": [
+              "pubspec.yaml"
+            ],
+            "sources": []
+          }
+        ],
+        "plists": [
+          {
+            "path": "ios/Runner/Info.plist",
+            "shortVersion": "$(FLUTTER_BUILD_NAME)",
+            "buildNumber": "$(FLUTTER_BUILD_NUMBER)",
+            "literal": false
+          }
+        ],
+        "keystore": {
+          "propertiesPath": "android/key.properties",
+          "propertiesPresent": true,
+          "storeFile": "fixture-release.jks"
+        }
+      }
+    ],
+    "branches": {
+      "releaseBranches": []
+    },
+    "workflows": []
+  },
+  "findings": [
+    {
+      "severity": "warning",
+      "code": "fvmrc_missing",
+      "message": "There is no .fvmrc, so XPath does not know which Flutter version to build with.",
+      "fix": "Add a .fvmrc with {\"flutter\": \"x.y.z\"} to the app or to the repository root.",
+      "path": ".fvmrc",
+      "app": "."
+    }
+  ]
+}

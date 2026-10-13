@@ -1,0 +1,15 @@
+flavors:
+  dev:
+    app:
+      name: "Dev"
+    android:
+      applicationId: "com.oneavant.guestTablet.dev"
+    ios:
+      bundleId: "com.oneavant.guestTablet.dev"
+  oneavant:
+    app:
+      name: "Oneavant"
+    android:
+      applicationId: "com.oneavant.guestTablet"
+    ios:
+      bundleId: "com.oneavant.guestTablet"

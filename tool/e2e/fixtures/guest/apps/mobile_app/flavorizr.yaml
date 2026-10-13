@@ -1,0 +1,22 @@
+flavors:
+  dev:
+    app:
+      name: "Dev"
+    android:
+      applicationId: "com.oneavant.guestExperience.dev"
+    ios:
+      bundleId: "com.oneavant.guestExperience.dev"
+  iniala:
+    app:
+      name: "Iniala"
+    android:
+      applicationId: "com.oneavant.guestExperience.iniala"
+    ios:
+      bundleId: "com.oneavant.guestExperience.iniala"
+  oneavant:
+    app:
+      name: "Oneavant"
+    android:
+      applicationId: "com.oneavant.guestExperience"
+    ios:
+      bundleId: "com.oneavant.guestExperience"

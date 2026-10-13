@@ -4,6 +4,7 @@ import 'package:xp_api/xp_api.dart';
 import 'package:xp_engine/xp_engine.dart';
 import 'package:xpd/src/api/events_route.dart';
 import 'package:xpd/src/api/middleware.dart';
+import 'package:xpd/src/api/projects/projects_routes.dart';
 import 'package:xpd/src/api/responses.dart';
 import 'package:xpd/src/api/system_routes.dart';
 
@@ -18,6 +19,7 @@ const publicPaths = {'/health', '/version'};
 Handler buildApiHandler({
   required TokenService tokens,
   required EventsRoute events,
+  required ProjectService projects,
   required String engineVersion,
   void Function(Object error, StackTrace stackTrace)? onError,
 }) {
@@ -31,6 +33,7 @@ Handler buildApiHandler({
         ..get('/health', health)
         ..get('/version', version(engineVersion))
         ..get('/events', events.handle);
+  ProjectsRoutes(projects).addTo(router);
   return const Pipeline()
       .addMiddleware(errorMiddleware(onError: onError))
       .addMiddleware(authMiddleware(tokens, publicPaths: publicPaths))
