@@ -104,12 +104,20 @@ dart run apps/xpd/bin/xpd.dart serve                                      # http
   receive what was missed. [`packages/xp_api/openapi.yaml`](packages/xp_api/openapi.yaml)
   documents the API.
 
-The data directory holds `tokens.json` for now (the database arrives in Phase 3). It is
+The data directory holds the SQLite database, `xpath.db` (ADR 0002). It is
 `--data-dir`, else `$XPATH_DATA_DIR`, else `~/Library/Application Support/XPath` on macOS or
 `$XDG_DATA_HOME/xpath` (`~/.local/share/xpath`) on Linux.
 
+The database (`packages/xp_adapters/lib/src/sqlite`) is opened with WAL, a busy timeout and foreign
+keys, through one connection per process. Its schema is the ordered list in `migrations.dart`,
+tracked by `PRAGMA user_version`; each migration runs in a transaction. Before an existing
+database is migrated, `xpd` copies it to `xpath.db.bak-v<old version>`. A migration is never
+edited once released: add a new one and a golden `test/src/sqlite/snapshots/v<N>.sql`
+(`UPDATE_GOLDENS=1 dart test test/src/sqlite/migrations_test.dart` writes it). Events older than
+seven days are pruned; their sequence numbers are never reused.
+
 `tool/e2e/smoke_bundle.sh` builds the `xpd` AOT bundle with `dart build cli`, starts it on a free
-port with a temporary data directory and checks `/health`, the token guard and a clean shutdown.
+port with a temporary data directory and checks `/health`, the database, the token guard and a clean shutdown.
 
 ## Testing
 

@@ -5,8 +5,8 @@ import 'package:crypto/crypto.dart';
 import 'package:equatable/equatable.dart';
 import 'package:xp_api/xp_api.dart';
 import 'package:xp_engine/src/clock/clock.dart';
+import 'package:xp_engine/src/repositories/device_token_repository.dart';
 import 'package:xp_engine/src/tokens/device_token.dart';
-import 'package:xp_engine/src/tokens/device_token_repository.dart';
 
 /// The hex SHA-256 of a token [secret]: what the engine stores.
 ///
