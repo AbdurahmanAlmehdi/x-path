@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>4 · macOS notification</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="ds/xpath/assets/Handoff/xp-tokens.css">
+<link rel="stylesheet" href="ds/xpath/components/bundle.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&amp;family=IBM+Plex+Mono:wght@400;500;600&amp;display=swap">
+<style>
+body{margin:0}
+:root{--font-sans:var(--xp-font-sans);--font-mono:var(--xp-font-mono)}
+.win{display:flex;overflow:hidden;background:var(--xp-color-surface-window);color:var(--xp-color-text-primary);font-family:var(--xp-font-sans);font-size:13px;line-height:20px;-webkit-font-smoothing:antialiased;position:relative}
+.win *{box-sizing:border-box}
+.main{flex:1;min-width:0;display:flex;flex-direction:column;min-height:0}
+.th{font:var(--xp-type-label);letter-spacing:.06em;text-transform:uppercase;color:var(--xp-color-text-secondary);font-weight:500}
+a{color:var(--xp-color-text-link);text-decoration:none}a:hover{color:var(--xp-color-accent-hover)}
+button{font-family:inherit}
+</style>
+</helmet>
+<div class="win" data-theme="light" style="width:440px;height:170px;background:var(--xp-color-surface-sunken);padding:0;flex-direction:column;"><div style="padding:24px 28px;display:flex;flex-direction:column;gap:14px;align-items:flex-end">
+<div role="alert" style="width:372px;padding:12px 14px;border-radius:14px;background:var(--xp-color-surface-overlay);border:1px solid var(--xp-color-border-default);box-shadow:var(--xp-elevation-2);display:flex;gap:12px;align-items:flex-start">
+<div style="width:38px;height:38px;border-radius:9px;background:var(--xp-color-surface-inverse);display:flex;align-items:center;justify-content:center;flex:none"><img src="/_blob/57ff05f707497ff0db0f4dc22653ba90" alt="" style="width:28px;height:auto"></img></div><div class="col" style="gap:2px;flex:1;min-width:0">
+<div class="row"><b style="font-size:13px">XPath</b><span class="sp"></span><span class="c2" style="font-size:12px">now</span></div>
+<span style="font-weight:600;font-size:13px">Claude Code asks to submit 5.4.1 (3283)</span>
+<span class="c2" style="font-size:12px;line-height:16px">App Store · mataa_new_app prod · 9a3bc0d · expires in 23h 51m</span>
+<div class="row g8" style="margin-top:8px"><button type="button" class="xp-btn secondary sm xp-f">Review…</button><button type="button" class="xp-btn tertiary sm xp-f">Later</button></div></div></div></div></div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":440,"height":170}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

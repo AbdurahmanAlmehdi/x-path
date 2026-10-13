@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>1 · Optional variant · store vitals (not in engine data)</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="ds/xpath/assets/Handoff/xp-tokens.css">
+<link rel="stylesheet" href="ds/xpath/components/bundle.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&amp;family=IBM+Plex+Mono:wght@400;500;600&amp;display=swap">
+<style>
+body{margin:0}
+:root{--font-sans:var(--xp-font-sans);--font-mono:var(--xp-font-mono)}
+.win{display:flex;overflow:hidden;background:var(--xp-color-surface-window);color:var(--xp-color-text-primary);font-family:var(--xp-font-sans);font-size:13px;line-height:20px;-webkit-font-smoothing:antialiased;position:relative}
+.win *{box-sizing:border-box}
+.main{flex:1;min-width:0;display:flex;flex-direction:column;min-height:0}
+.th{font:var(--xp-type-label);letter-spacing:.06em;text-transform:uppercase;color:var(--xp-color-text-secondary);font-weight:500}
+a{color:var(--xp-color-text-link);text-decoration:none}a:hover{color:var(--xp-color-accent-hover)}
+button{font-family:inherit}
+</style>
+</helmet>
+<div class="win" data-theme="light" style="width:1208px;height:400px;background:var(--xp-color-surface-window);padding:0;flex-direction:column;"><div style="padding:24px;display:flex;flex-direction:column;gap:12px">
+<div class="row g12"><b style="font-size:15px">Ledger with store vitals</b><span style="display:inline-flex;align-items:center;gap:6px;height:20px;padding:0 6px;border:1px dashed var(--xp-color-border-strong);border-radius:3px;font:500 10px/1 var(--xp-font-mono);letter-spacing:.06em;text-transform:uppercase;color:var(--xp-color-text-secondary);white-space:nowrap">Optional · needs store analytics the engine does not return</span></div>
+<p class="c2" style="margin:0;max-width:820px">Adoption by version and crash-free users would make the forced-update decision obvious, but §7 has no field for either. Values below are placeholders.</p>
+<section class="xp-panel" style="overflow:hidden"><table class="xp-ledger"><thead><tr><th class="xp-type-label">Flavor</th><th class="xp-type-label">Live · App Store</th><th class="xp-type-label">Live · Google Play</th><th class="xp-type-label">Patches</th></tr></thead><tbody>
+<tr><td><div class="col g2"><span class="xp-type-title-sm">prod</span><span class="xp-type-code c2" style="font-size:11px">com.sixdtec.mata · com.mataaa</span></div></td>
+<td><div class="xp-vc"><span class="v">5.3.6</span><span class="s"><span class="xp-st xp-p-positive sm"><svg class="xp-ic" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M128,24A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24Zm0,192a88,88,0,1,1,88-88A88.1,88.1,0,0,1,128,216Zm0-144a56,56,0,1,0,56,56A56.06,56.06,0,0,0,128,72Zm0,96a40,40,0,1,1,40-40A40,40,0,0,1,128,168Z"></path></svg>Ready for sale</span></span></div><div class="col g4" style="margin-top:8px;padding:6px 8px;border:1px dashed var(--xp-color-border-strong);border-radius:3px"><div class="row" style="font-size:12px"><span class="c2" style="width:84px">Adoption</span><span class="xp-type-code">[N]% of users</span></div><div class="row" style="font-size:12px"><span class="c2" style="width:84px">Crash-free</span><span class="xp-type-code">[N]%</span></div></div></td>
+<td><div class="xp-vc"><span class="v">5.3.7</span><span class="s"><span class="xp-st xp-p-positive sm"><svg class="xp-ic" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M128,24A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24Zm0,192a88,88,0,1,1,88-88A88.1,88.1,0,0,1,128,216Zm0-144a56,56,0,1,0,56,56A56.06,56.06,0,0,0,128,72Zm0,96a40,40,0,1,1,40-40A40,40,0,0,1,128,168Z"></path></svg>Published</span></span></div><div class="col g4" style="margin-top:8px;padding:6px 8px;border:1px dashed var(--xp-color-border-strong);border-radius:3px"><div class="row" style="font-size:12px"><span class="c2" style="width:84px">Adoption</span><span class="xp-type-code">[N]% of users</span></div><div class="row" style="font-size:12px"><span class="c2" style="width:84px">Crash-free</span><span class="xp-type-code">[N]%</span></div></div></td>
+<td><span class="xp-type-code">p1 · p2</span><div class="c2" style="font-size:12px">p2 on [N]% of 5.3.7</div></td></tr>
+</tbody></table></section></div></div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1208,"height":400}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

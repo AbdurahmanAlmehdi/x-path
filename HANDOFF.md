@@ -24,9 +24,9 @@ The source of truth is [docs/plan/2026-10-13-feat-xpath-release-tool-plan.md](do
     - `user-flow-gaps.md`: proposed defaults, now folded into the plan.
   - The plan was reviewed by three agents (simplicity, VGV and scope splitting), and their findings are applied.
   - The brainstorm is in `docs/brainstorm/`.
-- **Design:** `docs/design/PRODUCT.md` (the product brief) and four prompts in `docs/design/prompts/`. The owner runs those in a separate design tool.
-  - The results (visual direction, `tokens.json`, screen concepts, icon) come back into `docs/design/`.
-  - They gate only Phases 15–17 (the desktop UI) and 18b–18c (icon, Sparkle).
+- **Design system (Run Sheet direction) is in:** `docs/design/system/project/` (README, guides, `assets/Handoff/xp_tokens.dart`, `xp-tokens.json`, `xp-tokens.css`; source https://claude.ai/artifact/Ro9wMV4KEsUyG2vdoekip6). Fonts IBM Plex Sans/Mono, icons Phosphor via `phosphor_flutter`.
+- **Design is done:** [docs/design/DECISIONS.md](docs/design/DECISIONS.md) is the source of truth for the desktop UI. It covers the chosen concepts (1A Run Sheet ledger, 2A Graph over log, 3A Two swimlanes) and the behaviour those frames fix. The screen frames are in `docs/design/screens/project/`, and the app icon and logo (light and dark) in `docs/design/brand/`.
+  - Still missing before Phase 18b–18c: a transparent one-colour symbol, Icon Composer layers, a menu-bar template image and a favicon. See DECISIONS.md.
 - **Repo state:** this folder is a fresh `git init` on `main` with no commits. No GitHub repo exists yet.
 - **No code has been written.** Every phase has `Status: Not started`.
 
@@ -64,7 +64,8 @@ The source of truth is [docs/plan/2026-10-13-feat-xpath-release-tool-plan.md](do
    - a phase needs a decision the plan does not cover;
    - an ADR contradicts a D-xx decision;
    - anything would touch the Mataa or oneavant repos;
-   - Phase 15 starts and `docs/design/tokens.json` or a chosen direction does not exist yet. In that case, skip ahead to the next non-UI phase.
+   - a UI phase needs something the design frames or the design system don't cover;
+   - Phase 18b–18c needs the transparent symbol or the Icon Composer layers listed in DECISIONS.md.
 5. **Prerequisites the owner provides later:**
    - a Developer ID Application certificate on team AFBD5TBR5U (before Phase 18b);
    - API keys and service accounts (before Phase 19).
