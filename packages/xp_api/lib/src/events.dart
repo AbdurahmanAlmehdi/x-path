@@ -1,4 +1,5 @@
 import 'package:equatable/equatable.dart';
+import 'package:xp_api/src/job.dart';
 
 /// WebSocket close code of an `/events` stream whose cursor can no longer be
 /// resumed. The HTTP counterpart is `409 resync_required`.
@@ -30,6 +31,17 @@ sealed class EngineEvent extends Equatable {
     ),
     ProjectRemoved.eventType => ProjectRemoved(
       projectId: payload['projectId'] as String,
+    ),
+    JobStateChanged.eventType => JobStateChanged(
+      jobId: payload['jobId'] as String,
+      projectId: payload['projectId'] as String,
+      state: JobState.values.firstWhere((s) => s.wire == payload['state']),
+    ),
+    JobStepChanged.eventType => JobStepChanged(
+      jobId: payload['jobId'] as String,
+      ordinal: payload['ordinal'] as int,
+      kind: payload['kind'] as String,
+      state: StepState.values.byName(payload['state'] as String),
     ),
     _ => UnknownEvent(type: type, payload: payload),
   };
@@ -170,6 +182,81 @@ final class ProjectRemoved extends EngineEvent {
 
   @override
   List<Object?> get props => [projectId];
+}
+
+/// A job was created, started, ended, or moved to another state.
+final class JobStateChanged extends EngineEvent {
+  /// Creates the event.
+  const new({
+    required this.jobId,
+    required this.projectId,
+    required this.state,
+  });
+
+  /// The wire name of this event.
+  static const eventType = 'job.state_changed';
+
+  /// The job.
+  final String jobId;
+
+  /// The project the job runs for.
+  final String projectId;
+
+  /// The state the job is in now.
+  final JobState state;
+
+  @override
+  String get type => eventType;
+
+  @override
+  Map<String, dynamic> get payload => {
+    'jobId': jobId,
+    'projectId': projectId,
+    'state': state.wire,
+  };
+
+  @override
+  List<Object?> get props => [jobId, projectId, state];
+}
+
+/// A step of a job moved to another state.
+final class JobStepChanged extends EngineEvent {
+  /// Creates the event.
+  const new({
+    required this.jobId,
+    required this.ordinal,
+    required this.kind,
+    required this.state,
+  });
+
+  /// The wire name of this event.
+  static const eventType = 'job.step_changed';
+
+  /// The job.
+  final String jobId;
+
+  /// The step's position in the job, from 0.
+  final int ordinal;
+
+  /// The step type.
+  final String kind;
+
+  /// The state the step is in now.
+  final StepState state;
+
+  @override
+  String get type => eventType;
+
+  @override
+  Map<String, dynamic> get payload => {
+    'jobId': jobId,
+    'ordinal': ordinal,
+    'kind': kind,
+    'state': state.name,
+  };
+
+  @override
+  List<Object?> get props => [jobId, ordinal, kind, state];
 }
 
 /// An event whose type this client does not know.

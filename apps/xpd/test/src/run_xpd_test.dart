@@ -430,5 +430,173 @@ void main() {
       expect(code, 1);
       expect(err.toString(), startsWith('xpd: '));
     });
+
+    test('refuses to start without perl, which process groups need', () async {
+      final empty = Directory('${root.path}/empty')..createSync();
+
+      final code = await run(
+        ['serve', '--port', '0', '--data-dir', dataDir],
+        environment: {'PATH': empty.path},
+      );
+
+      expect(code, 1);
+      expect(err.toString(), allOf(startsWith('xpd: '), contains('perl')));
+      expect(out.toString(), isNot(contains('listening')));
+    });
+
+    group('jobs left running by an engine that stopped', () {
+      final environment = {'PATH': Platform.environment['PATH']!};
+
+      /// Seeds a job in the state a crash leaves it in: `running`, its step
+      /// `running` too.
+      Future<void> seedJob(
+        String id,
+        String executable,
+        List<String> args, {
+        bool sideEffect = false,
+      }) async {
+        Directory(dataDir).createSync(recursive: true);
+        await withDatabase((database) async {
+          final connection = database.connection;
+          if (connection
+              .select("SELECT 1 FROM workflow_version WHERE id = 'wfv_1'")
+              .isEmpty) {
+            connection
+              ..execute(
+                'INSERT INTO project (id, github_repo_id, remote, '
+                "default_base_branch) VALUES ('prj_1', 1, 'r', 'main')",
+              )
+              ..execute(
+                'INSERT INTO workflow (id, project_id, name) '
+                "VALUES ('wf_1', 'prj_1', 'w')",
+              )
+              ..execute(
+                'INSERT INTO workflow_version (id, workflow_id, version, yaml) '
+                "VALUES ('wfv_1', 'wf_1', 1, '')",
+              );
+          }
+          final plan = StepPlan.of(
+            const CommandStep(),
+            CommandInput(
+              ProcessCommand(executable, arguments: args),
+              sideEffect: sideEffect,
+            ),
+          );
+          await SqliteJobRepository(database).create(
+            JobRecord(
+              id: id,
+              workflowVersionId: 'wfv_1',
+              projectId: 'prj_1',
+              state: JobState.running,
+              createdAt: DateTime.utc(2026, 10, 13),
+            ),
+            [
+              StepRecord(
+                jobId: id,
+                ordinal: 0,
+                kind: plan.kind,
+                sideEffect: plan.sideEffect,
+                input: plan.input,
+                state: StepState.running,
+                attempts: 1,
+              ),
+            ],
+          );
+        });
+      }
+
+      Future<Job> readJob(String id) => withDatabase((database) async {
+        final repository = SqliteJobRepository(database);
+        final job = (await repository.get(id))!;
+        return toJob(job, await repository.steps(id));
+      });
+
+      test('are recovered: simple ones run again, risky ones wait', () async {
+        await seedJob('job_plain', 'sh', ['-c', 'echo recovered']);
+        await seedJob('job_risky', 'sh', [
+          '-c',
+          'echo never',
+        ], sideEffect: true);
+        final exit = run([
+          'serve',
+          '--port',
+          '0',
+          '--data-dir',
+          dataDir,
+        ], environment: environment);
+        final uri = await startServing(exit);
+        final secret = await withDatabase(
+          (database) async => (await TokenService(
+            tokens: SqliteDeviceTokenRepository(database),
+            clock: const SystemClock(),
+          ).issue(name: 'late', kind: DeviceTokenKind.app)).secret,
+        );
+
+        Future<Job> fetch(String id) async {
+          final client = HttpClient();
+          try {
+            final request = await client.getUrl(uri.resolve('/jobs/$id'))
+              ..headers.set('authorization', 'Bearer $secret');
+            final response = await request.close();
+            return Job.fromJson(
+              jsonDecode(await utf8.decodeStream(response))
+                  as Map<String, dynamic>,
+            );
+          } finally {
+            client.close(force: true);
+          }
+        }
+
+        var plain = await fetch('job_plain');
+        for (var i = 0; i < 200 && plain.state != JobState.succeeded; i++) {
+          await Future<void>.delayed(const Duration(milliseconds: 25));
+          plain = await fetch('job_plain');
+        }
+        final risky = await fetch('job_risky');
+
+        expect(plain.state, JobState.succeeded);
+        expect(plain.steps.single.attempts, 2);
+        expect(risky.state, JobState.waitingForResume);
+        expect(risky.steps.single.state, StepState.interrupted);
+        expect(out.toString(), contains('resuming interrupted job job_plain'));
+        expect(err.toString(), contains('job job_risky was interrupted'));
+        expect(
+          File('$dataDir/logs/job_plain/0-command.log').readAsStringSync(),
+          contains('recovered'),
+        );
+
+        shutdown.add(null);
+        expect(await exit, 0);
+      }, tags: 'process');
+
+      test('are interrupted, not lost, when the engine stops', () async {
+        await seedJob('job_long', 'sleep', ['300']);
+        final exit = run([
+          'serve',
+          '--port',
+          '0',
+          '--data-dir',
+          dataDir,
+        ], environment: environment);
+        await startServing(exit);
+        // Wait for the resumed job to be running its process.
+        late Job job;
+        for (var i = 0; i < 200; i++) {
+          job = await readJob('job_long');
+          if (job.steps.single.attempts == 2) break;
+          await Future<void>.delayed(const Duration(milliseconds: 25));
+        }
+        expect(job.steps.single.attempts, 2);
+
+        shutdown.add(null);
+        expect(await exit, 0);
+
+        job = await readJob('job_long');
+        expect(job.state, JobState.interrupted);
+        expect(job.steps.single.state, StepState.interrupted);
+        final left = Process.runSync('pgrep', ['-f', 'sleep 300']);
+        expect(left.exitCode, isNot(0), reason: 'the process must be gone');
+      }, tags: 'process');
+    });
   });
 }

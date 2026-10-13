@@ -1,4 +1,5 @@
 import 'package:test/test.dart';
+import 'package:xp_engine/xp_engine.dart';
 import 'package:xp_secrets/xp_secrets.dart';
 
 const _pem =
@@ -301,6 +302,20 @@ void main() {
           .toList();
 
       expect(out, isEmpty);
+    });
+  });
+
+  group('as an OutputMasker', () {
+    test('masks, through a stream per output stream, what it learned', () {
+      final OutputMasker masker = SecretMasker()..add('hunter2hunter2');
+      final stdout = masker.newStream();
+      final stderr = masker.newStream();
+
+      expect(stdout.add('log hunter'), 'log ');
+      expect(stderr.add('plain hunter2hunter2 x'), 'plain *** x');
+      expect(stdout.add('2hunter2 ok'), '*** ok');
+      expect(stdout.flush(), isEmpty);
+      expect(stderr.flush(), isEmpty);
     });
   });
 }
