@@ -30,6 +30,15 @@ abstract interface class GitHubClient {
   /// The pull request [number] of [repo].
   Future<GitHubPullRequest> getPullRequest(GitHubRepo repo, int number);
 
+  /// The open pull request of [repo] from the branch [head] into [base], or
+  /// `null` if there is none. Opening a pull request that exists is an error
+  /// at GitHub, so a step asks first.
+  Future<GitHubPullRequest?> findPullRequest(
+    GitHubRepo repo, {
+    required String head,
+    required String base,
+  });
+
   /// Merges the pull request [number] of [repo] with [method].
   ///
   /// If [expectedHeadSha] is given and the head has moved since, GitHub

@@ -383,6 +383,7 @@ void main() {
           'guard',
           'version.bump',
           'guard',
+          'guard',
           'gate',
           'git.releaseBranch',
         ]);
@@ -398,6 +399,7 @@ void main() {
           'git.tag',
           'gate',
           'git.push',
+          'github.createPr',
         ]);
         expect((await harness.input(tag, 'gate'))['action'], 'push');
         expect(await harness.input(tag, 'git.tag'), {

@@ -11,6 +11,7 @@ RunContext _run({
   AppVersion? version,
   AppVersion? current,
   AppVersion? release,
+  String? releaseId,
 }) => RunContext(
   runId: 'run_1',
   project: demoProject(),
@@ -29,6 +30,7 @@ RunContext _run({
   current: current,
   releaseVersion: release,
   patch: release == null ? null : 2,
+  release: releaseId,
 );
 
 StepPlanning _planning(Map<String, Object?> values) => StepPlanning(
@@ -63,6 +65,7 @@ void main() {
         },
         'ref': 'main',
         'sha': 'a' * 40,
+        'release': null,
         'version': '1.2.4',
         'build': 9,
         'bump': 'keep',
@@ -72,6 +75,11 @@ void main() {
         'flavors': ['dev', 'prod'],
         'inputs': {'notes': 'hi'},
       });
+    });
+
+    test('shows the release a run belongs to', () {
+      expect(_run(releaseId: 'rel_1').scope['release'], 'rel_1');
+      expect(_run().scope['release'], isNull);
     });
 
     test('shows the release a patch applies to', () {

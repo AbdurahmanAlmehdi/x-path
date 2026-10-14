@@ -33,6 +33,11 @@ StepRegistry allSteps({
     GitReleaseBranchStep(service),
     GitTagStep(service),
     GitPushStep(service),
+    GitHubCreatePrStep(FakeGitHubClient({})),
+    GitHubMergePrStep(
+      github: FakeGitHubClient({}),
+      releases: InMemoryReleaseRepository(),
+    ),
     VersionBumpStep(git: service, workspaces: workspace),
     BuildAndroidStep(
       toolchain: harness.toolchain,

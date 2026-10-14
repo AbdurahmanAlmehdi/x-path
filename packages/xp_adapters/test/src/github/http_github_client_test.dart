@@ -352,6 +352,54 @@ void main() {
       );
     });
 
+    test(
+      'findPullRequest asks for the open pull request of the branches',
+      () async {
+        final client = clientAnswering((_) => _json([_prJson()]));
+
+        final found = await client.findPullRequest(
+          _repo,
+          head: 'release/1.0',
+          base: 'main',
+        );
+
+        expect(found!.number, 7);
+        expect(found.headRef, 'release/1.0');
+        final url = requests.single.url;
+        expect(requests.single.method, 'GET');
+        expect(url.path, '/repos/acme/app/pulls');
+        expect(url.queryParameters, {
+          'head': 'acme:release/1.0',
+          'base': 'main',
+          'state': 'open',
+        });
+      },
+    );
+
+    test('findPullRequest is null when there is none', () async {
+      final client = clientAnswering((_) => _json(<Object>[]));
+
+      expect(
+        await client.findPullRequest(_repo, head: 'release/1.0', base: 'main'),
+        isNull,
+      );
+    });
+
+    test('findPullRequest rejects an answer that is not a list', () async {
+      final client = clientAnswering((_) => _json(_prJson()));
+
+      await expectLater(
+        client.findPullRequest(_repo, head: 'release/1.0', base: 'main'),
+        throwsA(
+          isA<GitHubException>().having(
+            (e) => e.message,
+            'message',
+            contains('not a JSON array'),
+          ),
+        ),
+      );
+    });
+
     test('mergePullRequest merges with a merge commit by default', () async {
       final client = clientAnswering(
         (_) => _json({'sha': 'mergesha', 'merged': true, 'message': 'Merged'}),

@@ -10,6 +10,7 @@ export 'src/api/jobs/job_logs_route.dart';
 export 'src/api/jobs/jobs_routes.dart';
 export 'src/api/middleware.dart';
 export 'src/api/projects/projects_routes.dart';
+export 'src/api/releases/releases_routes.dart';
 export 'src/api/request_body.dart';
 export 'src/api/responses.dart';
 export 'src/api/runs/runs_routes.dart';

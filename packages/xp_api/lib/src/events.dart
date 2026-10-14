@@ -3,6 +3,7 @@ import 'package:xp_api/src/approval.dart';
 import 'package:xp_api/src/credential.dart';
 import 'package:xp_api/src/device_token_kind.dart';
 import 'package:xp_api/src/job.dart';
+import 'package:xp_api/src/release.dart';
 
 /// WebSocket close code of an `/events` stream whose cursor can no longer be
 /// resumed. The HTTP counterpart is `409 resync_required`.
@@ -124,6 +125,28 @@ sealed class EngineEvent extends Equatable {
       projectId: payload['projectId'] as String,
       gates: (payload['gates'] as Map<String, dynamic>).cast<String, bool>(),
       changedBy: DeviceTokenKind.values.byName(payload['changedBy'] as String),
+    ),
+    ReleaseCreated.eventType => ReleaseCreated(
+      releaseId: payload['releaseId'] as String,
+      projectId: payload['projectId'] as String,
+      flavor: payload['flavor'] as String,
+      version: payload['version'] as String,
+      build: payload['build'] as int,
+    ),
+    ReleaseStateChanged.eventType => ReleaseStateChanged(
+      releaseId: payload['releaseId'] as String,
+      projectId: payload['projectId'] as String,
+      from: ReleaseState.values.firstWhere((s) => s.wire == payload['from']),
+      to: ReleaseState.values.firstWhere((s) => s.wire == payload['to']),
+    ),
+    ReleaseStoreChanged.eventType => ReleaseStoreChanged(
+      releaseId: payload['releaseId'] as String,
+      projectId: payload['projectId'] as String,
+      store: ReleaseStore.values.firstWhere((s) => s.wire == payload['store']),
+      state: StoreState.values.firstWhere((s) => s.wire == payload['state']),
+      source: StatusSource.values.firstWhere(
+        (s) => s.wire == payload['source'],
+      ),
     ),
     _ => UnknownEvent(type: type, payload: payload),
   };
@@ -842,6 +865,136 @@ final class ProjectGatesChanged extends EngineEvent {
 
   @override
   List<Object?> get props => [projectId, gates, changedBy];
+}
+
+/// A release was dispatched: a new release of a flavor, in state `draft`.
+final class ReleaseCreated extends EngineEvent {
+  /// Creates the event.
+  const new({
+    required this.releaseId,
+    required this.projectId,
+    required this.flavor,
+    required this.version,
+    required this.build,
+  });
+
+  /// The wire name of this event.
+  static const eventType = 'release.created';
+
+  /// The release.
+  final String releaseId;
+
+  /// The project.
+  final String projectId;
+
+  /// The flavor.
+  final String flavor;
+
+  /// The marketing version, `x.y.z`.
+  final String version;
+
+  /// The build number.
+  final int build;
+
+  @override
+  String get type => eventType;
+
+  @override
+  Map<String, dynamic> get payload => {
+    'releaseId': releaseId,
+    'projectId': projectId,
+    'flavor': flavor,
+    'version': version,
+    'build': build,
+  };
+
+  @override
+  List<Object?> get props => [releaseId, projectId, flavor, version, build];
+}
+
+/// A release moved to another state (D-17).
+final class ReleaseStateChanged extends EngineEvent {
+  /// Creates the event.
+  const new({
+    required this.releaseId,
+    required this.projectId,
+    required this.from,
+    required this.to,
+  });
+
+  /// The wire name of this event.
+  static const eventType = 'release.state_changed';
+
+  /// The release.
+  final String releaseId;
+
+  /// The project.
+  final String projectId;
+
+  /// The state it was in.
+  final ReleaseState from;
+
+  /// The state it is in now.
+  final ReleaseState to;
+
+  @override
+  String get type => eventType;
+
+  @override
+  Map<String, dynamic> get payload => {
+    'releaseId': releaseId,
+    'projectId': projectId,
+    'from': from.wire,
+    'to': to.wire,
+  };
+
+  @override
+  List<Object?> get props => [releaseId, projectId, from, to];
+}
+
+/// The status of a release in one store changed.
+final class ReleaseStoreChanged extends EngineEvent {
+  /// Creates the event.
+  const new({
+    required this.releaseId,
+    required this.projectId,
+    required this.store,
+    required this.state,
+    required this.source,
+  });
+
+  /// The wire name of this event.
+  static const eventType = 'release.store_changed';
+
+  /// The release.
+  final String releaseId;
+
+  /// The project.
+  final String projectId;
+
+  /// Which store.
+  final ReleaseStore store;
+
+  /// Where the release is in it now.
+  final StoreState state;
+
+  /// Where that came from.
+  final StatusSource source;
+
+  @override
+  String get type => eventType;
+
+  @override
+  Map<String, dynamic> get payload => {
+    'releaseId': releaseId,
+    'projectId': projectId,
+    'store': store.wire,
+    'state': state.wire,
+    'source': source.wire,
+  };
+
+  @override
+  List<Object?> get props => [releaseId, projectId, store, state, source];
 }
 
 /// An event whose type this client does not know.

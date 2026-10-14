@@ -133,6 +133,26 @@ void main() {
           gates: {'prod_release': true, 'push': false},
           changedBy: DeviceTokenKind.app,
         ),
+        const ReleaseCreated(
+          releaseId: 'rel_1',
+          projectId: 'prj_1',
+          flavor: 'prod',
+          version: '1.2.0',
+          build: 45,
+        ),
+        const ReleaseStateChanged(
+          releaseId: 'rel_1',
+          projectId: 'prj_1',
+          from: ReleaseState.inReview,
+          to: ReleaseState.approved,
+        ),
+        const ReleaseStoreChanged(
+          releaseId: 'rel_1',
+          projectId: 'prj_1',
+          store: ReleaseStore.apple,
+          state: StoreState.inReview,
+          source: StatusSource.api,
+        ),
       ]) {
         final sequenced = SequencedEvent(seq: 9, at: at, event: event);
 
@@ -179,6 +199,9 @@ void main() {
         ApprovalDecided() => 'decided',
         ApprovalExpired() => 'approval expired',
         ProjectGatesChanged() => 'gates',
+        ReleaseCreated() => 'release created',
+        ReleaseStateChanged() => 'release state',
+        ReleaseStoreChanged() => 'release store',
         UnknownEvent() => 'unknown',
       };
 
@@ -340,6 +363,41 @@ void main() {
           ),
         ),
         'gates',
+      );
+      expect(
+        describe(
+          const ReleaseCreated(
+            releaseId: 'r',
+            projectId: 'p',
+            flavor: 'prod',
+            version: '1.0.0',
+            build: 1,
+          ),
+        ),
+        'release created',
+      );
+      expect(
+        describe(
+          const ReleaseStateChanged(
+            releaseId: 'r',
+            projectId: 'p',
+            from: ReleaseState.live,
+            to: ReleaseState.merged,
+          ),
+        ),
+        'release state',
+      );
+      expect(
+        describe(
+          const ReleaseStoreChanged(
+            releaseId: 'r',
+            projectId: 'p',
+            store: ReleaseStore.play,
+            state: StoreState.live,
+            source: StatusSource.manual,
+          ),
+        ),
+        'release store',
       );
       expect(
         describe(EngineEvent.fromJson('x', const <String, dynamic>{})),

@@ -574,6 +574,104 @@ void main() {
       expect(await exit, 0);
     });
 
+    test('serves releases over the real database', () async {
+      Directory(dataDir).createSync(recursive: true);
+      final at = DateTime.now().toUtc();
+      final (appToken, mcpToken) = await withDatabase((database) async {
+        await SqliteProjectRepository(database).add(
+          ProjectRecord(
+            id: 'prj_real',
+            githubRepoId: 7,
+            fullName: 'octo/real',
+            remote: 'x',
+            githubDefaultBranch: 'main',
+            scan: const ProjectProfile(
+              apps: [
+                AppProfile(
+                  name: 'demo',
+                  path: '.',
+                  flavors: [
+                    FlavorProfile(
+                      name: 'default',
+                      entrypoint: 'lib/main.dart',
+                      implicit: true,
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            findings: const [],
+            scannedAt: at,
+          ),
+        );
+        await SqliteReleaseRepository(database).create(
+          ReleaseRecord(
+            id: 'rel_real',
+            projectId: 'prj_real',
+            appPath: '.',
+            flavor: 'default',
+            version: '1.2.0',
+            build: 5,
+            state: ReleaseState.draft,
+            stores: const {},
+            builds: [ReleaseBuild(build: 5, runId: 'run_1', createdAt: at)],
+            baseBranch: 'main',
+            createdAt: at,
+            updatedAt: at,
+          ),
+        );
+        final service = TokenService(
+          tokens: SqliteDeviceTokenRepository(database),
+          clock: const SystemClock(),
+        );
+        return (
+          (await service.issue(name: 'app', kind: DeviceTokenKind.app)).secret,
+          (await service.issue(name: 'mcp', kind: DeviceTokenKind.mcp)).secret,
+        );
+      });
+      final exit = run(['serve', '--port', '0', '--data-dir', dataDir]);
+      final uri = await startServing(exit);
+      final client = HttpClient();
+      addTearDown(() => client.close(force: true));
+
+      Future<(int, Map<String, dynamic>)> call(
+        String token,
+        String method,
+        String path,
+      ) async {
+        final request = await client.openUrl(method, uri.resolve(path))
+          ..headers.set('authorization', 'Bearer $token');
+        final response = await request.close();
+        return (
+          response.statusCode,
+          jsonDecode(await utf8.decodeStream(response)) as Map<String, dynamic>,
+        );
+      }
+
+      final (listed, releases) = await call(mcpToken, 'GET', '/releases');
+      final (refused, _) = await call(
+        mcpToken,
+        'POST',
+        '/releases/rel_real/abandon',
+      );
+      final (abandoned, release) = await call(
+        appToken,
+        'POST',
+        '/releases/rel_real/abandon',
+      );
+
+      expect(listed, 200);
+      expect(
+        ((releases['releases']! as List).single as Map<String, dynamic>)['id'],
+        'rel_real',
+      );
+      expect(refused, 403);
+      expect(abandoned, 200);
+      expect(release['state'], 'abandoned');
+      shutdown.add(null);
+      expect(await exit, 0);
+    });
+
     test('serves the workflows of a project over the real database', () async {
       Directory(dataDir).createSync(recursive: true);
       final projectId = await withDatabase((database) async {
@@ -668,7 +766,13 @@ void main() {
       final (missing, _) = await call('GET', '/runs/run_nope');
 
       expect(listed, 200);
-      expect(names, ['dev-build', 'prod-release', 'shorebird-patch', 'test']);
+      expect(names, [
+        'dev-build',
+        'prod-release',
+        'release-merge',
+        'shorebird-patch',
+        'test',
+      ]);
       expect(created, 201);
       expect(dispatched, 502, reason: 'there is no mirror to fetch: $run_');
       expect(missing, 404);
@@ -887,7 +991,11 @@ void main() {
       }, tags: 'process');
 
       test('are interrupted, not lost, when the engine stops', () async {
-        await seedJob('job_long', 'sleep', ['300']);
+        // A duration no other test or run has: `pgrep` below must find only
+        // the process this test started, not a `sleep 300` that an earlier
+        // run (or a test of another package) left behind.
+        final duration = '300.${DateTime.now().microsecondsSinceEpoch}';
+        await seedJob('job_long', 'sleep', [duration]);
         final exit = run([
           'serve',
           '--port',
@@ -911,7 +1019,7 @@ void main() {
         job = await readJob('job_long');
         expect(job.state, JobState.interrupted);
         expect(job.steps.single.state, StepState.interrupted);
-        final left = Process.runSync('pgrep', ['-f', 'sleep 300']);
+        final left = Process.runSync('pgrep', ['-f', 'sleep $duration']);
         expect(left.exitCode, isNot(0), reason: 'the process must be gone');
       }, tags: 'process');
     });

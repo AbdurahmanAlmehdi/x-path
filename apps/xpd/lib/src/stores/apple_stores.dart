@@ -44,6 +44,9 @@ class AppleStores {
   /// Finds the API key of an app.
   final AscCredentialSource credentials;
 
+  /// The public iTunes lookup, which an Apple ID flavor is read through.
+  ItunesLookup get itunes => _itunes;
+
   /// The state of the App Store trains of an app.
   late final AppStoreTrains trains;
 

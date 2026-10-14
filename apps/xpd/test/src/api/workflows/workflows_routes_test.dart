@@ -32,6 +32,7 @@ void main() {
       expect(workflows.map((w) => w.name), [
         'dev-build',
         'prod-release',
+        'release-merge',
         'shorebird-patch',
         'test',
       ]);

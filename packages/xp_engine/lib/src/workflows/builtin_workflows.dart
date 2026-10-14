@@ -6,6 +6,7 @@
 const builtinWorkflows = <String, String>{
   'dev-build': _devBuild,
   'prod-release': _prodRelease,
+  'release-merge': _releaseMerge,
   'shorebird-patch': _shorebirdPatch,
   'test': _test,
 };
@@ -81,10 +82,14 @@ stages:
 
 // A production release is ship.sh `release prod` plus the release model: the
 // version commit and the release branch are made once (prepare), every
-// platform builds that very commit (build), and the tag and the push come
-// last (finalize). Everything that can be checked is checked first; then the
-// owner approves the release before the branch is cut and anything is built or
-// uploaded, and the push before it leaves the machine (D-13).
+// platform builds that very commit (build), and the tag, the push and the
+// release pull request come last (finalize). Everything that can be checked is
+// checked first; then the owner approves the release before the branch is cut
+// and anything is built or uploaded, and the push before it leaves the machine
+// (D-13). The run is a release (D-17) that the stores then review; a new build
+// of the same version after a rejection dispatches this workflow again with
+// `release` set, which skips the check that the version was not released
+// before.
 const _prodRelease = r'''
 schema: 1
 name: Production release
@@ -131,7 +136,11 @@ stages:
           - kind: version.bump
           - kind: guard
             with:
-              checks: [versionSync, newReleaseNumber]
+              checks: [versionSync]
+          - kind: guard
+            if: "!release"
+            with:
+              checks: [newReleaseNumber]
           - kind: git.releaseBranch
             gate: prod_release
   - name: build
@@ -211,6 +220,28 @@ stages:
           - kind: git.tag
           - kind: git.push
             gate: push
+          - kind: github.createPr
+''';
+
+// The merge of the pull request of a release (D-17): started by
+// POST /releases/{id}/merge once every store is live. The merge is a gated
+// action, so the run waits for the owner to approve it (D-13), and the pull
+// request is merged with a merge commit (ADR 0007).
+const _releaseMerge = '''
+schema: 1
+name: Merge the release pull request
+description: >-
+  Merges the pull request of a release once every store it went to is live.
+  Started with POST /releases/{id}/merge; the merge waits for the owner's
+  approval.
+stages:
+  - name: merge
+    jobs:
+      merge:
+        name: Merge the release pull request
+        steps:
+          - kind: github.mergePr
+            gate: merge
 ''';
 
 // A patch is ship.sh `patch prod`: an over-the-air code patch against an

@@ -42,6 +42,13 @@ class FakeGitHub implements GitHubClient {
       throw UnimplementedError();
 
   @override
+  Future<GitHubPullRequest?> findPullRequest(
+    GitHubRepo repo, {
+    required String head,
+    required String base,
+  }) => throw UnimplementedError();
+
+  @override
   Future<GitHubMergeResult> mergePullRequest(
     GitHubRepo repo,
     int number, {
@@ -82,8 +89,7 @@ class FakeGit implements GitService {
   Future<void> removeWorktree(GitWorktree worktree) async {}
 
   @override
-  Future<List<GitTagInfo>> listTags(GitMirror mirror) =>
-      throw UnimplementedError();
+  Future<List<GitTagInfo>> listTags(GitMirror mirror) async => const [];
 
   @override
   Future<List<String>> changedFiles(

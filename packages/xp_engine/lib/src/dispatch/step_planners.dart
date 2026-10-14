@@ -454,9 +454,45 @@ class StepPlanners implements StepCatalog {
         if (p.flag('tag', otherwise: true)) 'tag': tag,
       };
     }),
+    StepPlanSpec('github.createPr', const {'title', 'body'}, (p) async {
+      final run = p.job.run;
+      final version = run.version;
+      if (version == null) {
+        return p.fail('There is no release version: this run bumps none.');
+      }
+      final flavor = p.job.flavor;
+      return {
+        'githubRepoId': run.project.githubRepoId,
+        'head': run.model.branchName(version.name, scope: p.job.worktree.scope),
+        'base': run.project.defaultBaseBranch,
+        'title':
+            p.text('title') ??
+            'Release ${version.name}${_flavorSuffix(flavor)}',
+        'body':
+            p.text('body') ??
+            'The release branch of ${version.name}, opened by XPath. Merge '
+                'it once every store has the release live.',
+      };
+    }),
+    StepPlanSpec(
+      'github.mergePr',
+      const {},
+      (p) async => {
+        'releaseId':
+            p.job.run.release ??
+            p.fail(
+              'There is no release to merge: dispatch this workflow with '
+              '"release", or with POST /releases/{id}/merge.',
+            ),
+        'githubRepoId': p.job.run.project.githubRepoId,
+      },
+    ),
   ];
 
   // --------------------------------------------------------------- helpers
+
+  static String _flavorSuffix(FlavorProfile? flavor) =>
+      flavor == null || flavor.implicit ? '' : ' (${flavor.name})';
 
   static Map<String, dynamic> _needsBuild(StepPlanning p) => p.fail(
     'The app has no build number, and this run allocates none: add a '

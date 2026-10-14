@@ -8,6 +8,44 @@ import 'job_harness.dart';
 import 'scripted_git.dart';
 import 'workflow_fixtures.dart';
 
+/// A [ReleaseOpener] that remembers what a dispatch told it.
+class FakeReleaseOpener implements ReleaseOpener {
+  /// What each [open] was told, oldest first.
+  final openings = <ReleaseOpening>[];
+
+  /// What each [attach] was told, as `release project kind run build`.
+  final attached = <String>[];
+
+  /// The id the release of each flavor gets: `rel_<flavor>`.
+  @override
+  Future<Map<String, String>> open(ReleaseOpening opening) async {
+    openings.add(opening);
+    return {
+      for (final flavor in opening.flavors)
+        flavor.flavor: 'rel_${flavor.flavor}',
+    };
+  }
+
+  /// Set to make the next [attach] fail with it.
+  ReleaseException? attachFailure;
+
+  @override
+  Future<void> attach({
+    required String releaseId,
+    required String projectId,
+    required ReleaseRunKind kind,
+    required String runId,
+    int? build,
+  }) async {
+    attached.add('$releaseId $projectId ${kind.name} $runId $build');
+    final error = attachFailure;
+    if (error != null) {
+      attachFailure = null;
+      throw error;
+    }
+  }
+}
+
 /// The commit `main` resolves to.
 const mainSha = 'a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1';
 
@@ -38,6 +76,7 @@ class DispatchHarness {
     List<SchedulerRunner> runners = const [],
     JobRepository? jobRepository,
     bool seeded = true,
+    ReleaseOpener? releases,
   }) async {
     final git = ScriptedGit()..refs['main'] = mainSha;
     final projects = InMemoryProjectRepository();
@@ -93,6 +132,7 @@ class DispatchHarness {
       clock: clock,
       workspaces: (_) => pubspec,
       worktreeAt: ScriptedGit.pathOf,
+      releases: releases,
       random: seeded ? Random(2) : null,
     );
     return ._(

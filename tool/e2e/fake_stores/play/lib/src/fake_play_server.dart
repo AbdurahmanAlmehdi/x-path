@@ -92,6 +92,11 @@ class FakePlayServer {
   /// The access tokens issued so far.
   int tokensIssued = 0;
 
+  /// When set, every bundle upload reports this version code, whatever the
+  /// bytes say: the fake cannot read the manifest of a real Android App
+  /// Bundle, which an end-to-end run uploads. The bytes may be anything.
+  int? uploadVersionCode;
+
   /// Whether releases that a commit makes go to review (`IN_REVIEW`) instead
   /// of straight to `PUBLISHED`.
   bool sendsToReview = false;
@@ -383,6 +388,19 @@ class FakePlayServer {
     );
   }
 
+  int _versionCodeOf(List<int> bytes) {
+    final text = utf8.decode(bytes.take(80).toList(), allowMalformed: true);
+    final match = RegExp(r'^fake-aab versionCode=(\d+)\n').firstMatch(text);
+    if (match == null) {
+      throw const _PlayError(
+        400,
+        'The uploaded file is not a valid Android App Bundle.',
+        'INVALID_ARGUMENT',
+      );
+    }
+    return int.parse(match[1]!);
+  }
+
   (int, Object?) _upload(
     FakePlayApp app,
     FakePlayEdit edit,
@@ -396,16 +414,7 @@ class FakePlayServer {
         'INVALID_ARGUMENT',
       );
     }
-    final text = utf8.decode(bytes.take(80).toList(), allowMalformed: true);
-    final match = RegExp(r'^fake-aab versionCode=(\d+)\n').firstMatch(text);
-    if (match == null) {
-      throw const _PlayError(
-        400,
-        'The uploaded file is not a valid Android App Bundle.',
-        'INVALID_ARGUMENT',
-      );
-    }
-    final versionCode = int.parse(match[1]!);
+    final versionCode = uploadVersionCode ?? _versionCodeOf(bytes);
     if (app.bundles.containsKey(versionCode) ||
         edit.bundles.containsKey(versionCode)) {
       throw _PlayError(

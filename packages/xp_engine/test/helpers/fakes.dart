@@ -60,6 +60,13 @@ class FakeGitHubClient implements GitHubClient {
       throw UnimplementedError();
 
   @override
+  Future<GitHubPullRequest?> findPullRequest(
+    GitHubRepo repo, {
+    required String head,
+    required String base,
+  }) => throw UnimplementedError();
+
+  @override
   Future<GitHubMergeResult> mergePullRequest(
     GitHubRepo repo,
     int number, {

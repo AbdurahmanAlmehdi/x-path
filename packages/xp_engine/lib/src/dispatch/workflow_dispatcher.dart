@@ -12,6 +12,8 @@ import 'package:xp_engine/src/jobs/job_repository.dart';
 import 'package:xp_engine/src/jobs/job_runner.dart';
 import 'package:xp_engine/src/projects/project_record.dart';
 import 'package:xp_engine/src/projects/project_repository.dart';
+import 'package:xp_engine/src/releases/release_exceptions.dart';
+import 'package:xp_engine/src/releases/release_opener.dart';
 import 'package:xp_engine/src/repositories/event_log.dart';
 import 'package:xp_engine/src/scan/scan_source.dart';
 import 'package:xp_engine/src/scheduler/run_record.dart';
@@ -38,6 +40,7 @@ const _unversionedKinds = {
   'analyze',
   'command',
   'git.checkout',
+  'github.mergePr',
   'guard',
   'test',
 };
@@ -53,7 +56,10 @@ const _unversionedKinds = {
 /// 4. expands the matrix of each job into jobs, drops the cells whose `if` is
 ///    false, and plans every step of every job: the stored input of each step
 ///    comes from the workflow's `with` values and what the dispatch decided,
-/// 5. creates the run and its jobs, all `queued`, and wakes the [Scheduler].
+/// 5. makes the release of each flavor of a workflow that cuts a release
+///    branch, or attaches the run to the release the request names (a new
+///    build of it, or the merge of its pull request), and
+/// 6. creates the run and its jobs, all `queued`, and wakes the [Scheduler].
 ///
 /// The plan is complete before anything is stored, so a dispatch that cannot
 /// work (an unknown flavor, a credential that is missing) leaves nothing
@@ -79,6 +85,7 @@ class WorkflowDispatcher {
     required this._clock,
     required this._workspaces,
     required this._worktreeAt,
+    this._releases,
     Random? random,
   }) : _random = random ?? Random.secure();
 
@@ -97,6 +104,7 @@ class WorkflowDispatcher {
   final Clock _clock;
   final WorkspaceOpener _workspaces;
   final WorktreeLocator _worktreeAt;
+  final ReleaseOpener? _releases;
   final Random _random;
 
   /// Dispatches the workflow [workflowId] of the project [projectId].
@@ -180,6 +188,7 @@ class WorkflowDispatcher {
       current: current,
       releaseVersion: releaseVersion,
       patch: patch,
+      release: request.release,
     );
     final jobs = await _planJobs(definition, context);
     if (jobs.isEmpty) {
@@ -189,6 +198,8 @@ class WorkflowDispatcher {
         'platforms (${platforms.join(', ')}) of this dispatch.',
       );
     }
+
+    final releaseOf = await _linkReleases(request, kinds, context, jobs);
 
     final run = RunRecord(
       id: runId,
@@ -211,6 +222,7 @@ class WorkflowDispatcher {
           id: job.id,
           workflowVersionId: stored.version.id,
           projectId: projectId,
+          releaseId: releaseOf[job.id],
           sha: sha,
           runId: runId,
           stage: job.stage,
@@ -236,6 +248,77 @@ class WorkflowDispatcher {
     );
     await _scheduler.pump();
     return run.toRun(await _records.forRun(runId));
+  }
+
+  // -------------------------------------------------------------- releases
+
+  /// The release of each job, by job id: the releases a workflow that cuts a
+  /// release branch makes (one per flavor), or the release the request names.
+  ///
+  /// Throws a [DispatchException] if the request names a release that cannot
+  /// take this run.
+  Future<Map<String, String>> _linkReleases(
+    DispatchRequest request,
+    Set<String> kinds,
+    RunContext context,
+    List<_PlannedJob> jobs,
+  ) async {
+    final opener = _releases;
+    final named = request.release;
+    if (named != null) {
+      if (opener == null) {
+        throw const DispatchException('This engine does not track releases.');
+      }
+      final ReleaseRunKind kind;
+      if (kinds.contains('github.mergePr')) {
+        kind = ReleaseRunKind.merge;
+      } else if (kinds.contains('version.bump')) {
+        kind = ReleaseRunKind.build;
+      } else {
+        throw const DispatchException(
+          'A run of a release has to build it again (a "version.bump" step) '
+          'or merge its pull request (a "github.mergePr" step).',
+        );
+      }
+      try {
+        await opener.attach(
+          releaseId: named,
+          projectId: context.project.id,
+          kind: kind,
+          runId: context.runId,
+          build: context.build,
+        );
+      } on ReleaseException catch (error) {
+        throw DispatchException(error.message);
+      }
+      return {for (final job in jobs) job.id: named};
+    }
+    if (opener == null || !kinds.contains('git.releaseBranch')) {
+      return const {};
+    }
+    // Planning a "git.releaseBranch" step needed a version, so there is one.
+    final version = context.version!;
+    final steps = <String, List<StepPlan>>{};
+    for (final job in jobs) {
+      final flavor = job.cell['flavor'];
+      if (flavor != null) steps.putIfAbsent(flavor, () => []).addAll(job.steps);
+    }
+    final ids = await opener.open(
+      ReleaseOpening(
+        projectId: context.project.id,
+        appPath: context.app.path,
+        runId: context.runId,
+        version: '${version.name}',
+        build: version.build!,
+        baseBranch: context.project.defaultBaseBranch,
+        storeCountry: context.app.storeCountry,
+        flavors: [
+          for (final entry in steps.entries)
+            FlavorSteps(flavor: entry.key, steps: entry.value),
+        ],
+      ),
+    );
+    return {for (final job in jobs) job.id: ?ids[job.cell['flavor']]};
   }
 
   // ----------------------------------------------------------- the request

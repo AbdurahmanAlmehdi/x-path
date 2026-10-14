@@ -20,6 +20,7 @@ const dispatchVariables = {
   'platforms',
   'project',
   'ref',
+  'release',
   'releaseVersion',
   'sha',
   'version',
