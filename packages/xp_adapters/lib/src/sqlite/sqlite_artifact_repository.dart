@@ -71,6 +71,12 @@ class SqliteArtifactRepository implements ArtifactRepository {
     return await get(id);
   }
 
+  @override
+  Future<bool> delete(String id) async {
+    _db.execute('DELETE FROM artifact WHERE id = ?', [id]);
+    return _db.updatedRows > 0;
+  }
+
   static int _flag(bool value) => value ? 1 : 0;
 
   static ArtifactRecord? _one(ResultSet rows) =>

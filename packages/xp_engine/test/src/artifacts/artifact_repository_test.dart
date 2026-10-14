@@ -52,4 +52,12 @@ void main() {
     expect((await repository.setPinned('a', pinned: false))!.pinned, isFalse);
     expect(await repository.setPinned('b', pinned: true), isNull);
   });
+
+  test('deletes a record and says whether there was one', () async {
+    await repository.save(record('a'));
+
+    expect(await repository.delete('a'), isTrue);
+    expect(await repository.get('a'), isNull);
+    expect(await repository.delete('a'), isFalse);
+  });
 }

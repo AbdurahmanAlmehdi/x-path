@@ -450,7 +450,7 @@ Mataa dev builds through `xp` can start after Phase 13, before the desktop app e
 
 ### Phase 12c: Notifications and housekeeping
 
-- **Status:** Not started
+- **Status:** Done
 - **Scope:** Slack webhook notifications from the engine, notification events for the app,
   release notes (Slack and WhatsApp text) from commits since the last tag, `min_version_*`
   reminder after a forced update is approved, artifact retention (last N per flavor plus pinned;

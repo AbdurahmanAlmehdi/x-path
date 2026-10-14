@@ -30,6 +30,8 @@ class XpdServer {
     required RunService runs,
     required ApprovalService approvals,
     required ReleaseService releases,
+    required ReleaseNotesService releaseNotes,
+    required HousekeepingService housekeeping,
     required Clock clock,
     required String engineVersion,
     String host = '127.0.0.1',
@@ -52,6 +54,8 @@ class XpdServer {
       runs: runs,
       approvals: approvals,
       releases: releases,
+      releaseNotes: releaseNotes,
+      housekeeping: housekeeping,
       engineVersion: engineVersion,
       onError: onError,
     );

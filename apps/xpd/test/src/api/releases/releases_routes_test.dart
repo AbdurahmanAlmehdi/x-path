@@ -435,4 +435,78 @@ void main() {
       expect(again.statusCode, 409);
     });
   });
+
+  group('GET /releases/{id}/notes', () {
+    test(
+      'lists the commits since the release before, as text to paste',
+      () async {
+        final id = await client.uploaded();
+        client.engine.git
+          ..tags.addAll([
+            const GitTagInfo(name: 'v1.0.0+3', commit: 'c'),
+            const GitTagInfo(name: 'v1.1.0+4', commit: 'c'),
+            const GitTagInfo(name: 'v1.1.0+4-p1', commit: 'c'),
+          ])
+          ..commits.addAll(const [
+            GitCommit(sha: 'd1', subject: 'feat(ui): add dark mode'),
+            GitCommit(sha: 'd2', subject: 'fix: spinner <b>'),
+          ]);
+
+        final response = await client.send('GET', '/releases/$id/notes');
+
+        expect(response.statusCode, 200, reason: response.body);
+        final notes = ReleaseNotes.fromJson(response.json);
+        expect(notes.releaseId, id);
+        expect(notes.version, '1.2.0');
+        expect(notes.from, 'v1.1.0+4');
+        expect(client.engine.git.lastRange, 'v1.1.0+4..${'a' * 40}');
+        expect(notes.groups.map((g) => g.type), ['feat', 'fix']);
+        expect(notes.slack, contains('\u2022 ui: add dark mode'));
+        expect(notes.slack, contains('spinner &lt;b&gt;'));
+        expect(notes.whatsapp, contains('*Features*'));
+        expect(notes.whatsapp, contains('Full changelog: https://github.com/'));
+        expect(notes.whatsapp, isNot(contains('<https')));
+      },
+    );
+
+    test('is open to every kind of token', () async {
+      final id = await client.uploaded();
+
+      for (final kind in DeviceTokenKind.values) {
+        final response = await client.send(
+          'GET',
+          '/releases/$id/notes',
+          kind: kind,
+        );
+
+        expect(response.statusCode, 200, reason: kind.name);
+      }
+    });
+
+    test('answers 404 for a release it does not know', () async {
+      final response = await client.send('GET', '/releases/rel_nope/notes');
+
+      expect(response.statusCode, 404);
+      expect(errorOf(response).error.code, ApiErrorCode.notFound);
+    });
+
+    test('answers 409 while the release has no commit', () async {
+      final id = await client.open();
+
+      final response = await client.send('GET', '/releases/$id/notes');
+
+      expect(response.statusCode, 409);
+      expect(errorOf(response).error.code, ApiErrorCode.conflict);
+    });
+
+    test('answers 502 when git cannot read the mirror', () async {
+      final id = await client.uploaded();
+      client.engine.git.commitsFailure = const GitException('mirror broken');
+
+      final response = await client.send('GET', '/releases/$id/notes');
+
+      expect(response.statusCode, 502);
+      expect(errorOf(response).error.code, ApiErrorCode.upstreamError);
+    });
+  });
 }

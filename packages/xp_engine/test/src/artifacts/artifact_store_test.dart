@@ -36,4 +36,13 @@ void main() {
     expect(await store.exists('job_1/a.apk'), isFalse);
     await expectLater(store.read('job_1/a.apk'), emitsError(isStateError));
   });
+
+  test('deletes a file, and does nothing for one that is not there', () async {
+    await store.write('job_1/a.apk', Stream.value(utf8.encode('one')));
+
+    await store.delete('job_1/a.apk');
+    await store.delete('job_1/a.apk');
+
+    expect(await store.exists('job_1/a.apk'), isFalse);
+  });
 }

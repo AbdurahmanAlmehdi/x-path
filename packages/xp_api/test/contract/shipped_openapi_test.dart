@@ -597,6 +597,7 @@ void main() {
         ('POST', '/releases/rel_1/builds'),
         ('POST', '/releases/rel_1/merge'),
         ('POST', '/releases/rel_1/abandon'),
+        ('GET', '/releases/rel_1/notes'),
       ]) {
         expect(
           shipped.validateResponse(
@@ -756,6 +757,134 @@ void main() {
       }
     });
 
+    test('documents the storage endpoints', () {
+      final unauthorized = jsonEncode(
+        ErrorResponse.of(ApiErrorCode.unauthorized, 'm').toJson(),
+      );
+      final forbidden = jsonEncode(
+        ErrorResponse.of(ApiErrorCode.forbidden, 'm').toJson(),
+      );
+      final invalid = jsonEncode(
+        ErrorResponse.of(ApiErrorCode.invalidRequest, 'm').toJson(),
+      );
+
+      for (final (method, path) in [
+        ('GET', '/storage'),
+        ('POST', '/storage/free'),
+        ('GET', '/storage/retention'),
+        ('PUT', '/storage/retention'),
+      ]) {
+        expect(
+          shipped.validateResponse(
+            method: method,
+            path: path,
+            statusCode: 401,
+            body: unauthorized,
+            contentType: 'application/json',
+          ),
+          isEmpty,
+          reason: '$method $path',
+        );
+      }
+      for (final (method, path, status, body) in [
+        ('POST', '/storage/free', 403, forbidden),
+        ('PUT', '/storage/retention', 403, forbidden),
+        ('POST', '/storage/free', 400, invalid),
+        ('PUT', '/storage/retention', 400, invalid),
+      ]) {
+        expect(
+          shipped.validateResponse(
+            method: method,
+            path: path,
+            statusCode: status,
+            body: body,
+            contentType: 'application/json',
+          ),
+          isEmpty,
+          reason: '$method $path $status',
+        );
+      }
+    });
+
+    test('describes the storage and release notes models', () {
+      final report = StorageReport(
+        generatedAt: DateTime.utc(2026, 10, 14),
+        categories: const [
+          CategoryUsage(
+            category: StorageCategory.artifacts,
+            usedBytes: 10,
+            reclaimableBytes: 4,
+            items: 1,
+          ),
+        ],
+        flavors: const [
+          FlavorUsage(
+            projectId: 'prj_1',
+            app: '.',
+            flavor: '',
+            builds: 1,
+            artifacts: 1,
+            usedBytes: 10,
+            reclaimableBytes: 4,
+          ),
+        ],
+        retention: const RetentionSettings(),
+      );
+      const free = FreeSpaceResult(
+        dryRun: true,
+        categories: [
+          FreedCategory(category: StorageCategory.logs, bytes: 1, items: 1),
+        ],
+        failures: ['x'],
+      );
+      const notes = ReleaseNotes(
+        releaseId: 'rel_1',
+        version: '1.2.0',
+        build: 45,
+        from: 'v1.1.0+40',
+        to: 'abc',
+        commits: 1,
+        groups: [
+          ReleaseNoteGroup(
+            type: 'feat',
+            title: 'Features',
+            items: [ReleaseNoteItem(sha: 'abc', description: 'a', scope: 'ui')],
+          ),
+        ],
+        compareUrl: 'https://github.com/o/r/compare/a...b',
+        slack: '*Features*',
+        whatsapp: '*Features*',
+      );
+
+      for (final (schema, json) in <(String, Object)>[
+        ('StorageReport', report.toJson()),
+        ('RetentionSettings', const RetentionSettings().toJson()),
+        ('RetentionSettings', <String, Object>{}),
+        ('FreeSpaceRequest', const FreeSpaceRequest().toJson()),
+        (
+          'FreeSpaceRequest',
+          const FreeSpaceRequest(
+            dryRun: false,
+            categories: [StorageCategory.mirrors],
+          ).toJson(),
+        ),
+        ('FreeSpaceResult', free.toJson()),
+        ('ReleaseNotes', notes.toJson()),
+      ]) {
+        expect(shipped.validateSchema(schema, json), isEmpty, reason: schema);
+      }
+      expect(
+        shipped.validateSchema('RetentionSettings', {'keepPerFlavor': 0}),
+        isNotEmpty,
+      );
+      expect(
+        shipped.validateSchema('FreeSpaceRequest', {
+          'categories': ['unicorns'],
+        }),
+        isNotEmpty,
+      );
+    });
+
     test('describes every event the engine can send', () {
       for (final event in <EngineEvent>[
         const EngineStarted(version: '0.0.1', apiVersion: '1'),
@@ -841,6 +970,14 @@ void main() {
           store: ReleaseStore.play,
           state: StoreState.live,
           source: StatusSource.api,
+        ),
+        const NotificationRaised(
+          kind: NotificationKind.approvalRequested,
+          level: NotificationLevel.warning,
+          title: 'Approval needed',
+          body: 'Release 1.2.0.',
+          projectId: 'prj_1',
+          approvalId: 'apr_1',
         ),
       ]) {
         final json = SequencedEvent(

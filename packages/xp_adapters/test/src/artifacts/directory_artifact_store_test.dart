@@ -91,4 +91,29 @@ void main() {
       await expectLater(store.exists(bad), throwsArgumentError, reason: bad);
     }
   });
+
+  test('deletes a file and the folder it leaves empty', () async {
+    await store.write('job_1/a.apk', Stream.value(utf8.encode('a')));
+    await store.write('job_1/b.apk', Stream.value(utf8.encode('b')));
+
+    await store.delete('job_1/a.apk');
+
+    expect(await store.exists('job_1/a.apk'), isFalse);
+    expect(await store.exists('job_1/b.apk'), isTrue);
+
+    await store.delete('job_1/b.apk');
+
+    expect(Directory('${root.path}/job_1').existsSync(), isFalse);
+  });
+
+  test('deleting a file that is not there does nothing', () async {
+    await store.delete('job_1/a.apk');
+    await store.delete('job_1/a.apk');
+
+    expect(root.existsSync(), isFalse);
+  });
+
+  test('refuses to delete outside the store', () {
+    expect(() => store.delete('../x'), throwsArgumentError);
+  });
 }

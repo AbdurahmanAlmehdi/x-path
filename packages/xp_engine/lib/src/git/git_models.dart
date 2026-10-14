@@ -35,6 +35,24 @@ class GitWorktree extends Equatable {
   List<Object?> get props => [mirror, path, sha];
 }
 
+/// A commit of a mirror: its id, subject and the rest of its message.
+class GitCommit extends Equatable {
+  /// Creates a commit.
+  const new({required this.sha, required this.subject, this.body = ''});
+
+  /// The commit, in full.
+  final String sha;
+
+  /// The first line of the message.
+  final String subject;
+
+  /// The message after the subject, without the blank line between them.
+  final String body;
+
+  @override
+  List<Object?> get props => [sha, subject, body];
+}
+
 /// A tag of a mirror and the commit it names.
 class GitTagInfo extends Equatable {
   /// Creates a tag record.

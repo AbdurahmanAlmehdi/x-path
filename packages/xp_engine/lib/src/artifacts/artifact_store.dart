@@ -19,6 +19,12 @@ abstract interface class ArtifactStore {
 
   /// Whether there is a file at [path].
   Future<bool> exists(String path);
+
+  /// Deletes the file at [path], and its folder when that is left empty. Does
+  /// nothing if there is no such file.
+  ///
+  /// Throws an [ArgumentError] like [write] if [path] is not `<folder>/<name>`.
+  Future<void> delete(String path);
 }
 
 /// An [ArtifactStore] whose files are ordinary files on the engine machine,
@@ -53,4 +59,7 @@ class InMemoryArtifactStore implements ArtifactStore {
 
   @override
   Future<bool> exists(String path) async => files.containsKey(path);
+
+  @override
+  Future<void> delete(String path) async => files.remove(path);
 }

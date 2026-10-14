@@ -1001,6 +1001,73 @@ draft -> building -> uploaded -> in_review -> approved -> live -> merged
 
 `release.created`, `release.state_changed` and `release.store_changed` go on `/events`.
 
+## Notifications and housekeeping
+
+`packages/xp_engine/lib/src/notify` tells the owner what matters (D-22); `.../housekeeping` keeps the disk in
+check (D-22, D-24). The endpoints are in `apps/xpd/lib/src/api/storage`.
+
+### Notifications
+
+`Notifier` listens to the event log. `NoticeFactory` decides which events are worth telling: a **production job**
+(a job of a release, or of a run that holds the project lock) that failed or succeeded, an approval that was
+requested, decided or expired, a release that was rejected, approved, went live or was merged, a credential that
+expired, and secrets that are locked (D-10, from `SecretStore.statusChanges`). Each becomes
+
+- a `notification.raised` event (`kind`, `level`, `title`, `body`, and the project, release, job or approval it
+  is about), which the macOS app shows as a notification (Phase 16b; the engine only raises the event); and
+- a Slack message to the webhook of the project's `slack` credential, if it has one (the webhook URL comes from
+  the secret store, `HttpSlackWebhook` posts it with `package:http`). The text goes through the secret masker and
+  is cut to 600 characters. A message is tried again after 1, 5 and 30 seconds (or as long as Slack's
+  `Retry-After` says, at most a minute); one that still fails is reported on stderr and dropped. Messages of one
+  project go out in the order of the events. Locked secrets go to the app only: the webhook is one of the secrets
+  that cannot be read then.
+
+The same notice (same `kind` and subject) within 15 minutes is told once, so a flapping state does not repeat,
+and at most 20 messages a minute go to Slack. The app is told even when Slack is not.
+
+**`min_version_*` reminder.** Raising `min_version_android` and `min_version_ios` in Firebase Remote Config is only
+right once the new version is approved *and available* in that store (`mataa_new_app/docs/RELEASING.md`). When a
+store reports a release `live`, a `min_version_reminder` notification names the variable of that store
+(`min_version_ios` for the App Store, `min_version_android` for Google Play) and the version. XPath does not know
+whether a release is a forced update, so the text says "if this is a forced update"; it is a reminder only and
+calls no remote-config API.
+
+**Release notes.** `GET /releases/{id}/notes` lists the commits (merge commits and XPath's own
+`chore(release)` version commits left out) between the previous release tag and the commit of the release, from the
+engine's mirror (it does not fetch). The previous tag is the newest non-patch tag of the same app and flavor, by the
+project's release model, with a lower version; a first release lists its latest 100 commits. Commits are grouped by
+conventional-commit type (breaking changes, features, fixes, performance, refactoring, documentation, other), and
+the response has the groups plus the text twice: Slack `mrkdwn` (`*bold*`, `<url|Full changelog>`, `&`, `<` and `>`
+escaped) and WhatsApp text (`*bold*`, the link as plain text). `409` while the release has no commit yet.
+
+### Housekeeping
+
+`HousekeepingPlanner` decides, `HousekeepingService` reports and does it.
+
+| Category | What goes | What stays |
+|---|---|---|
+| `artifacts` | The files of builds past the newest `keepPerFlavor` (5 unless set) of each flavor of each app. A build is a run, so one release that builds iOS and Android and records a manifest is one build. | Pinned artifacts; every artifact of a release that is **not over** (`draft`, `building`, `uploaded`, `in_review`, `rejected`, `approved`, `live`), also those of the runs that built or merge it; artifacts of jobs that have not finished. |
+| `logs` | The log folder and the record of jobs that finished more than `logDays` (90, D-24) ago. | The record of a job that a release not over needs, whose test run is a **current baseline** (the job row cascades to its test run, D-21), or that still has an artifact. |
+| `worktrees` | Worktrees of jobs that succeeded or were cancelled, of failed jobs after 7 days, and of no job at all. | Worktrees of jobs that have not finished, of failed jobs for a week (they can be resumed) and of failed jobs of a release not over. |
+| `mirrors` | Mirrors of repositories that are no longer projects (removing a project leaves its mirror, D-05). | Mirrors of projects. |
+| `flutter` | SDKs of the cache that no app pins in `.fvmrc`, no Shorebird release was built with (D-20) and no unfinished job uses. | The others. |
+
+- **Daily.** `HousekeepingSchedule` prunes the logs (and the records that nothing needs) at the start when the last
+  pruning was a day ago or never, then every 24 hours, on the `Clock`. Nothing else is deleted by itself: the
+  owner presses "free up space".
+- **Retention settings** are kept in the `housekeeping_setting` table (migration 12): `GET`/`PUT
+  /storage/retention` (`keepPerFlavor` and `logDays`, both at least 1).
+- **Who may delete.** Deleting is a gated action (D-13), but a gate binds an approval to one project, a commit and
+  a version, and housekeeping spans every project. So it is treated like `abandon` and the store statuses: only
+  `app` and `cli` tokens may delete (`"dryRun": false`) or change the retention, and that token is the owner
+  approving; `mcp` and `runner` tokens get `403` and may only read the report and dry-run.
+
+| Route | What it does |
+|---|---|
+| `GET /storage` | The report: per category the bytes held and the bytes that would be freed, and the artifacts by app and flavor. Deletes nothing. |
+| `POST /storage/free` | `{"dryRun": true, "categories": [...]}`, both optional. A dry run (the default) says what would be freed; `"dryRun": false` deletes (`app`/`cli` tokens), artifacts first, and answers what was freed and what could not be. |
+| `GET /storage/retention`, `PUT /storage/retention` | `{"keepPerFlavor", "logDays"}`. `PUT` is for `app` and `cli` tokens. |
+
 ## Testing
 
 ### Coverage policy
