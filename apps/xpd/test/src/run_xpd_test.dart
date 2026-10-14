@@ -486,15 +486,15 @@ void main() {
         await SqliteProjectRepository(database).add(record);
         return record.id;
       });
-      // The encrypted file, not the Keychain: this test runs on Linux too, and
-      // fetching the mirror reads the GitHub token from the secret store.
-      final exit = run([
-        'serve',
-        '--port',
-        '0',
-        '--data-dir',
-        dataDir,
-      ], operatingSystem: 'linux');
+      // Secrets in the encrypted file, not the Keychain: this test runs on
+      // Linux too, and fetching the mirror reads the GitHub token from the
+      // secret store. Only the secret store changes: as `linux`, the engine
+      // would also probe `swift` before it listens, which a cold CI machine
+      // can take longer than the 10 s that `startServing` waits.
+      final exit = run(
+        ['serve', '--port', '0', '--data-dir', dataDir],
+        environment: {TestEndpoints.fileSecretsVariable: '1'},
+      );
       final uri = await startServing(exit);
       final secret = await withDatabase(
         (database) async => (await TokenService(
