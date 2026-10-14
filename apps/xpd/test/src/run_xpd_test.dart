@@ -486,7 +486,15 @@ void main() {
         await SqliteProjectRepository(database).add(record);
         return record.id;
       });
-      final exit = run(['serve', '--port', '0', '--data-dir', dataDir]);
+      // The encrypted file, not the Keychain: this test runs on Linux too, and
+      // fetching the mirror reads the GitHub token from the secret store.
+      final exit = run([
+        'serve',
+        '--port',
+        '0',
+        '--data-dir',
+        dataDir,
+      ], operatingSystem: 'linux');
       final uri = await startServing(exit);
       final secret = await withDatabase(
         (database) async => (await TokenService(
