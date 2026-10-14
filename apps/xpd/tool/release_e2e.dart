@@ -262,8 +262,8 @@ class _E2e {
     final secondPrepare = _jobOf(second, 0);
     _lastJob = firstPrepare;
 
-    // Nothing approves a gate in this phase, so the first release stops at
-    // its gate and keeps the project.
+    // Nothing in this script approves the gate, so the first release stops
+    // at it and keeps the project.
     final stopped = await _waitForJob(
       firstPrepare,
       const Duration(minutes: 5),

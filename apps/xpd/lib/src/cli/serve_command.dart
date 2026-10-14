@@ -193,11 +193,21 @@ class ServeCommand extends XpdCommand {
       );
       final secretFiles = DirectorySecretFileStore(p.join(directory, 'tmp'));
       final logs = JobLogs(store: FileJobLogStore(p.join(directory, 'logs')));
-      // Nothing approves a gate yet (Phase 12a), so a job that reaches one
-      // waits.
-      const approvalGate = PendingApprovalGate();
+      // A job that reaches a gate waits for the owner (D-13). The service
+      // resumes the jobs that wait through the scheduler, which needs the job
+      // runner, which needs the steps, which need the service.
+      late final Scheduler scheduler;
+      final approvals = ApprovalService(
+        approvals: SqliteApprovalRepository(database),
+        gates: SqliteGateConfigRepository(database),
+        projects: projectRepository,
+        jobs: jobRepository,
+        events: events,
+        clock: const SystemClock(),
+        resume: (projectId) => scheduler.resumeWaiting(projectId: projectId),
+      );
       final registry = StepRegistry([
-        const GateStep(approvalGate),
+        GateStep(approvals),
         GitCheckoutStep(git: git, jobs: jobRepository),
         GitReleaseBranchStep(git),
         GitTagStep(git),
@@ -350,7 +360,7 @@ class ServeCommand extends XpdCommand {
         'xpd runs jobs here with $slots slot${slots == 1 ? '' : 's'} and $can',
       );
       final runRepository = SqliteRunRepository(database);
-      final scheduler = Scheduler(
+      scheduler = Scheduler(
         runner: jobs,
         records: jobRepository,
         runs: runRepository,
@@ -433,6 +443,7 @@ class ServeCommand extends XpdCommand {
           jobs: jobRepository,
           control: scheduler,
         ),
+        approvals: approvals,
         clock: const SystemClock(),
         engineVersion: packageVersion,
         host: host,
@@ -444,6 +455,14 @@ class ServeCommand extends XpdCommand {
       // The first check of credentials that are due must not hold up the
       // engine: each takes a call to a store.
       unawaited(credentialChecks.health.start());
+      // Approvals that ran out while the engine was off expire now, and then
+      // every minute, so that the jobs that wait for them fail.
+      final approvalSweeper = ApprovalSweeper(
+        service: approvals,
+        onError: (error, stackTrace) =>
+            context.err.writeln('warning: approval sweep failed: $error'),
+      );
+      unawaited(approvalSweeper.start());
 
       await context.shutdown.first;
       context.out.writeln('xpd shutting down');
@@ -452,6 +471,7 @@ class ServeCommand extends XpdCommand {
       scheduler.stop();
       await jobs.interruptAll();
       await server.close();
+      approvalSweeper.stop();
       credentialChecks.close();
       github.close();
       apple.close();

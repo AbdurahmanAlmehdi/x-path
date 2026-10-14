@@ -427,7 +427,7 @@ Mataa dev builds through `xp` can start after Phase 13, before the desktop app e
 
 ### Phase 12a: Approvals
 
-- **Status:** Not started
+- **Status:** Done
 - **Scope:** Approval requests bound to (project, action, SHA, version), compare-and-set
   decisions, 24 h expiry as denied, per-project gate config (only app tokens may loosen),
   approval endpoints and events.

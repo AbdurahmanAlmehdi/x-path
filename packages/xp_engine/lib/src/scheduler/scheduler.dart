@@ -110,7 +110,8 @@ class Scheduler implements JobControl {
   /// in the queue: a gate was decided, so each asks again. A job whose gate is
   /// still undecided waits again.
   ///
-  /// Phase 12a calls it when an approval is decided.
+  /// The `ApprovalService` calls it when an approval is decided or expires,
+  /// and when a gate is turned off.
   Future<void> resumeWaiting({String? projectId}) async {
     final waiting = await _records.list(states: {JobState.waitingForApproval});
     for (final job in waiting) {

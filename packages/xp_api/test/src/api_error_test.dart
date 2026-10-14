@@ -9,8 +9,10 @@ void main() {
         {
           ApiErrorCode.invalidRequest: 400,
           ApiErrorCode.unauthorized: 401,
+          ApiErrorCode.forbidden: 403,
           ApiErrorCode.notFound: 404,
           ApiErrorCode.conflict: 409,
+          ApiErrorCode.alreadyDecided: 409,
           ApiErrorCode.resyncRequired: 409,
           ApiErrorCode.credentialRejected: 422,
           ApiErrorCode.workflowInvalid: 422,

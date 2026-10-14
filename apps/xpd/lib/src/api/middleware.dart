@@ -26,8 +26,19 @@ Middleware errorMiddleware({
 
 final _bearer = RegExp(r'^Bearer\s+(\S+)$', caseSensitive: false);
 
+const _tokenContextKey = 'xpd.deviceToken';
+
+/// The device token that authenticated [request]: its kind decides what the
+/// request may do (D-13).
+///
+/// Only requests that went through [authMiddleware] and are not to a public
+/// path carry one.
+DeviceToken deviceTokenOf(Request request) =>
+    request.context[_tokenContextKey]! as DeviceToken;
+
 /// Requires `Authorization: Bearer <device token>` on every request except
-/// those to [publicPaths].
+/// those to [publicPaths], and hands the token to the handlers
+/// ([deviceTokenOf]).
 Middleware authMiddleware(
   TokenService tokens, {
   Set<String> publicPaths = const {},
@@ -40,12 +51,13 @@ Middleware authMiddleware(
       final secret = header == null
           ? null
           : _bearer.firstMatch(header)?.group(1);
-      if (await tokens.authenticate(secret) == null) {
+      final token = await tokens.authenticate(secret);
+      if (token == null) {
         return errorResponse(
           ApiErrorCode.unauthorized,
           'Missing, unknown or revoked bearer token.',
           headers: const {'www-authenticate': 'Bearer'},
         );
       }
-      return await inner(request);
+      return await inner(request.change(context: {_tokenContextKey: token}));
     };

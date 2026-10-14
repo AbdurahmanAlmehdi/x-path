@@ -28,6 +28,7 @@ class XpdServer {
     required WorkflowService workflows,
     required WorkflowDispatcher dispatcher,
     required RunService runs,
+    required ApprovalService approvals,
     required Clock clock,
     required String engineVersion,
     String host = '127.0.0.1',
@@ -48,6 +49,7 @@ class XpdServer {
       workflows: workflows,
       dispatcher: dispatcher,
       runs: runs,
+      approvals: approvals,
       engineVersion: engineVersion,
       onError: onError,
     );

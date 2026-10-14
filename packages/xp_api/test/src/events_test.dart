@@ -97,6 +97,42 @@ void main() {
           workflowId: 'wf_1',
           jobIds: ['job_1', 'job_2'],
         ),
+        ApprovalRequested(
+          approvalId: 'apr_1',
+          projectId: 'prj_1',
+          action: 'prod_release',
+          sha: 'a' * 40,
+          version: '1.2.3+45',
+          expiresAt: at.add(const Duration(hours: 24)),
+        ),
+        ApprovalRequested(
+          approvalId: 'apr_2',
+          projectId: 'prj_1',
+          action: 'push',
+          sha: 'a' * 40,
+          expiresAt: at.add(const Duration(hours: 24)),
+        ),
+        const ApprovalDecided(
+          approvalId: 'apr_1',
+          projectId: 'prj_1',
+          action: 'prod_release',
+          state: ApprovalState.approved,
+          decidedBy: DecidedBy(
+            tokenId: 'tok_1',
+            name: 'Mac mini',
+            kind: DeviceTokenKind.app,
+          ),
+        ),
+        const ApprovalExpired(
+          approvalId: 'apr_1',
+          projectId: 'prj_1',
+          action: 'prod_release',
+        ),
+        const ProjectGatesChanged(
+          projectId: 'prj_1',
+          gates: {'prod_release': true, 'push': false},
+          changedBy: DeviceTokenKind.app,
+        ),
       ]) {
         final sequenced = SequencedEvent(seq: 9, at: at, event: event);
 
@@ -139,6 +175,10 @@ void main() {
         WorkflowSaved() => 'workflow saved',
         WorkflowRemoved() => 'workflow removed',
         RunDispatched() => 'run',
+        ApprovalRequested() => 'requested',
+        ApprovalDecided() => 'decided',
+        ApprovalExpired() => 'approval expired',
+        ProjectGatesChanged() => 'gates',
         UnknownEvent() => 'unknown',
       };
 
@@ -256,6 +296,50 @@ void main() {
           ),
         ),
         'run',
+      );
+      expect(
+        describe(
+          ApprovalRequested(
+            approvalId: 'a',
+            projectId: 'p',
+            action: 'push',
+            sha: 's',
+            expiresAt: DateTime.utc(2026),
+          ),
+        ),
+        'requested',
+      );
+      expect(
+        describe(
+          const ApprovalDecided(
+            approvalId: 'a',
+            projectId: 'p',
+            action: 'push',
+            state: ApprovalState.denied,
+            decidedBy: DecidedBy(
+              tokenId: 't',
+              name: 'n',
+              kind: DeviceTokenKind.cli,
+            ),
+          ),
+        ),
+        'decided',
+      );
+      expect(
+        describe(
+          const ApprovalExpired(approvalId: 'a', projectId: 'p', action: 'x'),
+        ),
+        'approval expired',
+      );
+      expect(
+        describe(
+          const ProjectGatesChanged(
+            projectId: 'p',
+            gates: {},
+            changedBy: DeviceTokenKind.app,
+          ),
+        ),
+        'gates',
       );
       expect(
         describe(EngineEvent.fromJson('x', const <String, dynamic>{})),
