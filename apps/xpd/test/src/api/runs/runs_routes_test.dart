@@ -1,7 +1,11 @@
 import 'dart:async';
 
+import 'package:shelf/shelf.dart';
+import 'package:shelf_router/shelf_router.dart';
 import 'package:test/test.dart';
 import 'package:xp_api/xp_api.dart';
+import 'package:xp_engine/xp_engine.dart';
+import 'package:xpd/xpd.dart';
 
 import '../../../helpers/test_engine.dart';
 import '../../../helpers/workflow_helpers.dart';
@@ -94,4 +98,56 @@ void main() {
       expect(response.statusCode, 404);
     });
   });
+
+  test(
+    'answers 409 when a job ended while the run was being cancelled',
+    () async {
+      final runs = InMemoryRunRepository();
+      final jobs = InMemoryJobRepository();
+      await runs.create(
+        RunRecord(
+          id: 'run_1',
+          projectId: 'prj_1',
+          workflowId: 'wf_1',
+          workflowVersionId: 'wfv_1',
+          sha: 'a' * 40,
+          locksProject: false,
+          createdAt: DateTime.utc(2026),
+        ),
+      );
+      await jobs.create(
+        JobRecord(
+          id: 'job_1',
+          workflowVersionId: 'wfv_1',
+          projectId: 'prj_1',
+          state: JobState.queued,
+          createdAt: DateTime.utc(2026),
+          runId: 'run_1',
+        ),
+        const [],
+      );
+      final router = Router();
+      RunsRoutes(RunService(runs: runs, jobs: jobs, control: _EndedJobs()))
+          .addTo(router);
+
+      final response = await router.call(
+        Request('POST', Uri.parse('http://localhost/runs/run_1/cancel')),
+      );
+
+      expect(response.statusCode, 409);
+    },
+  );
+}
+
+/// A job control whose jobs have all ended by the time it is asked.
+class _EndedJobs implements JobControl {
+  @override
+  Future<Job> cancel(String id) async =>
+      throw const JobStateException('Job has ended.');
+
+  @override
+  Future<Job> get(String id) => throw UnimplementedError();
+
+  @override
+  Future<Job> resume(String id, {int? fromStep}) => throw UnimplementedError();
 }
