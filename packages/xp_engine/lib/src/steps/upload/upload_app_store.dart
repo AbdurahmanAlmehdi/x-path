@@ -178,13 +178,14 @@ class UploadAppStoreStep
     final ipa = await intactArtifact(
       repository: repository,
       store: store,
-      jobId: context.jobId,
+      jobId: input.artifactJob ?? context.jobId,
       name: input.artifactName,
       kind: ArtifactKind.ipa,
     );
     if (ipa == null) {
       return StepFailed(
-        'This job has no intact IPA named ${input.artifactName}. Build the '
+        '${input.sourceOfArtifact} has no intact IPA named '
+        '${input.artifactName}. Build the '
         'iOS app first; a changed or missing file is not uploaded.',
       );
     }

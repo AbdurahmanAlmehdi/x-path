@@ -484,7 +484,7 @@ Mataa dev builds through `xp` can start after Phase 13, before the desktop app e
 
 ### Phase 14b: Runner agent
 
-- **Status:** Not started
+- **Status:** Done
 - **Scope:** `xp runner`: pairing, outbound WebSocket with backoff, job execution through the
   shared step runner, per-job secrets in a temporary keychain or tmpfs folder wiped at job end
   and at start, drain, one-shot mode.

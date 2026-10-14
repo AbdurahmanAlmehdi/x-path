@@ -223,6 +223,10 @@ void main() {
         projectId: 'prj_1',
         sha: 'a' * 40,
         name: 'Build prod for android',
+        repository: const LeaseRepository(
+          githubRepoId: 7,
+          sshUrl: 'git@github.com:owner/app.git',
+        ),
         stage: 1,
         capabilities: const ['android', 'flutter'],
         expiresAt: at,
@@ -324,6 +328,22 @@ void main() {
     test('refuses a frame that is not well formed', () {
       expect(
         () => EngineFrame.fromJson(const {'type': 'cancel'}),
+        throwsFormatException,
+      );
+      // A repository without its URL.
+      expect(
+        () => EngineFrame.fromJson(const {
+          'type': 'lease_offer',
+          'leaseId': 'l',
+          'jobId': 'j',
+          'projectId': 'p',
+          'repository': {'githubRepoId': 1},
+          'stage': 0,
+          'capabilities': <String>[],
+          'expiresAt': '2026-10-14T10:00:00Z',
+          'steps': <Object>[],
+          'secrets': <String>[],
+        }),
         throwsFormatException,
       );
       // A list with an item that is not a string.

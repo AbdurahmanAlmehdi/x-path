@@ -42,6 +42,7 @@ void main() {
       expect(offer.leaseId, startsWith('lse_'));
       expect(offer.projectId, 'prj_1');
       expect(offer.sha, 'a' * 40);
+      expect(offer.repository!.githubRepoId, 7);
       expect(offer.name, 'job 1');
       expect(offer.stage, 0);
       expect(offer.capabilities, ['ios-sign']);

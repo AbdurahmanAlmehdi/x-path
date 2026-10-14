@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 /// Where the secrets a job passes to its processes as files are kept.
 ///
 /// Each file is readable by the engine's user only (mode 0600) and the files
@@ -6,6 +8,10 @@
 abstract interface class SecretFileStore {
   /// Writes [contents] to a new file of the job [jobId] and returns its path.
   Future<String> write(String jobId, String name, String contents);
+
+  /// Writes [contents], any bytes (an Android keystore is binary), to a new
+  /// file of the job [jobId] and returns its path.
+  Future<String> writeBytes(String jobId, String name, List<int> contents);
 
   /// Deletes every file of the job [jobId].
   Future<void> deleteAll(String jobId);
@@ -19,13 +25,26 @@ class InMemorySecretFileStore implements SecretFileStore {
   /// Every file that was ever written, by path, deleted or not.
   final written = <String, String>{};
 
+  /// The exact bytes of every file that was ever written, by path.
+  final writtenBytes = <String, List<int>>{};
+
   /// The jobs whose files were deleted, in order.
   final deleted = <String>[];
 
   @override
-  Future<String> write(String jobId, String name, String contents) async {
+  Future<String> write(String jobId, String name, String contents) =>
+      writeBytes(jobId, name, utf8.encode(contents));
+
+  @override
+  Future<String> writeBytes(
+    String jobId,
+    String name,
+    List<int> contents,
+  ) async {
     final path = '/secrets/$jobId/$name';
-    files[path] = written[path] = contents;
+    final text = utf8.decode(contents, allowMalformed: true);
+    files[path] = written[path] = text;
+    writtenBytes[path] = List.of(contents);
     return path;
   }
 

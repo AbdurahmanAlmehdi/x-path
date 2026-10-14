@@ -317,6 +317,7 @@ class StepPlanners implements StepCatalog {
       'upload.firebase',
       const {
         'artifactName',
+        'artifactsFrom',
         'appId',
         'testerEmails',
         'groupAliases',
@@ -332,6 +333,7 @@ class StepPlanners implements StepCatalog {
           'testerEmails': p.list('testerEmails'),
           'groupAliases': p.list('groupAliases'),
           'releaseNotes': ?_blankToNull(p.text('releaseNotes')),
+          'artifactJob': ?_artifactJob(p),
         };
       },
     ),
@@ -339,6 +341,7 @@ class StepPlanners implements StepCatalog {
       'upload.play',
       const {
         'artifactName',
+        'artifactsFrom',
         'packageName',
         'track',
         'status',
@@ -361,12 +364,13 @@ class StepPlanners implements StepCatalog {
           'userFraction': ?p.number('userFraction'),
           'releaseName': ?p.text('releaseName'),
           'releaseNotes': p.strings('releaseNotes'),
+          'artifactJob': ?_artifactJob(p),
         };
       },
     ),
     StepPlanSpec(
       'upload.appStore',
-      const {'artifactName', 'bundleId', 'appleAppId'},
+      const {'artifactName', 'artifactsFrom', 'bundleId', 'appleAppId'},
       (p) async {
         final version = _version(p);
         final key = p.job.credential(CredentialKind.ascKey);
@@ -394,6 +398,7 @@ class StepPlanners implements StepCatalog {
                       p.fail('The Apple ID credential has no Apple ID.'),
                   'passwordSecret': appleId.secretKey,
                 },
+          'artifactJob': ?_artifactJob(p),
         };
       },
       capabilities: (_) => const {Capability.iosSign},
@@ -541,6 +546,16 @@ class StepPlanners implements StepCatalog {
     return flavor?.shorebirdAppId ??
         app.shorebird?.flavorAppIds[flavor?.name] ??
         app.shorebird?.appId;
+  }
+
+  /// The job whose artifacts an upload step takes its file from
+  /// (`artifactsFrom`), as planned: a build job of an earlier stage whose
+  /// matrix cell agrees with this one (ADR 0010). `null` for the job itself.
+  static String? _artifactJob(StepPlanning p) {
+    final source = p.text('artifactsFrom');
+    if (source == null) return null;
+    return p.job.commitSources[source] ??
+        p.fail('The job "$source" has no job to take the artifact from here.');
   }
 
   static String? _secretOf(StepPlanning p, CredentialKind kind) =>

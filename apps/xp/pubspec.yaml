@@ -10,12 +10,14 @@ environment:
 dependencies:
   args: ^2.7.0
   cli_completion: ^0.6.0
+  crypto: ^3.0.7
   # Pinned exactly: dart_mcp is 0.x and changes between minors (the plan's
   # risk table). Only lib/src/mcp/dart_mcp_adapter.dart imports it.
   dart_mcp: 0.5.2
   http: ^1.6.0
   mason_logger: ^0.3.5
   path: ^1.9.1
+  web_socket_channel: ^3.0.3
   xp_adapters: any
   xp_api: any
   xp_client: any
@@ -23,7 +25,6 @@ dependencies:
   xp_secrets: any
 
 dev_dependencies:
-  crypto: ^3.0.7
   mocktail: ^1.0.5
   test: ^1.31.0
   very_good_analysis: 11.0.0
