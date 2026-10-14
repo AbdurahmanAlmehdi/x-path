@@ -64,6 +64,30 @@ void main() {
     );
   });
 
+  test('a job that ran on a remote runner holds no lease any more', () async {
+    await jobs.create(
+      JobRecord(
+        id: 'job_r',
+        workflowVersionId: 'wfv_1',
+        projectId: 'prj_1',
+        state: JobState.running,
+        runnerId: 'rnr_1',
+        leaseUntil: clock.now().add(const Duration(seconds: 60)),
+        createdAt: clock.now(),
+      ),
+      [step('job_r', 0, state: StepState.running)],
+    );
+
+    final report = await recovery.recover();
+
+    expect(report.resumable, ['job_r']);
+    final job = (await jobs.get('job_r'))!;
+    expect(job.state, JobState.interrupted);
+    expect(job.runnerId, isNull);
+    expect(job.leaseUntil, isNull);
+    expect(control.signals, isEmpty);
+  });
+
   test('does nothing when no job was running', () async {
     await addJob('job_q', [step('job_q', 0)], state: JobState.queued);
     await addJob('job_f', [step('job_f', 0)], state: JobState.failed);

@@ -57,6 +57,32 @@ void main() {
     });
   });
 
+  group('resolveRunner', () {
+    test('passes an id through without asking', () async {
+      expect(await resolveRunner(client, 'rnr_9'), 'rnr_9');
+      verifyNever(() => client.listRunners());
+    });
+
+    test('finds a runner by name', () async {
+      when(() => client.listRunners()).thenAnswer((_) async => [sample.runner]);
+
+      expect(await resolveRunner(client, 'mac-mini'), 'rnr_1');
+    });
+
+    test('says when nothing matches', () async {
+      when(() => client.listRunners()).thenAnswer((_) async => []);
+
+      await expectLater(
+        resolveRunner(client, 'nope'),
+        throwsA(
+          isA<ReferenceException>()
+              .having((e) => e.notFound, 'notFound', isTrue)
+              .having((e) => '$e', 'message', contains('"nope"')),
+        ),
+      );
+    });
+  });
+
   group('resolveWorkflow', () {
     test('passes an id through', () async {
       expect(await resolveWorkflow(client, 'prj_1', 'wf_3'), 'wf_3');

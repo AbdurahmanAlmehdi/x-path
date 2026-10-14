@@ -17,6 +17,7 @@ targets:
           - lib/src/release.dart
           - lib/src/release_notes.dart
           - lib/src/run.dart
+          - lib/src/runner.dart
           - lib/src/storage.dart
           - lib/src/test_run.dart
           - lib/src/version_response.dart

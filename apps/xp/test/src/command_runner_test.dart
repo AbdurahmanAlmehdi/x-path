@@ -172,8 +172,11 @@ void main() {
         }
       });
 
-      test('has no command for the runners yet', () {
-        expect(env.runner.commands, isNot(contains('runners')));
+      test('pairs and revokes runners', () {
+        expect(
+          env.runner.commands['runners']!.subcommands.keys,
+          unorderedEquals(['pair', 'revoke']),
+        );
       });
 
       test('prints the usage of a group', () async {

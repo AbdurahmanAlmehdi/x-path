@@ -65,6 +65,9 @@ class ThrowingDeviceTokenRepository implements DeviceTokenRepository {
 
   @override
   Future<void> add(DeviceToken token) async {}
+
+  @override
+  Future<bool> revoke(String id, {required DateTime at}) async => false;
 }
 
 /// Build number counters for any app: the first number of an app is 1.
@@ -121,6 +124,9 @@ class TestEngine {
     required this.shorebirdRecords,
     required this.dataFiles,
     required this.housekeepingSettings,
+    required this.runnerRepository,
+    required this.runnerHub,
+    required this.runnerService,
   });
 
   static Future<TestEngine> start({
@@ -269,6 +275,30 @@ class TestEngine {
       worktreeAt: (mirror, name) => '/worktrees/$name',
       releases: releaseService,
     );
+    final runnerRepository = InMemoryRunnerRepository();
+    final runnerHub = RunnerHub(
+      runners: runnerRepository,
+      jobs: jobRepository,
+      runner: jobs,
+      scheduler: scheduler,
+      logs: logs,
+      events: events,
+      clock: clock,
+      secrets: credentialSecrets,
+      masker: masker,
+      grants: SigningSecretGrants(credentialRepository),
+      engineVersion: '9.9.9',
+      onError: (error, _) => errors.add(error),
+    );
+    scheduler.remoteJobs = runnerHub;
+    final runnerService = RunnerService(
+      runners: runnerRepository,
+      pairing: InMemoryPairingTokenRepository(),
+      tokens: tokens,
+      presence: runnerHub,
+      events: events,
+      clock: clock,
+    );
     final shorebirdRecords = InMemoryShorebirdReleaseRepository();
     final dataFiles = InMemoryDataFiles();
     final housekeepingSettings = InMemoryHousekeepingRepository();
@@ -348,6 +378,16 @@ class TestEngine {
         git: git,
       ),
       housekeeping: housekeeping,
+      runners: runnerService,
+      runnerHub: runnerHub,
+      runnerArtifacts: RunnerArtifacts(
+        recorder: ArtifactRecorder(
+          store: artifactStore,
+          repository: artifactRepository,
+          clock: clock,
+        ),
+        holdsLease: runnerHub.holdsLease,
+      ),
       clock: clock,
       engineVersion: '9.9.9',
       onError: (error, _) => errors.add(error),
@@ -388,6 +428,9 @@ class TestEngine {
       shorebirdRecords: shorebirdRecords,
       dataFiles: dataFiles,
       housekeepingSettings: housekeepingSettings,
+      runnerRepository: runnerRepository,
+      runnerHub: runnerHub,
+      runnerService: runnerService,
     );
   }
 
@@ -457,6 +500,15 @@ class TestEngine {
 
   /// Where housekeeping keeps its settings.
   final InMemoryHousekeepingRepository housekeepingSettings;
+
+  /// The runners of the engine.
+  final InMemoryRunnerRepository runnerRepository;
+
+  /// The connections and leases of the runners.
+  final RunnerHub runnerHub;
+
+  /// Pairs, lists and revokes runners.
+  final RunnerService runnerService;
 
   /// The files of the folders a project can be added from, by path.
   final Map<String, Map<String, String>> folders;
@@ -598,6 +650,44 @@ class TestEngine {
     return JobLogStream(socket);
   }
 
+  /// Opens the connection of a runner with [token] as its credential.
+  Future<RunnerStream> connectRunner({String? token}) async {
+    final bearer = token ?? secret;
+    final socket = await WebSocket.connect(
+      'ws://127.0.0.1:${uri.port}/runners/connect',
+      headers: {if (bearer.isNotEmpty) 'authorization': 'Bearer $bearer'},
+    );
+    return RunnerStream(socket);
+  }
+
+  /// The events of type [T] logged so far.
+  Future<List<T>> eventsOf<T extends EngineEvent>() async {
+    final logged = <SequencedEvent>[];
+    final subscription = events.subscribe(after: 0).listen(logged.add);
+    await Future<void>.delayed(Duration.zero);
+    await subscription.cancel();
+    return [
+      for (final entry in logged) ?(entry.event is T ? entry.event as T : null),
+    ];
+  }
+
+  /// Makes a token of [kind] and returns its secret.
+  Future<String> tokenOf(DeviceTokenKind kind) async =>
+      (await tokens.issue(name: kind.name, kind: kind)).secret;
+
+  /// Pairs a runner called [name] and returns its credential.
+  Future<({Runner runner, String token})> pairRunner([
+    String name = 'mac-mini',
+  ]) async {
+    final owner = (await tokens.authenticate(secret))!;
+    final pairing = await runnerService.createPairingToken(
+      name: name,
+      by: owner,
+    );
+    final paired = await runnerService.pair(pairing.token);
+    return (runner: paired.runner, token: paired.token);
+  }
+
   /// Opens the event stream.
   Future<EventStream> connect({int? after, String? token}) async {
     final query = after == null ? '' : '?after=$after';
@@ -640,6 +730,52 @@ class EventStream {
       isFalse,
       reason: 'the engine sent another frame instead of closing',
     );
+    return socket.closeCode;
+  }
+
+  Future<void> close() async {
+    await socket.close();
+    await _frames.cancel(immediate: true);
+  }
+}
+
+/// The frames of one `/runners/connect` connection, as the runner sees them.
+class RunnerStream {
+  new(this.socket)
+    : _frames = StreamQueue(
+        socket.map(
+          (frame) => EngineFrame.fromJson(
+            jsonDecode(frame as String) as Map<String, dynamic>,
+          ),
+        ),
+      );
+
+  final WebSocket socket;
+  final StreamQueue<EngineFrame> _frames;
+
+  /// Sends a frame to the engine.
+  void send(RunnerFrame frame) => socket.add(jsonEncode(frame.toJson()));
+
+  /// Sends text as it is.
+  void sendText(String text) => socket.add(text);
+
+  /// The next frame, failing the test if none arrives.
+  Future<EngineFrame> next() =>
+      _frames.next.timeout(const Duration(seconds: 5));
+
+  /// The next frame of type [T], skipping others.
+  Future<T> nextOf<T extends EngineFrame>() async {
+    while (true) {
+      final frame = await next();
+      if (frame is T) return frame;
+    }
+  }
+
+  /// Waits for the engine to close the socket and returns its close code.
+  Future<int?> closeCode() async {
+    while (await _frames.hasNext.timeout(const Duration(seconds: 5))) {
+      await _frames.next;
+    }
     return socket.closeCode;
   }
 
