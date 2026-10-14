@@ -656,6 +656,30 @@ void main() {
     expect(api.map((r) => r.tokenProblem), [isNull, isNotNull]);
   });
 
+  test(
+    'uploadVersionCode stands in for the manifest of a real bundle',
+    () async {
+      server.uploadVersionCode = 42;
+      final editId = await insertEdit();
+
+      final response = await post(
+        '/upload$_api/edits/$editId/bundles',
+        bytes: utf8.encode('PK not a fake aab'),
+        query: const {'uploadType': 'media'},
+      );
+
+      expect(response.statusCode, 200);
+      expect(json(response)['versionCode'], 42);
+      server.uploadVersionCode = null;
+      final refused = await post(
+        '/upload$_api/edits/$editId/bundles',
+        bytes: utf8.encode('PK not a fake aab'),
+        query: const {'uploadType': 'media'},
+      );
+      expect(refused.statusCode, 400);
+    },
+  );
+
   test('a bundle is made from its version code', () {
     expect(utf8.decode(fakeAab(7, padding: 3)), 'fake-aab versionCode=7\nxxx');
   });

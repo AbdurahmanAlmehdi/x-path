@@ -17,8 +17,27 @@
 #   - dispatches `prod-release` twice and checks that the second queues behind
 #     the first (the project lock, D-11) and runs once the first is cancelled.
 #
-# `release_e2e.sh prod` (the whole production release against fake stores and
-# a fake GitHub, up to the merged pull request) is Phase 12b.
+#   release_e2e.sh prod
+#
+# runs a production release of the fixture app from `draft` to `merged` through
+# the same engine (Phase 12b): `prod-release` for Android and iOS, the owner's
+# approvals through an app token, the stores (fake App Store Connect with an API
+# key, fake Google Play, fake Firebase) moving from review to approved to live,
+# the merge of the release pull request on a fake GitHub (a merge commit, after
+# an approval of the `merge` gate), and then the checks: the state `merged`, the
+# tag `v<x.y.z>+<build>` on the tip of the release branch in the fake origin,
+# the owner's folder unchanged (git status, HEAD, refs and the hash of every
+# file) and no secret in a stored log, the database, the output of the engine or
+# the arguments of any process the engine started (PATH shims for `perl`, the
+# trampoline every step process goes through, and for `git` log them).
+#
+# What is real and what is faked in `prod`: the engine, its database, git
+# mirror, worktrees, tag and push, the Android build (a real AAB through Gradle)
+# and its upload to the fake Play are real. This Mac has no signing identity and
+# Apple has no fake, so `flutter build ipa` (an SDK wrapper writes a placeholder
+# IPA) and `xcrun altool` (a shim prints a successful upload) are faked; the
+# engine still schedules the iOS job on a Mac with Xcode, reads the IPA from the
+# artifact store and calls altool as it would. `prod` needs macOS with Xcode.
 #
 # Needs the repo's Dart and Flutter (3.47.6) first on PATH, git, perl, and the
 # Android SDK (ANDROID_HOME, ANDROID_SDK_ROOT, or the default location of
@@ -30,9 +49,8 @@
 set -euo pipefail
 
 mode="${1:-}"
-if [[ "$mode" != "dev" ]]; then
-  echo "usage: release_e2e.sh dev" >&2
-  echo "(release_e2e.sh prod arrives with Phase 12b)" >&2
+if [[ "$mode" != "dev" && "$mode" != "prod" ]]; then
+  echo "usage: release_e2e.sh dev|prod" >&2
   exit 64
 fi
 
@@ -48,6 +66,12 @@ fail() {
 for tool in dart flutter git perl; do
   command -v "$tool" >/dev/null 2>&1 || fail "$tool is not on PATH"
 done
+
+if [[ "$mode" == "prod" ]]; then
+  [[ "$(uname -s)" == "Darwin" ]] || fail "prod needs macOS: the iOS job of the release runs where Xcode is"
+  xcode-select -p >/dev/null 2>&1 || fail "prod needs Xcode (xcode-select -p finds none)"
+  command -v xcrun >/dev/null 2>&1 || fail "xcrun is not on PATH"
+fi
 
 sdk=""
 for candidate in "${ANDROID_HOME:-}" "${ANDROID_SDK_ROOT:-}" \
@@ -74,7 +98,11 @@ echo "Building the xpd bundle..."
 xpd="$work/build/bundle/bin/xpd"
 [[ -x "$xpd" ]] || fail "no executable at $xpd"
 
-echo "Running a dev build and a production release lock through the engine..."
+if [[ "$mode" == "prod" ]]; then
+  echo "Running a production release from draft to merged through the engine..."
+else
+  echo "Running a dev build and a production release lock through the engine..."
+fi
 (
   cd "$root/apps/xpd"
   dart run tool/release_e2e.dart \
@@ -85,4 +113,8 @@ echo "Running a dev build and a production release lock through the engine..."
     --flutter-sdk "$flutter_sdk"
 ) || fail "the release e2e failed"
 
-echo "OK: dev-build built the fixture through the engine (APK, manifest, Firebase release), and a second production release queued behind the first."
+if [[ "$mode" == "prod" ]]; then
+  echo "OK: the production release walked draft, building, uploaded, in_review, approved, live and merged; the tag is on the release branch in the origin, the source folder is unchanged and no secret is in the logs, the database or the process arguments."
+else
+  echo "OK: dev-build built the fixture through the engine (APK, manifest, Firebase release), and a second production release queued behind the first."
+fi

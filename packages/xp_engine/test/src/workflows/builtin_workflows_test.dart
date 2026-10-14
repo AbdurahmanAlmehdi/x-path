@@ -6,10 +6,11 @@ import '../../helpers/all_steps.dart';
 void main() {
   final parser = WorkflowParser(StepPlanners(allSteps()));
 
-  test('are the four of the plan', () {
+  test('are the four of the plan and the merge of a release', () {
     expect(builtinWorkflows.keys, [
       'dev-build',
       'prod-release',
+      'release-merge',
       'shorebird-patch',
       'test',
     ]);
@@ -33,6 +34,7 @@ void main() {
       expect(locks('prod-release'), isTrue);
       expect(locks('shorebird-patch'), isTrue);
       expect(locks('dev-build'), isFalse);
+      expect(locks('release-merge'), isFalse);
       expect(locks('test'), isFalse);
     },
   );
@@ -45,6 +47,7 @@ void main() {
     };
 
     expect(gates('prod-release'), {GateAction.prodRelease, GateAction.push});
+    expect(gates('release-merge'), {GateAction.merge});
     expect(gates('shorebird-patch'), {GateAction.prodPatch, GateAction.push});
     expect(gates('dev-build'), isEmpty);
     expect(gates('test'), isEmpty);

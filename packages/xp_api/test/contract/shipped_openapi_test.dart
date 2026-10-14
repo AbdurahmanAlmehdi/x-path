@@ -581,6 +581,121 @@ void main() {
       );
     });
 
+    test('documents the release endpoints', () {
+      final unauthorized = jsonEncode(
+        ErrorResponse.of(ApiErrorCode.unauthorized, 'm').toJson(),
+      );
+      final forbidden = jsonEncode(
+        ErrorResponse.of(ApiErrorCode.forbidden, 'm').toJson(),
+      );
+
+      for (final (method, path) in [
+        ('GET', '/releases'),
+        ('GET', '/releases/rel_1'),
+        ('POST', '/releases/rel_1/refresh'),
+        ('POST', '/releases/rel_1/stores/apple/status'),
+        ('POST', '/releases/rel_1/builds'),
+        ('POST', '/releases/rel_1/merge'),
+        ('POST', '/releases/rel_1/abandon'),
+      ]) {
+        expect(
+          shipped.validateResponse(
+            method: method,
+            path: path,
+            statusCode: 401,
+            body: unauthorized,
+            contentType: 'application/json',
+          ),
+          isEmpty,
+          reason: '$method $path',
+        );
+      }
+      for (final (method, path) in [
+        ('POST', '/releases/rel_1/stores/play/status'),
+        ('POST', '/releases/rel_1/abandon'),
+      ]) {
+        expect(
+          shipped.validateResponse(
+            method: method,
+            path: path,
+            statusCode: 403,
+            body: forbidden,
+            contentType: 'application/json',
+          ),
+          isEmpty,
+          reason: '$method $path',
+        );
+      }
+    });
+
+    test('describes the release models', () {
+      final at = DateTime.utc(2026, 10, 14);
+      final release = Release(
+        id: 'rel_1',
+        projectId: 'prj_1',
+        app: '.',
+        flavor: 'prod',
+        version: '1.2.0',
+        build: 45,
+        state: ReleaseState.live,
+        stores: [
+          StoreStatus(
+            store: ReleaseStore.apple,
+            state: StoreState.live,
+            source: StatusSource.api,
+            detail: 'READY_FOR_DISTRIBUTION',
+            checkedAt: at,
+            changedAt: at,
+            note: 'n',
+          ),
+        ],
+        builds: [ReleaseBuild(build: 45, runId: 'run_1', createdAt: at)],
+        mergeEnabled: true,
+        branch: 'release/1.2.0',
+        baseBranch: 'main',
+        tag: 'v1.2.0+45',
+        headSha: 'a' * 40,
+        prNumber: 7,
+        prUrl: 'https://github.com/o/r/pull/7',
+        mergeCommit: 'b' * 40,
+        mergeRunId: 'run_2',
+        message: 'm',
+        createdAt: at,
+        updatedAt: at,
+      );
+
+      expect(shipped.validateSchema('Release', release.toJson()), isEmpty);
+      expect(
+        shipped.validateSchema(
+          'ReleasesResponse',
+          ReleasesResponse([release]).toJson(),
+        ),
+        isEmpty,
+      );
+      expect(
+        shipped.validateSchema(
+          'StoreStatusRequest',
+          const StoreStatusRequest(state: StoreState.live).toJson(),
+        ),
+        isEmpty,
+      );
+      expect(
+        shipped.validateSchema('StoreStatusRequest', {'state': 'rejected'}),
+        isNotEmpty,
+      );
+      expect(
+        shipped.validateSchema(
+          'AbandonRequest',
+          const AbandonRequest(reason: 'r').toJson(),
+        ),
+        isEmpty,
+      );
+      expect(
+        shipped.validateSchema('Release', {...release.toJson(), 'state': 'x'}),
+        isNotEmpty,
+      );
+    });
+
     test('describes every kind of credential request', () {
       const requests = <Map<String, Object?>>[
         {
@@ -706,6 +821,26 @@ void main() {
           projectId: 'prj_1',
           workflowId: 'wf_1',
           jobIds: ['job_1'],
+        ),
+        const ReleaseCreated(
+          releaseId: 'rel_1',
+          projectId: 'prj_1',
+          flavor: 'prod',
+          version: '1.2.0',
+          build: 45,
+        ),
+        const ReleaseStateChanged(
+          releaseId: 'rel_1',
+          projectId: 'prj_1',
+          from: ReleaseState.uploaded,
+          to: ReleaseState.inReview,
+        ),
+        const ReleaseStoreChanged(
+          releaseId: 'rel_1',
+          projectId: 'prj_1',
+          store: ReleaseStore.play,
+          state: StoreState.live,
+          source: StatusSource.api,
         ),
       ]) {
         final json = SequencedEvent(

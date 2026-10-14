@@ -22,11 +22,13 @@ void main() {
         'bump': 'minor',
         'version': '1.3.0',
         'releaseVersion': '1.2.0+45',
+        'release': 'rel_1',
         'inputs': {'notes': 'hi'},
       });
 
       expect(request.ref, 'release/1.2.0');
       expect(request.bump, VersionBump.minor);
+      expect(request.release, 'rel_1');
       expect(request.inputs, {'notes': 'hi'});
       expect(DispatchRequest.fromJson(request.toJson()), request);
     });

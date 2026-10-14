@@ -66,6 +66,19 @@ class HttpGitHubClient implements GitHubClient {
       _pullRequest(await _json('GET', _pullsPath(repo, number)));
 
   @override
+  Future<GitHubPullRequest?> findPullRequest(
+    GitHubRepo repo, {
+    required String head,
+    required String base,
+  }) async {
+    final found = await _list(
+      _pullsPath(repo),
+      query: {'head': '${repo.owner}:$head', 'base': base, 'state': 'open'},
+    );
+    return found.isEmpty ? null : _pullRequest(found.first);
+  }
+
+  @override
   Future<GitHubMergeResult> mergePullRequest(
     GitHubRepo repo,
     int number, {
@@ -95,6 +108,31 @@ class HttpGitHubClient implements GitHubClient {
     String method,
     List<String> segments, {
     Map<String, Object?>? body,
+  }) async => _decode(await _call(method, segments, body: body));
+
+  /// Calls the API and decodes the JSON array of objects it answers with.
+  Future<List<Map<String, dynamic>>> _list(
+    List<String> segments, {
+    required Map<String, String> query,
+  }) async {
+    final response = await _call('GET', segments, query: query);
+    try {
+      return (jsonDecode(utf8.decode(response.bodyBytes)) as List<dynamic>)
+          .cast<Map<String, dynamic>>();
+    } on Object {
+      throw GitHubException(
+        response.statusCode,
+        'GitHub answered with something that is not a JSON array.',
+      );
+    }
+  }
+
+  /// Calls the API and returns the successful response.
+  Future<http.Response> _call(
+    String method,
+    List<String> segments, {
+    Map<String, Object?>? body,
+    Map<String, String>? query,
   }) async {
     final token = await _secrets.read(githubTokenSecretKey);
     if (token == null) {
@@ -107,6 +145,7 @@ class HttpGitHubClient implements GitHubClient {
         ..._baseUrl.pathSegments.where((s) => s.isNotEmpty),
         ...segments,
       ],
+      queryParameters: query,
     );
     for (var hops = 0; ; hops++) {
       final request = http.Request(method, url)
@@ -127,7 +166,7 @@ class HttpGitHubClient implements GitHubClient {
         continue;
       }
       if (response.statusCode >= 200 && response.statusCode < 300) {
-        return _decode(response);
+        return response;
       }
       throw _error(response);
     }

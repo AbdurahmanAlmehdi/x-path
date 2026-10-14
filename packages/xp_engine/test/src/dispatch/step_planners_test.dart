@@ -60,6 +60,8 @@ void main() {
         'git.push',
         'git.releaseBranch',
         'git.tag',
+        'github.createPr',
+        'github.mergePr',
         'guard',
         'ios.stripAndReexport',
         'record.manifest',

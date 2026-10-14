@@ -67,6 +67,22 @@ class ThrowingDeviceTokenRepository implements DeviceTokenRepository {
   Future<void> add(DeviceToken token) async {}
 }
 
+/// Build number counters for any app: the first number of an app is 1.
+class _AutoCounters implements BuildCounterRepository {
+  final _counters = <(String, String), int>{};
+
+  @override
+  Future<int> allocate({
+    required String projectId,
+    required String appPath,
+    required int seed,
+  }) async {
+    final key = (projectId, appPath);
+    final current = _counters[key] ?? 0;
+    return _counters[key] = (current > seed ? current : seed) + 1;
+  }
+}
+
 /// An engine on a free loopback port with everything in memory.
 class TestEngine {
   new _({
@@ -98,6 +114,10 @@ class TestEngine {
     required this.gate,
     required this.approvals,
     required this.approvalRepository,
+    required this.releaseService,
+    required this.releaseRepository,
+    required this.appleStatus,
+    required this.playStatus,
   });
 
   static Future<TestEngine> start({
@@ -153,10 +173,14 @@ class TestEngine {
       clock: clock,
       resume: (projectId) => scheduler.resumeWaiting(projectId: projectId),
     );
+    final releaseRepository = InMemoryReleaseRepository();
     final registry = StepRegistry([
       const CommandStep(),
       GateStep(realApprovals ? approvals : gate),
       GitCheckoutStep(git: git, jobs: jobRepository),
+      VersionBumpStep(git: git, workspaces: (_) => InMemoryWorkspace(const {})),
+      GitHubCreatePrStep(github),
+      GitHubMergePrStep(github: github, releases: releaseRepository),
     ]);
     final jobs = JobRunner(
       jobs: jobRepository,
@@ -195,7 +219,30 @@ class TestEngine {
       events: events,
       clock: clock,
     );
-    final dispatcher = WorkflowDispatcher(
+    final runService = RunService(
+      runs: runRepository,
+      jobs: jobRepository,
+      control: scheduler,
+    );
+    final appleStatus = FakeStoreStatusSource(ReleaseStore.apple);
+    final playStatus = FakeStoreStatusSource(ReleaseStore.play);
+    late final WorkflowDispatcher dispatcher;
+    final releaseService = ReleaseService(
+      releases: releaseRepository,
+      jobs: jobRepository,
+      runRecords: runRepository,
+      runs: runService,
+      workflows: workflows,
+      poller: ReleaseStatusPoller(
+        sources: [appleStatus, playStatus],
+        clock: clock,
+      ),
+      events: events,
+      clock: clock,
+      dispatch: (projectId, workflowId, request) =>
+          dispatcher.dispatch(projectId, workflowId, request),
+    );
+    dispatcher = WorkflowDispatcher(
       workflows: workflows,
       planners: planners,
       projects: projects,
@@ -203,7 +250,7 @@ class TestEngine {
       models: DefaultReleaseModels(),
       git: git,
       allocator: BuildNumberAllocator(
-        counters: InMemoryBuildCounterRepository(const []),
+        counters: _AutoCounters(),
         stores: FakeStoreBuildNumbers(),
         git: git,
       ),
@@ -213,8 +260,11 @@ class TestEngine {
       scheduler: scheduler,
       events: events,
       clock: clock,
-      workspaces: (_) => InMemoryWorkspace(const {}),
+      workspaces: (_) => InMemoryWorkspace(const {
+        'pubspec.yaml': 'name: demo\nversion: 1.0.0+1\n',
+      }),
       worktreeAt: (mirror, name) => '/worktrees/$name',
+      releases: releaseService,
     );
     final issued = await tokens.issue(name: 'test', kind: DeviceTokenKind.app);
     final server = await XpdServer.start(
@@ -264,12 +314,9 @@ class TestEngine {
       ),
       workflows: workflows,
       dispatcher: dispatcher,
-      runs: RunService(
-        runs: runRepository,
-        jobs: jobRepository,
-        control: scheduler,
-      ),
+      runs: runService,
       approvals: approvals,
+      releases: releaseService,
       clock: clock,
       engineVersion: '9.9.9',
       onError: (error, _) => errors.add(error),
@@ -303,6 +350,10 @@ class TestEngine {
       gate: gate,
       approvals: approvals,
       approvalRepository: approvalRepository,
+      releaseService: releaseService,
+      releaseRepository: releaseRepository,
+      appleStatus: appleStatus,
+      playStatus: playStatus,
     );
   }
 
@@ -350,6 +401,19 @@ class TestEngine {
 
   /// Where the approvals are kept.
   final InMemoryApprovalRepository approvalRepository;
+
+  /// The releases of the engine.
+  final ReleaseService releaseService;
+
+  /// Where the releases are kept.
+  final InMemoryReleaseRepository releaseRepository;
+
+  /// What App Store Connect says about a release; it cannot be read until the
+  /// test gives it an answer.
+  final FakeStoreStatusSource appleStatus;
+
+  /// What Google Play says about a release.
+  final FakeStoreStatusSource playStatus;
 
   /// The files of the folders a project can be added from, by path.
   final Map<String, Map<String, String>> folders;
