@@ -2,6 +2,7 @@ import 'package:shelf/shelf.dart';
 import 'package:shelf_router/shelf_router.dart';
 import 'package:xp_api/xp_api.dart';
 import 'package:xp_engine/xp_engine.dart';
+import 'package:xpd/src/api/approvals/approvals_routes.dart';
 import 'package:xpd/src/api/artifacts/artifacts_routes.dart';
 import 'package:xpd/src/api/credentials/credentials_routes.dart';
 import 'package:xpd/src/api/events_route.dart';
@@ -35,6 +36,7 @@ Handler buildApiHandler({
   required WorkflowService workflows,
   required WorkflowDispatcher dispatcher,
   required RunService runs,
+  required ApprovalService approvals,
   required String engineVersion,
   void Function(Object error, StackTrace stackTrace)? onError,
 }) {
@@ -56,6 +58,7 @@ Handler buildApiHandler({
   CredentialsRoutes(credentials).addTo(router);
   WorkflowsRoutes(workflows, dispatcher).addTo(router);
   RunsRoutes(runs).addTo(router);
+  ApprovalsRoutes(approvals).addTo(router);
   return const Pipeline()
       .addMiddleware(errorMiddleware(onError: onError))
       .addMiddleware(authMiddleware(tokens, publicPaths: publicPaths))

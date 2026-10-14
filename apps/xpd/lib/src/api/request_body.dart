@@ -21,9 +21,26 @@ Future<T> readJsonBody<T>(
   Request request,
   T Function(Map<String, dynamic> json) fromJson,
 ) async {
+  final text = await request.readAsString();
+  final body = _decode(text, fromJson);
+  return body;
+}
+
+/// Like [readJsonBody], but a request without a body gives [whenEmpty].
+Future<T> readOptionalJsonBody<T>(
+  Request request,
+  T Function(Map<String, dynamic> json) fromJson, {
+  required T whenEmpty,
+}) async {
+  final text = await request.readAsString();
+  final body = text.trim().isEmpty ? whenEmpty : _decode(text, fromJson);
+  return body;
+}
+
+T _decode<T>(String text, T Function(Map<String, dynamic> json) fromJson) {
   final Object? decoded;
   try {
-    decoded = jsonDecode(await request.readAsString());
+    decoded = jsonDecode(text);
   } on FormatException {
     throw const BadRequestException('The body is not valid JSON.');
   }

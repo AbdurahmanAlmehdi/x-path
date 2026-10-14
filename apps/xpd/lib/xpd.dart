@@ -2,6 +2,7 @@
 library;
 
 export 'src/api/api_handler.dart';
+export 'src/api/approvals/approvals_routes.dart';
 export 'src/api/artifacts/artifacts_routes.dart';
 export 'src/api/credentials/credentials_routes.dart';
 export 'src/api/events_route.dart';
