@@ -40,6 +40,16 @@ class SqliteDeviceTokenRepository implements DeviceTokenRepository {
     );
   }
 
+  @override
+  Future<bool> revoke(String id, {required DateTime at}) async {
+    _database.connection.execute(
+      'UPDATE device_token SET revoked_at = ? '
+      'WHERE id = ? AND revoked_at IS NULL',
+      [toDatabaseTime(at), id],
+    );
+    return _database.connection.updatedRows > 0;
+  }
+
   static DeviceToken _fromRow(Row row) {
     final revokedAt = row['revoked_at'] as int?;
     return DeviceToken(

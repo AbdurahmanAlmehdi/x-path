@@ -1,6 +1,7 @@
 import 'package:xp_client/xp_client.dart';
 
-/// A name the user typed matches no project or workflow, or more than one.
+/// A name the user typed matches no project, workflow or runner, or more than
+/// one.
 class ReferenceException implements Exception {
   /// Creates the exception.
   const new(this.message, {required this.notFound});
@@ -53,6 +54,18 @@ Future<String> resolveWorkflow(
   }
   throw ReferenceException(
     'No workflow "$reference" in this project. See: xp workflows list',
+    notFound: true,
+  );
+}
+
+/// The id of the runner called [reference]: an id (`rnr_...`) or its name.
+Future<String> resolveRunner(XpClient client, String reference) async {
+  if (reference.startsWith('rnr_')) return reference;
+  for (final runner in await client.listRunners()) {
+    if (runner.name == reference) return runner.id;
+  }
+  throw ReferenceException(
+    'No runner "$reference". Give the name it was paired with, or its id.',
     notFound: true,
   );
 }

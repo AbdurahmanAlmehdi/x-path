@@ -29,6 +29,14 @@ import 'package:xp_engine/src/scheduler/scheduler_runner.dart';
 /// - **Slots.** A runner runs at most `slots` jobs at once, and only one job
 ///   that needs `ios-sign` (the keychain and Xcode cannot share).
 /// - **Capabilities.** A job goes to a runner that can do everything it needs.
+/// - **Engine-only steps.** A runner may refuse a job by its steps: a remote
+///   runner never gets a job with an upload or another step that needs what
+///   only the engine has (D-09, `RemoteStepPolicy`).
+/// - **Placement.** The local runner is preferred: a job that fits the engine
+///   and has a free slot there runs on the engine, and a remote runner takes
+///   what the engine cannot do or has no slot for. Among remote runners the
+///   least loaded one (its running jobs per slot) goes first, then the one
+///   that connected first.
 /// - **Order.** Runs are served oldest first, their jobs in stage and creation
 ///   order. A job that cannot start (no free slot, a locked project) does not
 ///   hold up the jobs behind it that can. Nothing depends on the clock or on
@@ -71,6 +79,11 @@ class Scheduler implements JobControl {
   void removeRunner(String id) =>
       _targets.removeWhere((runner) => runner.id == id);
 
+  /// The place where jobs that run on remote runners are cancelled, if
+  /// there is one. Set once, after the runners hub exists: the hub needs the
+  /// scheduler, so the scheduler cannot take it in its constructor.
+  RemoteJobs? remoteJobs;
+
   /// Stops starting jobs: the engine is shutting down.
   void stop() => _stopped = true;
 
@@ -81,7 +94,10 @@ class Scheduler implements JobControl {
 
   @override
   Future<Job> cancel(String id) async {
-    final job = await _runner.cancel(id);
+    final remote = remoteJobs;
+    final job = remote != null && await remote.cancel(id)
+        ? await get(id)
+        : await _runner.cancel(id);
     await pump();
     return job;
   }
@@ -231,9 +247,12 @@ class Scheduler implements JobControl {
         waitingOn[run.projectId] = run.id;
       }
       for (final job in queued) {
-        final runner = _place(job, used, signing);
+        final kinds = [
+          for (final step in await _records.steps(job.id)) step.kind,
+        ];
+        final runner = _place(job, kinds, used, signing);
         if (runner == null) {
-          await _note(job, _whyNoRunner(job, used, signing));
+          await _note(job, _whyNoRunner(job, kinds, used, signing));
           continue;
         }
         if (await _launch(runner, job)) {
@@ -266,23 +285,37 @@ class Scheduler implements JobControl {
 
   SchedulerRunner? _place(
     JobRecord job,
+    List<String> kinds,
     Map<String, int> used,
     Set<String> signing,
   ) {
     final needs = _needs(job);
+    SchedulerRunner? best;
+    var bestLoad = 0.0;
     for (final runner in _targets) {
-      if (!runner.capabilities.containsAll(needs)) continue;
-      if ((used[runner.id] ?? 0) >= runner.slots) continue;
+      if (!runner.capabilities.containsAll(needs) || !runner.accepts(kinds)) {
+        continue;
+      }
+      final running = used[runner.id] ?? 0;
+      if (running >= runner.slots) continue;
       if (needs.contains(Capability.iosSign) && signing.contains(runner.id)) {
         continue;
       }
-      return runner;
+      // The engine first: it has the job's worktree, the secrets and the
+      // stores at hand.
+      if (runner.id == localRunnerId) return runner;
+      final load = running / runner.slots;
+      if (best == null || load < bestLoad) {
+        best = runner;
+        bestLoad = load;
+      }
     }
-    return null;
+    return best;
   }
 
   String _whyNoRunner(
     JobRecord job,
+    List<String> kinds,
     Map<String, int> used,
     Set<String> signing,
   ) {
@@ -293,12 +326,21 @@ class Scheduler implements JobControl {
     if (capable.isEmpty) {
       return 'No runner can do ${needs.map((c) => c.wire).join(', ')}.';
     }
+    final accepting = capable.where((runner) => runner.accepts(kinds)).toList();
+    if (accepting.isEmpty) {
+      final engineOnly = {
+        for (final kind in kinds)
+          if (!capable.any((runner) => runner.accepts([kind]))) kind,
+      }.toList()..sort();
+      return 'Only the engine runs ${engineOnly.join(', ')}, and the engine '
+          'cannot do ${needs.map((c) => c.wire).join(', ')}.';
+    }
     if (needs.contains(Capability.iosSign) &&
-        capable.every((runner) => signing.contains(runner.id))) {
+        accepting.every((runner) => signing.contains(runner.id))) {
       return 'Waiting for the ios-sign job that runs now: one at a time.';
     }
     return 'Waiting for a free slot on '
-        '${capable.map((runner) => runner.id).join(', ')}.';
+        '${accepting.map((runner) => runner.id).join(', ')}.';
   }
 
   Set<Capability> _needs(JobRecord job) => {

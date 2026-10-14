@@ -474,7 +474,7 @@ Mataa dev builds through `xp` can start after Phase 13, before the desktop app e
 
 ### Phase 14a: Runner protocol (engine side)
 
-- **Status:** Not started
+- **Status:** Done
 - **Scope:** Pairing tokens (single use, 15 minutes), credential exchange (hash stored), job
   leases and heartbeats, 90 s loss rule, never re-queue side-effect stages, capability probing,
   slots, sequence-numbered log chunks and artifact upload with sha256; runner endpoints.

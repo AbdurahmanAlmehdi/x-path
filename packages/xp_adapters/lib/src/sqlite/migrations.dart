@@ -17,6 +17,7 @@ const engineMigrations = <Migration>[
   Migration(version: 10, sql: _v10),
   Migration(version: 11, sql: _v11),
   Migration(version: 12, sql: _v12),
+  Migration(version: 13, sql: _v13),
 ];
 
 // Timestamps are integer microseconds since the Unix epoch (UTC), so that
@@ -365,4 +366,33 @@ CREATE TABLE housekeeping_setting (
   key TEXT PRIMARY KEY,
   value TEXT NOT NULL CHECK (json_valid(value))
 ) STRICT;
+''';
+
+// Phase 14a: runners (D-08). A runner keeps the device token that is its
+// credential (`token_id`), what it reported about itself and when it was
+// revoked; `capabilities` is a JSON array of the wire names the engine found
+// with its probe. A pairing token is single use and valid for 15 minutes; only
+// the hash of its secret is kept, and `used_at` is set by one compare-and-set.
+// A job that runs on a runner holds a lease: `job.runner_id` and
+// `job.lease_until` already exist.
+const _v13 = '''
+ALTER TABLE runner ADD COLUMN token_id TEXT REFERENCES device_token (id);
+ALTER TABLE runner ADD COLUMN os TEXT;
+ALTER TABLE runner ADD COLUMN arch TEXT;
+ALTER TABLE runner ADD COLUMN version TEXT;
+ALTER TABLE runner ADD COLUMN cores INTEGER CHECK (cores IS NULL OR cores > 0);
+ALTER TABLE runner ADD COLUMN created_at INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE runner ADD COLUMN revoked_at INTEGER;
+CREATE UNIQUE INDEX idx_runner_token ON runner (token_id);
+
+CREATE TABLE pairing_token (
+  id TEXT PRIMARY KEY,
+  hash TEXT NOT NULL UNIQUE,
+  name TEXT NOT NULL,
+  created_by TEXT NOT NULL,
+  created_at INTEGER NOT NULL,
+  expires_at INTEGER NOT NULL,
+  used_at INTEGER
+) STRICT;
+CREATE INDEX idx_pairing_token_expires ON pairing_token (expires_at);
 ''';

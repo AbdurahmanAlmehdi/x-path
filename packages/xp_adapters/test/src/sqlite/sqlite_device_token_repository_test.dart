@@ -61,6 +61,24 @@ void main() {
     );
   });
 
+  test('revokes a valid token, once', () async {
+    await repository.add(_token('a', kind: DeviceTokenKind.runner));
+    await repository.add(_token('b'));
+    final at = DateTime.utc(2026, 10, 14, 1, 2, 3, 4, 5);
+
+    expect(await repository.revoke('a', at: at), isTrue);
+    expect(
+      await repository.revoke('a', at: at.add(const Duration(days: 1))),
+      isFalse,
+    );
+    expect(await repository.revoke('nope', at: at), isFalse);
+
+    final tokens = {for (final t in await repository.list()) t.id: t};
+    expect(tokens['a']!.revokedAt, at);
+    expect(tokens['a']!.kind, DeviceTokenKind.runner);
+    expect(tokens['b']!.revokedAt, isNull);
+  });
+
   test('refuses a second token with the same id or hash', () async {
     await repository.add(_token('a'));
 

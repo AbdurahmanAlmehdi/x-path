@@ -20,6 +20,8 @@ export 'src/project_profile.dart';
 export 'src/release.dart';
 export 'src/release_notes.dart';
 export 'src/run.dart';
+export 'src/runner.dart';
+export 'src/runner_protocol.dart';
 export 'src/storage.dart';
 export 'src/test_run.dart';
 export 'src/version_response.dart';

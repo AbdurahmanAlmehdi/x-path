@@ -104,6 +104,7 @@
     "libsqlite",
     "lints",
     "loopback",
+    "lse",
     "mataa",
     "mataaa",
     "melos",
@@ -140,6 +141,7 @@
     "repo",
     "repos",
     "restartable",
+    "rnr",
     "roundtrip",
     "scaffolded",
     "secp",
@@ -189,6 +191,7 @@
     "xcscheme",
     "xcschemes",
     "xpath",
-    "xpd"
+    "xpd",
+    "xpp"
   ]
 }

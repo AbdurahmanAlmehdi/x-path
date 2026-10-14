@@ -41,6 +41,21 @@ void main() {
       expect(cleared.releaseId, 'rel_1');
     });
 
+    test('replaces and clears the runner and its lease', () {
+      final leased = job.copyWith(
+        runnerId: 'rnr_1',
+        leaseUntil: at.add(const Duration(seconds: 90)),
+      );
+
+      expect(leased.runnerId, 'rnr_1');
+      expect(leased.leaseUntil, at.add(const Duration(seconds: 90)));
+      expect(leased.copyWith().leaseUntil, leased.leaseUntil);
+      expect(leased == job, isFalse);
+      final cleared = leased.copyWith(runnerId: null, leaseUntil: null);
+      expect(cleared.runnerId, isNull);
+      expect(cleared.leaseUntil, isNull);
+    });
+
     test('replaces the message and the times', () {
       final later = at.add(const Duration(hours: 1));
       final changed = job.copyWith(
