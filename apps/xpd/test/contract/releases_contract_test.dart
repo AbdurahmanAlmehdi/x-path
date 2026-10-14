@@ -325,5 +325,33 @@ void main() {
         status: 409,
       );
     });
+
+    test('GET notes 200, 401, 404, 409 and 502', () async {
+      final id = await client.uploaded();
+      final path = '/releases/$id/notes';
+      client.engine.git
+        ..tags.add(const GitTagInfo(name: 'v1.1.0+4', commit: 'c'))
+        ..commits.add(const GitCommit(sha: 'd1', subject: 'feat: add search'));
+
+      expectContract(await client.send('GET', path), path: path, status: 200);
+      expectContract(
+        await client.engine.request(path, token: ''),
+        path: path,
+        status: 401,
+      );
+      expectContract(
+        await client.send('GET', '/releases/rel_nope/notes'),
+        path: '/releases/rel_nope/notes',
+        status: 404,
+      );
+      final draft = await client.open(runId: 'run_2', version: '2.0.0');
+      expectContract(
+        await client.send('GET', '/releases/$draft/notes'),
+        path: '/releases/$draft/notes',
+        status: 409,
+      );
+      client.engine.git.commitsFailure = const GitException('broken');
+      expectContract(await client.send('GET', path), path: path, status: 502);
+    });
   });
 }

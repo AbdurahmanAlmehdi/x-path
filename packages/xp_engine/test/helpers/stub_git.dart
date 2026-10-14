@@ -47,6 +47,20 @@ class StubGit implements GitService {
     return changed;
   }
 
+  /// What [commitsBetween] answers.
+  List<GitCommit> commits = [];
+
+  @override
+  Future<List<GitCommit>> commitsBetween(
+    GitMirror mirror, {
+    required String to,
+    String? from,
+    int limit = 500,
+  }) async {
+    calls.add('commitsBetween $from $to $limit');
+    return commits;
+  }
+
   @override
   Future<GitWorktreeStatus> status(GitWorktree worktree) async {
     calls.add('status');
@@ -88,14 +102,18 @@ class StubGit implements GitService {
   Future<GitMirror> ensureMirror({
     required int githubRepoId,
     required String remoteUrl,
-  }) => throw UnimplementedError();
+  }) async =>
+      GitMirror(githubRepoId: githubRepoId, path: '/mirrors/$githubRepoId.git');
 
   @override
   Future<void> fetch(GitMirror mirror) => throw UnimplementedError();
 
+  /// What [resolveRef] answers for a ref that is not a full commit id.
+  final refs = <String, String>{};
+
   @override
-  Future<String> resolveRef(GitMirror mirror, String ref) =>
-      throw UnimplementedError();
+  Future<String> resolveRef(GitMirror mirror, String ref) async =>
+      RegExp(r'^[0-9a-f]{40}$').hasMatch(ref) ? ref : refs[ref] ?? 'a' * 40;
 
   @override
   Future<GitWorktree> createWorktree(

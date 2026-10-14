@@ -19,6 +19,9 @@ abstract interface class ArtifactRepository {
   /// Sets whether the artifact [id] is pinned and returns it as it is now, or
   /// returns `null` if there is none.
   Future<ArtifactRecord?> setPinned(String id, {required bool pinned});
+
+  /// Deletes the record of the artifact [id]. Returns whether there was one.
+  Future<bool> delete(String id);
 }
 
 /// An [ArtifactRepository] that forgets everything on exit.
@@ -43,6 +46,9 @@ class InMemoryArtifactRepository implements ArtifactRepository {
     for (final record in _records.values)
       if (record.jobId == jobId) record,
   ];
+
+  @override
+  Future<bool> delete(String id) async => _records.remove(id) != null;
 
   @override
   Future<ArtifactRecord?> setPinned(String id, {required bool pinned}) async {

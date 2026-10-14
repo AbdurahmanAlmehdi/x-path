@@ -14,6 +14,7 @@ export 'src/api/releases/releases_routes.dart';
 export 'src/api/request_body.dart';
 export 'src/api/responses.dart';
 export 'src/api/runs/runs_routes.dart';
+export 'src/api/storage/storage_routes.dart';
 export 'src/api/system_routes.dart';
 export 'src/api/tests/tests_routes.dart';
 export 'src/api/workflows/workflows_routes.dart';

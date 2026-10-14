@@ -89,7 +89,7 @@ class FakeGit implements GitService {
   Future<void> removeWorktree(GitWorktree worktree) async {}
 
   @override
-  Future<List<GitTagInfo>> listTags(GitMirror mirror) async => const [];
+  Future<List<GitTagInfo>> listTags(GitMirror mirror) async => tags;
 
   @override
   Future<List<String>> changedFiles(
@@ -97,6 +97,31 @@ class FakeGit implements GitService {
     required String from,
     required String to,
   }) => throw UnimplementedError();
+
+  /// The tags [listTags] answers.
+  final tags = <GitTagInfo>[];
+
+  /// The commits [commitsBetween] answers.
+  final commits = <GitCommit>[];
+
+  /// Set to make [commitsBetween] fail with it.
+  Exception? commitsFailure;
+
+  /// The arguments of the last [commitsBetween], as `from..to`.
+  String? lastRange;
+
+  @override
+  Future<List<GitCommit>> commitsBetween(
+    GitMirror mirror, {
+    required String to,
+    String? from,
+    int limit = 500,
+  }) async {
+    final failure = commitsFailure;
+    if (failure != null) throw failure;
+    lastRange = '${from ?? ''}..$to';
+    return commits;
+  }
 
   @override
   Future<GitWorktreeStatus> status(GitWorktree worktree) =>

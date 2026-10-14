@@ -151,6 +151,14 @@ class FakeGitService implements GitService {
   }) => throw UnimplementedError();
 
   @override
+  Future<List<GitCommit>> commitsBetween(
+    GitMirror mirror, {
+    required String to,
+    String? from,
+    int limit = 500,
+  }) => throw UnimplementedError();
+
+  @override
   Future<GitWorktreeStatus> status(GitWorktree worktree) =>
       throw UnimplementedError();
 

@@ -80,6 +80,11 @@ abstract interface class ShorebirdReleaseRepository {
     AppVersion version,
     ShorebirdPlatform platform,
   );
+
+  /// The Flutter versions the recorded releases were built with. Every patch
+  /// of a release must use its version (D-20), so these SDKs stay in the
+  /// cache.
+  Future<Set<String>> flutterVersions();
 }
 
 /// A [ShorebirdReleaseRepository] that forgets everything on exit.
@@ -102,4 +107,9 @@ class InMemoryShorebirdReleaseRepository implements ShorebirdReleaseRepository {
     AppVersion version,
     ShorebirdPlatform platform,
   ) async => _records[_key(appId, version, platform)];
+
+  @override
+  Future<Set<String>> flutterVersions() async => {
+    for (final record in _records.values) record.flutterVersion,
+  };
 }

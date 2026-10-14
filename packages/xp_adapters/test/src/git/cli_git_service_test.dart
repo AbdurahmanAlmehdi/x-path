@@ -645,6 +645,112 @@ void main() {
     });
   });
 
+  group('commitsBetween', () {
+    test(
+      'lists the commits after a tag, newest first, with their bodies',
+      () async {
+        fixture
+          ..git(['tag', '-a', '-m', 'v', 'v1', second])
+          ..git(['push', '--quiet', 'origin', 'v1']);
+        final third = fixture.commit(
+          'c.txt',
+          'c',
+          message:
+              'feat(ui): add dark mode\n\nBody line.\n\nBREAKING CHANGE: x',
+        );
+        final fourth = fixture.commit(
+          'd.txt',
+          'd',
+          message: 'fix: handle \u00e9',
+        );
+        fixture.push('main');
+        await service.fetch(mirror);
+
+        final commits = await service.commitsBetween(
+          mirror,
+          from: 'v1',
+          to: 'main',
+        );
+
+        expect(commits, [
+          GitCommit(sha: fourth, subject: 'fix: handle \u00e9'),
+          GitCommit(
+            sha: third,
+            subject: 'feat(ui): add dark mode',
+            body: 'Body line.\n\nBREAKING CHANGE: x',
+          ),
+        ]);
+      },
+    );
+
+    test(
+      'leaves out merge commits but keeps the commits they merged',
+      () async {
+        fixture
+          ..git(['checkout', '--quiet', '-b', 'topic'])
+          ..commit('t.txt', 't', message: 'feat: on a branch')
+          ..git(['checkout', '--quiet', 'main']);
+        final onMain = fixture.commit('m.txt', 'm', message: 'fix: on main');
+        fixture
+          ..git(['merge', '--quiet', '--no-ff', '-m', 'Merge topic', 'topic'])
+          ..push('main');
+        await service.fetch(mirror);
+
+        final commits = await service.commitsBetween(
+          mirror,
+          from: second,
+          to: 'main',
+        );
+
+        expect(commits.map((c) => c.subject), [
+          'fix: on main',
+          'feat: on a branch',
+        ]);
+        expect(commits.map((c) => c.sha), contains(onMain));
+      },
+    );
+
+    test('lists nothing when the two are the same commit', () async {
+      expect(
+        await service.commitsBetween(mirror, from: second, to: second),
+        isEmpty,
+      );
+    });
+
+    test('without a start lists the latest commits up to the limit', () async {
+      expect(
+        (await service.commitsBetween(mirror, to: second)).map((c) => c.sha),
+        [second, first],
+      );
+      expect(
+        (await service.commitsBetween(
+          mirror,
+          to: second,
+          limit: 1,
+        )).map((c) => c.sha),
+        [second],
+      );
+    });
+
+    test('refuses a limit below 1', () {
+      expect(
+        service.commitsBetween(mirror, to: second, limit: 0),
+        throwsArgumentError,
+      );
+    });
+
+    test('fails for a ref that does not exist', () {
+      expect(
+        service.commitsBetween(mirror, from: 'v404', to: second),
+        throwsA(isA<GitRefNotFoundException>()),
+      );
+      expect(
+        service.commitsBetween(mirror, to: 'nope'),
+        throwsA(isA<GitRefNotFoundException>()),
+      );
+    });
+  });
+
   group('status and commit', () {
     late GitWorktree worktree;
 

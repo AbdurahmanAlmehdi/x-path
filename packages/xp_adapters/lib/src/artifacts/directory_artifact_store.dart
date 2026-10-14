@@ -47,6 +47,14 @@ class DirectoryArtifactStore implements LocalArtifactStore {
   @override
   Future<bool> exists(String path) async => File(_resolve(path)).existsSync();
 
+  @override
+  Future<void> delete(String path) async {
+    final file = File(_resolve(path));
+    if (file.existsSync()) file.deleteSync();
+    final folder = file.parent;
+    if (folder.existsSync() && folder.listSync().isEmpty) folder.deleteSync();
+  }
+
   /// The file of [path] in the directory.
   String _resolve(String path) {
     final parts = path.split('/');

@@ -140,6 +140,7 @@ class ServeCommand extends XpdCommand {
       final testRuns = SqliteTestRunRepository(database);
       final projectRepository = SqliteProjectRepository(database);
       final releaseRepository = SqliteReleaseRepository(database);
+      final releaseModels = SqliteReleaseModelRepository(database);
       final apple = AppleStores(
         database: database,
         secrets: secrets,
@@ -197,6 +198,7 @@ class ServeCommand extends XpdCommand {
         jobs: jobRepository,
       );
       final secretFiles = DirectorySecretFileStore(p.join(directory, 'tmp'));
+      final files = DirectoryDataFiles(dataDir: directory, git: git);
       final logs = JobLogs(store: FileJobLogStore(p.join(directory, 'logs')));
       // A job that reaches a gate waits for the owner (D-13). The service
       // resumes the jobs that wait through the scheduler, which needs the job
@@ -424,7 +426,7 @@ class ServeCommand extends XpdCommand {
         planners: planners,
         projects: projectRepository,
         credentials: credentialChecks.repository,
-        models: SqliteReleaseModelRepository(database),
+        models: releaseModels,
         git: git,
         allocator: BuildNumberAllocator(
           counters: SqliteBuildCounterRepository(database),
@@ -457,6 +459,24 @@ class ServeCommand extends XpdCommand {
       );
       // Jobs that were queued when the engine stopped take their turn.
       await scheduler.pump();
+      final housekeeping = HousekeepingService(
+        planner: HousekeepingPlanner(
+          artifacts: artifactRepository,
+          jobs: jobRepository,
+          releases: releaseRepository,
+          projects: projectRepository,
+          testRuns: testRuns,
+          shorebird: shorebirdRecords,
+          files: files,
+          clock: const SystemClock(),
+        ),
+        settings: SqliteHousekeepingRepository(database),
+        artifacts: artifactRepository,
+        store: artifactStore,
+        jobs: jobRepository,
+        files: files,
+        clock: const SystemClock(),
+      );
       final server = await XpdServer.start(
         tokens: TokenService(
           tokens: SqliteDeviceTokenRepository(database),
@@ -482,6 +502,13 @@ class ServeCommand extends XpdCommand {
         runs: runService,
         approvals: approvals,
         releases: releases,
+        releaseNotes: ReleaseNotesService(
+          releases: releaseRepository,
+          projects: projectRepository,
+          models: releaseModels,
+          git: git,
+        ),
+        housekeeping: housekeeping,
         clock: const SystemClock(),
         engineVersion: packageVersion,
         host: host,
@@ -490,6 +517,24 @@ class ServeCommand extends XpdCommand {
             context.err.writeln('error: $error\n$stackTrace'),
       );
       context.out.writeln('xpd listening on ${server.uri}');
+      // The owner hears about what matters, in the app and in Slack (D-22).
+      final slackWebhook = HttpSlackWebhook();
+      final notifier = Notifier(
+        events: events,
+        factory: NoticeFactory(
+          projects: projectRepository,
+          releases: releaseRepository,
+          jobs: jobRepository,
+          runs: runRepository,
+          masker: masker,
+        ),
+        credentials: credentialChecks.repository,
+        secrets: secrets,
+        slack: SlackSender(webhook: slackWebhook),
+        clock: const SystemClock(),
+        onError: (error, stackTrace) =>
+            context.err.writeln('warning: notification failed: $error'),
+      )..start();
       // The first check of credentials that are due must not hold up the
       // engine: each takes a call to a store.
       unawaited(credentialChecks.health.start());
@@ -510,6 +555,14 @@ class ServeCommand extends XpdCommand {
             context.err.writeln('warning: release update failed: $error'),
       );
       unawaited(releaseWatcher.start());
+      // Logs and job records older than 90 days go once a day (D-24).
+      final housekeepingSchedule = HousekeepingSchedule(
+        service: housekeeping,
+        clock: const SystemClock(),
+        onError: (error, stackTrace) =>
+            context.err.writeln('warning: housekeeping failed: $error'),
+      );
+      unawaited(housekeepingSchedule.start());
 
       await context.shutdown.first;
       context.out.writeln('xpd shutting down');
@@ -520,6 +573,9 @@ class ServeCommand extends XpdCommand {
       await server.close();
       approvalSweeper.stop();
       await releaseWatcher.stop();
+      housekeepingSchedule.stop();
+      await notifier.stop();
+      slackWebhook.close();
       credentialChecks.close();
       github.close();
       apple.close();

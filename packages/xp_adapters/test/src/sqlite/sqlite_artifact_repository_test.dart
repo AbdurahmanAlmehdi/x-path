@@ -151,4 +151,15 @@ void main() {
       DateTime.fromMicrosecondsSinceEpoch(0, isUtc: true),
     );
   });
+
+  test('deletes a record and says whether there was one', () async {
+    await repository.save(_record('art_1'));
+    await repository.save(_record('art_2'));
+
+    expect(await repository.delete('art_1'), isTrue);
+    expect(await repository.delete('art_1'), isFalse);
+
+    expect(await repository.get('art_1'), isNull);
+    expect(await repository.get('art_2'), isNotNull);
+  });
 }

@@ -3,6 +3,7 @@ import 'package:xp_api/src/approval.dart';
 import 'package:xp_api/src/credential.dart';
 import 'package:xp_api/src/device_token_kind.dart';
 import 'package:xp_api/src/job.dart';
+import 'package:xp_api/src/notification.dart';
 import 'package:xp_api/src/release.dart';
 
 /// WebSocket close code of an `/events` stream whose cursor can no longer be
@@ -148,8 +149,28 @@ sealed class EngineEvent extends Equatable {
         (s) => s.wire == payload['source'],
       ),
     ),
+    NotificationRaised.eventType => _notification(payload),
     _ => UnknownEvent(type: type, payload: payload),
   };
+
+  static EngineEvent _notification(Map<String, dynamic> payload) {
+    final kind = NotificationKind.fromWire(payload['kind'] as String);
+    final level = NotificationLevel.fromWire(payload['level'] as String);
+    // A kind or level of a newer engine: the client ignores the event.
+    if (kind == null || level == null) {
+      return UnknownEvent(type: NotificationRaised.eventType, payload: payload);
+    }
+    return NotificationRaised(
+      kind: kind,
+      level: level,
+      title: payload['title'] as String,
+      body: payload['body'] as String,
+      projectId: payload['projectId'] as String?,
+      releaseId: payload['releaseId'] as String?,
+      jobId: payload['jobId'] as String?,
+      approvalId: payload['approvalId'] as String?,
+    );
+  }
 
   /// The wire name, for example `engine.started`.
   String get type;
@@ -995,6 +1016,79 @@ final class ReleaseStoreChanged extends EngineEvent {
 
   @override
   List<Object?> get props => [releaseId, projectId, store, state, source];
+}
+
+/// Something the owner should hear about, for the app to show as a macOS
+/// notification (D-22). The engine posts the same text to the Slack webhook of
+/// the project, when it has one.
+///
+/// The text never holds a secret.
+final class NotificationRaised extends EngineEvent {
+  /// Creates the event.
+  const new({
+    required this.kind,
+    required this.level,
+    required this.title,
+    required this.body,
+    this.projectId,
+    this.releaseId,
+    this.jobId,
+    this.approvalId,
+  });
+
+  /// The wire name of this event.
+  static const eventType = 'notification.raised';
+
+  /// What it is about.
+  final NotificationKind kind;
+
+  /// How much it matters.
+  final NotificationLevel level;
+
+  /// One line.
+  final String title;
+
+  /// The details: plain text, a few lines at most.
+  final String body;
+
+  /// The project it is about, when it is about one.
+  final String? projectId;
+
+  /// The release it is about.
+  final String? releaseId;
+
+  /// The job it is about.
+  final String? jobId;
+
+  /// The approval it is about.
+  final String? approvalId;
+
+  @override
+  String get type => eventType;
+
+  @override
+  Map<String, dynamic> get payload => {
+    'kind': kind.wire,
+    'level': level.wire,
+    'title': title,
+    'body': body,
+    'projectId': ?projectId,
+    'releaseId': ?releaseId,
+    'jobId': ?jobId,
+    'approvalId': ?approvalId,
+  };
+
+  @override
+  List<Object?> get props => [
+    kind,
+    level,
+    title,
+    body,
+    projectId,
+    releaseId,
+    jobId,
+    approvalId,
+  ];
 }
 
 /// An event whose type this client does not know.

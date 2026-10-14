@@ -187,6 +187,40 @@ class CliGitService implements GitService {
   }
 
   @override
+  Future<List<GitCommit>> commitsBetween(
+    GitMirror mirror, {
+    required String to,
+    String? from,
+    int limit = 500,
+  }) async {
+    if (limit < 1) throw ArgumentError.value(limit, 'limit', 'is below 1');
+    final end = await resolveRef(mirror, to);
+    final start = from == null ? null : await resolveRef(mirror, from);
+    final output = await _git([
+      'log',
+      '--no-merges',
+      '--max-count=$limit',
+      // NUL between commits; the unit separator between the fields.
+      '-z',
+      '--format=%H%x1f%s%x1f%b',
+      if (start == null) end else '$start..$end',
+    ], cwd: mirror.path);
+    if (output.exitCode != 0) throw _failure('log', output);
+    return [
+      for (final record in _nulSeparated(output.stdout)) _commitFrom(record),
+    ];
+  }
+
+  GitCommit _commitFrom(String record) {
+    final fields = record.split('\x1f');
+    return GitCommit(
+      sha: fields[0].trim(),
+      subject: fields[1],
+      body: fields[2].trim(),
+    );
+  }
+
+  @override
   Future<GitWorktree> createWorktree(
     GitMirror mirror, {
     required String name,

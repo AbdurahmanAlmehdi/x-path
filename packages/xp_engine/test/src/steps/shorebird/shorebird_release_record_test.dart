@@ -65,6 +65,16 @@ void main() {
       );
     });
 
+    test('lists the Flutter versions its releases were built with', () async {
+      expect(await repository.flutterVersions(), isEmpty);
+
+      await repository.save(record());
+      await repository.save(record(appId: 'app-2', flutter: '3.47.6'));
+      await repository.save(record(version: '1.2.4+46'));
+
+      expect(await repository.flutterVersions(), {'3.35.4', '3.47.6'});
+    });
+
     test('replaces the record of the same release', () async {
       await repository.save(record());
       await repository.save(record(flutter: '3.47.6'));

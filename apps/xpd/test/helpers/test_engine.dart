@@ -118,6 +118,9 @@ class TestEngine {
     required this.releaseRepository,
     required this.appleStatus,
     required this.playStatus,
+    required this.shorebirdRecords,
+    required this.dataFiles,
+    required this.housekeepingSettings,
   });
 
   static Future<TestEngine> start({
@@ -266,6 +269,27 @@ class TestEngine {
       worktreeAt: (mirror, name) => '/worktrees/$name',
       releases: releaseService,
     );
+    final shorebirdRecords = InMemoryShorebirdReleaseRepository();
+    final dataFiles = InMemoryDataFiles();
+    final housekeepingSettings = InMemoryHousekeepingRepository();
+    final housekeeping = HousekeepingService(
+      planner: HousekeepingPlanner(
+        artifacts: artifactRepository,
+        jobs: jobRepository,
+        releases: releaseRepository,
+        projects: projects,
+        testRuns: testRuns,
+        shorebird: shorebirdRecords,
+        files: dataFiles,
+        clock: clock,
+      ),
+      settings: housekeepingSettings,
+      artifacts: artifactRepository,
+      store: artifactStore,
+      jobs: jobRepository,
+      files: dataFiles,
+      clock: clock,
+    );
     final issued = await tokens.issue(name: 'test', kind: DeviceTokenKind.app);
     final server = await XpdServer.start(
       tokens: tokens,
@@ -317,6 +341,13 @@ class TestEngine {
       runs: runService,
       approvals: approvals,
       releases: releaseService,
+      releaseNotes: ReleaseNotesService(
+        releases: releaseRepository,
+        projects: projects,
+        models: DefaultReleaseModels(),
+        git: git,
+      ),
+      housekeeping: housekeeping,
       clock: clock,
       engineVersion: '9.9.9',
       onError: (error, _) => errors.add(error),
@@ -354,6 +385,9 @@ class TestEngine {
       releaseRepository: releaseRepository,
       appleStatus: appleStatus,
       playStatus: playStatus,
+      shorebirdRecords: shorebirdRecords,
+      dataFiles: dataFiles,
+      housekeepingSettings: housekeepingSettings,
     );
   }
 
@@ -414,6 +448,15 @@ class TestEngine {
 
   /// What Google Play says about a release.
   final FakeStoreStatusSource playStatus;
+
+  /// The Shorebird releases the engine knows.
+  final InMemoryShorebirdReleaseRepository shorebirdRecords;
+
+  /// The folders of the data directory that housekeeping looks after.
+  final InMemoryDataFiles dataFiles;
+
+  /// Where housekeeping keeps its settings.
+  final InMemoryHousekeepingRepository housekeepingSettings;
 
   /// The files of the folders a project can be added from, by path.
   final Map<String, Map<String, String>> folders;

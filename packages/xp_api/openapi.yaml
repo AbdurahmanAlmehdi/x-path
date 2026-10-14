@@ -1396,6 +1396,142 @@ paths:
           $ref: "#/components/responses/Conflict"
         "500":
           $ref: "#/components/responses/InternalError"
+  /releases/{id}/notes:
+    parameters:
+      - $ref: "#/components/parameters/ReleaseId"
+    get:
+      operationId: getReleaseNotes
+      summary: What changed in the release, ready to paste.
+      description: |
+        The commits between the tag of the release before this one and the
+        commit of this release (merge commits left out), grouped by
+        conventional-commit type, with the same text as Slack `mrkdwn` and as
+        WhatsApp text (`*bold*`, no link markup). The release before is the
+        newest non-patch tag of the same app and flavor with a lower version;
+        a first release has none, and the notes are its latest commits. The
+        engine reads its mirror of the repository and does not fetch.
+        `409 conflict` while the release has no commit yet (`draft`,
+        `building` before the tag). Any token kind may read.
+      responses:
+        "200":
+          description: The notes.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReleaseNotes"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "502":
+          $ref: "#/components/responses/UpstreamError"
+        "503":
+          $ref: "#/components/responses/SecretsLocked"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /storage:
+    get:
+      operationId: getStorage
+      summary: What the engine keeps on disk and what could be freed.
+      description: |
+        One entry per category (artifacts, logs, worktrees, orphan mirrors,
+        Flutter SDKs nobody pins) with the bytes it holds and the bytes a
+        `POST /storage/free` would give back, and the artifacts by app and
+        flavor. It deletes nothing. Any token kind may read.
+      responses:
+        "200":
+          description: The report.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StorageReport"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /storage/free:
+    post:
+      operationId: freeStorage
+      summary: Free up space, or say how much would be freed.
+      description: |
+        Without a body, or with `"dryRun": true`, it deletes nothing and says
+        what it would. With `"dryRun": false` it deletes (D-13 lists delete
+        as a gated action): only `app` and `cli` tokens may, as for a
+        release `abandon`; the owner acting from the app or `xp` is the
+        approval. `mcp` and `runner` tokens may only dry-run and otherwise
+        get `403 forbidden`.
+
+        Retention never deletes the artifacts of a release that is not over
+        (`draft` to `live`), pinned artifacts, or the newest `keepPerFlavor`
+        builds of each flavor. Job records are only removed when nothing
+        needs them: a baseline test run, a release that is not over and
+        artifacts that are kept all keep theirs.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FreeSpaceRequest"
+      responses:
+        "200":
+          description: What was freed, or would be.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FreeSpaceResult"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /storage/retention:
+    get:
+      operationId: getRetention
+      summary: How many builds per flavor and how many days of logs are kept.
+      responses:
+        "200":
+          description: The settings.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RetentionSettings"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+    put:
+      operationId: setRetention
+      summary: Set the retention. Only `app` and `cli` tokens may.
+      description: |
+        Replaces the settings; a field left out takes its default (5 builds,
+        90 days). Both are at least 1. The daily log pruning uses `logDays`;
+        artifacts are only removed by `POST /storage/free`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RetentionSettings"
+      responses:
+        "200":
+          description: The settings now.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RetentionSettings"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/InternalError"
 components:
   securitySchemes:
     bearerAuth:
@@ -1649,7 +1785,7 @@ components:
             `approval.requested`, `approval.decided`, `approval.expired`,
             `project.gates_changed`, `release.created`,
             `release.state_changed`, `release.store_changed`,
-            or a type added by a
+            `notification.raised`, or a type added by a
             later engine version, which a client must ignore.
         payload:
           type: object
@@ -3004,3 +3140,177 @@ components:
       properties:
         reason:
           type: string
+    ReleaseNoteItem:
+      type: object
+      required: [sha, description, breaking]
+      additionalProperties: false
+      properties:
+        sha:
+          type: string
+        description:
+          type: string
+        scope:
+          type: string
+        breaking:
+          type: boolean
+    ReleaseNoteGroup:
+      type: object
+      required: [type, title, items]
+      additionalProperties: false
+      properties:
+        type:
+          type: string
+          description: |
+            `breaking`, `feat`, `fix`, `perf`, `refactor`, `docs` or `other`.
+        title:
+          type: string
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/ReleaseNoteItem"
+    ReleaseNotes:
+      type: object
+      required:
+        [releaseId, version, build, to, commits, groups, slack, whatsapp]
+      additionalProperties: false
+      properties:
+        releaseId:
+          type: string
+        version:
+          type: string
+        build:
+          type: integer
+        from:
+          type: string
+          description: The tag of the release before.
+        to:
+          type: string
+          description: The commit the notes end at.
+        commits:
+          type: integer
+          minimum: 0
+        groups:
+          type: array
+          items:
+            $ref: "#/components/schemas/ReleaseNoteGroup"
+        compareUrl:
+          type: string
+        slack:
+          type: string
+          description: Slack `mrkdwn`.
+        whatsapp:
+          type: string
+          description: WhatsApp text, `*bold*`, no link markup.
+    StorageCategory:
+      type: string
+      enum: [artifacts, logs, worktrees, mirrors, flutter]
+    RetentionSettings:
+      type: object
+      additionalProperties: false
+      properties:
+        keepPerFlavor:
+          type: integer
+          minimum: 1
+          default: 5
+        logDays:
+          type: integer
+          minimum: 1
+          default: 90
+    CategoryUsage:
+      type: object
+      required: [category, usedBytes, reclaimableBytes, items]
+      additionalProperties: false
+      properties:
+        category:
+          $ref: "#/components/schemas/StorageCategory"
+        usedBytes:
+          type: integer
+          minimum: 0
+        reclaimableBytes:
+          type: integer
+          minimum: 0
+        items:
+          type: integer
+          minimum: 0
+    FlavorUsage:
+      type: object
+      required:
+        [projectId, app, flavor, builds, artifacts, usedBytes, reclaimableBytes]
+      additionalProperties: false
+      properties:
+        projectId:
+          type: string
+        app:
+          type: string
+        flavor:
+          type: string
+          description: Empty for an app without flavors.
+        builds:
+          type: integer
+          minimum: 0
+        artifacts:
+          type: integer
+          minimum: 0
+        usedBytes:
+          type: integer
+          minimum: 0
+        reclaimableBytes:
+          type: integer
+          minimum: 0
+    StorageReport:
+      type: object
+      required: [generatedAt, categories, flavors, retention]
+      additionalProperties: false
+      properties:
+        generatedAt:
+          type: string
+          format: date-time
+        categories:
+          type: array
+          items:
+            $ref: "#/components/schemas/CategoryUsage"
+        flavors:
+          type: array
+          items:
+            $ref: "#/components/schemas/FlavorUsage"
+        retention:
+          $ref: "#/components/schemas/RetentionSettings"
+    FreeSpaceRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        dryRun:
+          type: boolean
+          default: true
+        categories:
+          type: array
+          items:
+            $ref: "#/components/schemas/StorageCategory"
+    FreedCategory:
+      type: object
+      required: [category, bytes, items]
+      additionalProperties: false
+      properties:
+        category:
+          $ref: "#/components/schemas/StorageCategory"
+        bytes:
+          type: integer
+          minimum: 0
+        items:
+          type: integer
+          minimum: 0
+    FreeSpaceResult:
+      type: object
+      required: [dryRun, categories, failures]
+      additionalProperties: false
+      properties:
+        dryRun:
+          type: boolean
+        categories:
+          type: array
+          items:
+            $ref: "#/components/schemas/FreedCategory"
+        failures:
+          type: array
+          items:
+            type: string

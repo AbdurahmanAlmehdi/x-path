@@ -28,6 +28,18 @@ void main() {
     );
   });
 
+  test('GitCommit compares by value and has no body by default', () {
+    expect(const GitCommit(sha: 'a', subject: 's').body, isEmpty);
+    expect(
+      const GitCommit(sha: 'a', subject: 's', body: 'b'),
+      const GitCommit(sha: 'a', subject: 's', body: 'b'),
+    );
+    expect(
+      const GitCommit(sha: 'a', subject: 's'),
+      isNot(const GitCommit(sha: 'a', subject: 't')),
+    );
+  });
+
   test('GitTagInfo compares by value', () {
     expect(
       const GitTagInfo(name: 'v1', commit: 'abc'),

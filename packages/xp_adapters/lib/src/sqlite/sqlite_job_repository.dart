@@ -157,6 +157,14 @@ class SqliteJobRepository implements JobRepository {
     }
   }
 
+  /// Deletes the job; its steps, artifact records and test run go with it
+  /// (`ON DELETE CASCADE`).
+  @override
+  Future<bool> delete(String id) async {
+    _db.execute('DELETE FROM job WHERE id = ?', [id]);
+    return _db.updatedRows > 0;
+  }
+
   static int _flag(bool value) => value ? 1 : 0;
 
   static String? _json(Object? value) =>

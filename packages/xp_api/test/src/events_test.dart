@@ -153,6 +153,22 @@ void main() {
           state: StoreState.inReview,
           source: StatusSource.api,
         ),
+        const NotificationRaised(
+          kind: NotificationKind.secretsLocked,
+          level: NotificationLevel.error,
+          title: 'Secrets are locked',
+          body: 'Unlock the Keychain.',
+        ),
+        const NotificationRaised(
+          kind: NotificationKind.releaseLive,
+          level: NotificationLevel.success,
+          title: 'Live',
+          body: 'On sale.',
+          projectId: 'prj_1',
+          releaseId: 'rel_1',
+          jobId: 'job_1',
+          approvalId: 'apr_1',
+        ),
       ]) {
         final sequenced = SequencedEvent(seq: 9, at: at, event: event);
 
@@ -202,6 +218,7 @@ void main() {
         ReleaseCreated() => 'release created',
         ReleaseStateChanged() => 'release state',
         ReleaseStoreChanged() => 'release store',
+        NotificationRaised() => 'notification',
         UnknownEvent() => 'unknown',
       };
 
@@ -400,6 +417,17 @@ void main() {
         'release store',
       );
       expect(
+        describe(
+          const NotificationRaised(
+            kind: NotificationKind.jobFailed,
+            level: NotificationLevel.error,
+            title: 't',
+            body: 'b',
+          ),
+        ),
+        'notification',
+      );
+      expect(
         describe(EngineEvent.fromJson('x', const <String, dynamic>{})),
         'unknown',
       );
@@ -412,6 +440,37 @@ void main() {
         ),
         'started',
       );
+    });
+
+    test('notification.raised omits the ids it does not have', () {
+      const event = NotificationRaised(
+        kind: NotificationKind.releaseRejected,
+        level: NotificationLevel.error,
+        title: 'Rejected',
+        body: 'Apple rejected 1.2.0.',
+        projectId: 'prj_1',
+      );
+
+      expect(event.type, 'notification.raised');
+      expect(event.payload, {
+        'kind': 'release_rejected',
+        'level': 'error',
+        'title': 'Rejected',
+        'body': 'Apple rejected 1.2.0.',
+        'projectId': 'prj_1',
+      });
+    });
+
+    test('notification.raised of a newer engine is an unknown event', () {
+      for (final payload in <Map<String, dynamic>>[
+        {'kind': 'from_the_future', 'level': 'info', 'title': 't', 'body': 'b'},
+        {'kind': 'job_failed', 'level': 'loud', 'title': 't', 'body': 'b'},
+      ]) {
+        expect(
+          EngineEvent.fromJson('notification.raised', payload),
+          UnknownEvent(type: 'notification.raised', payload: payload),
+        );
+      }
     });
 
     test('stream.opened has an empty payload and compares by value', () {

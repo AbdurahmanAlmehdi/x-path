@@ -33,6 +33,14 @@ class SqliteShorebirdReleaseRepository implements ShorebirdReleaseRepository {
   }
 
   @override
+  Future<Set<String>> flutterVersions() async => {
+    for (final row in _db.select(
+      'SELECT DISTINCT flutter_version FROM shorebird_release',
+    ))
+      row['flutter_version'] as String,
+  };
+
+  @override
   Future<ShorebirdReleaseRecord?> find(
     String appId,
     AppVersion version,
