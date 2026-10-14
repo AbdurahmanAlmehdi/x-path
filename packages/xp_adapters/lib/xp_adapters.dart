@@ -5,6 +5,8 @@ export 'artifacts.dart';
 export 'credentials.dart';
 export 'git.dart';
 export 'github.dart';
+export 'housekeeping.dart';
+export 'notify.dart';
 export 'process.dart';
 export 'scan.dart';
 export 'sqlite.dart';

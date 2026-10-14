@@ -102,4 +102,16 @@ void main() {
 
     expect(await repository.steps('a'), hasLength(1));
   });
+
+  test('deletes a job with its steps and tools', () async {
+    await repository.create(job('a'), [step('a', 0)]);
+    await repository.saveTools('a', const JobTools(flutter: '3.47.6'));
+
+    expect(await repository.delete('a'), isTrue);
+
+    expect(await repository.get('a'), isNull);
+    expect(await repository.steps('a'), isEmpty);
+    expect(await repository.tools('a'), isNull);
+    expect(await repository.delete('a'), isFalse);
+  });
 }

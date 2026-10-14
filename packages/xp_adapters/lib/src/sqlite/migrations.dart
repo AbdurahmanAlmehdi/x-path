@@ -16,6 +16,7 @@ const engineMigrations = <Migration>[
   Migration(version: 9, sql: _v9),
   Migration(version: 10, sql: _v10),
   Migration(version: 11, sql: _v11),
+  Migration(version: 12, sql: _v12),
 ];
 
 // Timestamps are integer microseconds since the Unix epoch (UTC), so that
@@ -353,4 +354,15 @@ ALTER TABLE release ADD COLUMN builds TEXT NOT NULL DEFAULT '[]'
   CHECK (json_valid(builds));
 ALTER TABLE release ADD COLUMN created_at INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE release ADD COLUMN updated_at INTEGER NOT NULL DEFAULT 0;
+''';
+
+// Phase 12c: what housekeeping remembers between runs. `housekeeping_setting`
+// is a small key to JSON table: the retention the owner set (`retention`) and
+// when the logs were last pruned (`last_log_prune`, microseconds since the
+// epoch).
+const _v12 = '''
+CREATE TABLE housekeeping_setting (
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL CHECK (json_valid(value))
+) STRICT;
 ''';

@@ -36,6 +36,10 @@ abstract interface class JobRepository {
 
   /// Replaces the stored step with the job and ordinal of [step].
   Future<void> updateStep(StepRecord step);
+
+  /// Deletes the job [id] with its steps, tool versions, artifact records and
+  /// test run (housekeeping, D-24). Returns whether there was a job.
+  Future<bool> delete(String id);
 }
 
 /// A [JobRepository] that forgets everything on exit.
@@ -93,6 +97,13 @@ class InMemoryJobRepository implements JobRepository {
 
   @override
   Future<JobTools?> tools(String jobId) async => _tools[jobId];
+
+  @override
+  Future<bool> delete(String id) async {
+    _steps.remove(id);
+    _tools.remove(id);
+    return _jobs.remove(id) != null;
+  }
 
   @override
   Future<void> updateStep(StepRecord step) async {

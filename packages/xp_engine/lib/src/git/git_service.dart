@@ -49,6 +49,20 @@ abstract interface class GitService {
     required String to,
   });
 
+  /// The commits reachable from [to] and not from [from] (the two refs are
+  /// resolved like [resolveRef] does), newest first, merge commits left out.
+  /// Without [from] the latest [limit] commits up to [to].
+  ///
+  /// At most [limit] commits are returned.
+  ///
+  /// Throws a `GitRefNotFoundException` if either ref does not exist.
+  Future<List<GitCommit>> commitsBetween(
+    GitMirror mirror, {
+    required String to,
+    String? from,
+    int limit = 500,
+  });
+
   /// Checks out the commit [sha] of [mirror] in a fresh directory for [name],
   /// typically a job id. The head is detached.
   ///

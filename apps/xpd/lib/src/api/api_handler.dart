@@ -13,6 +13,7 @@ import 'package:xpd/src/api/projects/projects_routes.dart';
 import 'package:xpd/src/api/releases/releases_routes.dart';
 import 'package:xpd/src/api/responses.dart';
 import 'package:xpd/src/api/runs/runs_routes.dart';
+import 'package:xpd/src/api/storage/storage_routes.dart';
 import 'package:xpd/src/api/system_routes.dart';
 import 'package:xpd/src/api/tests/tests_routes.dart';
 import 'package:xpd/src/api/workflows/workflows_routes.dart';
@@ -39,6 +40,8 @@ Handler buildApiHandler({
   required RunService runs,
   required ApprovalService approvals,
   required ReleaseService releases,
+  required ReleaseNotesService releaseNotes,
+  required HousekeepingService housekeeping,
   required String engineVersion,
   void Function(Object error, StackTrace stackTrace)? onError,
 }) {
@@ -61,7 +64,8 @@ Handler buildApiHandler({
   WorkflowsRoutes(workflows, dispatcher).addTo(router);
   RunsRoutes(runs).addTo(router);
   ApprovalsRoutes(approvals).addTo(router);
-  ReleasesRoutes(releases).addTo(router);
+  ReleasesRoutes(releases, releaseNotes).addTo(router);
+  StorageRoutes(housekeeping).addTo(router);
   return const Pipeline()
       .addMiddleware(errorMiddleware(onError: onError))
       .addMiddleware(authMiddleware(tokens, publicPaths: publicPaths))

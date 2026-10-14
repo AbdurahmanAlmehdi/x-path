@@ -75,6 +75,14 @@ class ScriptedGit implements GitService {
   }) => throw UnimplementedError();
 
   @override
+  Future<List<GitCommit>> commitsBetween(
+    GitMirror mirror, {
+    required String to,
+    String? from,
+    int limit = 500,
+  }) => throw UnimplementedError();
+
+  @override
   Future<GitWorktree> createWorktree(
     GitMirror mirror, {
     required String name,

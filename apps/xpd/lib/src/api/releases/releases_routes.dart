@@ -7,7 +7,8 @@ import 'package:xpd/src/api/request_body.dart';
 import 'package:xpd/src/api/responses.dart';
 import 'package:xpd/src/api/workflows/workflows_routes.dart';
 
-/// The release endpoints (D-17): list and read the releases, ask the stores
+/// The release endpoints (D-17): list and read the releases, read the notes
+/// of one for Slack and WhatsApp (D-22), ask the stores
 /// about one now, say what a store did by hand, build the same version again
 /// after a rejection, request the merge of the pull request and give a
 /// release up.
@@ -20,15 +21,17 @@ import 'package:xpd/src/api/workflows/workflows_routes.dart';
 /// may not answers `403 forbidden`.
 class ReleasesRoutes {
   /// Creates the routes over [_releases].
-  const new(this._releases);
+  const new(this._releases, this._notes);
 
   final ReleaseService _releases;
+  final ReleaseNotesService _notes;
 
   /// Registers the routes on [router].
   void addTo(Router router) {
     router
       ..get('/releases', _list)
       ..get('/releases/<id>', _get)
+      ..get('/releases/<id>/notes', _getNotes)
       ..post('/releases/<id>/refresh', _refresh)
       ..post('/releases/<id>/stores/<store>/status', _setStatus)
       ..post('/releases/<id>/builds', _newBuild)
@@ -56,6 +59,10 @@ class ReleasesRoutes {
 
   Future<Response> _get(Request request, String id) => _guard(() async {
     return jsonResponse((await _releases.get(id)).toJson());
+  });
+
+  Future<Response> _getNotes(Request request, String id) => _guard(() async {
+    return jsonResponse((await _notes.forRelease(id)).toJson());
   });
 
   Future<Response> _refresh(Request request, String id) => _guard(() async {

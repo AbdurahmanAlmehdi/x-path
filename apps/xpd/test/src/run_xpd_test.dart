@@ -672,6 +672,142 @@ void main() {
       expect(await exit, 0);
     });
 
+    test('serves the storage report, frees up space and tells the app what '
+        'matters', () async {
+      Directory(dataDir).createSync(recursive: true);
+      final now = DateTime.now().toUtc();
+      File('$dataDir/mirrors/99.git/HEAD')
+        ..parent.createSync(recursive: true)
+        ..writeAsBytesSync(List.filled(10, 1));
+      File('$dataDir/mirrors/7.git/HEAD')
+        ..parent.createSync(recursive: true)
+        ..writeAsBytesSync(List.filled(4, 1));
+      final tokens = await withDatabase((database) async {
+        await SqliteProjectRepository(database).add(
+          ProjectRecord(
+            id: 'prj_real',
+            githubRepoId: 7,
+            fullName: 'octo/real',
+            remote: 'x',
+            githubDefaultBranch: 'main',
+            scan: const ProjectProfile(),
+            findings: const [],
+            scannedAt: DateTime.utc(2026),
+          ),
+        );
+        // An approval that ran out while the engine was off.
+        final created = now.subtract(
+          approvalLifetime + const Duration(hours: 1),
+        );
+        await SqliteApprovalRepository(database).findOrCreate(
+          ApprovalRecord(
+            id: 'apr_old',
+            projectId: 'prj_real',
+            action: GateAction.prodRelease,
+            sha: 'a' * 40,
+            version: '1.0.0+1',
+            createdAt: created,
+            expiresAt: created.add(approvalLifetime),
+          ),
+        );
+        final service = TokenService(
+          tokens: SqliteDeviceTokenRepository(database),
+          clock: const SystemClock(),
+        );
+        return {
+          for (final kind in DeviceTokenKind.values)
+            kind: (await service.issue(name: kind.name, kind: kind)).secret,
+        };
+      });
+      final exit = run(['serve', '--port', '0', '--data-dir', dataDir]);
+      final uri = await startServing(exit);
+      final client = HttpClient();
+      addTearDown(() => client.close(force: true));
+
+      Future<(int, Map<String, dynamic>)> call(
+        DeviceTokenKind kind,
+        String method,
+        String path, [
+        Object? body,
+      ]) async {
+        final request = await client.openUrl(method, uri.resolve(path))
+          ..headers.set('authorization', 'Bearer ${tokens[kind]}');
+        if (body != null) request.write(jsonEncode(body));
+        final response = await request.close();
+        return (
+          response.statusCode,
+          jsonDecode(await utf8.decodeStream(response)) as Map<String, dynamic>,
+        );
+      }
+
+      // The sweep on start expired the approval; the app is told.
+      final socket = await WebSocket.connect(
+        'ws://127.0.0.1:${uri.port}/events?after=0',
+        headers: {'authorization': 'Bearer ${tokens[DeviceTokenKind.app]}'},
+      );
+      final told = Completer<Map<String, dynamic>>();
+      socket.listen((frame) {
+        final event = jsonDecode(frame as String) as Map<String, dynamic>;
+        if (event['type'] == 'notification.raised' && !told.isCompleted) {
+          told.complete(event['payload'] as Map<String, dynamic>);
+        }
+      });
+      final notification = await told.future.timeout(
+        const Duration(seconds: 10),
+      );
+
+      final (reported, report) = await call(
+        DeviceTokenKind.app,
+        'GET',
+        '/storage',
+      );
+      final (refused, _) = await call(
+        DeviceTokenKind.mcp,
+        'POST',
+        '/storage/free',
+        {'dryRun': false},
+      );
+      final (freed, result) = await call(
+        DeviceTokenKind.cli,
+        'POST',
+        '/storage/free',
+        {'dryRun': false},
+      );
+      // The daily pruning of logs runs at the start, but not first.
+      var lastPrune = 0;
+      for (var i = 0; i < 200 && lastPrune == 0; i++) {
+        lastPrune = await withDatabase(
+          (database) async => database.connection
+              .select(
+                'SELECT value FROM housekeeping_setting '
+                "WHERE key = 'last_log_prune'",
+              )
+              .length,
+        );
+        if (lastPrune == 0) {
+          await Future<void>.delayed(const Duration(milliseconds: 25));
+        }
+      }
+
+      expect(notification['kind'], 'approval_expired');
+      expect(notification['projectId'], 'prj_real');
+      expect(reported, 200);
+      final mirrors = (report['categories'] as List)
+          .cast<Map<String, dynamic>>()
+          .firstWhere((c) => c['category'] == 'mirrors');
+      expect(mirrors['usedBytes'], 14);
+      expect(mirrors['reclaimableBytes'], 10);
+      expect(refused, 403);
+      expect(freed, 200);
+      expect(result['dryRun'], isFalse);
+      expect(Directory('$dataDir/mirrors/99.git').existsSync(), isFalse);
+      expect(Directory('$dataDir/mirrors/7.git').existsSync(), isTrue);
+      expect(lastPrune, 1);
+      await socket.close();
+      shutdown.add(null);
+      expect(await exit, 0);
+    });
+
     test('serves the workflows of a project over the real database', () async {
       Directory(dataDir).createSync(recursive: true);
       final projectId = await withDatabase((database) async {

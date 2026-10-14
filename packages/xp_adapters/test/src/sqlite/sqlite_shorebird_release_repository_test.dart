@@ -76,4 +76,24 @@ void main() {
       hasLength(1),
     );
   });
+
+  test('lists each Flutter version once', () async {
+    expect(await repository.flutterVersions(), isEmpty);
+
+    await repository.save(_record());
+    await repository.save(_record(platform: ShorebirdPlatform.ios));
+    await repository.save(_record(flutter: '3.47.6', job: 'job_2'));
+    await repository.save(
+      ShorebirdReleaseRecord(
+        appId: 'sb-2',
+        version: AppVersion.parse('2.0.0+1'),
+        platform: ShorebirdPlatform.android,
+        flutterVersion: '3.35.4',
+        jobId: 'job_3',
+        recordedAt: DateTime.utc(2026, 10, 14),
+      ),
+    );
+
+    expect(await repository.flutterVersions(), {'3.35.4', '3.47.6'});
+  });
 }

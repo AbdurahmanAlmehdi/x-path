@@ -252,4 +252,31 @@ void main() {
 
     expect(await repository.steps('job_1'), isEmpty);
   });
+
+  test('deletes a job with its steps, artifacts and test run', () async {
+    await repository.create(_job('job_1'), [_step('job_1', 0)]);
+    await repository.create(_job('job_2'), [_step('job_2', 0)]);
+    database.connection
+      ..execute(
+        'INSERT INTO artifact (id, job_id, kind, path, size, sha256) '
+        "VALUES ('art_1', 'job_1', 'apk', 'job_1/a.apk', 1, 'x')",
+      )
+      ..execute(
+        'INSERT INTO test_run (id, job_id, branch) '
+        "VALUES ('tst_1', 'job_1', 'main')",
+      );
+
+    expect(await repository.delete('job_1'), isTrue);
+
+    expect(await repository.get('job_1'), isNull);
+    expect(await repository.steps('job_1'), isEmpty);
+    expect(database.connection.select('SELECT * FROM artifact'), isEmpty);
+    expect(database.connection.select('SELECT * FROM test_run'), isEmpty);
+    expect(await repository.get('job_2'), isNotNull);
+    expect(await repository.steps('job_2'), hasLength(1));
+  });
+
+  test('deleting a job it does not have answers false', () async {
+    expect(await repository.delete('job_9'), isFalse);
+  });
 }
