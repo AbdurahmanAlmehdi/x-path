@@ -245,6 +245,7 @@ class RunnerHarness {
     required this.tokens,
     required this.secrets,
     required this.credentials,
+    required this.projects,
     required this.hub,
     required this.service,
     required this.owner,
@@ -289,8 +290,22 @@ class RunnerHarness {
     );
     final secrets = BytesSecretStore();
     final credentials = InMemoryCredentialRepository();
+    final projects = InMemoryProjectRepository();
+    await projects.add(
+      ProjectRecord(
+        id: 'prj_1',
+        githubRepoId: 7,
+        fullName: 'owner/app',
+        remote: 'https://github.com/owner/app.git',
+        githubDefaultBranch: 'main',
+        scan: const ProjectProfile(),
+        findings: const [],
+        scannedAt: DateTime.utc(2026),
+      ),
+    );
     final hub = RunnerHub(
       runners: storedRunners,
+      projects: projects,
       jobs: jobs.jobs,
       runner: jobs.runner,
       scheduler: scheduler,
@@ -299,7 +314,7 @@ class RunnerHarness {
       clock: jobs.clock,
       secrets: secrets,
       masker: jobs.masker,
-      grants: SigningSecretGrants(credentials),
+      grants: RunnerSecretGrants(credentials),
       engineVersion: '9.9.9',
       onError: (error, _) => errors.add(error),
     );
@@ -327,6 +342,7 @@ class RunnerHarness {
       tokens: tokens,
       secrets: secrets,
       credentials: credentials,
+      projects: projects,
       hub: hub,
       service: service,
       owner: owner,
@@ -344,6 +360,7 @@ class RunnerHarness {
   final TokenService tokens;
   final BytesSecretStore secrets;
   final InMemoryCredentialRepository credentials;
+  final InMemoryProjectRepository projects;
   final RunnerHub hub;
   final RunnerService service;
   final DeviceToken owner;

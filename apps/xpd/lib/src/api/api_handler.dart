@@ -77,5 +77,6 @@ Handler buildApiHandler({
   return const Pipeline()
       .addMiddleware(errorMiddleware(onError: onError))
       .addMiddleware(authMiddleware(tokens, publicPaths: publicPaths))
+      .addMiddleware(runnerScopeMiddleware())
       .addHandler(router.call);
 }

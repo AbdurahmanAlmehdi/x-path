@@ -278,6 +278,7 @@ class TestEngine {
     final runnerRepository = InMemoryRunnerRepository();
     final runnerHub = RunnerHub(
       runners: runnerRepository,
+      projects: projects,
       jobs: jobRepository,
       runner: jobs,
       scheduler: scheduler,
@@ -286,7 +287,7 @@ class TestEngine {
       clock: clock,
       secrets: credentialSecrets,
       masker: masker,
-      grants: SigningSecretGrants(credentialRepository),
+      grants: RunnerSecretGrants(credentialRepository),
       engineVersion: '9.9.9',
       onError: (error, _) => errors.add(error),
     );

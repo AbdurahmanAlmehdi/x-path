@@ -52,4 +52,40 @@ void main() {
     expect(gates('dev-build'), isEmpty);
     expect(gates('test'), isEmpty);
   });
+
+  test('keep the engine-only steps out of the jobs that build (ADR 0010)', () {
+    for (final name in ['dev-build', 'prod-release', 'shorebird-patch']) {
+      final jobs = parser.parse(builtinWorkflows[name]!).definition!.jobs;
+      var builds = 0;
+      for (final job in jobs) {
+        final kinds = [for (final step in job.steps) step.kind];
+        final building = kinds.any(
+          (kind) =>
+              kind.startsWith('build.') ||
+              kind.startsWith('shorebird.') ||
+              kind == 'symbols.archive',
+        );
+        if (building) {
+          builds++;
+          expect(
+            RemoteStepPolicy.engineOnlyIn(kinds),
+            isEmpty,
+            reason: '$name ${job.id}',
+          );
+        }
+      }
+      expect(builds, 1, reason: '$name has one job that builds');
+    }
+  });
+
+  test('cut the release branch and push it before anything is built', () {
+    final jobs = parser
+        .parse(builtinWorkflows['prod-release']!)
+        .definition!
+        .jobs;
+    final kinds = [for (final step in jobs.first.steps) step.kind];
+
+    expect(jobs.first.id, 'prepare');
+    expect(kinds, containsAllInOrder(['git.releaseBranch', 'git.push']));
+  });
 }

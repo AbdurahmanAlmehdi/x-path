@@ -10,6 +10,9 @@ class MemorySecretStore implements SecretStore {
   /// What is stored, by key.
   final values = <String, String>{};
 
+  /// Binary values (a keystore), by key. [readBytes] returns them as they are.
+  final binary = <String, List<int>>{};
+
   @override
   SecretsStatus get status => SecretsStatus.unlocked;
 
@@ -24,6 +27,8 @@ class MemorySecretStore implements SecretStore {
 
   @override
   Future<Uint8List?> readBytes(String key) async {
+    final bytes = binary[key];
+    if (bytes != null) return Uint8List.fromList(bytes);
     final value = values[key];
     return value == null ? null : Uint8List.fromList(utf8.encode(value));
   }

@@ -541,6 +541,47 @@ void main() {
       expect(logged(jobId), ['1:0:password ***']);
     });
 
+    test('gives the Shorebird key of a step once, masked (ADR 0012)', () async {
+      await h.credentials.save(
+        const CredentialRecord(
+          id: 'crd_2',
+          flavor: CredentialFlavor(
+            id: 'flv_1',
+            projectId: 'prj_1',
+            appPath: '.',
+            name: 'prod',
+          ),
+          kind: CredentialKind.shorebird,
+          secretKey: 'sb',
+        ),
+      );
+      await h.secrets.write('sb', 'sb_api_secret');
+      final (runner, jobId) = await leased(
+        steps: [
+          const StepPlan(
+            kind: 'shorebird.release',
+            input: {'tokenSecret': 'sb'},
+            sideEffect: true,
+          ),
+        ],
+      );
+
+      expect(runner.offer.secrets, ['sb']);
+      await runner.secret('sb');
+      await runner.secret('sb');
+
+      final values = runner.link.sentOf<SecretValueFrame>();
+      expect(utf8.decode(base64Decode(values.single.value)), 'sb_api_secret');
+      expect(
+        runner.link.sentOf<SecretDeniedFrame>().single.reason,
+        contains('already'),
+      );
+      expect(await h.eventsOf<RunnerSecretDelivered>(), [
+        RunnerSecretDelivered(runnerId: runner.id, jobId: jobId, key: 'sb'),
+      ]);
+      expect(h.jobs.masker.secrets, ['sb_api_secret']);
+    });
+
     test('is never given for anything else', () async {
       final (runner, _) = await signing();
 

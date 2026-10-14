@@ -33,6 +33,9 @@ class GitHubRemote extends Equatable {
   /// `owner/name`.
   String get fullName => '$owner/$name';
 
+  /// The SSH URL a machine with its own SSH key fetches the repository from.
+  String get sshUrl => 'git@github.com:$owner/$name.git';
+
   @override
   List<Object?> get props => [owner, name];
 }

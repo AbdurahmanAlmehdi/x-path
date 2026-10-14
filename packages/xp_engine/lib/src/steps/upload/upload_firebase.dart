@@ -119,13 +119,14 @@ class UploadFirebaseStep
     final binary = await intactArtifact(
       repository: repository,
       store: store,
-      jobId: context.jobId,
+      jobId: input.artifactJob ?? context.jobId,
       name: input.artifactName,
       kind: input.kind,
     );
     if (binary == null) {
       return StepFailed(
-        'This job has no intact ${input.kind.wire.toUpperCase()} named '
+        '${input.sourceOfArtifact} has no intact '
+        '${input.kind.wire.toUpperCase()} named '
         '${input.artifactName}. Build the app first; a changed or missing '
         'file is not uploaded.',
       );

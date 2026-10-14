@@ -227,11 +227,15 @@ void main() {
       expect(runner.cores, 8);
     });
 
-    test('is open to every kind of token', () async {
+    test('is open to an app, a cli and an mcp token, not a runner', () async {
       for (final kind in DeviceTokenKind.values) {
         final response = await client.send('GET', '/runners', kind: kind);
 
-        expect(response.statusCode, 200, reason: kind.name);
+        expect(
+          response.statusCode,
+          kind == DeviceTokenKind.runner ? 403 : 200,
+          reason: kind.name,
+        );
       }
     });
   });

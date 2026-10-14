@@ -25,6 +25,21 @@ void main() {
       expect(input.toJson(), _json());
     });
 
+    test('names the build job whose artifact it uploads', () {
+      final json = {..._json(), 'artifactJob': 'job_build'};
+
+      final input = UploadAppStoreInput.fromJson(json);
+
+      expect(input.artifactJob, 'job_build');
+      expect(input.sourceOfArtifact, 'The build job job_build');
+      expect(UploadAppStoreInput.fromJson(input.toJson()), input);
+      expect(input.toJson(), json);
+      expect(
+        UploadAppStoreInput.fromJson(_json()).sourceOfArtifact,
+        'This job',
+      );
+    });
+
     test('round trips with an Apple ID', () {
       final json = _json(
         auth: {

@@ -661,6 +661,115 @@ stages:
       });
     });
 
+    test('take their file from the build job of the same cell', () async {
+      await harness.saveCredential('dev', CredentialKind.playSa);
+      await harness.saveCredential('dev', CredentialKind.firebaseSa);
+      await harness.saveCredential('dev', CredentialKind.ascKey);
+
+      final run = await harness.dispatchCustom(r'''
+schema: 1
+stages:
+  - name: build
+    jobs:
+      build:
+        matrix:
+          platform: ${{ platforms }}
+          flavor: ${{ flavors }}
+        steps:
+          - kind: version.bump
+  - name: upload
+    jobs:
+      upload:
+        matrix:
+          platform: ${{ platforms }}
+          flavor: ${{ flavors }}
+        steps:
+          - kind: upload.play
+            if: platform == 'android'
+            with:
+              artifactsFrom: build
+          - kind: upload.firebase
+            if: platform == 'android'
+            with:
+              artifactsFrom: build
+              appId: 1:684690133351:android:b434734f585770367c1fc2
+          - kind: upload.appStore
+            if: platform == 'ios'
+            with:
+              artifactsFrom: build
+              appleAppId: "123"
+''', const DispatchRequest(platforms: ['android', 'ios'], flavors: ['dev']));
+
+      final jobs = await harness.jobsOf(run);
+      final byName = {for (final job in jobs) job.name!: job};
+      expect(byName.keys, [
+        'build (android, dev)',
+        'build (ios, dev)',
+        'upload (android, dev)',
+        'upload (ios, dev)',
+      ]);
+      final android = byName['upload (android, dev)']!;
+      final ios = byName['upload (ios, dev)']!;
+      expect(
+        (await harness.input(android, 'upload.play'))['artifactJob'],
+        byName['build (android, dev)']!.id,
+      );
+      expect(
+        (await harness.input(android, 'upload.firebase'))['artifactJob'],
+        byName['build (android, dev)']!.id,
+      );
+      expect(
+        (await harness.input(ios, 'upload.appStore'))['artifactJob'],
+        byName['build (ios, dev)']!.id,
+      );
+    });
+
+    test('say when no job of this cell has the file to take', () async {
+      await harness.saveCredential('dev', CredentialKind.playSa);
+
+      await expectLater(
+        harness.dispatchCustom(r'''
+schema: 1
+stages:
+  - name: build
+    jobs:
+      build:
+        if: platform == 'ios'
+        matrix:
+          platform: ${{ platforms }}
+        steps:
+          - kind: version.bump
+  - name: upload
+    jobs:
+      upload:
+        matrix:
+          platform: ${{ platforms }}
+          flavor: ${{ flavors }}
+        steps:
+          - kind: upload.play
+            with:
+              artifactsFrom: build
+''', const DispatchRequest(platforms: ['android'], flavors: ['dev'])),
+        _fails(
+          contains(
+            'upload.play: The job "build" has no job to take the artifact '
+            'from here.',
+          ),
+        ),
+      );
+    });
+
+    test('cannot take their file from a job that is not earlier', () async {
+      await expectLater(
+        dispatch('''
+          - kind: upload.play
+            with:
+              artifactsFrom: job
+'''),
+        throwsA(isA<WorkflowInvalidException>()),
+      );
+    });
+
     test('need the credential, the ids and valid values', () async {
       await expectLater(
         dispatch(

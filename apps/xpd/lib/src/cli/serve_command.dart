@@ -486,6 +486,7 @@ class ServeCommand extends XpdCommand {
       final runnerRepository = SqliteRunnerRepository(database);
       final runnerHub = RunnerHub(
         runners: runnerRepository,
+        projects: projectRepository,
         jobs: jobRepository,
         runner: jobs,
         scheduler: scheduler,
@@ -494,7 +495,7 @@ class ServeCommand extends XpdCommand {
         clock: const SystemClock(),
         secrets: secrets,
         masker: masker,
-        grants: SigningSecretGrants(credentialChecks.repository),
+        grants: RunnerSecretGrants(credentialChecks.repository),
         engineVersion: packageVersion,
         onError: (error, stackTrace) =>
             context.err.writeln('error: runner hub: $error\n$stackTrace'),

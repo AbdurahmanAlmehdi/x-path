@@ -17,4 +17,16 @@ void main() {
       expect(store.deleted, ['job_1']);
     },
   );
+
+  test(
+    'InMemorySecretFileStore keeps the exact bytes of a binary file',
+    () async {
+      final store = InMemorySecretFileStore();
+
+      final path = await store.writeBytes('job_1', 'KS', [0xff, 0x00, 0x41]);
+
+      expect(store.writtenBytes[path], [0xff, 0x00, 0x41]);
+      expect(store.files[path], '\u{fffd}\u0000A');
+    },
+  );
 }

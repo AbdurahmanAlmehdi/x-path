@@ -29,9 +29,23 @@
 // MCP-dispatched production release must stop at a pending approval that the
 // MCP token cannot decide: see `_mcpGate`.
 //
-// Usage: dart run tool/release_e2e.dart --mode dev|prod|mcp --xpd <executable>
-//          --fixture <dir> --work <dir> [--flutter-sdk <dir>]
-//          [--xp <executable>]
+// `--mode runner-loss` (Phase 14b, tool/e2e/runner_loss_e2e.sh) pairs and
+// starts a real `xp runner` as a process of its own, gives it jobs that hold
+// per-job secrets, kills it with SIGKILL in the middle of them and checks the
+// loss rule of the engine after the lease lapses and that the restarted runner
+// leaves no secret file, temporary keychain or process behind: see
+// `_runnerLoss`.
+//
+// `--mode runner-build` (Phase 14b, tool/e2e/runner_build_e2e.sh) builds the
+// fixture app with the built-in `dev-build` workflow on a real `xp runner`: the
+// engine cannot build Android (its environment has no Android SDK), the runner
+// can, so the build job of the workflow is leased to the runner, which fetches
+// the commit, bumps the version, builds the APK and uploads it; the check and
+// the upload to Firebase run on the engine: see `_runnerBuild`.
+//
+// Usage: dart run tool/release_e2e.dart --mode dev|prod|mcp|runner-loss|runner-build
+//          --xpd <executable> --fixture <dir> --work <dir>
+//          [--flutter-sdk <dir>] [--xp <executable>]
 //
 // Exits 0 only if everything held; progress goes to standard error.
 import 'dart:async';
@@ -51,9 +65,13 @@ const _firebaseAppId = '1:684690133351:android:b434734f585770367c1fc2';
 
 Future<void> main(List<String> arguments) async {
   final parser = ArgParser()
-    ..addOption('mode', allowed: ['dev', 'prod', 'mcp'], defaultsTo: 'dev')
+    ..addOption(
+      'mode',
+      allowed: ['dev', 'prod', 'mcp', 'runner-loss', 'runner-build'],
+      defaultsTo: 'dev',
+    )
     ..addOption('xpd', mandatory: true, help: 'The xpd executable.')
-    ..addOption('xp', help: 'The xp executable (mode mcp).')
+    ..addOption('xp', help: 'The xp executable (modes mcp and runner-loss).')
     ..addOption('fixture', mandatory: true, help: 'The fixture app folder.')
     ..addOption('work', mandatory: true, help: 'An empty scratch folder.')
     ..addOption(
@@ -113,6 +131,8 @@ class _E2e {
   FakeAscServer? _asc;
   FakePlayServer? _play;
   Process? _engine;
+  Process? _runnerProcess;
+  final _runnerLog = StringBuffer();
   late Uri _url;
   late String _token;
   final _engineLog = StringBuffer();
@@ -170,6 +190,14 @@ class _E2e {
       await _mcpGate(projectId);
       return;
     }
+    if (mode == 'runner-loss') {
+      await _runnerLoss(projectId);
+      return;
+    }
+    if (mode == 'runner-build') {
+      await _runnerBuild(projectId);
+      return;
+    }
     if (mode == 'prod') {
       await _prod(project);
       return;
@@ -221,24 +249,49 @@ class _E2e {
       expect: 202,
     );
     final jobs = run['jobs'] as List;
-    _expect(jobs.length == 1, 'dev-build for android is one job: $jobs');
-    final jobId = (jobs.single as Map)['id']! as String;
-    _lastJob = jobId;
-    _log('dispatched run ${run['id']} (build ${run['build']}), job $jobId');
+    final ids = {
+      for (final job in jobs)
+        (job as Map)['name']! as String: job['id']! as String,
+    };
+    _expect(
+      ids.keys.toList().toString() ==
+          [
+            'Check dev for android',
+            'Build dev for android',
+            'Upload dev for android',
+          ].toString(),
+      'dev-build for android is a check, a build and an upload job (ADR '
+      '0010): ${ids.keys}',
+    );
+    final jobId = ids['Build dev for android']!;
+    final uploadId = ids['Upload dev for android']!;
+    _lastJob = uploadId;
+    _log('dispatched run ${run['id']} (build ${run['build']}), jobs $ids');
 
-    final job = await _waitForJob(jobId, const Duration(minutes: 25), {
+    final upload = await _waitForJob(uploadId, const Duration(minutes: 25), {
       'succeeded',
       'failed',
       'cancelled',
       'waiting_for_approval',
     });
-    if (job['state'] != 'succeeded') {
-      throw _Failure('the dev build ${job['state']}: ${job['message']}');
+    if (upload['state'] != 'succeeded') {
+      throw _Failure('the upload ${upload['state']}: ${upload['message']}');
     }
+    final job = await _get('/jobs/$jobId');
     final kinds = [
       for (final step in job['steps'] as List) (step as Map)['kind'],
     ];
-    _log('steps: $kinds');
+    _log('steps of the build job: $kinds');
+    _expect(
+      RemoteStepPolicy.engineOnlyIn(kinds.cast<String>()).isEmpty,
+      'the build job has no step only the engine runs: $kinds',
+    );
+    _expect(
+      (upload['steps'] as List).length == 1 &&
+          ((upload['steps'] as List).single as Map)['kind'] ==
+              'upload.firebase',
+      'the upload job uploads to Firebase: ${upload['steps']}',
+    );
 
     final artifacts =
         (await _get('/jobs/$jobId/artifacts'))['artifacts'] as List;
@@ -349,6 +402,653 @@ class _E2e {
     );
     await _post('/runs/${second['id']}/cancel', null);
     _log('the second production release ran once the first ended');
+  }
+
+  // ----------------------------------------------------------- runner loss
+
+  /// Phase 14b: killing a runner in the middle of a job.
+  ///
+  /// What is real: the engine (`xpd serve --slots 1`, so that one long job on
+  /// the engine keeps its only slot and the next jobs go to the runner), the
+  /// `xp` bundle as the runner in a process of its own with its own data
+  /// folder (paired with `xp runner pair`; its credential in the encrypted
+  /// file, never a Keychain), the source (the runner fetches the exact commit
+  /// from the bare repository that plays GitHub with `git fetch`, in a bare
+  /// cache of its own, and checks it out in a worktree of its own: ADR 0009),
+  /// the step runner and its process groups, the per-job secret folder and
+  /// the loss rule of the engine. What is faked: the keystore (some bytes,
+  /// and a `keytool` shim that accepts it on save).
+  ///
+  /// Two jobs go to the runner, each with a `command` step that holds a
+  /// keystore secret (a file and a password) and sleeps: one declares a side
+  /// effect, one does not. The script
+  ///
+  ///   1. waits until both run on the runner with their secret files in the
+  ///      runner's secret folder, and checks that the engine's stored log has
+  ///      the password masked,
+  ///   2. kills the runner with SIGKILL (no clean-up of its own can run),
+  ///   3. checks that nothing changes at once: the jobs still hold their
+  ///      leases, and the crash left the secret files and the sleeping
+  ///      processes behind,
+  ///   4. waits for the lease to lapse (90 s plus the sweep, the production
+  ///      timing) and checks the loss rule (D-08): the job with the side
+  ///      effect is `waiting_for_resume` (never repeated by itself, and that
+  ///      is how a job with a step that cannot be repeated "fails" when its
+  ///      runner is lost), the one without is queued again; both with a
+  ///      `runner.lease_lost` event, and neither runs again by itself,
+  ///   5. starts the runner again and checks that it cleaned up after the
+  ///      dead one: no secret file, no temporary keychain, no process left,
+  ///   6. resumes the job with the side effect, which the runner takes, and
+  ///      cancels it: the process group ends and the secret files are gone.
+  Future<void> _runnerLoss(String projectId) async {
+    final xp = this.xp;
+    if (xp == null) {
+      throw const _Failure('--xp is required for --mode runner-loss');
+    }
+    await _listenToEvents();
+    final runnerData = p.join(work, 'runner-data');
+    final environment = _runnerEnvironment();
+    final identity = await _pairRunner(xp, runnerData, environment);
+    Future<void> startRunner() => _startRunner(xp, runnerData, environment);
+
+    await startRunner();
+    _log('the runner is online');
+
+    // --- the jobs
+    await _put('/projects/$projectId/credentials', {
+      'app': '.',
+      'flavor': 'dev',
+      'kind': 'keystore',
+      'keystore': base64Encode(utf8.encode(_fakeKeystore)),
+      'storePassword': _fakeStorePassword,
+      'keyAlias': 'upload',
+    });
+    final credentials =
+        (await _get('/projects/$projectId/credentials'))['credentials'] as List;
+    final keystoreId =
+        (credentials.firstWhere((c) => (c as Map)['kind'] == 'keystore')
+                as Map)['id']!
+            as String;
+    final secretKey = 'credential.$keystoreId';
+
+    Future<String> workflow(String name, String jobs) async {
+      final created = await _post('/projects/$projectId/workflows', {
+        'name': name,
+        'yaml':
+            'schema: 1\nname: $name\nstages:\n  - name: only\n    jobs:\n'
+            '$jobs',
+      }, expect: 201);
+      return created['id']! as String;
+    }
+
+    String job(String id, String sleep, {required bool sideEffect}) =>
+        '''
+      $id:
+        name: $id
+        steps:
+          - kind: git.checkout
+          - kind: command
+            with:
+              executable: sh
+              arguments:
+                - -c
+                - 'echo "keystore=\$E2E_KEYSTORE"; echo "password=\$E2E_STORE_PASSWORD"; test -s "\$E2E_KEYSTORE" && echo secret-file-ok; sleep $sleep'
+              secretFiles:
+                E2E_KEYSTORE: $secretKey
+              secretEnvironment:
+                E2E_STORE_PASSWORD: $secretKey.storePassword
+              sideEffect: $sideEffect
+''';
+    final occupy = await workflow('occupy', '''
+      occupy:
+        name: occupy
+        steps:
+          - kind: git.checkout
+          - kind: command
+            with:
+              executable: sleep
+              arguments: ['3600']
+''');
+    final holdEffect = await workflow(
+      'hold-effect',
+      job('effect', '3571', sideEffect: true),
+    );
+    final holdPure = await workflow(
+      'hold-pure',
+      job('pure', '3572', sideEffect: false),
+    );
+    Future<Map<String, dynamic>> dispatch(String workflowId) =>
+        _post('/projects/$projectId/workflows/$workflowId/dispatch', {
+          'platforms': ['android'],
+          'flavors': ['dev'],
+        }, expect: 202);
+
+    // The only slot of the engine is taken, so the jobs below go to the runner.
+    final occupier = _jobOf(await dispatch(occupy), 0);
+    await _waitForJob(occupier, const Duration(minutes: 2), {'running'});
+    final effectRun = await dispatch(holdEffect);
+    final pureRun = await dispatch(holdPure);
+    _lastRun = effectRun['id'] as String?;
+    final effect = _jobOf(effectRun, 0);
+    final pure = _jobOf(pureRun, 0);
+    _lastJob = effect;
+    for (final id in [effect, pure]) {
+      final running = await _waitForJob(id, const Duration(minutes: 3), {
+        'running',
+        'failed',
+      });
+      _expect(
+        running['state'] == 'running' && running['runnerId'] != null,
+        'job $id runs on the runner, not ${running['state']}: '
+        '${running['message']}',
+      );
+    }
+    final runnerId = identity['runnerId'];
+    _expect(
+      (await _get('/jobs/$effect'))['runnerId'] == runnerId,
+      'the job runs on the paired runner',
+    );
+    _log('both jobs run on the runner');
+
+    // --- secrets reach the runner's secret folder, and only masked into logs
+    final held = await _waitFor(
+      'the secret files of both jobs in the secret folder of the runner',
+      () {
+        final files = _secretFiles(runnerData);
+        final keystores = files.where(
+          (f) => p.basename(f.path).endsWith('E2E_KEYSTORE'),
+        );
+        return keystores.length >= 2 ? files : null;
+      },
+    );
+    for (final file in held.where(
+      (f) => p.basename(f.path).endsWith('E2E_KEYSTORE'),
+    )) {
+      _expect(
+        file.readAsStringSync() == _fakeKeystore,
+        'the keystore file has the bytes the engine delivered',
+      );
+    }
+    _expect(
+      held.any((f) => p.basename(f.path).startsWith('delivered-')),
+      'the delivered secrets are kept in the secret folder too',
+    );
+    _expect(_alive('sleep 3571') && _alive('sleep 3572'), 'the jobs sleep');
+    await _waitFor('the log of the job to have the masked password', () {
+      final logs = _storedLogs(effect);
+      return logs.contains('password=***') && logs.contains('secret-file-ok')
+          ? logs
+          : null;
+    });
+    _expect(
+      !_storedLogs(effect).contains(_fakeStorePassword) &&
+          !_runnerLog.toString().contains(_fakeStorePassword),
+      'the password is in no stored log and not in the output of the runner',
+    );
+
+    // --- the crash
+    final killedAt = DateTime.now();
+    _runnerProcess!.kill(ProcessSignal.sigkill);
+    await _runnerProcess!.exitCode;
+    _log('killed the runner with SIGKILL');
+    _expect(
+      _secretFiles(runnerData).isNotEmpty && _alive('sleep 3571'),
+      'a runner killed with SIGKILL could not clean up: its secret files and '
+      'its processes are still there',
+    );
+    await Future<void>.delayed(const Duration(seconds: 15));
+    for (final id in [effect, pure]) {
+      _expect(
+        (await _get('/jobs/$id'))['state'] == 'running',
+        'job $id still holds its lease 15 s after the crash (the lease lasts '
+        '90 s)',
+      );
+    }
+
+    // --- the lease lapses
+    final lost = await _waitForJob(effect, const Duration(minutes: 4), {
+      'waiting_for_resume',
+      'failed',
+      'cancelled',
+      'queued',
+    });
+    final elapsed = DateTime.now().difference(killedAt);
+    _expect(
+      elapsed >= const Duration(seconds: 60),
+      'the job was not taken from the runner before its lease lapsed '
+      '(after ${elapsed.inSeconds} s)',
+    );
+    _expect(
+      lost['state'] == 'waiting_for_resume' &&
+          lost['runnerId'] == null &&
+          '${lost['message']}'.contains('lost its lease') &&
+          '${lost['message']}'.contains('never repeated'),
+      'the job with a side effect waits for a resume and says why: '
+      '${lost['state']} ${lost['message']}',
+    );
+    final steps = lost['steps'] as List;
+    _expect(
+      (steps.last as Map)['state'] == 'interrupted',
+      'its running step is interrupted: ${steps.last}',
+    );
+    final requeued = await _waitForJob(pure, const Duration(seconds: 30), {
+      'queued',
+      'failed',
+      'cancelled',
+    });
+    _expect(
+      requeued['state'] == 'queued' && requeued['runnerId'] == null,
+      'the job without a side effect is queued again: ${requeued['state']}',
+    );
+    await Future<void>.delayed(const Duration(seconds: 12));
+    _expect(
+      (await _get('/jobs/$effect'))['state'] == 'waiting_for_resume' &&
+          (await _get('/jobs/$pure'))['state'] == 'queued',
+      'neither job runs again by itself',
+    );
+    await Future<void>.delayed(const Duration(milliseconds: 500));
+    final lapses = _events
+        .map((e) => e.event)
+        .whereType<RunnerLeaseLost>()
+        .toList();
+    _expect(
+      lapses.length == 2 &&
+          lapses.every((e) => e.reason == 'lapsed' && e.runnerId == runnerId) &&
+          lapses.map((e) => e.jobId).toSet().containsAll([effect, pure]),
+      'a runner.lease_lost event (lapsed) for each job: $lapses',
+    );
+    _log(
+      'after ${elapsed.inSeconds} s the engine took the jobs back: '
+      'waiting_for_resume (side effect) and queued',
+    );
+
+    // --- the restart cleans up after the dead runner
+    await _post('/jobs/$pure/cancel', null);
+    _runnerLog.clear();
+    await startRunner();
+    await _waitFor('the start-up clean-up to be reported', () {
+      final text = _runnerLog.toString();
+      return text.contains('Cleaned up after an earlier run') ? text : null;
+    });
+    _expect(
+      _secretFiles(runnerData).isEmpty,
+      'no secret file is left after the runner restarted: '
+      '${_secretFiles(runnerData).map((f) => f.path).toList()}',
+    );
+    _expect(
+      !_alive('sleep 3571') && !_alive('sleep 3572'),
+      'the processes the dead runner left are stopped',
+    );
+    final keychains = Directory(p.join(runnerData, 'keychains'));
+    _expect(
+      !keychains.existsSync() || keychains.listSync().isEmpty,
+      'no temporary keychain is left',
+    );
+    if (Platform.isMacOS) {
+      final listed = Process.runSync('/usr/bin/security', [
+        'list-keychains',
+        '-d',
+        'user',
+      ]);
+      _expect(
+        !'${listed.stdout}'.contains(runnerData),
+        'the keychain search list of the user does not name the runner',
+      );
+    }
+    _log('the restarted runner left no secret, keychain or process behind');
+
+    // --- the job can be resumed; cancelling it wipes its secrets again
+    await _post('/jobs/$effect/resume', null, expect: 202);
+    final again = await _waitForJob(effect, const Duration(minutes: 2), {
+      'running',
+      'failed',
+    });
+    _expect(
+      again['state'] == 'running' && again['runnerId'] == runnerId,
+      'the resumed job runs on the restarted runner: ${again['state']} '
+      '${again['message']}',
+    );
+    await _waitFor('the secret file of the resumed job', () {
+      final files = _secretFiles(runnerData);
+      return files.isEmpty ? null : files;
+    });
+    await _post('/jobs/$effect/cancel', null);
+    await _waitFor('the secrets to be wiped when the job is cancelled', () {
+      return _secretFiles(runnerData).isEmpty && !_alive('sleep 3571')
+          ? true
+          : null;
+    });
+    _log('cancelling the job stopped its process group and wiped its secrets');
+    await _post('/jobs/$occupier/cancel', null);
+  }
+
+  // ------------------------------------------------------------ the runner
+
+  /// The environment of `xp runner`: nothing of `XP_*` from this machine, the
+  /// credential in a file in its data folder (never a Keychain), and the URL
+  /// of the repository replaced, as there is no SSH key to read from.
+  Map<String, String> _runnerEnvironment({String? path}) => {
+    for (final entry in Platform.environment.entries)
+      if (!entry.key.startsWith('XP_')) entry.key: entry.value,
+    'XP_TEST_FILE_SECRETS': '1',
+    'XP_NO_UPDATE_CHECK': '1',
+    // The offer names the repository the engine knows (here a local path
+    // that plays GitHub). A test points the runner at it all the same.
+    'XP_RUNNER_TEST_SOURCE_URL': p.join(work, 'origin.git'),
+    'PATH': ?path,
+  };
+
+  /// Makes a pairing token, exchanges it with `xp runner pair` for the
+  /// credential of a runner called `e2e-runner`, and checks that what the
+  /// runner keeps in its data folder names no secret. Returns `runner.json`.
+  Future<Map<String, dynamic>> _pairRunner(
+    String xp,
+    String runnerData,
+    Map<String, String> environment,
+  ) async {
+    final pairing = await _post('/runners/pairing-tokens', {
+      'name': 'e2e-runner',
+    }, expect: 201);
+    final paired = await Process.run(
+      xp,
+      [
+        'runner',
+        'pair',
+        '--engine',
+        _url.toString(),
+        '--token',
+        pairing['token']! as String,
+        '--data-dir',
+        runnerData,
+      ],
+      environment: environment,
+      includeParentEnvironment: false,
+    );
+    _expect(
+      paired.exitCode == 0,
+      'xp runner pair exits 0, not ${paired.exitCode}: ${paired.stderr}',
+    );
+    final identity = jsonDecode(
+      File(p.join(runnerData, 'runner.json')).readAsStringSync(),
+    ) as Map<String, dynamic>;
+    _expect(
+      identity.keys.toSet().containsAll(['engine', 'runnerId', 'name']) &&
+          identity.length == 3,
+      'runner.json holds who the runner is and no credential: $identity',
+    );
+    _log('paired the runner ${identity['runnerId']}');
+    return identity;
+  }
+
+  /// Starts `xp runner start` as a process of its own and waits until the
+  /// engine lists the runner as online, with [capability] if one is given.
+  Future<void> _startRunner(
+    String xp,
+    String runnerData,
+    Map<String, String> environment, {
+    String? capability,
+  }) async {
+    final process = _runnerProcess = await Process.start(
+      xp,
+      ['runner', 'start', '--data-dir', runnerData, '--slots', '2'],
+      environment: environment,
+      includeParentEnvironment: false,
+    );
+    for (final stream in [process.stdout, process.stderr]) {
+      stream
+          .transform(utf8.decoder)
+          .transform(const LineSplitter())
+          .listen(_runnerLog.writeln);
+    }
+    final deadline = DateTime.now().add(const Duration(seconds: 90));
+    while (DateTime.now().isBefore(deadline)) {
+      final runners = (await _get('/runners'))['runners'] as List;
+      if (runners.any(
+        (r) =>
+            (r as Map)['status'] == 'online' &&
+            (capability == null ||
+                (r['capabilities'] as List).contains(capability)),
+      )) {
+        return;
+      }
+      await Future<void>.delayed(const Duration(seconds: 1));
+    }
+    throw const _Failure('the runner did not come online in 90 s');
+  }
+
+  static const _fakeKeystore = 'FAKE-KEYSTORE-BYTES-FOR-E2E';
+  static const _fakeStorePassword = 'fake-store-password-e2e-4471';
+
+  /// Every file in the secret folders of the runner: its data folder, and the
+  /// tmpfs folder of a Linux runner.
+  List<File> _secretFiles(String runnerData) {
+    final roots = <Directory>[Directory(p.join(runnerData, 'secrets'))];
+    final shm = Directory('/dev/shm');
+    if (shm.existsSync()) {
+      roots.addAll(
+        shm.listSync().whereType<Directory>().where(
+          (d) => p.basename(d.path).startsWith('xpath-runner-'),
+        ),
+      );
+    }
+    return [
+      for (final root in roots)
+        if (root.existsSync())
+          ...root.listSync(recursive: true).whereType<File>(),
+    ];
+  }
+
+  /// Whether a process whose command line contains [pattern] is alive.
+  bool _alive(String pattern) =>
+      Process.runSync('pgrep', ['-f', pattern]).exitCode == 0;
+
+  /// The stored log of the job [id] on the engine, all its steps.
+  String _storedLogs(String id) {
+    final directory = Directory(p.join(data, 'logs', id));
+    if (!directory.existsSync()) return '';
+    return [
+      for (final file in directory.listSync().whereType<File>())
+        file.readAsStringSync(),
+    ].join('\n');
+  }
+
+  /// Calls [check] every second until it gives a value; fails after 3 minutes.
+  Future<T> _waitFor<T>(String what, T? Function() check) async {
+    final deadline = DateTime.now().add(const Duration(minutes: 3));
+    while (DateTime.now().isBefore(deadline)) {
+      final value = check();
+      if (value != null) return value;
+      await Future<void>.delayed(const Duration(seconds: 1));
+    }
+    throw _Failure('timed out waiting for $what');
+  }
+
+  // ---------------------------------------------------------- runner build
+
+  /// Phase 14b: the build job of `dev-build` on a runner (ADR 0010).
+  ///
+  /// The engine has no Android SDK, so the build job (which needs `android`)
+  /// can only go to the runner; the check and the upload (an engine-only
+  /// guard and `upload.firebase`) run on the engine. What it checks:
+  ///
+  ///   - the three jobs ran where they should: the build job on the runner,
+  ///     the others on the engine,
+  ///   - the runner fetched the commit into a bare cache of its own and built
+  ///     in a worktree of its own (the paths of the engine's disk were
+  ///     translated), and left no worktree, work folder or secret behind,
+  ///   - the APK and the manifest the runner uploaded are in the engine's store
+  ///     with the digests the runner computed, and Firebase received that
+  ///     very APK from the upload job on the engine,
+  ///   - the build number is the one allocated at dispatch.
+  Future<void> _runnerBuild(String projectId) async {
+    final xp = this.xp;
+    if (xp == null) {
+      throw const _Failure('--xp is required for --mode runner-build');
+    }
+    final runnerData = p.join(work, 'runner-data');
+    // The runner's own Flutter cache has the pinned SDK, and no fvm answers.
+    final pin =
+        (jsonDecode(File(p.join(fixture, '.fvmrc')).readAsStringSync())
+                as Map<String, dynamic>)['flutter']!
+            as String;
+    final sdk = flutterSdk;
+    if (sdk != null) {
+      final target = p.join(runnerData, 'toolchains', 'flutter', pin);
+      Directory(p.dirname(target)).createSync(recursive: true);
+      Link(target).createSync(sdk);
+    }
+    final shims = Directory(_fvmShim());
+    final environment = _runnerEnvironment(
+      path: '${shims.path}:${Platform.environment['PATH']}',
+    );
+    final identity = await _pairRunner(xp, runnerData, environment);
+    await _startRunner(xp, runnerData, environment, capability: 'android');
+    _log('the runner is online and can build Android; the engine cannot');
+
+    await _put('/projects/$projectId/credentials', {
+      'app': '.',
+      'flavor': 'dev',
+      'kind': 'firebase_sa',
+      'serviceAccount': _firebase!.serviceAccountJson(),
+    });
+    final workflows = await _get('/projects/$projectId/workflows');
+    final devBuild =
+        ((workflows['workflows'] as List).firstWhere(
+              (w) => (w as Map)['name'] == 'dev-build',
+            ) as Map)['id']!
+            as String;
+    final run = await _post(
+      '/projects/$projectId/workflows/$devBuild/dispatch',
+      {
+        'platforms': ['android'],
+        'flavors': ['dev'],
+        'inputs': {
+          'firebaseAppIds': {
+            'dev': {'android': _firebaseAppId},
+          },
+          'testerGroups': ['testers'],
+          'notes': 'built by a runner',
+        },
+      },
+      expect: 202,
+    );
+    _lastRun = run['id'] as String?;
+    final ids = {
+      for (final job in run['jobs'] as List)
+        (job as Map)['name']! as String: job['id']! as String,
+    };
+    final checkId = ids['Check dev for android']!;
+    final buildId = ids['Build dev for android']!;
+    final uploadId = ids['Upload dev for android']!;
+    _lastJob = buildId;
+    final upload = await _waitForJob(uploadId, const Duration(minutes: 30), {
+      'succeeded',
+      'failed',
+      'cancelled',
+      'waiting_for_approval',
+    });
+    if (upload['state'] != 'succeeded') {
+      throw _Failure('the upload ${upload['state']}: ${upload['message']}');
+    }
+
+    // --- where the jobs ran
+    final check = await _get('/jobs/$checkId');
+    final build = await _get('/jobs/$buildId');
+    _expect(
+      check['state'] == 'succeeded' && check['runnerId'] == null,
+      'the check ran on the engine: ${check['state']} ${check['runnerId']}',
+    );
+    _expect(
+      build['state'] == 'succeeded' &&
+          build['runnerId'] == identity['runnerId'],
+      'the build ran on the runner ${identity['runnerId']}: '
+      '${build['state']} ${build['runnerId']} ${build['message']}',
+    );
+    _expect(upload['runnerId'] == null, 'the upload ran on the engine');
+    final steps = [for (final step in build['steps'] as List) step as Map];
+    _expect(
+      steps.map((s) => s['kind']).toList().toString() ==
+              [
+                'git.checkout',
+                'version.bump',
+                'build.android',
+                'record.manifest',
+              ].toString() &&
+          steps.every((s) => s['state'] == 'succeeded'),
+      'the build job ran its four steps: $steps',
+    );
+    final checkout = steps.first['result'] as Map;
+    final remoteWorktree = checkout['path']! as String;
+    _expect(
+      remoteWorktree.startsWith(p.join(runnerData, 'source', 'worktrees')) &&
+          !remoteWorktree.startsWith(data),
+      'the checkout was made in a worktree of the runner: $remoteWorktree',
+    );
+
+    // --- what the runner uploaded
+    final build_ = run['build']! as int;
+    final artifacts =
+        (await _get('/jobs/$buildId/artifacts'))['artifacts'] as List;
+    Map<dynamic, dynamic> artifact(String kind) => artifacts.firstWhere(
+      (a) => (a as Map)['kind'] == kind,
+      orElse: () => throw _Failure('the build stored no $kind: $artifacts'),
+    ) as Map;
+    final apk = artifact('apk');
+    final manifest = artifact('manifest');
+    _expect(
+      apk['name'] == 'dev-1.0.0+$build_.apk',
+      'the APK is named for the version and build: ${apk['name']}',
+    );
+    final apkBytes = await _download('/artifacts/${apk['id']}/download');
+    _expect(
+      sha256OfBytes(apkBytes) == apk['sha256'] &&
+          apkBytes.length == apk['size'] &&
+          apkBytes[0] == 0x50 &&
+          apkBytes[1] == 0x4b,
+      'the APK in the engine store is the zip the runner uploaded, with the '
+      'digest it declared',
+    );
+    final manifestText = utf8.decode(
+      await _download('/artifacts/${manifest['id']}/download'),
+    );
+    _expect(
+      manifestText.contains('"build": $build_') &&
+          manifestText.contains('"sha256": "${apk['sha256']}"'),
+      'the manifest the runner uploaded names the build and the APK',
+    );
+    final releases = _firebase!.apps[_firebaseAppId]!.releases;
+    _expect(
+      releases.length == 1 &&
+          sha256OfBytes(releases.single.binary) == apk['sha256'] &&
+          releases.single.buildVersion == '$build_',
+      'Firebase received the APK the runner built, from the engine: $releases',
+    );
+
+    // --- what the runner left
+    _expect(
+      _secretFiles(runnerData).isEmpty,
+      'no secret file is left on the runner',
+    );
+    final jobsFolder = Directory(p.join(runnerData, 'jobs'));
+    _expect(
+      !jobsFolder.existsSync() || jobsFolder.listSync().isEmpty,
+      'no work folder is left on the runner',
+    );
+    final worktrees = Directory(p.join(runnerData, 'source', 'worktrees'));
+    _expect(
+      !worktrees.existsSync() ||
+          worktrees.listSync(recursive: true).whereType<File>().isEmpty,
+      'no worktree is left on the runner',
+    );
+    _expect(
+      Directory(p.join(runnerData, 'source', 'mirrors')).listSync().length == 1,
+      'the runner keeps one bare cache of the repository, keyed by its id',
+    );
+    _log(
+      'the build job ran on the runner (${checkout['sha']}), the check and the '
+      'upload on the engine; the APK in the engine store is the one the runner '
+      'built and Firebase received it',
+    );
   }
 
   // ------------------------------------------------------------- MCP gate
@@ -655,6 +1355,13 @@ class _E2e {
       TestEndpoints.githubApiVariable: _github!.url.toString(),
       TestEndpoints.firebaseVariable: _firebase!.baseUrl.toString(),
       TestEndpoints.fileSecretsVariable: '1',
+      if (mode == 'runner-loss')
+        // `keytool` accepts the made-up keystore the script saves.
+        'PATH': '${_keytoolShim()}:${Platform.environment['PATH']}',
+      if (mode == 'runner-build')
+        // No fvm answers, so the engine takes the Flutter SDK of its cache
+        // (its home folder is not the one fvm keeps its SDKs in).
+        'PATH': '${_fvmShim()}:${Platform.environment['PATH']}',
       if (mode == 'prod') ...{
         TestEndpoints.ascVariable: _asc!.baseUrl.toString(),
         TestEndpoints.playVariable: _play!.baseUrl.toString(),
@@ -663,6 +1370,16 @@ class _E2e {
         'PATH': '${p.join(work, 'shims')}:${Platform.environment['PATH']}',
       },
     };
+    if (mode == 'runner-build') {
+      // An engine that cannot build Android: no SDK in its environment, and a
+      // home folder where Android Studio has put none.
+      environment
+        ..remove('ANDROID_HOME')
+        ..remove('ANDROID_SDK_ROOT')
+        ..['HOME'] = (Directory(
+          p.join(work, 'engine-home'),
+        )..createSync(recursive: true)).path;
+    }
     // The GitHub CLI of the engine is a script that prints a made-up token.
     final gh = File(p.join(work, 'gh'))
       ..writeAsStringSync('#!/bin/sh\necho $_githubToken\n');
@@ -693,15 +1410,22 @@ class _E2e {
     }
     _token = (created.stdout as String).trim();
 
-    final engine = _engine = await Process.start(xpd, [
-      'serve',
-      '--port',
-      '0',
-      '--data-dir',
-      data,
-      '--slots',
-      '2',
-    ], environment: environment);
+    final engine = _engine = await Process.start(
+      xpd,
+      [
+        'serve',
+        '--port',
+        '0',
+        '--data-dir',
+        data,
+        '--slots',
+        // One slot for the runner test: a long job on the engine keeps the next
+        // ones for the runner.
+        if (mode == 'runner-loss') '1' else '2',
+      ],
+      environment: environment,
+      includeParentEnvironment: mode != 'runner-build',
+    );
     final listening = Completer<Uri>();
     engine.stdout
         .transform(utf8.decoder)
@@ -1245,6 +1969,27 @@ class _E2e {
 
   /// Where `perl` is on the machine, `git`, `xcrun`: the programs the shims
   /// stand in front of.
+  /// A folder with an `fvm` that always fails.
+  String _fvmShim() {
+    final directory = Directory(p.join(work, 'runner-shims'))
+      ..createSync(recursive: true);
+    final file = File(p.join(directory.path, 'fvm'))
+      ..writeAsStringSync('#!/bin/sh\nexit 1\n');
+    Process.runSync('chmod', ['+x', file.path]);
+    return directory.path;
+  }
+
+  /// A folder with a `keytool` that accepts any keystore, for the engine to
+  /// check the made-up one with.
+  String _keytoolShim() {
+    final directory = Directory(p.join(work, 'keytool-shim'))
+      ..createSync(recursive: true);
+    final file = File(p.join(directory.path, 'keytool'))
+      ..writeAsStringSync('#!/bin/sh\nexit 0\n');
+    Process.runSync('chmod', ['+x', file.path]);
+    return directory.path;
+  }
+
   String _real(String name) {
     for (final directory in Platform.environment['PATH']!.split(':')) {
       final candidate = File(p.join(directory, name));
@@ -1460,6 +2205,9 @@ class _E2e {
 
   /// Prints what helps to find out why a check failed.
   Future<void> explain() async {
+    if (_runnerLog.isNotEmpty) {
+      stderr.writeln('--- output of the runner:\n$_runnerLog');
+    }
     final id = _lastJob;
     if (id != null && _engine != null) await _explainJob(id);
     final run = _lastRun;
@@ -1514,6 +2262,7 @@ class _E2e {
 
   Future<void> stop() async {
     _client.close(force: true);
+    _runnerProcess?.kill(ProcessSignal.sigkill);
     final engine = _engine;
     if (engine != null) {
       engine.kill();

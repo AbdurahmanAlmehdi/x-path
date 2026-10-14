@@ -141,6 +141,40 @@ final class LeaseGrant extends Equatable {
   List<Object?> get props => [jobId, leaseId, until];
 }
 
+/// The repository a leased job builds, as the runner reaches it with its own
+/// access to GitHub (ADR 0009).
+///
+/// The offer names the repository and the commit and nothing else: it never
+/// carries a credential. The runner keeps a bare cache per repository, keyed
+/// by [githubRepoId], fetches the commit over SSH and checks it out in a
+/// worktree of its own.
+final class LeaseRepository extends Equatable {
+  /// Creates the repository.
+  const new({required this.githubRepoId, required this.sshUrl});
+
+  /// Reads the repository from its JSON form.
+  factory fromJson(Map<String, dynamic> json) => LeaseRepository(
+    githubRepoId: _required<int>(json, 'githubRepoId'),
+    sshUrl: _required<String>(json, 'sshUrl'),
+  );
+
+  /// The id GitHub gave the repository. It survives renames, so it keys the
+  /// runner's cache.
+  final int githubRepoId;
+
+  /// The SSH URL to fetch from, for example `git@github.com:owner/app.git`.
+  final String sshUrl;
+
+  /// The JSON form.
+  Map<String, dynamic> toJson() => {
+    'githubRepoId': githubRepoId,
+    'sshUrl': sshUrl,
+  };
+
+  @override
+  List<Object?> get props => [githubRepoId, sshUrl];
+}
+
 /// A step of a job the engine leases to a runner.
 final class LeaseStep extends Equatable {
   /// Creates the step.
@@ -867,8 +901,9 @@ final class JobDoneFrame extends RunnerFrame {
   List<Object?> get props => [jobId, leaseId, state, lastChunk, message];
 }
 
-/// The runner asks for a secret of the leased job (D-09). The engine gives
-/// signing material the job's steps name, once per lease.
+/// The runner asks for a secret of the leased job (D-09, ADR 0012). The engine
+/// gives signing material and the Shorebird key that the job's steps name,
+/// once per lease.
 final class SecretRequestFrame extends RunnerFrame {
   /// Creates the frame.
   const new({required this.jobId, required this.leaseId, required this.key});
@@ -1093,6 +1128,7 @@ final class LeaseOfferFrame extends EngineFrame {
     required this.steps,
     this.sha,
     this.name,
+    this.repository,
     this.secrets = const [],
   });
 
@@ -1103,6 +1139,10 @@ final class LeaseOfferFrame extends EngineFrame {
     projectId: _required<String>(json, 'projectId'),
     sha: _optional<String>(json, 'sha'),
     name: _optional<String>(json, 'name'),
+    repository: switch (_optional<Map<String, dynamic>>(json, 'repository')) {
+      final repository? => LeaseRepository.fromJson(repository),
+      null => null,
+    },
     stage: _required<int>(json, 'stage'),
     capabilities: _list<String>(json, 'capabilities'),
     expiresAt: _time(json, 'expiresAt'),
@@ -1122,11 +1162,17 @@ final class LeaseOfferFrame extends EngineFrame {
   /// The project.
   final String projectId;
 
-  /// The commit the job builds.
+  /// The exact commit the job builds, in full. It is the dispatched commit,
+  /// or, for a job that starts from the version commit of an earlier job of
+  /// its run, that commit. The runner checks out this commit and verifies its
+  /// head before it runs anything (ADR 0009).
   final String? sha;
 
   /// What the workflow calls the job.
   final String? name;
+
+  /// Where the runner gets the commit from; see [LeaseRepository].
+  final LeaseRepository? repository;
 
   /// The stage of the job in its run.
   final int stage;
@@ -1141,8 +1187,9 @@ final class LeaseOfferFrame extends EngineFrame {
   /// that is not done.
   final List<LeaseStep> steps;
 
-  /// The keys of the signing material the job may ask for with a
-  /// [SecretRequestFrame] (D-09). Keys only, never values.
+  /// The keys of the secrets the job may ask for with a [SecretRequestFrame]:
+  /// signing material (D-09) and the Shorebird key (ADR 0012). Keys only,
+  /// never values.
   final List<String> secrets;
 
   @override
@@ -1156,6 +1203,7 @@ final class LeaseOfferFrame extends EngineFrame {
     'projectId': projectId,
     'sha': ?sha,
     'name': ?name,
+    'repository': ?repository?.toJson(),
     'stage': stage,
     'capabilities': capabilities,
     'expiresAt': _iso(expiresAt),
@@ -1170,6 +1218,7 @@ final class LeaseOfferFrame extends EngineFrame {
     projectId,
     sha,
     name,
+    repository,
     stage,
     capabilities,
     expiresAt,
@@ -1342,8 +1391,9 @@ final class CancelFrame extends EngineFrame {
   List<Object?> get props => [jobId, leaseId, reason];
 }
 
-/// A secret of the leased job (D-09). It is sent once per lease; the runner
-/// keeps it in a temporary keychain or folder and wipes it when the job ends.
+/// A secret of the leased job (D-09, ADR 0012). It is sent once per lease; the
+/// runner keeps it in a temporary keychain or folder and wipes it when the job
+/// ends.
 final class SecretValueFrame extends EngineFrame {
   /// Creates the frame.
   const new({
@@ -1422,8 +1472,9 @@ final class SecretDeniedFrame extends EngineFrame {
   /// The key.
   final String key;
 
-  /// Why: the job does not hold the lease, the key is not signing material
-  /// of the job, or it was given already.
+  /// Why: the job does not hold the lease, the key is not a secret the job
+  /// may have (signing material or the Shorebird key that its steps name), or
+  /// it was given already.
   final String reason;
 
   @override

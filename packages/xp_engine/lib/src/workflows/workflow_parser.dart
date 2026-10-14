@@ -464,22 +464,24 @@ class _Reader {
     );
   }
 
-  /// Checks `commitFrom` of the steps: it names a job of an earlier stage.
+  /// Checks `commitFrom` and `artifactsFrom` of the steps: each names a job of
+  /// an earlier stage.
   void _checkCommitSources(List<StageDefinition> stages) {
     final earlier = <String>{};
     for (final stage in stages) {
       for (final job in stage.jobs) {
         for (final step in job.steps) {
-          final source = step.withValues['commitFrom'];
-          if (source is String &&
-              !source.contains(r'${{') &&
-              !earlier.contains(source)) {
-            _issue(
-              step.position.line,
-              step.position.column,
-              '"commitFrom" must name a job of an earlier stage, not '
-              '"$source".',
-            );
+          for (final key in const ['commitFrom', 'artifactsFrom']) {
+            final source = step.withValues[key];
+            if (source is String &&
+                !source.contains(r'${{') &&
+                !earlier.contains(source)) {
+              _issue(
+                step.position.line,
+                step.position.column,
+                '"$key" must name a job of an earlier stage, not "$source".',
+              );
+            }
           }
         }
       }

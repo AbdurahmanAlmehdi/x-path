@@ -84,14 +84,21 @@ void main() {
       expect(report.retention, const RetentionSettings());
     });
 
-    test('is open to every kind of token and deletes nothing', () async {
-      await addBuilds();
+    test(
+      'is open to an app, a cli and an mcp token and deletes nothing',
+      () async {
+        await addBuilds();
 
-      for (final kind in DeviceTokenKind.values) {
-        expect((await send('GET', '/storage', kind: kind)).statusCode, 200);
-      }
-      expect(engine.artifactStore.files, hasLength(7));
-    });
+        for (final kind in DeviceTokenKind.values) {
+          expect(
+            (await send('GET', '/storage', kind: kind)).statusCode,
+            kind == DeviceTokenKind.runner ? 403 : 200,
+            reason: kind.name,
+          );
+        }
+        expect(engine.artifactStore.files, hasLength(7));
+      },
+    );
 
     test('needs a token', () async {
       final response = await engine.request('/storage', token: '');
@@ -113,19 +120,24 @@ void main() {
       expect(engine.artifactStore.files, hasLength(7));
     });
 
-    test('is a dry run for an agent and a runner too', () async {
+    test('is a dry run for an agent, and not for a runner', () async {
       await addBuilds();
 
-      for (final kind in [DeviceTokenKind.mcp, DeviceTokenKind.runner]) {
-        final response = await send(
-          'POST',
-          '/storage/free',
-          kind: kind,
-          body: {'dryRun': true},
-        );
+      final agent = await send(
+        'POST',
+        '/storage/free',
+        kind: DeviceTokenKind.mcp,
+        body: {'dryRun': true},
+      );
+      final runner = await send(
+        'POST',
+        '/storage/free',
+        kind: DeviceTokenKind.runner,
+        body: {'dryRun': true},
+      );
 
-        expect(response.statusCode, 200);
-      }
+      expect(agent.statusCode, 200);
+      expect(runner.statusCode, 403);
     });
 
     test('deletes for the app and for xp', () async {

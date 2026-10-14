@@ -12,16 +12,18 @@
 ///   engine (D-05, D-07).
 /// - `gate`: approvals are the engine's state (D-13).
 /// - `guard`: its checks read the credentials and ask the stores.
-/// - `shorebird.release`, `shorebird.patch`: they publish with the Shorebird
-///   API key, which is not signing material, so it stays on the engine too
-///   (D-07, D-09).
+/// - `test`: it judges the run against the baseline and stores the run, both
+///   in the engine's database (D-21); a runner has neither.
 ///
-/// What a runner may be handed is signing material only, and only for the
-/// one job it leases (`SigningSecretGrants`).
+/// `shorebird.release` and `shorebird.patch` may run on a runner (ADR 0012):
+/// the Shorebird `sb_api_*` key reaches it for the one job, like signing
+/// material (`RunnerSecretGrants`).
 ///
-/// The built-in workflows put a `guard` or an upload in the same job as the
-/// build, so those jobs run on the engine. A workflow that builds on a runner
-/// splits the engine-only steps into a job of their own.
+/// What a runner may be handed is signing material and the Shorebird key, and
+/// only for the one job it leases.
+///
+/// The built-in workflows keep the engine-only steps in jobs of their own
+/// (ADR 0010), so their build jobs can go to a runner.
 abstract final class RemoteStepPolicy {
   /// The step kinds that only the engine runs, besides every `upload.*` and
   /// `github.*` step.
@@ -31,8 +33,7 @@ abstract final class RemoteStepPolicy {
     'git.releaseBranch',
     'gate',
     'guard',
-    'shorebird.release',
-    'shorebird.patch',
+    'test',
   };
 
   /// The prefixes of the step kinds that only the engine runs.

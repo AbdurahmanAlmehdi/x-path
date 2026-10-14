@@ -22,6 +22,7 @@ class UploadFirebaseInput extends Equatable {
     this.testerEmails = const [],
     this.groupAliases = const [],
     this.releaseNotes,
+    this.artifactJob,
   });
 
   /// Reads the input from its stored form.
@@ -75,6 +76,7 @@ class UploadFirebaseInput extends Equatable {
       testerEmails: emails,
       groupAliases: groups,
       releaseNotes: optionalString(json, 'releaseNotes'),
+      artifactJob: optionalString(json, 'artifactJob'),
     );
   }
 
@@ -91,6 +93,11 @@ class UploadFirebaseInput extends Equatable {
   /// The file name of the binary in the artifact store, such as
   /// `dev-1.2.3+45.apk`. It is looked up among the artifacts of the job.
   final String artifactName;
+
+  /// The job whose artifacts hold the file, when it is not this job: a build
+  /// job of an earlier stage that the runner uploaded the file from (ADR
+  /// 0010). `null` looks among the artifacts of the job the step runs in.
+  final String? artifactJob;
 
   /// The Firebase app id, such as `1:684690133351:android:b434734f`.
   final String appId;
@@ -109,6 +116,10 @@ class UploadFirebaseInput extends Equatable {
 
   /// The release notes; none are set if absent.
   final String? releaseNotes;
+
+  /// Who has the file, for a message: this job, or the build job.
+  String get sourceOfArtifact =>
+      artifactJob == null ? 'This job' : 'The build job $artifactJob';
 
   /// The kind of the binary.
   ArtifactKind get kind => kindOf(artifactName)!;
@@ -131,6 +142,7 @@ class UploadFirebaseInput extends Equatable {
     if (testerEmails.isNotEmpty) 'testerEmails': testerEmails,
     if (groupAliases.isNotEmpty) 'groupAliases': groupAliases,
     'releaseNotes': ?releaseNotes,
+    'artifactJob': ?artifactJob,
   };
 
   @override
@@ -142,6 +154,7 @@ class UploadFirebaseInput extends Equatable {
     testerEmails,
     groupAliases,
     releaseNotes,
+    artifactJob,
   ];
 }
 

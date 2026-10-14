@@ -13,6 +13,7 @@ import 'package:xp/src/commands/storage_commands.dart';
 import 'package:xp/src/commands/workflows_commands.dart';
 import 'package:xp/src/context.dart';
 import 'package:xp/src/mcp/mcp_command.dart';
+import 'package:xp/src/runner/runner_command.dart';
 import 'package:xp/src/version.dart';
 
 const executableName = 'xp';
@@ -62,6 +63,7 @@ class XpCommandRunner extends CompletionCommandRunner<int> {
     addCommand(gatesCommand(_context));
     addCommand(releasesCommand(_context));
     addCommand(runnersCommand(_context));
+    addCommand(runnerCommand(_context));
     addCommand(storageCommand(_context));
     addCommand(artifactsCommand(_context));
     addCommand(McpCommand(_context));

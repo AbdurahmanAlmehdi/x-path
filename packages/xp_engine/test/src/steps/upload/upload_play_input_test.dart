@@ -27,6 +27,21 @@ void main() {
       expect(UploadPlayInput.fromJson(input.toJson()), input);
     });
 
+    test('names the build job whose artifact it uploads', () {
+      final input = UploadPlayInput.fromJson(
+        _json(overrides: {'artifactJob': 'job_build'}),
+      );
+
+      expect(input.artifactJob, 'job_build');
+      expect(input.sourceOfArtifact, 'The build job job_build');
+      expect(UploadPlayInput.fromJson(input.toJson()), input);
+      expect(UploadPlayInput.fromJson(_json()).sourceOfArtifact, 'This job');
+      expect(
+        UploadPlayInput.fromJson(_json()).toJson(),
+        isNot(contains('artifactJob')),
+      );
+    });
+
     test('round trips a staged rollout with notes', () {
       final json = _json(
         overrides: {

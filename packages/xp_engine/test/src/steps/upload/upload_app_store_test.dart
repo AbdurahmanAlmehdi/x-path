@@ -266,6 +266,41 @@ void main() {
       expect(context.commands, isEmpty);
     });
 
+    test('finds the IPA in the build job the input names', () async {
+      await putIpa(jobId: 'job_build');
+      store.files.remove('job_1/$_ipaName');
+      final context = _context('altool_upload_succeeded.txt', jobId: 'job_2');
+
+      final outcome = await step().run(
+        UploadAppStoreInput.fromJson({
+          ..._input().toJson(),
+          'artifactJob': 'job_build',
+        }),
+        context,
+      );
+
+      expect(outcome, isA<StepSucceeded<UploadAppStoreResult>>());
+      expect(context.commands, isNotEmpty);
+    });
+
+    test('says which job lacks the IPA when it is another one', () async {
+      final context = StreamingContext.single(const []);
+
+      final outcome = await step().run(
+        UploadAppStoreInput.fromJson({
+          ..._input().toJson(),
+          'artifactJob': 'job_other',
+        }),
+        context,
+      );
+
+      expect(
+        (outcome as StepFailed).message,
+        contains('The build job job_other has no intact IPA'),
+      );
+      expect(context.commands, isEmpty);
+    });
+
     test('fails when the stored IPA changed', () async {
       store.files['job_1/$_ipaName'] = utf8.encode('other bytes');
       final context = StreamingContext.single(const []);

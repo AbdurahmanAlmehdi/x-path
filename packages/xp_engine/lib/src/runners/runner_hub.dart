@@ -11,6 +11,8 @@ import 'package:xp_engine/src/jobs/job_repository.dart';
 import 'package:xp_engine/src/jobs/job_runner.dart';
 import 'package:xp_engine/src/process/output_line.dart';
 import 'package:xp_engine/src/process/output_masker.dart';
+import 'package:xp_engine/src/projects/github_remote.dart';
+import 'package:xp_engine/src/projects/project_repository.dart';
 import 'package:xp_engine/src/repositories/event_log.dart';
 import 'package:xp_engine/src/runners/remote_runner.dart';
 import 'package:xp_engine/src/runners/remote_step_policy.dart';
@@ -18,11 +20,12 @@ import 'package:xp_engine/src/runners/runner_link.dart';
 import 'package:xp_engine/src/runners/runner_probe.dart';
 import 'package:xp_engine/src/runners/runner_record.dart';
 import 'package:xp_engine/src/runners/runner_repository.dart';
+import 'package:xp_engine/src/runners/runner_secret_grants.dart';
 import 'package:xp_engine/src/runners/serial_queues.dart';
-import 'package:xp_engine/src/runners/signing_secret_grants.dart';
 import 'package:xp_engine/src/scheduler/scheduler.dart';
 import 'package:xp_engine/src/scheduler/scheduler_runner.dart';
 import 'package:xp_engine/src/secrets/secret_store.dart';
+import 'package:xp_engine/src/steps/git/git_checkout.dart';
 
 /// What the service that lists and revokes runners asks of the live part.
 abstract interface class RunnerPresence {
@@ -109,8 +112,9 @@ class _Session {
 /// - **Logs.** Output arrives in numbered chunks; the engine stores the next
 ///   one and answers the others with where it wants to go on, so duplicates
 ///   and gaps never reach the log.
-/// - **Secrets.** A runner can ask for the signing material the steps of its
-///   job name, once per lease (D-09, `SigningSecretGrants`).
+/// - **Secrets.** A runner can ask for the signing material and the
+///   Shorebird key the steps of its job name, once per lease (D-09, ADR 0012,
+///   `RunnerSecretGrants`).
 ///
 /// Every state change of a job is done under a per-job lock, so heartbeats,
 /// reports, cancels and the sweep never interleave.
@@ -122,6 +126,7 @@ class RunnerHub implements RemoteLeases, RemoteJobs, RunnerPresence {
   /// [random] is for tests; it must be cryptographically secure otherwise.
   new({
     required this._runners,
+    required this._projects,
     required this._jobs,
     required this._runner,
     required this._scheduler,
@@ -149,6 +154,7 @@ class RunnerHub implements RemoteLeases, RemoteJobs, RunnerPresence {
   final void Function(Object error, StackTrace stackTrace)? onError;
 
   final RunnerRepository _runners;
+  final ProjectRepository _projects;
   final JobRepository _jobs;
   final JobRunner _runner;
   final Scheduler _scheduler;
@@ -157,7 +163,7 @@ class RunnerHub implements RemoteLeases, RemoteJobs, RunnerPresence {
   final Clock _clock;
   final SecretStore _secrets;
   final OutputMasker _masker;
-  final SigningSecretGrants _grants;
+  final RunnerSecretGrants _grants;
   final String _engineVersion;
   final RunnerProbe _probe;
   final Random _random;
@@ -300,8 +306,9 @@ class RunnerHub implements RemoteLeases, RemoteJobs, RunnerPresence {
             leaseId: lease.id,
             jobId: jobId,
             projectId: job.projectId,
-            sha: job.sha,
+            sha: await _commitOf(job, steps),
             name: job.name,
+            repository: await _repositoryOf(job.projectId),
             stage: job.stage,
             capabilities: job.capabilities,
             expiresAt: until,
@@ -336,6 +343,38 @@ class RunnerHub implements RemoteLeases, RemoteJobs, RunnerPresence {
       }
       await _lose(jobId, 'offer_failed');
     }
+  }
+
+  /// The exact commit the runner builds: the dispatched one, or the version
+  /// commit of the earlier job that the `git.checkout` step starts from. A
+  /// job that starts from a job which made no version commit gets no commit,
+  /// and the runner fails it with that explanation instead of building the
+  /// wrong source.
+  Future<String?> _commitOf(JobRecord job, List<StepRecord> steps) async {
+    final checkout = steps.where((s) => s.kind == 'git.checkout').firstOrNull;
+    final source = checkout?.input['commitFromJob'];
+    if (source is! String) return job.sha;
+    return await versionCommitOf(_jobs, source);
+  }
+
+  /// Where the runner fetches the source of [projectId] from: the SSH URL of
+  /// the repository and its GitHub id. Never a credential (ADR 0009). A
+  /// remote that is not on GitHub (the end-to-end tests use a local one) is
+  /// sent as it is, without the user information of a URL.
+  Future<LeaseRepository?> _repositoryOf(String projectId) async {
+    final project = await _projects.get(projectId);
+    if (project == null) return null;
+    final github = GitHubRemote.parse(project.remote);
+    return LeaseRepository(
+      githubRepoId: project.githubRepoId,
+      sshUrl: github?.sshUrl ?? _withoutUserInfo(project.remote),
+    );
+  }
+
+  static String _withoutUserInfo(String remote) {
+    final uri = Uri.tryParse(remote);
+    if (uri == null || !uri.hasScheme || uri.userInfo.isEmpty) return remote;
+    return uri.replace(userInfo: '').toString();
   }
 
   @override
@@ -1037,7 +1076,9 @@ class RunnerHub implements RemoteLeases, RemoteJobs, RunnerPresence {
       ),
     );
     if (!lease.grants.contains(frame.key)) {
-      return deny('This is not signing material that the job names.');
+      return deny(
+        'This is not signing material or a Shorebird key that the job names.',
+      );
     }
     if (!lease.delivered.add(frame.key)) {
       return deny('It was given for this lease already.');

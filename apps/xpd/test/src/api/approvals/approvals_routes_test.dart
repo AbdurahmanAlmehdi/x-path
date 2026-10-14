@@ -96,24 +96,33 @@ void main() {
       expect(response.statusCode, 401);
     });
 
-    test('is open to every kind of token', () async {
+    test('is open to an app, a cli and an mcp token, not a runner', () async {
       await client.ask();
 
       for (final kind in DeviceTokenKind.values) {
         final response = await client.send('GET', '/approvals', kind: kind);
 
-        expect(response.statusCode, 200, reason: kind.name);
+        expect(
+          response.statusCode,
+          kind == DeviceTokenKind.runner ? 403 : 200,
+          reason: kind.name,
+        );
       }
     });
   });
 
   group('GET /approvals/{id}', () {
-    test('shows one approval to every kind of token, MCP polls this', () async {
+    test('shows one approval to an app, a cli and an mcp token (MCP polls '
+        'this), not to a runner', () async {
       final id = await client.ask();
 
       for (final kind in DeviceTokenKind.values) {
         final response = await client.send('GET', '/approvals/$id', kind: kind);
 
+        if (kind == DeviceTokenKind.runner) {
+          expect(response.statusCode, 403, reason: kind.name);
+          continue;
+        }
         expect(response.statusCode, 200, reason: kind.name);
         expect(Approval.fromJson(response.json).state, ApprovalState.pending);
       }
@@ -340,13 +349,20 @@ void main() {
       expect(gates.values, everyElement(isTrue));
     });
 
-    test('every kind of token reads them', () async {
-      for (final kind in DeviceTokenKind.values) {
-        final response = await client.send('GET', gatesPath(), kind: kind);
+    test(
+      'an app, a cli and an mcp token read them, a runner does not',
+      () async {
+        for (final kind in DeviceTokenKind.values) {
+          final response = await client.send('GET', gatesPath(), kind: kind);
 
-        expect(response.statusCode, 200, reason: kind.name);
-      }
-    });
+          expect(
+            response.statusCode,
+            kind == DeviceTokenKind.runner ? 403 : 200,
+            reason: kind.name,
+          );
+        }
+      },
+    );
 
     test('are 404 for a project that does not exist', () async {
       for (final method in ['GET', 'PUT']) {

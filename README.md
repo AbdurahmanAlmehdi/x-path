@@ -46,8 +46,8 @@ Everything is one [Dart pub workspace](https://dart.dev/tools/pub/workspaces) (A
 - `xp_engine` depends on `xp_api` only, plus a short allowlist of pure utility packages.
 - `xp_adapters` and `xp_secrets` may depend on `xp_engine` and `xp_api`.
 - `xp_client` depends on `xp_api`; `xp_repositories` on `xp_client` and `xp_api`.
-- `xp` uses `xp_client` for everything it asks of the engine, and `xp_secrets` to keep its tokens (the runner of
-  Phase 14b will use the engine and the adapters).
+- `xp` uses `xp_client` for everything it asks of the engine, and `xp_secrets` to keep its tokens. `xp runner` also
+  uses the engine's step runner and the adapters, since it runs jobs.
 - `xpd` wires the engine, the adapters and the secret stores. Its tests also run the shipped `xp_client` against it.
 - The desktop app never imports `xp_engine`, `xp_adapters` or `xp_secrets`.
 
@@ -773,7 +773,7 @@ stages:                        # required; run in order
   spans, so each problem has the line and column where it is: an unknown key (with the allowed ones), a
   value of the wrong type, an unknown step type, an unknown `with` key for that type, an unknown
   capability or gate, a matrix axis that is not `platform` or `flavor`, a platform that is not `android`
-  or `ios`, a job id used twice, `commitFrom` naming a job that is not in an earlier stage, an expression
+  or `ios`, a job id used twice, `commitFrom` or `artifactsFrom` naming a job that is not in an earlier stage, an expression
   that does not parse (the column points into it), or a variable it reads that does not exist there. A
   document with issues is never saved (`422 workflow_invalid`). YAML reads a leading `!` as a tag, so
   quote `"!flavor.prod"`.
@@ -809,6 +809,13 @@ stages:                        # required; run in order
   `git.tag` tags it (`v<x.y.z>+<build>`, or `-p<n>` for a patch; an existing tag on the same commit is
   reused, one on another commit fails, nothing is forced) and `git.push` pushes the branch and the tag.
   Worktrees of finished jobs are kept for resume and inspection until the housekeeping of Phase 12c.
+  On a remote runner `git.checkout` is the runner's own step (see Runners): the commit comes from GitHub over
+  the runner's SSH key.
+- **`artifactsFrom: <job id>`** under `with` of `upload.play`, `upload.firebase` and `upload.appStore` takes the
+  file to upload from a job of an earlier stage (the build job) instead of from the job the step is in. The
+  planner stores the id of the job of the same matrix cell as `artifactJob` in the step input; a step
+  without it looks in its own job. This is how an upload can run on the engine while the build ran on a
+  runner, which uploaded what it built to the engine's artifact store (ADR 0010).
 - **Gates** (D-13). `gate: prod_release | prod_patch | store_submission | push | merge | delete` on a step
   puts a `gate` step in front of it. The gate asks the `ApprovalGate` port (`xp_engine`) about the action,
   project, commit and version, and while nobody decided, its step returns `StepWaiting`: the job stops in
@@ -829,14 +836,16 @@ stages:                        # required; run in order
 
 Every project gets `dev-build`, `prod-release`, `release-merge`, `shorebird-patch` and `test` the first time its workflows
 are listed (and a new version of one when the engine ships another document). They compose the steps in the
-order of `ship.sh`:
+order of `ship.sh`. **The job that builds has no step only the engine may run** (ADR 0010), so that it can be
+leased to a runner: the guards, the gates, the uploads, the tag and the pushes are in engine jobs of an earlier
+or later stage, and the uploads take what the runner built from the engine's artifact store (`artifactsFrom`).
 
 | Workflow | Stages | Notes |
 |---|---|---|
-| `dev-build` | `build` (platform x flavor) | `git.checkout`, `guard`, `version.bump`, `build.android` / `build.ios`, `record.manifest`, then `upload.firebase` (an Android build with an app id in `firebaseAppIds`) or `upload.appStore` (an iOS build with an id in `appleAppIds`). No lock: as many as the slots allow. |
-| `prod-release` | `prepare`, `build` (platform x flavor), `finalize` | `lock: project`. `prepare` bumps the version once and cuts the release branch after `gate: prod_release`; each `build` job starts from that commit and runs `shorebird.release` (a Shorebird flavor) or `build.android` / `build.ios`, `symbols.archive`, `record.manifest` and the uploads the flavor has credentials for; `finalize` tags, pushes after `gate: push` and opens the release pull request (`github.createPr`). A run of it is a release (see Releases). |
+| `dev-build` | `check`, `build`, `upload` (each: platform x flavor) | No lock: as many as the slots allow. `check` (engine): `git.checkout`, `guard` source and credentials. `build` (runner-eligible): `git.checkout`, `version.bump` (a dev build pushes nothing, so the version commit stays in the job's worktree), `build.android` / `build.ios`, `record.manifest`. `upload` (engine, only for a platform and flavor that has something to upload): `upload.firebase` (an Android build with an app id in `firebaseAppIds`) or `upload.appStore` (an iOS build with an id in `appleAppIds`). |
+| `prod-release` | `prepare`, `check`, `build`, `upload`, `finalize` | `lock: project`. `prepare` (engine) bumps the version once, cuts the release branch after `gate: prod_release` and pushes the branch after `gate: push`, so that a runner can fetch the version commit (ADR 0009). `check` (engine): `versionSync`, `buildNumberReuse`, `credentials`, and the store checks, from that commit. `build` (runner-eligible): `git.checkout` from that commit, `shorebird.release` (a Shorebird flavor) or `build.android` / `build.ios`, `symbols.archive`, `record.manifest`. `upload` (engine): `upload.play`, `upload.firebase`, `upload.appStore`, the ones the flavor has credentials for. `finalize` (engine) tags, pushes the tag and opens the release pull request (`github.createPr`). The approval of the push covers the tag push too (it binds to the same project, commit, version and run). A run of it is a release (see Releases). |
 | `release-merge` | `merge` | Merges the pull request of a release: `gate: merge`, then `github.mergePr`. Started by `POST /releases/{id}/merge`, no project lock. |
-| `shorebird-patch` | `patch` (platform x flavor), `finalize` | `lock: project`. Dispatch it with `releaseVersion` (`x.y.z+build`, never `latest`); `gate: prod_patch` before `shorebird.patch`, then the patch tag `v<x.y.z>+<build>-p<n>` and `gate: push`. |
+| `shorebird-patch` | `check`, `patch` (platform x flavor), `finalize` | `lock: project`. Dispatch it with `releaseVersion` (`x.y.z+build`, never `latest`). `check` (engine): the guards, and `gate: prod_patch` in front of the last of them (so that the owner is asked only about a patch that passed the others). `patch` (runner-eligible): `git.checkout`, `shorebird.patch`. `finalize` (engine): the patch tag `v<x.y.z>+<build>-p<n>` and `gate: push`. |
 | `test` | `test` | `test` and `analyze`; allocates no build number. |
 
 Built-ins cannot be edited or deleted (`409`); copy the YAML into a workflow of your own. **Every save is a
@@ -909,8 +918,9 @@ nothing, and the same state always gives the same pass.
 a fake Firebase App Distribution and a fake GitHub, starts `xpd serve` with `XPD_TEST_GITHUB_API_URL`,
 `XPD_TEST_FIREBASE_URL` and `XPD_TEST_FILE_SECRETS=1` (**test only**: they point the engine at the fakes and
 keep its secrets in a file instead of the Keychain; `xpd` warns when one is set), adds the fixture app as a
-project over HTTP, saves a Firebase service account, dispatches `dev-build` for Android, and checks the APK,
-the manifest and the Firebase release. It then dispatches `prod-release` twice and checks that the second
+project over HTTP, saves a Firebase service account, dispatches `dev-build` for Android (a check, a build and
+an upload job), and checks the APK and the manifest of the build job, that the build job has no engine-only
+step, and the Firebase release made by the upload job. It then dispatches `prod-release` twice and checks that the second
 queues behind the first, which stops at its gate, and runs once the first is cancelled. It needs the
 Android SDK, takes a few minutes the first time and is not part of CI (Gradle and the SDK make it too slow
 for the Linux workflow).
@@ -948,17 +958,25 @@ Android SDK; it takes several minutes and is not part of CI.
 `--mode mcp`. It needs no Android SDK or Xcode: `prod-release` reaches its first gate before any build. It takes about
 half a minute.
 
+`tool/e2e/runner_loss_e2e.sh` (Phase 14b, see Runners) runs the same script with `--mode runner-loss`. It needs no
+Android SDK or Xcode and takes about four minutes, most of it the production lease of 90 seconds.
+
+`tool/e2e/runner_build_e2e.sh` runs it with `--mode runner-build`: an engine that cannot build Android and a runner that
+can. The build job of `dev-build` goes to the runner (its own checkout, a real APK), the check and the upload (to a
+local fake Firebase) stay on the engine, and the APK in the engine store is the one the runner built.
+
 ## Runners
 
 A runner is a machine that runs jobs for the engine (D-08, D-19): another Mac for `ios-sign`, a Linux box for
 `android`, `flutter` and `swift-linux`. The engine is also a runner (the local one). Phase 14a is the engine
-side: the protocol, the leases, the probe and the endpoints. The runner agent (`xp runner`) is Phase 14b.
+side: the protocol, the leases, the probe and the endpoints. The runner agent, `xp runner`, is Phase 14b
+(see The runner agent below).
 
 ### Pairing
 
 ```sh
 xp runners pair mac-mini        # on any machine with a cli token: prints a pairing token, once
-# on the runner machine (Phase 14b): xp runner ... exchanges it for the credential
+# on the runner machine: xp runner pair --engine <url> --token <pairing token> exchanges it for the credential
 xp runners revoke mac-mini      # kills the credential, the connection and the leases
 ```
 
@@ -972,9 +990,12 @@ xp runners revoke mac-mini      # kills the credential, the connection and the l
 - **Revoke** (`POST /runners/{id}/revoke`, `app` and `cli`): the credential stops authenticating, the connection closes
   (code 4003) and every lease the runner holds ends **at once**, each job by the loss rule below. Revoking again
   changes nothing. `GET /runners` lists the runners with their status (`offline`, `online`, `draining`, `revoked`), the
-  capabilities the probe found, the slots and the jobs they hold; every kind of token can read it.
-- A runner token reaches the same reads an `mcp` token does and can never approve or change gates (D-13). Only the
-  runner endpoints below are made for it.
+  capabilities the probe found, the slots and the jobs they hold; `app`, `cli` and `mcp` tokens can read it.
+- **A runner token is scoped to the runner endpoints** (ADR 0011): `GET /runners/connect` and
+  `PUT /runners/jobs/{id}/artifacts/{name}` and nothing else. Every other route answers a `runner` token
+  `403 forbidden` with a message that names the route (`runnerScopeMiddleware`, in front of the router, so a
+  route added later is closed to runner tokens until someone opens it). A runner holds signing material for
+  the jobs it leases, so a stolen credential must not be able to read projects, jobs, credentials or approvals.
 
 ### The connection
 
@@ -989,7 +1010,7 @@ real engine sends against them.
 | | `welcome` | the runner's id, the heartbeat interval (30 s) and the lease length (90 s) |
 | `hello` | `probe` | version, os, arch, cores, optional `maxJobs`, the leases it still holds; then the probe commands |
 | `probe_result` | | the results; the engine derives the capabilities and the runner is online |
-| | `lease_offer` | a job: its steps with their state, the capabilities, the keys of the secrets it may ask for |
+| | `lease_offer` | a job: its steps with their state, the capabilities, the repository (SSH URL and GitHub id) and the exact commit, the keys of the secrets it may ask for |
 | `lease_accept`, `lease_reject` | | take or refuse the offer (`draining`, `busy`) |
 | `heartbeat` | `heartbeat_ack` | renews the leases it lists; the ack says until when |
 | `log_chunk` | `chunk_ack` | numbered output lines; `stored`, `duplicate` or `gap`, and the chunk wanted next |
@@ -1057,20 +1078,109 @@ answered with `cancel`. The sweep (`LeaseSweeper`, every 10 s) ends the leases t
 - **Steps only the engine runs.** A job is leased as a whole, so a job with one of these steps runs on the engine
   (`RemoteStepPolicy`): `upload.*` (D-09), `git.push`, `git.tag`, `git.releaseBranch` and `github.*` (they push and
   talk to GitHub with the token that stays on the engine, D-05, D-07), `gate` (approvals are the engine's, D-13),
-  `guard` (its checks read credentials and ask the stores), and `shorebird.release` and `shorebird.patch` (the Shorebird
-  API key is not signing material). The scheduler never places such a job on a remote runner and the hub refuses it
-  again at the offer. The built-in workflows put a `guard` or an upload in the same job as the build, so today those
-  jobs run on the engine; a workflow that builds on a runner puts its engine-only steps in a job of their own.
-- **Secrets (D-09).** Over the authenticated socket, on request, never in the offer: the offer lists **keys only**, the
-  runner asks with `secret_request` and gets `secret_value` (the base64 of the bytes) **once per lease and key**. What
-  may be asked for is signing material the steps of this job name in `secretFiles` or `secretEnvironment` **and** that
-  is the keystore of the project or one of its passwords (`SigningSecretGrants`); the GitHub token, store credentials
-  and anything else are `secret_denied`. Each delivery is a `runner.secret_delivered` event (key, never value), and the
-  delivered text is added to the log masker. A single-use URL was the other option; the socket is already
-  authenticated, bound to the lease and outbound only, and needs no second credential to leak. The socket is not
-  encrypted by `xpd` itself (see `--host` above): a runner on another machine should reach the engine through TLS (a
-  reverse proxy or a tunnel), because the socket carries signing material. Wiping the secret at the end of the job is
-  the runner agent's (14b).
+  `guard` (its checks read credentials and ask the stores) and `test` (it judges against the baseline and stores
+  the run, both in the engine's database, D-21). `shorebird.release` and `shorebird.patch` may run on a runner
+  (ADR 0012). The scheduler never places a job with an engine-only step on a remote runner and the hub refuses
+  it again at the offer. The built-in workflows keep these steps in jobs of their own, so their build jobs can
+  go to a runner (ADR 0010).
+- **Secrets (D-09, ADR 0012).** Over the authenticated socket, on request, never in the offer: the offer lists
+  **keys only**, the runner asks with `secret_request` and gets `secret_value` (the base64 of the bytes)
+  **once per lease and key**. What may be asked for is what the steps of this job name in `secretFiles`,
+  `secretEnvironment` or `tokenSecret` **and** that is the keystore of the project or one of its passwords, or the
+  Shorebird key of the project (`RunnerSecretGrants`); the GitHub token, store credentials and anything else are
+  `secret_denied`. Each delivery is a `runner.secret_delivered` event (key, never value), and the delivered
+  text is added to the log masker. A single-use URL was the other option; the socket is already authenticated,
+  bound to the lease and outbound only, and needs no second credential to leak. The socket is not encrypted by
+  `xpd` itself (see `--host` above): a runner on another machine should reach the engine through TLS (a reverse
+  proxy or a tunnel), because the socket carries signing material. The runner wipes the secret at the end of the
+  job and at its start (see The runner agent).
+- **The source (ADR 0009).** The offer names the repository (its SSH URL and GitHub id) and the exact commit and
+  never a credential; the runner fetches the commit with its own SSH key.
+
+### The runner agent
+
+`xp runner` is the other end of everything above (`apps/xp/lib/src/runner`).
+
+```sh
+xp runner pair --engine https://xpath.example.com --token xpp_...   # once; xp runners pair <name> made the token
+xp runner start [--slots 4] [--one-shot] [--data-dir ~/runner]      # connects out and runs jobs until stopped
+```
+
+- **Pairing.** `pair` checks the engine (`GET /version`), exchanges the pairing token (`POST /runners/pair`) and
+  keeps the credential in the secret store of the machine: the Keychain on macOS (service
+  `ly.abdurahman.xpath.runner`), an encrypted file in the data directory on Linux (`XP_TEST_FILE_SECRETS=1` forces
+  the file, for tests). It is never printed or logged. `runner.json` in the data directory holds who the runner is
+  (engine, id, name) and no secret. `--name` only warns when the engine named the runner otherwise: the pairing
+  token fixes the name. Pairing again in a paired data directory needs `--force`.
+- **Data directory** (`--data-dir`, else `$XP_RUNNER_DATA_DIR`, else `~/.local/share/xpath/runner`):
+  `source/mirrors/<repo id>.git` (the bare cache), `source/worktrees/<repo id>/<job id>` (fresh worktrees),
+  `jobs/<job id>` (what a job leaves before it is uploaded), `toolchains/flutter`, `secrets/` (where no tmpfs is
+  available), `keychains/`, `state/pgids.json`.
+- **Connection.** Outbound only, with the credential. It reconnects with an exponential backoff (1 s doubling to
+  60 s, half of each delay random so that runners that lost the same engine do not come back together) and starts
+  the backoff again after a connection that worked. It stops for good when the engine revokes it (close code
+  4003), when another connection of the same runner replaced it (4001) or when the credential is refused.
+- **Hello and probe.** After the welcome the runner says hello (version, system, architecture, cores, `--slots`
+  as `maxJobs`, whether it drains, the leases it still holds) and runs the commands of the probe the engine sends
+  (`ProbeExecutor`: `onlyOn`, `requires`, not installed, timeouts, 64 KiB of output). It claims no capability; the
+  engine derives them from the results (D-19).
+- **Leases.** It accepts an offer within its slots (`--slots`, else a quarter of the cores) and refuses the rest
+  with a reason: `busy` (the slots are taken, the job runs here already, or another `ios-sign` job runs: those
+  run one at a time), `draining`, `unsupported` (a step this runner has no implementation for). It heartbeats
+  every `heartbeatSeconds` of the welcome (30 s), listing its leases, also those whose end the engine has not
+  acknowledged yet.
+- **The job** runs through the engine's step runner (`JobRunner` and `StepRegistry` of `xp_engine`, the process
+  supervisor of `xp_adapters`: every process in its own group, ADR 0003) with the steps the engine lets a runner run
+  (`RunnerSteps`). The paths of the engine's disk in the steps (`worktree.path`, `mirror.path`, a working
+  directory below it) are translated to the runner's (`LeasePaths`). Every step of the offer starts again, since
+  the work of an earlier lease is not on this machine, but the attempts are kept, so that a step with side effects
+  asks first whether its work exists (`alreadyDone`). `step_state` frames report each new state of a step.
+- **Source (ADR 0009).** `git.checkout` is `RemoteCheckoutStep`: it fetches the exact commit of the offer into the
+  runner's own bare cache (`git fetch origin <sha>` with `GIT_SSH_COMMAND='ssh -o BatchMode=yes'`, no global git
+  configuration, no prompt), cuts a fresh worktree and verifies `HEAD == sha` before anything runs. A key that
+  cannot read the repository fails the job with "add this runner's SSH key as a deploy key on `<owner/repo>`", an
+  unknown host key with "run `ssh -T git@github.com` once", a commit that was never pushed with "push it". The
+  machine needs `git`, `ssh` and its own access to GitHub (a deploy key or the key of a user). **Test only:**
+  `XP_RUNNER_TEST_SOURCE_URL` replaces the URL of every lease (the end-to-end test points it at a local bare
+  repository); a real runner never sets it.
+- **Logs and reports.** The output of the processes goes to the engine as `log_chunk` frames numbered from 1 per
+  lease (up to 500 lines or a quarter of a second each). The runner keeps every chunk, the newest state of every
+  step and the end of the job until the engine acknowledges them, and sends them again after a reconnect or after
+  a `gap` answer. `job_done` carries the last chunk and the explanation of a failure, and is resent until the
+  `done_ack`. Artifacts a build records are uploaded to the engine with their SHA-256 and the lease before the step
+  that made them ends (`PUT /runners/jobs/{id}/artifacts/{name}`, tried again on connection errors).
+- **Per-job secrets (D-09, ADR 0012).** A step reads a secret like on the engine, from a secret store; here the
+  store (`LeaseSecretStore`) asks the engine with `secret_request` the first time a step needs the key (only keys
+  of the offer can be asked for) and keeps the answer in the job's secret folder. The folder is 0700, its
+  files 0600: on Linux in a tmpfs (`/dev/shm`, else `$XDG_RUNTIME_DIR`), so the secrets never reach the disk; on
+  macOS and elsewhere in `secrets/` of the data directory. The secret files of steps (`secretFiles`, bytes as
+  they are, so a keystore stays binary) go to the same folder. **The folder is deleted when the job ends, however
+  it ends (success, failure, cancel), and again at every start of the runner.** Delivered text is added to the
+  runner's masker, so it is hidden in the log before it leaves the machine. For signing material that has to be in
+  a keychain on macOS, `TemporaryKeychain` makes a keychain for the job (never the login keychain; created
+  unlocked with a random password and set never to lock, over `security -i` so that the password is in no
+  argument; added to the search list only if the build needs it, and the list put back when it is deleted);
+  nothing the engine delivers today needs it, and a start of the runner deletes any that a crash left.
+- **Cancel.** A `cancel` frame (the lease was lost, the job was cancelled, the engine does not know the lease)
+  stops the job's process groups (`SIGTERM`, ten seconds, `SIGKILL`, ADR 0003), wipes its secrets and reports
+  nothing more.
+- **Start-up clean-up.** Before it connects, a start of the runner stops the process groups of steps that a runner
+  killed with `SIGKILL` left (the groups are recorded in `state/pgids.json` while a step runs), deletes every
+  secret folder and temporary keychain, and removes the work folders and worktrees of jobs. It prints what it
+  found. This is what makes "no secret is left after a crash" true.
+- **Drain and one-shot.** The first `SIGINT` or `SIGTERM` drains: a `drain` frame, no more offers, the running
+  jobs finish and the runner exits 0. The second stops now: the jobs are cancelled, nothing is reported and the
+  engine ends the leases when they run out. `--one-shot` takes one job, tells the engine to offer no more and
+  exits after the engine acknowledged its end. Exit codes: 0 drained or done, 77 revoked or credential refused,
+  73 replaced, 78 not paired, 69 `perl` missing.
+- **Tests.** The agent, the outbox, the step and the secret folder are unit tests with fakes
+  (`apps/xp/test/src/runner`); the wiring runs the real step runner against a fake engine on a loopback port
+  (tag `process`); `TemporaryKeychain` has a `macos` test on a keychain of its own. `tool/e2e/runner_loss_e2e.sh`
+  is the end-to-end proof: it pairs and starts a real runner, gives it two jobs that hold a keystore secret, kills
+  it with `SIGKILL`, waits for the production lease (90 s plus the sweep) and checks the loss rule (a job with a
+  declared side effect is `waiting_for_resume`, never repeated by itself; one without is queued again, both with
+  a `runner.lease_lost` event), then restarts the runner and checks that no secret file, temporary keychain or
+  process is left, and that a resumed job that is cancelled wipes its secrets and ends its process group.
 
 ### Events
 
@@ -1111,7 +1221,8 @@ draft -> building -> uploaded -> in_review -> approved -> live -> merged
   why in `note`. `ReleaseWatcher` checks what is due every minute; `POST /releases/{id}/refresh` asks at once.
 - **By hand.** `POST /releases/{id}/stores/{apple|play}/status` takes `approved` or `live` for Apple and `live`
   for Play, once the store has the build. Because a status moves the release toward the merge of its pull request,
-  it and `abandon` are for `app` and `cli` tokens (`403` for `mcp` and `runner`, D-13).
+  it and `abandon` are for `app` and `cli` tokens (`403` for `mcp` and `runner`, D-13). A `runner` token reaches no
+  release route at all (ADR 0011).
 - **New build, same version.** After a rejection `POST /releases/{id}/builds` dispatches the workflow that made
   the release again, on its release branch, with the same version and a new build number (D-11, never reused) and
   the inputs of the first dispatch (`DispatchRequest.release` links the run; a workflow reads it as `release`, and
@@ -1135,7 +1246,7 @@ draft -> building -> uploaded -> in_review -> approved -> live -> merged
 |---|---|
 | `GET /releases[?project=&app=&state=]` | The releases, newest first, each brought up to date. |
 | `GET /releases/{id}` | One release: state, `version`, `build`, `builds`, the status in each `stores`, `branch`, `tag`, `headSha`, `prNumber`, `prUrl`, `mergeEnabled`, `mergeCommit`. |
-| `POST /releases/{id}/refresh` | Asks the stores now (bypasses the ten-minute cache). Any token. |
+| `POST /releases/{id}/refresh` | Asks the stores now (bypasses the ten-minute cache). Any token but a `runner` one (ADR 0011). |
 | `POST /releases/{id}/stores/{store}/status` | `{"state": "approved" or "live"}`. `app` and `cli` tokens; `409` when the store has no build yet or is past that status. |
 | `POST /releases/{id}/builds` | New build, same version. `202` with the run; `409` unless the release is `rejected`. |
 | `POST /releases/{id}/merge` | Request the merge. `202` with the run, which waits for approval; `409` unless the release is `live` with a pull request. |
@@ -1202,7 +1313,7 @@ escaped) and WhatsApp text (`*bold*`, the link as plain text). `409` while the r
 - **Who may delete.** Deleting is a gated action (D-13), but a gate binds an approval to one project, a commit and
   a version, and housekeeping spans every project. So it is treated like `abandon` and the store statuses: only
   `app` and `cli` tokens may delete (`"dryRun": false`) or change the retention, and that token is the owner
-  approving; `mcp` and `runner` tokens get `403` and may only read the report and dry-run.
+  approving; `mcp` tokens get `403` and may only read the report and dry-run, and `runner` tokens reach nothing here (ADR 0011).
 
 | Route | What it does |
 |---|---|
@@ -1254,6 +1365,7 @@ the API answered, for scripts; otherwise it prints text and tables.
 | `xp releases list`, `show <r>`, `refresh <r>`, `status <r> <apple\|play> <state>`, `build <r>`, `merge <r>`, `abandon <r>`, `notes <r> [--format slack\|whatsapp]` | `/releases` |
 | `xp storage report`, `free [--apply] [--category c]`, `retention [--keep n] [--log-days n]` | `/storage` (`free` is a dry run unless you pass `--apply`) |
 | `xp runners pair <name>`, `revoke <runner>` | `POST /runners/pairing-tokens`, `POST /runners/{id}/revoke` (a runner is its name or id); see Runners |
+| `xp runner pair`, `start` | the runner agent of this machine (`POST /runners/pair`, `GET /runners/connect`); see The runner agent |
 | `xp artifacts list <job>`, `download <a> [-o path]` | `/jobs/{id}/artifacts`, `/artifacts/{id}/download` (checks the SHA-256 the engine sends) |
 | `xp mcp` | see below |
 

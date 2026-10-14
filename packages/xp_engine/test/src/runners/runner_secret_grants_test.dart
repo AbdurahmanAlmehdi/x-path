@@ -4,7 +4,7 @@ import 'package:xp_engine/xp_engine.dart';
 
 void main() {
   late InMemoryCredentialRepository credentials;
-  late SigningSecretGrants grants;
+  late RunnerSecretGrants grants;
 
   CredentialRecord record(
     String id,
@@ -33,7 +33,7 @@ void main() {
 
   setUp(() async {
     credentials = InMemoryCredentialRepository();
-    grants = SigningSecretGrants(credentials);
+    grants = RunnerSecretGrants(credentials);
     await credentials.save(record('a', CredentialKind.keystore, 'ks-a'));
     await credentials.save(
       record('b', CredentialKind.keystore, 'ks-b', project: 'prj_2'),
@@ -66,12 +66,65 @@ void main() {
     expect(granted, {'ks-a.storePassword'});
   });
 
-  test('never grants a secret that is not signing material', () async {
+  test('grants the Shorebird key that a step names as its token', () async {
+    final granted = await grants.forSteps('prj_1', [
+      step({'tokenSecret': 'shorebird'}),
+    ]);
+
+    expect(granted, {'shorebird'});
+  });
+
+  test('grants the Shorebird key a step names in its environment', () async {
+    final granted = await grants.forSteps('prj_1', [
+      step({
+        'secretEnvironment': {'SHOREBIRD_TOKEN': 'shorebird'},
+      }),
+    ]);
+
+    expect(granted, {'shorebird'});
+  });
+
+  test(
+    'grants the Shorebird key and the keystore of one job together',
+    () async {
+      final granted = await grants.forSteps('prj_1', [
+        step({
+          'secretFiles': {'XPATH_KEYSTORE_FILE': 'ks-a'},
+          'tokenSecret': 'shorebird',
+        }),
+      ]);
+
+      expect(granted, {'ks-a', 'shorebird'});
+    },
+  );
+
+  test('never grants the Shorebird key unless a step names it', () async {
+    final granted = await grants.forSteps('prj_1', [
+      step({
+        'secretFiles': {'XPATH_KEYSTORE_FILE': 'ks-a'},
+      }),
+    ]);
+
+    expect(granted, {'ks-a'});
+  });
+
+  test('never grants the Shorebird key of another project', () async {
+    await credentials.save(
+      record('e', CredentialKind.shorebird, 'shorebird-2', project: 'prj_2'),
+    );
+
+    final granted = await grants.forSteps('prj_1', [
+      step({'tokenSecret': 'shorebird-2'}),
+    ]);
+
+    expect(granted, isEmpty);
+  });
+
+  test('never grants a secret that may not travel to a runner', () async {
     final granted = await grants.forSteps('prj_1', [
       step({
         'secretFiles': {'F': 'asc'},
-        'secretEnvironment': {'T': 'shorebird', 'G': 'github', 'U': 'unknown'},
-        'tokenSecret': 'shorebird',
+        'secretEnvironment': {'G': 'github', 'U': 'unknown'},
       }),
     ]);
 
@@ -93,6 +146,7 @@ void main() {
       step({
         'secretFiles': 'ks-a',
         'secretEnvironment': {'N': 3},
+        'tokenSecret': 3,
       }),
       step({}),
     ]);
