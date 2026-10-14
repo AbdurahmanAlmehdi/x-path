@@ -15,6 +15,7 @@ Future<void> main(List<String> args) async {
     shutdown: shutdown.stream,
     environment: Platform.environment,
     operatingSystem: Platform.operatingSystem,
+    executable: Platform.resolvedExecutable,
   );
   await Future.wait([stdout.flush(), stderr.flush()]);
   // The signal watchers would keep the process alive.

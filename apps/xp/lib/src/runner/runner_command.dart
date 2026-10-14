@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:args/args.dart';
 import 'package:args/command_runner.dart';
 import 'package:xp/src/commands/xp_command.dart';
 import 'package:xp/src/config/xp_config.dart';
@@ -9,43 +8,37 @@ import 'package:xp/src/context.dart';
 import 'package:xp/src/exit_codes.dart';
 import 'package:xp/src/runner/runner_agent.dart';
 import 'package:xp/src/runner/runner_identity.dart';
-import 'package:xp/src/runner/runner_paths.dart';
+import 'package:xp/src/runner/runner_options.dart';
 import 'package:xp/src/runner/runner_runtime.dart';
+import 'package:xp/src/runner/service/runner_service_commands.dart';
+import 'package:xp/src/runner/update/restarter.dart';
 import 'package:xp_api/xp_api.dart';
 import 'package:xp_client/xp_client.dart';
 import 'package:xp_engine/xp_engine.dart';
 
 /// `xp runner`: this machine as a runner of an engine (D-08, D-19).
 ///
-/// [host], [build] and [signals] are what the commands run on and with; tests
-/// pass their own.
+/// [host], [build], [signals] and [restarter] are what the commands run on and
+/// with; tests pass their own.
 XpGroup runnerCommand(
   XpContext context, {
   RunnerHost? host,
   RunnerBuilder build = buildRunner,
   Stream<ProcessSignal>? signals,
+  Restarter? restarter,
 }) {
   final machine = host ?? RunnerHost.system(context.environment);
+  final restart =
+      restarter ??
+      Restarter(managed: machine.environment[runnerManagedVariable] == '1');
   return XpGroup(context, 'runner', 'Run jobs for an engine on this machine.', [
     RunnerPairCommand(context, machine),
-    RunnerStartCommand(context, machine, build, signals),
+    RunnerStartCommand(context, machine, build, signals, restart),
+    RunnerInstallServiceCommand(context, machine),
+    RunnerUninstallServiceCommand(context, machine),
+    RunnerServiceStatusCommand(context, machine),
   ]);
 }
-
-RunnerPaths _pathsOf(ArgResults results, RunnerHost host) {
-  final directory = results.option('data-dir');
-  return directory == null
-      ? RunnerPaths.fromEnvironment(host.environment, host.home)
-      : RunnerPaths(directory);
-}
-
-void _addDataDir(ArgParser parser) => parser.addOption(
-  'data-dir',
-  help:
-      r'Where the runner keeps its files (default: $XP_RUNNER_DATA_DIR, else '
-      '~/.local/share/xpath/runner).',
-  valueHelp: 'dir',
-);
 
 /// `xp runner pair --engine <url> --token <pairing token>`.
 ///
@@ -81,7 +74,7 @@ class RunnerPairCommand extends Command<int> {
         negatable: false,
         help: 'Pair again although this data directory is paired already.',
       );
-    _addDataDir(argParser);
+    addRunnerDataDirOption(argParser);
   }
 
   final XpContext _context;
@@ -118,7 +111,7 @@ class RunnerPairCommand extends Command<int> {
     } on FormatException catch (error) {
       usageException(error.message);
     }
-    final paths = _pathsOf(results, _host);
+    final paths = runnerPathsOf(results, _host);
     final enrollments = RunnerEnrollments(paths, _host.credentials(paths));
     final existing = await enrollments.read();
     if (existing != null && !results.flag('force')) {
@@ -184,9 +177,13 @@ class RunnerPairCommand extends Command<int> {
 /// Connects to the engine (outbound only) and runs the jobs it leases until
 /// told to stop. SIGINT or SIGTERM drains (finishes the jobs, takes none,
 /// exits); a second one stops now and cancels the jobs.
+///
+/// When the engine runs another version, the runner finishes its jobs,
+/// updates itself (`RunnerUpdater`) and starts again as the new version through
+/// the [Restarter] (D-24).
 class RunnerStartCommand extends Command<int> {
   /// Creates the command.
-  new(this._context, this._host, this._build, this._signals) {
+  new(this._context, this._host, this._build, this._signals, this._restarter) {
     argParser
       ..addOption(
         'slots',
@@ -197,13 +194,14 @@ class RunnerStartCommand extends Command<int> {
         valueHelp: 'n',
       )
       ..addFlag('one-shot', negatable: false, help: 'Run one job, then exit.');
-    _addDataDir(argParser);
+    addRunnerDataDirOption(argParser);
   }
 
   final XpContext _context;
   final RunnerHost _host;
   final RunnerBuilder _build;
   final Stream<ProcessSignal>? _signals;
+  final Restarter _restarter;
 
   @override
   String get name => 'start';
@@ -232,7 +230,7 @@ class RunnerStartCommand extends Command<int> {
         usageException('--slots must be a whole number of at least 1.');
       }
     }
-    final paths = _pathsOf(results, _host);
+    final paths = runnerPathsOf(results, _host);
     final RunnerEnrollment? enrollment;
     try {
       enrollment = await RunnerEnrollments(
@@ -282,18 +280,27 @@ class RunnerStartCommand extends Command<int> {
         unawaited(runner.stop());
       }
     });
+    final AgentExit exit;
     try {
       final identity = enrollment.identity;
       logger.info('Runner "${identity.name}" connects to ${identity.engine}.');
-      return switch (await runner.run()) {
-        AgentExit.drained || AgentExit.oneShotDone => XpExit.ok,
-        AgentExit.revoked || AgentExit.credentialRejected => XpExit.permission,
-        AgentExit.replaced => XpExit.conflict,
-        AgentExit.stopped => XpExit.failed,
-      };
+      exit = await runner.run();
     } finally {
       await subscription.cancel();
     }
+    return switch (exit) {
+      AgentExit.drained || AgentExit.oneShotDone => XpExit.ok,
+      AgentExit.revoked || AgentExit.credentialRejected => XpExit.permission,
+      AgentExit.replaced => XpExit.conflict,
+      AgentExit.stopped || AgentExit.updateRequired => XpExit.failed,
+      AgentExit.updated => await _restarter.restart(paths.currentExecutable, [
+        'runner',
+        'start',
+        '--data-dir',
+        paths.root,
+        if (slots != null) ...['--slots', '$slots'],
+      ], logger.info),
+    };
   }
 
   static Stream<ProcessSignal> _systemSignals() =>

@@ -584,6 +584,28 @@ class XpClient {
   Future<WebSocketChannel> connectRunner() =>
       _openSocket(['runners', 'connect']);
 
+  /// `GET /runners/bundle`: the `xp` bundle of the engine's own version for a
+  /// runner of [os] and [arch], as a `.tar.gz`. This client's token must be the
+  /// runner's credential. The download carries the SHA-256 and the size the
+  /// engine announced; [ArtifactDownload.saveTo] checks the file against them.
+  /// Throws an [ApiException] when the engine has no bundle for the machine
+  /// (`404`).
+  Future<ArtifactDownload> downloadRunnerBundle({
+    required String os,
+    required String arch,
+  }) async {
+    final response = await _open(
+      'GET',
+      ['runners', 'bundle'],
+      query: {'os': os, 'arch': arch},
+    );
+    return ArtifactDownload(
+      content: response.stream,
+      sha256: response.headers['x-content-sha256']?.toLowerCase(),
+      length: response.contentLength,
+    );
+  }
+
   /// `PUT /runners/jobs/{id}/artifacts/{name}`: uploads a file a leased job
   /// produced. [size] and [sha256] declare what [content] is; the engine
   /// stores the file only if the bytes are what was declared, so a connection

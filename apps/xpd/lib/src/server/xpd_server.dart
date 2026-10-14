@@ -36,6 +36,7 @@ class XpdServer {
     required RunnerService runners,
     required RunnerHub runnerHub,
     required RunnerArtifacts runnerArtifacts,
+    required RunnerBundles runnerBundles,
     required Clock clock,
     required String engineVersion,
     String host = '127.0.0.1',
@@ -64,6 +65,7 @@ class XpdServer {
       runners: runners,
       runnerConnect: runnerRoute,
       runnerArtifacts: runnerArtifacts,
+      runnerBundles: runnerBundles,
       engineVersion: engineVersion,
       onError: onError,
     );

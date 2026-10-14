@@ -9,6 +9,7 @@ import 'package:xp/src/runner/runner_command.dart';
 import 'package:xp/src/runner/runner_identity.dart';
 import 'package:xp/src/runner/runner_paths.dart';
 import 'package:xp/src/runner/runner_runtime.dart';
+import 'package:xp/src/runner/update/restarter.dart';
 import 'package:xp_api/xp_api.dart';
 import 'package:xp_client/xp_client.dart';
 import 'package:xp_engine/xp_engine.dart';
@@ -48,6 +49,7 @@ void main() {
   late StreamController<ProcessSignal> signals;
   late CommandRunner<int> commands;
   Exception? buildFails;
+  late List<(String, List<String>)> restarts;
 
   final paired = PairRunnerResponse(
     runner: Runner(
@@ -84,12 +86,21 @@ void main() {
     buildFails = null;
     process = _FakeRunnerProcess((_) async => AgentExit.drained);
     signals = StreamController<ProcessSignal>.broadcast();
+    restarts = [];
     commands = CommandRunner<int>('xp', 'test')
       ..addCommand(
         runnerCommand(
           env.context,
           host: host,
           signals: signals.stream,
+          // Never starts a program: the new version is only recorded.
+          restarter: Restarter(
+            managed: false,
+            launch: (executable, arguments) async {
+              restarts.add((executable, arguments));
+              return 42;
+            },
+          ),
           build: (setup) async {
             built = setup;
             if (buildFails case final error?) throw error;
@@ -124,7 +135,13 @@ void main() {
 
   test('is a command of xp', () async {
     expect(env.runner.commands.keys, contains('runner'));
-    expect(env.runner.commands['runner']!.subcommands.keys, ['pair', 'start']);
+    expect(env.runner.commands['runner']!.subcommands.keys, [
+      'pair',
+      'start',
+      'install-service',
+      'uninstall-service',
+      'service-status',
+    ]);
     expect(await env.run(['runner', '--help']), 0);
   });
 
@@ -388,6 +405,7 @@ void main() {
         (AgentExit.credentialRejected, 77),
         (AgentExit.replaced, 73),
         (AgentExit.stopped, 1),
+        (AgentExit.updateRequired, 1),
       ]) {
         process = _FakeRunnerProcess((_) async => exit);
 
@@ -398,6 +416,71 @@ void main() {
         );
       }
     });
+
+    test(
+      'starts the new version after an update, with the same options',
+      () async {
+        process = _FakeRunnerProcess((_) async => AgentExit.updated);
+
+        final code = await run([
+          'start',
+          '--data-dir',
+          paths.root,
+          '--slots',
+          '3',
+        ]);
+
+        expect(code, 42, reason: 'the code of the new version');
+        expect(restarts, hasLength(1));
+        expect(restarts.single.$1, paths.currentExecutable);
+        expect(restarts.single.$2, [
+          'runner',
+          'start',
+          '--data-dir',
+          paths.root,
+          '--slots',
+          '3',
+        ]);
+        expect(env.logger.out, contains('Starting the new version'));
+      },
+    );
+
+    test('leaves the slots out of the restart when it had none', () async {
+      process = _FakeRunnerProcess((_) async => AgentExit.updated);
+
+      await run(['start', '--data-dir', paths.root]);
+
+      expect(restarts.single.$2, ['runner', 'start', '--data-dir', paths.root]);
+    });
+
+    test(
+      'exits for its service manager to restart it when it is managed',
+      () async {
+        process = _FakeRunnerProcess((_) async => AgentExit.updated);
+        final managed = RunnerHost(
+          operatingSystem: 'linux',
+          cores: 8,
+          pid: 1,
+          environment: {'HOME': directory.path, runnerManagedVariable: '1'},
+          runner: FakeProcessRunner((call) => const ProcessOutput(exitCode: 0)),
+          openCredentials: (_) => credentials,
+        );
+        commands = CommandRunner<int>('xp', 'test')
+          ..addCommand(
+            runnerCommand(
+              env.context,
+              host: managed,
+              signals: signals.stream,
+              build: (setup) async => process,
+            ),
+          );
+
+        final code = await run(['start', '--data-dir', paths.root]);
+
+        expect(code, 75);
+        expect(restarts, isEmpty);
+      },
+    );
 
     test('drains on the first signal and stops on the second', () async {
       final done = Completer<AgentExit>();

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io' as io;
 
+import 'package:path/path.dart' as p;
 import 'package:xp/src/config/client_secret_store.dart';
 import 'package:xp/src/config/xp_config.dart';
 import 'package:xp/src/context.dart';
@@ -16,6 +17,7 @@ import 'package:xp/src/runner/runner_socket.dart';
 import 'package:xp/src/runner/runner_startup.dart';
 import 'package:xp/src/runner/runner_steps.dart';
 import 'package:xp/src/runner/secrets/secret_area.dart';
+import 'package:xp/src/runner/update/runner_updater.dart';
 import 'package:xp/src/version.dart';
 import 'package:xp_adapters/xp_adapters.dart';
 import 'package:xp_engine/xp_engine.dart';
@@ -37,6 +39,7 @@ class RunnerHost {
     required this.environment,
     required this.runner,
     this.openCredentials,
+    this.executable = '',
   });
 
   /// The real machine.
@@ -46,6 +49,7 @@ class RunnerHost {
     pid: io.pid,
     environment: environment,
     runner: const IoProcessRunner(),
+    executable: io.Platform.resolvedExecutable,
   );
 
   /// `macos` or `linux`.
@@ -65,6 +69,21 @@ class RunnerHost {
 
   /// Opens the store of the credential, instead of the usual one. For tests.
   final SecretStore Function(RunnerPaths paths)? openCredentials;
+
+  /// The path of the running `xp` as the operating system resolves it
+  /// (`Platform.resolvedExecutable`), or empty when it is not known.
+  final String executable;
+
+  /// The folder of the bundle that runs (`<bundle>/bin/xp` and
+  /// `<bundle>/lib`), or `null` when `xp` does not run from a bundle (`dart
+  /// run`, a test).
+  String? get bundle {
+    final bin = p.dirname(executable);
+    if (p.basename(executable) != 'xp' || p.basename(bin) != 'bin') {
+      return null;
+    }
+    return p.dirname(bin);
+  }
 
   /// Whether this is a Mac.
   bool get isMacOS => operatingSystem == 'macos';
@@ -100,6 +119,7 @@ class RunnerSetup {
     required this.clientFactory,
     this.slots,
     this.oneShot = false,
+    this.version = packageVersion,
   });
 
   /// The data directory.
@@ -122,6 +142,10 @@ class RunnerSetup {
 
   /// Whether the runner exits after one job.
   final bool oneShot;
+
+  /// The version of `xp` this runner reports and compares with the engine's.
+  /// Only a test passes another one, to play the new version after an update.
+  final String version;
 }
 
 /// A runner that is ready to run.
@@ -202,7 +226,21 @@ Future<RunnerProcess> buildRunner(RunnerSetup setup) async {
     removeWorktree: git.removeWorktree,
   );
   final arch = await _architecture(host.runner);
-  final agent = RunnerAgent(
+  // A one-shot runner is made for one job and lives for minutes: it does not
+  // update (D-24).
+  final updater = setup.oneShot
+      ? null
+      : RunnerUpdater(
+          paths: paths,
+          version: setup.version,
+          os: host.operatingSystem,
+          arch: arch,
+          runner: host.runner,
+          fetch: client.downloadRunnerBundle,
+          log: setup.log,
+          bundle: host.bundle,
+        );
+  RunnerAgent makeAgent() => RunnerAgent(
     connect: () async => ChannelRunnerSocket(await client.connectRunner()),
     start: (offer, outbox, requestSecret) => LeasedJob(
       offer: offer,
@@ -217,16 +255,19 @@ Future<RunnerProcess> buildRunner(RunnerSetup setup) async {
     ),
     stepKinds: RunnerSteps.kinds,
     log: setup.log,
-    version: packageVersion,
+    version: setup.version,
     os: host.operatingSystem,
     arch: arch,
     cores: host.cores,
     slots: setup.slots ?? defaultSlots(host.cores),
     requestedSlots: setup.slots,
     oneShot: setup.oneShot,
+    wantsUpdateTo: updater?.wantsUpdateTo,
+    onWelcomed: updater?.connected,
   );
   return _Runner(
-    agent: agent,
+    makeAgent: makeAgent,
+    updater: updater,
     cleanUp: () => cleanUpAfterCrash(
       paths: paths,
       secrets: secretArea,
@@ -242,32 +283,66 @@ Future<RunnerProcess> buildRunner(RunnerSetup setup) async {
 
 class _Runner implements RunnerProcess {
   new({
-    required this._agent,
+    required this._makeAgent,
+    required this._updater,
     required this._cleanUp,
     required this._log,
     required this._close,
-  });
+  }) {
+    _agent = _makeAgent();
+  }
 
-  final RunnerAgent _agent;
+  final RunnerAgent Function() _makeAgent;
+  final RunnerUpdater? _updater;
   final Future<StartupReport> Function() _cleanUp;
   final void Function(String message) _log;
   final void Function() _close;
 
+  late RunnerAgent _agent;
+  var _draining = false;
+  var _stopped = false;
+
   @override
   Future<AgentExit> run() async {
-    _log((await _cleanUp()).describe());
     try {
-      return await _agent.run();
+      // A version that never reached the engine goes back before it does
+      // anything else.
+      if (_updater?.checkStart() != null) return AgentExit.updated;
+      _log((await _cleanUp()).describe());
+      while (true) {
+        final exit = await _agent.run();
+        final target = _agent.updateVersion;
+        final updater = _updater;
+        if (exit != AgentExit.updateRequired ||
+            target == null ||
+            updater == null) {
+          return exit;
+        }
+        // The agent ended with no job open and no connection: the moment to
+        // update.
+        final outcome = await updater.update(target);
+        if (_stopped) return AgentExit.stopped;
+        if (_draining) return AgentExit.drained;
+        if (outcome is Updated) return AgentExit.updated;
+        // The update failed: go on with the version that works.
+        _agent = _makeAgent();
+      }
     } finally {
       _close();
     }
   }
 
   @override
-  void drain() => _agent.drain();
+  void drain() {
+    _draining = true;
+    _agent.drain();
+  }
 
   @override
-  Future<void> stop() => _agent.stop();
+  Future<void> stop() {
+    _stopped = true;
+    return _agent.stop();
+  }
 }
 
 /// The machine's architecture as `uname -m` says it, `arm64` for Apple

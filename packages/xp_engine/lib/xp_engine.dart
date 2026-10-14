@@ -92,6 +92,7 @@ export 'src/runners/lease_sweeper.dart';
 export 'src/runners/remote_runner.dart';
 export 'src/runners/remote_step_policy.dart';
 export 'src/runners/runner_artifacts.dart';
+export 'src/runners/runner_bundles.dart';
 export 'src/runners/runner_exceptions.dart';
 export 'src/runners/runner_hub.dart';
 export 'src/runners/runner_link.dart';

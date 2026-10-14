@@ -2,11 +2,14 @@ import 'dart:io';
 
 import 'package:args/args.dart';
 import 'package:args/command_runner.dart';
+import 'package:xp_adapters/xp_adapters.dart';
 import 'package:xp_api/xp_api.dart';
+import 'package:xp_engine/xp_engine.dart';
 import 'package:xpd/src/cli/secrets_command.dart';
 import 'package:xpd/src/cli/serve_command.dart';
 import 'package:xpd/src/cli/token_command.dart';
 import 'package:xpd/src/cli/xpd_context.dart';
+import 'package:xpd/src/service/service_commands.dart';
 import 'package:xpd/src/version.dart';
 
 /// Exit code for a command line that `xpd` does not understand
@@ -17,7 +20,9 @@ const _usageExitCode = 64;
 ///
 /// Results go to [out], diagnostics to [err]. `xpd serve` runs until
 /// [shutdown] emits. [ghFallbackPaths] is where `xpd secrets import-gh` looks
-/// for `gh` when it is not on `PATH`.
+/// for `gh` when it is not on `PATH`. [processes] starts the programs of the
+/// service commands (`launchctl`, `systemctl`); [executable] is the running
+/// `xpd` (`Platform.resolvedExecutable`).
 Future<int> runXpd(
   List<String> args, {
   required StringSink out,
@@ -26,6 +31,8 @@ Future<int> runXpd(
   required Map<String, String> environment,
   required String operatingSystem,
   List<String> ghFallbackPaths = XpdContext.defaultGhFallbackPaths,
+  ProcessRunner processes = const IoProcessRunner(),
+  String executable = '',
 }) async {
   final context = XpdContext(
     out: out,
@@ -34,11 +41,16 @@ Future<int> runXpd(
     environment: environment,
     operatingSystem: operatingSystem,
     ghFallbackPaths: ghFallbackPaths,
+    processes: processes,
+    executable: executable,
   );
   final runner = _XpdCommandRunner(context)
+    ..addCommand(InstallServiceCommand(context))
     ..addCommand(SecretsCommand(context))
     ..addCommand(ServeCommand(context))
-    ..addCommand(TokenCommand(context));
+    ..addCommand(ServiceStatusCommand(context))
+    ..addCommand(TokenCommand(context))
+    ..addCommand(UninstallServiceCommand(context));
   try {
     return await runner.run(args) ?? 0;
   } on UsageException catch (e) {

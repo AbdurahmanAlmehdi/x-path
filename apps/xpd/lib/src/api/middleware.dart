@@ -62,11 +62,13 @@ Middleware authMiddleware(
       return await inner(request.change(context: {_tokenContextKey: token}));
     };
 
-/// What a `runner` token may reach (ADR 0011): the connection it dials out on
-/// and the upload of an artifact of a job it holds, and nothing else.
+/// What a `runner` token may reach (ADR 0011): the connection it dials out on,
+/// the upload of an artifact of a job it holds and the download of the bundle
+/// it updates itself with, and nothing else.
 bool _runnerMayReach(Request request) {
   final path = request.requestedUri.path;
-  return (request.method == 'GET' && path == '/runners/connect') ||
+  return (request.method == 'GET' &&
+          (path == '/runners/connect' || path == '/runners/bundle')) ||
       (request.method == 'PUT' && _artifactUpload.hasMatch(path));
 }
 
@@ -90,7 +92,8 @@ Middleware runnerScopeMiddleware() =>
         return errorResponse(
           ApiErrorCode.forbidden,
           'A runner token reaches only the runner connection '
-          '(GET /runners/connect) and the artifact upload of a job it holds '
+          '(GET /runners/connect), the runner bundle '
+          '(GET /runners/bundle) and the artifact upload of a job it holds '
           '(PUT /runners/jobs/{id}/artifacts/{name}), not '
           '${request.method} ${request.requestedUri.path}.',
         );

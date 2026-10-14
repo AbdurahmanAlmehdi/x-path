@@ -223,6 +223,47 @@ void main() {
       );
     });
 
+    test('GET bundle 200, 400, 401 and 404', () async {
+      client.engine.runnerBundles.files['linux-arm64'] = utf8.encode('tgz');
+
+      expectContract(
+        await client.send(
+          'GET',
+          '/runners/bundle?os=linux&arch=arm64',
+          token: client.credential,
+        ),
+        path: '/runners/bundle',
+        status: 200,
+      );
+      expectContract(
+        await client.send(
+          'GET',
+          '/runners/bundle?os=linux',
+          token: client.credential,
+        ),
+        path: '/runners/bundle',
+        status: 400,
+      );
+      expectContract(
+        await client.send(
+          'GET',
+          '/runners/bundle?os=linux&arch=arm64',
+          token: '',
+        ),
+        path: '/runners/bundle',
+        status: 401,
+      );
+      expectContract(
+        await client.send(
+          'GET',
+          '/runners/bundle?os=macos&arch=arm64',
+          token: client.credential,
+        ),
+        path: '/runners/bundle',
+        status: 404,
+      );
+    });
+
     test('PUT artifact 201, 400, 401, 403 and 409', () async {
       final stream = await client.online();
       addTearDown(stream.close);

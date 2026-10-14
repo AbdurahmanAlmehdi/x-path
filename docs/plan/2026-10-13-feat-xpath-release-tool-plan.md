@@ -495,7 +495,7 @@ Mataa dev builds through `xp` can start after Phase 13, before the desktop app e
 
 ### Phase 14c: Runner updates and services
 
-- **Status:** Not started
+- **Status:** Done
 - **Scope:** Runner self-update to the engine's version between jobs; macOS LaunchAgent and
   Linux systemd units for runners and the engine; `xpd install-service`. LaunchAgent labels are
   `ly.abdurahman.xpath.xpd` (engine) and `ly.abdurahman.xpath.runner` (runner), per ADR 0005.

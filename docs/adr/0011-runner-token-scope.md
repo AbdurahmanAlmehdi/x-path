@@ -35,3 +35,12 @@ added later is closed to runner tokens until someone opens it on purpose.
   a job.
 - `openapi.yaml` states the scope once, in its description, and the contract tests of the runner
   endpoints still pass.
+
+## Amendment (Phase 14c)
+
+A runner updates itself to the version of its engine (D-24) and needs the bundle for that. A token of kind
+`runner` also reaches **`GET /runners/bundle?os=&arch=`**, which streams the `xp` bundle of the engine's own
+version for that machine as a `.tar.gz`, with its SHA-256 and size. It hands out the engine's own build, not
+data, and takes nothing from the runner but the machine it runs on. Everything else in this ADR stands: the
+allowlist is still one middleware (`runnerScopeMiddleware`) and every other route is still closed to a runner
+token.
