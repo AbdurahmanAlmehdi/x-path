@@ -23,8 +23,15 @@
 // see `_prod` for what it does and checks, and tool/e2e/release_e2e.sh for what
 // is real and what is faked.
 //
-// Usage: dart run tool/release_e2e.dart --mode dev|prod --xpd <executable>
+// `--mode mcp` (Phase 13, tool/e2e/mcp_gate_e2e.sh) drives the same engine
+// through `xp`: `xp connect` saves a CLI token and an MCP token, `xp mcp` runs
+// as a stdio subprocess that this script speaks MCP JSON-RPC to, and an
+// MCP-dispatched production release must stop at a pending approval that the
+// MCP token cannot decide: see `_mcpGate`.
+//
+// Usage: dart run tool/release_e2e.dart --mode dev|prod|mcp --xpd <executable>
 //          --fixture <dir> --work <dir> [--flutter-sdk <dir>]
+//          [--xp <executable>]
 //
 // Exits 0 only if everything held; progress goes to standard error.
 import 'dart:async';
@@ -44,8 +51,9 @@ const _firebaseAppId = '1:684690133351:android:b434734f585770367c1fc2';
 
 Future<void> main(List<String> arguments) async {
   final parser = ArgParser()
-    ..addOption('mode', allowed: ['dev', 'prod'], defaultsTo: 'dev')
+    ..addOption('mode', allowed: ['dev', 'prod', 'mcp'], defaultsTo: 'dev')
     ..addOption('xpd', mandatory: true, help: 'The xpd executable.')
+    ..addOption('xp', help: 'The xp executable (mode mcp).')
     ..addOption('fixture', mandatory: true, help: 'The fixture app folder.')
     ..addOption('work', mandatory: true, help: 'An empty scratch folder.')
     ..addOption(
@@ -58,6 +66,7 @@ Future<void> main(List<String> arguments) async {
   final e2e = _E2e(
     mode: options['mode'] as String,
     xpd: options['xpd'] as String,
+    xp: options['xp'] as String?,
     fixture: options['fixture'] as String,
     work: options['work'] as String,
     flutterSdk: options['flutter-sdk'] as String?,
@@ -85,6 +94,7 @@ class _E2e {
   new({
     required this.mode,
     required this.xpd,
+    required this.xp,
     required this.fixture,
     required this.work,
     required this.flutterSdk,
@@ -92,6 +102,7 @@ class _E2e {
 
   final String mode;
   final String xpd;
+  final String? xp;
   final String fixture;
   final String work;
   final String? flutterSdk;
@@ -155,6 +166,10 @@ class _E2e {
       'the scan found the flavors dev and prod, not $flavors',
     );
     _log('added project $projectId with the flavors $flavors');
+    if (mode == 'mcp') {
+      await _mcpGate(projectId);
+      return;
+    }
     if (mode == 'prod') {
       await _prod(project);
       return;
@@ -334,6 +349,249 @@ class _E2e {
     );
     await _post('/runs/${second['id']}/cancel', null);
     _log('the second production release ran once the first ended');
+  }
+
+  // ------------------------------------------------------------- MCP gate
+
+  /// Phase 13: an agent that dispatches a production release through
+  /// `xp mcp` ends up at a pending approval that its token cannot decide.
+  ///
+  /// What is real: the engine, its database and gates, `xp connect` (tokens in
+  /// the file secret store of a temporary config folder, never a Keychain),
+  /// `xp mcp` as a child process speaking MCP JSON-RPC on standard input and
+  /// output, and the `prod-release` workflow up to its first gate (which comes
+  /// before any build, so nothing heavy runs). It checks that
+  ///
+  ///   - the MCP tool list has no tool to approve, deny, merge or change a
+  ///     gate,
+  ///   - the dispatched run stops at `waiting_for_approval` and the approval is
+  ///     pending, as the MCP tools, the CLI and the HTTP API all see it,
+  ///   - the MCP token gets 403 on approve, on deny and on loosening a gate,
+  ///     and the approval is still pending afterwards,
+  ///   - the app token approves it (the first decision wins) and the job goes
+  ///     on, and the MCP tools then see it approved.
+  Future<void> _mcpGate(String projectId) async {
+    final xp = this.xp;
+    if (xp == null) throw const _Failure('--xp is required for --mode mcp');
+    final cliToken = await _createToken('cli', 'e2e cli');
+    final mcpToken = await _createToken('mcp', 'e2e mcp');
+    final environment = {
+      for (final entry in Platform.environment.entries)
+        if (!entry.key.startsWith('XP_')) entry.key: entry.value,
+      'XP_CONFIG_DIR': p.join(work, 'xp-config'),
+      // The tokens go to a file, not to the Keychain of this Mac.
+      'XP_TEST_FILE_SECRETS': '1',
+      'XP_NO_UPDATE_CHECK': '1',
+    };
+
+    Future<ProcessResult> runXp(List<String> arguments) async {
+      final result = await Process.run(
+        xp,
+        arguments,
+        environment: environment,
+        includeParentEnvironment: false,
+      );
+      _log('xp ${arguments.first}... exited ${result.exitCode}');
+      return result;
+    }
+
+    final connected = await runXp([
+      'connect',
+      _url.toString(),
+      '--token',
+      cliToken,
+      '--mcp-token',
+      mcpToken,
+    ]);
+    _expect(
+      connected.exitCode == 0,
+      'xp connect exits 0, not ${connected.exitCode}: ${connected.stderr}',
+    );
+    final listed = await runXp(['--json', 'projects', 'list']);
+    _expect(
+      listed.exitCode == 0 && '${listed.stdout}'.contains(projectId),
+      'xp projects list (with the saved CLI token) shows the project: '
+      '${listed.stdout}${listed.stderr}',
+    );
+    _log('xp connect saved the tokens; the CLI reads the project');
+
+    final session = await _McpSession.start(xp, environment);
+    try {
+      final initialized = await session.request('initialize', {
+        'protocolVersion': '2025-06-18',
+        'capabilities': <String, Object?>{},
+        'clientInfo': {'name': 'mcp_gate_e2e', 'version': '1'},
+      });
+      session.notify('notifications/initialized');
+      _expect(
+        (initialized['serverInfo'] as Map)['name'] == 'xpath',
+        'the MCP server introduces itself as xpath: $initialized',
+      );
+
+      final listing = await session.request('tools/list', {});
+      final names = [
+        for (final tool in listing['tools'] as List)
+          (tool as Map)['name']! as String,
+      ];
+      for (final name in names) {
+        for (final forbidden in [
+          'approve',
+          'deny',
+          'merge',
+          'abandon',
+          'delete',
+          'remove',
+          'set_gates',
+          'tighten',
+        ]) {
+          _expect(
+            !name.contains(forbidden),
+            'the tool $name offers $forbidden',
+          );
+        }
+      }
+      _expect(
+        names.toSet().containsAll([
+          'list_projects',
+          'dispatch_workflow',
+          'get_run',
+          'get_approval',
+        ]),
+        'the MCP tools include dispatch and the approval poll: $names',
+      );
+      _log('xp mcp offers ${names.length} tools, none that approves');
+
+      final projects = await session.toolList('list_projects');
+      _expect(
+        projects.any((project) => (project as Map)['id'] == projectId),
+        'the MCP tool list_projects shows the project',
+      );
+
+      final dispatched = await session.toolObject('dispatch_workflow', {
+        'project': projectId,
+        'workflow': 'prod-release',
+        'platforms': ['android'],
+        'flavors': ['prod'],
+      });
+      final runId =
+          (dispatched['run'] as Map<String, dynamic>)['id']! as String;
+      _lastRun = runId;
+      _log('dispatched the production release through MCP: $runId');
+
+      // The run stops at its first gate and says which approval it waits for.
+      Map<dynamic, dynamic>? waiting;
+      final deadline = DateTime.now().add(const Duration(minutes: 5));
+      while (DateTime.now().isBefore(deadline)) {
+        final view = await session.toolObject('get_run', {'run': runId});
+        final state = (view['run'] as Map)['state'];
+        if (state == 'waiting_for_approval' &&
+            (view['pendingApprovals'] as List).isNotEmpty) {
+          waiting = view;
+          break;
+        }
+        if (state == 'failed' || state == 'cancelled' || state == 'succeeded') {
+          throw _Failure('the run is $state before it reached its gate');
+        }
+        await Future<void>.delayed(const Duration(seconds: 1));
+      }
+      if (waiting == null) {
+        throw const _Failure('the run did not stop at an approval in 5 min');
+      }
+      final approval =
+          (waiting['pendingApprovals'] as List).first as Map<dynamic, dynamic>;
+      final approvalId = approval['id']! as String;
+      _expect(
+        approval['action'] == 'prod_release' && approval['state'] == 'pending',
+        'the run waits for a pending prod_release approval: $approval',
+      );
+      _log('the run waits for the pending approval $approvalId');
+
+      final polled = await session.toolObject('get_approval', {
+        'approval': approvalId,
+      });
+      _expect(polled['state'] == 'pending', 'MCP polls it as pending: $polled');
+      final viaCli = await runXp([
+        '--json',
+        'approvals',
+        'list',
+        '--state',
+        'pending',
+      ]);
+      _expect(
+        viaCli.exitCode == 0 && '${viaCli.stdout}'.contains(approvalId),
+        'xp approvals list shows it: ${viaCli.stdout}${viaCli.stderr}',
+      );
+      final viaRun = await runXp(['--json', 'runs', 'show', runId]);
+      _expect(
+        '${viaRun.stdout}'.contains('pendingApprovals') &&
+            '${viaRun.stdout}'.contains(approvalId),
+        'xp runs show names the approval: ${viaRun.stdout}',
+      );
+
+      // The MCP token cannot decide it, nor loosen the gate (D-13).
+      final approve = await _call(
+        'POST',
+        '/approvals/$approvalId/approve',
+        null,
+        expect: 403,
+        token: mcpToken,
+      );
+      _expect(
+        (approve['error'] as Map)['code'] == 'forbidden',
+        'approving with the MCP token is forbidden: $approve',
+      );
+      await _call(
+        'POST',
+        '/approvals/$approvalId/deny',
+        null,
+        expect: 403,
+        token: mcpToken,
+      );
+      await _call(
+        'PUT',
+        '/projects/$projectId/gates',
+        {
+          'gates': {'prod_release': false},
+        },
+        expect: 403,
+        token: mcpToken,
+      );
+      final still = await _get('/approvals/$approvalId');
+      _expect(
+        still['state'] == 'pending',
+        'the approval is still pending after the MCP token tried: $still',
+      );
+      _log('the MCP token got 403 on approve, deny and loosening the gate');
+
+      // The owner (an app token) approves; the job goes on.
+      final decided = await _post('/approvals/$approvalId/approve', null);
+      _expect(
+        decided['state'] == 'approved' &&
+            (decided['decidedBy'] as Map)['kind'] == 'app',
+        'the app token approves it: $decided',
+      );
+      final after = await session.toolObject('get_approval', {
+        'approval': approvalId,
+      });
+      _expect(after['state'] == 'approved', 'MCP sees it approved: $after');
+      final jobs = (waiting['run'] as Map<String, dynamic>)['jobs'] as List;
+      final jobId = (jobs.first as Map<String, dynamic>)['id']! as String;
+      _lastJob = jobId;
+      final resumed = await _waitForJob(jobId, const Duration(minutes: 2), {
+        'running',
+        'succeeded',
+        'failed',
+        'cancelled',
+      });
+      _log('after the approval the job is ${resumed['state']}');
+      try {
+        await _post('/runs/$runId/cancel', null);
+      } on _Failure {
+        // It may have ended on its own already.
+      }
+    } finally {
+      await session.close();
+    }
   }
 
   String _jobOf(Map<String, dynamic> run, int index) =>
@@ -941,16 +1199,19 @@ class _E2e {
   }
 
   /// A token of the `mcp` kind, as an agent has.
-  Future<String> _agentToken() async {
+  Future<String> _agentToken() => _createToken('mcp', 'agent');
+
+  /// A new device token of [kind], printed once by `xpd token create`.
+  Future<String> _createToken(String kind, String name) async {
     final created = await Process.run(xpd, [
       'token',
       'create',
       '--data-dir',
       data,
       '--name',
-      'agent',
+      name,
       '--kind',
-      'mcp',
+      kind,
     ], environment: _engineEnvironment);
     if (created.exitCode != 0) {
       throw _Failure('xpd token create failed: ${created.stderr}');
@@ -1273,6 +1534,119 @@ class _E2e {
 
   void _expect(bool condition, String what) {
     if (!condition) throw _Failure('check failed: $what');
+  }
+}
+
+/// `xp mcp` as a child process, spoken to in MCP JSON-RPC (one JSON message
+/// per line on standard input and output).
+class _McpSession {
+  new _(this._process) {
+    _process.stdout
+        .transform(utf8.decoder)
+        .transform(const LineSplitter())
+        .listen(_onLine);
+    _process.stderr.transform(utf8.decoder).listen(_stderr.write);
+  }
+
+  /// Starts `xp mcp` with [environment].
+  static Future<_McpSession> start(
+    String xp,
+    Map<String, String> environment,
+  ) async => _McpSession._(
+    await Process.start(
+      xp,
+      ['mcp'],
+      environment: environment,
+      includeParentEnvironment: false,
+    ),
+  );
+
+  final Process _process;
+  final _stderr = StringBuffer();
+  final _pending = <int, Completer<Map<String, dynamic>>>{};
+  var _nextId = 1;
+
+  void _onLine(String line) {
+    final Map<String, dynamic> message;
+    try {
+      message = jsonDecode(line) as Map<String, dynamic>;
+    } on FormatException {
+      // Standard output must carry MCP messages only.
+      for (final pending in _pending.values) {
+        pending.completeError(
+          _Failure('xp mcp wrote something that is not JSON: $line'),
+        );
+      }
+      return;
+    }
+    final id = message['id'];
+    if (id is int) _pending.remove(id)?.complete(message);
+  }
+
+  void _send(Map<String, Object?> message) =>
+      _process.stdin.writeln(jsonEncode({'jsonrpc': '2.0', ...message}));
+
+  /// Sends a request and returns its `result`.
+  Future<Map<String, dynamic>> request(
+    String method,
+    Map<String, Object?> params,
+  ) async {
+    final id = _nextId++;
+    final answer = _pending[id] = Completer();
+    _send({'id': id, 'method': method, 'params': params});
+    final message = await answer.future.timeout(
+      const Duration(seconds: 60),
+      onTimeout: () =>
+          throw _Failure('xp mcp did not answer $method: $_stderr'),
+    );
+    if (message['error'] != null) {
+      throw _Failure('xp mcp answered $method with ${message['error']}');
+    }
+    return message['result'] as Map<String, dynamic>;
+  }
+
+  /// Sends a notification.
+  void notify(String method) => _send({'method': method});
+
+  /// Calls a tool whose text is a JSON object.
+  Future<Map<String, dynamic>> toolObject(
+    String name, [
+    Map<String, Object?> arguments = const {},
+  ]) async => (await tool(name, arguments))! as Map<String, dynamic>;
+
+  /// Calls a tool whose text is a JSON list.
+  Future<List<dynamic>> toolList(
+    String name, [
+    Map<String, Object?> arguments = const {},
+  ]) async => (await tool(name, arguments))! as List<dynamic>;
+
+  /// Calls a tool and returns what its text says, decoded from JSON.
+  Future<Object?> tool(
+    String name, [
+    Map<String, Object?> arguments = const {},
+  ]) async {
+    final result = await request('tools/call', {
+      'name': name,
+      'arguments': arguments,
+    });
+    final text =
+        (((result['content'] as List).single) as Map)['text']! as String;
+    if (result['isError'] == true) {
+      throw _Failure('the MCP tool $name failed: $text');
+    }
+    return jsonDecode(text);
+  }
+
+  /// Ends the session: closing standard input ends `xp mcp`.
+  Future<void> close() async {
+    await _process.stdin.close();
+    await _process.exitCode.timeout(
+      const Duration(seconds: 10),
+      onTimeout: () {
+        _process.kill();
+        return -1;
+      },
+    );
   }
 }
 

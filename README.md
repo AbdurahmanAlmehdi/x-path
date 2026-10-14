@@ -22,7 +22,7 @@ It writes nothing to the repo except release-model git changes.
 | Path | What it is |
 |---|---|
 | `apps/xpd` | Engine entrypoint (Dart). Wires the implementations and owns the HTTP handlers. |
-| `apps/xp` | The `xp` CLI (Dart). |
+| `apps/xp` | The `xp` CLI and `xp mcp` (Dart). |
 | `apps/xp_desktop` | The macOS app (Flutter). |
 | `packages/xp_api` | Models, error codes and events shared by every client and the engine. |
 | `packages/xp_client` | HTTP and WebSocket client for the engine API. |
@@ -46,7 +46,9 @@ Everything is one [Dart pub workspace](https://dart.dev/tools/pub/workspaces) (A
 - `xp_engine` depends on `xp_api` only, plus a short allowlist of pure utility packages.
 - `xp_adapters` and `xp_secrets` may depend on `xp_engine` and `xp_api`.
 - `xp_client` depends on `xp_api`; `xp_repositories` on `xp_client` and `xp_api`.
-- `xpd` wires the engine, the adapters and the secret stores.
+- `xp` uses `xp_client` for everything it asks of the engine, and `xp_secrets` to keep its tokens (the runner of
+  Phase 14b will use the engine and the adapters).
+- `xpd` wires the engine, the adapters and the secret stores. Its tests also run the shipped `xp_client` against it.
 - The desktop app never imports `xp_engine`, `xp_adapters` or `xp_secrets`.
 
 ## Development setup
@@ -936,6 +938,10 @@ Flutter for everything else and writes a placeholder IPA) and `xcrun altool` (a 
 upload prints). It needs macOS with Xcode, since the engine schedules the iOS job where `ios-sign` is, and the
 Android SDK; it takes several minutes and is not part of CI.
 
+`tool/e2e/mcp_gate_e2e.sh` (Phase 13, see `xp mcp`) builds the `xpd` and `xp` bundles and runs the same script with
+`--mode mcp`. It needs no Android SDK or Xcode: `prod-release` reaches its first gate before any build. It takes about
+half a minute.
+
 ## Releases
 
 A **release** is one flavor of an app going to the stores (D-17). The engine creates it when a workflow that cuts
@@ -1067,6 +1073,137 @@ escaped) and WhatsApp text (`*bold*`, the link as plain text). `409` while the r
 | `GET /storage` | The report: per category the bytes held and the bytes that would be freed, and the artifacts by app and flavor. Deletes nothing. |
 | `POST /storage/free` | `{"dryRun": true, "categories": [...]}`, both optional. A dry run (the default) says what would be freed; `"dryRun": false` deletes (`app`/`cli` tokens), artifacts first, and answers what was freed and what could not be. |
 | `GET /storage/retention`, `PUT /storage/retention` | `{"keepPerFlavor", "logDays"}`. `PUT` is for `app` and `cli` tokens. |
+
+## The `xp` command line
+
+`xp` mirrors the API (Phase 13). It is built on `CommandRunner`, `mason_logger` and `cli_completion`
+(`xp completion`, `xp install-completion-files`), and talks to the engine only through `xp_client`.
+
+```sh
+xpd token create --name "My Mac" --kind cli                     # on the engine machine; printed once
+xpd token create --name "Claude" --kind mcp                     # a second token, for `xp mcp`
+xp connect http://127.0.0.1:7480 --token <cli token> --mcp-token <mcp token>
+xp projects add acme/app            # or a folder on the engine machine
+xp workflows list acme/app
+xp dispatch acme/app dev-build --flavor dev --platform android
+xp logs -f <job id>
+```
+
+**Connecting.** `xp connect <url> --token <token> [--mcp-token <token>]` checks that the URL is an engine of this API
+version (`GET /health`, `GET /version`, no token needed) and that each token works (an authenticated
+`GET /projects`), and only then saves anything. The engine URL goes to `xp.json` in `$XP_CONFIG_DIR`, else
+`$XDG_CONFIG_HOME/xpath`, else `~/.config/xpath`. **The tokens never go in that file**: they go to the OS secret
+store (`packages/xp_secrets`, the same code as the engine's), under the names `token.cli` and `token.mcp`. On macOS
+that is the login Keychain, service `ly.abdurahman.xpath.client` (ADR 0005); on Linux it is `secrets.enc` in the config
+folder, sealed with `$CREDENTIALS_DIRECTORY/xpath-master-key` or a 0600 `master.key` beside it. `XP_ENGINE_URL`,
+`XP_TOKEN` and `XP_MCP_TOKEN` override what was saved, so scripts need to save nothing and never touch a Keychain;
+`XP_TEST_FILE_SECRETS=1` keeps the tokens in the file store even on macOS (the end-to-end scripts use it).
+`xp mcp` uses the `mcp` token and the CLI the `cli` token: they are two tokens, one per client (D-06, D-12).
+
+**Commands.** A project is named by its id (`prj_...`), `owner/name` or just `name`; a workflow by its id
+(`wf_...`) or its name. Every command takes `--json` (before the command: `xp --json projects list`) to print what
+the API answered, for scripts; otherwise it prints text and tables.
+
+| Command | API |
+|---|---|
+| `xp connect <url> --token T [--mcp-token T]` | `/health`, `/version`, `GET /projects` |
+| `xp projects list`, `show <p>`, `add <folder or owner/name>`, `scan <p>`, `remove <p>` | `/projects` |
+| `xp workflows list <p>`, `show <p> <w> [--version n]`, `validate <p> -f file`, `create <p> <name> -f file`, `edit <p> <w> -f file` | `/projects/{id}/workflows` (`validate` exits 65 and prints `line:column: message`) |
+| `xp dispatch <p> <w> [--ref --app --flavor --platform --bump --version --release-version --input k=v]` | `POST .../dispatch` |
+| `xp runs show <run>`, `cancel <run>` | `/runs/{id}`; `show` names the approval a waiting run needs |
+| `xp jobs show <job>`, `cancel <job>`, `resume <job> [--from-step n]` | `/jobs/{id}` |
+| `xp logs <job> [-f] [--after seq]` | `/jobs/{id}/logs` (WebSocket) |
+| `xp approvals list [--project --state]`, `show <a>`, `approve <a> [--reason]`, `deny <a> [--reason]` | `/approvals`; the CLI token is a `cli` token, which may decide (D-13) |
+| `xp gates show <p>`, `tighten <p> <action>...` | `/projects/{id}/gates`; only the app loosens a gate |
+| `xp releases list`, `show <r>`, `refresh <r>`, `status <r> <apple\|play> <state>`, `build <r>`, `merge <r>`, `abandon <r>`, `notes <r> [--format slack\|whatsapp]` | `/releases` |
+| `xp storage report`, `free [--apply] [--category c]`, `retention [--keep n] [--log-days n]` | `/storage` (`free` is a dry run unless you pass `--apply`) |
+| `xp artifacts list <job>`, `download <a> [-o path]` | `/jobs/{id}/artifacts`, `/artifacts/{id}/download` (checks the SHA-256 the engine sends) |
+| `xp mcp` | see below |
+
+`xp logs` without `-f` prints the log so far and stops once the engine has been quiet for 750 ms; with `-f` it follows
+the job until it ends, reconnecting with the last line it printed if the connection drops, and exits 1 if the job
+failed, was cancelled or was interrupted. `xp runners` (pair, revoke) is not there yet: the runner protocol and its
+endpoints are Phase 14a and 14b.
+
+**Exit codes.**
+
+| Code | Meaning |
+|---|---|
+| 0 | success |
+| 1 | the command ran, and the job it followed, the free-up or the download failed |
+| 64 | usage error (also a `400` from the engine) |
+| 65 | the engine refused the content: an invalid workflow, a rejected credential (`422`) |
+| 66 | no such project, job, run, approval, release or artifact (`404`) |
+| 69 | the engine cannot be reached, or cannot serve (`502`, `503`: secrets locked) |
+| 70 | the engine failed (`500`) |
+| 73 | a conflict (`409`): an approval decided already, a project added already |
+| 77 | the token is rejected (`401`), or its kind may not do this (`403`) |
+| 78 | not connected: `xp connect` first |
+
+**The update check.** Once a day `xp` asks GitHub for the latest release of `AbdurahmanAlmehdi/x-path` and prints a
+line on standard error if it is newer than the running version. It is a plain unauthenticated `GET` of the public
+release list with a fixed `User-Agent`: it sends no version, machine, user or engine address (D-24: no telemetry),
+caches the answer for a day in `update-check.json` beside `xp.json`, fails silently (the repository is private until
+1.0, so for now it always does), runs beside the command, is never waited for more than a moment, and does not run
+for `--json` or `xp mcp`. `XP_NO_UPDATE_CHECK=1` turns it off.
+
+## `xp mcp`
+
+`xp mcp` is an MCP server on standard input and output (Phase 13, D-12) for agents such as Claude Code:
+
+```sh
+claude mcp add xpath -- xp mcp
+```
+
+It is a thin adapter: `apps/xp/lib/src/mcp/dart_mcp_adapter.dart` is the **only** file that imports `dart_mcp`
+(pinned to exactly 0.5.2, which supports stdio only: enough for 1.0; the plan moves to Streamable HTTP when 0.6 is
+published). Everything else works with `McpTool`, so an API change of `dart_mcp` stays in that file. Standard output
+carries MCP messages only; whatever else it has to say goes to standard error. It uses the **`mcp` token** saved with
+`xp connect --mcp-token`, never the CLI's.
+
+The tools (all of them answer with JSON text, or with `isError` and a message):
+
+| Kind | Tools |
+|---|---|
+| Read | `list_projects`, `get_project`, `list_workflows`, `get_workflow`, `get_run`, `get_job`, `get_job_log_tail`, `list_artifacts`, `get_job_tests`, `get_test_baselines`, `list_releases`, `get_release`, `get_release_notes`, `list_approvals`, `get_approval`, `get_gates`, `get_storage_report` |
+| Create and edit | `add_project`, `scan_project`, `update_project`, `validate_workflow`, `create_workflow`, `update_workflow` (a document is validated first; with issues nothing is saved and they come back with `line` and `column`) |
+| Run | `dispatch_workflow` |
+
+**Gates (D-13).** There is no tool to approve, deny, merge, abandon, delete or change a gate, and the engine answers
+`403` to an `mcp` token that tries it by hand anyway. A gated action, such as a production release, stops at its gate:
+`get_run` then shows the run as `waiting_for_approval` with `pendingApprovals`, the agent tells the owner, who approves
+in the app or with `xp approvals approve <id>`, and the agent polls `get_approval` until the state is no longer
+`pending`. An approval nobody decides within 24 hours expires, which counts as denied.
+`tool/e2e/mcp_gate_e2e.sh` proves it against a real engine: it speaks MCP JSON-RPC to a real `xp mcp` subprocess,
+dispatches `prod-release`, sees the run stop at a pending approval, gets `403` for the MCP token on approve, deny and
+loosening the gate, and approves with an app token.
+
+## The client library
+
+`packages/xp_client` is the Dart client of the API that `xp`, `xp mcp` and the desktop app share. It depends on
+`xp_api` only, has a method per endpoint (the ones in `openapi.yaml`: projects, scans, credentials, workflows,
+dispatch, runs, jobs, artifacts, test runs, approvals, gates, releases, storage) and 100% test coverage.
+
+- **Errors.** Every error is an `XpClientException`. A non-2xx answer is an `ApiException` with the status, the
+  `ApiErrorCode` of the error envelope (`null` if the answer was not one) and, for `already_decided`, the approval as
+  it stands. A network failure, a timeout or an answer that is not JSON is a `ConnectionException`.
+- **Events.** `watchEvents({after})` is `GET /events` with a resume cursor: it remembers the `seq` of the last event it
+  passed on, and when the connection drops reconnects with `?after=<seq>` after a growing delay (1 s doubling to 30 s,
+  reset by a connection that delivered something), so the listener sees each event once, in order. A `StreamOpened`
+  frame starts every connection but only a stream without a cursor takes its `seq` (the head of the log). When the
+  engine cannot resume (`409 resync_required` on the upgrade, or the close code 4409) the stream emits
+  `EventsResyncRequired`, reconnects without a cursor and carries on: the listener reloads its state over HTTP. A
+  refused token ends the stream with the `ApiException`.
+- **Logs.** `followJobLogs(job, {after})` is `GET /jobs/{id}/logs` the same way: lines in order, each once, the end
+  frame last. A `gap` frame (the client read too slowly) makes it reconnect from the line before the gap, so the
+  lines it missed arrive after all.
+- **WebSockets.** The default connector does the upgrade by hand over `dart:io`, because `WebSocket.connect` throws away
+  the body of a refusal, and that body is the error envelope. Tests pass their own connector and clock.
+- **Downloads.** `downloadArtifact(id)` gives the bytes as a stream; `ArtifactDownload.saveTo(file)` writes
+  `<file>.part`, checks the size and SHA-256 the engine sent and renames it, or deletes it and throws.
+
+The client is tested against fake HTTP servers (`packages/xp_client/test`) and against the real engine in-process
+(`apps/xpd/test/src/client`).
 
 ## Testing
 

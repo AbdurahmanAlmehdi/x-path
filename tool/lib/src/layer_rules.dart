@@ -79,11 +79,14 @@ const layerRules = <String, LayerRule>{
   // fake (both are Google's JWT bearer flow).
   'xp_fake_firebase': LayerRule(workspace: {'xp_fake_play'}),
   // The engine entrypoint wires every implementation.
-  // The fake store servers are for the tests of the store wiring.
+  // The fake store servers are for the tests of the store wiring, and
+  // `xp_client` (which knows only `xp_api`) for the tests that run the shipped
+  // client against the shipped engine.
   'xpd': LayerRule(
     workspace: {
       'xp_adapters',
       'xp_api',
+      'xp_client',
       'xp_engine',
       'xp_fake_asc',
       'xp_fake_firebase',
