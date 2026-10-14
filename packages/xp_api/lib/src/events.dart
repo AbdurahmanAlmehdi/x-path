@@ -1,5 +1,7 @@
 import 'package:equatable/equatable.dart';
+import 'package:xp_api/src/approval.dart';
 import 'package:xp_api/src/credential.dart';
+import 'package:xp_api/src/device_token_kind.dart';
 import 'package:xp_api/src/job.dart';
 
 /// WebSocket close code of an `/events` stream whose cursor can no longer be
@@ -93,6 +95,35 @@ sealed class EngineEvent extends Equatable {
       projectId: payload['projectId'] as String,
       workflowId: payload['workflowId'] as String,
       jobIds: (payload['jobIds'] as List<dynamic>).cast<String>(),
+    ),
+    ApprovalRequested.eventType => ApprovalRequested(
+      approvalId: payload['approvalId'] as String,
+      projectId: payload['projectId'] as String,
+      action: payload['action'] as String,
+      sha: payload['sha'] as String,
+      version: payload['version'] as String?,
+      expiresAt: DateTime.parse(payload['expiresAt'] as String),
+    ),
+    ApprovalDecided.eventType => ApprovalDecided(
+      approvalId: payload['approvalId'] as String,
+      projectId: payload['projectId'] as String,
+      action: payload['action'] as String,
+      state: ApprovalState.values.firstWhere(
+        (state) => state.wire == payload['state'],
+      ),
+      decidedBy: DecidedBy.fromJson(
+        payload['decidedBy'] as Map<String, dynamic>,
+      ),
+    ),
+    ApprovalExpired.eventType => ApprovalExpired(
+      approvalId: payload['approvalId'] as String,
+      projectId: payload['projectId'] as String,
+      action: payload['action'] as String,
+    ),
+    ProjectGatesChanged.eventType => ProjectGatesChanged(
+      projectId: payload['projectId'] as String,
+      gates: (payload['gates'] as Map<String, dynamic>).cast<String, bool>(),
+      changedBy: DeviceTokenKind.values.byName(payload['changedBy'] as String),
     ),
     _ => UnknownEvent(type: type, payload: payload),
   };
@@ -637,6 +668,180 @@ final class RunDispatched extends EngineEvent {
 
   @override
   List<Object?> get props => [runId, projectId, workflowId, jobIds];
+}
+
+/// An action reached a gate and asks for the owner's approval (D-13).
+final class ApprovalRequested extends EngineEvent {
+  /// Creates the event.
+  const new({
+    required this.approvalId,
+    required this.projectId,
+    required this.action,
+    required this.sha,
+    required this.expiresAt,
+    this.version,
+  });
+
+  /// The wire name of this event.
+  static const eventType = 'approval.requested';
+
+  /// The approval.
+  final String approvalId;
+
+  /// The project the action happens in.
+  final String projectId;
+
+  /// What is to be approved, for example `prod_release`.
+  final String action;
+
+  /// The commit it happens on.
+  final String sha;
+
+  /// The version it releases, `x.y.z+build`, when it releases one.
+  final String? version;
+
+  /// When it counts as denied if nobody decides, in UTC.
+  final DateTime expiresAt;
+
+  @override
+  String get type => eventType;
+
+  @override
+  Map<String, dynamic> get payload => {
+    'approvalId': approvalId,
+    'projectId': projectId,
+    'action': action,
+    'sha': sha,
+    'version': ?version,
+    'expiresAt': expiresAt.toUtc().toIso8601String(),
+  };
+
+  @override
+  List<Object?> get props => [
+    approvalId,
+    projectId,
+    action,
+    sha,
+    version,
+    expiresAt,
+  ];
+}
+
+/// The owner approved or denied an approval. The first decision wins; there
+/// is no second one (D-13).
+final class ApprovalDecided extends EngineEvent {
+  /// Creates the event.
+  const new({
+    required this.approvalId,
+    required this.projectId,
+    required this.action,
+    required this.state,
+    required this.decidedBy,
+  });
+
+  /// The wire name of this event.
+  static const eventType = 'approval.decided';
+
+  /// The approval.
+  final String approvalId;
+
+  /// The project the action happens in.
+  final String projectId;
+
+  /// What was decided about, for example `prod_release`.
+  final String action;
+
+  /// `approved` or `denied`.
+  final ApprovalState state;
+
+  /// The device that decided.
+  final DecidedBy decidedBy;
+
+  @override
+  String get type => eventType;
+
+  @override
+  Map<String, dynamic> get payload => {
+    'approvalId': approvalId,
+    'projectId': projectId,
+    'action': action,
+    'state': state.wire,
+    'decidedBy': decidedBy.toJson(),
+  };
+
+  @override
+  List<Object?> get props => [approvalId, projectId, action, state, decidedBy];
+}
+
+/// Nobody decided an approval within 24 hours. Expired counts as denied
+/// (D-13).
+final class ApprovalExpired extends EngineEvent {
+  /// Creates the event.
+  const new({
+    required this.approvalId,
+    required this.projectId,
+    required this.action,
+  });
+
+  /// The wire name of this event.
+  static const eventType = 'approval.expired';
+
+  /// The approval.
+  final String approvalId;
+
+  /// The project the action would have happened in.
+  final String projectId;
+
+  /// What was asked for, for example `prod_release`.
+  final String action;
+
+  @override
+  String get type => eventType;
+
+  @override
+  Map<String, dynamic> get payload => {
+    'approvalId': approvalId,
+    'projectId': projectId,
+    'action': action,
+  };
+
+  @override
+  List<Object?> get props => [approvalId, projectId, action];
+}
+
+/// The gates of a project were changed: which actions wait for approval.
+final class ProjectGatesChanged extends EngineEvent {
+  /// Creates the event.
+  const new({
+    required this.projectId,
+    required this.gates,
+    required this.changedBy,
+  });
+
+  /// The wire name of this event.
+  static const eventType = 'project.gates_changed';
+
+  /// The project.
+  final String projectId;
+
+  /// Whether each action is gated now, for every action.
+  final Map<String, bool> gates;
+
+  /// The kind of token that changed them.
+  final DeviceTokenKind changedBy;
+
+  @override
+  String get type => eventType;
+
+  @override
+  Map<String, dynamic> get payload => {
+    'projectId': projectId,
+    'gates': gates,
+    'changedBy': changedBy.name,
+  };
+
+  @override
+  List<Object?> get props => [projectId, gates, changedBy];
 }
 
 /// An event whose type this client does not know.

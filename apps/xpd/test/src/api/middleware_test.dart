@@ -85,6 +85,29 @@ void main() {
       expect(response.statusCode, 200);
     });
 
+    test('hands the token to the handler, whatever its kind', () async {
+      for (final kind in DeviceTokenKind.values) {
+        final issued = await tokens.issue(name: 'dev $kind', kind: kind);
+        DeviceToken? seen;
+        final reading = const Pipeline()
+            .addMiddleware(authMiddleware(tokens))
+            .addHandler((request) {
+              seen = deviceTokenOf(request);
+              return Response.ok('in');
+            });
+
+        await reading(
+          _request(
+            '/closed',
+            headers: {'authorization': 'Bearer ${issued.secret}'},
+          ),
+        );
+
+        expect(seen, issued.token, reason: kind.name);
+        expect(seen!.kind, kind);
+      }
+    });
+
     test('lets public paths through without a token', () async {
       expect((await handler(_request('/open'))).statusCode, 200);
     });

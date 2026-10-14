@@ -455,6 +455,125 @@ void main() {
       await exit;
     });
 
+    test('serves approvals and gates over the real database', () async {
+      Directory(dataDir).createSync(recursive: true);
+      final now = DateTime.now().toUtc();
+      ApprovalRecord approval(String id, String sha, DateTime createdAt) =>
+          ApprovalRecord(
+            id: id,
+            projectId: 'prj_real',
+            action: GateAction.prodRelease,
+            sha: sha,
+            version: '1.0.0+1',
+            createdAt: createdAt,
+            expiresAt: createdAt.add(approvalLifetime),
+          );
+      final tokens = await withDatabase((database) async {
+        await SqliteProjectRepository(database).add(
+          ProjectRecord(
+            id: 'prj_real',
+            githubRepoId: 7,
+            fullName: 'octo/real',
+            remote: 'x',
+            githubDefaultBranch: 'main',
+            scan: const ProjectProfile(),
+            findings: const [],
+            scannedAt: DateTime.utc(2026),
+          ),
+        );
+        final approvals = SqliteApprovalRepository(database);
+        // One that ran out while the engine was off, one that has time left.
+        await approvals.findOrCreate(
+          approval(
+            'apr_old',
+            'a' * 40,
+            now.subtract(approvalLifetime + const Duration(hours: 1)),
+          ),
+        );
+        await approvals.findOrCreate(approval('apr_new', 'b' * 40, now));
+        final service = TokenService(
+          tokens: SqliteDeviceTokenRepository(database),
+          clock: const SystemClock(),
+        );
+        return {
+          for (final kind in DeviceTokenKind.values)
+            kind: (await service.issue(name: kind.name, kind: kind)).secret,
+        };
+      });
+      final exit = run(['serve', '--port', '0', '--data-dir', dataDir]);
+      final uri = await startServing(exit);
+      final client = HttpClient();
+      addTearDown(() => client.close(force: true));
+
+      Future<(int, Map<String, dynamic>)> call(
+        DeviceTokenKind kind,
+        String method,
+        String path, [
+        Object? body,
+      ]) async {
+        final request = await client.openUrl(method, uri.resolve(path))
+          ..headers.set('authorization', 'Bearer ${tokens[kind]}');
+        if (body != null) request.write(jsonEncode(body));
+        final response = await request.close();
+        return (
+          response.statusCode,
+          jsonDecode(await utf8.decodeStream(response)) as Map<String, dynamic>,
+        );
+      }
+
+      const app = DeviceTokenKind.app;
+      const mcp = DeviceTokenKind.mcp;
+      // The sweep on start expires the one that ran out.
+      for (var i = 0; i < 200; i++) {
+        final (_, listed) = await call(app, 'GET', '/approvals/apr_old');
+        if (listed['state'] == 'expired') break;
+        await Future<void>.delayed(const Duration(milliseconds: 25));
+      }
+      final (_, old) = await call(app, 'GET', '/approvals/apr_old');
+      final (agent, _) = await call(mcp, 'POST', '/approvals/apr_new/approve');
+      final (agentGates, _) = await call(
+        mcp,
+        'PUT',
+        '/projects/prj_real/gates',
+        {
+          'gates': {'push': false},
+        },
+      );
+      final (won, winner) = await call(
+        app,
+        'POST',
+        '/approvals/apr_new/approve',
+      );
+      final (lost, loser) = await call(
+        DeviceTokenKind.cli,
+        'POST',
+        '/approvals/apr_new/deny',
+      );
+      final (loosened, gates) = await call(
+        app,
+        'PUT',
+        '/projects/prj_real/gates',
+        {
+          'gates': {'push': false},
+        },
+      );
+      final (read, again) = await call(mcp, 'GET', '/projects/prj_real/gates');
+
+      expect(old['state'], 'expired');
+      expect(agent, 403);
+      expect(agentGates, 403);
+      expect(won, 200);
+      expect(winner['state'], 'approved');
+      expect(lost, 409);
+      expect((loser['approval'] as Map)['state'], 'approved');
+      expect(loosened, 200);
+      expect((gates['gates'] as Map)['push'], isFalse);
+      expect(read, 200);
+      expect(again, gates);
+      shutdown.add(null);
+      expect(await exit, 0);
+    });
+
     test('serves the workflows of a project over the real database', () async {
       Directory(dataDir).createSync(recursive: true);
       final projectId = await withDatabase((database) async {

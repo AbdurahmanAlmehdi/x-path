@@ -4,7 +4,7 @@ import 'package:equatable/equatable.dart';
 ///
 /// A workflow names the gate in front of a step (`gate: prod_release`). The
 /// engine stops the job there until an approval for exactly this action,
-/// project, commit and version exists; the approvals themselves are Phase 12a.
+/// project, commit and version exists; the `ApprovalService` keeps them.
 enum GateAction {
   /// Releasing a production flavor to the stores.
   prodRelease('prod_release'),
@@ -100,10 +100,10 @@ final class GateDenied extends GateDecision {
 
 /// Where gates ask for approval (D-13).
 ///
-/// Phase 12a implements it: it creates an approval for the request the first
-/// time (or finds the one that exists for the same action, project, commit
-/// and version), and answers with its state. The workflow engine only asks;
-/// it never decides, and nothing in it can approve.
+/// `ApprovalService` implements it: it creates an approval for the request
+/// the first time (or finds the one that exists for the same action, project,
+/// commit and version), and answers with its state. The workflow engine only
+/// asks; it never decides, and nothing in it can approve.
 abstract interface class ApprovalGate {
   /// Asks for the approval of [request], or finds out what became of it.
   ///
@@ -112,9 +112,9 @@ abstract interface class ApprovalGate {
   Future<GateDecision> check(GateRequest request);
 }
 
-/// An [ApprovalGate] for an engine that has no approvals yet: nothing is ever
-/// approved, so every gate holds its job. A job is never let through by the
-/// absence of an answer.
+/// An [ApprovalGate] for tests of an engine that has no approvals: nothing is
+/// ever approved, so every gate holds its job. A job is never let through by
+/// the absence of an answer.
 class PendingApprovalGate implements ApprovalGate {
   /// Creates the gate.
   const new();

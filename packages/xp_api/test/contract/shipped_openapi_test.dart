@@ -468,6 +468,119 @@ void main() {
       );
     });
 
+    test('documents the approval and gate endpoints', () {
+      final unauthorized = jsonEncode(
+        ErrorResponse.of(ApiErrorCode.unauthorized, 'm').toJson(),
+      );
+      final forbidden = jsonEncode(
+        ErrorResponse.of(ApiErrorCode.forbidden, 'm').toJson(),
+      );
+
+      for (final (method, path) in [
+        ('GET', '/approvals'),
+        ('GET', '/approvals/apr_1'),
+        ('POST', '/approvals/apr_1/approve'),
+        ('POST', '/approvals/apr_1/deny'),
+        ('GET', '/projects/prj_1/gates'),
+        ('PUT', '/projects/prj_1/gates'),
+      ]) {
+        expect(
+          shipped.validateResponse(
+            method: method,
+            path: path,
+            statusCode: 401,
+            body: unauthorized,
+            contentType: 'application/json',
+          ),
+          isEmpty,
+          reason: '$method $path',
+        );
+      }
+      for (final (method, path) in [
+        ('POST', '/approvals/apr_1/approve'),
+        ('POST', '/approvals/apr_1/deny'),
+        ('PUT', '/projects/prj_1/gates'),
+      ]) {
+        expect(
+          shipped.validateResponse(
+            method: method,
+            path: path,
+            statusCode: 403,
+            body: forbidden,
+            contentType: 'application/json',
+          ),
+          isEmpty,
+          reason: '$method $path',
+        );
+      }
+    });
+
+    test('describes the approval models', () {
+      final at = DateTime.utc(2026, 10, 13);
+      final approval = Approval(
+        id: 'apr_1',
+        projectId: 'prj_1',
+        action: 'prod_release',
+        sha: 'a' * 40,
+        version: '1.2.3+45',
+        runId: 'run_1',
+        jobId: 'job_1',
+        state: ApprovalState.approved,
+        createdAt: at,
+        expiresAt: at.add(const Duration(hours: 24)),
+        decidedAt: at,
+        decidedBy: const DecidedBy(
+          tokenId: 'tok_1',
+          name: 'Mac mini',
+          kind: DeviceTokenKind.app,
+        ),
+        reason: 'ok',
+      );
+
+      expect(shipped.validateSchema('Approval', approval.toJson()), isEmpty);
+      expect(
+        shipped.validateSchema(
+          'ApprovalsResponse',
+          ApprovalsResponse([approval]).toJson(),
+        ),
+        isEmpty,
+      );
+      expect(
+        shipped.validateSchema('AlreadyDecidedResponse', {
+          ...ErrorResponse.of(ApiErrorCode.alreadyDecided, 'm').toJson(),
+          'approval': approval.toJson(),
+        }),
+        isEmpty,
+      );
+      expect(
+        shipped.validateSchema(
+          'DecisionRequest',
+          const DecisionRequest(reason: 'ok').toJson(),
+        ),
+        isEmpty,
+      );
+      expect(
+        shipped.validateSchema(
+          'ProjectGates',
+          const ProjectGates({'prod_release': false, 'push': true}).toJson(),
+        ),
+        isEmpty,
+      );
+      expect(
+        shipped.validateSchema('ProjectGates', {
+          'gates': {'launch_rocket': true},
+        }),
+        isNotEmpty,
+      );
+      expect(
+        shipped.validateSchema('Approval', {
+          ...approval.toJson(),
+          'decidedBy': {'tokenId': 't', 'name': 'n', 'kind': 'mcp'},
+        }),
+        isNotEmpty,
+      );
+    });
+
     test('describes every kind of credential request', () {
       const requests = <Map<String, Object?>>[
         {

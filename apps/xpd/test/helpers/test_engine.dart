@@ -96,6 +96,8 @@ class TestEngine {
     required this.runRepository,
     required this.workflowRepository,
     required this.gate,
+    required this.approvals,
+    required this.approvalRepository,
   });
 
   static Future<TestEngine> start({
@@ -105,6 +107,7 @@ class TestEngine {
     ProjectRepository? projectRepository,
     JobLogStore? logStore,
     int logLiveCapacity = 1024,
+    bool realApprovals = false,
   }) async {
     const repo = GitHubRepo(
       id: 42,
@@ -139,9 +142,20 @@ class TestEngine {
     };
     final masker = RecordingMasker();
     final gate = FakeApprovalGate();
+    late final Scheduler scheduler;
+    final approvalRepository = InMemoryApprovalRepository();
+    final approvals = ApprovalService(
+      approvals: approvalRepository,
+      gates: InMemoryGateConfigRepository(),
+      projects: projects,
+      jobs: jobRepository,
+      events: events,
+      clock: clock,
+      resume: (projectId) => scheduler.resumeWaiting(projectId: projectId),
+    );
     final registry = StepRegistry([
       const CommandStep(),
-      GateStep(gate),
+      GateStep(realApprovals ? approvals : gate),
       GitCheckoutStep(git: git, jobs: jobRepository),
     ]);
     final jobs = JobRunner(
@@ -158,7 +172,7 @@ class TestEngine {
       onError: (error, _) => errors.add(error),
     );
     final runRepository = InMemoryRunRepository();
-    final scheduler = Scheduler(
+    scheduler = Scheduler(
       runner: jobs,
       records: jobRepository,
       runs: runRepository,
@@ -255,6 +269,7 @@ class TestEngine {
         jobs: jobRepository,
         control: scheduler,
       ),
+      approvals: approvals,
       clock: clock,
       engineVersion: '9.9.9',
       onError: (error, _) => errors.add(error),
@@ -286,6 +301,8 @@ class TestEngine {
       runRepository: runRepository,
       workflowRepository: workflowRepository,
       gate: gate,
+      approvals: approvals,
+      approvalRepository: approvalRepository,
     );
   }
 
@@ -324,7 +341,15 @@ class TestEngine {
   final InMemoryWorkflowRepository workflowRepository;
 
   /// What the gates of workflows ask; it leaves them pending until told.
+  /// (Unless the engine was started with `realApprovals`: then they ask
+  /// [approvals].)
   final FakeApprovalGate gate;
+
+  /// The approvals and gates of the engine.
+  final ApprovalService approvals;
+
+  /// Where the approvals are kept.
+  final InMemoryApprovalRepository approvalRepository;
 
   /// The files of the folders a project can be added from, by path.
   final Map<String, Map<String, String>> folders;

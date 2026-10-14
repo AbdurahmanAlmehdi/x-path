@@ -983,6 +983,188 @@ paths:
           $ref: "#/components/responses/Conflict"
         "500":
           $ref: "#/components/responses/InternalError"
+  /approvals:
+    get:
+      operationId: listApprovals
+      summary: The approval requests, newest first.
+      description: |
+        A gate (D-13) asks for an approval when a job reaches it: one request
+        per project, action, commit, version and run. A request that nobody
+        decided within 24 hours turns `expired` before it is listed. Expired
+        counts as denied.
+
+        `xp mcp` and other clients poll `GET /approvals/{id}` with the id a
+        gated action returned; the owner's app lists `pending` ones here.
+      parameters:
+        - name: project
+          in: query
+          required: false
+          description: Only the approvals of this project.
+          schema:
+            type: string
+        - name: state
+          in: query
+          required: false
+          description: Only the approvals in this state.
+          schema:
+            $ref: "#/components/schemas/ApprovalState"
+      responses:
+        "200":
+          description: The approvals.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApprovalsResponse"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /approvals/{id}:
+    parameters:
+      - $ref: "#/components/parameters/ApprovalId"
+    get:
+      operationId: getApproval
+      summary: One approval request. Any token kind may read it.
+      responses:
+        "200":
+          description: The approval.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Approval"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /approvals/{id}/approve:
+    parameters:
+      - $ref: "#/components/parameters/ApprovalId"
+    post:
+      operationId: approveApproval
+      summary: Approve the action. Only `app` and `cli` tokens may.
+      description: |
+        The first decision wins: the request moves from `pending` to
+        `approved` in one compare-and-set, and the jobs that wait for it are
+        resumed. A request that was decided already, or expired, answers `409
+        already_decided` with the approval as it stands. An `mcp` or `runner`
+        token answers `403 forbidden` (D-13: agents can never approve).
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DecisionRequest"
+      responses:
+        "200":
+          description: The approval, now approved.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Approval"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/AlreadyDecided"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /approvals/{id}/deny:
+    parameters:
+      - $ref: "#/components/parameters/ApprovalId"
+    post:
+      operationId: denyApproval
+      summary: Deny the action. Only `app` and `cli` tokens may.
+      description: |
+        Like `POST /approvals/{id}/approve`: the first decision wins. The
+        gate step of every job that waits for it fails with the reason.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DecisionRequest"
+      responses:
+        "200":
+          description: The approval, now denied.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Approval"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/AlreadyDecided"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /projects/{id}/gates:
+    parameters:
+      - $ref: "#/components/parameters/ProjectId"
+    get:
+      operationId: getProjectGates
+      summary: Which actions of a project wait for an approval.
+      description: |
+        Every action is listed. A project that never set anything has all of
+        them on.
+      responses:
+        "200":
+          description: The gates.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectGates"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+    put:
+      operationId: setProjectGates
+      summary: Set which actions of a project wait for an approval.
+      description: |
+        Replaces the gates; an action left out is on. An `app` token may turn
+        gates on and off. A `cli` token may only turn them on: a body that
+        turns a gate off answers `403 forbidden`. `mcp` and `runner` tokens
+        never change gates (D-13). Turning a gate off lets the jobs that wait
+        at it go on.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProjectGates"
+      responses:
+        "200":
+          description: The gates now.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectGates"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
 components:
   securitySchemes:
     bearerAuth:
@@ -1025,6 +1207,13 @@ components:
       description: The run id, for example `run_1a2b3c4d5e6f7a8b`.
       schema:
         type: string
+    ApprovalId:
+      name: id
+      in: path
+      required: true
+      description: The approval id, for example `apr_1a2b3c4d5e6f7a8b`.
+      schema:
+        type: string
     CredentialId:
       name: credentialId
       in: path
@@ -1049,9 +1238,25 @@ components:
         application/json:
           schema:
             $ref: "#/components/schemas/ErrorResponse"
+    Forbidden:
+      description: |
+        The token is valid but its kind may not do this (D-13). The message
+        says what the kind may do.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    AlreadyDecided:
+      description: |
+        The approval was decided already, or it expired. The first decision
+        wins; `approval` is the approval as it stands.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/AlreadyDecidedResponse"
     NotFound:
       description: |
-        There is no such project, job, artifact or test run, or GitHub cannot
+        There is no such project, job, artifact, approval or test run, or GitHub cannot
         find the repository.
       content:
         application/json:
@@ -1118,8 +1323,10 @@ components:
       enum:
         - invalid_request
         - unauthorized
+        - forbidden
         - not_found
         - conflict
+        - already_decided
         - resync_required
         - credential_rejected
         - workflow_invalid
@@ -1141,6 +1348,22 @@ components:
               $ref: "#/components/schemas/ErrorCode"
             message:
               type: string
+    AlreadyDecidedResponse:
+      type: object
+      required: [error, approval]
+      additionalProperties: false
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          additionalProperties: false
+          properties:
+            code:
+              $ref: "#/components/schemas/ErrorCode"
+            message:
+              type: string
+        approval:
+          $ref: "#/components/schemas/Approval"
     HealthResponse:
       type: object
       required: [status]
@@ -1178,6 +1401,8 @@ components:
             `job.step_changed`, `test_run.completed`, `credential.saved`,
             `credential.verified`, `credential.expired`, `credential.removed`,
             `workflow.saved`, `workflow.removed`, `run.dispatched`,
+            `approval.requested`, `approval.decided`, `approval.expired`,
+            `project.gates_changed`,
             or a type added by a
             later engine version, which a client must ignore.
         payload:
@@ -2272,3 +2497,99 @@ components:
         - $ref: "#/components/schemas/KeystoreCredentialRequest"
         - $ref: "#/components/schemas/TokenCredentialRequest"
         - $ref: "#/components/schemas/SlackCredentialRequest"
+    ApprovalState:
+      type: string
+      enum: [pending, approved, denied, expired]
+      description: |
+        `expired` counts as denied: nobody decided within 24 hours (D-13).
+    DecidedBy:
+      type: object
+      required: [tokenId, name, kind]
+      additionalProperties: false
+      properties:
+        tokenId:
+          type: string
+        name:
+          type: string
+          description: What the owner called the device or client.
+        kind:
+          type: string
+          enum: [app, cli]
+    Approval:
+      type: object
+      required: [id, projectId, action, sha, state, createdAt, expiresAt]
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+        projectId:
+          type: string
+        action:
+          $ref: "#/components/schemas/GateAction"
+        sha:
+          type: string
+          description: The commit the action happens on, in full.
+        version:
+          type: string
+          description: The version it releases, `x.y.z+build`, if it does.
+        runId:
+          type: string
+        jobId:
+          type: string
+          description: |
+            The first job that asked. Other jobs of the run that reach the
+            same gate share the approval.
+        state:
+          $ref: "#/components/schemas/ApprovalState"
+        createdAt:
+          type: string
+          format: date-time
+        expiresAt:
+          type: string
+          format: date-time
+          description: 24 hours after `createdAt`.
+        decidedAt:
+          type: string
+          format: date-time
+        decidedBy:
+          $ref: "#/components/schemas/DecidedBy"
+        reason:
+          type: string
+    GateAction:
+      type: string
+      enum:
+        - prod_release
+        - prod_patch
+        - store_submission
+        - push
+        - merge
+        - delete
+    ApprovalsResponse:
+      type: object
+      required: [approvals]
+      additionalProperties: false
+      properties:
+        approvals:
+          type: array
+          items:
+            $ref: "#/components/schemas/Approval"
+    DecisionRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        reason:
+          type: string
+    ProjectGates:
+      type: object
+      required: [gates]
+      additionalProperties: false
+      properties:
+        gates:
+          type: object
+          description: |
+            Whether each action waits for an approval. A request lists any
+            of the actions; a response lists all of them.
+          propertyNames:
+            $ref: "#/components/schemas/GateAction"
+          additionalProperties:
+            type: boolean

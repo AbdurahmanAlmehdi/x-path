@@ -14,6 +14,7 @@ const engineMigrations = <Migration>[
   Migration(version: 7, sql: _v7),
   Migration(version: 8, sql: _v8),
   Migration(version: 9, sql: _v9),
+  Migration(version: 10, sql: _v10),
 ];
 
 // Timestamps are integer microseconds since the Unix epoch (UTC), so that
@@ -306,4 +307,28 @@ ALTER TABLE job ADD COLUMN capabilities TEXT NOT NULL DEFAULT '[]'
   CHECK (json_valid(capabilities));
 CREATE INDEX idx_job_run ON job (run_id, stage);
 ALTER TABLE workflow_version ADD COLUMN created_at INTEGER NOT NULL DEFAULT 0;
+''';
+
+// Phase 12a: what an approval needs beyond the binding of version 1. The
+// binding is (project, action, commit, version) plus the run that asked, so
+// that a denial or an expiry of one dispatch does not stop the next; there is
+// one row per binding for good (a null counts as the empty string in the
+// unique index), and a decision is a compare-and-set on `state = 'pending'`.
+// `job_id` and `run_id` are plain text (the record outlives the housekeeping
+// of jobs). Who decided is copied from the device token, so that the record
+// reads the same after the token is revoked.
+const _v10 = '''
+ALTER TABLE approval ADD COLUMN run_id TEXT;
+ALTER TABLE approval ADD COLUMN job_id TEXT;
+ALTER TABLE approval ADD COLUMN created_at INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE approval ADD COLUMN decided_at INTEGER;
+ALTER TABLE approval ADD COLUMN decided_by_name TEXT;
+ALTER TABLE approval ADD COLUMN decided_by_kind TEXT
+  CHECK (decided_by_kind IS NULL OR decided_by_kind IN ('app', 'cli'));
+ALTER TABLE approval ADD COLUMN reason TEXT;
+CREATE UNIQUE INDEX idx_approval_binding ON approval (
+  project_id, action, COALESCE(sha, ''), COALESCE(version, ''),
+  COALESCE(run_id, '')
+);
+CREATE INDEX idx_approval_due ON approval (expires_at) WHERE state = 'pending';
 ''';

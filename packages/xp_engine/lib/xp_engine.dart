@@ -1,6 +1,12 @@
 /// XPath engine domain and application logic. Framework-free.
 library;
 
+export 'src/approvals/approval_exceptions.dart';
+export 'src/approvals/approval_record.dart';
+export 'src/approvals/approval_repository.dart';
+export 'src/approvals/approval_service.dart';
+export 'src/approvals/approval_sweeper.dart';
+export 'src/approvals/gate_config.dart';
 export 'src/artifacts/artifact_exceptions.dart';
 export 'src/artifacts/artifact_record.dart';
 export 'src/artifacts/artifact_recorder.dart';

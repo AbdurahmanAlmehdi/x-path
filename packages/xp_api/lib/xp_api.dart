@@ -4,6 +4,7 @@ library;
 
 export 'src/api_error.dart';
 export 'src/api_version.dart';
+export 'src/approval.dart';
 export 'src/artifact.dart';
 export 'src/credential.dart';
 export 'src/device_token_kind.dart';

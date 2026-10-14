@@ -18,6 +18,12 @@ enum ApiErrorCode {
   @JsonValue('unauthorized')
   unauthorized(401),
 
+  /// The bearer token is valid, but its kind may not do this (D-13): an MCP
+  /// or runner token cannot approve, and only an app token loosens gates. The
+  /// message names what the token's kind may do.
+  @JsonValue('forbidden')
+  forbidden(403),
+
   /// No such route or resource.
   @JsonValue('not_found')
   notFound(404),
@@ -26,6 +32,11 @@ enum ApiErrorCode {
   /// that was added already.
   @JsonValue('conflict')
   conflict(409),
+
+  /// The approval was decided already (first decision wins, D-13), or it
+  /// expired. The response carries the approval as it stands.
+  @JsonValue('already_decided')
+  alreadyDecided(409),
 
   /// The requested event cursor is outside the resume window; the client
   /// must reload its state and reconnect without a cursor.

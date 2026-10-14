@@ -19,8 +19,10 @@ Map<String, dynamic> _$ApiErrorToJson(ApiError instance) => <String, dynamic>{
 const _$ApiErrorCodeEnumMap = {
   ApiErrorCode.invalidRequest: 'invalid_request',
   ApiErrorCode.unauthorized: 'unauthorized',
+  ApiErrorCode.forbidden: 'forbidden',
   ApiErrorCode.notFound: 'not_found',
   ApiErrorCode.conflict: 'conflict',
+  ApiErrorCode.alreadyDecided: 'already_decided',
   ApiErrorCode.resyncRequired: 'resync_required',
   ApiErrorCode.credentialRejected: 'credential_rejected',
   ApiErrorCode.workflowInvalid: 'workflow_invalid',
