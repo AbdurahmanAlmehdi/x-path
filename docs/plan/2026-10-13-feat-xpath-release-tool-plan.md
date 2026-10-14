@@ -461,7 +461,7 @@ Mataa dev builds through `xp` can start after Phase 13, before the desktop app e
 
 ### Phase 13: `xp` CLI and `xp mcp`
 
-- **Status:** Not started
+- **Status:** Done
 - **Scope:** `xp` commands mirroring the API (`CommandRunner`, `mason_logger`,
   `cli_completion`, update check): connect to an engine, projects, scan, dispatch, `logs -f`,
   approve, releases, runners pair/revoke, storage. `xp mcp` stdio server (`dart_mcp` 0.5,
