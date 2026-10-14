@@ -78,6 +78,7 @@ class UploadAppStoreInput extends Equatable {
     required this.appleAppId,
     required this.version,
     required this.auth,
+    this.artifactJob,
   });
 
   /// Reads the input from its stored form.
@@ -99,12 +100,18 @@ class UploadAppStoreInput extends Equatable {
       appleAppId: requiredString(json, 'appleAppId'),
       version: version,
       auth: AppStoreUploadAuth.fromJson(requiredObject(json, 'auth')),
+      artifactJob: optionalString(json, 'artifactJob'),
     );
   }
 
   /// The file name of the IPA in the artifact store, such as
   /// `prod-1.2.3+45.ipa`. It is looked up among the artifacts of the job.
   final String artifactName;
+
+  /// The job whose artifacts hold the file, when it is not this job: a build
+  /// job of an earlier stage that the runner uploaded the file from (ADR
+  /// 0010). `null` looks among the artifacts of the job the step runs in.
+  final String? artifactJob;
 
   /// The bundle id of the app.
   final String bundleId;
@@ -119,6 +126,10 @@ class UploadAppStoreInput extends Equatable {
   /// How to sign in.
   final AppStoreUploadAuth auth;
 
+  /// Who has the file, for a message: this job, or the build job.
+  String get sourceOfArtifact =>
+      artifactJob == null ? 'This job' : 'The build job $artifactJob';
+
   /// The build number as text.
   String get build => '${version.build ?? 0}';
 
@@ -129,6 +140,7 @@ class UploadAppStoreInput extends Equatable {
     'appleAppId': appleAppId,
     'version': '$version',
     'auth': auth.toJson(),
+    'artifactJob': ?artifactJob,
   };
 
   @override
@@ -138,6 +150,7 @@ class UploadAppStoreInput extends Equatable {
     appleAppId,
     version,
     auth,
+    artifactJob,
   ];
 }
 

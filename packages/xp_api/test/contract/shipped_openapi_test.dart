@@ -984,6 +984,10 @@ void main() {
           projectId: 'prj_1',
           sha: 'a' * 40,
           name: 'Build',
+          repository: const LeaseRepository(
+            githubRepoId: 7,
+            sshUrl: 'git@github.com:owner/app.git',
+          ),
           stage: 0,
           capabilities: const ['android'],
           expiresAt: at,

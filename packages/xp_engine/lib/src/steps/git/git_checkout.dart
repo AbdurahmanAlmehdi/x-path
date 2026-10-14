@@ -117,13 +117,17 @@ class GitCheckoutStep extends Step<GitCheckoutInput, GitCheckoutResult> {
     return StepSucceeded(GitCheckoutResult(path: worktree.path, sha: sha));
   }
 
-  /// The commit the `version.bump` step of the job [jobId] made or found.
-  Future<String?> _versionCommitOf(String jobId) async {
-    for (final step in await _jobs.steps(jobId)) {
-      if (step.kind == 'version.bump' && step.state.isDone) {
-        return step.result?['commit'] as String?;
-      }
+  Future<String?> _versionCommitOf(String jobId) =>
+      versionCommitOf(_jobs, jobId);
+}
+
+/// The commit the `version.bump` step of the job [jobId] made or found, or
+/// `null` if the job has none.
+Future<String?> versionCommitOf(JobRepository jobs, String jobId) async {
+  for (final step in await jobs.steps(jobId)) {
+    if (step.kind == 'version.bump' && step.state.isDone) {
+      return step.result?['commit'] as String?;
     }
-    return null;
   }
+  return null;
 }

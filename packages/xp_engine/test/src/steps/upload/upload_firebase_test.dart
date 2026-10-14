@@ -68,13 +68,14 @@ void main() {
   Future<void> putBinary({
     String name = _apkName,
     ArtifactKind kind = ArtifactKind.apk,
+    String jobId = 'job_1',
   }) async {
     await ArtifactRecorder(
       store: store,
       repository: repository,
       clock: ManualClock(DateTime.utc(2026, 10, 13)),
     ).record(
-      jobId: 'job_1',
+      jobId: jobId,
       kind: kind,
       name: name,
       content: Stream.value(utf8.encode('apk bytes')),
@@ -250,6 +251,31 @@ void main() {
       expect(
         message(await run()),
         allOf(contains('no intact APK'), contains(_apkName)),
+      );
+      expect(firebase.calls, isEmpty);
+    });
+
+    test('finds the binary in the build job the input names', () async {
+      await putBinary(jobId: 'job_build');
+      store.files.remove('job_1/$_apkName');
+
+      final outcome = await step().run(
+        _input(overrides: {'artifactJob': 'job_build'}),
+        NoProcessContext(),
+      );
+
+      expect(outcome, isA<StepSucceeded<UploadFirebaseResult>>());
+    });
+
+    test('says which job lacks the binary when it is another one', () async {
+      final outcome = await step().run(
+        _input(overrides: {'artifactJob': 'job_other'}),
+        NoProcessContext(),
+      );
+
+      expect(
+        message(outcome),
+        contains('The build job job_other has no intact APK'),
       );
       expect(firebase.calls, isEmpty);
     });

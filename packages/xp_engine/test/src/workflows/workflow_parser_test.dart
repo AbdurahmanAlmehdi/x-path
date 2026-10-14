@@ -4,6 +4,7 @@ import 'package:xp_engine/xp_engine.dart';
 const _catalog = MapStepCatalog({
   'build.android': {'artifact', 'dartDefineFile'},
   'git.checkout': {'commitFrom'},
+  'upload.play': {'artifactsFrom'},
   'guard': {'checks'},
   'version.bump': {},
 });
@@ -555,7 +556,7 @@ stages:
       expect(
         issues(step('          - kind: nope')).single,
         '7:19 Unknown step type "nope". Known: build.android, git.checkout, '
-        'guard, version.bump.',
+        'guard, upload.play, version.bump.',
       );
     });
 
@@ -638,6 +639,30 @@ stages:
       expect(problems, [
         '7:13 "commitFrom" must name a job of an earlier stage, not "second".',
       ]);
+    });
+
+    test('say artifactsFrom a job of an earlier stage', () {
+      final problems = issues('''
+schema: 1
+stages:
+  - name: a
+    jobs:
+      build:
+        steps:
+          - kind: upload.play
+            with:
+              artifactsFrom: upload
+  - name: b
+    jobs:
+      upload:
+        steps:
+          - kind: upload.play
+            with:
+              artifactsFrom: build
+''');
+
+      expect(problems.single, contains('"artifactsFrom" must name a job of'));
+      expect(problems.single, startsWith('7:13 '));
     });
 
     test('report every problem of a document at once', () {

@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:path/path.dart' as p;
@@ -19,7 +20,15 @@ class DirectorySecretFileStore implements SecretFileStore {
   final Future<ProcessResult> Function(String, List<String>) _runProcess;
 
   @override
-  Future<String> write(String jobId, String name, String contents) async {
+  Future<String> write(String jobId, String name, String contents) =>
+      writeBytes(jobId, name, utf8.encode(contents));
+
+  @override
+  Future<String> writeBytes(
+    String jobId,
+    String name,
+    List<int> contents,
+  ) async {
     if (name != p.basename(name) || name.isEmpty || name == '..') {
       throw ArgumentError.value(name, 'name', 'Not a plain file name');
     }
@@ -30,7 +39,7 @@ class DirectorySecretFileStore implements SecretFileStore {
     }
     final file = File(p.join(directory.path, name))..createSync();
     await _chmod('600', file.path);
-    await file.writeAsString(contents);
+    await file.writeAsBytes(contents);
     return file.path;
   }
 

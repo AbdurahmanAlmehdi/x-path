@@ -288,6 +288,30 @@ void main() {
       expect(play.calls, isEmpty);
     });
 
+    test('uploads the bundle of the build job the input names', () async {
+      store.files.remove('job_1/$_aabName');
+      await putAab(jobId: 'job_build');
+
+      final outcome = await run(
+        _input(overrides: {'artifactJob': 'job_build'}),
+      );
+
+      expect(outcome, isA<StepSucceeded<UploadPlayResult>>());
+      expect(utf8.decode(play.uploads.single), 'aab bytes');
+    });
+
+    test('says which job lacks the bundle when it is another one', () async {
+      final outcome = await run(
+        _input(overrides: {'artifactJob': 'job_other'}),
+      );
+
+      expect(
+        message(outcome),
+        contains('The build job job_other has no intact AAB'),
+      );
+      expect(play.calls, isEmpty);
+    });
+
     test('fails when the stored AAB changed', () async {
       store.files['job_1/$_aabName'] = utf8.encode('other bytes');
 

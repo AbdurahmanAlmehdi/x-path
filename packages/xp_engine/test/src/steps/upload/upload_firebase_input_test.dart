@@ -26,6 +26,24 @@ void main() {
       expect(input.kind, ArtifactKind.apk);
     });
 
+    test('names the build job whose artifact it uploads', () {
+      final input = UploadFirebaseInput.fromJson(
+        _json({'artifactJob': 'job_build'}),
+      );
+
+      expect(input.artifactJob, 'job_build');
+      expect(input.sourceOfArtifact, 'The build job job_build');
+      expect(UploadFirebaseInput.fromJson(input.toJson()), input);
+      expect(
+        UploadFirebaseInput.fromJson(_json()).sourceOfArtifact,
+        'This job',
+      );
+      expect(
+        UploadFirebaseInput.fromJson(_json()).toJson(),
+        isNot(contains('artifactJob')),
+      );
+    });
+
     test('derives the project number and the app name from the app id', () {
       final input = UploadFirebaseInput.fromJson(_json());
 

@@ -31,6 +31,16 @@ void main() {
     },
   );
 
+  test('writes binary contents byte for byte, with the same modes', () async {
+    const keystore = [0xfe, 0xed, 0xfe, 0xed, 0x00, 0xff];
+
+    final path = await store.writeBytes('job_1', '0-KS', keystore);
+
+    expect(File(path).readAsBytesSync(), keystore);
+    expect(_mode(path), 384, reason: '0600');
+    expect(_mode(p.dirname(path)), 448, reason: '0700');
+  });
+
   test('keeps several files of a job in one folder', () async {
     final a = await store.write('job_1', 'a', '1');
     final b = await store.write('job_1', 'b', '2');

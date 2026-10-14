@@ -112,15 +112,26 @@ void main() {
       expect(release.mergeEnabled, isFalse);
     });
 
-    test('is readable by every kind of token', () async {
-      final id = await client.open();
+    test(
+      'is readable by an app, a cli and an mcp token, not a runner',
+      () async {
+        final id = await client.open();
 
-      for (final kind in DeviceTokenKind.values) {
-        final response = await client.send('GET', '/releases/$id', kind: kind);
+        for (final kind in DeviceTokenKind.values) {
+          final response = await client.send(
+            'GET',
+            '/releases/$id',
+            kind: kind,
+          );
 
-        expect(response.statusCode, 200, reason: kind.name);
-      }
-    });
+          expect(
+            response.statusCode,
+            kind == DeviceTokenKind.runner ? 403 : 200,
+            reason: kind.name,
+          );
+        }
+      },
+    );
 
     test('answers 404 for a release that does not exist', () async {
       final response = await client.send('GET', '/releases/rel_nope');
@@ -469,7 +480,7 @@ void main() {
       },
     );
 
-    test('is open to every kind of token', () async {
+    test('is open to an app, a cli and an mcp token, not a runner', () async {
       final id = await client.uploaded();
 
       for (final kind in DeviceTokenKind.values) {
@@ -479,7 +490,11 @@ void main() {
           kind: kind,
         );
 
-        expect(response.statusCode, 200, reason: kind.name);
+        expect(
+          response.statusCode,
+          kind == DeviceTokenKind.runner ? 403 : 200,
+          reason: kind.name,
+        );
       }
     });
 

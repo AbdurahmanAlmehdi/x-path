@@ -150,6 +150,8 @@ void main() {
           'guard',
           'gate',
           'git.releaseBranch',
+          'gate',
+          'git.push',
         ]);
         for (final job in run.jobs) {
           expect(await releaseOf(job.id), 'rel_1', reason: job.name);

@@ -100,13 +100,14 @@ class UploadPlayStep extends Step<UploadPlayInput, UploadPlayResult> {
     final aab = await intactArtifact(
       repository: repository,
       store: store,
-      jobId: context.jobId,
+      jobId: input.artifactJob ?? context.jobId,
       name: input.artifactName,
       kind: ArtifactKind.aab,
     );
     if (aab == null) {
       return StepFailed(
-        'This job has no intact AAB named ${input.artifactName}. Build the '
+        '${input.sourceOfArtifact} has no intact AAB named '
+        '${input.artifactName}. Build the '
         'Android app first; a changed or missing file is not uploaded.',
       );
     }

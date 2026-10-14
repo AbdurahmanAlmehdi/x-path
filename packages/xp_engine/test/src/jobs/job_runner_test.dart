@@ -259,6 +259,32 @@ void main() {
       },
     );
 
+    test('writes a binary secret file byte for byte', () async {
+      const keystore = [0xfe, 0xed, 0xfe, 0xed, 0x00, 0xff];
+      harness.secrets.binary['ks'] = keystore;
+
+      final job = await harness.run([
+        harness.command('gradle', secretFiles: {'KEYSTORE': 'ks'}),
+      ]);
+
+      expect(job.state, JobState.succeeded);
+      expect(
+        harness.secretFiles.writtenBytes['/secrets/${job.id}/0-KEYSTORE'],
+        keystore,
+      );
+      // Nothing readable to hide, so the masker learns nothing.
+      expect(harness.masker.secrets, isEmpty);
+    });
+
+    test('fails a step whose secret file has no secret', () async {
+      final job = await harness.run([
+        harness.command('gradle', secretFiles: {'KEYSTORE': 'missing'}),
+      ]);
+
+      expect(job.state, JobState.failed);
+      expect(job.steps.single.message, contains('There is no secret'));
+    });
+
     test('tells the masker about every secret before it starts', () async {
       harness.secrets.values['a'] = 'secret-a';
       harness.secrets.values['b'] = 'secret-b';

@@ -26,14 +26,15 @@ void main() {
       }
     });
 
-    test('keeps the gate, the guard and Shorebird on the engine', () {
-      for (final kind in [
-        'gate',
-        'guard',
-        'shorebird.release',
-        'shorebird.patch',
-      ]) {
+    test('keeps the gate, the guard and the test baseline on the engine', () {
+      for (final kind in ['gate', 'guard', 'test']) {
         expect(RemoteStepPolicy.isEngineOnly(kind), isTrue, reason: kind);
+      }
+    });
+
+    test('lets Shorebird go: its key travels like signing material', () {
+      for (final kind in ['shorebird.release', 'shorebird.patch']) {
+        expect(RemoteStepPolicy.isEngineOnly(kind), isFalse, reason: kind);
       }
     });
 
@@ -47,7 +48,6 @@ void main() {
         'ios.stripAndReexport',
         'symbols.archive',
         'record.manifest',
-        'test',
         'analyze',
         'command',
       ]) {
@@ -77,7 +77,7 @@ void main() {
         ]),
         ['guard', 'upload.play'],
       );
-      expect(RemoteStepPolicy.engineOnlyIn(['test']), isEmpty);
+      expect(RemoteStepPolicy.engineOnlyIn(['shorebird.patch']), isEmpty);
     });
   });
 }

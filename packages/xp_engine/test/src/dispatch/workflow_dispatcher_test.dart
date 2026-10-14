@@ -14,8 +14,12 @@ void main() {
 
   setUp(() async => harness = await DispatchHarness.create());
 
+  /// The job of [run] called [name], with its steps.
+  Future<Job> jobNamed(Run run, String name) =>
+      harness.job(run.jobs.firstWhere((job) => job.name == name).id);
+
   group('the dev-build workflow', () {
-    test('makes one queued job per platform for the dev flavor', () async {
+    test('checks, then builds, a queued job per platform for dev', () async {
       final run = await harness.dispatchBuiltin('dev-build');
 
       expect(run.id, startsWith('run_'));
@@ -26,10 +30,14 @@ void main() {
       expect(run.build, 1);
       expect(run.state, RunState.queued);
       expect(run.jobs.map((job) => (job.name, job.stage, job.state)), [
-        ('Build dev for android', 0, JobState.queued),
-        ('Build dev for ios', 0, JobState.queued),
+        ('Check dev for android', 0, JobState.queued),
+        ('Check dev for ios', 0, JobState.queued),
+        ('Build dev for android', 1, JobState.queued),
+        ('Build dev for ios', 1, JobState.queued),
       ]);
       expect(run.jobs.map((job) => job.capabilities), [
+        <String>[],
+        <String>[],
         ['android', 'flutter'],
         ['flutter', 'ios-sign'],
       ]);
@@ -42,10 +50,11 @@ void main() {
         const DispatchRequest(platforms: ['android']),
       );
 
-      final job = await harness.job(run.jobs.single.id);
+      final check = await jobNamed(run, 'Check dev for android');
+      expect(harness.kinds(check), ['git.checkout', 'guard']);
+      final job = await jobNamed(run, 'Build dev for android');
       expect(harness.kinds(job), [
         'git.checkout',
-        'guard',
         'version.bump',
         'build.android',
         'record.manifest',
@@ -71,7 +80,7 @@ void main() {
       expect(build['flutterVersion'], '3.47.6');
       expect(build['artifact'], 'apk');
       expect(build.containsKey('dartDefineFile'), isFalse);
-      final guard = await harness.input(job, 'guard');
+      final guard = await harness.input(check, 'guard');
       expect(guard['checks'], ['source', 'credentials']);
       expect(guard['flavorId'], 'flv_dev');
       expect(guard['androidAppId'], 'ly.demo.dev');
@@ -89,7 +98,7 @@ void main() {
         ),
       );
 
-      final job = await harness.job(run.jobs.single.id);
+      final job = await jobNamed(run, 'Build dev for ios');
       expect(harness.kinds(job), contains('build.ios'));
       final build = await harness.input(job, 'build.ios');
       expect(build['exportOptionsPlist'], 'ios/ExportOptions.plist');
@@ -115,9 +124,15 @@ void main() {
           ),
         );
 
-        final job = await harness.job(run.jobs.single.id);
-        expect(harness.kinds(job).last, 'upload.firebase');
+        expect(run.jobs.map((job) => job.name), [
+          'Check dev for android',
+          'Build dev for android',
+          'Upload dev for android',
+        ]);
+        final job = await jobNamed(run, 'Upload dev for android');
+        expect(harness.kinds(job), ['upload.firebase']);
         final upload = await harness.input(job, 'upload.firebase');
+        final build = await jobNamed(run, 'Build dev for android');
         expect(upload, {
           'artifactName': 'dev-1.2.3+1.apk',
           'appId': '1:123456789012:android:abc',
@@ -125,6 +140,7 @@ void main() {
           'serviceAccountSecret': 'credential.dev.firebase_sa',
           'groupAliases': ['qa'],
           'releaseNotes': 'Notes.',
+          'artifactJob': build.id,
         });
       },
     );
@@ -145,7 +161,7 @@ void main() {
       );
 
       final upload = await harness.input(
-        await harness.job(run.jobs.single.id),
+        await jobNamed(run, 'Upload dev for android'),
         'upload.firebase',
       );
       expect(upload.containsKey('releaseNotes'), isFalse);
@@ -201,15 +217,17 @@ void main() {
         );
 
         final upload = await harness.input(
-          await harness.job(run.jobs.single.id),
+          await jobNamed(run, 'Upload dev for ios'),
           'upload.appStore',
         );
+        final build = await jobNamed(run, 'Build dev for ios');
         expect(upload, {
           'artifactName': 'dev-1.2.3+1.ipa',
           'bundleId': 'ly.demo.dev',
           'appleAppId': '1234567890',
           'version': '1.2.3+1',
           'auth': {'type': 'apiKey', 'keySecret': 'credential.dev.asc_key'},
+          'artifactJob': build.id,
         });
       },
     );
@@ -234,7 +252,7 @@ void main() {
         );
 
         final upload = await harness.input(
-          await harness.job(run.jobs.single.id),
+          await jobNamed(run, 'Upload dev for ios'),
           'upload.appStore',
         );
         expect(upload['auth'], {
@@ -286,7 +304,7 @@ void main() {
       );
 
       final build = await harness.input(
-        await harness.job(run.jobs.single.id),
+        await jobNamed(run, 'Build dev for android'),
         'build.android',
       );
       expect(build['secretFiles'], {
@@ -320,14 +338,47 @@ void main() {
     });
 
     test('says why a queued job waits when no runner can do it', () async {
-      final run = await harness.dispatchBuiltin(
-        'dev-build',
-        const DispatchRequest(platforms: ['android']),
-      );
+      final run = await harness.dispatchCustom('''
+schema: 1
+stages:
+  - name: build
+    jobs:
+      build:
+        steps:
+          - kind: version.bump
+          - kind: build.android
+''');
 
       final job = await harness.job(run.jobs.single.id);
       expect(job.state, JobState.queued);
       expect(job.message, 'No runner can do android, flutter.');
+    });
+
+    test('keeps the engine-only steps out of the job that builds', () async {
+      await harness.saveCredential('dev', CredentialKind.firebaseSa);
+      await harness.saveCredential('dev', CredentialKind.ascKey);
+
+      final run = await harness.dispatchBuiltin(
+        'dev-build',
+        const DispatchRequest(
+          inputs: {
+            'firebaseAppIds': {
+              'dev': {'android': '1:123456789012:android:abc'},
+            },
+            'appleAppIds': {'dev': '1234567890'},
+          },
+        ),
+      );
+
+      final jobs = await harness.jobsOf(run);
+      for (final job in jobs) {
+        final engineOnly = RemoteStepPolicy.engineOnlyIn(harness.kinds(job));
+        expect(
+          engineOnly.isEmpty,
+          job.name!.startsWith('Build'),
+          reason: '${job.name}: $engineOnly',
+        );
+      }
     });
 
     test('keeps the request in the run', () async {
@@ -349,7 +400,7 @@ void main() {
 
   group('the prod-release workflow', () {
     test(
-      'locks the project and makes the prepare, build and finalize jobs',
+      'locks the project and makes the prepare, check, build and tag jobs',
       () async {
         final run = await harness.dispatchBuiltin(
           'prod-release',
@@ -361,9 +412,11 @@ void main() {
         expect(run.build, 1);
         expect(run.jobs.map((job) => (job.name, job.stage)), [
           ('Prepare prod', 0),
-          ('Build prod for android', 1),
-          ('Build prod for ios', 1),
-          ('Tag prod', 2),
+          ('Check prod for android', 1),
+          ('Check prod for ios', 1),
+          ('Build prod for android', 2),
+          ('Build prod for ios', 2),
+          ('Tag prod', 4),
         ]);
       },
     );
@@ -386,6 +439,8 @@ void main() {
           'guard',
           'gate',
           'git.releaseBranch',
+          'gate',
+          'git.push',
         ]);
         expect(await harness.input(prepare, 'gate'), {
           'action': 'prod_release',
@@ -393,6 +448,17 @@ void main() {
           'sha': mainSha,
           'version': '2.0.0+1',
         });
+        expect(
+          (await harness.input(prepare, 'gate', nth: 1))['action'],
+          'push',
+        );
+        final branchPush = await harness.input(prepare, 'git.push');
+        expect(branchPush['branch'], 'release/2.0.0');
+        expect(
+          branchPush.containsKey('tag'),
+          isFalse,
+          reason: 'the tag is pushed last, by the tag job',
+        );
         final tag = jobs.last;
         expect(harness.kinds(tag), [
           'git.checkout',
@@ -408,7 +474,7 @@ void main() {
           'message': 'Release 2.0.0+1',
         });
         final push = await harness.input(tag, 'git.push');
-        expect(push['branch'], 'release/2.0.0');
+        expect(push.containsKey('branch'), isFalse);
         expect(push['tag'], 'v2.0.0+1');
       },
     );
@@ -447,20 +513,17 @@ void main() {
         ),
       );
 
-      final jobs = await harness.jobsOf(run);
-      final android = jobs.firstWhere(
-        (job) => job.name == 'Build prod for android',
-      );
+      final checkAndroid = await jobNamed(run, 'Check prod for android');
+      expect(harness.kinds(checkAndroid), ['git.checkout', 'guard', 'guard']);
+      final android = await jobNamed(run, 'Build prod for android');
       expect(harness.kinds(android), [
         'git.checkout',
-        'guard',
-        'guard',
         'shorebird.release',
         'symbols.archive',
         'record.manifest',
-        'upload.play',
-        'upload.firebase',
       ]);
+      final androidUpload = await jobNamed(run, 'Upload prod for android');
+      expect(harness.kinds(androidUpload), ['upload.play', 'upload.firebase']);
       final release = await harness.input(android, 'shorebird.release');
       expect(release['platform'], 'android');
       expect(release['shorebirdAppId'], 'sb-prod');
@@ -468,7 +531,12 @@ void main() {
       expect(release['obfuscate'], isTrue);
       expect(release['tokenSecret'], 'credential.prod.shorebird');
       expect(release['version'], '1.2.3+1');
-      final play = await harness.input(android, 'upload.play');
+      final play = await harness.input(androidUpload, 'upload.play');
+      expect(play['artifactJob'], android.id);
+      expect(
+        (await harness.input(androidUpload, 'upload.firebase'))['artifactJob'],
+        android.id,
+      );
       expect(play['artifactName'], 'prod-1.2.3+1.aab');
       expect(play['packageName'], 'ly.demo');
       expect(play['track'], 'beta');
@@ -478,25 +546,34 @@ void main() {
       expect(symbols['android'], isTrue);
       expect(symbols['ios'], isFalse);
 
-      final ios = jobs.firstWhere((job) => job.name == 'Build prod for ios');
+      final ios = await jobNamed(run, 'Build prod for ios');
       expect(harness.kinds(ios), [
         'git.checkout',
-        'guard',
-        'guard',
         'shorebird.release',
         'symbols.archive',
         'record.manifest',
-        'upload.appStore',
       ]);
       expect(
         (await harness.input(ios, 'shorebird.release'))['platform'],
         'ios',
       );
-      expect((await harness.input(ios, 'guard', nth: 1))['checks'], [
+      final iosUpload = await jobNamed(run, 'Upload prod for ios');
+      expect(harness.kinds(iosUpload), ['upload.appStore']);
+      expect(
+        (await harness.input(iosUpload, 'upload.appStore'))['artifactJob'],
+        ios.id,
+      );
+      final checkIos = await jobNamed(run, 'Check prod for ios');
+      expect((await harness.input(checkIos, 'guard', nth: 1))['checks'], [
         'appStoreTrain',
       ]);
-      expect((await harness.input(android, 'guard', nth: 1))['checks'], [
+      expect((await harness.input(checkAndroid, 'guard', nth: 1))['checks'], [
         'playTargetSdk',
+      ]);
+      expect((await harness.input(checkAndroid, 'guard'))['checks'], [
+        'versionSync',
+        'buildNumberReuse',
+        'credentials',
       ]);
     });
 
@@ -517,17 +594,39 @@ void main() {
 
       final run = await harness.dispatchBuiltin('prod-release');
 
-      final jobs = await harness.jobsOf(run);
-      final android = jobs.firstWhere(
-        (job) => job.name == 'Build prod for android',
-      );
+      final android = await jobNamed(run, 'Build prod for android');
       expect(harness.kinds(android), contains('build.android'));
       expect(
         (await harness.input(android, 'build.android'))['artifact'],
         'aab',
       );
-      final ios = jobs.firstWhere((job) => job.name == 'Build prod for ios');
+      final ios = await jobNamed(run, 'Build prod for ios');
       expect(harness.kinds(ios), contains('build.ios'));
+    });
+
+    test('keeps the engine-only steps out of the jobs that build', () async {
+      await harness.saveCredential('prod', CredentialKind.shorebird);
+      await harness.saveCredential('prod', CredentialKind.playSa);
+      await harness.saveCredential('prod', CredentialKind.ascKey);
+
+      final run = await harness.dispatchBuiltin(
+        'prod-release',
+        const DispatchRequest(
+          inputs: {
+            'appleAppIds': {'prod': '1234567890'},
+          },
+        ),
+      );
+
+      final jobs = await harness.jobsOf(run);
+      for (final job in jobs) {
+        final engineOnly = RemoteStepPolicy.engineOnlyIn(harness.kinds(job));
+        expect(
+          engineOnly.isEmpty,
+          job.name!.startsWith('Build'),
+          reason: '${job.name}: $engineOnly',
+        );
+      }
     });
 
     test('waits behind a release of the same project', () async {
@@ -569,33 +668,35 @@ void main() {
       expect(run.version, isNull);
       expect(run.build, isNull);
       expect(run.jobs.map((job) => (job.name, job.stage)), [
-        ('Patch prod for android', 0),
-        ('Patch prod for ios', 0),
-        ('Tag the patch of prod', 1),
+        ('Check the patch of prod for android', 0),
+        ('Check the patch of prod for ios', 0),
+        ('Patch prod for android', 1),
+        ('Patch prod for ios', 1),
+        ('Tag the patch of prod', 2),
       ]);
       final jobs = await harness.jobsOf(run);
-      final android = jobs.first;
-      expect(harness.kinds(android), [
-        'git.checkout',
-        'guard',
-        'gate',
-        'shorebird.patch',
-      ]);
-      expect(await harness.input(android, 'gate'), {
+      final check = jobs.first;
+      expect(harness.kinds(check), ['git.checkout', 'guard', 'gate', 'guard']);
+      expect(await harness.input(check, 'gate'), {
         'action': 'prod_patch',
         'projectId': 'prj_1',
         'sha': mainSha,
         'version': '1.2.0+30-p3',
       });
-      final guard = await harness.input(android, 'guard');
+      final guard = await harness.input(check, 'guard');
       expect(guard['releaseVersion'], '1.2.0+30');
       expect(guard['checks'], [
-        'source',
+        'credentials',
         'patchTarget',
         'patchNativeDiff',
-        'credentials',
       ]);
       expect(guard['shorebirdAppId'], 'sb-prod');
+      expect((await harness.input(check, 'guard', nth: 1))['checks'], [
+        'source',
+      ]);
+      final android = jobs[2];
+      expect(harness.kinds(android), ['git.checkout', 'shorebird.patch']);
+      expect(RemoteStepPolicy.canRunRemotely(harness.kinds(android)), isTrue);
       final patch = await harness.input(android, 'shorebird.patch');
       expect(patch['version'], '1.2.0+30');
       expect(patch['platform'], 'android');
@@ -634,10 +735,7 @@ void main() {
         'v1.2.0+30-p1',
       );
       expect(
-        (await harness.input(
-          jobs.first,
-          'shorebird.patch',
-        ))['allowNativeDiffs'],
+        (await harness.input(jobs[1], 'shorebird.patch'))['allowNativeDiffs'],
         isTrue,
       );
     });
@@ -807,7 +905,10 @@ void main() {
         const DispatchRequest(flavors: ['prod'], platforms: ['android']),
       );
 
-      expect(run.jobs.single.name, 'Build prod for android');
+      expect(run.jobs.map((job) => job.name), [
+        'Check prod for android',
+        'Build prod for android',
+      ]);
       await expectLater(
         harness.dispatchBuiltin(
           'dev-build',
@@ -836,14 +937,11 @@ void main() {
       final run = await harness.dispatchBuiltin('prod-release');
 
       expect(run.jobs.first.name, 'Prepare default');
-      final build = await harness.input(
-        await harness.job(run.jobs[1].id),
-        'build.android',
-      );
+      final job = await jobNamed(run, 'Build default for android');
+      final build = await harness.input(job, 'build.android');
       expect(build.containsKey('flavor'), isFalse);
       expect(build.containsKey('target'), isFalse);
-      final upload = await harness.job(run.jobs[1].id);
-      expect(harness.kinds(upload), contains('build.android'));
+      expect(harness.kinds(job), contains('build.android'));
     });
 
     test(
@@ -898,7 +996,10 @@ void main() {
       harness = await DispatchHarness.create(apps: [androidOnly]);
 
       final run = await harness.dispatchBuiltin('dev-build');
-      expect(run.jobs.map((job) => job.name), ['Build dev for android']);
+      expect(run.jobs.map((job) => job.name), [
+        'Check dev for android',
+        'Build dev for android',
+      ]);
       await expectLater(
         harness.dispatchBuiltin(
           'dev-build',

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:math';
 
 import 'package:xp_api/xp_api.dart';
@@ -10,6 +11,7 @@ import 'package:xp_engine/src/jobs/job_record.dart';
 import 'package:xp_engine/src/jobs/job_repository.dart';
 import 'package:xp_engine/src/jobs/secret_file_store.dart';
 import 'package:xp_engine/src/process/output_line.dart';
+import 'package:xp_engine/src/process/output_masker.dart';
 import 'package:xp_engine/src/process/power_assertion.dart';
 import 'package:xp_engine/src/process/process_environment.dart';
 import 'package:xp_engine/src/process/process_supervisor.dart';
@@ -548,6 +550,17 @@ class JobRunner implements JobControl {
   ).join();
 }
 
+/// Teaches [masker] the text of [bytes], if they are text. A binary secret,
+/// a keystore, has nothing readable to hide.
+void _maskReadable(OutputMasker masker, List<int> bytes) {
+  try {
+    final text = utf8.decode(bytes);
+    if (text.isNotEmpty) masker.add(text);
+  } on FormatException {
+    // Binary.
+  }
+}
+
 /// A job that runs now.
 class _Run {
   final done = Completer<void>();
@@ -643,7 +656,8 @@ class _RunnerContext implements StepContext {
   }
 
   /// The secrets of [command] as environment variables: the values of the
-  /// `secretEnvironment` ones, the paths of the files for `secretFiles`.
+  /// `secretEnvironment` ones, the paths of the files for `secretFiles` (a
+  /// file holds the exact bytes of the secret, so a keystore stays binary).
   Future<Map<String, String>> _secretEnvironment(ProcessCommand command) async {
     final environment = <String, String>{};
     final masker = _runner._supervisor.masker;
@@ -659,18 +673,25 @@ class _RunnerContext implements StepContext {
             'Not a valid environment variable name',
           );
         }
-        final value = await _runner._secrets.read(secretKey);
-        if (value == null) {
-          throw SecretStoreException('There is no secret "$secretKey".');
+        if (asFile) {
+          final bytes = await _runner._secrets.readBytes(secretKey);
+          if (bytes == null) {
+            throw SecretStoreException('There is no secret "$secretKey".');
+          }
+          _maskReadable(masker, bytes);
+          environment[variable] = await _runner._secretFiles.writeBytes(
+            jobId,
+            '$ordinal-$variable',
+            bytes,
+          );
+        } else {
+          final value = await _runner._secrets.read(secretKey);
+          if (value == null) {
+            throw SecretStoreException('There is no secret "$secretKey".');
+          }
+          masker.add(value);
+          environment[variable] = value;
         }
-        masker.add(value);
-        environment[variable] = asFile
-            ? await _runner._secretFiles.write(
-                jobId,
-                '$ordinal-$variable',
-                value,
-              )
-            : value;
       }
     }
     return environment;

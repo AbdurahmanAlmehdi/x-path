@@ -14,6 +14,13 @@ const builtinWorkflows = <String, String>{
 // A dev build is the build of ship.sh `release dev`: flutter build, then
 // Firebase App Distribution for Android and TestFlight for iOS. Unlimited:
 // no lock, only the slots of the runners limit how many run.
+//
+// Three stages keep what only the engine does apart from the build (ADR 0010):
+// `check` and `upload` run on the engine, `build` has no engine-only step and
+// can be leased to a runner. The runner uploads what it builds to the
+// engine's artifact store, and `upload` takes it from there. The version
+// commit of a dev build is never pushed, so the build job bumps the version
+// itself, in its own worktree.
 const _devBuild = r'''
 schema: 1
 name: Dev build
@@ -42,6 +49,18 @@ inputs:
   dartDefineFile:
     description: The --dart-define-from-file file, relative to the app.
 stages:
+  - name: check
+    jobs:
+      check:
+        name: Check ${{ flavor.name }} for ${{ platform }}
+        matrix:
+          platform: ${{ platforms }}
+          flavor: ${{ flavors }}
+        steps:
+          - kind: git.checkout
+          - kind: guard
+            with:
+              checks: [source, credentials]
   - name: build
     jobs:
       build:
@@ -51,9 +70,6 @@ stages:
           flavor: ${{ flavors }}
         steps:
           - kind: git.checkout
-          - kind: guard
-            with:
-              checks: [source, credentials]
           - kind: version.bump
           - kind: build.android
             if: platform == 'android'
@@ -68,28 +84,50 @@ stages:
           - kind: record.manifest
             with:
               dartDefineFile: ${{ inputs.dartDefineFile }}
+  - name: upload
+    jobs:
+      upload:
+        name: Upload ${{ flavor.name }} for ${{ platform }}
+        matrix:
+          platform: ${{ platforms }}
+          flavor: ${{ flavors }}
+        if: >-
+          (platform == 'android' && inputs.firebaseAppIds[flavor.name].android)
+          || (platform == 'ios' && inputs.appleAppIds[flavor.name])
+        steps:
           - kind: upload.firebase
             if: platform == 'android' && inputs.firebaseAppIds[flavor.name].android
             with:
+              artifactsFrom: build
               appId: ${{ inputs.firebaseAppIds[flavor.name].android }}
               groupAliases: ${{ inputs.testerGroups }}
               releaseNotes: ${{ inputs.notes }}
           - kind: upload.appStore
             if: platform == 'ios' && inputs.appleAppIds[flavor.name]
             with:
+              artifactsFrom: build
               appleAppId: ${{ inputs.appleAppIds[flavor.name] }}
 ''';
 
 // A production release is ship.sh `release prod` plus the release model: the
 // version commit and the release branch are made once (prepare), every
-// platform builds that very commit (build), and the tag, the push and the
-// release pull request come last (finalize). Everything that can be checked is
-// checked first; then the owner approves the release before the branch is cut
-// and anything is built or uploaded, and the push before it leaves the machine
+// platform builds that very commit (build), and the tag and the release pull
+// request come last (finalize). Everything that can be checked is checked
+// first; then the owner approves the release before the branch is cut and
+// anything is built or uploaded, and the push before it leaves the machine
 // (D-13). The run is a release (D-17) that the stores then review; a new build
 // of the same version after a rejection dispatches this workflow again with
 // `release` set, which skips the check that the version was not released
 // before.
+//
+// Five stages keep what only the engine does apart from the build (ADR 0010):
+// `prepare`, `check`, `upload` and `finalize` run on the engine, `build` has
+// no engine-only step and can be leased to a runner. A runner fetches the
+// version commit from GitHub with its own SSH key (ADR 0009), so `prepare`
+// pushes the release branch right after it cuts it (the owner approves the
+// push there; the approval covers the tag push of `finalize` too, as it is
+// the same project, commit, version and run). The runner uploads what it
+// builds to the engine's artifact store, and `upload` takes it from there.
 const _prodRelease = r'''
 schema: 1
 name: Production release
@@ -143,10 +181,14 @@ stages:
               checks: [newReleaseNumber]
           - kind: git.releaseBranch
             gate: prod_release
-  - name: build
+          - kind: git.push
+            gate: push
+            with:
+              tag: false
+  - name: check
     jobs:
-      build:
-        name: Build ${{ flavor.name }} for ${{ platform }}
+      check:
+        name: Check ${{ flavor.name }} for ${{ platform }}
         matrix:
           platform: ${{ platforms }}
           flavor: ${{ flavors }}
@@ -165,6 +207,17 @@ stages:
             if: platform == 'ios'
             with:
               checks: [appStoreTrain]
+  - name: build
+    jobs:
+      build:
+        name: Build ${{ flavor.name }} for ${{ platform }}
+        matrix:
+          platform: ${{ platforms }}
+          flavor: ${{ flavors }}
+        steps:
+          - kind: git.checkout
+            with:
+              commitFrom: prepare
           - kind: shorebird.release
             if: flavor.shorebird
             with:
@@ -191,21 +244,36 @@ stages:
           - kind: record.manifest
             with:
               dartDefineFile: ${{ inputs.dartDefineFile }}
+  - name: upload
+    jobs:
+      upload:
+        name: Upload ${{ flavor.name }} for ${{ platform }}
+        matrix:
+          platform: ${{ platforms }}
+          flavor: ${{ flavors }}
+        if: >-
+          (platform == 'android' && (flavor.credentials.play_sa
+          || (flavor.shorebird && inputs.firebaseAppIds[flavor.name].android)))
+          || (platform == 'ios' && inputs.appleAppIds[flavor.name])
+        steps:
           - kind: upload.play
             if: platform == 'android' && flavor.credentials.play_sa
             with:
+              artifactsFrom: build
               track: ${{ inputs.playTrack }}
               releaseNotes:
                 en-US: ${{ inputs.notes }}
           - kind: upload.firebase
             if: platform == 'android' && flavor.shorebird && inputs.firebaseAppIds[flavor.name].android
             with:
+              artifactsFrom: build
               appId: ${{ inputs.firebaseAppIds[flavor.name].android }}
               groupAliases: ${{ inputs.testerGroups }}
               releaseNotes: ${{ inputs.notes }}
           - kind: upload.appStore
             if: platform == 'ios' && inputs.appleAppIds[flavor.name]
             with:
+              artifactsFrom: build
               appleAppId: ${{ inputs.appleAppIds[flavor.name] }}
   - name: finalize
     jobs:
@@ -220,6 +288,8 @@ stages:
           - kind: git.tag
           - kind: git.push
             gate: push
+            with:
+              branch: false
           - kind: github.createPr
 ''';
 
@@ -247,6 +317,13 @@ stages:
 // A patch is ship.sh `patch prod`: an over-the-air code patch against an
 // exact release, with the Flutter version of that release. It changes no
 // version, so every job builds the dispatched commit.
+//
+// The checks and the owner's approval run on the engine (`check`), the patch
+// itself, which needs no engine-only step, can be leased to a runner (`patch`,
+// ADR 0010; the Shorebird key goes to the runner for the one job, ADR 0012),
+// and the tag comes last (`finalize`). The approval is asked in front of the
+// last check, so that the owner is asked only about a patch that passed the
+// others.
 const _shorebirdPatch = r'''
 schema: 1
 name: Shorebird patch
@@ -267,6 +344,23 @@ inputs:
       differences you have checked are not real native changes.
     default: false
 stages:
+  - name: check
+    jobs:
+      check:
+        name: Check the patch of ${{ flavor.name }} for ${{ platform }}
+        matrix:
+          platform: ${{ platforms }}
+          flavor: ${{ flavors }}
+        if: flavor.shorebird
+        steps:
+          - kind: git.checkout
+          - kind: guard
+            with:
+              checks: [credentials, patchTarget, patchNativeDiff]
+          - kind: guard
+            gate: prod_patch
+            with:
+              checks: [source]
   - name: patch
     jobs:
       patch:
@@ -277,11 +371,7 @@ stages:
         if: flavor.shorebird
         steps:
           - kind: git.checkout
-          - kind: guard
-            with:
-              checks: [source, patchTarget, patchNativeDiff, credentials]
           - kind: shorebird.patch
-            gate: prod_patch
             with:
               exportOptionsPlist: ${{ inputs.exportOptionsPlist }}
               dartDefineFile: ${{ inputs.dartDefineFile }}

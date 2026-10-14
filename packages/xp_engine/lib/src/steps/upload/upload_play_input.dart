@@ -23,6 +23,7 @@ class UploadPlayInput extends Equatable {
     this.userFraction,
     this.releaseName,
     this.releaseNotes = const {},
+    this.artifactJob,
   });
 
   /// Reads the input from its stored form.
@@ -72,6 +73,7 @@ class UploadPlayInput extends Equatable {
       userFraction: userFraction,
       releaseName: optionalString(json, 'releaseName'),
       releaseNotes: stringMap(json, 'releaseNotes'),
+      artifactJob: optionalString(json, 'artifactJob'),
     );
   }
 
@@ -97,6 +99,11 @@ class UploadPlayInput extends Equatable {
   /// The file name of the AAB in the artifact store, such as
   /// `prod-1.2.3+45.aab`. It is looked up among the artifacts of the job.
   final String artifactName;
+
+  /// The job whose artifacts hold the file, when it is not this job: a build
+  /// job of an earlier stage that the runner uploaded the file from (ADR
+  /// 0010). `null` looks among the artifacts of the job the step runs in.
+  final String? artifactJob;
 
   /// The Android application id of the app.
   final String packageName;
@@ -124,6 +131,10 @@ class UploadPlayInput extends Equatable {
   /// The release notes, by language tag.
   final Map<String, String> releaseNotes;
 
+  /// Who has the file, for a message: this job, or the build job.
+  String get sourceOfArtifact =>
+      artifactJob == null ? 'This job' : 'The build job $artifactJob';
+
   /// The version code.
   int get versionCode => version.build ?? 0;
 
@@ -138,6 +149,7 @@ class UploadPlayInput extends Equatable {
     'userFraction': ?userFraction,
     'releaseName': ?releaseName,
     if (releaseNotes.isNotEmpty) 'releaseNotes': releaseNotes,
+    'artifactJob': ?artifactJob,
   };
 
   @override
@@ -151,6 +163,7 @@ class UploadPlayInput extends Equatable {
     userFraction,
     releaseName,
     releaseNotes,
+    artifactJob,
   ];
 }
 

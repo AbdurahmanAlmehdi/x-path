@@ -10,6 +10,12 @@ info:
     Every route except `/health` and `/version` needs a device token:
     `Authorization: Bearer <token>`. Errors are always
     `{"error": {"code": "...", "message": "..."}}`.
+
+    A token of kind `runner` (a paired runner's credential) reaches only the
+    two routes made for runners: `GET /runners/connect` and
+    `PUT /runners/jobs/{id}/artifacts/{name}` (ADR 0011). Every other route
+    answers it `403 forbidden`, whatever the route says about other kinds of
+    token. `POST /runners/pair` needs no token.
   license:
     name: Apache-2.0
     identifier: Apache-2.0
@@ -1026,7 +1032,7 @@ paths:
       - $ref: "#/components/parameters/ApprovalId"
     get:
       operationId: getApproval
-      summary: One approval request. Any token kind may read it.
+      summary: One approval request. Any token kind but `runner` (ADR 0011) may read it.
       responses:
         "200":
           description: The approval.
@@ -1214,7 +1220,7 @@ paths:
       - $ref: "#/components/parameters/ReleaseId"
     get:
       operationId: getRelease
-      summary: One release. Any token kind may read it.
+      summary: One release. Any token kind but `runner` (ADR 0011) may read it.
       responses:
         "200":
           description: The release.
@@ -1239,7 +1245,7 @@ paths:
         lookup for an Apple ID flavor) and Google Play are asked once, and
         the release moves if they say so. A store that cannot be read (no
         API key or service account) keeps its status and says why in
-        `note`. Any token kind may refresh.
+        `note`. Any token kind but `runner` (ADR 0011) may refresh.
       responses:
         "200":
           description: The release after the refresh.
@@ -1411,7 +1417,7 @@ paths:
         a first release has none, and the notes are its latest commits. The
         engine reads its mirror of the repository and does not fetch.
         `409 conflict` while the release has no commit yet (`draft`,
-        `building` before the tag). Any token kind may read.
+        `building` before the tag). Any token kind but `runner` (ADR 0011) may read.
       responses:
         "200":
           description: The notes.
@@ -1439,7 +1445,7 @@ paths:
         One entry per category (artifacts, logs, worktrees, orphan mirrors,
         Flutter SDKs nobody pins) with the bytes it holds and the bytes a
         `POST /storage/free` would give back, and the artifacts by app and
-        flavor. It deletes nothing. Any token kind may read.
+        flavor. It deletes nothing. Any token kind but `runner` (ADR 0011) may read.
       responses:
         "200":
           description: The report.
@@ -1677,10 +1683,13 @@ paths:
            `chunk_ack` (`next` is the chunk it wants). The runner keeps
            chunks until they are acknowledged and sends again from `next`.
            `step_state` and `job_done` are idempotent.
-        6. `secret_request` asks for a secret of the job (D-09): only signing
-           material the steps name (`secrets` of the offer), once per lease,
-           answered with `secret_value` or `secret_denied`. Uploads never run
-           on a runner.
+        6. `secret_request` asks for a secret of the job (D-09, ADR 0012): only
+           signing material and the Shorebird key the steps name (`secrets` of
+           the offer), once per lease, answered with `secret_value` or
+           `secret_denied`. Uploads never run on a runner. The offer carries
+           the repository (`repository`: SSH URL and GitHub id) and the exact
+           commit (`sha`) and never a credential: the runner fetches the
+           commit with its own SSH key (ADR 0009).
         7. `job_done` ends the job (`lastChunk` is the last chunk sent; the
            engine ends the job once it has the log up to there) and is
            answered with `done_ack`. The artifacts are uploaded over HTTP
@@ -3956,6 +3965,19 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/ProbeCommand"
+    LeaseRepository:
+      type: object
+      description: >-
+        Where a runner gets the commit of a leased job: the repository's SSH
+        URL and GitHub id. Never a credential; the runner reaches GitHub with
+        its own SSH key (ADR 0009).
+      required: [githubRepoId, sshUrl]
+      additionalProperties: false
+      properties:
+        githubRepoId:
+          type: integer
+        sshUrl:
+          type: string
     LeaseOfferFrame:
       type: object
       required:
@@ -3972,8 +3994,13 @@ components:
           type: string
         sha:
           type: string
+          description: >-
+            The exact commit the job builds, in full. The runner checks it out
+            and verifies its head before it runs a step (ADR 0009).
         name:
           type: string
+        repository:
+          $ref: "#/components/schemas/LeaseRepository"
         stage:
           type: integer
           minimum: 0
@@ -3990,7 +4017,10 @@ components:
             $ref: "#/components/schemas/LeaseStep"
         secrets:
           type: array
-          description: Keys only; the values come with `secret_value`.
+          description: >-
+            Keys only; the values come with `secret_value`. Signing material
+            and the Shorebird key that the steps of the job name (D-09, ADR
+            0012).
           items:
             type: string
     HeartbeatAckFrame:

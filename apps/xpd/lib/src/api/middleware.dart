@@ -61,3 +61,39 @@ Middleware authMiddleware(
       }
       return await inner(request.change(context: {_tokenContextKey: token}));
     };
+
+/// What a `runner` token may reach (ADR 0011): the connection it dials out on
+/// and the upload of an artifact of a job it holds, and nothing else.
+bool _runnerMayReach(Request request) {
+  final path = request.requestedUri.path;
+  return (request.method == 'GET' && path == '/runners/connect') ||
+      (request.method == 'PUT' && _artifactUpload.hasMatch(path));
+}
+
+final _artifactUpload = RegExp(r'^/runners/jobs/[^/]+/artifacts/[^/]+$');
+
+/// Keeps a `runner` token to the runner endpoints (ADR 0011): every other
+/// route answers `403 forbidden` with a message that says so, whatever the
+/// route would have done with the token otherwise. A runner holds signing
+/// material for the one job it leases, so it must not be able to read
+/// projects, jobs or credentials, or to change anything.
+///
+/// Add it after [authMiddleware]: it reads the token that middleware found.
+/// The routes that need no token ([authMiddleware]'s `publicPaths`) are not
+/// affected.
+Middleware runnerScopeMiddleware() =>
+    (inner) => (request) async {
+      final token = request.context[_tokenContextKey];
+      if (token is DeviceToken &&
+          token.kind == DeviceTokenKind.runner &&
+          !_runnerMayReach(request)) {
+        return errorResponse(
+          ApiErrorCode.forbidden,
+          'A runner token reaches only the runner connection '
+          '(GET /runners/connect) and the artifact upload of a job it holds '
+          '(PUT /runners/jobs/{id}/artifacts/{name}), not '
+          '${request.method} ${request.requestedUri.path}.',
+        );
+      }
+      return await inner(request);
+    };
