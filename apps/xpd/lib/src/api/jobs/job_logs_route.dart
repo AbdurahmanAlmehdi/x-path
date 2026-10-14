@@ -25,7 +25,7 @@ class JobLogsRoute {
   /// Creates the route over the jobs and their logs.
   new({required this._jobs, required this._logs});
 
-  final JobRunner _jobs;
+  final JobControl _jobs;
   final JobLogs _logs;
   final _sockets = <WebSocketChannel>{};
 

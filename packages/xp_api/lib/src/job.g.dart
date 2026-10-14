@@ -42,6 +42,7 @@ const _$StepStateEnumMap = {
   StepState.skipped: 'skipped',
   StepState.cancelled: 'cancelled',
   StepState.interrupted: 'interrupted',
+  StepState.waitingForApproval: 'waitingForApproval',
 };
 
 Job _$JobFromJson(Map<String, dynamic> json) => Job(
@@ -56,6 +57,14 @@ Job _$JobFromJson(Map<String, dynamic> json) => Job(
   releaseId: json['releaseId'] as String?,
   sha: json['sha'] as String?,
   runnerId: json['runnerId'] as String?,
+  runId: json['runId'] as String?,
+  name: json['name'] as String?,
+  stage: (json['stage'] as num?)?.toInt(),
+  capabilities:
+      (json['capabilities'] as List<dynamic>?)
+          ?.map((e) => e as String)
+          .toList() ??
+      const [],
   message: json['message'] as String?,
   startedAt: json['startedAt'] == null
       ? null
@@ -73,6 +82,10 @@ Map<String, dynamic> _$JobToJson(Job instance) => <String, dynamic>{
   'sha': ?instance.sha,
   'state': _$JobStateEnumMap[instance.state]!,
   'runnerId': ?instance.runnerId,
+  'runId': ?instance.runId,
+  'name': ?instance.name,
+  'stage': ?instance.stage,
+  'capabilities': instance.capabilities,
   'message': ?instance.message,
   'createdAt': instance.createdAt.toIso8601String(),
   'startedAt': ?instance.startedAt?.toIso8601String(),
@@ -88,6 +101,7 @@ const _$JobStateEnumMap = {
   JobState.cancelled: 'cancelled',
   JobState.interrupted: 'interrupted',
   JobState.waitingForResume: 'waiting_for_resume',
+  JobState.waitingForApproval: 'waiting_for_approval',
 };
 
 ResumeJobRequest _$ResumeJobRequestFromJson(Map<String, dynamic> json) =>

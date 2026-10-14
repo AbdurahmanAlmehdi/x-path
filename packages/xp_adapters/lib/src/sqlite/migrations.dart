@@ -13,6 +13,7 @@ const engineMigrations = <Migration>[
   Migration(version: 6, sql: _v6),
   Migration(version: 7, sql: _v7),
   Migration(version: 8, sql: _v8),
+  Migration(version: 9, sql: _v9),
 ];
 
 // Timestamps are integer microseconds since the Unix epoch (UTC), so that
@@ -274,4 +275,35 @@ ALTER TABLE credential_ref ADD COLUMN message TEXT;
 ALTER TABLE credential_ref ADD COLUMN fix TEXT;
 CREATE UNIQUE INDEX idx_credential_ref_flavor_kind
   ON credential_ref (flavor_id, kind);
+''';
+
+// Phase 11: runs and what the scheduler needs to know of a job. A run is one
+// dispatch of a workflow version; its jobs name it, their stage (a stage
+// starts when the stages before it succeeded), what the workflow calls them
+// and the capabilities a runner needs for them. `workflow_version` gets the
+// time it was saved.
+const _v9 = '''
+CREATE TABLE run (
+  id TEXT PRIMARY KEY,
+  project_id TEXT NOT NULL REFERENCES project (id),
+  workflow_id TEXT NOT NULL,
+  workflow_version_id TEXT NOT NULL REFERENCES workflow_version (id),
+  sha TEXT NOT NULL,
+  ref TEXT,
+  locks_project INTEGER NOT NULL DEFAULT 0 CHECK (locks_project IN (0, 1)),
+  lock_held INTEGER NOT NULL DEFAULT 0 CHECK (lock_held IN (0, 1)),
+  version TEXT,
+  build INTEGER,
+  request TEXT NOT NULL DEFAULT '{}' CHECK (json_valid(request)),
+  created_at INTEGER NOT NULL
+) STRICT;
+CREATE INDEX idx_run_project ON run (project_id, created_at);
+CREATE INDEX idx_run_workflow_version ON run (workflow_version_id);
+ALTER TABLE job ADD COLUMN run_id TEXT REFERENCES run (id);
+ALTER TABLE job ADD COLUMN stage INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE job ADD COLUMN name TEXT;
+ALTER TABLE job ADD COLUMN capabilities TEXT NOT NULL DEFAULT '[]'
+  CHECK (json_valid(capabilities));
+CREATE INDEX idx_job_run ON job (run_id, stage);
+ALTER TABLE workflow_version ADD COLUMN created_at INTEGER NOT NULL DEFAULT 0;
 ''';

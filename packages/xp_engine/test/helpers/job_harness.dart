@@ -164,6 +164,7 @@ class JobHarness {
     JobRepository? repository,
     ScriptedStep? scripted,
     InMemorySecretFileStore? secretFiles,
+    Iterable<Step<Object?, Object?>> extraSteps = const [],
   }) {
     final clock = ManualClock(DateTime.utc(2026, 10, 13, 9));
     final masker = ReplacingMasker();
@@ -196,7 +197,7 @@ class JobHarness {
       errors: errors,
       runner: JobRunner(
         jobs: jobs,
-        steps: StepRegistry([const CommandStep(), step]),
+        steps: StepRegistry([const CommandStep(), step, ...extraSteps]),
         supervisor: supervisor,
         logs: logs,
         secrets: secrets,

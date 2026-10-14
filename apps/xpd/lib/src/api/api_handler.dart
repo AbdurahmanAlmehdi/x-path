@@ -10,8 +10,10 @@ import 'package:xpd/src/api/jobs/jobs_routes.dart';
 import 'package:xpd/src/api/middleware.dart';
 import 'package:xpd/src/api/projects/projects_routes.dart';
 import 'package:xpd/src/api/responses.dart';
+import 'package:xpd/src/api/runs/runs_routes.dart';
 import 'package:xpd/src/api/system_routes.dart';
 import 'package:xpd/src/api/tests/tests_routes.dart';
+import 'package:xpd/src/api/workflows/workflows_routes.dart';
 
 /// Routes that need no device token: a client can probe an engine, and read
 /// its version, before it has been paired.
@@ -25,11 +27,14 @@ Handler buildApiHandler({
   required TokenService tokens,
   required EventsRoute events,
   required ProjectService projects,
-  required JobRunner jobs,
+  required JobControl jobs,
   required JobLogsRoute jobLogs,
   required ArtifactService artifacts,
   required TestRunService tests,
   required CredentialService credentials,
+  required WorkflowService workflows,
+  required WorkflowDispatcher dispatcher,
+  required RunService runs,
   required String engineVersion,
   void Function(Object error, StackTrace stackTrace)? onError,
 }) {
@@ -49,6 +54,8 @@ Handler buildApiHandler({
   ArtifactsRoutes(artifacts).addTo(router);
   TestsRoutes(tests).addTo(router);
   CredentialsRoutes(credentials).addTo(router);
+  WorkflowsRoutes(workflows, dispatcher).addTo(router);
+  RunsRoutes(runs).addTo(router);
   return const Pipeline()
       .addMiddleware(errorMiddleware(onError: onError))
       .addMiddleware(authMiddleware(tokens, publicPaths: publicPaths))

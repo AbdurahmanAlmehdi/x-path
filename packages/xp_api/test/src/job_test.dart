@@ -9,6 +9,7 @@ void main() {
     test('uses snake_case on the wire', () {
       expect(JobState.waitingForResume.wire, 'waiting_for_resume');
       expect(JobState.running.wire, 'running');
+      expect(JobState.waitingForApproval.wire, 'waiting_for_approval');
     });
 
     test('is finished when it succeeded, failed or was cancelled', () {
@@ -87,7 +88,11 @@ void main() {
       releaseId: 'rel_1',
       sha: 'a' * 40,
       state: JobState.waitingForResume,
-      runnerId: 'run_1',
+      runnerId: 'runner_1',
+      runId: 'run_1',
+      name: 'build (android, dev)',
+      stage: 1,
+      capabilities: const ['android', 'flutter'],
       message: 'engine stopped',
       createdAt: created,
       startedAt: created,
@@ -107,6 +112,9 @@ void main() {
       final json = job.toJson();
 
       expect(json['state'], 'waiting_for_resume');
+      expect(json['runId'], 'run_1');
+      expect(json['stage'], 1);
+      expect(json['capabilities'], ['android', 'flutter']);
       expect(json['createdAt'], '2026-10-13T09:00:00.000Z');
       expect((json['steps']! as List).single, isA<Map<String, dynamic>>());
     });
@@ -130,6 +138,7 @@ void main() {
         'projectId',
         'workflowVersionId',
         'state',
+        'capabilities',
         'createdAt',
         'steps',
       ]);

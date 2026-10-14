@@ -3,6 +3,7 @@ import 'dart:math';
 
 import 'package:xp_api/xp_api.dart';
 import 'package:xp_engine/src/clock/clock.dart';
+import 'package:xp_engine/src/jobs/job_control.dart';
 import 'package:xp_engine/src/jobs/job_exceptions.dart';
 import 'package:xp_engine/src/jobs/job_logs.dart';
 import 'package:xp_engine/src/jobs/job_record.dart';
@@ -35,7 +36,7 @@ final _variableName = RegExp(r'^[A-Za-z_][A-Za-z0-9_]*$');
 ///
 /// Scheduling (how many jobs run at once, which runner) is not done here:
 /// [start] starts a job at once.
-class JobRunner {
+class JobRunner implements JobControl {
   /// Creates a runner.
   ///
   /// `hostEnvironment` is the engine's own environment, from which processes
@@ -77,20 +78,38 @@ class JobRunner {
   /// The ids of the jobs that are running now.
   Iterable<String> get activeJobs => _active.keys;
 
+  /// A new job id. A caller that needs to know the ids of jobs before it
+  /// creates them (a run whose jobs refer to each other) asks for them here
+  /// and passes one to [create].
+  String newJobId() => 'job_${_hex(8)}';
+
   /// Creates a queued job that runs [steps] in order.
+  ///
+  /// [id] is one from [newJobId]. A job that belongs to a run of a workflow
+  /// says which ([runId]), in which [stage], what the workflow calls it
+  /// ([name]) and what a runner needs to run it ([capabilities]).
   Future<Job> create({
     required String workflowVersionId,
     required String projectId,
     required List<StepPlan> steps,
+    String? id,
     String? releaseId,
     String? sha,
+    String? runId,
+    int stage = 0,
+    String? name,
+    List<String> capabilities = const [],
   }) async {
     final job = JobRecord(
-      id: 'job_${_hex(8)}',
+      id: id ?? newJobId(),
       workflowVersionId: workflowVersionId,
       projectId: projectId,
       releaseId: releaseId,
       sha: sha,
+      runId: runId,
+      stage: stage,
+      name: name,
+      capabilities: capabilities,
       state: JobState.queued,
       createdAt: _clock.now(),
     );
@@ -112,6 +131,7 @@ class JobRunner {
   /// The job [id] with its steps.
   ///
   /// Throws a [JobNotFoundException] if there is none.
+  @override
   Future<Job> get(String id) async =>
       toJob(await _require(id), await _jobs.steps(id));
 
@@ -137,26 +157,48 @@ class JobRunner {
   /// again too.
   ///
   /// Throws a [JobNotFoundException] if there is no such job, a
-  /// [JobStateException] unless it is failed, cancelled, interrupted or
-  /// waiting for a resume, and a [JobInvalidException] if [fromStep] is not a
-  /// step of the job or a step before it is not done.
+  /// [JobStateException] unless it is failed, cancelled, interrupted, waiting
+  /// for a resume or waiting for an approval, and a [JobInvalidException] if
+  /// [fromStep] is not a step of the job or a step before it is not done.
+  @override
   Future<Job> resume(String id, {int? fromStep}) async {
+    final job = await _prepareResume(id, fromStep);
+    return await _launch(job);
+  }
+
+  /// Makes the job [id] ready to run again, as [resume] does, but leaves it
+  /// `queued` for the scheduler to start. Returns it.
+  ///
+  /// Throws what [resume] throws.
+  Future<Job> requeue(String id, {int? fromStep}) async {
+    final job = await _prepareResume(id, fromStep);
+    final queued = job.copyWith(
+      state: JobState.queued,
+      message: null,
+      finishedAt: null,
+    );
+    await _saveJob(queued);
+    return toJob(queued, await _jobs.steps(id));
+  }
+
+  Future<JobRecord> _prepareResume(String id, int? fromStep) async {
     final job = await _require(id);
     const resumable = {
       JobState.failed,
       JobState.cancelled,
       JobState.interrupted,
       JobState.waitingForResume,
+      JobState.waitingForApproval,
     };
     if (_active.containsKey(id) || !resumable.contains(job.state)) {
       throw JobStateException(
         'Job $id is ${job.state.wire}, so it cannot be resumed. A job can be '
-        'resumed when it is failed, cancelled, interrupted or waiting for a '
-        'resume.',
+        'resumed when it is failed, cancelled, interrupted, waiting for a '
+        'resume or waiting for an approval.',
       );
     }
     if (fromStep != null) await _rewind(id, fromStep);
-    return await _launch(job);
+    return job;
   }
 
   /// Cancels the job [id] and returns it once it has ended.
@@ -167,6 +209,7 @@ class JobRunner {
   ///
   /// Throws a [JobNotFoundException] if there is no such job and a
   /// [JobStateException] if it ended already.
+  @override
   Future<Job> cancel(String id) async {
     final job = await _require(id);
     final run = _active[id];
@@ -180,7 +223,8 @@ class JobRunner {
       throw JobStateException('Job $id has ended (${job.state.wire}).');
     }
     for (final step in await _jobs.steps(id)) {
-      if (step.state == StepState.interrupted) {
+      if (step.state == StepState.interrupted ||
+          step.state == StepState.waitingForApproval) {
         await _saveStep(step.copyWith(state: StepState.cancelled));
       }
     }
@@ -281,7 +325,10 @@ class JobRunner {
     for (final step in await _jobs.steps(job.id)) {
       if (step.state.isDone) continue;
       if (run.stopping) break;
-      if (await _runStep(step, run) == StepState.failed) break;
+      final ended = await _runStep(step, run);
+      if (ended == StepState.failed || ended == StepState.waitingForApproval) {
+        break;
+      }
     }
     await _finish(job, run);
   }
@@ -290,6 +337,9 @@ class JobRunner {
     final steps = await _jobs.steps(job.id);
     final latest = await _require(job.id);
     final failed = steps.where((s) => s.state == StepState.failed).firstOrNull;
+    final waiting = steps
+        .where((s) => s.state == StepState.waitingForApproval)
+        .firstOrNull;
     final (state, message) = switch (run) {
       // The work was done before the stop mattered.
       _ when steps.every((s) => s.state.isDone) => (JobState.succeeded, null),
@@ -303,6 +353,10 @@ class JobRunner {
       _ when failed != null => (
         JobState.failed,
         'Step ${failed.ordinal} (${failed.kind}) failed: ${failed.message}',
+      ),
+      _ when waiting != null => (
+        JobState.waitingForApproval,
+        'Step ${waiting.ordinal} (${waiting.kind}) waits: ${waiting.message}',
       ),
       _ => (JobState.succeeded, null),
     };
@@ -362,6 +416,10 @@ class JobRunner {
         StepFailed(:final message) => ended.copyWith(
           state: StepState.failed,
           message: _mask(message),
+        ),
+        StepWaiting(:final reason) => ended.copyWith(
+          state: StepState.waitingForApproval,
+          message: _mask(reason),
         ),
       };
     } on Object catch (error) {

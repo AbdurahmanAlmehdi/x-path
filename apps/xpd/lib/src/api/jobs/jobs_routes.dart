@@ -7,11 +7,14 @@ import 'package:xpd/src/api/responses.dart';
 
 /// The `/jobs` endpoints: read, cancel and resume a job. The log WebSocket is
 /// `JobLogsRoute`.
+///
+/// Cancelling and resuming go through the scheduler in the engine, which
+/// decides when a resumed job gets its place again.
 class JobsRoutes {
   /// Creates the routes over [_jobs].
   const new(this._jobs);
 
-  final JobRunner _jobs;
+  final JobControl _jobs;
 
   /// Registers the routes on [router].
   void addTo(Router router) {

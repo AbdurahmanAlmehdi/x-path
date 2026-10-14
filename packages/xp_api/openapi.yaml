@@ -299,8 +299,11 @@ paths:
       operationId: resumeJob
       summary: Resume a job at its first unfinished step.
       description: |
-        Valid for a job that is `failed`, `cancelled`, `interrupted` or
-        `waiting_for_resume`. Steps that succeeded or were skipped are not run
+        Valid for a job that is `failed`, `cancelled`, `interrupted`,
+        `waiting_for_resume` or `waiting_for_approval`. A job that is part
+        of a run goes back in the queue of the scheduler and takes its turn
+        (a production release waits for the project, a job waits for a free
+        slot): the answer is the job, `queued` or `running`. Steps that succeeded or were skipped are not run
         again (D-18). A step with side effects that was started before asks
         its store whether the work exists already (`alreadyDone`) and is
         skipped if so; only a resume ever runs it again. The job runs in the
@@ -715,6 +718,271 @@ paths:
           $ref: "#/components/responses/SecretsLocked"
         "500":
           $ref: "#/components/responses/InternalError"
+  /projects/{id}/workflows:
+    parameters:
+      - $ref: "#/components/parameters/ProjectId"
+    get:
+      operationId: listWorkflows
+      summary: The workflows of a project, by name.
+      description: |
+        The built-in workflows (`dev-build`, `prod-release`, `shorebird-patch`,
+        `test`) are made for the project the first time they are asked for, and
+        brought up to date when the engine's version of one changes. Each
+        workflow shows its newest version.
+      responses:
+        "200":
+          description: The workflows.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkflowsResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+    post:
+      operationId: createWorkflow
+      summary: Create a workflow from a YAML document.
+      description: |
+        The document must be valid (`POST .../workflows/validate` lists its
+        issues with their lines): otherwise `422 workflow_invalid`, and the
+        message lists the issues. The name is unique in the project. To change
+        a built-in workflow, create a workflow of your own with its YAML.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateWorkflowRequest"
+      responses:
+        "201":
+          description: The workflow, at version 1.
+          headers:
+            Location:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Workflow"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/WorkflowInvalid"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /projects/{id}/workflows/validate:
+    parameters:
+      - $ref: "#/components/parameters/ProjectId"
+    post:
+      operationId: validateWorkflow
+      summary: Check a workflow document without saving it.
+      description: |
+        Answers `200` whether or not the document is valid; the issues carry
+        their line and column. Nothing is stored.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WorkflowYamlRequest"
+      responses:
+        "200":
+          description: The result of the check.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidateWorkflowResponse"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /projects/{id}/workflows/{workflowId}:
+    parameters:
+      - $ref: "#/components/parameters/ProjectId"
+      - $ref: "#/components/parameters/WorkflowId"
+    get:
+      operationId: getWorkflow
+      summary: A workflow with the YAML of one of its versions.
+      parameters:
+        - name: version
+          in: query
+          required: false
+          description: The number of the version. The newest by default.
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        "200":
+          description: The workflow.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Workflow"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+    put:
+      operationId: saveWorkflow
+      summary: Save a new version of a workflow.
+      description: |
+        Every save makes a new version; jobs that were dispatched keep the
+        version they ran. A built-in workflow answers `409 conflict`. An
+        invalid document answers `422 workflow_invalid`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WorkflowYamlRequest"
+      responses:
+        "200":
+          description: The workflow at its new version.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Workflow"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/WorkflowInvalid"
+        "500":
+          $ref: "#/components/responses/InternalError"
+    delete:
+      operationId: deleteWorkflow
+      summary: Delete a workflow of your own.
+      description: |
+        A built-in workflow, and a workflow that jobs ran, answer `409
+        conflict`: the jobs keep the version they ran.
+      responses:
+        "204":
+          description: The workflow is gone.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /projects/{id}/workflows/{workflowId}/dispatch:
+    parameters:
+      - $ref: "#/components/parameters/ProjectId"
+      - $ref: "#/components/parameters/WorkflowId"
+    post:
+      operationId: dispatchWorkflow
+      summary: Run a workflow.
+      description: |
+        Fetches the mirror, resolves `ref` to a commit, allocates the build
+        number (D-11), expands the matrix into jobs and queues them. The jobs
+        run when the scheduler has a runner with the capabilities and a free
+        slot for them: a workflow that locks the project (a production
+        release or patch) waits as long as another such run of the project is
+        under way (the jobs stay `queued` and say why). A job that reaches a
+        gate stops in `waiting_for_approval` until the action is approved
+        (D-13).
+
+        `422 workflow_invalid` when the document no longer is valid or the
+        request asks for something the project cannot do (an unknown flavor,
+        a step without a credential it needs); the message says what.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DispatchRequest"
+      responses:
+        "202":
+          description: The run, with its jobs.
+          headers:
+            Location:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Run"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/WorkflowInvalid"
+        "502":
+          $ref: "#/components/responses/UpstreamError"
+        "503":
+          $ref: "#/components/responses/SecretsLocked"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /runs/{id}:
+    parameters:
+      - $ref: "#/components/parameters/RunId"
+    get:
+      operationId: getRun
+      summary: A run with the state of its jobs.
+      responses:
+        "200":
+          description: The run.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Run"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /runs/{id}/cancel:
+    parameters:
+      - $ref: "#/components/parameters/RunId"
+    post:
+      operationId: cancelRun
+      summary: Cancel every job of a run that has not ended.
+      description: |
+        Like `POST /jobs/{id}/cancel` for each job that is queued, running,
+        interrupted or waiting. A run whose jobs all ended answers `409
+        conflict`.
+      responses:
+        "200":
+          description: The run after the cancel.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Run"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "500":
+          $ref: "#/components/responses/InternalError"
 components:
   securitySchemes:
     bearerAuth:
@@ -743,6 +1011,20 @@ components:
       description: The project id, for example `prj_1a2b3c4d5e6f7a8b`.
       schema:
         type: string
+    WorkflowId:
+      name: workflowId
+      in: path
+      required: true
+      description: The workflow id, for example `wf_1a2b3c4d5e6f7a8b`.
+      schema:
+        type: string
+    RunId:
+      name: id
+      in: path
+      required: true
+      description: The run id, for example `run_1a2b3c4d5e6f7a8b`.
+      schema:
+        type: string
     CredentialId:
       name: credentialId
       in: path
@@ -751,6 +1033,14 @@ components:
       schema:
         type: string
   responses:
+    WorkflowInvalid:
+      description: |
+        The workflow document has issues, or the dispatch asks for something
+        the project cannot do. The message lists them.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
     CredentialRejected:
       description: |
         The credential was not stored: the store or tool it is for refused it,
@@ -832,6 +1122,7 @@ components:
         - conflict
         - resync_required
         - credential_rejected
+        - workflow_invalid
         - upgrade_required
         - internal
         - upstream_error
@@ -886,6 +1177,7 @@ components:
             `project.scanned`, `project.removed`, `job.state_changed`,
             `job.step_changed`, `test_run.completed`, `credential.saved`,
             `credential.verified`, `credential.expired`, `credential.removed`,
+            `workflow.saved`, `workflow.removed`, `run.dispatched`,
             or a type added by a
             later engine version, which a client must ignore.
         payload:
@@ -1218,6 +1510,7 @@ components:
         - cancelled
         - interrupted
         - waiting_for_resume
+        - waiting_for_approval
     StepState:
       type: string
       enum:
@@ -1228,6 +1521,7 @@ components:
         - skipped
         - cancelled
         - interrupted
+        - waitingForApproval
     JobStep:
       type: object
       required: [ordinal, kind, state, sideEffect, attempts]
@@ -1278,8 +1572,25 @@ components:
           $ref: "#/components/schemas/JobState"
         runnerId:
           type: string
+        runId:
+          type: string
+          description: The run the job belongs to, if it was dispatched.
+        name:
+          type: string
+          description: What the workflow calls the job, for example `build (android, dev)`.
+        stage:
+          type: integer
+          minimum: 0
+          description: |
+            The stage of the workflow the job is in. A stage starts when every
+            job of the stages before it succeeded.
+        capabilities:
+          type: array
+          items:
+            $ref: "#/components/schemas/Capability"
         message:
           type: string
+          description: Why the job failed or was cancelled, or why it still waits.
         createdAt:
           type: string
           format: date-time
@@ -1293,6 +1604,241 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/JobStep"
+    Capability:
+      type: string
+      description: |
+        What a runner can do (D-19). The engine probes them; it does not trust
+        what a runner says about itself.
+      enum:
+        - ios-sign
+        - android
+        - flutter
+        - swift-linux
+    WorkflowVersionInfo:
+      type: object
+      required: [id, version, createdAt]
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          description: The id `Job.workflowVersionId` refers to.
+        version:
+          type: integer
+          minimum: 1
+        createdAt:
+          type: string
+          format: date-time
+    Workflow:
+      type: object
+      required: [id, projectId, name, builtin, version, versions, yaml]
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+        projectId:
+          type: string
+        name:
+          type: string
+        builtin:
+          type: boolean
+          description: Made by the engine; cannot be edited or deleted.
+        version:
+          $ref: "#/components/schemas/WorkflowVersionInfo"
+        versions:
+          type: array
+          description: Every version, oldest first.
+          items:
+            $ref: "#/components/schemas/WorkflowVersionInfo"
+        yaml:
+          type: string
+          description: The workflow document of `version`.
+    WorkflowSummary:
+      type: object
+      required: [id, projectId, name, builtin, version]
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+        projectId:
+          type: string
+        name:
+          type: string
+        builtin:
+          type: boolean
+        version:
+          $ref: "#/components/schemas/WorkflowVersionInfo"
+    WorkflowsResponse:
+      type: object
+      required: [workflows]
+      additionalProperties: false
+      properties:
+        workflows:
+          type: array
+          items:
+            $ref: "#/components/schemas/WorkflowSummary"
+    CreateWorkflowRequest:
+      type: object
+      required: [name, yaml]
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+          pattern: "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$"
+        yaml:
+          type: string
+    WorkflowYamlRequest:
+      type: object
+      required: [yaml]
+      additionalProperties: false
+      properties:
+        yaml:
+          type: string
+    WorkflowIssue:
+      type: object
+      required: [line, column, message]
+      additionalProperties: false
+      properties:
+        line:
+          type: integer
+          minimum: 1
+        column:
+          type: integer
+          minimum: 1
+        message:
+          type: string
+    ValidateWorkflowResponse:
+      type: object
+      required: [valid, issues]
+      additionalProperties: false
+      properties:
+        valid:
+          type: boolean
+        issues:
+          type: array
+          items:
+            $ref: "#/components/schemas/WorkflowIssue"
+    VersionBump:
+      type: string
+      enum:
+        - major
+        - minor
+        - patch
+        - keep
+    DispatchRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        ref:
+          type: string
+          description: |
+            The branch, tag or commit to run on; the base branch of the project
+            by default.
+        app:
+          type: string
+          description: The path of the app (`.` for the root); needed when the project has several.
+        flavors:
+          type: array
+          items:
+            type: string
+          description: |
+            The flavors to run for. Workflows that lock the project take the
+            production flavors by default, the others take the rest.
+        platforms:
+          type: array
+          items:
+            type: string
+            enum: [android, ios]
+          description: The platforms to run for; what the app has by default.
+        bump:
+          $ref: "#/components/schemas/VersionBump"
+        version:
+          type: string
+          pattern: "^\\d+\\.\\d+\\.\\d+$"
+          description: The version to release, instead of `bump`.
+        releaseVersion:
+          type: string
+          pattern: "^\\d+\\.\\d+\\.\\d+\\+\\d+$"
+          description: The release a patch applies to, `x.y.z+build`.
+        inputs:
+          type: object
+          description: The values of the inputs the workflow declares.
+    RunState:
+      type: string
+      enum:
+        - queued
+        - running
+        - waiting_for_approval
+        - succeeded
+        - failed
+        - cancelled
+    RunJob:
+      type: object
+      required: [id, name, stage, state]
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        stage:
+          type: integer
+          minimum: 0
+        state:
+          $ref: "#/components/schemas/JobState"
+        capabilities:
+          type: array
+          items:
+            $ref: "#/components/schemas/Capability"
+        message:
+          type: string
+    Run:
+      type: object
+      required:
+        [
+          id,
+          projectId,
+          workflowId,
+          workflowVersionId,
+          sha,
+          state,
+          locksProject,
+          createdAt,
+          jobs,
+        ]
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+        projectId:
+          type: string
+        workflowId:
+          type: string
+        workflowVersionId:
+          type: string
+        sha:
+          type: string
+          description: The commit every job starts from, in full.
+        ref:
+          type: string
+        state:
+          $ref: "#/components/schemas/RunState"
+        locksProject:
+          type: boolean
+          description: |
+            Whether the run holds the project: one production release or patch
+            at a time (D-11).
+        version:
+          type: string
+        build:
+          type: integer
+          description: The build number allocated at dispatch (D-11).
+        createdAt:
+          type: string
+          format: date-time
+        jobs:
+          type: array
+          items:
+            $ref: "#/components/schemas/RunJob"
     ResumeJobRequest:
       type: object
       additionalProperties: false

@@ -15,6 +15,10 @@ class JobRecord extends Equatable {
     this.releaseId,
     this.sha,
     this.runnerId,
+    this.runId,
+    this.stage = 0,
+    this.name,
+    this.capabilities = const [],
     this.message,
     this.startedAt,
     this.finishedAt,
@@ -41,7 +45,20 @@ class JobRecord extends Equatable {
   /// The runner executing it, or `null` for the engine.
   final String? runnerId;
 
-  /// Why it failed or was cancelled.
+  /// The run (one dispatch of a workflow) it belongs to, or `null` for a job
+  /// that was not dispatched.
+  final String? runId;
+
+  /// Its stage in the run, from 0.
+  final int stage;
+
+  /// What the workflow calls it.
+  final String? name;
+
+  /// The capabilities a runner needs to run it, by their wire names.
+  final List<String> capabilities;
+
+  /// Why it failed or was cancelled, or why a queued job still waits.
   final String? message;
 
   /// When it was created.
@@ -68,6 +85,10 @@ class JobRecord extends Equatable {
     sha: sha,
     state: state ?? this.state,
     runnerId: runnerId,
+    runId: runId,
+    stage: stage,
+    name: name,
+    capabilities: capabilities,
     message: identical(message, _unset) ? this.message : message as String?,
     createdAt: createdAt,
     startedAt: identical(startedAt, _unset)
@@ -87,6 +108,10 @@ class JobRecord extends Equatable {
     sha,
     state,
     runnerId,
+    runId,
+    stage,
+    name,
+    capabilities,
     message,
     createdAt,
     startedAt,
@@ -226,6 +251,10 @@ Job toJob(JobRecord job, List<StepRecord> steps) => Job(
   sha: job.sha,
   state: job.state,
   runnerId: job.runnerId,
+  runId: job.runId,
+  name: job.name,
+  stage: job.runId == null ? null : job.stage,
+  capabilities: job.capabilities,
   message: job.message,
   createdAt: job.createdAt,
   startedAt: job.startedAt,

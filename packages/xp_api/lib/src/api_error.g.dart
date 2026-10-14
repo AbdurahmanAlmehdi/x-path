@@ -23,6 +23,7 @@ const _$ApiErrorCodeEnumMap = {
   ApiErrorCode.conflict: 'conflict',
   ApiErrorCode.resyncRequired: 'resync_required',
   ApiErrorCode.credentialRejected: 'credential_rejected',
+  ApiErrorCode.workflowInvalid: 'workflow_invalid',
   ApiErrorCode.upgradeRequired: 'upgrade_required',
   ApiErrorCode.internal: 'internal',
   ApiErrorCode.upstreamError: 'upstream_error',

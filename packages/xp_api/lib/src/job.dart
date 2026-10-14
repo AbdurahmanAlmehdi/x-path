@@ -30,7 +30,11 @@ enum JobState {
 
   /// The engine stopped in the middle of a step with side effects, which it
   /// never repeats by itself (D-18). It waits for an explicit resume.
-  waitingForResume('waiting_for_resume');
+  waitingForResume('waiting_for_resume'),
+
+  /// A gate stopped the job until the owner approves the action it guards
+  /// (D-13). It holds no slot; approving the action resumes it.
+  waitingForApproval('waiting_for_approval');
 
   new(this.wire);
 
@@ -65,7 +69,10 @@ enum StepState {
   cancelled,
 
   /// The engine stopped while it ran.
-  interrupted;
+  interrupted,
+
+  /// A gate step is waiting for the owner to approve the action (D-13).
+  waitingForApproval;
 
   /// Whether a resume moves past this step without running it.
   bool get isDone => this == StepState.succeeded || this == StepState.skipped;
@@ -150,6 +157,10 @@ class Job extends Equatable {
     this.releaseId,
     this.sha,
     this.runnerId,
+    this.runId,
+    this.name,
+    this.stage,
+    this.capabilities = const [],
     this.message,
     this.startedAt,
     this.finishedAt,
@@ -179,7 +190,22 @@ class Job extends Equatable {
   /// The runner executing it, or `null` for the engine itself.
   final String? runnerId;
 
-  /// Why it failed or was cancelled.
+  /// The run (one dispatch of a workflow) the job belongs to, if it was
+  /// dispatched.
+  final String? runId;
+
+  /// What the workflow calls the job, for example `build (android, dev)`.
+  final String? name;
+
+  /// The stage of the workflow the job is in, from 0. A stage starts when
+  /// every job of the stages before it succeeded.
+  final int? stage;
+
+  /// What a runner must be able to do to run the job: `flutter`, `android`,
+  /// `ios-sign` or `swift-linux` (D-19).
+  final List<String> capabilities;
+
+  /// Why it failed or was cancelled, or why it still waits.
   final String? message;
 
   /// When it was created, in UTC.
@@ -206,6 +232,10 @@ class Job extends Equatable {
     sha,
     state,
     runnerId,
+    runId,
+    name,
+    stage,
+    capabilities,
     message,
     createdAt,
     startedAt,

@@ -33,3 +33,13 @@ class MemorySecretStore implements SecretStore {
   @override
   Future<void> delete(String key) async => values.remove(key);
 }
+
+/// A [ReleaseModelRepository] that gives every project the default release
+/// model, for projects whose ids the test does not know beforehand.
+class DefaultReleaseModels implements ReleaseModelRepository {
+  @override
+  Future<ReleaseModel> get(String projectId) async => const ReleaseModel();
+
+  @override
+  Future<void> save(String projectId, ReleaseModel model) async {}
+}

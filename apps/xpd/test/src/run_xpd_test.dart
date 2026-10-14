@@ -371,6 +371,185 @@ void main() {
       expect(out.toString(), isNot(contains('listening')));
     });
 
+    test('says how many jobs run here and with what', () async {
+      final exit = run([
+        'serve',
+        '--port',
+        '0',
+        '--slots',
+        '3',
+        '--data-dir',
+        dataDir,
+      ]);
+      await startServing(exit);
+
+      expect(out.toString(), contains('xpd runs jobs here with 3 slots and '));
+
+      shutdown.add(null);
+      await exit;
+    });
+
+    test(
+      'counts slots in the singular, and by default a quarter of the cores',
+      () async {
+        final one = run([
+          'serve',
+          '--port',
+          '0',
+          '--slots',
+          '1',
+          '--data-dir',
+          dataDir,
+        ]);
+        await startServing(one);
+        expect(out.toString(), contains('with 1 slot and '));
+        shutdown.add(null);
+        await one;
+
+        out = WatchedSink();
+        final byDefault = run(['serve', '--port', '0', '--data-dir', dataDir]);
+        await startServing(byDefault);
+        final slots = defaultSlots(Platform.numberOfProcessors);
+        expect(
+          out.toString(),
+          contains('with $slots slot${slots == 1 ? '' : 's'} and '),
+        );
+        shutdown.add(null);
+        await byDefault;
+      },
+    );
+
+    test(
+      'rejects a number of slots that is not a whole number above zero',
+      () async {
+        for (final slots in ['many', '0', '-1']) {
+          final code = await run([
+            'serve',
+            '--port',
+            '0',
+            '--slots',
+            slots,
+            '--data-dir',
+            dataDir,
+          ]);
+
+          expect(code, 64, reason: slots);
+          expect(err.toString(), contains('--slots must be a whole number'));
+        }
+      },
+    );
+
+    test('warns when it is a test engine', () async {
+      final exit = run(
+        ['serve', '--port', '0', '--data-dir', dataDir],
+        environment: {
+          TestEndpoints.fileSecretsVariable: '1',
+          'PATH': Platform.environment['PATH']!,
+        },
+      );
+      await startServing(exit);
+
+      expect(err.toString(), contains('XPD_TEST_* is set'));
+
+      shutdown.add(null);
+      await exit;
+    });
+
+    test('serves the workflows of a project over the real database', () async {
+      Directory(dataDir).createSync(recursive: true);
+      final projectId = await withDatabase((database) async {
+        final record = ProjectRecord(
+          id: 'prj_real',
+          githubRepoId: 7,
+          fullName: 'octo/real',
+          remote: '${root.path}/no-such-repository.git',
+          githubDefaultBranch: 'main',
+          scan: const ProjectProfile(
+            apps: [
+              AppProfile(
+                name: 'demo',
+                path: '.',
+                hasAndroid: true,
+                flavors: [
+                  FlavorProfile(
+                    name: 'default',
+                    entrypoint: 'lib/main.dart',
+                    implicit: true,
+                  ),
+                ],
+              ),
+            ],
+          ),
+          findings: const [],
+          scannedAt: DateTime.utc(2026),
+        );
+        await SqliteProjectRepository(database).add(record);
+        return record.id;
+      });
+      final exit = run(['serve', '--port', '0', '--data-dir', dataDir]);
+      final uri = await startServing(exit);
+      final secret = await withDatabase(
+        (database) async => (await TokenService(
+          tokens: SqliteDeviceTokenRepository(database),
+          clock: const SystemClock(),
+        ).issue(name: 'late', kind: DeviceTokenKind.app)).secret,
+      );
+      final client = HttpClient();
+      addTearDown(() => client.close(force: true));
+
+      Future<(int, Map<String, dynamic>)> call(
+        String method,
+        String path, [
+        Object? body,
+      ]) async {
+        final request = await client.openUrl(method, uri.resolve(path))
+          ..headers.set('authorization', 'Bearer $secret');
+        if (body != null) request.write(jsonEncode(body));
+        final response = await request.close();
+        final text = await utf8.decodeStream(response);
+        return (
+          response.statusCode,
+          text.isEmpty
+              ? <String, dynamic>{}
+              : jsonDecode(text) as Map<String, dynamic>,
+        );
+      }
+
+      final (listed, workflows) = await call(
+        'GET',
+        '/projects/$projectId/workflows',
+      );
+      final names = [
+        for (final workflow in workflows['workflows']! as List)
+          (workflow as Map)['name'],
+      ];
+      final (created, mine) = await call(
+        'POST',
+        '/projects/$projectId/workflows',
+        {
+          'name': 'mine',
+          'yaml':
+              'schema: 1\nstages:\n  - name: a\n    jobs:\n      j:\n'
+              '        steps:\n          - kind: git.checkout\n',
+        },
+      );
+      final (dispatched, run_) = await call(
+        'POST',
+        '/projects/$projectId/workflows/${mine['id']}/dispatch',
+        {'ref': 'main'},
+      );
+      final (missing, _) = await call('GET', '/runs/run_nope');
+
+      expect(listed, 200);
+      expect(names, ['dev-build', 'prod-release', 'shorebird-patch', 'test']);
+      expect(created, 201);
+      expect(dispatched, 502, reason: 'there is no mirror to fetch: $run_');
+      expect(missing, 404);
+
+      shutdown.add(null);
+      await exit;
+    });
+
     test('warns when the address is not loopback', () async {
       final exit = run([
         'serve',

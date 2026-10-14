@@ -5,6 +5,7 @@ import 'package:xp_secrets/xp_secrets.dart';
 import 'package:xpd/src/cli/gh_executable.dart';
 import 'package:xpd/src/cli/xpd_command.dart';
 import 'package:xpd/src/cli/xpd_context.dart';
+import 'package:xpd/src/test_endpoints.dart';
 
 /// `xpd secrets`: manage the secrets of the engine.
 class SecretsCommand extends Command<int> {
@@ -68,7 +69,8 @@ class SecretsImportGhCommand extends XpdCommand {
     final secrets = createSecretStore(
       runner: runner,
       dataDir: dataDirectory,
-      operatingSystem: context.operatingSystem,
+      operatingSystem: TestEndpoints.fromEnvironment(context.environment)
+          .secretStoreSystem(context.operatingSystem),
       environment: context.environment,
     );
     try {

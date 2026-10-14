@@ -197,6 +197,23 @@ void main() {
       expect(File(p.join(fixture.seed, 'a.txt')).readAsStringSync(), 'one');
     });
 
+    test('are where the engine says they will be, before they exist', () async {
+      final path = CliGitService.worktreePath(
+        dataDir.path,
+        mirror,
+        'job-before',
+      );
+
+      final worktree = await service.createWorktree(
+        mirror,
+        name: 'job-before',
+        sha: first,
+      );
+
+      expect(worktree.path, path);
+      expect(path, p.join(dataDir.path, 'worktrees', '42', 'job-before'));
+    });
+
     test('are replaced when the name is reused', () async {
       final old = await service.createWorktree(mirror, name: 'job', sha: first);
       File(p.join(old.path, 'leftover.txt')).writeAsStringSync('stale');

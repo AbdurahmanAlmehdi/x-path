@@ -80,6 +80,23 @@ void main() {
           projectId: 'prj_1',
           kind: CredentialKind.slack,
         ),
+        const WorkflowSaved(
+          workflowId: 'wf_1',
+          projectId: 'prj_1',
+          name: 'dev-build',
+          version: 2,
+        ),
+        const WorkflowRemoved(
+          workflowId: 'wf_1',
+          projectId: 'prj_1',
+          name: 'dev-build',
+        ),
+        const RunDispatched(
+          runId: 'run_1',
+          projectId: 'prj_1',
+          workflowId: 'wf_1',
+          jobIds: ['job_1', 'job_2'],
+        ),
       ]) {
         final sequenced = SequencedEvent(seq: 9, at: at, event: event);
 
@@ -119,6 +136,9 @@ void main() {
         CredentialVerified() => 'verified',
         CredentialExpired() => 'expired',
         CredentialRemoved() => 'removed credential',
+        WorkflowSaved() => 'workflow saved',
+        WorkflowRemoved() => 'workflow removed',
+        RunDispatched() => 'run',
         UnknownEvent() => 'unknown',
       };
 
@@ -208,6 +228,34 @@ void main() {
           ),
         ),
         'removed credential',
+      );
+      expect(
+        describe(
+          const WorkflowSaved(
+            workflowId: 'w',
+            projectId: 'p',
+            name: 'n',
+            version: 1,
+          ),
+        ),
+        'workflow saved',
+      );
+      expect(
+        describe(
+          const WorkflowRemoved(workflowId: 'w', projectId: 'p', name: 'n'),
+        ),
+        'workflow removed',
+      );
+      expect(
+        describe(
+          const RunDispatched(
+            runId: 'r',
+            projectId: 'p',
+            workflowId: 'w',
+            jobIds: [],
+          ),
+        ),
+        'run',
       );
       expect(
         describe(EngineEvent.fromJson('x', const <String, dynamic>{})),

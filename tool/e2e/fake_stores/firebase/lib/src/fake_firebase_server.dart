@@ -17,6 +17,13 @@ import 'package:xp_fake_play/xp_fake_play.dart';
 ///
 /// An upload is processed asynchronously like the real thing: its operation
 /// answers "not done" for [pollsBeforeDone] polls.
+///
+/// The real service reads the version from the manifest of the APK. The fake
+/// reads it from the first line of a test binary (see `fakeBinary`); with
+/// `readVersionFromFileName` it takes a file that is not one from the file
+/// name XPath gives the upload instead (`dev-1.0.0+7.apk`, percent-encoded as
+/// the real API takes it), so that an
+/// end-to-end script can upload an APK it really built.
 class FakeFirebaseServer {
   new _(
     this._server,
@@ -24,6 +31,7 @@ class FakeFirebaseServer {
     this._accounts,
     this._lifetime,
     this.pollsBeforeDone,
+    this._readVersionFromFileName,
   ) {
     _verifier = AssertionVerifier(
       accounts: _accounts,
@@ -42,6 +50,7 @@ class FakeFirebaseServer {
     DateTime Function()? now,
     Duration tokenLifetime = const Duration(hours: 1),
     int pollsBeforeDone = 1,
+    bool readVersionFromFileName = false,
   }) async {
     final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
     return FakeFirebaseServer._(
@@ -50,6 +59,7 @@ class FakeFirebaseServer {
       accounts.toList(),
       tokenLifetime,
       pollsBeforeDone,
+      readVersionFromFileName,
     );
   }
 
@@ -57,6 +67,7 @@ class FakeFirebaseServer {
   final DateTime Function() _now;
   final List<FakePlayAccount> _accounts;
   final Duration _lifetime;
+  final bool _readVersionFromFileName;
   late final AssertionVerifier _verifier;
   var _ids = 0;
   final _tokens = <String, DateTime>{};
@@ -374,20 +385,19 @@ class FakeFirebaseServer {
         'INVALID_ARGUMENT',
       );
     }
-    final text = utf8.decode(bytes.take(120).toList(), allowMalformed: true);
-    final match = RegExp(
-      r'^fake-(apk|aab|ipa) versionName=(\S+) versionCode=(\d+)\n',
-    ).firstMatch(text);
-    if (match == null) {
+    final binary = _readBinary(bytes, headers['x-goog-upload-file-name']!);
+    if (binary == null) {
       throw const _FirebaseError(
         400,
         'The uploaded file is not a valid APK, AAB or IPA.',
         'INVALID_ARGUMENT',
       );
     }
+    final (type, versionName, versionCode) = binary;
     final existing = app.releases
         .where(
-          (r) => r.displayVersion == match[2] && r.buildVersion == match[3],
+          (r) =>
+              r.displayVersion == versionName && r.buildVersion == versionCode,
         )
         .firstOrNull;
     final FakeFirebaseRelease release;
@@ -395,9 +405,9 @@ class FakeFirebaseServer {
     if (existing == null) {
       release = FakeFirebaseRelease(
         name: '${app.name}/releases/rel-${++_ids}',
-        displayVersion: match[2]!,
-        buildVersion: match[3]!,
-        binaryType: match[1]!.toUpperCase(),
+        displayVersion: versionName,
+        buildVersion: versionCode,
+        binaryType: type.toUpperCase(),
         createTime: _now(),
         binary: bytes,
       );
@@ -418,6 +428,19 @@ class FakeFirebaseServer {
     );
     operations[operation.name] = operation;
     return (200, _operationJson(operation));
+  }
+
+  /// The binary type, version name and version code of an upload.
+  (String, String, String)? _readBinary(List<int> bytes, String fileName) {
+    final text = utf8.decode(bytes.take(120).toList(), allowMalformed: true);
+    final fake = RegExp(
+      r'^fake-(apk|aab|ipa) versionName=(\S+) versionCode=(\d+)\n',
+    ).firstMatch(text);
+    if (fake != null) return (fake[1]!, fake[2]!, fake[3]!);
+    if (!_readVersionFromFileName) return null;
+    final named = RegExp(r'^(?:.*-)?(\d+\.\d+\.\d+)\+(\d+)\.(apk|aab|ipa)$')
+        .firstMatch(Uri.decodeComponent(fileName));
+    return named == null ? null : (named[3]!, named[1]!, named[2]!);
   }
 
   bool _sameBytes(List<int> a, List<int> b) {
