@@ -98,9 +98,10 @@ dart run apps/xpd/bin/xpd.dart token create --name "My Mac" --kind app   # print
 dart run apps/xpd/bin/xpd.dart serve                                      # http://127.0.0.1:7480
 ```
 
-- `xpd serve [--host 127.0.0.1] [--port 7480] [--data-dir <path>]` listens on loopback by default.
+- `xpd serve [--host 127.0.0.1] [--port 7480] [--data-dir <path>] [--slots <n>]` listens on loopback by default.
   Any other `--host` exposes the engine to the network without encryption, and prints a warning.
-  SIGINT and SIGTERM close the server and its WebSocket connections cleanly.
+  SIGINT and SIGTERM close the server and its WebSocket connections cleanly. `--slots` is how many jobs run at
+  once here (see Workflows and the scheduler).
 - `xpd token create --name <name> --kind app|cli|mcp|runner` creates a device token and prints it
   once on stdout. Only its SHA-256 is stored. A running engine accepts it at once.
 - `xpd secrets import-gh [--data-dir <path>] [--gh <path>]` stores the token of the GitHub CLI in
@@ -125,7 +126,7 @@ columns of `project`; version 3 adds what the job runner records to `job` and `j
 adds the tool versions of a job; version 5 adds the time and a unique path to `artifact`; version 6 adds
 `shorebird_release`, the Flutter version each Shorebird release was built with; version 7 gives `test_run` its
 project, app, time and the baseline index; version 8 gives `credential_ref` the result of its last check and
-one credential per flavor and kind.
+one credential per flavor and kind; version 9 adds `run` and gives `job` its run, stage, name and capabilities.
 
 Secrets (`packages/xp_secrets`) live on the engine machine behind the `SecretStore` interface of
 `xp_engine`; `createSecretStore` picks the implementation for the platform.
@@ -218,16 +219,16 @@ port with a temporary data directory and checks `/health`, the database, the tok
 ## Jobs and processes
 
 A job is a list of steps that run one after the other (D-18). Every step records its state, result and
-output as it goes, so a job survives a restart. Dispatching jobs from workflows comes in a later
-phase; for now the engine runs jobs created through `JobRunner` (the built-in steps are `command`,
-which runs a command the owner declares, `version.bump` and `guard`, see Versions and guards, and
-`build.android`, `build.ios` and `record.manifest`, see Builds and artifacts).
+output as it goes, so a job survives a restart. Jobs are made by dispatching a workflow (see Workflows
+and the scheduler) and run by the `JobRunner`; the step types are `command`, which runs a command the
+owner declares, `version.bump` and `guard` (see Versions and guards), `build.android`, `build.ios` and
+`record.manifest` (see Builds and artifacts), and the ones of the sections after it.
 
 | Route | What it does |
 |---|---|
 | `GET /jobs/{id}` | The job with its steps. |
 | `POST /jobs/{id}/cancel` | Stops the process group of the running step (`SIGTERM`, ten seconds of grace, `SIGKILL`) and returns the cancelled job. |
-| `POST /jobs/{id}/resume` | Runs a `failed`, `cancelled`, `interrupted` or `waiting_for_resume` job again at its first unfinished step; `{"fromStep": n}` re-runs from step `n`. Answers `202` while the job runs on. |
+| `POST /jobs/{id}/resume` | Runs a `failed`, `cancelled`, `interrupted`, `waiting_for_resume` or `waiting_for_approval` job again at its first unfinished step; `{"fromStep": n}` re-runs from step `n`. Answers `202` while the job runs on. |
 | `GET /jobs/{id}/logs` | WebSocket: the log lines of the job, replayed from `?after=<seq>` and then live, ending with an `end` frame. |
 
 - **Process groups** (ADR 0003). Every step process starts through a `perl` trampoline that makes it a
@@ -256,7 +257,7 @@ which runs a command the owner declares, `version.bump` and `guard`, see Version
 ## Versions and guards
 
 Phase 8 adds the release model: how versions, build numbers, branches and tags are handled. No
-endpoint exposes it yet; workflows call it from Phase 11.
+endpoint exposes it; workflows call it (see Workflows and the scheduler).
 
 - **Version files.** A version is `x.y.z+build`. `version.bump` writes it into the app's `pubspec.yaml`
   and every plist the flavor lists in `versionFiles`, by text replacement so the diff stays one line
@@ -314,8 +315,8 @@ Phase 9a decides which tools a job runs with (D-20). The build steps of Phase 9b
 ## Builds and artifacts
 
 Phase 9b adds the steps that build an app and the store that keeps what they produce. Workflows start
-them from Phase 11; until then a job is created through `JobRunner`, as `tool/e2e/build_fixture_apk.sh`
-does.
+them (see Workflows and the scheduler); `tool/e2e/build_fixture_apk.sh` still builds the fixture with a
+job made through `JobRunner` alone.
 
 - **`build.android` / `build.ios`** (`packages/xp_engine/lib/src/steps/build`). Each runs `flutter build
   apk|appbundle|ipa --release` of the Flutter SDK that `FlutterResolver` resolves for the app's `.fvmrc`
@@ -328,7 +329,7 @@ does.
   their versions for the job (`JobRepository.saveTools`). Signing inputs never go in the arguments: the
   step input names secrets (`secretEnvironment`: variable to secret key; `secretFiles`: variable to the
   path of a 0600 file that is deleted when the job ends), which the job runner reads from the secret store.
-  Which credential maps to which variable is a workflow matter (Phase 11; the secret keys are listed under Credentials). `build.ios` fails
+  Which credential maps to which variable is decided when a workflow is dispatched (the keystore reaches a build as `XPATH_KEYSTORE_*`; see Workflows and the scheduler). `build.ios` fails
   with "needs macOS (ios-sign)" on any machine that is not a Mac.
 - **Freshness marker** (`BuildFiles.markBuildStart`, `BuildOutputs`). `build/` is not cleaned between
   runs, so a failed build can leave the artifact of an earlier one. Right before the build the step asks
@@ -654,7 +655,7 @@ checked every day, and checked again before a job builds. Interfaces and verifie
   30 s; a `5xx` is retried for reads, release notes and distribution, **never for the upload**, which may have gone
   through.
 - **The Firebase app id is a step input.** The scanner does not read `google-services.json` or `firebase.json` yet, so
-  workflows (Phase 11) take the app id from the project configuration; nothing here guesses it.
+  workflows take it as an input (`firebaseAppIds`, by flavor and platform); nothing here guesses it.
 
 ### Fake Firebase App Distribution
 
@@ -730,6 +731,178 @@ next tick.
 `unreachable` or never-checked one is a warning. The acceptance tests are `credentials_preflight_test.dart` in
 `xp_engine` (an expired ASC key and a revoked app-specific password, through `JobRunner` with the guard first and a
 build step that must stay `pending`) and `credential_checks_test.dart` in `xpd` (the same against the fake ASC server).
+
+## Workflows and the scheduler
+
+Phase 11 puts the steps in order and decides when they run (D-11, D-13, D-19). A **workflow** is a YAML
+document; **dispatching** it makes a **run**, whose **jobs** wait in the database until the **scheduler**
+starts them. The engine is also the local runner; remote runners are Phase 14.
+
+### The workflow document (schema 1)
+
+```yaml
+schema: 1                      # required
+name: Dev build                # optional
+description: ...               # optional
+lock: project                  # optional: one run of this workflow at a time per project
+inputs:                        # optional: variables a dispatch can set
+  notes: {description: Release notes, default: ""}
+stages:                        # required; run in order
+  - name: build
+    jobs:                      # run in parallel, as slots allow
+      build:                   # the job id, unique in the workflow
+        name: Build ${{ flavor.name }} for ${{ platform }}
+        matrix:                # one job per cell
+          platform: ${{ platforms }}     # or [android, ios]
+          flavor: ${{ flavors }}
+        if: platform == 'android'        # a cell without a job when false
+        capabilities: [flutter]          # on top of what the steps need
+        steps:
+          - kind: build.android          # a step type
+            with: {artifact: apk}        # what the step type takes
+            if: "!flavor.shorebird"      # the step is left out when false
+            gate: prod_release           # the owner approves first (D-13)
+```
+
+- **Validation** (`POST /projects/{id}/workflows/validate`, and on every save) uses the `yaml` package's
+  spans, so each problem has the line and column where it is: an unknown key (with the allowed ones), a
+  value of the wrong type, an unknown step type, an unknown `with` key for that type, an unknown
+  capability or gate, a matrix axis that is not `platform` or `flavor`, a platform that is not `android`
+  or `ios`, a job id used twice, `commitFrom` naming a job that is not in an earlier stage, an expression
+  that does not parse (the column points into it), or a variable it reads that does not exist there. A
+  document with issues is never saved (`422 workflow_invalid`). YAML reads a leading `!` as a tag, so
+  quote `"!flavor.prod"`.
+- **Expressions** (`if:` and `${{ ... }}` in `name`, matrix values and `with`) are a small language that
+  reads values and runs nothing: literals (`'x'`, `"x"`, numbers, `true`, `false`, `null`), variables,
+  `a.b` and `a['b']` and `a[0]`, `==`, `!=`, `!`, `&&`, `||` and parentheses. Reading what is not there gives
+  `null`, also past a `null`. `&&` and `||` give one of their operands, so `a && b || c` picks a value;
+  `null`, `false`, `0` and `''` are false. A string that is one `${{ }}` keeps the type of its value; with
+  text around it, it becomes text. There is no function, assignment, loop or `eval`.
+- **Variables.** From the dispatch: `app` (`name`, `path`, `hasIos`, `hasAndroid`, `version`), `project`
+  (`id`, `fullName`, `baseBranch`), `ref`, `sha`, `version` (the version released, `x.y.z`), `build` (the
+  number allocated at dispatch), `bump`, `releaseVersion` and `patch` (for a patch), `platforms`, `flavors`
+  and `inputs` (the defaults of the document, then what the request gave). A matrix adds `platform` and
+  `flavor` (`name`, `prod`, `shorebird`, `implicit`, `entrypoint`, `iosBundleId`, `androidAppId`,
+  `shorebirdAppId`, and `credentials.<kind>` for each credential the flavor has, such as
+  `flavor.credentials.play_sa`). `if` is evaluated when the workflow is dispatched, not while the job runs.
+- **Steps** are the registered step types; the engine fills in what it knows (the worktree, the commit, the
+  version and build number, the flavor and its ids, the Flutter pin, the secrets of the flavor's
+  credentials), so `with` carries only what varies. `StepPlanners` has the table: `command`,
+  `git.checkout`, `guard`, `version.bump`, `build.android`, `build.ios`, `build.verifyCompiledConfig`,
+  `ios.stripAndReexport`, `shorebird.release`, `shorebird.patch`, `symbols.archive`, `record.manifest`,
+  `test`, `analyze`, `upload.appStore`, `upload.play`, `upload.firebase`, `git.releaseBranch`, `git.tag`
+  and `git.push`. The inputs are the ones of the sections above; a workflow gets the credentials by
+  flavor and kind (`upload.firebase` needs a `firebase_sa` credential, `upload.play` a `play_sa`,
+  `upload.appStore` an `asc_key` or `apple_id`, Shorebird steps a `shorebird` key if there is one). The
+  Android keystore of a `keystore` credential reaches a build as `XPATH_KEYSTORE_FILE` (a 0600 file),
+  `XPATH_KEYSTORE_STORE_PASSWORD` and `XPATH_KEYSTORE_KEY_PASSWORD`. The Firebase app id of a flavor is
+  an input (`firebaseAppIds: {dev: {android: "1:..."}}`), as are the App Store Connect app ids.
+- **`git.checkout`** is the first step of every job. It makes the job's worktree when the job runs, not at
+  dispatch, so a queued job holds no directory; with `commitFrom: <job id>` it starts from the version
+  commit that an earlier job of the run made (`version.bump`), so every platform of a release builds
+  the very commit that is tagged. `git.releaseBranch` cuts `release/<x.y.z>` at the head of the worktree,
+  `git.tag` tags it (`v<x.y.z>+<build>`, or `-p<n>` for a patch; an existing tag on the same commit is
+  reused, one on another commit fails, nothing is forced) and `git.push` pushes the branch and the tag.
+  Worktrees of finished jobs are kept for resume and inspection until the housekeeping of Phase 12c.
+- **Gates** (D-13). `gate: prod_release | prod_patch | store_submission | push | merge | delete` on a step
+  puts a `gate` step in front of it. The gate asks the `ApprovalGate` port (`xp_engine`) about the action,
+  project, commit and version, and while nobody decided, its step returns `StepWaiting`: the job stops in
+  state **`waiting_for_approval`**, holding no slot and no runner, and its run holds the project lock.
+  Whoever decides a gate calls `Scheduler.resumeWaiting(projectId:)`; each waiting job asks again and goes
+  on (approved), fails (denied or expired) or waits again. Approvals themselves are Phase 12a: until then
+  `xpd` wires `PendingApprovalGate`, which approves nothing, so a production release or patch stops at its
+  first gate and a dev build or test run is not affected. The engine never approves on its own.
+- **Matrix.** `platform` takes `android` and `ios`, `flavor` a flavor name; the values are written out or
+  come from `${{ platforms }}` / `${{ flavors }}` (or an input). A job is made for each cell whose `if` is
+  true. The default platforms are what the app has; the default flavors are the production flavors for a
+  workflow with `lock: project` and the others otherwise (an app with one flavor always uses it).
+- **Capabilities.** A job needs what it declares plus what its steps imply: `android` and `flutter` for
+  `build.android`, `ios-sign` and `flutter` for `build.ios` and `upload.appStore`, the platform's for
+  Shorebird steps, `flutter` for `test` and `analyze`.
+
+### Built-in workflows and versions
+
+Every project gets `dev-build`, `prod-release`, `shorebird-patch` and `test` the first time its workflows
+are listed (and a new version of one when the engine ships another document). They compose the steps in the
+order of `ship.sh`:
+
+| Workflow | Stages | Notes |
+|---|---|---|
+| `dev-build` | `build` (platform x flavor) | `git.checkout`, `guard`, `version.bump`, `build.android` / `build.ios`, `record.manifest`, then `upload.firebase` (an Android build with an app id in `firebaseAppIds`) or `upload.appStore` (an iOS build with an id in `appleAppIds`). No lock: as many as the slots allow. |
+| `prod-release` | `prepare`, `build` (platform x flavor), `finalize` | `lock: project`. `prepare` bumps the version once and cuts the release branch after `gate: prod_release`; each `build` job starts from that commit and runs `shorebird.release` (a Shorebird flavor) or `build.android` / `build.ios`, `symbols.archive`, `record.manifest` and the uploads the flavor has credentials for; `finalize` tags and pushes after `gate: push`. |
+| `shorebird-patch` | `patch` (platform x flavor), `finalize` | `lock: project`. Dispatch it with `releaseVersion` (`x.y.z+build`, never `latest`); `gate: prod_patch` before `shorebird.patch`, then the patch tag `v<x.y.z>+<build>-p<n>` and `gate: push`. |
+| `test` | `test` | `test` and `analyze`; allocates no build number. |
+
+Built-ins cannot be edited or deleted (`409`); copy the YAML into a workflow of your own. **Every save is a
+new `workflow_version`**, and a dispatch records the exact version it ran: `Job.workflowVersionId` and
+`GET .../workflows/{id}?version=n` show what a job ran, even after the workflow changed. A workflow that jobs
+ran cannot be deleted.
+
+### Dispatch
+
+`POST /projects/{id}/workflows/{workflowId}/dispatch` takes `ref` (default: the base branch), `app`,
+`flavors`, `platforms`, `bump` (`major`, `minor`, `patch`, `keep`) or `version`, `releaseVersion` and
+`inputs`. It fetches the mirror, resolves the ref to a commit, reads the version of the app at that commit,
+**allocates the build number once for the run** (D-11: `BuildNumberAllocator` over the stores, the tags and
+the counter, only for a workflow with `version.bump`; the number is never handed back, even if the run fails),
+expands the matrix, plans every step of every job, and only then stores the run and its jobs, all `queued`.
+A request that cannot be done (an unknown flavor, a credential a step needs, a value a step refuses) is
+`422 workflow_invalid` with the line of the workflow and nothing stored. The answer is `202` with the
+`Run` (`GET /runs/{id}` shows it again; its state is derived from its jobs), and `run.dispatched` goes on
+`/events`.
+
+| Route | What it does |
+|---|---|
+| `GET /projects/{id}/workflows` | The workflows of the project, built-ins first made if needed. |
+| `POST /projects/{id}/workflows` | `{"name", "yaml"}`: a new workflow at version 1. `409` for a used name, `422` for issues. |
+| `POST /projects/{id}/workflows/validate` | `{"yaml"}`: always `200`, with `valid` and the `issues` (`line`, `column`, `message`). |
+| `GET /projects/{id}/workflows/{workflowId}[?version=n]` | The workflow with the YAML of a version and the list of versions. |
+| `PUT /projects/{id}/workflows/{workflowId}` | `{"yaml"}`: a new version. |
+| `DELETE /projects/{id}/workflows/{workflowId}` | Deletes a workflow of your own that no job ran. |
+| `POST /projects/{id}/workflows/{workflowId}/dispatch` | Described above. |
+| `GET /runs/{id}`, `POST /runs/{id}/cancel` | A run with its jobs; cancel every job that has not ended. |
+
+### The scheduler
+
+`Scheduler` (`packages/xp_engine/lib/src/scheduler`) reads the open runs from the database and, each time
+something changes (a dispatch, a job that ends or is cancelled or resumed, a gate decided, the engine
+starting), makes one pass that starts what may start. It keeps no state of its own, so a restart loses
+nothing, and the same state always gives the same pass.
+
+- **Stages.** A stage starts when every job of the stages before it succeeded. A failed or cancelled job
+  holds the later stages (and its queued siblings) back, `queued`, with the reason in the job's `message`,
+  until it is resumed and succeeds.
+- **The project lock** (D-11). A run of a `lock: project` workflow takes the project when the scheduler
+  starts its first job and keeps it, through its stages and through a gate that waits, until it succeeds,
+  fails or is cancelled. A second prod release or patch of the project stays `queued` ("Waiting for run
+  `<id>` to finish ...") and takes its turn in the order the runs were dispatched; a later run never
+  overtakes an earlier one that waits. A run whose failed job is resumed asks for the project again, so it
+  waits for a run that took it meanwhile. Dev builds, tests and other projects are not held.
+- **Slots and `ios-sign`** (D-19). A runner runs at most `slots` jobs at once: `xpd serve --slots <n>`, by
+  default a quarter of the processor cores and at least one. A job that needs `ios-sign` runs alone on its
+  machine in that respect (another Mac takes the next). Runs are served oldest first, their jobs by stage
+  and creation order; a job that cannot start does not hold up those behind it.
+- **Capabilities.** The engine probes this machine (`LocalCapabilities`): `flutter` when `git` runs (the
+  pinned SDK is fetched on demand), `android` when an Android SDK is found (`ANDROID_HOME`,
+  `ANDROID_SDK_ROOT`, the default places of Android Studio), `ios-sign` when `xcode-select` and
+  `xcodebuild` find an Xcode, `swift-linux` when Linux has `swift`. A job goes to a runner that has all
+  it needs; if none does the job says "No runner can do ios-sign." and waits. `xpd serve` prints what it
+  found. The `SchedulerRunner` interface (`id`, `capabilities`, `slots`, `launch`, `whenFinished`) is what
+  Phase 14 implements for remote runners with leases; only the local runner exists now.
+- **Resume and cancel** go through the scheduler (`POST /jobs/{id}/resume` puts a dispatched job back in
+  the queue and answers with it, `queued` or `running`; a job that is not part of a run resumes at once).
+
+### End to end
+
+`tool/e2e/release_e2e.sh dev` builds the `xpd` bundle and runs `apps/xpd/tool/release_e2e.dart`, which starts
+a fake Firebase App Distribution and a fake GitHub, starts `xpd serve` with `XPD_TEST_GITHUB_API_URL`,
+`XPD_TEST_FIREBASE_URL` and `XPD_TEST_FILE_SECRETS=1` (**test only**: they point the engine at the fakes and
+keep its secrets in a file instead of the Keychain; `xpd` warns when one is set), adds the fixture app as a
+project over HTTP, saves a Firebase service account, dispatches `dev-build` for Android, and checks the APK,
+the manifest and the Firebase release. It then dispatches `prod-release` twice and checks that the second
+queues behind the first, which stops at its gate, and runs once the first is cancelled. It needs the
+Android SDK, takes a few minutes the first time and is not part of CI (Gradle and the SDK make it too slow
+for the Linux workflow). `release_e2e.sh prod` is Phase 12b.
 
 ## Testing
 

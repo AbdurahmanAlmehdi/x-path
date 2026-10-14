@@ -1,0 +1,136 @@
+// GENERATED CODE - DO NOT MODIFY BY HAND
+
+part of 'workflow.dart';
+
+// **************************************************************************
+// JsonSerializableGenerator
+// **************************************************************************
+
+WorkflowVersionInfo _$WorkflowVersionInfoFromJson(Map<String, dynamic> json) =>
+    WorkflowVersionInfo(
+      id: json['id'] as String,
+      version: (json['version'] as num).toInt(),
+      createdAt: DateTime.parse(json['createdAt'] as String),
+    );
+
+Map<String, dynamic> _$WorkflowVersionInfoToJson(
+  WorkflowVersionInfo instance,
+) => <String, dynamic>{
+  'id': instance.id,
+  'version': instance.version,
+  'createdAt': instance.createdAt.toIso8601String(),
+};
+
+Workflow _$WorkflowFromJson(Map<String, dynamic> json) => Workflow(
+  id: json['id'] as String,
+  projectId: json['projectId'] as String,
+  name: json['name'] as String,
+  builtin: json['builtin'] as bool,
+  version: WorkflowVersionInfo.fromJson(
+    json['version'] as Map<String, dynamic>,
+  ),
+  versions: (json['versions'] as List<dynamic>)
+      .map((e) => WorkflowVersionInfo.fromJson(e as Map<String, dynamic>))
+      .toList(),
+  yaml: json['yaml'] as String,
+);
+
+Map<String, dynamic> _$WorkflowToJson(Workflow instance) => <String, dynamic>{
+  'id': instance.id,
+  'projectId': instance.projectId,
+  'name': instance.name,
+  'builtin': instance.builtin,
+  'version': instance.version.toJson(),
+  'versions': instance.versions.map((e) => e.toJson()).toList(),
+  'yaml': instance.yaml,
+};
+
+WorkflowSummary _$WorkflowSummaryFromJson(Map<String, dynamic> json) =>
+    WorkflowSummary(
+      id: json['id'] as String,
+      projectId: json['projectId'] as String,
+      name: json['name'] as String,
+      builtin: json['builtin'] as bool,
+      version: WorkflowVersionInfo.fromJson(
+        json['version'] as Map<String, dynamic>,
+      ),
+    );
+
+Map<String, dynamic> _$WorkflowSummaryToJson(WorkflowSummary instance) =>
+    <String, dynamic>{
+      'id': instance.id,
+      'projectId': instance.projectId,
+      'name': instance.name,
+      'builtin': instance.builtin,
+      'version': instance.version.toJson(),
+    };
+
+WorkflowsResponse _$WorkflowsResponseFromJson(Map<String, dynamic> json) =>
+    WorkflowsResponse(
+      (json['workflows'] as List<dynamic>)
+          .map((e) => WorkflowSummary.fromJson(e as Map<String, dynamic>))
+          .toList(),
+    );
+
+Map<String, dynamic> _$WorkflowsResponseToJson(WorkflowsResponse instance) =>
+    <String, dynamic>{
+      'workflows': instance.workflows.map((e) => e.toJson()).toList(),
+    };
+
+CreateWorkflowRequest _$CreateWorkflowRequestFromJson(
+  Map<String, dynamic> json,
+) => $checkedCreate('CreateWorkflowRequest', json, ($checkedConvert) {
+  final val = CreateWorkflowRequest(
+    name: $checkedConvert('name', (v) => v as String),
+    yaml: $checkedConvert('yaml', (v) => v as String),
+  );
+  return val;
+});
+
+Map<String, dynamic> _$CreateWorkflowRequestToJson(
+  CreateWorkflowRequest instance,
+) => <String, dynamic>{'name': instance.name, 'yaml': instance.yaml};
+
+WorkflowYamlRequest _$WorkflowYamlRequestFromJson(Map<String, dynamic> json) =>
+    $checkedCreate('WorkflowYamlRequest', json, ($checkedConvert) {
+      final val = WorkflowYamlRequest(
+        yaml: $checkedConvert('yaml', (v) => v as String),
+      );
+      return val;
+    });
+
+Map<String, dynamic> _$WorkflowYamlRequestToJson(
+  WorkflowYamlRequest instance,
+) => <String, dynamic>{'yaml': instance.yaml};
+
+WorkflowIssue _$WorkflowIssueFromJson(Map<String, dynamic> json) =>
+    WorkflowIssue(
+      line: (json['line'] as num).toInt(),
+      column: (json['column'] as num).toInt(),
+      message: json['message'] as String,
+    );
+
+Map<String, dynamic> _$WorkflowIssueToJson(WorkflowIssue instance) =>
+    <String, dynamic>{
+      'line': instance.line,
+      'column': instance.column,
+      'message': instance.message,
+    };
+
+ValidateWorkflowResponse _$ValidateWorkflowResponseFromJson(
+  Map<String, dynamic> json,
+) => ValidateWorkflowResponse(
+  valid: json['valid'] as bool,
+  issues:
+      (json['issues'] as List<dynamic>?)
+          ?.map((e) => WorkflowIssue.fromJson(e as Map<String, dynamic>))
+          .toList() ??
+      const [],
+);
+
+Map<String, dynamic> _$ValidateWorkflowResponseToJson(
+  ValidateWorkflowResponse instance,
+) => <String, dynamic>{
+  'valid': instance.valid,
+  'issues': instance.issues.map((e) => e.toJson()).toList(),
+};

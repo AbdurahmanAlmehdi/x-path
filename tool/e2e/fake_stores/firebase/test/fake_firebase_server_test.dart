@@ -328,6 +328,39 @@ void main() {
       },
     );
 
+    test('reads the version from the file name when told to', () async {
+      await server.close();
+      server =
+          await FakeFirebaseServer.start(
+              pollsBeforeDone: 0,
+              readVersionFromFileName: true,
+            )
+            ..addApp('684690133351', _appId);
+      token = await issue();
+
+      final named = await upload(
+        utf8.encode('PK a real apk'),
+        headers: {
+          'X-Goog-Upload-Protocol': 'raw',
+          'X-Goog-Upload-File-Name': Uri.encodeComponent('dev-1.2.3+45.apk'),
+        },
+      );
+      final unnamed = await upload(utf8.encode('PK a real apk'));
+      final fake = await upload(apk('2.0.0', 7));
+
+      expect(
+        at(body(named), ['response', 'release', 'displayVersion']),
+        '1.2.3',
+      );
+      expect(at(body(named), ['response', 'release', 'buildVersion']), '45');
+      expect(at(body(named), ['response', 'release', 'binaryType']), 'APK');
+      expect(unnamed.statusCode, 400);
+      expect(
+        at(body(fake), ['response', 'release', 'displayVersion']),
+        '2.0.0',
+      );
+    });
+
     test('does not take an upload to another path', () async {
       final response = await call(
         'POST',

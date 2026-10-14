@@ -414,7 +414,7 @@ Mataa dev builds through `xp` can start after Phase 13, before the desktop app e
 
 ### Phase 11: Workflow engine and scheduler
 
-- **Status:** Not started
+- **Status:** Done
 - **Scope:** YAML schema v1 (stages, jobs, steps, capabilities, matrix, `if`, gates) with
   line-level validation errors; built-in `dev-build`, `prod-release`, `shorebird-patch`, `test`;
   workflow versions with per-job snapshots; scheduler with a project lock for prod release and

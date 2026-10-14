@@ -1,4 +1,6 @@
-/// The `dart:io` implementation of the engine's writable workspace.
+/// The `dart:io` implementation of the engine's writable workspace and of the
+/// search for the Android SDK.
 library;
 
+export 'src/workspace/directory_android_sdk.dart';
 export 'src/workspace/directory_workspace.dart';

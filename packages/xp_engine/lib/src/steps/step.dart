@@ -23,6 +23,17 @@ final class StepFailed extends StepOutcome<Never> {
   final String message;
 }
 
+/// The step cannot go on until someone decides (D-13): a gate waits for the
+/// owner to approve an action. The job stops here, holding no slot, and goes
+/// on when it is resumed; the step runs again then and asks again.
+final class StepWaiting extends StepOutcome<Never> {
+  /// Creates the outcome.
+  const new(this.reason);
+
+  /// What the step waits for, for the owner.
+  final String reason;
+}
+
 /// The step had nothing to do.
 final class StepSkipped extends StepOutcome<Never> {
   /// Creates the outcome.

@@ -327,6 +327,147 @@ void main() {
       );
     });
 
+    test('documents the workflow and run endpoints', () {
+      final unauthorized = jsonEncode(
+        ErrorResponse.of(ApiErrorCode.unauthorized, 'm').toJson(),
+      );
+      final invalid = jsonEncode(
+        ErrorResponse.of(ApiErrorCode.workflowInvalid, 'm').toJson(),
+      );
+
+      for (final (method, path) in [
+        ('GET', '/projects/prj_1/workflows'),
+        ('POST', '/projects/prj_1/workflows'),
+        ('POST', '/projects/prj_1/workflows/validate'),
+        ('GET', '/projects/prj_1/workflows/wf_1'),
+        ('PUT', '/projects/prj_1/workflows/wf_1'),
+        ('DELETE', '/projects/prj_1/workflows/wf_1'),
+        ('POST', '/projects/prj_1/workflows/wf_1/dispatch'),
+        ('GET', '/runs/run_1'),
+        ('POST', '/runs/run_1/cancel'),
+      ]) {
+        expect(
+          shipped.validateResponse(
+            method: method,
+            path: path,
+            statusCode: 401,
+            body: unauthorized,
+            contentType: 'application/json',
+          ),
+          isEmpty,
+          reason: '$method $path',
+        );
+      }
+      for (final (method, path) in [
+        ('POST', '/projects/prj_1/workflows'),
+        ('PUT', '/projects/prj_1/workflows/wf_1'),
+        ('POST', '/projects/prj_1/workflows/wf_1/dispatch'),
+      ]) {
+        expect(
+          shipped.validateResponse(
+            method: method,
+            path: path,
+            statusCode: 422,
+            body: invalid,
+            contentType: 'application/json',
+          ),
+          isEmpty,
+          reason: '$method $path',
+        );
+      }
+    });
+
+    test('describes the workflow and run models', () {
+      final at = DateTime.utc(2026, 10, 13);
+      final version = WorkflowVersionInfo(
+        id: 'wfv_1',
+        version: 1,
+        createdAt: at,
+      );
+      final workflow = Workflow(
+        id: 'wf_1',
+        projectId: 'prj_1',
+        name: 'test',
+        builtin: true,
+        version: version,
+        versions: [version],
+        yaml: 'schema: 1',
+      );
+      final run = Run(
+        id: 'run_1',
+        projectId: 'prj_1',
+        workflowId: 'wf_1',
+        workflowVersionId: 'wfv_1',
+        sha: 'a' * 40,
+        ref: 'main',
+        state: RunState.waitingForApproval,
+        locksProject: true,
+        version: '1.0.0',
+        build: 7,
+        createdAt: at,
+        jobs: const [
+          RunJob(
+            id: 'job_1',
+            name: 'prepare',
+            stage: 0,
+            state: JobState.waitingForApproval,
+            capabilities: ['flutter'],
+            message: 'm',
+          ),
+        ],
+      );
+
+      expect(shipped.validateSchema('Workflow', workflow.toJson()), isEmpty);
+      expect(
+        shipped.validateSchema(
+          'WorkflowsResponse',
+          WorkflowsResponse([
+            WorkflowSummary(
+              id: 'wf_1',
+              projectId: 'prj_1',
+              name: 'test',
+              builtin: true,
+              version: version,
+            ),
+          ]).toJson(),
+        ),
+        isEmpty,
+      );
+      expect(shipped.validateSchema('Run', run.toJson()), isEmpty);
+      expect(
+        shipped.validateSchema(
+          'ValidateWorkflowResponse',
+          const ValidateWorkflowResponse(
+            valid: false,
+            issues: [WorkflowIssue(line: 1, column: 1, message: 'm')],
+          ).toJson(),
+        ),
+        isEmpty,
+      );
+      expect(
+        shipped.validateSchema(
+          'DispatchRequest',
+          const DispatchRequest(
+            ref: 'main',
+            flavors: ['dev'],
+            platforms: ['android'],
+            bump: VersionBump.patch,
+            version: '1.2.3',
+            releaseVersion: '1.2.0+4',
+            inputs: {'a': 1},
+          ).toJson(),
+        ),
+        isEmpty,
+      );
+      expect(
+        shipped.validateSchema(
+          'CreateWorkflowRequest',
+          const CreateWorkflowRequest(name: 'my.flow', yaml: 'y').toJson(),
+        ),
+        isEmpty,
+      );
+    });
+
     test('describes every kind of credential request', () {
       const requests = <Map<String, Object?>>[
         {
@@ -435,6 +576,23 @@ void main() {
           credentialId: 'crd_1',
           projectId: 'prj_1',
           kind: CredentialKind.ascKey,
+        ),
+        const WorkflowSaved(
+          workflowId: 'wf_1',
+          projectId: 'prj_1',
+          name: 'dev-build',
+          version: 1,
+        ),
+        const WorkflowRemoved(
+          workflowId: 'wf_1',
+          projectId: 'prj_1',
+          name: 'dev-build',
+        ),
+        const RunDispatched(
+          runId: 'run_1',
+          projectId: 'prj_1',
+          workflowId: 'wf_1',
+          jobIds: ['job_1'],
         ),
       ]) {
         final json = SequencedEvent(

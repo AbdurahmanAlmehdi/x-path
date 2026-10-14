@@ -29,11 +29,19 @@ dependencies:
 
 /// A response read to the end.
 class RawResponse {
-  const new(this.statusCode, this.contentType, this.body);
+  const new(
+    this.statusCode,
+    this.contentType,
+    this.body, [
+    this.headers = const {},
+  ]);
 
   final int statusCode;
   final String? contentType;
   final String body;
+
+  /// The headers of the response, by lower-case name.
+  final Map<String, String> headers;
 
   Map<String, dynamic> get json => jsonDecode(body) as Map<String, dynamic>;
 }
@@ -84,6 +92,10 @@ class TestEngine {
     required this.credentialSecrets,
     required this.credentialVerifiers,
     required this.masker,
+    required this.scheduler,
+    required this.runRepository,
+    required this.workflowRepository,
+    required this.gate,
   });
 
   static Future<TestEngine> start({
@@ -126,9 +138,15 @@ class TestEngine {
         kind: FakeCredentialVerifier(kind),
     };
     final masker = RecordingMasker();
+    final gate = FakeApprovalGate();
+    final registry = StepRegistry([
+      const CommandStep(),
+      GateStep(gate),
+      GitCheckoutStep(git: git, jobs: jobRepository),
+    ]);
     final jobs = JobRunner(
       jobs: jobRepository,
-      steps: StepRegistry([const CommandStep()]),
+      steps: registry,
       supervisor: supervisor,
       logs: logs,
       secrets: MemorySecretStore(),
@@ -138,6 +156,51 @@ class TestEngine {
       clock: clock,
       hostEnvironment: const {'PATH': '/usr/bin'},
       onError: (error, _) => errors.add(error),
+    );
+    final runRepository = InMemoryRunRepository();
+    final scheduler = Scheduler(
+      runner: jobs,
+      records: jobRepository,
+      runs: runRepository,
+      events: events,
+      runners: [
+        LocalRunner(
+          jobs: jobs,
+          capabilities: const {Capability.flutter},
+          slots: 2,
+        ),
+      ],
+      onError: (error, _) => errors.add(error),
+    );
+    final planners = StepPlanners(registry);
+    final workflowRepository = InMemoryWorkflowRepository();
+    final workflows = WorkflowService(
+      repository: workflowRepository,
+      projects: projects,
+      catalog: planners,
+      events: events,
+      clock: clock,
+    );
+    final dispatcher = WorkflowDispatcher(
+      workflows: workflows,
+      planners: planners,
+      projects: projects,
+      credentials: credentialRepository,
+      models: DefaultReleaseModels(),
+      git: git,
+      allocator: BuildNumberAllocator(
+        counters: InMemoryBuildCounterRepository(const []),
+        stores: FakeStoreBuildNumbers(),
+        git: git,
+      ),
+      jobs: jobs,
+      records: jobRepository,
+      runs: runRepository,
+      scheduler: scheduler,
+      events: events,
+      clock: clock,
+      workspaces: (_) => InMemoryWorkspace(const {}),
+      worktreeAt: (mirror, name) => '/worktrees/$name',
     );
     final issued = await tokens.issue(name: 'test', kind: DeviceTokenKind.app);
     final server = await XpdServer.start(
@@ -164,7 +227,7 @@ class TestEngine {
         events: events,
         clock: clock,
       ),
-      jobs: jobs,
+      jobs: scheduler,
       logs: logs,
       artifacts: ArtifactService(
         repository: artifactRepository,
@@ -184,6 +247,13 @@ class TestEngine {
         masker: masker,
         events: events,
         clock: clock,
+      ),
+      workflows: workflows,
+      dispatcher: dispatcher,
+      runs: RunService(
+        runs: runRepository,
+        jobs: jobRepository,
+        control: scheduler,
       ),
       clock: clock,
       engineVersion: '9.9.9',
@@ -212,6 +282,10 @@ class TestEngine {
       credentialSecrets: credentialSecrets,
       credentialVerifiers: credentialVerifiers,
       masker: masker,
+      scheduler: scheduler,
+      runRepository: runRepository,
+      workflowRepository: workflowRepository,
+      gate: gate,
     );
   }
 
@@ -239,6 +313,18 @@ class TestEngine {
 
   /// What the engine was told to hide in logs.
   final RecordingMasker masker;
+
+  /// Starts the queued jobs of runs.
+  final Scheduler scheduler;
+
+  /// The runs.
+  final InMemoryRunRepository runRepository;
+
+  /// The workflows.
+  final InMemoryWorkflowRepository workflowRepository;
+
+  /// What the gates of workflows ask; it leaves them pending until told.
+  final FakeApprovalGate gate;
 
   /// The files of the folders a project can be added from, by path.
   final Map<String, Map<String, String>> folders;
@@ -278,10 +364,13 @@ class TestEngine {
         request.write(body);
       }
       final response = await request.close();
+      final received = <String, String>{};
+      response.headers.forEach((name, values) => received[name] = values.first);
       return RawResponse(
         response.statusCode,
         response.headers.contentType?.toString(),
         await utf8.decodeStream(response),
+        received,
       );
     } finally {
       client.close(force: true);

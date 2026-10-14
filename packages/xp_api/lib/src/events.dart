@@ -77,6 +77,23 @@ sealed class EngineEvent extends Equatable {
       projectId: payload['projectId'] as String,
       kind: CredentialKind.fromWire(payload['kind'] as String)!,
     ),
+    WorkflowSaved.eventType => WorkflowSaved(
+      workflowId: payload['workflowId'] as String,
+      projectId: payload['projectId'] as String,
+      name: payload['name'] as String,
+      version: payload['version'] as int,
+    ),
+    WorkflowRemoved.eventType => WorkflowRemoved(
+      workflowId: payload['workflowId'] as String,
+      projectId: payload['projectId'] as String,
+      name: payload['name'] as String,
+    ),
+    RunDispatched.eventType => RunDispatched(
+      runId: payload['runId'] as String,
+      projectId: payload['projectId'] as String,
+      workflowId: payload['workflowId'] as String,
+      jobIds: (payload['jobIds'] as List<dynamic>).cast<String>(),
+    ),
     _ => UnknownEvent(type: type, payload: payload),
   };
 
@@ -505,6 +522,121 @@ final class CredentialRemoved extends EngineEvent {
 
   @override
   List<Object?> get props => [credentialId, projectId, kind];
+}
+
+/// A workflow was created, or got a new version.
+final class WorkflowSaved extends EngineEvent {
+  /// Creates the event.
+  const new({
+    required this.workflowId,
+    required this.projectId,
+    required this.name,
+    required this.version,
+  });
+
+  /// The wire name of this event.
+  static const eventType = 'workflow.saved';
+
+  /// The workflow.
+  final String workflowId;
+
+  /// The project it belongs to.
+  final String projectId;
+
+  /// Its name.
+  final String name;
+
+  /// The number of the version that was saved.
+  final int version;
+
+  @override
+  String get type => eventType;
+
+  @override
+  Map<String, dynamic> get payload => {
+    'workflowId': workflowId,
+    'projectId': projectId,
+    'name': name,
+    'version': version,
+  };
+
+  @override
+  List<Object?> get props => [workflowId, projectId, name, version];
+}
+
+/// A workflow was deleted.
+final class WorkflowRemoved extends EngineEvent {
+  /// Creates the event.
+  const new({
+    required this.workflowId,
+    required this.projectId,
+    required this.name,
+  });
+
+  /// The wire name of this event.
+  static const eventType = 'workflow.removed';
+
+  /// The workflow.
+  final String workflowId;
+
+  /// The project it belonged to.
+  final String projectId;
+
+  /// Its name.
+  final String name;
+
+  @override
+  String get type => eventType;
+
+  @override
+  Map<String, dynamic> get payload => {
+    'workflowId': workflowId,
+    'projectId': projectId,
+    'name': name,
+  };
+
+  @override
+  List<Object?> get props => [workflowId, projectId, name];
+}
+
+/// A workflow was dispatched: its jobs exist and wait for the scheduler.
+final class RunDispatched extends EngineEvent {
+  /// Creates the event.
+  const new({
+    required this.runId,
+    required this.projectId,
+    required this.workflowId,
+    required this.jobIds,
+  });
+
+  /// The wire name of this event.
+  static const eventType = 'run.dispatched';
+
+  /// The run.
+  final String runId;
+
+  /// The project it runs for.
+  final String projectId;
+
+  /// The workflow that was dispatched.
+  final String workflowId;
+
+  /// The jobs it made, by stage.
+  final List<String> jobIds;
+
+  @override
+  String get type => eventType;
+
+  @override
+  Map<String, dynamic> get payload => {
+    'runId': runId,
+    'projectId': projectId,
+    'workflowId': workflowId,
+    'jobIds': jobIds,
+  };
+
+  @override
+  List<Object?> get props => [runId, projectId, workflowId, jobIds];
 }
 
 /// An event whose type this client does not know.
