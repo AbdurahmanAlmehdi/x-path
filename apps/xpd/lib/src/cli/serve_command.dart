@@ -12,6 +12,7 @@ import 'package:xpd/src/stores/apple_stores.dart';
 import 'package:xpd/src/stores/firebase_stores.dart';
 import 'package:xpd/src/stores/play_stores.dart';
 import 'package:xpd/src/stores/store_guard_checks.dart';
+import 'package:xpd/src/test_endpoints.dart';
 import 'package:xpd/src/version.dart';
 
 /// The port `xpd serve` listens on unless told otherwise.
@@ -33,6 +34,14 @@ class ServeCommand extends XpdCommand {
         'port',
         help: 'Port to listen on. 0 picks a free port.',
         defaultsTo: '$defaultPort',
+      )
+      ..addOption(
+        'slots',
+        help:
+            'How many jobs run at once on this machine. iOS signing jobs run '
+            'one at a time whatever this is.\n'
+            '(defaults to a quarter of the processor cores, at least 1)',
+        valueHelp: 'n',
       );
   }
 
@@ -56,6 +65,21 @@ class ServeCommand extends XpdCommand {
       context.err.writeln(
         'warning: $host is not a loopback address; anyone who can reach it '
         'can try device tokens, and traffic is not encrypted.',
+      );
+    }
+
+    final slots = argResults!.option('slots') == null
+        ? defaultSlots(Platform.numberOfProcessors)
+        : int.tryParse(argResults!.option('slots')!);
+    if (slots == null || slots < 1) {
+      usageException('--slots must be a whole number of at least 1.');
+    }
+
+    final testing = TestEndpoints.fromEnvironment(context.environment);
+    if (testing.isActive) {
+      context.err.writeln(
+        'warning: XPD_TEST_* is set, so this engine talks to test servers '
+        'or keeps secrets in a file. Use it for end-to-end tests only.',
       );
     }
 
@@ -87,10 +111,13 @@ class ServeCommand extends XpdCommand {
       final secrets = createSecretStore(
         runner: runner,
         dataDir: directory,
-        operatingSystem: context.operatingSystem,
+        operatingSystem: testing.secretStoreSystem(context.operatingSystem),
         environment: context.environment,
       );
-      final github = HttpGitHubClient(secrets: secrets);
+      final github = HttpGitHubClient(
+        secrets: secrets,
+        baseUrl: testing.githubApiUrl,
+      );
       final events = SqliteEventLog(
         database: database,
         clock: const SystemClock(),
@@ -123,7 +150,10 @@ class ServeCommand extends XpdCommand {
         clock: const SystemClock(),
         requiredTargetSdk: targetSdk,
       );
-      final firebase = FirebaseStores(clock: const SystemClock());
+      final firebase = FirebaseStores(
+        clock: const SystemClock(),
+        baseUrl: testing.firebaseUrl,
+      );
       final credentialChecks = CredentialChecks(
         database: database,
         secrets: secrets,
@@ -137,6 +167,7 @@ class ServeCommand extends XpdCommand {
         firebase: firebase,
         dataDir: directory,
         isMacOS: context.operatingSystem == 'macos',
+        githubBaseUrl: testing.githubApiUrl,
         onError: (error, stackTrace) =>
             context.err.writeln('warning: credential check failed: $error'),
       );
@@ -162,110 +193,119 @@ class ServeCommand extends XpdCommand {
       );
       final secretFiles = DirectorySecretFileStore(p.join(directory, 'tmp'));
       final logs = JobLogs(store: FileJobLogStore(p.join(directory, 'logs')));
+      // Nothing approves a gate yet (Phase 12a), so a job that reaches one
+      // waits.
+      const approvalGate = PendingApprovalGate();
+      final registry = StepRegistry([
+        const GateStep(approvalGate),
+        GitCheckoutStep(git: git, jobs: jobRepository),
+        GitReleaseBranchStep(git),
+        GitTagStep(git),
+        GitPushStep(git),
+        const CommandStep(),
+        VersionBumpStep(git: git, workspaces: DirectoryWorkspace.new),
+        BuildAndroidStep(
+          toolchain: buildToolchain,
+          files: buildFiles,
+          recorder: artifactRecorder,
+          repository: artifactRepository,
+          store: artifactStore,
+        ),
+        BuildIosStep(
+          toolchain: buildToolchain,
+          files: buildFiles,
+          recorder: artifactRecorder,
+          repository: artifactRepository,
+          store: artifactStore,
+          isMacOS: isMacOS,
+        ),
+        ShorebirdReleaseStep(
+          toolchain: buildToolchain,
+          files: buildFiles,
+          recorder: artifactRecorder,
+          repository: artifactRepository,
+          store: artifactStore,
+          releases: shorebirdReleases,
+          records: shorebirdRecords,
+          clock: const SystemClock(),
+          isMacOS: isMacOS,
+        ),
+        ShorebirdPatchStep(
+          toolchain: buildToolchain,
+          files: buildFiles,
+          releases: shorebirdReleases,
+          records: shorebirdRecords,
+          isMacOS: isMacOS,
+        ),
+        SymbolsArchiveStep(
+          directories: buildDirectories,
+          files: buildFiles,
+          recorder: artifactRecorder,
+          repository: artifactRepository,
+          store: artifactStore,
+        ),
+        VerifyCompiledConfigStep(
+          workspaces: DirectoryWorkspace.new,
+          repository: artifactRepository,
+          store: artifactStore,
+          snapshots: const ZipSnapshotReader(),
+        ),
+        StripAndReexportStep(
+          directories: buildDirectories,
+          files: buildFiles,
+          recorder: artifactRecorder,
+          isMacOS: isMacOS,
+        ),
+        RecordManifestStep(
+          git: git,
+          workspaces: DirectoryWorkspace.new,
+          artifacts: artifactRepository,
+          recorder: artifactRecorder,
+          jobs: jobRepository,
+          clock: const SystemClock(),
+        ),
+        TestStep(
+          toolchain: buildToolchain,
+          jobs: jobRepository,
+          runs: testRuns,
+          events: events,
+          clock: const SystemClock(),
+        ),
+        AnalyzeStep(toolchain: buildToolchain),
+        apple.uploadStep(
+          repository: artifactRepository,
+          store: artifactStore,
+          secrets: secrets,
+          secretFiles: secretFiles,
+          isMacOS: isMacOS,
+        ),
+        play.uploadStep(
+          repository: artifactRepository,
+          store: artifactStore,
+          secrets: secrets,
+        ),
+        firebase.uploadStep(
+          repository: artifactRepository,
+          store: artifactStore,
+          secrets: secrets,
+        ),
+        GuardStep(
+          checks: [
+            const SourceCheck(),
+            const VersionSyncCheck(),
+            const PatchTargetCheck(),
+            const NewReleaseNumberCheck(),
+            const PatchNativeDiffCheck(),
+            ...storeGuardChecks(apple: apple, play: play),
+            credentialChecks.guardCheck,
+          ],
+          git: git,
+          workspaces: DirectoryWorkspace.new,
+        ),
+      ]);
       final jobs = JobRunner(
         jobs: jobRepository,
-        steps: StepRegistry([
-          const CommandStep(),
-          VersionBumpStep(git: git, workspaces: DirectoryWorkspace.new),
-          BuildAndroidStep(
-            toolchain: buildToolchain,
-            files: buildFiles,
-            recorder: artifactRecorder,
-            repository: artifactRepository,
-            store: artifactStore,
-          ),
-          BuildIosStep(
-            toolchain: buildToolchain,
-            files: buildFiles,
-            recorder: artifactRecorder,
-            repository: artifactRepository,
-            store: artifactStore,
-            isMacOS: isMacOS,
-          ),
-          ShorebirdReleaseStep(
-            toolchain: buildToolchain,
-            files: buildFiles,
-            recorder: artifactRecorder,
-            repository: artifactRepository,
-            store: artifactStore,
-            releases: shorebirdReleases,
-            records: shorebirdRecords,
-            clock: const SystemClock(),
-            isMacOS: isMacOS,
-          ),
-          ShorebirdPatchStep(
-            toolchain: buildToolchain,
-            files: buildFiles,
-            releases: shorebirdReleases,
-            records: shorebirdRecords,
-            isMacOS: isMacOS,
-          ),
-          SymbolsArchiveStep(
-            directories: buildDirectories,
-            files: buildFiles,
-            recorder: artifactRecorder,
-            repository: artifactRepository,
-            store: artifactStore,
-          ),
-          VerifyCompiledConfigStep(
-            workspaces: DirectoryWorkspace.new,
-            repository: artifactRepository,
-            store: artifactStore,
-            snapshots: const ZipSnapshotReader(),
-          ),
-          StripAndReexportStep(
-            directories: buildDirectories,
-            files: buildFiles,
-            recorder: artifactRecorder,
-            isMacOS: isMacOS,
-          ),
-          RecordManifestStep(
-            git: git,
-            workspaces: DirectoryWorkspace.new,
-            artifacts: artifactRepository,
-            recorder: artifactRecorder,
-            jobs: jobRepository,
-            clock: const SystemClock(),
-          ),
-          TestStep(
-            toolchain: buildToolchain,
-            jobs: jobRepository,
-            runs: testRuns,
-            events: events,
-            clock: const SystemClock(),
-          ),
-          AnalyzeStep(toolchain: buildToolchain),
-          apple.uploadStep(
-            repository: artifactRepository,
-            store: artifactStore,
-            secrets: secrets,
-            secretFiles: secretFiles,
-            isMacOS: isMacOS,
-          ),
-          play.uploadStep(
-            repository: artifactRepository,
-            store: artifactStore,
-            secrets: secrets,
-          ),
-          firebase.uploadStep(
-            repository: artifactRepository,
-            store: artifactStore,
-            secrets: secrets,
-          ),
-          GuardStep(
-            checks: [
-              const SourceCheck(),
-              const VersionSyncCheck(),
-              const PatchTargetCheck(),
-              const NewReleaseNumberCheck(),
-              const PatchNativeDiffCheck(),
-              ...storeGuardChecks(apple: apple, play: play),
-              credentialChecks.guardCheck,
-            ],
-            git: git,
-            workspaces: DirectoryWorkspace.new,
-          ),
-        ]),
+        steps: registry,
         supervisor: supervisor,
         logs: logs,
         secrets: secrets,
@@ -284,6 +324,76 @@ class ServeCommand extends XpdCommand {
         onError: (error, stackTrace) =>
             context.err.writeln('error: $error\n$stackTrace'),
       );
+      final projects = ProjectService(
+        repository: projectRepository,
+        github: github,
+        git: git,
+        scanner: const ProjectScanner(),
+        sources: DirectoryScanSource.new,
+        runner: runner,
+        events: events,
+        clock: const SystemClock(),
+      );
+      final capabilities = await LocalCapabilities(
+        runner: runner,
+        prober: ToolProber(runner: runner, isMacOS: isMacOS),
+        android: DirectoryAndroidSdk(
+          environment: context.environment,
+          home: context.environment['HOME'],
+        ),
+        isMacOS: isMacOS,
+      ).probe();
+      final can = capabilities.isEmpty
+          ? 'no capability'
+          : capabilities.map((capability) => capability.wire).join(', ');
+      context.out.writeln(
+        'xpd runs jobs here with $slots slot${slots == 1 ? '' : 's'} and $can',
+      );
+      final runRepository = SqliteRunRepository(database);
+      final scheduler = Scheduler(
+        runner: jobs,
+        records: jobRepository,
+        runs: runRepository,
+        events: events,
+        runners: [
+          LocalRunner(jobs: jobs, capabilities: capabilities, slots: slots),
+        ],
+        onError: (error, stackTrace) =>
+            context.err.writeln('error: scheduler: $error\n$stackTrace'),
+      );
+      final planners = StepPlanners(registry);
+      final workflows = WorkflowService(
+        repository: SqliteWorkflowRepository(database),
+        projects: projectRepository,
+        catalog: planners,
+        events: events,
+        clock: const SystemClock(),
+      );
+      final dispatcher = WorkflowDispatcher(
+        workflows: workflows,
+        planners: planners,
+        projects: projectRepository,
+        credentials: credentialChecks.repository,
+        models: SqliteReleaseModelRepository(database),
+        git: git,
+        allocator: BuildNumberAllocator(
+          counters: SqliteBuildCounterRepository(database),
+          stores: CombinedStoreBuildNumbers(
+            apple: apple.buildNumbers,
+            play: play.buildNumbers,
+          ),
+          git: git,
+        ),
+        jobs: jobs,
+        records: jobRepository,
+        runs: runRepository,
+        scheduler: scheduler,
+        events: events,
+        clock: const SystemClock(),
+        workspaces: DirectoryWorkspace.new,
+        worktreeAt: (mirror, name) =>
+            CliGitService.worktreePath(directory, mirror, name),
+      );
       await _recoverJobs(
         JobRecovery(
           jobs: jobRepository,
@@ -292,25 +402,18 @@ class ServeCommand extends XpdCommand {
           events: events,
           clock: const SystemClock(),
         ),
-        jobs,
+        scheduler,
       );
+      // Jobs that were queued when the engine stopped take their turn.
+      await scheduler.pump();
       final server = await XpdServer.start(
         tokens: TokenService(
           tokens: SqliteDeviceTokenRepository(database),
           clock: const SystemClock(),
         ),
         events: events,
-        projects: ProjectService(
-          repository: projectRepository,
-          github: github,
-          git: git,
-          scanner: const ProjectScanner(),
-          sources: DirectoryScanSource.new,
-          runner: runner,
-          events: events,
-          clock: const SystemClock(),
-        ),
-        jobs: jobs,
+        projects: projects,
+        jobs: scheduler,
         logs: logs,
         artifacts: ArtifactService(
           repository: artifactRepository,
@@ -323,6 +426,13 @@ class ServeCommand extends XpdCommand {
           projects: projectRepository,
         ),
         credentials: credentialChecks.service,
+        workflows: workflows,
+        dispatcher: dispatcher,
+        runs: RunService(
+          runs: runRepository,
+          jobs: jobRepository,
+          control: scheduler,
+        ),
         clock: const SystemClock(),
         engineVersion: packageVersion,
         host: host,
@@ -339,6 +449,7 @@ class ServeCommand extends XpdCommand {
       context.out.writeln('xpd shutting down');
       // Stop the jobs the way a crash would, but cleanly: their processes end
       // and the next start resumes them.
+      scheduler.stop();
       await jobs.interruptAll();
       await server.close();
       credentialChecks.close();
@@ -353,7 +464,7 @@ class ServeCommand extends XpdCommand {
   /// Cleans up after an engine that stopped while jobs ran (ADR 0003, D-18):
   /// stops what they left running, and runs the jobs that can simply go on.
   /// Jobs with an interrupted side-effect step wait for an explicit resume.
-  Future<void> _recoverJobs(JobRecovery recovery, JobRunner jobs) async {
+  Future<void> _recoverJobs(JobRecovery recovery, JobControl jobs) async {
     final report = await recovery.recover();
     for (final id in report.waiting) {
       context.err.writeln(

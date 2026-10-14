@@ -38,6 +38,13 @@ enum ApiErrorCode {
   @JsonValue('credential_rejected')
   credentialRejected(422),
 
+  /// A workflow document was not saved or dispatched because it has issues
+  /// (`POST .../workflows/validate` lists them with their lines), or a
+  /// dispatch asked for something the project cannot do. The message says
+  /// what to fix.
+  @JsonValue('workflow_invalid')
+  workflowInvalid(422),
+
   /// The route only speaks WebSocket.
   @JsonValue('upgrade_required')
   upgradeRequired(426),

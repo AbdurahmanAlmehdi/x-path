@@ -18,6 +18,9 @@ abstract interface class JobRepository {
   /// The jobs in one of [states], oldest first.
   Future<List<JobRecord>> list({required Set<JobState> states});
 
+  /// The jobs of the run [runId], by stage, in the order they were made.
+  Future<List<JobRecord>> forRun(String runId);
+
   /// Replaces the stored job that has the id of [job].
   Future<void> updateJob(JobRecord job);
 
@@ -60,6 +63,21 @@ class InMemoryJobRepository implements JobRepository {
     for (final job in _jobs.values)
       if (states.contains(job.state)) job,
   ];
+
+  @override
+  Future<List<JobRecord>> forRun(String runId) async {
+    final jobs = _jobs.values.where((job) => job.runId == runId).toList();
+    // `sort` is not stable, and jobs are in the order they were made.
+    return [
+      for (final (_, job)
+          in [for (final (index, job) in jobs.indexed) (index, job)]..sort(
+            (a, b) => a.$2.stage != b.$2.stage
+                ? a.$2.stage.compareTo(b.$2.stage)
+                : a.$1.compareTo(b.$1),
+          ))
+        job,
+    ];
+  }
 
   @override
   Future<void> updateJob(JobRecord job) async {

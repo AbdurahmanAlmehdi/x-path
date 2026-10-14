@@ -20,7 +20,8 @@ class SqliteJobRepository implements JobRepository {
 
   static const _jobColumns =
       'id, workflow_version_id, project_id, release_id, sha, state, '
-      'runner_id, message, created_at, started_at, finished_at';
+      'runner_id, run_id, stage, name, capabilities, message, created_at, '
+      'started_at, finished_at';
 
   static const _stepColumns =
       'job_id, ordinal, kind, state, side_effect, input, attempts, result, '
@@ -31,7 +32,7 @@ class SqliteJobRepository implements JobRepository {
     _database.transaction(() {
       _db.execute(
         'INSERT INTO job ($_jobColumns) '
-        'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
         [
           job.id,
           job.workflowVersionId,
@@ -40,6 +41,10 @@ class SqliteJobRepository implements JobRepository {
           job.sha,
           job.state.wire,
           job.runnerId,
+          job.runId,
+          job.stage,
+          job.name,
+          jsonEncode(job.capabilities),
           job.message,
           toDatabaseTime(job.createdAt),
           _time(job.startedAt),
@@ -78,6 +83,15 @@ class SqliteJobRepository implements JobRepository {
       'WHERE state IN (${List.filled(states.length, '?').join(', ')}) '
       'ORDER BY rowid',
       [for (final state in states) state.wire],
+    ))
+      _jobFromRow(row),
+  ];
+
+  @override
+  Future<List<JobRecord>> forRun(String runId) async => [
+    for (final row in _db.select(
+      'SELECT $_jobColumns FROM job WHERE run_id = ? ORDER BY stage, rowid',
+      [runId],
     ))
       _jobFromRow(row),
   ];
@@ -179,6 +193,11 @@ class SqliteJobRepository implements JobRepository {
     sha: row['sha'] as String?,
     state: JobState.values.firstWhere((s) => s.wire == row['state']),
     runnerId: row['runner_id'] as String?,
+    runId: row['run_id'] as String?,
+    stage: row['stage'] as int,
+    name: row['name'] as String?,
+    capabilities: (jsonDecode(row['capabilities'] as String) as List<dynamic>)
+        .cast<String>(),
     message: row['message'] as String?,
     createdAt: fromDatabaseTime(row['created_at'] as int),
     startedAt: _fromTime(row['started_at']),

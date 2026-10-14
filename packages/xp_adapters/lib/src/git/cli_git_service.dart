@@ -54,6 +54,11 @@ class CliGitService implements GitService {
       r'!f() { test "$1" = get || exit 0; '
       r'echo username=x-access-token; echo "password=$XPATH_GIT_TOKEN"; }; f';
 
+  /// Where the worktree [name] of [mirror] is under the data directory
+  /// [dataDir]: `worktrees/<repository id>/<name>`.
+  static String worktreePath(String dataDir, GitMirror mirror, String name) =>
+      p.join(dataDir, 'worktrees', '${mirror.githubRepoId}', name);
+
   static final _fullSha = RegExp(r'^[0-9a-f]{40}$');
   static final _abbreviatedSha = RegExp(r'^[0-9a-fA-F]{4,40}$');
   static final _worktreeName = RegExp(r'^[A-Za-z0-9][A-Za-z0-9._-]*$');
@@ -191,7 +196,7 @@ class CliGitService implements GitService {
       throw ArgumentError.value(name, 'name', 'is not a safe directory name');
     }
     final full = await resolveRef(mirror, sha);
-    final path = p.join(_dataDir, 'worktrees', '${mirror.githubRepoId}', name);
+    final path = worktreePath(_dataDir, mirror, name);
     await _discardWorktree(mirror, path);
     Directory(p.dirname(path)).createSync(recursive: true);
     await _ok('worktree', [

@@ -8,6 +8,7 @@ environment:
   sdk: ^3.13.0
 
 dependencies:
+  collection: ^1.19.1
   crypto: ^3.0.7
   equatable: ^2.1.0
   xp_api: any
