@@ -477,11 +477,39 @@ class ServeCommand extends XpdCommand {
         files: files,
         clock: const SystemClock(),
       );
+      // Runners dial out (D-08): the hub holds their connections and leases,
+      // places jobs on them through the scheduler, and cancels theirs.
+      final tokenService = TokenService(
+        tokens: SqliteDeviceTokenRepository(database),
+        clock: const SystemClock(),
+      );
+      final runnerRepository = SqliteRunnerRepository(database);
+      final runnerHub = RunnerHub(
+        runners: runnerRepository,
+        jobs: jobRepository,
+        runner: jobs,
+        scheduler: scheduler,
+        logs: logs,
+        events: events,
+        clock: const SystemClock(),
+        secrets: secrets,
+        masker: masker,
+        grants: SigningSecretGrants(credentialChecks.repository),
+        engineVersion: packageVersion,
+        onError: (error, stackTrace) =>
+            context.err.writeln('error: runner hub: $error\n$stackTrace'),
+      );
+      scheduler.remoteJobs = runnerHub;
+      final runnerService = RunnerService(
+        runners: runnerRepository,
+        pairing: SqlitePairingTokenRepository(database),
+        tokens: tokenService,
+        presence: runnerHub,
+        events: events,
+        clock: const SystemClock(),
+      );
       final server = await XpdServer.start(
-        tokens: TokenService(
-          tokens: SqliteDeviceTokenRepository(database),
-          clock: const SystemClock(),
-        ),
+        tokens: tokenService,
         events: events,
         projects: projects,
         jobs: scheduler,
@@ -509,6 +537,12 @@ class ServeCommand extends XpdCommand {
           git: git,
         ),
         housekeeping: housekeeping,
+        runners: runnerService,
+        runnerHub: runnerHub,
+        runnerArtifacts: RunnerArtifacts(
+          recorder: artifactRecorder,
+          holdsLease: runnerHub.holdsLease,
+        ),
         clock: const SystemClock(),
         engineVersion: packageVersion,
         host: host,
@@ -563,6 +597,15 @@ class ServeCommand extends XpdCommand {
             context.err.writeln('warning: housekeeping failed: $error'),
       );
       unawaited(housekeepingSchedule.start());
+      // A runner that stops sending heartbeats loses its leases 90 seconds
+      // later, and the jobs it held are queued again or wait for a resume
+      // (D-08).
+      final leaseSweeper = LeaseSweeper(
+        hub: runnerHub,
+        onError: (error, stackTrace) =>
+            context.err.writeln('warning: lease sweep failed: $error'),
+      );
+      unawaited(leaseSweeper.start());
 
       await context.shutdown.first;
       context.out.writeln('xpd shutting down');
@@ -572,6 +615,7 @@ class ServeCommand extends XpdCommand {
       await jobs.interruptAll();
       await server.close();
       approvalSweeper.stop();
+      leaseSweeper.stop();
       await releaseWatcher.stop();
       housekeepingSchedule.stop();
       await notifier.stop();

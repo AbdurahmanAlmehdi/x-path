@@ -130,7 +130,8 @@ adds the tool versions of a job; version 5 adds the time and a unique path to `a
 project, app, time and the baseline index; version 8 gives `credential_ref` the result of its last check and
 one credential per flavor and kind; version 9 adds `run` and gives `job` its run, stage, name and capabilities;
 version 10 gives `approval` its run, job, decision and expiry; version 11 gives `release` its flavor, branch, pull request,
-builds and the status in each store.
+builds and the status in each store; version 12 adds `housekeeping_setting`; version 13 gives `runner` its credential,
+what it reported and when it was revoked, and adds `pairing_token`.
 
 Secrets (`packages/xp_secrets`) live on the engine machine behind the `SecretStore` interface of
 `xp_engine`; `createSecretStore` picks the implementation for the platform.
@@ -740,7 +741,7 @@ build step that must stay `pending`) and `credential_checks_test.dart` in `xpd` 
 
 Phase 11 puts the steps in order and decides when they run (D-11, D-13, D-19). A **workflow** is a YAML
 document; **dispatching** it makes a **run**, whose **jobs** wait in the database until the **scheduler**
-starts them. The engine is also the local runner; remote runners are Phase 14.
+starts them. The engine is also the local runner; remote runners are described under Runners.
 
 ### The workflow document (schema 1)
 
@@ -892,8 +893,13 @@ nothing, and the same state always gives the same pass.
   `ANDROID_SDK_ROOT`, the default places of Android Studio), `ios-sign` when `xcode-select` and
   `xcodebuild` find an Xcode, `swift-linux` when Linux has `swift`. A job goes to a runner that has all
   it needs; if none does the job says "No runner can do ios-sign." and waits. `xpd serve` prints what it
-  found. The `SchedulerRunner` interface (`id`, `capabilities`, `slots`, `launch`, `whenFinished`) is what
-  Phase 14 implements for remote runners with leases; only the local runner exists now.
+  found. The `SchedulerRunner` interface (`id`, `capabilities`, `slots`, `accepts`, `launch`, `whenFinished`) is
+  what the engine (`LocalRunner`) and the remote runners (`RemoteRunner`, see Runners) implement.
+- **Placement.** The engine is preferred: a job that fits it and finds a free slot there runs there. A remote
+  runner takes what the engine cannot do or has no slot for; among remote runners the least loaded goes first
+  (running jobs per slot), then the one that connected first. A runner can refuse a job by its steps
+  (`accepts`): a remote runner never gets a job with a step only the engine runs, and a job that waits for that
+  says which steps.
 - **Resume and cancel** go through the scheduler (`POST /jobs/{id}/resume` puts a dispatched job back in
   the queue and answers with it, `queued` or `running`; a job that is not part of a run resumes at once).
 
@@ -941,6 +947,136 @@ Android SDK; it takes several minutes and is not part of CI.
 `tool/e2e/mcp_gate_e2e.sh` (Phase 13, see `xp mcp`) builds the `xpd` and `xp` bundles and runs the same script with
 `--mode mcp`. It needs no Android SDK or Xcode: `prod-release` reaches its first gate before any build. It takes about
 half a minute.
+
+## Runners
+
+A runner is a machine that runs jobs for the engine (D-08, D-19): another Mac for `ios-sign`, a Linux box for
+`android`, `flutter` and `swift-linux`. The engine is also a runner (the local one). Phase 14a is the engine
+side: the protocol, the leases, the probe and the endpoints. The runner agent (`xp runner`) is Phase 14b.
+
+### Pairing
+
+```sh
+xp runners pair mac-mini        # on any machine with a cli token: prints a pairing token, once
+# on the runner machine (Phase 14b): xp runner ... exchanges it for the credential
+xp runners revoke mac-mini      # kills the credential, the connection and the leases
+```
+
+- **Pairing token** (`POST /runners/pairing-tokens`, `app` and `cli` tokens only: a paired runner receives signing
+  material, so an `mcp` token must not be able to pair one). `xpp_` and 43 URL-safe characters, **single use**, valid
+  for **15 minutes**, bound to the name of the runner. Only its SHA-256 is stored. The names of runners are unique,
+  revoked runners keep theirs.
+- **Exchange** (`POST /runners/pair`, no bearer token: the pairing token is the proof). It makes the runner and its
+  credential, a device token of kind `runner` (D-06), which is shown once; only its hash is stored. Two exchanges of one
+  token make one runner (a compare-and-set on `used_at`). Unknown, expired and used tokens answer `401`.
+- **Revoke** (`POST /runners/{id}/revoke`, `app` and `cli`): the credential stops authenticating, the connection closes
+  (code 4003) and every lease the runner holds ends **at once**, each job by the loss rule below. Revoking again
+  changes nothing. `GET /runners` lists the runners with their status (`offline`, `online`, `draining`, `revoked`), the
+  capabilities the probe found, the slots and the jobs they hold; every kind of token can read it.
+- A runner token reaches the same reads an `mcp` token does and can never approve or change gates (D-13). Only the
+  runner endpoints below are made for it.
+
+### The connection
+
+A runner dials out (nothing connects to it): `GET /runners/connect`, a WebSocket with the credential as the bearer
+token (other kinds of token answer `403`; browsers are refused). Every text frame is a JSON object with a `type`.
+`RunnerFrame` (runner to engine) and `EngineFrame` (engine to runner) are sealed types in `packages/xp_api`
+(`runner_protocol.dart`), and `openapi.yaml` describes each frame as a schema; contract tests check the frames the
+real engine sends against them.
+
+| Runner sends | Engine sends | What |
+|---|---|---|
+| | `welcome` | the runner's id, the heartbeat interval (30 s) and the lease length (90 s) |
+| `hello` | `probe` | version, os, arch, cores, optional `maxJobs`, the leases it still holds; then the probe commands |
+| `probe_result` | | the results; the engine derives the capabilities and the runner is online |
+| | `lease_offer` | a job: its steps with their state, the capabilities, the keys of the secrets it may ask for |
+| `lease_accept`, `lease_reject` | | take or refuse the offer (`draining`, `busy`) |
+| `heartbeat` | `heartbeat_ack` | renews the leases it lists; the ack says until when |
+| `log_chunk` | `chunk_ack` | numbered output lines; `stored`, `duplicate` or `gap`, and the chunk wanted next |
+| `step_state` | | where a step is; idempotent |
+| `job_done` | `done_ack` | ends the job; the ack says the state the engine recorded |
+| `secret_request` | `secret_value`, `secret_denied` | signing material of the leased job (D-09) |
+| `drain` | | asks for no more jobs, or starts again |
+| | `cancel` | stop this job: the lease is gone, the job was cancelled, or the engine does not know the lease |
+| | `fault` | a frame the engine could not use |
+
+A second connection of the same runner replaces the first (close code 4001). The engine closes with 4008 when a
+runner sent nothing for a whole lease or did not answer the probe in 60 s, and with 4400 for something that is not a
+frame (also: the first frame must be `hello`). A frame the engine cannot read is answered with a `fault` and
+ignored; a runner ignores a type it does not know. The engine pings every 30 s.
+
+### Capability probing (D-19)
+
+The engine does not trust what a runner says about itself; the `hello` carries no capabilities. After every `hello` it
+sends fixed commands (`RunnerProbe`) and derives the capabilities from what they print, with the same rules as
+`LocalCapabilities` for the engine's own machine: `flutter` when `git --version` runs, `android` when a folder with
+`platform-tools`, `cmdline-tools` or `build-tools` is `ANDROID_HOME`, `ANDROID_SDK_ROOT` or a default place of Android
+Studio, `ios-sign` on macOS (`uname -s`) when `xcode-select -p` and `xcodebuild -version` find an Xcode, `swift-linux` on
+Linux when `swift --version` runs. Nothing touches a keychain, and `xcodebuild` and `swift` are not even started where
+macOS would answer with a dialog (`requires` and `onlyOn` in the command). A runner gets jobs only after it answered; a
+change of capabilities since the last connection is recorded as a `runner.capabilities_changed` event. The slots are
+`maxJobs` of the `hello`, else a quarter of the cores, at least one; `ios-sign` jobs run one at a time per runner.
+
+### Leases and the 90 second rule (D-08)
+
+The lease is the single source of truth for where a job runs. The scheduler places a queued job on a runner; the job
+becomes `running` with `runner_id` and `lease_until` (now + 90 s) and the runner gets a `lease_offer` with the id of
+the lease. A heartbeat every 30 s renews the leases it lists (idle runners send one too). Every later message about
+the job carries the lease id, so a runner that comes back after its lease was lost cannot touch the job: it is
+answered with `cancel`. The sweep (`LeaseSweeper`, every 10 s) ends the leases that ran out:
+
+- A job whose steps have **no side effect left to do** is put back in the queue (its running step is `interrupted`,
+  the job runs again from its first unfinished step, possibly on another runner).
+- A job with a **step with side effects that is not done** (the running one, or one still to come) is
+  `waiting_for_resume` and is **never re-queued**: the runner may only be unreachable and still doing it (D-08, D-18).
+  `POST /jobs/{id}/resume` runs it again; steps with side effects ask their `alreadyDone` first.
+- Heartbeats are idempotent; one that arrives after the lease ran out finds it lost. A connection that drops keeps
+  its leases until they run out; a runner that comes back in time shows the leases it holds in its `hello` and they
+  continue. The engine restarting does the same as a crash for the jobs on runners (ADR 0006): the recovery marks
+  them, and the `hello` of a runner that still holds one is answered with `cancel`.
+- A runner that refuses an offer gets none for 15 s (`draining` takes it out until it says otherwise), so a refusal
+  cannot become a loop. Cancelling a job on a runner ends it at once and tells the runner.
+
+### Logs, steps and artifacts
+
+- **Log chunks.** A runner numbers its chunks from 1 per lease and keeps each until acknowledged. The engine stores the
+  next one, answers a chunk it has with `duplicate` and one that skips ahead with `gap` (nothing is stored; the runner
+  sends again from `next`). The lines get the job-wide `seq` of the job's log like local output does, are masked again
+  with every secret the engine knows, and reach `GET /jobs/{id}/logs` followers. `job_done` carries the number of the
+  last chunk; the engine ends the job only when it has the log up to there.
+- **Steps and results.** `step_state` is accepted when it is newer (more attempts, or a later state of the same
+  attempt) and ignored otherwise. A job reported `succeeded` while a step is not done is recorded `failed`.
+- **Artifacts.** `PUT /runners/jobs/{id}/artifacts/{name}?kind=apk` with `X-Content-SHA256`, `X-Lease-Id` and
+  `Content-Length`: the bytes are hashed as they stream into the artifact store, which commits the file only if the
+  digest and the size are what was declared, so a wrong or half upload leaves nothing and never replaces a good file.
+  The runner must hold the lease of the job. The answer is the `Artifact`. This is the existing store and recorder, so
+  retention and downloads work as for local builds.
+
+### What never goes to a runner
+
+- **Steps only the engine runs.** A job is leased as a whole, so a job with one of these steps runs on the engine
+  (`RemoteStepPolicy`): `upload.*` (D-09), `git.push`, `git.tag`, `git.releaseBranch` and `github.*` (they push and
+  talk to GitHub with the token that stays on the engine, D-05, D-07), `gate` (approvals are the engine's, D-13),
+  `guard` (its checks read credentials and ask the stores), and `shorebird.release` and `shorebird.patch` (the Shorebird
+  API key is not signing material). The scheduler never places such a job on a remote runner and the hub refuses it
+  again at the offer. The built-in workflows put a `guard` or an upload in the same job as the build, so today those
+  jobs run on the engine; a workflow that builds on a runner puts its engine-only steps in a job of their own.
+- **Secrets (D-09).** Over the authenticated socket, on request, never in the offer: the offer lists **keys only**, the
+  runner asks with `secret_request` and gets `secret_value` (the base64 of the bytes) **once per lease and key**. What
+  may be asked for is signing material the steps of this job name in `secretFiles` or `secretEnvironment` **and** that
+  is the keystore of the project or one of its passwords (`SigningSecretGrants`); the GitHub token, store credentials
+  and anything else are `secret_denied`. Each delivery is a `runner.secret_delivered` event (key, never value), and the
+  delivered text is added to the log masker. A single-use URL was the other option; the socket is already
+  authenticated, bound to the lease and outbound only, and needs no second credential to leak. The socket is not
+  encrypted by `xpd` itself (see `--host` above): a runner on another machine should reach the engine through TLS (a
+  reverse proxy or a tunnel), because the socket carries signing material. Wiping the secret at the end of the job is
+  the runner agent's (14b).
+
+### Events
+
+`runner.paired`, `runner.connected`, `runner.disconnected`, `runner.revoked`, `runner.capabilities_changed`,
+`runner.lease_lost` (with the state the job is in now) and `runner.secret_delivered`; the job events (`job.state_changed`,
+`job.step_changed`) are the same as for local jobs.
 
 ## Releases
 
@@ -1117,13 +1253,13 @@ the API answered, for scripts; otherwise it prints text and tables.
 | `xp gates show <p>`, `tighten <p> <action>...` | `/projects/{id}/gates`; only the app loosens a gate |
 | `xp releases list`, `show <r>`, `refresh <r>`, `status <r> <apple\|play> <state>`, `build <r>`, `merge <r>`, `abandon <r>`, `notes <r> [--format slack\|whatsapp]` | `/releases` |
 | `xp storage report`, `free [--apply] [--category c]`, `retention [--keep n] [--log-days n]` | `/storage` (`free` is a dry run unless you pass `--apply`) |
+| `xp runners pair <name>`, `revoke <runner>` | `POST /runners/pairing-tokens`, `POST /runners/{id}/revoke` (a runner is its name or id); see Runners |
 | `xp artifacts list <job>`, `download <a> [-o path]` | `/jobs/{id}/artifacts`, `/artifacts/{id}/download` (checks the SHA-256 the engine sends) |
 | `xp mcp` | see below |
 
 `xp logs` without `-f` prints the log so far and stops once the engine has been quiet for 750 ms; with `-f` it follows
 the job until it ends, reconnecting with the last line it printed if the connection drops, and exits 1 if the job
-failed, was cancelled or was interrupted. `xp runners` (pair, revoke) is not there yet: the runner protocol and its
-endpoints are Phase 14a and 14b.
+failed, was cancelled or was interrupted.
 
 **Exit codes.**
 
@@ -1182,7 +1318,9 @@ loosening the gate, and approves with an app token.
 
 `packages/xp_client` is the Dart client of the API that `xp`, `xp mcp` and the desktop app share. It depends on
 `xp_api` only, has a method per endpoint (the ones in `openapi.yaml`: projects, scans, credentials, workflows,
-dispatch, runs, jobs, artifacts, test runs, approvals, gates, releases, storage) and 100% test coverage.
+dispatch, runs, jobs, artifacts, test runs, approvals, gates, releases, storage, runners) and 100% test coverage.
+The runner methods are what the runner agent uses: `pairRunner` (no token), `connectRunner` (the WebSocket; the
+caller speaks the frames of `xp_api`) and `uploadRunnerArtifact` (streams the file with its SHA-256 and size).
 
 - **Errors.** Every error is an `XpClientException`. A non-2xx answer is an `ApiException` with the status, the
   `ApiErrorCode` of the error envelope (`null` if the answer was not one) and, for `already_decided`, the approval as

@@ -81,6 +81,10 @@ class TokenService {
     return match;
   }
 
+  /// Revokes the token [id]: it no longer authenticates. Returns whether it
+  /// was valid until now.
+  Future<bool> revoke(String id) => _tokens.revoke(id, at: _clock.now());
+
   List<int> _bytes(int length) =>
       List.generate(length, (_) => _random.nextInt(256));
 

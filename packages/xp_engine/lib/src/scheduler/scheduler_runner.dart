@@ -5,8 +5,8 @@ import 'package:xp_engine/src/scheduler/capability.dart';
 ///
 /// The `Scheduler` decides which job goes to which runner and when; the runner
 /// only carries it out. The engine is a runner itself ([LocalRunner]). Remote
-/// runners (Phase 14) implement the same interface: they take a job with a
-/// lease and heartbeats, report [capabilities] the engine probed itself, and
+/// runners (`RemoteRunner`) implement the same interface: they take a job with
+/// a lease and heartbeats, report [capabilities] the engine probed itself, and
 /// finish a job when its lease ends or it reports back.
 abstract interface class SchedulerRunner {
   /// The id the runner is known by. The jobs it runs name it as their
@@ -20,12 +20,25 @@ abstract interface class SchedulerRunner {
   /// this is.
   int get slots;
 
+  /// Whether this runner may run a job made of steps of [stepKinds]. The
+  /// engine runs everything; a remote runner never runs the steps that need
+  /// what only the engine has (`RemoteStepPolicy`).
+  bool accepts(Iterable<String> stepKinds);
+
   /// Starts the queued job [jobId] on this runner, which runs it in the
   /// background.
   Future<void> launch(String jobId);
 
   /// Completes once [jobId] is no longer running on this runner.
   Future<void> whenFinished(String jobId);
+}
+
+/// Where jobs that run on remote runners are cancelled: the engine cannot stop
+/// their processes itself, so the runner is told and the job ends at once.
+abstract interface class RemoteJobs {
+  /// Cancels the job [id] if a remote runner holds its lease and returns
+  /// whether it did. A job that runs elsewhere is left alone.
+  Future<bool> cancel(String id);
 }
 
 /// How many jobs the engine runs at once by default: a quarter of the
@@ -55,6 +68,9 @@ class LocalRunner implements SchedulerRunner {
 
   @override
   final int slots;
+
+  @override
+  bool accepts(Iterable<String> stepKinds) => true;
 
   @override
   Future<void> launch(String jobId) async {

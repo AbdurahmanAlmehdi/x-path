@@ -150,6 +150,42 @@ sealed class EngineEvent extends Equatable {
       ),
     ),
     NotificationRaised.eventType => _notification(payload),
+    RunnerPaired.eventType => RunnerPaired(
+      runnerId: payload['runnerId'] as String,
+      name: payload['name'] as String,
+    ),
+    RunnerConnected.eventType => RunnerConnected(
+      runnerId: payload['runnerId'] as String,
+      name: payload['name'] as String,
+      capabilities: (payload['capabilities'] as List<dynamic>).cast<String>(),
+      slots: payload['slots'] as int,
+    ),
+    RunnerDisconnected.eventType => RunnerDisconnected(
+      runnerId: payload['runnerId'] as String,
+      name: payload['name'] as String,
+    ),
+    RunnerRevoked.eventType => RunnerRevoked(
+      runnerId: payload['runnerId'] as String,
+      name: payload['name'] as String,
+    ),
+    RunnerCapabilitiesChanged.eventType => RunnerCapabilitiesChanged(
+      runnerId: payload['runnerId'] as String,
+      name: payload['name'] as String,
+      from: (payload['from'] as List<dynamic>).cast<String>(),
+      to: (payload['to'] as List<dynamic>).cast<String>(),
+    ),
+    RunnerLeaseLost.eventType => RunnerLeaseLost(
+      runnerId: payload['runnerId'] as String,
+      jobId: payload['jobId'] as String,
+      projectId: payload['projectId'] as String,
+      reason: payload['reason'] as String,
+      state: JobState.values.firstWhere((s) => s.wire == payload['state']),
+    ),
+    RunnerSecretDelivered.eventType => RunnerSecretDelivered(
+      runnerId: payload['runnerId'] as String,
+      jobId: payload['jobId'] as String,
+      key: payload['key'] as String,
+    ),
     _ => UnknownEvent(type: type, payload: payload),
   };
 
@@ -1089,6 +1125,238 @@ final class NotificationRaised extends EngineEvent {
     jobId,
     approvalId,
   ];
+}
+
+/// A runner was paired: a pairing token was exchanged for its credential.
+final class RunnerPaired extends EngineEvent {
+  /// Creates the event.
+  const new({required this.runnerId, required this.name});
+
+  /// The wire name of this event.
+  static const eventType = 'runner.paired';
+
+  /// The runner.
+  final String runnerId;
+
+  /// Its name.
+  final String name;
+
+  @override
+  String get type => eventType;
+
+  @override
+  Map<String, dynamic> get payload => {'runnerId': runnerId, 'name': name};
+
+  @override
+  List<Object?> get props => [runnerId, name];
+}
+
+/// A runner connected and the engine probed it: it takes jobs now.
+final class RunnerConnected extends EngineEvent {
+  /// Creates the event.
+  const new({
+    required this.runnerId,
+    required this.name,
+    required this.capabilities,
+    required this.slots,
+  });
+
+  /// The wire name of this event.
+  static const eventType = 'runner.connected';
+
+  /// The runner.
+  final String runnerId;
+
+  /// Its name.
+  final String name;
+
+  /// What the probe found it can do.
+  final List<String> capabilities;
+
+  /// How many jobs it runs at once.
+  final int slots;
+
+  @override
+  String get type => eventType;
+
+  @override
+  Map<String, dynamic> get payload => {
+    'runnerId': runnerId,
+    'name': name,
+    'capabilities': capabilities,
+    'slots': slots,
+  };
+
+  @override
+  List<Object?> get props => [runnerId, name, capabilities, slots];
+}
+
+/// A runner's connection ended. The leases it held run out 90 seconds after
+/// its last heartbeat unless it comes back.
+final class RunnerDisconnected extends EngineEvent {
+  /// Creates the event.
+  const new({required this.runnerId, required this.name});
+
+  /// The wire name of this event.
+  static const eventType = 'runner.disconnected';
+
+  /// The runner.
+  final String runnerId;
+
+  /// Its name.
+  final String name;
+
+  @override
+  String get type => eventType;
+
+  @override
+  Map<String, dynamic> get payload => {'runnerId': runnerId, 'name': name};
+
+  @override
+  List<Object?> get props => [runnerId, name];
+}
+
+/// A runner was revoked. Its credential stops working and its leases end.
+final class RunnerRevoked extends EngineEvent {
+  /// Creates the event.
+  const new({required this.runnerId, required this.name});
+
+  /// The wire name of this event.
+  static const eventType = 'runner.revoked';
+
+  /// The runner.
+  final String runnerId;
+
+  /// Its name.
+  final String name;
+
+  @override
+  String get type => eventType;
+
+  @override
+  Map<String, dynamic> get payload => {'runnerId': runnerId, 'name': name};
+
+  @override
+  List<Object?> get props => [runnerId, name];
+}
+
+/// The probe found a runner can do something else than it could (D-19).
+final class RunnerCapabilitiesChanged extends EngineEvent {
+  /// Creates the event.
+  const new({
+    required this.runnerId,
+    required this.name,
+    required this.from,
+    required this.to,
+  });
+
+  /// The wire name of this event.
+  static const eventType = 'runner.capabilities_changed';
+
+  /// The runner.
+  final String runnerId;
+
+  /// Its name.
+  final String name;
+
+  /// What it could do before.
+  final List<String> from;
+
+  /// What it can do now.
+  final List<String> to;
+
+  @override
+  String get type => eventType;
+
+  @override
+  Map<String, dynamic> get payload => {
+    'runnerId': runnerId,
+    'name': name,
+    'from': from,
+    'to': to,
+  };
+
+  @override
+  List<Object?> get props => [runnerId, name, from, to];
+}
+
+/// A runner lost the lease of a job (D-08): the lease ran out, or the runner
+/// was revoked. The job is `queued` again, or `waiting_for_resume` when it has
+/// a step with side effects.
+final class RunnerLeaseLost extends EngineEvent {
+  /// Creates the event.
+  const new({
+    required this.runnerId,
+    required this.jobId,
+    required this.projectId,
+    required this.reason,
+    required this.state,
+  });
+
+  /// The wire name of this event.
+  static const eventType = 'runner.lease_lost';
+
+  /// The runner.
+  final String runnerId;
+
+  /// The job.
+  final String jobId;
+
+  /// The project of the job.
+  final String projectId;
+
+  /// Why: `lapsed`, `revoked` or `offer_failed`.
+  final String reason;
+
+  /// The state the job is in now.
+  final JobState state;
+
+  @override
+  String get type => eventType;
+
+  @override
+  Map<String, dynamic> get payload => {
+    'runnerId': runnerId,
+    'jobId': jobId,
+    'projectId': projectId,
+    'reason': reason,
+    'state': state.wire,
+  };
+
+  @override
+  List<Object?> get props => [runnerId, jobId, projectId, reason, state];
+}
+
+/// The engine gave a runner a secret of a leased job (D-09). The value is
+/// never in an event.
+final class RunnerSecretDelivered extends EngineEvent {
+  /// Creates the event.
+  const new({required this.runnerId, required this.jobId, required this.key});
+
+  /// The wire name of this event.
+  static const eventType = 'runner.secret_delivered';
+
+  /// The runner.
+  final String runnerId;
+
+  /// The job.
+  final String jobId;
+
+  /// The key of the secret.
+  final String key;
+
+  @override
+  String get type => eventType;
+
+  @override
+  Map<String, dynamic> get payload => {
+    'runnerId': runnerId,
+    'jobId': jobId,
+    'key': key,
+  };
+
+  @override
+  List<Object?> get props => [runnerId, jobId, key];
 }
 
 /// An event whose type this client does not know.

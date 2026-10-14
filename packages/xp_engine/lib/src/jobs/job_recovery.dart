@@ -78,9 +78,13 @@ class JobRecovery {
       final state = sideEffect
           ? JobState.waitingForResume
           : JobState.interrupted;
+      // A job that ran on a remote runner holds no lease any more: the
+      // runner's next hello is answered with a cancel.
       await _jobs.updateJob(
         job.copyWith(
           state: state,
+          runnerId: null,
+          leaseUntil: null,
           message: 'The engine stopped while the job was running.',
           finishedAt: _clock.now(),
         ),

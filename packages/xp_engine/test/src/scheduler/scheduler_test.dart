@@ -10,11 +10,19 @@ typedef _Outcome = StepOutcome<Map<String, dynamic>>;
 
 /// One job to make: its stage, name and capabilities.
 class _Spec {
-  const new(this.name, {this.stage = 0, this.needs = const []});
+  const new(
+    this.name, {
+    this.stage = 0,
+    this.needs = const [],
+    this.kinds = const [],
+  });
 
   final String name;
   final int stage;
   final List<String> needs;
+
+  /// Kinds of steps the job has besides its scripted one.
+  final List<String> kinds;
 }
 
 /// A scheduler over fake runners and jobs that wait until the test finishes
@@ -97,7 +105,11 @@ class _Fixture {
         stage: spec.stage,
         name: spec.name,
         capabilities: spec.needs,
-        steps: [harness.script()],
+        steps: [
+          harness.script(),
+          for (final kind in spec.kinds)
+            StepPlan(kind: kind, input: const {}, sideEffect: false),
+        ],
       );
       ids[spec.name] = job.id;
     }
@@ -764,6 +776,145 @@ void main() {
     });
   });
 
+  group('placement', () {
+    _Spy spy(String id, {int slots = 2, Set<String> refuses = const {}}) =>
+        _Spy(id, f.local(slots: slots), f.harness.jobs, refuses: refuses);
+
+    test('prefers the local runner whatever the order', () async {
+      final remote = spy('rnr_1');
+      final local = spy('local');
+      f.build([remote, local]);
+      final ids = await f.run([const _Spec('a')]);
+
+      await f.scheduler.pump();
+
+      expect(local.launched, [ids['a']]);
+      expect(remote.launched, isEmpty);
+    });
+
+    test('uses a remote runner when the engine has no free slot', () async {
+      final remote = spy('rnr_1');
+      final local = spy('local', slots: 1);
+      f.build([local, remote]);
+      final ids = await f.run([const _Spec('a'), const _Spec('b')]);
+
+      await f.scheduler.pump();
+
+      expect(local.launched, [ids['a']]);
+      expect(remote.launched, [ids['b']]);
+    });
+
+    test('uses a remote runner for what the engine cannot do', () async {
+      final remote = spy('rnr_1');
+      final local = spy('local');
+      remote.extra.add(Capability.iosSign);
+      f.build([local, remote]);
+      final ids = await f.run([
+        const _Spec('ios', needs: ['ios-sign']),
+      ]);
+
+      await f.scheduler.pump();
+
+      expect(remote.launched, [ids['ios']]);
+      expect(local.launched, isEmpty);
+    });
+
+    test('gives a job to the least loaded remote runner', () async {
+      final first = spy('rnr_1', slots: 4);
+      final second = spy('rnr_2');
+      final third = spy('rnr_3');
+      f.build([first, second, third]);
+      final ids = await f.run([
+        const _Spec('a'),
+        const _Spec('b'),
+        const _Spec('c'),
+        const _Spec('d'),
+      ]);
+
+      await f.scheduler.pump();
+
+      // a: all idle, the first wins; b: the idle ones; c: the other idle one;
+      // d: first has 1 of 4, the others 1 of 2.
+      expect(first.launched, [ids['a'], ids['d']]);
+      expect(second.launched, [ids['b']]);
+      expect(third.launched, [ids['c']]);
+    });
+
+    test('never gives a job to a runner that refuses its steps', () async {
+      final remote = spy('rnr_1', refuses: {'upload.play'});
+      final local = spy('local', slots: 1);
+      f.build([remote, local]);
+      final ids = await f.run([
+        const _Spec('upload', kinds: ['upload.play']),
+        const _Spec('plain'),
+      ]);
+
+      await f.scheduler.pump();
+
+      expect(local.launched, [ids['upload']]);
+      expect(remote.launched, [ids['plain']]);
+    });
+
+    test('says why a job with engine-only steps waits', () async {
+      final remote = spy('rnr_1', refuses: {'upload.play', 'upload.firebase'});
+      remote.extra.add(Capability.iosSign);
+      final local = spy('local', slots: 1);
+      f.build([local, remote]);
+      final ids = await f.run([
+        const _Spec('hold', kinds: ['upload.play']),
+        const _Spec(
+          'ios',
+          needs: ['ios-sign'],
+          kinds: ['upload.play', 'upload.firebase', 'upload.play'],
+        ),
+        const _Spec('waits', kinds: ['upload.play']),
+      ]);
+
+      await f.scheduler.pump();
+
+      expect(
+        await f.message(ids['ios']!),
+        'Only the engine runs upload.firebase, upload.play, and the engine '
+        'cannot do ios-sign.',
+      );
+      expect(remote.launched, isEmpty);
+      expect(
+        await f.message(ids['waits']!),
+        'Waiting for a free slot on local.',
+      );
+    });
+  });
+
+  group('cancelling a job on a remote runner', () {
+    test('is left to the place that holds its lease', () async {
+      f.build([f.local()]);
+      final remote = _Remote({'job_remote'});
+      f.scheduler.remoteJobs = remote;
+      final ids = await f.run([const _Spec('a')]);
+      await f.scheduler.pump();
+
+      // The job is the remote's: the scheduler does not cancel it itself.
+      remote.handled.add(ids['a']!);
+      final job = await f.scheduler.cancel(ids['a']!);
+
+      expect(remote.asked, [ids['a']]);
+      expect(job.state, JobState.running);
+    });
+
+    test("is the scheduler's for any other job", () async {
+      f.build([f.local()]);
+      final remote = _Remote({});
+      f.scheduler.remoteJobs = remote;
+      final ids = await f.run([const _Spec('a')]);
+
+      final job = await f.scheduler.cancel(ids['a']!);
+
+      expect(remote.asked, [ids['a']]);
+      expect(job.state, JobState.cancelled);
+      expect(f.scheduler.remoteJobs, same(remote));
+    });
+  });
+
   group('a pass', () {
     test('does nothing once the scheduler was stopped', () async {
       f.build([f.local()]);
@@ -849,6 +1000,9 @@ class _Named implements SchedulerRunner {
   int get slots => _inner.slots;
 
   @override
+  bool accepts(Iterable<String> stepKinds) => _inner.accepts(stepKinds);
+
+  @override
   Future<void> launch(String jobId) => _inner.launch(jobId);
 
   @override
@@ -869,6 +1023,9 @@ class _Cancelling implements SchedulerRunner {
 
   @override
   int get slots => 2;
+
+  @override
+  bool accepts(Iterable<String> stepKinds) => true;
 
   @override
   Future<void> launch(String jobId) async {
@@ -927,4 +1084,59 @@ class _StaleJobs extends InMemoryJobRepository {
 
   @override
   Future<void> updateStep(StepRecord step) => _inner.updateStep(step);
+}
+
+/// A runner that remembers which jobs it was given and marks them as its own,
+/// as a remote runner does.
+class _Spy implements SchedulerRunner {
+  new(this.id, this._inner, this._jobs, {this.refuses = const {}});
+
+  @override
+  final String id;
+  final LocalRunner _inner;
+  final JobRepository _jobs;
+
+  /// The step kinds it refuses.
+  final Set<String> refuses;
+
+  /// Capabilities it has besides those of the inner runner.
+  final extra = <Capability>{};
+
+  /// The jobs it was given.
+  final launched = <String>[];
+
+  @override
+  Set<Capability> get capabilities => {..._inner.capabilities, ...extra};
+
+  @override
+  int get slots => _inner.slots;
+
+  @override
+  bool accepts(Iterable<String> stepKinds) => !stepKinds.any(refuses.contains);
+
+  @override
+  Future<void> launch(String jobId) async {
+    launched.add(jobId);
+    await _inner.launch(jobId);
+    if (id == localRunnerId) return;
+    final job = (await _jobs.get(jobId))!;
+    await _jobs.updateJob(job.copyWith(runnerId: id));
+  }
+
+  @override
+  Future<void> whenFinished(String jobId) => _inner.whenFinished(jobId);
+}
+
+/// A place that cancels the jobs it holds.
+class _Remote implements RemoteJobs {
+  new(this.handled);
+
+  final Set<String> handled;
+  final asked = <String>[];
+
+  @override
+  Future<bool> cancel(String id) async {
+    asked.add(id);
+    return handled.contains(id);
+  }
 }

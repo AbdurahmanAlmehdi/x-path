@@ -62,6 +62,57 @@ void main() {
     await expectLater(repository.updateJob(job('x')), throwsStateError);
   });
 
+  group('renewLease', () {
+    final until = at.add(const Duration(seconds: 90));
+
+    test('extends the lease of a running job on that runner', () async {
+      await repository.create(
+        job('a', JobState.running).copyWith(runnerId: 'rnr_1', leaseUntil: at),
+        [],
+      );
+
+      final renewed = await repository.renewLease(
+        'a',
+        runnerId: 'rnr_1',
+        until: until,
+      );
+
+      expect(renewed, isTrue);
+      final stored = (await repository.get('a'))!;
+      expect(stored.leaseUntil, until);
+      expect(stored.state, JobState.running);
+    });
+
+    test('does nothing for another runner, state or job', () async {
+      await repository.create(
+        job('a', JobState.running).copyWith(runnerId: 'rnr_1', leaseUntil: at),
+        [],
+      );
+      await repository.create(
+        job(
+          'b',
+          JobState.cancelled,
+        ).copyWith(runnerId: 'rnr_1', leaseUntil: at),
+        [],
+      );
+
+      expect(
+        await repository.renewLease('a', runnerId: 'rnr_2', until: until),
+        isFalse,
+      );
+      expect(
+        await repository.renewLease('b', runnerId: 'rnr_1', until: until),
+        isFalse,
+      );
+      expect(
+        await repository.renewLease('x', runnerId: 'rnr_1', until: until),
+        isFalse,
+      );
+      expect((await repository.get('a'))!.leaseUntil, at);
+      expect((await repository.get('b'))!.leaseUntil, at);
+    });
+  });
+
   test('records the tool versions of a job, replacing earlier ones', () async {
     await repository.create(job('a'), const []);
     expect(await repository.tools('a'), isNull);

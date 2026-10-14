@@ -57,6 +57,115 @@ void main() {
     repository = SqliteJobRepository(database);
   });
 
+  group('lease', () {
+    final until = _created.add(const Duration(seconds: 90));
+
+    void addRunner(String id) => database.connection.execute(
+      'INSERT INTO runner (id, name) VALUES (?, ?)',
+      [id, 'runner $id'],
+    );
+
+    test('is stored with the job and read back', () async {
+      addRunner('rnr_1');
+      final leased = _job(
+        'job_1',
+        state: JobState.running,
+      ).copyWith(runnerId: 'rnr_1', leaseUntil: until);
+
+      await repository.create(leased, const []);
+
+      expect(await repository.get('job_1'), leased);
+      expect(
+        (await repository.list(states: {JobState.running})).single.leaseUntil,
+        until,
+      );
+    });
+
+    test('is saved and cleared by updateJob', () async {
+      addRunner('rnr_1');
+      await repository.create(_job('job_1'), const []);
+
+      await repository.updateJob(
+        _job(
+          'job_1',
+          state: JobState.running,
+        ).copyWith(runnerId: 'rnr_1', leaseUntil: until),
+      );
+      final leased = (await repository.get('job_1'))!;
+      expect(leased.runnerId, 'rnr_1');
+      expect(leased.leaseUntil, until);
+
+      await repository.updateJob(
+        leased.copyWith(
+          state: JobState.queued,
+          runnerId: null,
+          leaseUntil: null,
+        ),
+      );
+      final released = (await repository.get('job_1'))!;
+      expect(released.runnerId, isNull);
+      expect(released.leaseUntil, isNull);
+    });
+
+    test('renewLease moves the end of the lease and nothing else', () async {
+      addRunner('rnr_1');
+      await repository.create(
+        _job(
+          'job_1',
+          state: JobState.running,
+          message: 'm',
+        ).copyWith(runnerId: 'rnr_1', leaseUntil: _created),
+        const [],
+      );
+
+      final renewed = await repository.renewLease(
+        'job_1',
+        runnerId: 'rnr_1',
+        until: until,
+      );
+
+      expect(renewed, isTrue);
+      final stored = (await repository.get('job_1'))!;
+      expect(stored.leaseUntil, until);
+      expect(stored.state, JobState.running);
+      expect(stored.message, 'm');
+    });
+
+    test('renewLease does nothing for another runner, state or job', () async {
+      addRunner('rnr_1');
+      addRunner('rnr_2');
+      await repository.create(
+        _job(
+          'job_1',
+          state: JobState.running,
+        ).copyWith(runnerId: 'rnr_1', leaseUntil: _created),
+        const [],
+      );
+      await repository.create(
+        _job(
+          'job_2',
+          state: JobState.cancelled,
+        ).copyWith(runnerId: 'rnr_1', leaseUntil: _created),
+        const [],
+      );
+
+      expect(
+        await repository.renewLease('job_1', runnerId: 'rnr_2', until: until),
+        isFalse,
+      );
+      expect(
+        await repository.renewLease('job_2', runnerId: 'rnr_1', until: until),
+        isFalse,
+      );
+      expect(
+        await repository.renewLease('nope', runnerId: 'rnr_1', until: until),
+        isFalse,
+      );
+      expect((await repository.get('job_1'))!.leaseUntil, _created);
+      expect((await repository.get('job_2'))!.leaseUntil, _created);
+    });
+  });
+
   test('stores a job and its steps', () async {
     await repository.create(_job('job_1'), [
       _step('job_1', 0),

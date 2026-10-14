@@ -7,6 +7,7 @@ import 'package:xp/src/commands/artifacts_commands.dart';
 import 'package:xp/src/commands/connect_command.dart';
 import 'package:xp/src/commands/projects_commands.dart';
 import 'package:xp/src/commands/releases_commands.dart';
+import 'package:xp/src/commands/runners_commands.dart';
 import 'package:xp/src/commands/runs_commands.dart';
 import 'package:xp/src/commands/storage_commands.dart';
 import 'package:xp/src/commands/workflows_commands.dart';
@@ -60,6 +61,7 @@ class XpCommandRunner extends CompletionCommandRunner<int> {
     addCommand(approvalsCommand(_context));
     addCommand(gatesCommand(_context));
     addCommand(releasesCommand(_context));
+    addCommand(runnersCommand(_context));
     addCommand(storageCommand(_context));
     addCommand(artifactsCommand(_context));
     addCommand(McpCommand(_context));

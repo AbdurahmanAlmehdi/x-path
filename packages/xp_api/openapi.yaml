@@ -1532,6 +1532,233 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "500":
           $ref: "#/components/responses/InternalError"
+  /runners:
+    get:
+      operationId: listRunners
+      summary: Every runner, oldest first, revoked ones included.
+      description: |
+        A runner is a machine that dials out to the engine and runs jobs
+        (D-08). `status` is `online` while it is connected and probed.
+        `capabilities` are what the engine found with its own probe, never
+        what the runner says (D-19).
+      responses:
+        "200":
+          description: The runners.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RunnersResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /runners/pairing-tokens:
+    post:
+      operationId: createPairingToken
+      summary: Create a pairing token for a new runner. Only `app` and `cli` tokens may.
+      description: |
+        The token is single use and valid for 15 minutes (D-08). Only its
+        hash is kept, so the secret is shown here and never again. An `mcp`
+        or `runner` token answers `403 forbidden`: pairing a machine lets it
+        receive signing material.
+
+        The name is the runner's; it must not belong to a runner already,
+        revoked ones included (`409 conflict`).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePairingTokenRequest"
+      responses:
+        "201":
+          description: The pairing token.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PairingToken"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /runners/pair:
+    post:
+      operationId: pairRunner
+      summary: Exchange a pairing token for the runner's credential.
+      description: |
+        The one runner route that needs no bearer token: the pairing token in
+        the body is the proof. The answer carries the new runner and its
+        credential, a device token of kind `runner`, shown once; only its hash
+        is kept. A pairing token that is unknown, expired or used answers `401
+        unauthorized` with the reason.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PairRunnerRequest"
+      responses:
+        "201":
+          description: The runner and its credential.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PairRunnerResponse"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /runners/{id}/revoke:
+    parameters:
+      - $ref: "#/components/parameters/RunnerId"
+    post:
+      operationId: revokeRunner
+      summary: Revoke a runner. Only `app` and `cli` tokens may.
+      description: |
+        Its credential stops working, its connection is closed and the leases
+        it holds end at once. Each job it held is handled by the loss rule
+        (D-08): queued again, or `waiting_for_resume` when it has a step with
+        side effects. Revoking a revoked runner changes nothing.
+      responses:
+        "200":
+          description: The runner, revoked.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Runner"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /runners/connect:
+    get:
+      operationId: connectRunner
+      summary: The WebSocket a runner dials out on. Runner tokens only.
+      description: |
+        Upgrade to a WebSocket with the runner's credential as the bearer
+        token (browsers are refused). Every text frame is one JSON object with
+        a `type`: the runner sends `RunnerFrame`s and the engine `EngineFrame`s.
+        Another token kind answers `403 forbidden`.
+
+        1. The engine sends `welcome` (heartbeat every 30 s, lease of 90 s).
+        2. The runner sends `hello` (version, os, cores, `maxJobs`, the leases
+           it still holds).
+        3. The engine sends `probe`; the runner runs the commands and answers
+           `probe_result`. The engine derives the capabilities from the
+           results (`ios-sign`, `android`, `flutter`, `swift-linux`) and
+           ignores anything the runner claims. Until then the runner gets no
+           job. It probes again at every connection.
+        4. The engine sends `lease_offer` for a queued job that fits. The
+           runner answers `lease_accept` or `lease_reject`. The lease lasts
+           90 s and every `heartbeat` (every 30 s, idle runners too) renews
+           the leases it lists; `heartbeat_ack` says until when. A lease that
+           runs out is lost: the engine sends `cancel` when the runner comes
+           back, and the job is queued again, or `waiting_for_resume` when it
+           has a step with side effects, never repeated by itself (D-08,
+           D-18).
+        5. While the job runs the runner sends `log_chunk` (numbered from 1 per
+           lease) and `step_state`. The engine stores the next chunk, ignores
+           a duplicate and a chunk that skips ahead, and answers each with
+           `chunk_ack` (`next` is the chunk it wants). The runner keeps
+           chunks until they are acknowledged and sends again from `next`.
+           `step_state` and `job_done` are idempotent.
+        6. `secret_request` asks for a secret of the job (D-09): only signing
+           material the steps name (`secrets` of the offer), once per lease,
+           answered with `secret_value` or `secret_denied`. Uploads never run
+           on a runner.
+        7. `job_done` ends the job (`lastChunk` is the last chunk sent; the
+           engine ends the job once it has the log up to there) and is
+           answered with `done_ack`. The artifacts are uploaded over HTTP
+           before it (`PUT /runners/jobs/{id}/artifacts/{name}`).
+        8. `drain` asks for no more jobs; the runner finishes its leases and
+           closes. A frame the engine cannot use is answered with `fault`.
+
+        A second connection of the same runner replaces the first (close code
+        4001). The engine closes with 4003 when the runner is revoked, 4008
+        when it went quiet for 90 s and 4400 on a broken protocol.
+      responses:
+        "101":
+          description: Switching Protocols.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "426":
+          $ref: "#/components/responses/UpgradeRequired"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /runners/jobs/{id}/artifacts/{name}:
+    parameters:
+      - $ref: "#/components/parameters/JobId"
+      - $ref: "#/components/parameters/ArtifactName"
+    put:
+      operationId: uploadRunnerArtifact
+      summary: Upload a file a leased job produced. Runner tokens only.
+      description: |
+        The body is the file. `X-Content-SHA256` (lowercase hexadecimal) and
+        `Content-Length` declare what it must be; the engine hashes the bytes
+        as they arrive and stores the file only when the digest and the size
+        match, so a half or wrong upload never replaces a good one. `X-Lease-Id`
+        names the lease: the runner must hold it. The upload may be repeated:
+        a job keeps one file per name.
+      parameters:
+        - name: kind
+          in: query
+          required: true
+          description: What the file is.
+          schema:
+            $ref: "#/components/schemas/ArtifactKind"
+        - name: X-Content-SHA256
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: X-Lease-Id
+          in: header
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema:
+              type: string
+              format: binary
+      responses:
+        "201":
+          description: The artifact as the engine stored it.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Artifact"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "500":
+          $ref: "#/components/responses/InternalError"
 components:
   securitySchemes:
     bearerAuth:
@@ -1595,6 +1822,20 @@ components:
       description: The store.
       schema:
         $ref: "#/components/schemas/ReleaseStore"
+    RunnerId:
+      name: id
+      in: path
+      required: true
+      description: The runner id, for example `rnr_1a2b3c4d5e6f7a8b`.
+      schema:
+        type: string
+    ArtifactName:
+      name: name
+      in: path
+      required: true
+      description: The file name, a plain name such as `prod-1.2.0+45.aab`.
+      schema:
+        type: string
     CredentialId:
       name: credentialId
       in: path
@@ -1785,7 +2026,10 @@ components:
             `approval.requested`, `approval.decided`, `approval.expired`,
             `project.gates_changed`, `release.created`,
             `release.state_changed`, `release.store_changed`,
-            `notification.raised`, or a type added by a
+            `notification.raised`, `runner.paired`, `runner.connected`,
+            `runner.disconnected`, `runner.revoked`,
+            `runner.capabilities_changed`, `runner.lease_lost`,
+            `runner.secret_delivered`, or a type added by a
             later engine version, which a client must ignore.
         payload:
           type: object
@@ -3314,3 +3558,549 @@ components:
           type: array
           items:
             type: string
+
+    RunnerStatus:
+      type: string
+      enum: [offline, online, draining, revoked]
+    Runner:
+      type: object
+      required: [id, name, status, capabilities, slots, jobIds, createdAt]
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        status:
+          $ref: "#/components/schemas/RunnerStatus"
+        capabilities:
+          type: array
+          description: What the engine's probe found, by wire name.
+          items:
+            type: string
+            enum: [ios-sign, android, flutter, swift-linux]
+        slots:
+          type: integer
+          minimum: 1
+        jobIds:
+          type: array
+          items:
+            type: string
+        os:
+          type: string
+        arch:
+          type: string
+        version:
+          type: string
+        cores:
+          type: integer
+          minimum: 1
+        lastHeartbeat:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+        revokedAt:
+          type: string
+          format: date-time
+    RunnersResponse:
+      type: object
+      required: [runners]
+      additionalProperties: false
+      properties:
+        runners:
+          type: array
+          items:
+            $ref: "#/components/schemas/Runner"
+    CreatePairingTokenRequest:
+      type: object
+      required: [name]
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+          minLength: 1
+          description: The runner's name, unique.
+    PairingToken:
+      type: object
+      required: [token, name, expiresAt]
+      additionalProperties: false
+      properties:
+        token:
+          type: string
+          description: "`xpp_` followed by 43 URL-safe characters."
+        name:
+          type: string
+        expiresAt:
+          type: string
+          format: date-time
+    PairRunnerRequest:
+      type: object
+      required: [pairingToken]
+      additionalProperties: false
+      properties:
+        pairingToken:
+          type: string
+    PairRunnerResponse:
+      type: object
+      required: [runner, token]
+      additionalProperties: false
+      properties:
+        runner:
+          $ref: "#/components/schemas/Runner"
+        token:
+          type: string
+          description: The runner's credential, a device token of kind `runner`.
+    LeaseRef:
+      type: object
+      required: [jobId, leaseId]
+      additionalProperties: false
+      properties:
+        jobId:
+          type: string
+        leaseId:
+          type: string
+    LeaseGrant:
+      type: object
+      required: [jobId, leaseId, until]
+      additionalProperties: false
+      properties:
+        jobId:
+          type: string
+        leaseId:
+          type: string
+        until:
+          type: string
+          format: date-time
+    LeaseStep:
+      type: object
+      required: [ordinal, kind, sideEffect, state, attempts, input]
+      additionalProperties: false
+      properties:
+        ordinal:
+          type: integer
+          minimum: 0
+        kind:
+          type: string
+        sideEffect:
+          type: boolean
+        state:
+          $ref: "#/components/schemas/StepState"
+        attempts:
+          type: integer
+          minimum: 0
+        input:
+          type: object
+    ProbeCommand:
+      type: object
+      required: [id, executable, arguments, timeoutSeconds]
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+        executable:
+          type: string
+        arguments:
+          type: array
+          items:
+            type: string
+        timeoutSeconds:
+          type: integer
+          minimum: 1
+        requires:
+          type: string
+          description: The id of a command that must have exited with 0.
+        onlyOn:
+          type: string
+          enum: [macos, linux]
+    ProbeResult:
+      type: object
+      required: [id, status, stdout, stderr]
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+        status:
+          type: string
+          enum: [exited, skipped, not_started, timed_out]
+        exitCode:
+          type: integer
+        stdout:
+          type: string
+        stderr:
+          type: string
+    ChunkLine:
+      type: object
+      required: [step, at, stream, text]
+      additionalProperties: false
+      properties:
+        step:
+          type: integer
+          minimum: 0
+        at:
+          type: string
+          format: date-time
+        stream:
+          type: string
+          enum: [stdout, stderr]
+        text:
+          type: string
+    HelloFrame:
+      type: object
+      required: [type, version, os, arch, cores, draining, leases]
+      additionalProperties: false
+      properties:
+        type:
+          const: hello
+        version:
+          type: string
+        os:
+          type: string
+        arch:
+          type: string
+        cores:
+          type: integer
+          minimum: 1
+        maxJobs:
+          type: integer
+          minimum: 1
+        draining:
+          type: boolean
+        leases:
+          type: array
+          items:
+            $ref: "#/components/schemas/LeaseRef"
+    ProbeResultFrame:
+      type: object
+      required: [type, probeId, results]
+      additionalProperties: false
+      properties:
+        type:
+          const: probe_result
+        probeId:
+          type: string
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProbeResult"
+    LeaseAcceptFrame:
+      type: object
+      required: [type, jobId, leaseId]
+      additionalProperties: false
+      properties:
+        type:
+          const: lease_accept
+        jobId:
+          type: string
+        leaseId:
+          type: string
+    LeaseRejectFrame:
+      type: object
+      required: [type, jobId, leaseId, reason]
+      additionalProperties: false
+      properties:
+        type:
+          const: lease_reject
+        jobId:
+          type: string
+        leaseId:
+          type: string
+        reason:
+          type: string
+    HeartbeatFrame:
+      type: object
+      required: [type, leases]
+      additionalProperties: false
+      properties:
+        type:
+          const: heartbeat
+        leases:
+          type: array
+          items:
+            $ref: "#/components/schemas/LeaseRef"
+    LogChunkFrame:
+      type: object
+      required: [type, jobId, leaseId, seq, lines]
+      additionalProperties: false
+      properties:
+        type:
+          const: log_chunk
+        jobId:
+          type: string
+        leaseId:
+          type: string
+        seq:
+          type: integer
+          minimum: 1
+        lines:
+          type: array
+          maxItems: 5000
+          items:
+            $ref: "#/components/schemas/ChunkLine"
+    StepStateFrame:
+      type: object
+      required: [type, jobId, leaseId, ordinal, state, attempts]
+      additionalProperties: false
+      properties:
+        type:
+          const: step_state
+        jobId:
+          type: string
+        leaseId:
+          type: string
+        ordinal:
+          type: integer
+          minimum: 0
+        state:
+          $ref: "#/components/schemas/StepState"
+        attempts:
+          type: integer
+          minimum: 0
+        result:
+          type: object
+        message:
+          type: string
+        startedAt:
+          type: string
+          format: date-time
+        finishedAt:
+          type: string
+          format: date-time
+    JobDoneFrame:
+      type: object
+      required: [type, jobId, leaseId, state, lastChunk]
+      additionalProperties: false
+      properties:
+        type:
+          const: job_done
+        jobId:
+          type: string
+        leaseId:
+          type: string
+        state:
+          type: string
+          enum: [succeeded, failed, cancelled]
+        lastChunk:
+          type: integer
+          minimum: 0
+        message:
+          type: string
+    SecretRequestFrame:
+      type: object
+      required: [type, jobId, leaseId, key]
+      additionalProperties: false
+      properties:
+        type:
+          const: secret_request
+        jobId:
+          type: string
+        leaseId:
+          type: string
+        key:
+          type: string
+    DrainFrame:
+      type: object
+      required: [type, draining]
+      additionalProperties: false
+      properties:
+        type:
+          const: drain
+        draining:
+          type: boolean
+    RunnerFrame:
+      description: |
+        A frame the runner sends. A type this engine does not know is
+        answered with a `fault` frame.
+      oneOf:
+        - $ref: "#/components/schemas/HelloFrame"
+        - $ref: "#/components/schemas/ProbeResultFrame"
+        - $ref: "#/components/schemas/LeaseAcceptFrame"
+        - $ref: "#/components/schemas/LeaseRejectFrame"
+        - $ref: "#/components/schemas/HeartbeatFrame"
+        - $ref: "#/components/schemas/LogChunkFrame"
+        - $ref: "#/components/schemas/StepStateFrame"
+        - $ref: "#/components/schemas/JobDoneFrame"
+        - $ref: "#/components/schemas/SecretRequestFrame"
+        - $ref: "#/components/schemas/DrainFrame"
+    WelcomeFrame:
+      type: object
+      required:
+        [type, runnerId, engineVersion, apiVersion, heartbeatSeconds, leaseSeconds]
+      additionalProperties: false
+      properties:
+        type:
+          const: welcome
+        runnerId:
+          type: string
+        engineVersion:
+          type: string
+        apiVersion:
+          type: string
+        heartbeatSeconds:
+          type: integer
+          minimum: 1
+        leaseSeconds:
+          type: integer
+          minimum: 1
+    ProbeFrame:
+      type: object
+      required: [type, probeId, commands]
+      additionalProperties: false
+      properties:
+        type:
+          const: probe
+        probeId:
+          type: string
+        commands:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProbeCommand"
+    LeaseOfferFrame:
+      type: object
+      required:
+        [type, leaseId, jobId, projectId, stage, capabilities, expiresAt, steps, secrets]
+      additionalProperties: false
+      properties:
+        type:
+          const: lease_offer
+        leaseId:
+          type: string
+        jobId:
+          type: string
+        projectId:
+          type: string
+        sha:
+          type: string
+        name:
+          type: string
+        stage:
+          type: integer
+          minimum: 0
+        capabilities:
+          type: array
+          items:
+            type: string
+        expiresAt:
+          type: string
+          format: date-time
+        steps:
+          type: array
+          items:
+            $ref: "#/components/schemas/LeaseStep"
+        secrets:
+          type: array
+          description: Keys only; the values come with `secret_value`.
+          items:
+            type: string
+    HeartbeatAckFrame:
+      type: object
+      required: [type, leases]
+      additionalProperties: false
+      properties:
+        type:
+          const: heartbeat_ack
+        leases:
+          type: array
+          items:
+            $ref: "#/components/schemas/LeaseGrant"
+    ChunkAckFrame:
+      type: object
+      required: [type, jobId, leaseId, seq, next, status]
+      additionalProperties: false
+      properties:
+        type:
+          const: chunk_ack
+        jobId:
+          type: string
+        leaseId:
+          type: string
+        seq:
+          type: integer
+        next:
+          type: integer
+          minimum: 1
+        status:
+          type: string
+          enum: [stored, duplicate, gap]
+    DoneAckFrame:
+      type: object
+      required: [type, jobId, leaseId, state]
+      additionalProperties: false
+      properties:
+        type:
+          const: done_ack
+        jobId:
+          type: string
+        leaseId:
+          type: string
+        state:
+          $ref: "#/components/schemas/JobState"
+    CancelFrame:
+      type: object
+      required: [type, jobId, reason]
+      additionalProperties: false
+      properties:
+        type:
+          const: cancel
+        jobId:
+          type: string
+        leaseId:
+          type: string
+        reason:
+          type: string
+    SecretValueFrame:
+      type: object
+      required: [type, jobId, leaseId, key, value]
+      additionalProperties: false
+      properties:
+        type:
+          const: secret_value
+        jobId:
+          type: string
+        leaseId:
+          type: string
+        key:
+          type: string
+        value:
+          type: string
+    SecretDeniedFrame:
+      type: object
+      required: [type, jobId, leaseId, key, reason]
+      additionalProperties: false
+      properties:
+        type:
+          const: secret_denied
+        jobId:
+          type: string
+        leaseId:
+          type: string
+        key:
+          type: string
+        reason:
+          type: string
+    FaultFrame:
+      type: object
+      required: [type, code, message]
+      additionalProperties: false
+      properties:
+        type:
+          const: fault
+        code:
+          type: string
+        message:
+          type: string
+    EngineFrame:
+      description: |
+        A frame the engine sends. A runner ignores a type it does not know.
+      oneOf:
+        - $ref: "#/components/schemas/WelcomeFrame"
+        - $ref: "#/components/schemas/ProbeFrame"
+        - $ref: "#/components/schemas/LeaseOfferFrame"
+        - $ref: "#/components/schemas/HeartbeatAckFrame"
+        - $ref: "#/components/schemas/ChunkAckFrame"
+        - $ref: "#/components/schemas/DoneAckFrame"
+        - $ref: "#/components/schemas/CancelFrame"
+        - $ref: "#/components/schemas/SecretValueFrame"
+        - $ref: "#/components/schemas/SecretDeniedFrame"
+        - $ref: "#/components/schemas/FaultFrame"

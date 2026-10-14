@@ -15,6 +15,7 @@ class JobRecord extends Equatable {
     this.releaseId,
     this.sha,
     this.runnerId,
+    this.leaseUntil,
     this.runId,
     this.stage = 0,
     this.name,
@@ -45,6 +46,10 @@ class JobRecord extends Equatable {
   /// The runner executing it, or `null` for the engine.
   final String? runnerId;
 
+  /// When the lease of a job on a remote runner runs out unless a heartbeat
+  /// renews it (D-08), or `null` for a job that holds no lease.
+  final DateTime? leaseUntil;
+
   /// The run (one dispatch of a workflow) it belongs to, or `null` for a job
   /// that was not dispatched.
   final String? runId;
@@ -71,9 +76,11 @@ class JobRecord extends Equatable {
   final DateTime? finishedAt;
 
   /// This record with the given fields replaced. Pass `null` to [message],
-  /// [startedAt] or [finishedAt] to clear them.
+  /// [runnerId], [leaseUntil], [startedAt] or [finishedAt] to clear them.
   JobRecord copyWith({
     JobState? state,
+    Object? runnerId = _unset,
+    Object? leaseUntil = _unset,
     Object? message = _unset,
     Object? startedAt = _unset,
     Object? finishedAt = _unset,
@@ -84,7 +91,10 @@ class JobRecord extends Equatable {
     releaseId: releaseId,
     sha: sha,
     state: state ?? this.state,
-    runnerId: runnerId,
+    runnerId: identical(runnerId, _unset) ? this.runnerId : runnerId as String?,
+    leaseUntil: identical(leaseUntil, _unset)
+        ? this.leaseUntil
+        : leaseUntil as DateTime?,
     runId: runId,
     stage: stage,
     name: name,
@@ -108,6 +118,7 @@ class JobRecord extends Equatable {
     sha,
     state,
     runnerId,
+    leaseUntil,
     runId,
     stage,
     name,

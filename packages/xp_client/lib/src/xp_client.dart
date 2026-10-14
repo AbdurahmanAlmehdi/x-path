@@ -537,6 +537,89 @@ class XpClient {
         ),
       );
 
+  // --------------------------------------------------------------- runners
+
+  /// `GET /runners`: every runner, oldest first, revoked ones included.
+  Future<List<Runner>> listRunners() async =>
+      RunnersResponse.fromJson(await _json(await _send('GET', ['runners'])))
+          .runners;
+
+  /// `POST /runners/pairing-tokens`: makes a pairing token for a runner called
+  /// [name]. Single use, valid for 15 minutes; shown once. Only `app` and `cli`
+  /// tokens may.
+  Future<PairingToken> createPairingToken(String name) async =>
+      PairingToken.fromJson(
+        await _json(
+          await _send('POST', [
+            'runners',
+            'pairing-tokens',
+          ], body: CreatePairingTokenRequest(name: name).toJson()),
+        ),
+      );
+
+  /// `POST /runners/pair`: exchanges the pairing token [pairingToken] for the
+  /// runner and its credential. Needs no token, so this client's token is not
+  /// sent.
+  Future<PairRunnerResponse> pairRunner(String pairingToken) async =>
+      PairRunnerResponse.fromJson(
+        await _json(
+          await _send(
+            'POST',
+            ['runners', 'pair'],
+            body: PairRunnerRequest(pairingToken: pairingToken).toJson(),
+            authenticated: false,
+          ),
+        ),
+      );
+
+  /// `POST /runners/{id}/revoke`. Only `app` and `cli` tokens may.
+  Future<Runner> revokeRunner(String id) async => Runner.fromJson(
+    await _json(await _send('POST', ['runners', id, 'revoke'])),
+  );
+
+  /// Opens the connection of a runner: `GET /runners/connect`. This client's
+  /// token must be the runner's credential. The caller speaks the frames of
+  /// the protocol (`RunnerFrame`, `EngineFrame`) over the channel and
+  /// reconnects when it drops; a refusal is an [ApiException].
+  Future<WebSocketChannel> connectRunner() =>
+      _openSocket(['runners', 'connect']);
+
+  /// `PUT /runners/jobs/{id}/artifacts/{name}`: uploads a file a leased job
+  /// produced. [size] and [sha256] declare what [content] is; the engine
+  /// stores the file only if the bytes are what was declared, so a connection
+  /// that breaks halfway leaves nothing behind. Throws an [ApiException] when
+  /// it refuses (the lease is not held, the digest is wrong).
+  Future<Artifact> uploadRunnerArtifact({
+    required String jobId,
+    required String name,
+    required String leaseId,
+    required ArtifactKind kind,
+    required Stream<List<int>> content,
+    required int size,
+    required String sha256,
+    Duration timeout = const Duration(minutes: 30),
+  }) async {
+    final request =
+        http.StreamedRequest(
+            'PUT',
+            _uri(
+              ['runners', 'jobs', jobId, 'artifacts', name],
+              {'kind': kind.wire},
+            ),
+          )
+          ..headers.addAll(_headers(authenticated: true))
+          ..headers['x-content-sha256'] = sha256
+          ..headers['x-lease-id'] = leaseId
+          ..headers[HttpHeaders.contentTypeHeader] = 'application/octet-stream'
+          ..contentLength = size;
+    // The body is sent as it is read, as fast as the engine takes it. A source
+    // that fails ends the request with that failure; a request the engine
+    // already answered has no body to feed any more.
+    unawaited(_feed(request.sink, content).catchError((Object _) {}));
+    final response = await _dispatch(request, timeout: timeout);
+    return Artifact.fromJson(await _json(await _collect(response)));
+  }
+
   // ---------------------------------------------------------------- events
 
   /// Watches the engine's events: `GET /events`.
@@ -634,12 +717,20 @@ class XpClient {
         ..headers[HttpHeaders.contentTypeHeader] = 'application/json'
         ..body = jsonEncode(body);
     }
+    return await _dispatch(request);
+  }
+
+  Future<http.StreamedResponse> _dispatch(
+    http.BaseRequest request, {
+    Duration? timeout,
+  }) async {
+    final limit = timeout ?? requestTimeout;
     final http.StreamedResponse response;
     try {
-      response = await _http.send(request).timeout(requestTimeout);
+      response = await _http.send(request).timeout(limit);
     } on TimeoutException catch (error) {
       throw ConnectionException(
-        'The engine did not answer within ${requestTimeout.inSeconds} s.',
+        'The engine did not answer within ${limit.inSeconds} s.',
         cause: error,
       );
     } on Object catch (error) {
@@ -673,5 +764,17 @@ class XpClient {
   static String? _fileNameOf(String disposition) {
     final match = RegExp('filename="?([^";]+)"?').firstMatch(disposition);
     return match?.group(1);
+  }
+}
+
+/// Sends [content] into the body of a request, and ends it.
+Future<void> _feed(
+  StreamSink<List<int>> sink,
+  Stream<List<int>> content,
+) async {
+  try {
+    await sink.addStream(content);
+  } finally {
+    await sink.close();
   }
 }

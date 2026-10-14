@@ -158,3 +158,13 @@ final storageReport = StorageReport(
 );
 
 const freeSpaceResult = FreeSpaceResult(dryRun: true, categories: []);
+
+final runner = Runner(
+  id: 'rnr_1',
+  name: 'mac-mini',
+  status: RunnerStatus.online,
+  capabilities: const ['flutter', 'ios-sign'],
+  slots: 2,
+  jobIds: const ['job_1'],
+  createdAt: at,
+);

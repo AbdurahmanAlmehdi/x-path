@@ -757,6 +757,315 @@ void main() {
       }
     });
 
+    test('documents the runner endpoints', () {
+      final unauthorized = jsonEncode(
+        ErrorResponse.of(ApiErrorCode.unauthorized, 'm').toJson(),
+      );
+      final forbidden = jsonEncode(
+        ErrorResponse.of(ApiErrorCode.forbidden, 'm').toJson(),
+      );
+      final conflict = jsonEncode(
+        ErrorResponse.of(ApiErrorCode.conflict, 'm').toJson(),
+      );
+
+      for (final (method, path) in [
+        ('GET', '/runners'),
+        ('POST', '/runners/pairing-tokens'),
+        ('POST', '/runners/pair'),
+        ('POST', '/runners/rnr_1/revoke'),
+        ('GET', '/runners/connect'),
+        ('PUT', '/runners/jobs/job_1/artifacts/a.apk'),
+      ]) {
+        expect(
+          shipped.validateResponse(
+            method: method,
+            path: path,
+            statusCode: 401,
+            body: unauthorized,
+            contentType: 'application/json',
+          ),
+          isEmpty,
+          reason: '$method $path',
+        );
+      }
+      for (final (method, path) in [
+        ('POST', '/runners/pairing-tokens'),
+        ('POST', '/runners/rnr_1/revoke'),
+        ('GET', '/runners/connect'),
+        ('PUT', '/runners/jobs/job_1/artifacts/a.apk'),
+      ]) {
+        expect(
+          shipped.validateResponse(
+            method: method,
+            path: path,
+            statusCode: 403,
+            body: forbidden,
+            contentType: 'application/json',
+          ),
+          isEmpty,
+          reason: '$method $path',
+        );
+      }
+      for (final (method, path) in [
+        ('POST', '/runners/pairing-tokens'),
+        ('POST', '/runners/pair'),
+        ('PUT', '/runners/jobs/job_1/artifacts/a.apk'),
+      ]) {
+        expect(
+          shipped.validateResponse(
+            method: method,
+            path: path,
+            statusCode: 409,
+            body: conflict,
+            contentType: 'application/json',
+          ),
+          isEmpty,
+          reason: '$method $path',
+        );
+      }
+      expect(
+        shipped.validateResponse(
+          method: 'GET',
+          path: '/runners/connect',
+          statusCode: 101,
+          body: '',
+        ),
+        isEmpty,
+      );
+    });
+
+    test('describes the runner models', () {
+      final at = DateTime.utc(2026, 10, 14);
+      final runner = Runner(
+        id: 'rnr_1',
+        name: 'mac-mini',
+        status: RunnerStatus.online,
+        capabilities: const ['flutter', 'ios-sign'],
+        slots: 2,
+        jobIds: const ['job_1'],
+        os: 'macos',
+        arch: 'arm64',
+        version: '1.0.0',
+        cores: 8,
+        lastHeartbeat: at,
+        createdAt: at,
+        revokedAt: at,
+      );
+
+      expect(shipped.validateSchema('Runner', runner.toJson()), isEmpty);
+      expect(
+        shipped.validateSchema(
+          'RunnersResponse',
+          RunnersResponse([runner]).toJson(),
+        ),
+        isEmpty,
+      );
+      expect(
+        shipped.validateSchema(
+          'CreatePairingTokenRequest',
+          const CreatePairingTokenRequest(name: 'mac-mini').toJson(),
+        ),
+        isEmpty,
+      );
+      expect(
+        shipped.validateSchema(
+          'PairingToken',
+          PairingToken(
+            token: 'xpp_x',
+            name: 'mac-mini',
+            expiresAt: at,
+          ).toJson(),
+        ),
+        isEmpty,
+      );
+      expect(
+        shipped.validateSchema(
+          'PairRunnerRequest',
+          const PairRunnerRequest(pairingToken: 'xpp_x').toJson(),
+        ),
+        isEmpty,
+      );
+      expect(
+        shipped.validateSchema(
+          'PairRunnerResponse',
+          PairRunnerResponse(runner: runner, token: 'xpt_x').toJson(),
+        ),
+        isEmpty,
+      );
+      expect(shipped.validateSchema('Runner', {'id': 'rnr_1'}), isNotEmpty);
+    });
+
+    test('describes every frame of the runner protocol', () {
+      final at = DateTime.utc(2026, 10, 14);
+      const lease = LeaseRef(jobId: 'job_1', leaseId: 'lse_1');
+      final fromRunner = <RunnerFrame>[
+        const HelloFrame(
+          version: '1.0.0',
+          os: 'macos',
+          arch: 'arm64',
+          cores: 8,
+          maxJobs: 2,
+          leases: [lease],
+        ),
+        const ProbeResultFrame(
+          probeId: 'prb_1',
+          results: [
+            ProbeResult(
+              id: 'git',
+              status: ProbeStatus.exited,
+              exitCode: 0,
+              stdout: 'git version 2',
+            ),
+            ProbeResult(id: 'swift', status: ProbeStatus.notStarted),
+          ],
+        ),
+        const LeaseAcceptFrame(jobId: 'job_1', leaseId: 'lse_1'),
+        const LeaseRejectFrame(
+          jobId: 'job_1',
+          leaseId: 'lse_1',
+          reason: 'busy',
+        ),
+        const HeartbeatFrame(leases: [lease]),
+        LogChunkFrame(
+          jobId: 'job_1',
+          leaseId: 'lse_1',
+          seq: 1,
+          lines: [
+            ChunkLine(step: 0, at: at, stream: LogStream.stdout, text: 'hi'),
+          ],
+        ),
+        StepStateFrame(
+          jobId: 'job_1',
+          leaseId: 'lse_1',
+          ordinal: 0,
+          state: StepState.succeeded,
+          attempts: 1,
+          result: const {'a': 1},
+          message: 'ok',
+          startedAt: at,
+          finishedAt: at,
+        ),
+        const JobDoneFrame(
+          jobId: 'job_1',
+          leaseId: 'lse_1',
+          state: JobState.failed,
+          lastChunk: 1,
+          message: 'boom',
+        ),
+        const SecretRequestFrame(jobId: 'job_1', leaseId: 'lse_1', key: 'k'),
+        const DrainFrame(),
+      ];
+      final fromEngine = <EngineFrame>[
+        const WelcomeFrame(
+          runnerId: 'rnr_1',
+          engineVersion: '1.0.0',
+          apiVersion: '1',
+        ),
+        const ProbeFrame(
+          probeId: 'prb_1',
+          commands: [
+            ProbeCommand(
+              id: 'git',
+              executable: 'git',
+              arguments: ['--version'],
+            ),
+            ProbeCommand(
+              id: 'xcodebuild',
+              executable: 'xcodebuild',
+              arguments: ['-version'],
+              requires: 'xcode_select',
+              onlyOn: 'macos',
+            ),
+          ],
+        ),
+        LeaseOfferFrame(
+          leaseId: 'lse_1',
+          jobId: 'job_1',
+          projectId: 'prj_1',
+          sha: 'a' * 40,
+          name: 'Build',
+          stage: 0,
+          capabilities: const ['android'],
+          expiresAt: at,
+          steps: const [
+            LeaseStep(
+              ordinal: 0,
+              kind: 'build.android',
+              sideEffect: false,
+              state: StepState.pending,
+              attempts: 0,
+              input: {'artifact': 'aab'},
+            ),
+          ],
+          secrets: const ['keystore'],
+        ),
+        HeartbeatAckFrame(
+          leases: [LeaseGrant(jobId: 'job_1', leaseId: 'lse_1', until: at)],
+        ),
+        const ChunkAckFrame(
+          jobId: 'job_1',
+          leaseId: 'lse_1',
+          seq: 2,
+          next: 1,
+          status: ChunkStatus.gap,
+        ),
+        const DoneAckFrame(
+          jobId: 'job_1',
+          leaseId: 'lse_1',
+          state: JobState.succeeded,
+        ),
+        const CancelFrame(jobId: 'job_1', leaseId: 'lse_1', reason: 'r'),
+        const SecretValueFrame(
+          jobId: 'job_1',
+          leaseId: 'lse_1',
+          key: 'k',
+          value: 'v',
+        ),
+        const SecretDeniedFrame(
+          jobId: 'job_1',
+          leaseId: 'lse_1',
+          key: 'k',
+          reason: 'r',
+        ),
+        const FaultFrame(code: 'invalid_frame', message: 'm'),
+      ];
+
+      for (final frame in fromRunner) {
+        expect(
+          shipped.validateSchema(
+            'RunnerFrame',
+            jsonDecode(jsonEncode(frame.toJson())),
+          ),
+          isEmpty,
+          reason: frame.type,
+        );
+      }
+      for (final frame in fromEngine) {
+        expect(
+          shipped.validateSchema(
+            'EngineFrame',
+            jsonDecode(jsonEncode(frame.toJson())),
+          ),
+          isEmpty,
+          reason: frame.type,
+        );
+      }
+      expect(
+        shipped.validateSchema('RunnerFrame', {'type': 'warp'}),
+        isNotEmpty,
+      );
+      expect(
+        shipped.validateSchema('RunnerFrame', {
+          'type': 'job_done',
+          'jobId': 'j',
+          'leaseId': 'l',
+          'state': 'running',
+          'lastChunk': 0,
+        }),
+        isNotEmpty,
+      );
+    });
+
     test('documents the storage endpoints', () {
       final unauthorized = jsonEncode(
         ErrorResponse.of(ApiErrorCode.unauthorized, 'm').toJson(),
@@ -978,6 +1287,33 @@ void main() {
           body: 'Release 1.2.0.',
           projectId: 'prj_1',
           approvalId: 'apr_1',
+        ),
+        const RunnerPaired(runnerId: 'rnr_1', name: 'mac-mini'),
+        const RunnerConnected(
+          runnerId: 'rnr_1',
+          name: 'mac-mini',
+          capabilities: ['flutter'],
+          slots: 1,
+        ),
+        const RunnerDisconnected(runnerId: 'rnr_1', name: 'mac-mini'),
+        const RunnerRevoked(runnerId: 'rnr_1', name: 'mac-mini'),
+        const RunnerCapabilitiesChanged(
+          runnerId: 'rnr_1',
+          name: 'mac-mini',
+          from: [],
+          to: ['flutter'],
+        ),
+        const RunnerLeaseLost(
+          runnerId: 'rnr_1',
+          jobId: 'job_1',
+          projectId: 'prj_1',
+          reason: 'lapsed',
+          state: JobState.queued,
+        ),
+        const RunnerSecretDelivered(
+          runnerId: 'rnr_1',
+          jobId: 'job_1',
+          key: 'k',
         ),
       ]) {
         final json = SequencedEvent(

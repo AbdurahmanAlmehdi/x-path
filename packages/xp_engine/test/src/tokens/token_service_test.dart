@@ -141,6 +141,29 @@ void main() {
     });
   });
 
+  group('revoke', () {
+    test('stops the token from authenticating, once', () async {
+      final issued = await service.issue(
+        name: 'Mac mini',
+        kind: DeviceTokenKind.runner,
+      );
+      clock.advance(const Duration(minutes: 5));
+
+      expect(await service.revoke(issued.token.id), isTrue);
+
+      expect(await service.authenticate(issued.secret), isNull);
+      final stored = (await repository.list()).single;
+      expect(stored.revokedAt, DateTime.utc(2026, 10, 13, 8, 5));
+      expect(stored.name, 'Mac mini');
+      expect(stored.kind, DeviceTokenKind.runner);
+      expect(await service.revoke(issued.token.id), isFalse);
+    });
+
+    test('knows no token it was not given', () async {
+      expect(await service.revoke('tok_nope'), isFalse);
+    });
+  });
+
   test('IssuedToken compares by value', () async {
     final issued = await service.issue(name: 'n', kind: DeviceTokenKind.app);
 

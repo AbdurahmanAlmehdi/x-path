@@ -24,6 +24,15 @@ abstract interface class JobRepository {
   /// Replaces the stored job that has the id of [job].
   Future<void> updateJob(JobRecord job);
 
+  /// Extends the lease of the running job [id] to [until], if it runs on the
+  /// runner [runnerId]. Returns whether it did. It writes nothing else, so it
+  /// cannot overwrite a state another writer saved in the meantime.
+  Future<bool> renewLease(
+    String id, {
+    required String runnerId,
+    required DateTime until,
+  });
+
   /// Records the versions of the tools the job [jobId] runs with (D-20),
   /// replacing any recorded before.
   ///
@@ -87,6 +96,22 @@ class InMemoryJobRepository implements JobRepository {
   Future<void> updateJob(JobRecord job) async {
     if (!_jobs.containsKey(job.id)) throw StateError('No job ${job.id}.');
     _jobs[job.id] = job;
+  }
+
+  @override
+  Future<bool> renewLease(
+    String id, {
+    required String runnerId,
+    required DateTime until,
+  }) async {
+    final job = _jobs[id];
+    if (job == null ||
+        job.state != JobState.running ||
+        job.runnerId != runnerId) {
+      return false;
+    }
+    _jobs[id] = job.copyWith(leaseUntil: until);
+    return true;
   }
 
   @override

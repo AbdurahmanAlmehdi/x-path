@@ -169,6 +169,33 @@ void main() {
           jobId: 'job_1',
           approvalId: 'apr_1',
         ),
+        const RunnerPaired(runnerId: 'rnr_1', name: 'mac-mini'),
+        const RunnerConnected(
+          runnerId: 'rnr_1',
+          name: 'mac-mini',
+          capabilities: ['flutter', 'ios-sign'],
+          slots: 2,
+        ),
+        const RunnerDisconnected(runnerId: 'rnr_1', name: 'mac-mini'),
+        const RunnerRevoked(runnerId: 'rnr_1', name: 'mac-mini'),
+        const RunnerCapabilitiesChanged(
+          runnerId: 'rnr_1',
+          name: 'mac-mini',
+          from: ['flutter'],
+          to: ['flutter', 'android'],
+        ),
+        const RunnerLeaseLost(
+          runnerId: 'rnr_1',
+          jobId: 'job_1',
+          projectId: 'prj_1',
+          reason: 'lapsed',
+          state: JobState.waitingForResume,
+        ),
+        const RunnerSecretDelivered(
+          runnerId: 'rnr_1',
+          jobId: 'job_1',
+          key: 'k',
+        ),
       ]) {
         final sequenced = SequencedEvent(seq: 9, at: at, event: event);
 
@@ -219,6 +246,13 @@ void main() {
         ReleaseStateChanged() => 'release state',
         ReleaseStoreChanged() => 'release store',
         NotificationRaised() => 'notification',
+        RunnerPaired() => 'runner paired',
+        RunnerConnected() => 'runner connected',
+        RunnerDisconnected() => 'runner disconnected',
+        RunnerRevoked() => 'runner revoked',
+        RunnerCapabilitiesChanged() => 'runner capabilities',
+        RunnerLeaseLost() => 'runner lease lost',
+        RunnerSecretDelivered() => 'runner secret',
         UnknownEvent() => 'unknown',
       };
 
@@ -426,6 +460,58 @@ void main() {
           ),
         ),
         'notification',
+      );
+      expect(
+        describe(const RunnerPaired(runnerId: 'r', name: 'n')),
+        'runner paired',
+      );
+      expect(
+        describe(
+          const RunnerConnected(
+            runnerId: 'r',
+            name: 'n',
+            capabilities: [],
+            slots: 1,
+          ),
+        ),
+        'runner connected',
+      );
+      expect(
+        describe(const RunnerDisconnected(runnerId: 'r', name: 'n')),
+        'runner disconnected',
+      );
+      expect(
+        describe(const RunnerRevoked(runnerId: 'r', name: 'n')),
+        'runner revoked',
+      );
+      expect(
+        describe(
+          const RunnerCapabilitiesChanged(
+            runnerId: 'r',
+            name: 'n',
+            from: [],
+            to: [],
+          ),
+        ),
+        'runner capabilities',
+      );
+      expect(
+        describe(
+          const RunnerLeaseLost(
+            runnerId: 'r',
+            jobId: 'j',
+            projectId: 'p',
+            reason: 'lapsed',
+            state: JobState.queued,
+          ),
+        ),
+        'runner lease lost',
+      );
+      expect(
+        describe(
+          const RunnerSecretDelivered(runnerId: 'r', jobId: 'j', key: 'k'),
+        ),
+        'runner secret',
       );
       expect(
         describe(EngineEvent.fromJson('x', const <String, dynamic>{})),

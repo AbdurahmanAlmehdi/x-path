@@ -86,6 +86,9 @@ class FakeEngine {
           'user-agent',
           'content-type',
           'accept',
+          'content-length',
+          'x-content-sha256',
+          'x-lease-id',
         ])
           name: ?request.headers.value(name),
       },

@@ -6,7 +6,8 @@ import 'package:xp_adapters/src/sqlite/timestamps.dart';
 import 'package:xp_api/xp_api.dart';
 import 'package:xp_engine/xp_engine.dart';
 
-/// Jobs and their steps in the `job` and `job_step` tables.
+/// Jobs and their steps in the `job` and `job_step` tables. A job on a
+/// remote runner keeps its lease in `runner_id` and `lease_until`.
 ///
 /// Job states are stored as their wire names (`waiting_for_resume`), step
 /// states as their names. The `job_step` id is `<jobId>/<ordinal>`.
@@ -20,8 +21,8 @@ class SqliteJobRepository implements JobRepository {
 
   static const _jobColumns =
       'id, workflow_version_id, project_id, release_id, sha, state, '
-      'runner_id, run_id, stage, name, capabilities, message, created_at, '
-      'started_at, finished_at';
+      'runner_id, lease_until, run_id, stage, name, capabilities, message, '
+      'created_at, started_at, finished_at';
 
   static const _stepColumns =
       'job_id, ordinal, kind, state, side_effect, input, attempts, result, '
@@ -32,7 +33,7 @@ class SqliteJobRepository implements JobRepository {
     _database.transaction(() {
       _db.execute(
         'INSERT INTO job ($_jobColumns) '
-        'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
         [
           job.id,
           job.workflowVersionId,
@@ -41,6 +42,7 @@ class SqliteJobRepository implements JobRepository {
           job.sha,
           job.state.wire,
           job.runnerId,
+          _time(job.leaseUntil),
           job.runId,
           job.stage,
           job.name,
@@ -99,11 +101,12 @@ class SqliteJobRepository implements JobRepository {
   @override
   Future<void> updateJob(JobRecord job) async {
     _db.execute(
-      'UPDATE job SET state = ?, runner_id = ?, message = ?, started_at = ?, '
-      'finished_at = ? WHERE id = ?',
+      'UPDATE job SET state = ?, runner_id = ?, lease_until = ?, '
+      'message = ?, started_at = ?, finished_at = ? WHERE id = ?',
       [
         job.state.wire,
         job.runnerId,
+        _time(job.leaseUntil),
         job.message,
         _time(job.startedAt),
         _time(job.finishedAt),
@@ -111,6 +114,20 @@ class SqliteJobRepository implements JobRepository {
       ],
     );
     if (_db.updatedRows == 0) throw StateError('There is no job ${job.id}.');
+  }
+
+  @override
+  Future<bool> renewLease(
+    String id, {
+    required String runnerId,
+    required DateTime until,
+  }) async {
+    _db.execute(
+      'UPDATE job SET lease_until = ? '
+      "WHERE id = ? AND state = 'running' AND runner_id = ?",
+      [toDatabaseTime(until), id, runnerId],
+    );
+    return _db.updatedRows > 0;
   }
 
   @override
@@ -201,6 +218,7 @@ class SqliteJobRepository implements JobRepository {
     sha: row['sha'] as String?,
     state: JobState.values.firstWhere((s) => s.wire == row['state']),
     runnerId: row['runner_id'] as String?,
+    leaseUntil: _fromTime(row['lease_until']),
     runId: row['run_id'] as String?,
     stage: row['stage'] as int,
     name: row['name'] as String?,

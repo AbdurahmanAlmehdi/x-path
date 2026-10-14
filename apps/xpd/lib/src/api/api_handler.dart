@@ -12,6 +12,8 @@ import 'package:xpd/src/api/middleware.dart';
 import 'package:xpd/src/api/projects/projects_routes.dart';
 import 'package:xpd/src/api/releases/releases_routes.dart';
 import 'package:xpd/src/api/responses.dart';
+import 'package:xpd/src/api/runners/runner_connect_route.dart';
+import 'package:xpd/src/api/runners/runners_routes.dart';
 import 'package:xpd/src/api/runs/runs_routes.dart';
 import 'package:xpd/src/api/storage/storage_routes.dart';
 import 'package:xpd/src/api/system_routes.dart';
@@ -19,8 +21,9 @@ import 'package:xpd/src/api/tests/tests_routes.dart';
 import 'package:xpd/src/api/workflows/workflows_routes.dart';
 
 /// Routes that need no device token: a client can probe an engine, and read
-/// its version, before it has been paired.
-const publicPaths = {'/health', '/version'};
+/// its version, before it has been paired; a runner exchanges its pairing
+/// token for a credential.
+const publicPaths = {'/health', '/version', '/runners/pair'};
 
 /// The whole HTTP API of the engine as one shelf handler.
 ///
@@ -42,6 +45,9 @@ Handler buildApiHandler({
   required ReleaseService releases,
   required ReleaseNotesService releaseNotes,
   required HousekeepingService housekeeping,
+  required RunnerService runners,
+  required RunnerConnectRoute runnerConnect,
+  required RunnerArtifacts runnerArtifacts,
   required String engineVersion,
   void Function(Object error, StackTrace stackTrace)? onError,
 }) {
@@ -55,7 +61,8 @@ Handler buildApiHandler({
         ..get('/health', health)
         ..get('/version', version(engineVersion))
         ..get('/events', events.handle)
-        ..get('/jobs/<id>/logs', jobLogs.handle);
+        ..get('/jobs/<id>/logs', jobLogs.handle)
+        ..get('/runners/connect', runnerConnect.handle);
   ProjectsRoutes(projects).addTo(router);
   JobsRoutes(jobs).addTo(router);
   ArtifactsRoutes(artifacts).addTo(router);
@@ -66,6 +73,7 @@ Handler buildApiHandler({
   ApprovalsRoutes(approvals).addTo(router);
   ReleasesRoutes(releases, releaseNotes).addTo(router);
   StorageRoutes(housekeeping).addTo(router);
+  RunnersRoutes(runners, runnerArtifacts).addTo(router);
   return const Pipeline()
       .addMiddleware(errorMiddleware(onError: onError))
       .addMiddleware(authMiddleware(tokens, publicPaths: publicPaths))

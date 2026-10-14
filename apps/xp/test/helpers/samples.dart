@@ -190,3 +190,14 @@ StorageReport storageReport() => StorageReport(
   flavors: const [],
   retention: const RetentionSettings(),
 );
+
+final runner = Runner(
+  id: 'rnr_1',
+  name: 'mac-mini',
+  status: RunnerStatus.revoked,
+  capabilities: const ['flutter'],
+  slots: 1,
+  jobIds: const [],
+  createdAt: DateTime.utc(2026, 10, 14, 9),
+  revokedAt: DateTime.utc(2026, 10, 14, 10),
+);
