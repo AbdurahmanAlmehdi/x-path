@@ -438,7 +438,7 @@ Mataa dev builds through `xp` can start after Phase 13, before the desktop app e
 
 ### Phase 12b: Releases and PR merge
 
-- **Status:** Not started
+- **Status:** Done
 - **Scope:** Release state machine (D-17) driven by store polling (10-minute cache, manual
   refresh) and manual buttons; "new build, same version"; release PR create and merge once both
   stores are live; release endpoints. Release PRs are merged with a merge commit (ADR 0007).

@@ -34,6 +34,7 @@ class RunContext {
     this.current,
     this.releaseVersion,
     this.patch,
+    this.release,
   });
 
   /// The run.
@@ -89,6 +90,10 @@ class RunContext {
   /// For a patch, its number: one more than the patches of that release.
   final int? patch;
 
+  /// The release (`rel_...`) this run builds again or merges, when the
+  /// dispatch named one. A workflow reads it as `release`.
+  final String? release;
+
   /// The variables a workflow reads that do not depend on the job.
   Map<String, Object?> get scope => {
     'app': {
@@ -105,6 +110,7 @@ class RunContext {
     },
     'ref': ref,
     'sha': sha,
+    'release': release,
     'version': version == null ? null : '${version!.name}',
     'build': build,
     'bump': bump,

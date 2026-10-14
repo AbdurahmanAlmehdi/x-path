@@ -126,7 +126,9 @@ columns of `project`; version 3 adds what the job runner records to `job` and `j
 adds the tool versions of a job; version 5 adds the time and a unique path to `artifact`; version 6 adds
 `shorebird_release`, the Flutter version each Shorebird release was built with; version 7 gives `test_run` its
 project, app, time and the baseline index; version 8 gives `credential_ref` the result of its last check and
-one credential per flavor and kind; version 9 adds `run` and gives `job` its run, stage, name and capabilities.
+one credential per flavor and kind; version 9 adds `run` and gives `job` its run, stage, name and capabilities;
+version 10 gives `approval` its run, job, decision and expiry; version 11 gives `release` its flavor, branch, pull request,
+builds and the status in each store.
 
 Secrets (`packages/xp_secrets`) live on the engine machine behind the `SecretStore` interface of
 `xp_engine`; `createSecretStore` picks the implementation for the platform.
@@ -545,7 +547,7 @@ here calls Google in a test: the adapters run against `tool/e2e/fake_stores/play
   `client_email` and `private_key`, uses `token_uri` (default `https://oauth2.googleapis.com/token`) and
   `private_key_id`, and ignores the rest. The credential endpoints (see Credentials) write it. A flavor with no
   `play_sa` reference has no service account: XPath cannot upload for it, `upload.play` fails with "upload the
-  bundle by hand", and the build numbers of Play are unknown (the desktop's "Play: live" button is Phase 12b/16b).
+  bundle by hand", and the build numbers of Play are unknown (the endpoint behind "Play: live" is Phase 12b, the desktop's button Phase 16b).
   Setting up the account: enable the Google Play Android Developer API in the Cloud project, create the service
   account and a JSON key, and invite its email in the Play Console (Users and permissions) with permission to
   release the app.
@@ -790,8 +792,8 @@ stages:                        # required; run in order
   credentials), so `with` carries only what varies. `StepPlanners` has the table: `command`,
   `git.checkout`, `guard`, `version.bump`, `build.android`, `build.ios`, `build.verifyCompiledConfig`,
   `ios.stripAndReexport`, `shorebird.release`, `shorebird.patch`, `symbols.archive`, `record.manifest`,
-  `test`, `analyze`, `upload.appStore`, `upload.play`, `upload.firebase`, `git.releaseBranch`, `git.tag`
-  and `git.push`. The inputs are the ones of the sections above; a workflow gets the credentials by
+  `test`, `analyze`, `upload.appStore`, `upload.play`, `upload.firebase`, `git.releaseBranch`, `git.tag`,
+  `git.push`, `github.createPr` and `github.mergePr`. The inputs are the ones of the sections above; a workflow gets the credentials by
   flavor and kind (`upload.firebase` needs a `firebase_sa` credential, `upload.play` a `play_sa`,
   `upload.appStore` an `asc_key` or `apple_id`, Shorebird steps a `shorebird` key if there is one). The
   Android keystore of a `keystore` credential reaches a build as `XPATH_KEYSTORE_FILE` (a 0600 file),
@@ -809,9 +811,9 @@ stages:                        # required; run in order
   project, commit and version, and while nobody decided, its step returns `StepWaiting`: the job stops in
   state **`waiting_for_approval`**, holding no slot and no runner, and its run holds the project lock.
   Whoever decides a gate calls `Scheduler.resumeWaiting(projectId:)`; each waiting job asks again and goes
-  on (approved), fails (denied or expired) or waits again. Approvals themselves are Phase 12a: until then
-  `xpd` wires `PendingApprovalGate`, which approves nothing, so a production release or patch stops at its
-  first gate and a dev build or test run is not affected. The engine never approves on its own.
+  on (approved), fails (denied or expired) or waits again. The `ApprovalService` (Phase 12a) is the gate: only
+  `app` and `cli` tokens decide (`/approvals`), and the engine never approves on its own. A production release
+  therefore stops at its first gate until the owner approves; a dev build or test run is not affected.
 - **Matrix.** `platform` takes `android` and `ios`, `flavor` a flavor name; the values are written out or
   come from `${{ platforms }}` / `${{ flavors }}` (or an input). A job is made for each cell whose `if` is
   true. The default platforms are what the app has; the default flavors are the production flavors for a
@@ -822,14 +824,15 @@ stages:                        # required; run in order
 
 ### Built-in workflows and versions
 
-Every project gets `dev-build`, `prod-release`, `shorebird-patch` and `test` the first time its workflows
+Every project gets `dev-build`, `prod-release`, `release-merge`, `shorebird-patch` and `test` the first time its workflows
 are listed (and a new version of one when the engine ships another document). They compose the steps in the
 order of `ship.sh`:
 
 | Workflow | Stages | Notes |
 |---|---|---|
 | `dev-build` | `build` (platform x flavor) | `git.checkout`, `guard`, `version.bump`, `build.android` / `build.ios`, `record.manifest`, then `upload.firebase` (an Android build with an app id in `firebaseAppIds`) or `upload.appStore` (an iOS build with an id in `appleAppIds`). No lock: as many as the slots allow. |
-| `prod-release` | `prepare`, `build` (platform x flavor), `finalize` | `lock: project`. `prepare` bumps the version once and cuts the release branch after `gate: prod_release`; each `build` job starts from that commit and runs `shorebird.release` (a Shorebird flavor) or `build.android` / `build.ios`, `symbols.archive`, `record.manifest` and the uploads the flavor has credentials for; `finalize` tags and pushes after `gate: push`. |
+| `prod-release` | `prepare`, `build` (platform x flavor), `finalize` | `lock: project`. `prepare` bumps the version once and cuts the release branch after `gate: prod_release`; each `build` job starts from that commit and runs `shorebird.release` (a Shorebird flavor) or `build.android` / `build.ios`, `symbols.archive`, `record.manifest` and the uploads the flavor has credentials for; `finalize` tags, pushes after `gate: push` and opens the release pull request (`github.createPr`). A run of it is a release (see Releases). |
+| `release-merge` | `merge` | Merges the pull request of a release: `gate: merge`, then `github.mergePr`. Started by `POST /releases/{id}/merge`, no project lock. |
 | `shorebird-patch` | `patch` (platform x flavor), `finalize` | `lock: project`. Dispatch it with `releaseVersion` (`x.y.z+build`, never `latest`); `gate: prod_patch` before `shorebird.patch`, then the patch tag `v<x.y.z>+<build>-p<n>` and `gate: push`. |
 | `test` | `test` | `test` and `analyze`; allocates no build number. |
 
@@ -902,7 +905,101 @@ project over HTTP, saves a Firebase service account, dispatches `dev-build` for 
 the manifest and the Firebase release. It then dispatches `prod-release` twice and checks that the second
 queues behind the first, which stops at its gate, and runs once the first is cancelled. It needs the
 Android SDK, takes a few minutes the first time and is not part of CI (Gradle and the SDK make it too slow
-for the Linux workflow). `release_e2e.sh prod` is Phase 12b.
+for the Linux workflow).
+
+`tool/e2e/release_e2e.sh prod` runs a whole production release (see Releases) from `draft` to `merged`, over
+HTTP only, as an app would: it starts fake App Store Connect (an API key) and iTunes lookup, Google Play,
+Firebase and GitHub (`XPD_TEST_ASC_URL` and `XPD_TEST_PLAY_URL` join the variables above; the fake GitHub
+knows pull requests and makes a real merge commit in the bare repository that is the fixture's `origin`),
+saves the credentials, dispatches `prod-release` for Android and iOS and approves each gate with an app token
+(`prod_release`, `push`), then moves the fake stores from review to approved to live, asks for the merge,
+checks that an `mcp` token cannot approve it, approves it and waits for `merged`. It checks:
+
+- the states in order (the `release.state_changed` events too), the build number after the highest the fake
+  stores have seen, and the tag `v<x.y.z>+<build>` on the tip of the release branch in the origin, reachable
+  from the base branch after the merge, which GitHub was asked to do with `merge_method: merge`;
+- that Play got one commit with `changesInReviewBehavior=ERROR_IF_IN_REVIEW`, and Firebase none (the fixture's
+  prod flavor is not a Shorebird flavor);
+- that the owner's folder is unchanged: `git status --ignored`, `HEAD`, every ref and the SHA-256 of every
+  file of the working tree before and after;
+- that no secret (the GitHub token, the device token, the private keys of the fake ASC key and Play service
+  account, whole and line by line) is in a stored log, the SQLite database with its WAL, the engine's output,
+  what is left of the engine's temporary folder, or **the arguments of any process the engine started**. Those
+  are captured by shims first on the engine's `PATH`: every process a step starts goes through the `perl`
+  trampoline of ADR 0003, so the `perl` shim sees the full command line of all of them, and a `git` shim sees
+  every git call. They append to `argv.log` and run the real program.
+
+What is real: the engine, its database, mirror, worktrees, tag and push, a real Android App Bundle built by
+Gradle, its upload to the fake Play, the polling and the merge. What is faked, because the machine has no signing
+identity and Apple has no fake: `flutter build ipa` (an SDK wrapper in the engine's toolchain cache runs the real
+Flutter for everything else and writes a placeholder IPA) and `xcrun altool` (a shim prints what a successful
+upload prints). It needs macOS with Xcode, since the engine schedules the iOS job where `ios-sign` is, and the
+Android SDK; it takes several minutes and is not part of CI.
+
+## Releases
+
+A **release** is one flavor of an app going to the stores (D-17). The engine creates it when a workflow that cuts
+a release branch (`git.releaseBranch`, so `prod-release`) is dispatched, one per flavor of the run, and follows it
+to the end. `packages/xp_engine/lib/src/releases` has the logic, `apps/xpd/lib/src/api/releases` the endpoints.
+
+```text
+draft -> building -> uploaded -> in_review -> approved -> live -> merged
+                                    |
+                                    +-> rejected -> building (a new build of the same version)
+                       any state that is not over -> abandoned
+```
+
+- **How it moves.** `ReleaseStateMachine` lists the allowed moves (a store that is quick, or an internal Play
+  track, may take `uploaded` straight to `approved` or `live`). The service reads the steps of the jobs of the
+  release (`ReleaseService.sync`): `building` once a build step started, `uploaded` once every store the release
+  targets (`upload.appStore` is Apple, `upload.play` is Play) has its upload, and the branch, tag and pull request
+  as their steps succeed. After that the **stores** decide, each with its own status (`pending`, `uploaded`,
+  `in_review`, `rejected`, `approved`, `live`; kept in `store_status`): the release is `rejected` if any store is,
+  else as far along as the slowest store (`in_review` while either reviews, `live` only when every store targeted
+  is). A status only moves forward, and a rejection only before the approval. Reading a release brings it up to
+  date with its jobs, and `ReleaseWatcher` does the same when a job or step event arrives.
+- **Asking the stores** (D-14, D-15). Apple: App Store Connect `appVersionState` of the version with the API key
+  (`IN_REVIEW`/`WAITING_FOR_REVIEW` are in review, `REJECTED`/`METADATA_REJECTED`/`INVALID_BINARY`/
+  `DEVELOPER_REJECTED` rejected, `PENDING_*`/`ACCEPTED` approved, `READY_FOR_DISTRIBUTION` live); an Apple ID
+  flavor has no key, so the iTunes lookup says the version is live when it is on sale in the app's storefront and
+  approval is the owner's button. Play: `tracks.releases.list`, the release that holds the version code
+  (`IN_REVIEW`, `NOT_APPROVED`, `APPROVED_NOT_PUBLISHED`, `PUBLISHED`); without a service account the owner presses
+  "Play: live". `ReleaseStatusPoller` asks a store at most every ten minutes (the `checked_at` of its status is the
+  cache, so a restart keeps it), also a store that fails, and a store that cannot be read keeps its status and says
+  why in `note`. `ReleaseWatcher` checks what is due every minute; `POST /releases/{id}/refresh` asks at once.
+- **By hand.** `POST /releases/{id}/stores/{apple|play}/status` takes `approved` or `live` for Apple and `live`
+  for Play, once the store has the build. Because a status moves the release toward the merge of its pull request,
+  it and `abandon` are for `app` and `cli` tokens (`403` for `mcp` and `runner`, D-13).
+- **New build, same version.** After a rejection `POST /releases/{id}/builds` dispatches the workflow that made
+  the release again, on its release branch, with the same version and a new build number (D-11, never reused) and
+  the inputs of the first dispatch (`DispatchRequest.release` links the run; a workflow reads it as `release`, and
+  `prod-release` skips the check that the version shipped before when it is set). The release goes back to
+  `building`, the stores to `pending`; App Store Connect keeps reporting `REJECTED` for the version until the new
+  build is submitted, so that reading is ignored until it changes. The new build is tagged and pushed (the branch
+  moves forward only) and reuses the open pull request.
+- **The pull request is opened after the push**, by the `github.createPr` step of `prod-release` (the release
+  branch is not on GitHub before the gated push, so opening it when the release starts is not possible). An open
+  pull request for the same branches is reused.
+- **The merge** is enabled once every store targeted is live (`mergeEnabled`). `POST /releases/{id}/merge` runs the
+  built-in `release-merge` workflow on the release branch; its `gate: merge` binds the approval to the project,
+  the commit and `x.y.z+build`, so it waits for an `app` or `cli` token to approve it (an `mcp` token gets the pending
+  approval and can poll, never approve). `github.mergePr` then merges with a **merge commit** (ADR 0007: it calls
+  `mergePullRequest` without a method, and the e2e asserts `merge_method: merge`), only when the release is `live`
+  and only the commit that was tagged (`sha` is sent, so a push to the branch since is refused with GitHub's
+  `409`). The release is `merged` when the step succeeded. A merge run that ends without merging (a denied gate, a
+  GitHub error) frees the merge to be asked for again, and asking while a run is under way answers with it.
+
+| Route | What it does |
+|---|---|
+| `GET /releases[?project=&app=&state=]` | The releases, newest first, each brought up to date. |
+| `GET /releases/{id}` | One release: state, `version`, `build`, `builds`, the status in each `stores`, `branch`, `tag`, `headSha`, `prNumber`, `prUrl`, `mergeEnabled`, `mergeCommit`. |
+| `POST /releases/{id}/refresh` | Asks the stores now (bypasses the ten-minute cache). Any token. |
+| `POST /releases/{id}/stores/{store}/status` | `{"state": "approved" or "live"}`. `app` and `cli` tokens; `409` when the store has no build yet or is past that status. |
+| `POST /releases/{id}/builds` | New build, same version. `202` with the run; `409` unless the release is `rejected`. |
+| `POST /releases/{id}/merge` | Request the merge. `202` with the run, which waits for approval; `409` unless the release is `live` with a pull request. |
+| `POST /releases/{id}/abandon` | `{"reason"}` optional. `app` and `cli` tokens; cancels a run that still builds it. |
+
+`release.created`, `release.state_changed` and `release.store_changed` go on `/events`.
 
 ## Testing
 

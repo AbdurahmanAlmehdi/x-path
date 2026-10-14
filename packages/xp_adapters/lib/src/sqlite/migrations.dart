@@ -15,6 +15,7 @@ const engineMigrations = <Migration>[
   Migration(version: 8, sql: _v8),
   Migration(version: 9, sql: _v9),
   Migration(version: 10, sql: _v10),
+  Migration(version: 11, sql: _v11),
 ];
 
 // Timestamps are integer microseconds since the Unix epoch (UTC), so that
@@ -331,4 +332,25 @@ CREATE UNIQUE INDEX idx_approval_binding ON approval (
   COALESCE(run_id, '')
 );
 CREATE INDEX idx_approval_due ON approval (expires_at) WHERE state = 'pending';
+''';
+
+// Phase 12b: what a release needs beyond the version 1 table. A release is one
+// flavor of an app at one version (a new build of the same version after a
+// rejection stays in it, `builds` lists them all as JSON), with its release
+// branch, the commit its tag names, its pull request, the run that merges it
+// and the merge commit. `store_status` holds the status in each store (JSON,
+// by store). The project of a release is the project of its app.
+const _v11 = '''
+ALTER TABLE release ADD COLUMN flavor TEXT NOT NULL DEFAULT '';
+ALTER TABLE release ADD COLUMN base_branch TEXT NOT NULL DEFAULT '';
+ALTER TABLE release ADD COLUMN branch TEXT;
+ALTER TABLE release ADD COLUMN head_sha TEXT;
+ALTER TABLE release ADD COLUMN pr_number INTEGER;
+ALTER TABLE release ADD COLUMN merge_sha TEXT;
+ALTER TABLE release ADD COLUMN merge_run_id TEXT;
+ALTER TABLE release ADD COLUMN message TEXT;
+ALTER TABLE release ADD COLUMN builds TEXT NOT NULL DEFAULT '[]'
+  CHECK (json_valid(builds));
+ALTER TABLE release ADD COLUMN created_at INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE release ADD COLUMN updated_at INTEGER NOT NULL DEFAULT 0;
 ''';

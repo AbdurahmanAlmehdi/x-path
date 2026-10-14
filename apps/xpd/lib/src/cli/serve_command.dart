@@ -139,16 +139,21 @@ class ServeCommand extends XpdCommand {
       );
       final testRuns = SqliteTestRunRepository(database);
       final projectRepository = SqliteProjectRepository(database);
+      final releaseRepository = SqliteReleaseRepository(database);
       final apple = AppleStores(
         database: database,
         secrets: secrets,
         clock: const SystemClock(),
+        ascBaseUrl: testing.ascUrl,
+        itunesBaseUrl: testing.ascUrl,
       );
       final play = PlayStores(
         database: database,
         secrets: secrets,
         clock: const SystemClock(),
         requiredTargetSdk: targetSdk,
+        apiBaseUrl: testing.playUrl,
+        uploadBaseUrl: testing.playUrl,
       );
       final firebase = FirebaseStores(
         clock: const SystemClock(),
@@ -212,6 +217,8 @@ class ServeCommand extends XpdCommand {
         GitReleaseBranchStep(git),
         GitTagStep(git),
         GitPushStep(git),
+        GitHubCreatePrStep(github),
+        GitHubMergePrStep(github: github, releases: releaseRepository),
         const CommandStep(),
         VersionBumpStep(git: git, workspaces: DirectoryWorkspace.new),
         BuildAndroidStep(
@@ -379,7 +386,40 @@ class ServeCommand extends XpdCommand {
         events: events,
         clock: const SystemClock(),
       );
-      final dispatcher = WorkflowDispatcher(
+      final runService = RunService(
+        runs: runRepository,
+        jobs: jobRepository,
+        control: scheduler,
+      );
+      // The releases dispatch the workflows of new builds and merges, and the
+      // dispatcher tells them about the releases it makes.
+      late final WorkflowDispatcher dispatcher;
+      final releases = ReleaseService(
+        releases: releaseRepository,
+        jobs: jobRepository,
+        runRecords: runRepository,
+        runs: runService,
+        workflows: workflows,
+        poller: ReleaseStatusPoller(
+          sources: [
+            AppleStatusSource(
+              credentials: apple.credentials,
+              connect: apple.connect,
+              itunes: apple.itunes,
+            ),
+            PlayStatusSource(
+              credentials: play.credentials,
+              connect: play.connect,
+            ),
+          ],
+          clock: const SystemClock(),
+        ),
+        events: events,
+        clock: const SystemClock(),
+        dispatch: (projectId, workflowId, request) =>
+            dispatcher.dispatch(projectId, workflowId, request),
+      );
+      dispatcher = WorkflowDispatcher(
         workflows: workflows,
         planners: planners,
         projects: projectRepository,
@@ -403,6 +443,7 @@ class ServeCommand extends XpdCommand {
         workspaces: DirectoryWorkspace.new,
         worktreeAt: (mirror, name) =>
             CliGitService.worktreePath(directory, mirror, name),
+        releases: releases,
       );
       await _recoverJobs(
         JobRecovery(
@@ -438,12 +479,9 @@ class ServeCommand extends XpdCommand {
         credentials: credentialChecks.service,
         workflows: workflows,
         dispatcher: dispatcher,
-        runs: RunService(
-          runs: runRepository,
-          jobs: jobRepository,
-          control: scheduler,
-        ),
+        runs: runService,
         approvals: approvals,
+        releases: releases,
         clock: const SystemClock(),
         engineVersion: packageVersion,
         host: host,
@@ -463,6 +501,15 @@ class ServeCommand extends XpdCommand {
             context.err.writeln('warning: approval sweep failed: $error'),
       );
       unawaited(approvalSweeper.start());
+      // Releases follow their jobs, and the stores are asked about the ones
+      // that wait for them (at most every ten minutes each).
+      final releaseWatcher = ReleaseWatcher(
+        events: events,
+        service: releases,
+        onError: (error, stackTrace) =>
+            context.err.writeln('warning: release update failed: $error'),
+      );
+      unawaited(releaseWatcher.start());
 
       await context.shutdown.first;
       context.out.writeln('xpd shutting down');
@@ -472,6 +519,7 @@ class ServeCommand extends XpdCommand {
       await jobs.interruptAll();
       await server.close();
       approvalSweeper.stop();
+      await releaseWatcher.stop();
       credentialChecks.close();
       github.close();
       apple.close();

@@ -56,6 +56,14 @@ void main() {
     addTearDown(apple.close);
   });
 
+  test('reads the iTunes lookup of the storefront for a release', () async {
+    server.addItunes(_bundleId, version: '2.0.0', country: 'sa');
+
+    final app = await apple.itunes.lookup(bundleId: _bundleId, country: 'sa');
+
+    expect(app!.version, '2.0.0');
+  });
+
   group('a flavor with an asc_key credential', () {
     setUp(() {
       addFlavor('prod', _bundleId, credentialKind: 'asc_key');

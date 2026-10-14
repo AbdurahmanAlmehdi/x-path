@@ -1165,6 +1165,237 @@ paths:
           $ref: "#/components/responses/NotFound"
         "500":
           $ref: "#/components/responses/InternalError"
+  /releases:
+    get:
+      operationId: listReleases
+      summary: The releases, newest first.
+      description: |
+        A release is one flavor of an app going to the stores (D-17). The
+        engine creates it when a production release is dispatched and moves
+        it through `draft`, `building`, `uploaded`, `in_review`, `rejected`
+        or `approved`, `live` and `merged` (or `abandoned`) as the jobs and
+        the stores progress. Reading a release brings it up to date with its
+        jobs; the stores are asked at most every ten minutes
+        (`POST /releases/{id}/refresh` asks at once).
+      parameters:
+        - name: project
+          in: query
+          required: false
+          description: Only the releases of this project.
+          schema:
+            type: string
+        - name: app
+          in: query
+          required: false
+          description: Only the releases of the app at this path.
+          schema:
+            type: string
+        - name: state
+          in: query
+          required: false
+          description: Only the releases in this state.
+          schema:
+            $ref: "#/components/schemas/ReleaseState"
+      responses:
+        "200":
+          description: The releases.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReleasesResponse"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /releases/{id}:
+    parameters:
+      - $ref: "#/components/parameters/ReleaseId"
+    get:
+      operationId: getRelease
+      summary: One release. Any token kind may read it.
+      responses:
+        "200":
+          description: The release.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Release"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /releases/{id}/refresh:
+    parameters:
+      - $ref: "#/components/parameters/ReleaseId"
+    post:
+      operationId: refreshRelease
+      summary: Ask the stores about the release now.
+      description: |
+        Bypasses the ten-minute cache: App Store Connect (or the iTunes
+        lookup for an Apple ID flavor) and Google Play are asked once, and
+        the release moves if they say so. A store that cannot be read (no
+        API key or service account) keeps its status and says why in
+        `note`. Any token kind may refresh.
+      responses:
+        "200":
+          description: The release after the refresh.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Release"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /releases/{id}/stores/{store}/status:
+    parameters:
+      - $ref: "#/components/parameters/ReleaseId"
+      - $ref: "#/components/parameters/ReleaseStoreName"
+    post:
+      operationId: setReleaseStoreStatus
+      summary: Say what a store did, by hand. Only `app` and `cli` tokens may.
+      description: |
+        The buttons "Apple approved" and "Apple live" (an Apple ID flavor has
+        no review API, D-14) and "Play: live" (no service account, D-15).
+        Apple takes `approved` or `live`, Google Play `live`. The status
+        only moves forward, and only once the store has the build. An `mcp`
+        or `runner` token answers `403 forbidden`: a status moves the
+        release toward the merge of its pull request, which only the owner
+        may enable (D-13).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StoreStatusRequest"
+      responses:
+        "200":
+          description: The release after the change.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Release"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /releases/{id}/builds:
+    parameters:
+      - $ref: "#/components/parameters/ReleaseId"
+    post:
+      operationId: startReleaseBuild
+      summary: Build the same version again with a new build number.
+      description: |
+        Offered once a store rejected the release (D-17). It dispatches the
+        production workflow of the release again on its release branch, with
+        the same version and a new build number (D-11: numbers are never
+        reused), and links the run to the release. The release goes back to
+        `building`. The workflow asks for the owner's approval like any
+        production release. `409 conflict` unless the release is `rejected`.
+      responses:
+        "202":
+          description: The run that builds it.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Run"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/WorkflowInvalid"
+        "502":
+          $ref: "#/components/responses/UpstreamError"
+        "503":
+          $ref: "#/components/responses/SecretsLocked"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /releases/{id}/merge:
+    parameters:
+      - $ref: "#/components/parameters/ReleaseId"
+    post:
+      operationId: mergeRelease
+      summary: Request the merge of the release pull request.
+      description: |
+        Open once every store targeted is live (`mergeEnabled`). It
+        dispatches the `release-merge` workflow, whose merge is a gated
+        action (D-13): the run waits for an `app` or `cli` token to approve
+        it, and then merges the pull request with a merge commit (ADR 0007).
+        Asking again while that run is under way answers with the same run.
+        `409 conflict` unless the release is `live` and has its pull request.
+      responses:
+        "202":
+          description: The run that merges it.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Run"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/WorkflowInvalid"
+        "502":
+          $ref: "#/components/responses/UpstreamError"
+        "503":
+          $ref: "#/components/responses/SecretsLocked"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /releases/{id}/abandon:
+    parameters:
+      - $ref: "#/components/parameters/ReleaseId"
+    post:
+      operationId: abandonRelease
+      summary: Give the release up. Only `app` and `cli` tokens may.
+      description: |
+        Moves a release that is not over to `abandoned`. A run that still
+        builds it is cancelled. `409 conflict` for a release that is merged or
+        abandoned already.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AbandonRequest"
+      responses:
+        "200":
+          description: The release, abandoned.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Release"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "500":
+          $ref: "#/components/responses/InternalError"
 components:
   securitySchemes:
     bearerAuth:
@@ -1214,6 +1445,20 @@ components:
       description: The approval id, for example `apr_1a2b3c4d5e6f7a8b`.
       schema:
         type: string
+    ReleaseId:
+      name: id
+      in: path
+      required: true
+      description: The release id, for example `rel_1a2b3c4d5e6f7a8b`.
+      schema:
+        type: string
+    ReleaseStoreName:
+      name: store
+      in: path
+      required: true
+      description: The store.
+      schema:
+        $ref: "#/components/schemas/ReleaseStore"
     CredentialId:
       name: credentialId
       in: path
@@ -1402,7 +1647,8 @@ components:
             `credential.verified`, `credential.expired`, `credential.removed`,
             `workflow.saved`, `workflow.removed`, `run.dispatched`,
             `approval.requested`, `approval.decided`, `approval.expired`,
-            `project.gates_changed`,
+            `project.gates_changed`, `release.created`,
+            `release.state_changed`, `release.store_changed`,
             or a type added by a
             later engine version, which a client must ignore.
         payload:
@@ -1984,6 +2230,12 @@ components:
           type: string
           pattern: "^\\d+\\.\\d+\\.\\d+\\+\\d+$"
           description: The release a patch applies to, `x.y.z+build`.
+        release:
+          type: string
+          description: |
+            The release (`rel_...`) the run belongs to: a new build of the
+            same version after a rejection, or the merge of its pull request.
+            The release endpoints set it.
         inputs:
           type: object
           description: The values of the inputs the workflow declares.
@@ -2593,3 +2845,162 @@ components:
             $ref: "#/components/schemas/GateAction"
           additionalProperties:
             type: boolean
+    ReleaseState:
+      type: string
+      enum:
+        - draft
+        - building
+        - uploaded
+        - in_review
+        - rejected
+        - approved
+        - live
+        - merged
+        - abandoned
+    ReleaseStore:
+      type: string
+      enum: [apple, play]
+    StoreState:
+      type: string
+      enum: [pending, uploaded, in_review, rejected, approved, live]
+    StatusSource:
+      type: string
+      enum: [upload, api, lookup, manual]
+    StoreStatus:
+      type: object
+      required: [store, state, source]
+      additionalProperties: false
+      properties:
+        store:
+          $ref: "#/components/schemas/ReleaseStore"
+        state:
+          $ref: "#/components/schemas/StoreState"
+        source:
+          $ref: "#/components/schemas/StatusSource"
+        detail:
+          type: string
+          description: |
+            What the store said, as it said it, for example `IN_REVIEW` or
+            `RELEASE_LIFECYCLE_STATE_PUBLISHED`.
+        checkedAt:
+          type: string
+          format: date-time
+          description: When the store was asked last.
+        changedAt:
+          type: string
+          format: date-time
+          description: When `state` last changed.
+        note:
+          type: string
+          description: |
+            Why the store could not be read the last time it was asked, or
+            what the owner should know.
+    ReleaseBuild:
+      type: object
+      required: [build, runId, createdAt]
+      additionalProperties: false
+      properties:
+        build:
+          type: integer
+          minimum: 1
+        runId:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+    Release:
+      type: object
+      required:
+        - id
+        - projectId
+        - app
+        - flavor
+        - version
+        - build
+        - state
+        - stores
+        - builds
+        - mergeEnabled
+        - createdAt
+        - updatedAt
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+        projectId:
+          type: string
+        app:
+          type: string
+          description: The path of the app (`.` for the root).
+        flavor:
+          type: string
+        version:
+          type: string
+          pattern: "^\\d+\\.\\d+\\.\\d+$"
+        build:
+          type: integer
+          minimum: 1
+          description: The build number now.
+        state:
+          $ref: "#/components/schemas/ReleaseState"
+        stores:
+          type: array
+          items:
+            $ref: "#/components/schemas/StoreStatus"
+        builds:
+          type: array
+          items:
+            $ref: "#/components/schemas/ReleaseBuild"
+        mergeEnabled:
+          type: boolean
+          description: |
+            Whether `POST /releases/{id}/merge` is open: every store is live,
+            the release has its pull request and nothing merges it yet.
+        branch:
+          type: string
+        baseBranch:
+          type: string
+        tag:
+          type: string
+        headSha:
+          type: string
+        prNumber:
+          type: integer
+        prUrl:
+          type: string
+        mergeCommit:
+          type: string
+        mergeRunId:
+          type: string
+        message:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    ReleasesResponse:
+      type: object
+      required: [releases]
+      additionalProperties: false
+      properties:
+        releases:
+          type: array
+          items:
+            $ref: "#/components/schemas/Release"
+    StoreStatusRequest:
+      type: object
+      required: [state]
+      additionalProperties: false
+      properties:
+        state:
+          type: string
+          enum: [approved, live]
+          description: '`approved` or `live` for Apple, `live` for Google Play.'
+    AbandonRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        reason:
+          type: string

@@ -25,6 +25,7 @@ DispatchRequest _$DispatchRequestFromJson(Map<String, dynamic> json) =>
         ),
         version: $checkedConvert('version', (v) => v as String?),
         releaseVersion: $checkedConvert('releaseVersion', (v) => v as String?),
+        release: $checkedConvert('release', (v) => v as String?),
         inputs: $checkedConvert(
           'inputs',
           (v) => v as Map<String, dynamic>? ?? const {},
@@ -42,6 +43,7 @@ Map<String, dynamic> _$DispatchRequestToJson(DispatchRequest instance) =>
       'bump': ?_$VersionBumpEnumMap[instance.bump],
       'version': ?instance.version,
       'releaseVersion': ?instance.releaseVersion,
+      'release': ?instance.release,
       'inputs': instance.inputs,
     };
 

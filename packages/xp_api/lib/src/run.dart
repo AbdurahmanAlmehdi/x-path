@@ -67,6 +67,7 @@ class DispatchRequest extends Equatable {
     this.bump,
     this.version,
     this.releaseVersion,
+    this.release,
     this.inputs = const {},
   });
 
@@ -98,6 +99,12 @@ class DispatchRequest extends Equatable {
   /// The release a patch applies to, `x.y.z+build`.
   final String? releaseVersion;
 
+  /// The release (`rel_...`) this run belongs to: a new build of the same
+  /// version after a rejection, or the merge of its pull request. The engine
+  /// sets it for `POST /releases/{id}/builds` and `.../merge`; a workflow
+  /// reads it as `release`.
+  final String? release;
+
   /// The values of the inputs the workflow declares.
   final Map<String, dynamic> inputs;
 
@@ -113,6 +120,7 @@ class DispatchRequest extends Equatable {
     bump,
     version,
     releaseVersion,
+    release,
     inputs,
   ];
 }
