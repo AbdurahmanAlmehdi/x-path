@@ -541,7 +541,7 @@ Mataa dev builds through `xp` can start after Phase 13, before the desktop app e
 
 ### Phase 16c: Desktop tests, runners and storage
 
-- **Status:** Not started
+- **Status:** Done
 - **Scope:** Tests view with baseline diff, runners view with pairing, storage view with "free
   up space".
 - **Files touched:** `apps/xp_desktop/lib/tests/**`, `apps/xp_desktop/lib/runners/**`, `apps/xp_desktop/lib/storage/**`

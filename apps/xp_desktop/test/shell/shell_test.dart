@@ -14,10 +14,15 @@ import 'package:xp_desktop/project_overview/view/project_overview_page.dart';
 import 'package:xp_desktop/projects/bloc/projects_bloc.dart';
 import 'package:xp_desktop/projects/view/no_projects_page.dart';
 import 'package:xp_desktop/releases/view/releases_page.dart';
+import 'package:xp_desktop/runners/runners.dart';
 import 'package:xp_desktop/shell/shell.dart';
+import 'package:xp_desktop/storage/storage.dart';
+import 'package:xp_desktop/tests/tests.dart';
+import 'package:xp_desktop/widgets/widgets.dart';
 import 'package:xp_repositories/xp_repositories.dart';
 
 import '../helpers/approval_fixtures.dart';
+import '../helpers/engine_fixtures.dart';
 import '../helpers/fakes.dart';
 import '../helpers/pump_app.dart';
 
@@ -82,6 +87,9 @@ void main() {
       (const JobDestination('run_1'), JobPage),
       (const AddProjectDestination(), AddProjectPage),
       (const ReleasesDestination('prj_1'), ReleasesPage),
+      (const TestsDestination('prj_1'), TestsPage),
+      (const RunnersDestination(), RunnersPage),
+      (const StorageDestination(), StoragePage),
       (const ApprovalsDestination(), ApprovalsPage),
       (const CredentialsDestination('prj_1'), CredentialsPage),
       (const EnginesDestination(), EnginesPage),
@@ -117,6 +125,10 @@ void main() {
       await tester.tap(find.text('Releases'));
       await tester.pump();
       expect(shell.state, const ReleasesDestination('prj_1'));
+      await tester.tap(find.text('Tests'));
+      await tester.pump();
+      expect(shell.state, const TestsDestination('prj_1'));
+      expect(shell.projectId, 'prj_1');
       await tester.tap(find.text('Overview'));
       await tester.pump();
       expect(shell.state, const ProjectDestination('prj_1'));
@@ -124,6 +136,34 @@ void main() {
       await tester.pump();
       expect(shell.state, const ApprovalsDestination());
       expect(find.text('Releases'), findsNothing);
+    });
+
+    testWidgets('says how many runners are busy and what storage frees', (
+      tester,
+    ) async {
+      final shell = ShellCubit();
+      await tester.pumpApp(
+        const Sidebar(),
+        shell: shell,
+        projects: projectsIn(
+          const ProjectsState(loaded: true, projects: [mataa]),
+        ),
+        runners: runnersIn(
+          RunnersState(loaded: true, runners: [busyRunner, idleRunner]),
+        ),
+        storage: storageIn(StorageState(loaded: true, report: storageReport)),
+      );
+      expect(find.text('1 busy'), findsOneWidget);
+      expect(
+        find.text('${formatSize(storageReport.reclaimableBytes)} free-able'),
+        findsOneWidget,
+      );
+      await tester.tap(find.text('Runners'));
+      await tester.pump();
+      expect(shell.state, const RunnersDestination());
+      await tester.tap(find.text('Storage'));
+      await tester.pump();
+      expect(shell.state, const StorageDestination());
     });
 
     testWidgets('lists the projects with what their scan found', (

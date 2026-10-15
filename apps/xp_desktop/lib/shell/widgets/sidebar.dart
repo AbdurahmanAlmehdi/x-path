@@ -4,8 +4,10 @@ import 'package:xp_api/xp_api.dart';
 import 'package:xp_desktop/approvals/bloc/pending_approvals_bloc.dart';
 import 'package:xp_desktop/l10n/l10n.dart';
 import 'package:xp_desktop/projects/bloc/projects_bloc.dart';
+import 'package:xp_desktop/runners/bloc/runners_bloc.dart';
 import 'package:xp_desktop/shell/cubit/shell_cubit.dart';
 import 'package:xp_desktop/shell/widgets/engine_switcher.dart';
+import 'package:xp_desktop/storage/bloc/storage_bloc.dart';
 import 'package:xp_desktop/theme/theme.dart';
 import 'package:xp_desktop/widgets/widgets.dart';
 
@@ -21,9 +23,16 @@ class Sidebar extends StatelessWidget {
     final destination = context.watch<ShellCubit>().state;
     final projects = context.watch<ProjectsBloc>().state;
     final pending = context.watch<PendingApprovalsBloc>().state.approvals;
+    final busyRunners = context.select<RunnersBloc, int>(
+      (bloc) => bloc.state.busy,
+    );
+    final reclaimable = context.select<StorageBloc, int?>(
+      (bloc) => bloc.state.report?.reclaimableBytes,
+    );
     final selectedProject = switch (destination) {
       ProjectDestination(:final projectId) => projectId,
       ReleasesDestination(:final projectId) => projectId,
+      TestsDestination(:final projectId) => projectId,
       JobDestination(:final projectId) => projectId,
       HomeDestination() when projects.projects.isNotEmpty =>
         projects.projects.first.id,
@@ -88,6 +97,14 @@ class Sidebar extends StatelessWidget {
                       selected: destination is ReleasesDestination,
                       onTap: () => show(ReleasesDestination(project.id)),
                     ),
+                    SidebarRow(
+                      icon: PhosphorIconsRegular.testTube,
+                      selectedIcon: PhosphorIconsFill.testTube,
+                      label: l10n.sidebarTests,
+                      indent: 12,
+                      selected: destination is TestsDestination,
+                      onTap: () => show(TestsDestination(project.id)),
+                    ),
                   ],
                 ],
                 const SizedBox(height: 18),
@@ -101,6 +118,16 @@ class Sidebar extends StatelessWidget {
                   onTap: () => show(const ApprovalsDestination()),
                 ),
                 SidebarRow(
+                  icon: PhosphorIconsRegular.hardDrives,
+                  selectedIcon: PhosphorIconsFill.hardDrives,
+                  label: l10n.sidebarRunners,
+                  selected: destination is RunnersDestination,
+                  meta: busyRunners > 0
+                      ? l10n.sidebarRunnersBusy(busyRunners)
+                      : null,
+                  onTap: () => show(const RunnersDestination()),
+                ),
+                SidebarRow(
                   icon: PhosphorIconsRegular.key,
                   selectedIcon: PhosphorIconsFill.key,
                   label: l10n.sidebarCredentials,
@@ -108,8 +135,18 @@ class Sidebar extends StatelessWidget {
                   onTap: () => show(const CredentialsDestination()),
                 ),
                 SidebarRow(
-                  icon: PhosphorIconsRegular.hardDrives,
-                  selectedIcon: PhosphorIconsFill.hardDrives,
+                  icon: PhosphorIconsRegular.database,
+                  selectedIcon: PhosphorIconsFill.database,
+                  label: l10n.sidebarStorage,
+                  selected: destination is StorageDestination,
+                  meta: reclaimable == null || reclaimable == 0
+                      ? null
+                      : l10n.sidebarStorageFreeable(formatSize(reclaimable)),
+                  onTap: () => show(const StorageDestination()),
+                ),
+                SidebarRow(
+                  icon: PhosphorIconsRegular.laptop,
+                  selectedIcon: PhosphorIconsFill.laptop,
                   label: l10n.sidebarEngines,
                   selected:
                       destination is EnginesDestination ||
@@ -181,6 +218,7 @@ class SidebarRow extends StatefulWidget {
     this.selected = false,
     this.indent = 0,
     this.count = 0,
+    this.meta,
     super.key,
   });
 
@@ -196,6 +234,9 @@ class SidebarRow extends StatefulWidget {
   /// What waits for the owner here: the needs-you count badge, the only
   /// warning fill besides the needs-you bar (Colour guide).
   final int count;
+
+  /// A short fact at the trailing end, for example `2 busy`.
+  final String? meta;
 
   @override
   State<SidebarRow> createState() => _SidebarRowState();
@@ -235,6 +276,13 @@ class _SidebarRowState extends State<SidebarRow> {
                         .copyWith(color: colors.textPrimary),
               ),
             ),
+            if (widget.meta case final meta?)
+              Text(
+                meta,
+                style: context.xpType.caption.copyWith(
+                  color: colors.textSecondary,
+                ),
+              ),
             if (widget.count > 0) _CountBadge(widget.count),
           ],
         ),

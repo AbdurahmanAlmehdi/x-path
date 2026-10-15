@@ -17,9 +17,12 @@ import 'package:xp_desktop/project_overview/view/project_overview_page.dart';
 import 'package:xp_desktop/projects/bloc/projects_bloc.dart';
 import 'package:xp_desktop/projects/view/no_projects_page.dart';
 import 'package:xp_desktop/releases/view/releases_page.dart';
+import 'package:xp_desktop/runners/view/runners_page.dart';
 import 'package:xp_desktop/shell/cubit/shell_cubit.dart';
 import 'package:xp_desktop/shell/widgets/shell_page.dart';
 import 'package:xp_desktop/shell/widgets/sidebar.dart';
+import 'package:xp_desktop/storage/view/storage_page.dart';
+import 'package:xp_desktop/tests/view/tests_page.dart';
 import 'package:xp_desktop/theme/theme.dart';
 import 'package:xp_desktop/widgets/widgets.dart';
 
@@ -76,6 +79,12 @@ class AppShell extends StatelessWidget {
                 ),
                 ReleasesDestination(:final projectId, :final releaseId) =>
                   ReleasesPage(projectId: projectId, releaseId: releaseId),
+                TestsDestination(:final projectId, :final jobId) => TestsPage(
+                  projectId: projectId,
+                  jobId: jobId,
+                ),
+                RunnersDestination() => const RunnersPage(),
+                StorageDestination() => const StoragePage(),
                 ApprovalsDestination(:final approvalId) => ApprovalsPage(
                   approvalId: approvalId,
                 ),

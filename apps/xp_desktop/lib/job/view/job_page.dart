@@ -14,6 +14,7 @@ import 'package:xp_desktop/job/widgets/pipeline_graph.dart';
 import 'package:xp_desktop/job/widgets/step_list.dart';
 import 'package:xp_desktop/l10n/l10n.dart';
 import 'package:xp_desktop/projects/bloc/projects_bloc.dart';
+import 'package:xp_desktop/shell/cubit/shell_cubit.dart';
 import 'package:xp_desktop/shell/widgets/shell_page.dart';
 import 'package:xp_desktop/theme/theme.dart';
 import 'package:xp_desktop/widgets/widgets.dart';
@@ -170,6 +171,14 @@ class JobView extends StatelessWidget {
                 : null,
           ),
       ],
+      if (job != null && hasTestResults(job))
+        XpButton(
+          label: l10n.jobTestResults,
+          icon: PhosphorIconsRegular.testTube,
+          onPressed: () => context.read<ShellCubit>().show(
+            TestsDestination(job.projectId, jobId: job.id),
+          ),
+        ),
       if (open)
         XpButton(
           label: l10n.jobCancel,
@@ -181,6 +190,14 @@ class JobView extends StatelessWidget {
     ];
   }
 }
+
+/// Whether [job] ran its tests to the end: its `test` step succeeded or
+/// failed, so the engine has the run (D-21).
+bool hasTestResults(Job job) => job.steps.any(
+  (step) =>
+      step.kind == 'test' &&
+      (step.state == StepState.succeeded || step.state == StepState.failed),
+);
 
 /// Asks, then cancels the run of the job view.
 Future<void> cancelRun(BuildContext context, String title) async {

@@ -6,6 +6,7 @@ import 'package:xp_api/xp_api.dart';
 import 'package:xp_client/xp_client.dart';
 import 'package:xp_desktop/job/job.dart';
 import 'package:xp_desktop/l10n/l10n.dart';
+import 'package:xp_desktop/shell/cubit/shell_cubit.dart';
 import 'package:xp_repositories/xp_repositories.dart';
 
 import '../helpers/job_fixtures.dart';
@@ -285,6 +286,59 @@ void main() {
       expect(find.byType(CancelRunDialog), findsNothing);
       verifyNever(
         () => harness.jobs.resumeJob(any(), fromStep: any(named: 'fromStep')),
+      );
+    });
+
+    testWidgets('opens the test results of a job that ran its tests', (
+      tester,
+    ) async {
+      final shell = ShellCubit();
+      final tests = job(
+        'job_tests',
+        'Tests dev',
+        0,
+        JobState.failed,
+        start: local(14, 2),
+        end: local(14, 4, 41),
+        steps: [
+          step(
+            0,
+            'test',
+            StepState.failed,
+            start: local(14, 2),
+            end: local(14, 4, 41),
+          ),
+        ],
+      );
+      final harness = JobHarness(
+        run: RunJobs(run: runningRun().run, jobs: [tests]),
+      );
+      await harness.pump(tester, shell: shell);
+      await tester.tap(find.text('Test results'));
+      expect(shell.state, const TestsDestination('prj_1', jobId: 'job_tests'));
+      expect(
+        hasTestResults(
+          job(
+            'j',
+            'n',
+            0,
+            JobState.running,
+            steps: [step(0, 'test', StepState.running)],
+          ),
+        ),
+        isFalse,
+      );
+      expect(
+        hasTestResults(
+          job(
+            'j',
+            'n',
+            0,
+            JobState.succeeded,
+            steps: [step(0, 'test', StepState.succeeded)],
+          ),
+        ),
+        isTrue,
       );
     });
 
