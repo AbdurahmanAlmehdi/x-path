@@ -50,6 +50,27 @@ void main() {
     expect(int.parse(lines[2].trim()), greaterThan(1));
   });
 
+  test('looks programs up on the PATH of its environment', () async {
+    final dir = Directory.systemTemp.createTempSync('xp_runner_path_');
+    addTearDown(() => dir.deleteSync(recursive: true));
+    final tool = File('${dir.path}/xp-path-probe')
+      ..writeAsStringSync('#!/bin/sh\necho "probe \$XP_TEST_VALUE"\n');
+    Process.runSync('chmod', ['+x', tool.path]);
+    final withPath = IoProcessRunner(
+      environment: {'PATH': '${dir.path}:/usr/bin:/bin', 'XP_TEST_VALUE': 'a'},
+    );
+
+    expect((await withPath.run('xp-path-probe', [])).stdout, 'probe a\n');
+    expect(
+      (await withPath.run(
+        'xp-path-probe',
+        [],
+        environment: {'XP_TEST_VALUE': 'b'},
+      )).stdout,
+      'probe b\n',
+    );
+  });
+
   test('throws a ProcessStartException for a missing program', () async {
     await expectLater(
       runner.start('/definitely/not/a/program', []),

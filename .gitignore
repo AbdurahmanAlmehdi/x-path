@@ -10,3 +10,6 @@ pubspec_overrides.yaml
 # The build steps live in directories called build.
 !packages/xp_engine/lib/src/steps/build/
 !packages/xp_engine/test/src/steps/build/
+
+# The signed XPath.app of tool/release/build_mac.sh.
+dist/

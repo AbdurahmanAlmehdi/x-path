@@ -6,8 +6,10 @@ import 'package:xp_adapters/xp_adapters.dart';
 import 'package:xp_engine/xp_engine.dart';
 import 'package:xp_secrets/xp_secrets.dart';
 import 'package:xpd/src/cli/xpd_command.dart';
+import 'package:xpd/src/cli/xpd_context.dart';
 import 'package:xpd/src/credentials/credential_checks.dart';
 import 'package:xpd/src/server/xpd_server.dart';
+import 'package:xpd/src/service/serve_environment.dart';
 import 'package:xpd/src/stores/apple_stores.dart';
 import 'package:xpd/src/stores/firebase_stores.dart';
 import 'package:xpd/src/stores/play_stores.dart';
@@ -24,7 +26,11 @@ const defaultPort = 7480;
 /// 1. `<data-dir>/bundles/<version>`, where the packaging puts the bundles of
 ///    this version, and
 /// 2. `runners` next to the `bin` and `lib` of the engine's own bundle, when
-///    [executable] is `<bundle>/bin/xpd`.
+///    [executable] is `<bundle>/bin/xpd`, and
+/// 3. `Contents/Resources/runners` of `XPath.app`, when the engine is the one
+///    the app carries (`Contents/Helpers/xpd/bin/xpd`): `Contents/Helpers`
+///    may hold only signed code, so `tool/release/build_mac.sh` puts the
+///    archives there.
 ///
 /// Each holds `<os>-<arch>/xp.tar.gz`.
 List<String> runnerBundleRoots({
@@ -33,10 +39,16 @@ List<String> runnerBundleRoots({
   required String executable,
 }) {
   final binDirectory = p.dirname(executable);
+  final bundle = p.dirname(binDirectory);
+  final contents = p.dirname(p.dirname(bundle));
   return [
     p.join(dataDirectory, 'bundles', version),
-    if (executable.isNotEmpty && p.basename(binDirectory) == 'bin')
-      p.join(p.dirname(binDirectory), 'runners'),
+    if (executable.isNotEmpty && p.basename(binDirectory) == 'bin') ...[
+      p.join(bundle, 'runners'),
+      if (p.basename(p.dirname(bundle)) == 'Helpers' &&
+          p.basename(contents) == 'Contents')
+        p.join(contents, 'Resources', 'runners'),
+    ],
   ];
 }
 
@@ -73,8 +85,34 @@ class ServeCommand extends XpdCommand {
   @override
   String get description => 'Run the engine.';
 
+  XpdContext? _serving;
+
+  /// While the engine runs: the context with the tool folders on `PATH`
+  /// ([withToolDirectories]) and, when launchd started the engine for the
+  /// app ([isLaunchedByLaunchd]), the output going to [serveLogPath].
+  @override
+  XpdContext get context => _serving ?? super.context;
+
   @override
   Future<int> run() async {
+    final base = super.context;
+    final environment = withToolDirectories(base.environment);
+    final log = isLaunchedByLaunchd(base.environment)
+        ? LogFileSink.open(serveLogPath(dataDirectory))
+        : null;
+    _serving = base.copyWith(out: log, err: log, environment: environment);
+    try {
+      if (environment['PATH'] != base.environment['PATH']) {
+        context.out.writeln('xpd runs tools with PATH=${environment['PATH']}');
+      }
+      return await _serve();
+    } finally {
+      _serving = null;
+      await log?.close();
+    }
+  }
+
+  Future<int> _serve() async {
     final host = argResults!['host'] as String;
     final port = int.tryParse(argResults!['port'] as String);
     if (port == null || port < 0 || port > 65535) {
@@ -129,7 +167,9 @@ class ServeCommand extends XpdCommand {
       return 1;
     }
     return await withDatabase((database) async {
-      const runner = IoProcessRunner();
+      final runner = IoProcessRunner(
+        environment: {'PATH': ?context.environment['PATH']},
+      );
       final secrets = createSecretStore(
         runner: runner,
         dataDir: directory,
