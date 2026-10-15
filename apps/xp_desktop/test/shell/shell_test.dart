@@ -1,5 +1,6 @@
 import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter/gestures.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:xp_api/xp_api.dart';
@@ -15,11 +16,13 @@ import 'package:xp_desktop/projects/bloc/projects_bloc.dart';
 import 'package:xp_desktop/projects/view/no_projects_page.dart';
 import 'package:xp_desktop/releases/view/releases_page.dart';
 import 'package:xp_desktop/runners/runners.dart';
+import 'package:xp_desktop/settings/settings.dart';
 import 'package:xp_desktop/shell/shell.dart';
 import 'package:xp_desktop/storage/storage.dart';
 import 'package:xp_desktop/tests/tests.dart';
 import 'package:xp_desktop/widgets/widgets.dart';
 import 'package:xp_desktop/workflow_builder/workflow_builder.dart';
+import 'package:xp_macos_services/testing.dart';
 import 'package:xp_repositories/xp_repositories.dart';
 
 import '../helpers/approval_fixtures.dart';
@@ -58,6 +61,27 @@ void main() {
   );
 
   group('AppShell', () {
+    testWidgets('XPath ▸ Settings… shows the settings', (tester) async {
+      final shell = ShellCubit();
+      final menu = FakeAppMenu();
+      await tester.pumpApp(
+        const AppShell(),
+        shell: shell,
+        projects: projectsIn(
+          const ProjectsState(loaded: true, projects: [mataa]),
+        ),
+        projectsRepository: repository,
+        services: testServices(appMenu: menu),
+      );
+
+      menu.chooseSettings();
+      await tester.pump();
+
+      expect(shell.state, const SettingsDestination());
+      await tester.pumpWidget(const SizedBox());
+      menu.chooseSettings();
+    });
+
     testWidgets('shows the first project at home', (tester) async {
       await pumpShell(tester);
       expect(find.byType(ProjectOverviewPage), findsOneWidget);
@@ -96,6 +120,7 @@ void main() {
       (const CredentialsDestination('prj_1'), CredentialsPage),
       (const EnginesDestination(), EnginesPage),
       (const OnboardingDestination(), OnboardingPage),
+      (const SettingsDestination(github: true), SettingsPage),
     ]) {
       testWidgets('shows $page for $destination', (tester) async {
         await pumpShell(tester, shell: ShellCubit(destination));
@@ -246,6 +271,9 @@ void main() {
       await tester.tap(find.text('Engines'));
       await tester.pump();
       expect(shell.state, const EnginesDestination());
+      await tester.tap(find.text('Settings'));
+      await tester.pump();
+      expect(shell.state, const SettingsDestination());
       await tester.tap(find.text('Add project…'));
       await tester.pump();
       expect(shell.state, const AddProjectDestination());

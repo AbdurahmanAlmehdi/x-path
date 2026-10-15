@@ -105,6 +105,7 @@ class EngineScope extends StatelessWidget {
         RepositoryProvider(create: (_) => WorkflowsRepository(session)),
         RepositoryProvider(create: (_) => TestsRepository(session)),
         RepositoryProvider(create: (_) => StorageRepository(session)),
+        RepositoryProvider(create: (_) => SettingsRepository(session)),
       ],
       child: MultiBlocProvider(
         providers: [

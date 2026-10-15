@@ -377,6 +377,37 @@ class XpClient {
     await _send('DELETE', ['projects', projectId, 'credentials', credentialId]);
   }
 
+  // ---------------------------------------------------------- github token
+
+  /// `GET /github-token`: whether the engine has its GitHub token, and who
+  /// GitHub says it belongs to.
+  Future<GitHubTokenStatus> getGitHubToken() async =>
+      GitHubTokenStatus.fromJson(
+        await _json(await _send('GET', ['github-token'])),
+      );
+
+  /// `PUT /github-token`: checks [token] with GitHub, then stores it.
+  Future<GitHubTokenStatus> setGitHubToken(String token) async =>
+      GitHubTokenStatus.fromJson(
+        await _json(
+          await _send('PUT', [
+            'github-token',
+          ], body: SetGitHubTokenRequest(token).toJson()),
+        ),
+      );
+
+  /// `POST /github-token/import`: takes the token of the GitHub CLI of the
+  /// engine machine.
+  Future<GitHubTokenStatus> importGitHubToken() async =>
+      GitHubTokenStatus.fromJson(
+        await _json(await _send('POST', ['github-token', 'import'])),
+      );
+
+  /// `DELETE /github-token`.
+  Future<void> deleteGitHubToken() async {
+    await _send('DELETE', ['github-token']);
+  }
+
   // ------------------------------------------------------------- approvals
 
   /// `GET /approvals`, newest first, of one [projectId] or [state] if given.

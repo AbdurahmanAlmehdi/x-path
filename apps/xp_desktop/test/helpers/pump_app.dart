@@ -142,6 +142,7 @@ extension PumpApp on WidgetTester {
     ApprovalsRepository? approvalsRepository,
     TestsRepository? testsRepository,
     StorageRepository? storageRepository,
+    SettingsRepository? settingsRepository,
     PendingApprovalsBloc? pendingApprovals,
     RunnersBloc? runners,
     StorageBloc? storage,
@@ -177,6 +178,9 @@ extension PumpApp on WidgetTester {
           ),
           RepositoryProvider<StorageRepository>.value(
             value: storageRepository ?? quietStorage(),
+          ),
+          RepositoryProvider<SettingsRepository>.value(
+            value: settingsRepository ?? quietSettings(),
           ),
         ],
         child: MultiBlocProvider(

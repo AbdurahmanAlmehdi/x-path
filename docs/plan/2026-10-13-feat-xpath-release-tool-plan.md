@@ -578,7 +578,7 @@ Mataa dev builds through `xp` can start after Phase 13, before the desktop app e
 
 ### Phase 18c: Sparkle, cask and uninstall
 
-- **Status:** Not started
+- **Status:** Done (local). Skipped (owner, Goal 3): Sparkle and appcast publishing, Homebrew cask.
 - **Scope:** Sparkle 2 behind `xp_macos_services` with an appcast at
   `https://xpath.abdurahman.ly/appcast.xml` (enclosures on GitHub Releases), Homebrew
   cask in `AbdurahmanAlmehdi/homebrew-tap` with a `zap` stanza, "Remove XPath" in the app

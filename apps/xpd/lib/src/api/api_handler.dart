@@ -6,6 +6,7 @@ import 'package:xpd/src/api/approvals/approvals_routes.dart';
 import 'package:xpd/src/api/artifacts/artifacts_routes.dart';
 import 'package:xpd/src/api/credentials/credentials_routes.dart';
 import 'package:xpd/src/api/events_route.dart';
+import 'package:xpd/src/api/github/github_token_routes.dart';
 import 'package:xpd/src/api/jobs/job_logs_route.dart';
 import 'package:xpd/src/api/jobs/jobs_routes.dart';
 import 'package:xpd/src/api/middleware.dart';
@@ -38,6 +39,7 @@ Handler buildApiHandler({
   required ArtifactService artifacts,
   required TestRunService tests,
   required CredentialService credentials,
+  required GitHubTokenService githubToken,
   required WorkflowService workflows,
   required WorkflowDispatcher dispatcher,
   required RunService runs,
@@ -69,6 +71,7 @@ Handler buildApiHandler({
   ArtifactsRoutes(artifacts).addTo(router);
   TestsRoutes(tests).addTo(router);
   CredentialsRoutes(credentials).addTo(router);
+  GitHubTokenRoutes(githubToken).addTo(router);
   WorkflowsRoutes(workflows, dispatcher).addTo(router);
   RunsRoutes(runs).addTo(router);
   ApprovalsRoutes(approvals).addTo(router);

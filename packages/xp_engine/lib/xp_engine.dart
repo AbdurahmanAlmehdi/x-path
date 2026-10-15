@@ -38,6 +38,7 @@ export 'src/git/git_service.dart';
 export 'src/git/github_client.dart';
 export 'src/git/github_exceptions.dart';
 export 'src/git/github_models.dart';
+export 'src/git/github_token_service.dart';
 export 'src/housekeeping/data_files.dart';
 export 'src/housekeeping/housekeeping_exceptions.dart';
 export 'src/housekeeping/housekeeping_plan.dart';

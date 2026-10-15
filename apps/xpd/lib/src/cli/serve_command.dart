@@ -5,6 +5,7 @@ import 'package:path/path.dart' as p;
 import 'package:xp_adapters/xp_adapters.dart';
 import 'package:xp_engine/xp_engine.dart';
 import 'package:xp_secrets/xp_secrets.dart';
+import 'package:xpd/src/cli/gh_executable.dart';
 import 'package:xpd/src/cli/xpd_command.dart';
 import 'package:xpd/src/cli/xpd_context.dart';
 import 'package:xpd/src/credentials/credential_checks.dart';
@@ -588,6 +589,17 @@ class ServeCommand extends XpdCommand {
           projects: projectRepository,
         ),
         credentials: credentialChecks.service,
+        githubToken: GitHubTokenService(
+          secrets: secrets,
+          verifier: credentialChecks.githubVerifier,
+          cli: LocatingGitHubCliToken(
+            runner: runner,
+            secrets: secrets,
+            path: context.environment['PATH'],
+            fallbacks: context.ghFallbackPaths,
+          ),
+          masker: masker,
+        ),
         workflows: workflows,
         dispatcher: dispatcher,
         runs: runService,

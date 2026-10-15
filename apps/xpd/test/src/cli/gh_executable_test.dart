@@ -2,7 +2,10 @@ import 'dart:io';
 
 import 'package:path/path.dart' as p;
 import 'package:test/test.dart';
+import 'package:xp_engine/xp_engine.dart';
 import 'package:xpd/xpd.dart';
+
+import '../../helpers/job_fakes.dart';
 
 void main() {
   late Directory root;
@@ -98,5 +101,48 @@ void main() {
 
     expect(findGhExecutable(path: null, fallbacks: [fallback]), fallback);
     expect(findGhExecutable(path: null, fallbacks: []), isNull);
+  });
+
+  group('LocatingGitHubCliToken', () {
+    test('runs the gh it finds and stores nothing', () async {
+      final gh = makeGh('bin');
+      final runner = FakeProcessRunner(
+        (_) => const ProcessOutput(exitCode: 0, stdout: 'gho_cli\n'),
+      );
+      final secrets = MemorySecretStore();
+
+      final token = await LocatingGitHubCliToken(
+        runner: runner,
+        secrets: secrets,
+        path: p.dirname(gh),
+        fallbacks: const [],
+      ).read();
+
+      expect(token, 'gho_cli');
+      expect(runner.calls.single.executable, gh);
+      expect(runner.calls.single.arguments, ['auth', 'token']);
+      expect(secrets.values, isEmpty);
+    });
+
+    test('says how to get gh when there is none', () async {
+      final runner = FakeProcessRunner(
+        (_) => const ProcessOutput(exitCode: 0, stdout: 'gho_cli\n'),
+      );
+
+      await expectLater(
+        LocatingGitHubCliToken(
+          runner: runner,
+          secrets: MemorySecretStore(),
+          path: p.join(root.path, 'nowhere'),
+          fallbacks: const ['/nowhere/gh'],
+        ).read(),
+        throwsA(
+          isA<GitHubCliTokenException>()
+              .having((e) => e.message, 'message', contains('/nowhere/gh'))
+              .having((e) => e.fix, 'fix', contains('brew install gh')),
+        ),
+      );
+      expect(runner.calls, isEmpty);
+    });
   });
 }

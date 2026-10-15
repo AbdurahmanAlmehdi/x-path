@@ -57,6 +57,23 @@ void main() {
       );
     });
 
+    test('unregisters the agent', () async {
+      answer = (_) => 'notRegistered';
+      expect(await agent.unregister(), AgentStatus.notRegistered);
+      expect(calls.single.method, 'agentUnregister');
+      answer = (_) => throw PlatformException(code: 'unregister_failed');
+      await expectLater(
+        agent.unregister(),
+        throwsA(
+          isA<MacosServiceException>().having(
+            (error) => error.code,
+            'code',
+            'unregister_failed',
+          ),
+        ),
+      );
+    });
+
     test('opens Login Items', () async {
       await agent.openLoginItemsSettings();
       expect(calls.single.method, 'openLoginItems');

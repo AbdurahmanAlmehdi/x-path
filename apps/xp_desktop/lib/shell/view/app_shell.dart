@@ -5,6 +5,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:xp_api/xp_api.dart';
 import 'package:xp_desktop/add_project/view/add_project_page.dart';
+import 'package:xp_desktop/app/app_services.dart';
 import 'package:xp_desktop/approvals/bloc/pending_approvals_bloc.dart';
 import 'package:xp_desktop/approvals/view/approval_review_sheet.dart';
 import 'package:xp_desktop/approvals/view/approvals_page.dart';
@@ -18,6 +19,7 @@ import 'package:xp_desktop/projects/bloc/projects_bloc.dart';
 import 'package:xp_desktop/projects/view/no_projects_page.dart';
 import 'package:xp_desktop/releases/view/releases_page.dart';
 import 'package:xp_desktop/runners/view/runners_page.dart';
+import 'package:xp_desktop/settings/view/settings_page.dart';
 import 'package:xp_desktop/shell/cubit/shell_cubit.dart';
 import 'package:xp_desktop/shell/widgets/shell_page.dart';
 import 'package:xp_desktop/shell/widgets/sidebar.dart';
@@ -47,8 +49,31 @@ void reviewApprovals(BuildContext context) {
 }
 
 /// The window: the sidebar and the content area of the destination.
-class AppShell extends StatelessWidget {
+/// XPath ▸ Settings… (⌘,) shows the settings.
+class AppShell extends StatefulWidget {
   const new({super.key});
+
+  @override
+  State<AppShell> createState() => _AppShellState();
+}
+
+class _AppShellState extends State<AppShell> {
+  StreamSubscription<void>? _settings;
+
+  @override
+  void initState() {
+    super.initState();
+    final shell = context.read<ShellCubit>();
+    _settings = context.read<AppServices>().appMenu.settingsRequests.listen(
+      (_) => shell.show(const SettingsDestination()),
+    );
+  }
+
+  @override
+  void dispose() {
+    unawaited(_settings?.cancel());
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) => CallbackShortcuts(
@@ -100,6 +125,9 @@ class AppShell extends StatelessWidget {
                 ),
                 EnginesDestination() => const EnginesPage(),
                 OnboardingDestination() => const OnboardingPage(),
+                SettingsDestination(:final github) => SettingsPage(
+                  github: github,
+                ),
               },
             ),
           ),

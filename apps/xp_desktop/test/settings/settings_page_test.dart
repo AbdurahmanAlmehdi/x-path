@@ -1,0 +1,326 @@
+import 'package:flutter/services.dart';
+import 'package:flutter/widgets.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:mocktail/mocktail.dart';
+import 'package:xp_api/xp_api.dart';
+import 'package:xp_client/xp_client.dart';
+import 'package:xp_desktop/l10n/l10n.dart';
+import 'package:xp_desktop/settings/settings.dart';
+import 'package:xp_macos_services/testing.dart';
+import 'package:xp_macos_services/xp_macos_services.dart';
+import 'package:xp_repositories/xp_repositories.dart';
+
+import '../helpers/fakes.dart';
+import '../helpers/pump_app.dart';
+
+void main() {
+  const missing = GitHubTokenStatus(stored: false);
+  const connected = GitHubTokenStatus(
+    stored: true,
+    status: CredentialStatus.verified,
+    login: 'octo',
+  );
+
+  late MockSettingsRepository settings;
+  late MockEnginesRepository engines;
+  late FakeEngineAgent agent;
+  late FakeCliLinker linker;
+  late FakeDataWiper data;
+  late FakeKeychainWiper keychain;
+  late FakeRunningApp app;
+
+  setUp(() {
+    settings = quietSettings(token: missing);
+    engines = noEngines();
+    agent = FakeEngineAgent(current: AgentStatus.enabled);
+    linker = FakeCliLinker();
+    data = FakeDataWiper(folders: const ['/data/XPath']);
+    keychain = FakeKeychainWiper(count: 4);
+    app = FakeRunningApp();
+    when(engines.revokeLocalRunners).thenAnswer((_) async => 1);
+    when(engines.waitForLocalEngineToStop).thenAnswer((_) async => true);
+  });
+
+  Future<void> pump(
+    WidgetTester tester, {
+    bool github = false,
+    EngineStatus status = EngineStatus.connected,
+  }) async {
+    await tester.pumpApp(
+      SettingsPage(github: github),
+      settingsRepository: settings,
+      connection: connectionIn(connectedTo(status: status)),
+      services: testServices(
+        engines: engines,
+        agent: agent,
+        linker: linker,
+        dataWiper: data,
+        keychainWiper: keychain,
+        runningApp: app,
+      ),
+    );
+    // Tall enough for the whole page, so every section is built.
+    tester.view.physicalSize = const Size(1440, 1400);
+    await tester.pumpAndSettle();
+  }
+
+  group('SettingsPage', () {
+    testWidgets('shows the versions, the engine and its login item', (
+      tester,
+    ) async {
+      await pump(tester);
+
+      expect(find.text('Settings'), findsOneWidget);
+      expect(find.text('0.0.1 (1)'), findsOneWidget);
+      expect(find.text('0.0.1 (API v1)'), findsOneWidget);
+      expect(find.text('This Mac'), findsOneWidget);
+      expect(find.text('http://127.0.0.1:7480'), findsOneWidget);
+      expect(find.text('Runs at login'), findsOneWidget);
+    });
+
+    testWidgets('says why the engine version is unknown', (tester) async {
+      when(settings.engineVersion)
+          .thenThrow(const ConnectionException('Cannot reach the engine.'));
+      agent.current = AgentStatus.requiresApproval;
+
+      await pump(tester);
+
+      expect(find.text('Cannot reach the engine.'), findsOneWidget);
+      expect(find.text('Waiting for you in Login Items'), findsOneWidget);
+    });
+
+    test('names every login item status', () async {
+      final l10n = await AppLocalizations.delegate.load(const Locale('en'));
+      expect(
+        [
+          for (final status in AgentStatus.values)
+            agentStatusLabel(l10n, status),
+        ],
+        [
+          'Not running',
+          'Runs at login',
+          'Waiting for you in Login Items',
+          'Not in this build',
+          'Needs macOS 13',
+        ],
+      );
+      expect(agentStatusLabel(l10n, null), 'Unknown');
+    });
+  });
+
+  group('GitHubTokenSection', () {
+    final field = find.byKey(const Key('settings.githubToken'));
+    final save = find.byKey(const Key('settings.githubSave'));
+
+    testWidgets('saves a pasted token and clears the field', (tester) async {
+      when(() => settings.setGitHubToken('ghp_new'))
+          .thenAnswer((_) async => connected);
+      await pump(tester, github: true);
+
+      expect(
+        find.text('The engine has no GitHub token, so it cannot add projects.'),
+        findsOneWidget,
+      );
+      expect(find.byKey(const Key('settings.githubRemove')), findsNothing);
+      await tester.enterText(field, ' ghp_new ');
+      await tester.pump();
+      await tester.tap(save);
+      await tester.pumpAndSettle();
+
+      verify(() => settings.setGitHubToken('ghp_new')).called(1);
+      expect(find.text('Connected to GitHub as octo.'), findsOneWidget);
+      expect(find.text('ghp_new'), findsNothing);
+    });
+
+    testWidgets('imports the token of the GitHub CLI', (tester) async {
+      when(settings.importGitHubToken).thenAnswer((_) async => connected);
+      await pump(tester);
+
+      await tester.tap(find.byKey(const Key('settings.githubImport')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Connected to GitHub as octo.'), findsOneWidget);
+    });
+
+    testWidgets('says why a token was not saved', (tester) async {
+      when(() => settings.setGitHubToken('ghp_bad')).thenThrow(
+        const ApiException(
+          'GitHub refused the token.',
+          statusCode: 422,
+          code: ApiErrorCode.credentialRejected,
+        ),
+      );
+      await pump(tester);
+
+      await tester.enterText(field, 'ghp_bad');
+      await tester.pump();
+      await tester.tap(save);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Not saved: GitHub refused the token.'), findsOneWidget);
+    });
+
+    testWidgets('removes the stored token', (tester) async {
+      settings = quietSettings();
+      when(settings.clearGitHubToken).thenAnswer((_) async {});
+      await pump(tester);
+
+      expect(find.text('Connected to GitHub as octo.'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('settings.githubRemove')));
+      await tester.pumpAndSettle();
+
+      verify(settings.clearGitHubToken).called(1);
+      expect(
+        find.text('The engine has no GitHub token, so it cannot add projects.'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('shows what GitHub said of the stored token', (tester) async {
+      for (final (status, text) in [
+        (
+          const GitHubTokenStatus(
+            stored: true,
+            status: CredentialStatus.rejected,
+            message: 'GitHub refused the token.',
+            fix: 'Save a new token.',
+          ),
+          "GitHub refused the engine's token: GitHub refused the token. "
+              'Save a new token.',
+        ),
+        (
+          const GitHubTokenStatus(
+            stored: true,
+            status: CredentialStatus.unreachable,
+            message: 'GitHub is not reachable.',
+          ),
+          "GitHub could not check the engine's token: GitHub is not "
+              'reachable.',
+        ),
+        (
+          const GitHubTokenStatus(
+            stored: true,
+            status: CredentialStatus.verified,
+          ),
+          'Connected to GitHub.',
+        ),
+      ]) {
+        settings = quietSettings(token: status);
+        await tester.pumpWidget(const SizedBox());
+        await pump(tester);
+        expect(find.text(text), findsOneWidget);
+      }
+    });
+
+    testWidgets('asks GitHub while the status loads', (tester) async {
+      when(settings.gitHubToken).thenAnswer(
+        (_) => Future.delayed(const Duration(seconds: 1), () => missing),
+      );
+      await tester.pumpApp(const SettingsPage(), settingsRepository: settings);
+      await tester.pump();
+
+      expect(find.text('Asking GitHub…'), findsOneWidget);
+      await tester.pumpAndSettle(const Duration(seconds: 1));
+    });
+
+    testWidgets('changes nothing while the engine is offline', (tester) async {
+      await pump(tester, status: EngineStatus.unreachable);
+      await tester.enterText(field, 'ghp_new');
+      await tester.pump();
+      await tester.tap(save);
+      await tester.tap(find.byKey(const Key('settings.githubImport')));
+      await tester.pumpAndSettle();
+
+      verifyNever(() => settings.setGitHubToken(any()));
+      verifyNever(settings.importGitHubToken);
+    });
+  });
+
+  group('RemoveXPathSheet', () {
+    Future<void> openSheet(WidgetTester tester) async {
+      await pump(tester);
+      await tester.tap(find.byKey(const Key('settings.remove')));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('keeps XPath with Keep or Escape', (tester) async {
+      await openSheet(tester);
+      expect(find.text('Remove XPath from this Mac?'), findsOneWidget);
+      expect(
+        find.text('The database, builds, logs and copies in /data/XPath.'),
+        findsOneWidget,
+      );
+
+      await tester.tap(find.text('Keep XPath'));
+      await tester.pumpAndSettle();
+      expect(find.text('Remove XPath from this Mac?'), findsNothing);
+
+      await tester.tap(find.byKey(const Key('settings.remove')));
+      await tester.pumpAndSettle();
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pumpAndSettle();
+      expect(agent.unregistrations, 0);
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await tester.pumpAndSettle();
+      expect(find.text('Remove XPath from this Mac?'), findsNothing);
+      expect(agent.unregistrations, 0);
+    });
+
+    testWidgets('removes XPath with both options, then trashes and quits', (
+      tester,
+    ) async {
+      await openSheet(tester);
+
+      await tester.tap(find.text('Also delete engine data'));
+      await tester.tap(find.text('Also delete Keychain items'));
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('remove.confirm')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('XPath is removed from this Mac'), findsOneWidget);
+      expect(find.text('1 runner revoked'), findsOneWidget);
+      expect(find.text('4 items deleted'), findsOneWidget);
+      expect((data.wipes, keychain.wipes), (1, 1));
+      // The sheet cannot be dismissed once it started.
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await tester.pumpAndSettle();
+      expect(find.text('XPath is removed from this Mac'), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('remove.trash')));
+      await tester.pumpAndSettle();
+      expect((app.movedToTrash, app.quitted), (true, true));
+    });
+
+    testWidgets('says what failed and quits when the Trash refuses', (
+      tester,
+    ) async {
+      when(engines.revokeLocalRunners)
+          .thenThrow(const ConnectionException('Cannot reach the engine.'));
+      when(engines.waitForLocalEngineToStop).thenAnswer((_) async => false);
+      app.trashes = false;
+      await openSheet(tester);
+
+      await tester.tap(find.text('Also delete engine data'));
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('remove.confirm')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Cannot reach the engine.'), findsOneWidget);
+      expect(find.text('The engine did not stop in time.'), findsOneWidget);
+      expect(find.text('Kept: the engine did not stop.'), findsOneWidget);
+      expect(data.wipes, 0);
+
+      await tester.tap(find.byKey(const Key('remove.trash')));
+      await tester.pumpAndSettle();
+      expect(
+        find.textContaining('could not move itself to the Trash'),
+        findsOneWidget,
+      );
+      expect(find.byKey(const Key('remove.trash')), findsNothing);
+
+      await tester.tap(find.byKey(const Key('remove.quit')));
+      await tester.pumpAndSettle();
+      expect(app.quitted, isTrue);
+    });
+  });
+}
