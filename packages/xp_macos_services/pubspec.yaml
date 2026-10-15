@@ -1,5 +1,5 @@
 name: xp_macos_services
-description: XPath macOS platform services (login item registration, Sparkle).
+description: XPath macOS platform services (login item registration, Keychain, the xp link, Sparkle).
 version: 0.0.1
 publish_to: none
 resolution: workspace
@@ -9,8 +9,10 @@ environment:
   flutter: ^3.47.0
 
 dependencies:
+  equatable: ^2.1.0
   flutter:
     sdk: flutter
+  path: ^1.9.1
 
 dev_dependencies:
   flutter_test:

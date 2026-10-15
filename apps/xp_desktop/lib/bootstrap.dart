@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:developer';
 
 import 'package:bloc/bloc.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
 class AppBlocObserver extends BlocObserver {
@@ -20,14 +22,23 @@ class AppBlocObserver extends BlocObserver {
   }
 }
 
+/// The licence of the bundled IBM Plex fonts (SIL Open Font License 1.1),
+/// for the app's licence page.
+Stream<LicenseEntry> fontLicenses() async* {
+  yield LicenseEntryWithLineBreaks([
+    'IBM Plex Sans',
+    'IBM Plex Mono',
+  ], await rootBundle.loadString('assets/fonts/OFL.txt'));
+}
+
 Future<void> bootstrap(FutureOr<Widget> Function() builder) async {
+  WidgetsFlutterBinding.ensureInitialized();
   FlutterError.onError = (details) {
     log(details.exceptionAsString(), stackTrace: details.stack);
   };
 
   Bloc.observer = const AppBlocObserver();
-
-  // Add cross-flavor configuration here
+  LicenseRegistry.addLicense(fontLicenses);
 
   runApp(await builder());
 }

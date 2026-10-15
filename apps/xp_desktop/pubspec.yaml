@@ -10,15 +10,56 @@ environment:
 
 dependencies:
   bloc: ^9.2.1
+  bloc_concurrency: ^0.3.0
+  equatable: ^2.1.0
+  file_selector: ^1.1.0
   flutter:
     sdk: flutter
-  material_ui: ^1.1.1
+  flutter_bloc: ^9.1.1
+  flutter_localizations:
+    sdk: flutter
+  intl: ^0.20.2
+  material_ui: ^1.6.0
+  path: ^1.9.1
+  path_provider: ^2.1.6
+  phosphor_flutter: ^2.1.0
+  xp_api: any
+  xp_macos_services: any
+  xp_repositories: any
 
 dev_dependencies:
   bloc_lint: ^0.4.2
+  bloc_test: ^10.0.0
   flutter_test:
     sdk: flutter
+  mocktail: ^1.0.5
+  path_provider_platform_interface: ^2.1.2
+  plugin_platform_interface: ^2.1.8
   very_good_analysis: 11.0.0
+  xp_client: any
 
 flutter:
   uses-material-design: true
+  generate: true
+  assets:
+    - assets/brand/
+    - assets/fonts/OFL.txt
+  fonts:
+    - family: IBM Plex Sans
+      fonts:
+        - asset: assets/fonts/IBMPlexSans-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/IBMPlexSans-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/IBMPlexSans-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/IBMPlexSans-Bold.ttf
+          weight: 700
+    - family: IBM Plex Mono
+      fonts:
+        - asset: assets/fonts/IBMPlexMono-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/IBMPlexMono-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/IBMPlexMono-SemiBold.ttf
+          weight: 600

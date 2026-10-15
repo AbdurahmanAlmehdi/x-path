@@ -23,6 +23,17 @@ void main() {
     });
   });
 
+  group('fontLicenses', () {
+    testWidgets('names the IBM Plex fonts and their licence', (tester) async {
+      final entry = await tester.runAsync(() => fontLicenses().first);
+      expect(entry!.packages, ['IBM Plex Sans', 'IBM Plex Mono']);
+      expect(
+        entry.paragraphs.map((paragraph) => paragraph.text).join(' '),
+        contains('SIL Open Font License'),
+      );
+    });
+  });
+
   group('bootstrap', () {
     testWidgets('installs the observer and runs the built widget', (
       tester,
