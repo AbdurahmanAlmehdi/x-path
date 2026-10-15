@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:crypto/crypto.dart';
 import 'package:xp_api/xp_api.dart';
 
 /// One upload of an artifact the fake engine received.
@@ -131,6 +132,16 @@ class FakeRunnerEngine {
   /// The status the connection answers with when it is not an upgrade.
   int connectStatus = 200;
 
+  /// The runner bundle `GET /runners/bundle` serves, or `null` for a `404`.
+  List<int>? bundle;
+
+  /// The SHA-256 the bundle download announces; the real one when `null`.
+  String? bundleSha256;
+
+  /// The `os` and `arch` of every bundle download, with the token it came
+  /// with.
+  final bundleRequests = <({String os, String arch, String? authorization})>[];
+
   /// Where a runner reaches this engine.
   Uri get url => Uri.parse('http://127.0.0.1:${_server.port}');
 
@@ -158,6 +169,10 @@ class FakeRunnerEngine {
       return;
     }
     final path = request.uri.path;
+    if (request.method == 'GET' && path == '/runners/bundle') {
+      await _serveBundle(request);
+      return;
+    }
     if (path == '/runners/connect') {
       if (connectStatus != 200) {
         request.response.statusCode = connectStatus;
@@ -217,6 +232,38 @@ class FakeRunnerEngine {
       return;
     }
     request.response.statusCode = 404;
+    await request.response.close();
+  }
+
+  Future<void> _serveBundle(HttpRequest request) async {
+    bundleRequests.add((
+      os: request.uri.queryParameters['os'] ?? '',
+      arch: request.uri.queryParameters['arch'] ?? '',
+      authorization: request.headers.value('authorization'),
+    ));
+    final bytes = bundle;
+    if (bytes == null) {
+      request.response
+        ..statusCode = 404
+        ..headers.contentType = ContentType.json
+        ..write(
+          jsonEncode({
+            'error': {
+              'code': 'not_found',
+              'message': 'This engine has no runner bundle for this machine.',
+            },
+          }),
+        );
+    } else {
+      request.response
+        ..headers.contentType = ContentType('application', 'gzip')
+        ..headers.set(
+          'x-content-sha256',
+          bundleSha256 ?? sha256.convert(bytes).toString(),
+        )
+        ..headers.contentLength = bytes.length
+        ..add(bytes);
+    }
     await request.response.close();
   }
 

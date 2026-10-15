@@ -1,3 +1,6 @@
+import 'package:xp_adapters/xp_adapters.dart';
+import 'package:xp_engine/xp_engine.dart';
+
 /// What the `xpd` commands run against: the streams they print to and the
 /// process around them. Tests pass fakes.
 class XpdContext {
@@ -9,6 +12,9 @@ class XpdContext {
     required this.environment,
     required this.operatingSystem,
     this.ghFallbackPaths = defaultGhFallbackPaths,
+    this.processes = const IoProcessRunner(),
+    this.executable = '',
+    this.serviceManager,
   });
 
   /// Where Homebrew puts `gh` on Apple Silicon and on Intel Macs. `launchd`
@@ -35,4 +41,16 @@ class XpdContext {
 
   /// Where to look for the GitHub CLI when it is not on `PATH`.
   final List<String> ghFallbackPaths;
+
+  /// Starts the programs the service commands run (`launchctl`, `systemctl`).
+  final ProcessRunner processes;
+
+  /// The path of the running `xpd` executable, as the operating system
+  /// resolves it (`Platform.resolvedExecutable`): inside an installed bundle
+  /// it is `<bundle>/bin/xpd`. Empty when it is not known.
+  final String executable;
+
+  /// Makes the service manager for a scope, instead of the one of this
+  /// machine. Tests use it to keep the unit files in a temporary folder.
+  final ServiceManager Function(ServiceScope scope)? serviceManager;
 }

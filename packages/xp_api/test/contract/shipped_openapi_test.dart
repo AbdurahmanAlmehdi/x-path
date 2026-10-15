@@ -774,6 +774,7 @@ void main() {
         ('POST', '/runners/pair'),
         ('POST', '/runners/rnr_1/revoke'),
         ('GET', '/runners/connect'),
+        ('GET', '/runners/bundle'),
         ('PUT', '/runners/jobs/job_1/artifacts/a.apk'),
       ]) {
         expect(
@@ -832,6 +833,32 @@ void main() {
         ),
         isEmpty,
       );
+      expect(
+        shipped.validateResponse(
+          method: 'GET',
+          path: '/runners/bundle',
+          statusCode: 200,
+          body: 'bytes',
+          contentType: 'application/gzip',
+        ),
+        isEmpty,
+      );
+      for (final (status, code) in [
+        (400, ApiErrorCode.invalidRequest),
+        (404, ApiErrorCode.notFound),
+      ]) {
+        expect(
+          shipped.validateResponse(
+            method: 'GET',
+            path: '/runners/bundle',
+            statusCode: status,
+            body: jsonEncode(ErrorResponse.of(code, 'm').toJson()),
+            contentType: 'application/json',
+          ),
+          isEmpty,
+          reason: '$status',
+        );
+      }
     });
 
     test('describes the runner models', () {

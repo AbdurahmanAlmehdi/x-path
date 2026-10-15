@@ -160,6 +160,62 @@ Secrets (`packages/xp_secrets`) live on the engine machine behind the `SecretSto
   multi-line secret is masked line by line, overlapping secrets are merged, lines shorter than 6
   characters are ignored, and `MaskingStream` masks a secret split between two chunks.
 
+## Running as a service
+
+The engine and a runner are meant to run all the time, under the service manager of the machine: a LaunchAgent on
+macOS, a systemd unit on Linux. The commands only write the file and call `launchctl` or `systemctl` through the
+`ProcessRunner` port (`packages/xp_adapters/lib/src/service`).
+
+```sh
+xpd install-service [--data-dir <dir>] [--host ...] [--port ...] [--slots ...]   # then: xpd service-status, xpd uninstall-service
+xp runner install-service [--slots 4]                                           # then: xp runner service-status, xp runner uninstall-service
+```
+
+- **macOS: LaunchAgents** (D-10, ADR 0005). `~/Library/LaunchAgents/ly.abdurahman.xpath.xpd.plist` for the engine and
+  `ly.abdurahman.xpath.runner.plist` for a runner, loaded with `launchctl bootstrap gui/<uid>` (and `bootout` to
+  unload). A LaunchAgent belongs to the login session of the user: the Mac mini of D-10 logs in on its own (an
+  auto-login user), and so the engine can reach the login Keychain; a locked Keychain is "secrets locked", the
+  engine never prompts. `RunAtLoad` starts it at login; `KeepAlive` with `SuccessfulExit` false starts it again after
+  a crash or a restart request, not after a clean exit (a drain, a stop), with a throttle of 10 s. The plist sets a
+  `PATH` that finds what launchd's own does not: `/opt/homebrew/bin`, `/usr/local/bin`, `~/.shorebird/bin`,
+  `~/.pub-cache/bin`, `~/fvm/default/bin` and the system directories (`--path` replaces it). Output goes to
+  `<data dir>/service-logs/xpd.out.log` and `.err.log` (`runner.*` for a runner); launchd does not rotate them.
+  **Who owns the label.** The XPath app registers the bundled `xpd` under the same label with `SMAppService`
+  (Phase 15); with the app installed the app owns the service and `xpd install-service` is not needed. The command
+  is the way to run the engine without the app (a headless Mac mini, a Mac with the CLI only). It reads
+  `launchctl print` first and refuses to replace a label that another registration owns, naming it; `--force` takes
+  it over.
+- **Linux: systemd.** A user unit by default, `~/.config/systemd/user/xpd.service` and `xp-runner.service`, enabled
+  and started with `systemctl --user daemon-reload` and `enable --now`; `--system --run-as <user>` writes a system
+  unit in `/etc/systemd/system` that runs as that user (run it as root). A user service stops when the user logs out;
+  the command says so and names the fix, `sudo loginctl enable-linger <user>`, when the user does not linger.
+  `Restart=on-failure` starts it after a crash or a restart request and not after a clean exit; the unit of a runner
+  adds `RestartPreventExitStatus=77 73 78` (revoked, replaced, not paired: starting again would not help).
+  `KillMode=mixed` sends the stop signal to the main process (the runner drains, the engine shuts down) and kills the
+  steps that are left when `TimeoutStopSec` ran out: 30 s for the engine, 600 s for a runner.
+- **The master key (D-07).** `--master-key-credential <file>` writes
+  `LoadCredentialEncrypted=xpath-master-key:<file>`; `--master-key-credential-plain <file>` writes
+  `LoadCredential=xpath-master-key:<file>`. systemd then puts the key in `$CREDENTIALS_DIRECTORY/xpath-master-key`,
+  where the secret store reads it, instead of a `master.key` file in the data directory. Make the file with
+  `head -c 32 /dev/urandom | systemd-creds encrypt --name=xpath-master-key - xpath-master-key.cred` (see
+  <https://systemd.io/CREDENTIALS/>; `--user` for a user unit on systemd 256 or newer). Do this before the first
+  secret is stored: a key that changes later does not open the file. A runner has to be paired with the same key
+  (`systemd-run --user -p LoadCredentialEncrypted=xpath-master-key:<file> xp runner pair ...`).
+- **The runner service runs `<data dir>/current/bin/xp`.** `xp runner install-service` needs a paired runner and an
+  `xp` that runs from an installed bundle (`bin/xp` and `lib/`): it copies that bundle to
+  `versions/<version>/`, points `current` at it, and writes a service that starts `current/bin/xp runner start`
+  with `XP_RUNNER_MANAGED=1`. That is what lets the runner update itself in place (see Runner updates). It must be
+  run from the `xp` that is to run.
+- **The files that ship.** `tool/release/linux/xpd.service` and `xp-runner.service` are the reference units for the
+  packaging of a release (Phase 18a): user units under `%h`. They are what the Dart templates
+  (`renderSystemdUnit`) make of `XpdService.reference` and `RunnerServiceDefinition.reference`; a test fails when
+  either file differs, and says how to write it again. The commands render from the same templates with the real
+  paths.
+- **Engine updates** are not done here: the engine updates only when idle and backs up its database before it
+  migrates (D-24); that is the app's job (Phase 18c, Sparkle). Runners follow the engine (Runner updates).
+- **Tests.** The managers, the templates and the commands are unit tests with a fake `ProcessRunner` and temporary
+  folders: no test installs a LaunchAgent or a unit, or calls `launchctl` or `systemctl`.
+
 ## Projects and scans
 
 A project is a GitHub repository, keyed by its GitHub repository id (D-05). The folder you pick only
@@ -991,7 +1047,8 @@ xp runners revoke mac-mini      # kills the credential, the connection and the l
   (code 4003) and every lease the runner holds ends **at once**, each job by the loss rule below. Revoking again
   changes nothing. `GET /runners` lists the runners with their status (`offline`, `online`, `draining`, `revoked`), the
   capabilities the probe found, the slots and the jobs they hold; `app`, `cli` and `mcp` tokens can read it.
-- **A runner token is scoped to the runner endpoints** (ADR 0011): `GET /runners/connect` and
+- **A runner token is scoped to the runner endpoints** (ADR 0011): `GET /runners/connect`,
+  `GET /runners/bundle` (the bundle a runner updates itself with, see Runner updates) and
   `PUT /runners/jobs/{id}/artifacts/{name}` and nothing else. Every other route answers a `runner` token
   `403 forbidden` with a message that names the route (`runnerScopeMiddleware`, in front of the router, so a
   route added later is closed to runner tokens until someone opens it). A runner holds signing material for
@@ -1104,6 +1161,7 @@ answered with `cancel`. The sweep (`LeaseSweeper`, every 10 s) ends the leases t
 ```sh
 xp runner pair --engine https://xpath.example.com --token xpp_...   # once; xp runners pair <name> made the token
 xp runner start [--slots 4] [--one-shot] [--data-dir ~/runner]      # connects out and runs jobs until stopped
+xp runner install-service [--slots 4]                                # keeps it running, and lets it update itself
 ```
 
 - **Pairing.** `pair` checks the engine (`GET /version`), exchanges the pairing token (`POST /runners/pair`) and
@@ -1115,7 +1173,9 @@ xp runner start [--slots 4] [--one-shot] [--data-dir ~/runner]      # connects o
 - **Data directory** (`--data-dir`, else `$XP_RUNNER_DATA_DIR`, else `~/.local/share/xpath/runner`):
   `source/mirrors/<repo id>.git` (the bare cache), `source/worktrees/<repo id>/<job id>` (fresh worktrees),
   `jobs/<job id>` (what a job leaves before it is uploaded), `toolchains/flutter`, `secrets/` (where no tmpfs is
-  available), `keychains/`, `state/pgids.json`.
+  available), `keychains/`, `state/pgids.json`, and for updates and services `versions/<version>/` (the installed
+  `xp` bundles), `current` (a symlink to the version that starts), `update.json`, `service-logs/` (see Runner updates
+  and Running as a service).
 - **Connection.** Outbound only, with the credential. It reconnects with an exponential backoff (1 s doubling to
   60 s, half of each delay random so that runners that lost the same engine do not come back together) and starts
   the backoff again after a connection that worked. It stops for good when the engine revokes it (close code
@@ -1172,7 +1232,7 @@ xp runner start [--slots 4] [--one-shot] [--data-dir ~/runner]      # connects o
   jobs finish and the runner exits 0. The second stops now: the jobs are cancelled, nothing is reported and the
   engine ends the leases when they run out. `--one-shot` takes one job, tells the engine to offer no more and
   exits after the engine acknowledged its end. Exit codes: 0 drained or done, 77 revoked or credential refused,
-  73 replaced, 78 not paired, 69 `perl` missing.
+  73 replaced, 78 not paired, 69 `perl` missing, 75 switched to another version (see Runner updates).
 - **Tests.** The agent, the outbox, the step and the secret folder are unit tests with fakes
   (`apps/xp/test/src/runner`); the wiring runs the real step runner against a fake engine on a loopback port
   (tag `process`); `TemporaryKeychain` has a `macos` test on a keychain of its own. `tool/e2e/runner_loss_e2e.sh`
@@ -1181,6 +1241,57 @@ xp runner start [--slots 4] [--one-shot] [--data-dir ~/runner]      # connects o
   declared side effect is `waiting_for_resume`, never repeated by itself; one without is queued again, both with
   a `runner.lease_lost` event), then restarts the runner and checks that no secret file, temporary keychain or
   process is left, and that a resumed job that is cancelled wipes its secrets and ends its process group.
+
+### Runner updates (D-24)
+
+A runner runs the version of `xp` its engine runs. The engine says its version in every `welcome`
+(`engineVersion`); a runner whose own version is not that one updates itself **between jobs**, never in the middle of
+one (`apps/xp/lib/src/runner/update`).
+
+1. **Wait.** At the welcome the runner sees the difference. It says `draining` in its hello (the engine offers it
+   nothing), refuses every offer it still gets with `updating`, and lets the jobs it holds finish, however long they
+   take. When none is left (the engine acknowledged their end) the agent ends with `AgentExit.updateRequired`. A
+   job is never cancelled to update. If the engine goes back to the runner's version meanwhile, the runner goes on
+   as it was. A `--one-shot` runner does not update.
+2. **Download.** `GET /runners/bundle?os=<os>&arch=<arch>` (the runner token reaches it, ADR 0011) streams the
+   `xp` bundle of the engine's own version for the machine as a `.tar.gz`, with `Content-Length` and
+   `X-Content-SHA256`. The runner checks the size and the digest before it unpacks anything, and refuses a
+   response that does not announce them. The digest guards against a broken download; the engine is trusted for the
+   content, as it is for the commands it has the runner run.
+3. **Unpack and try.** `tar -xzf` into `updates/`, a check that `bin/xp` exists and is executable, and then
+   `bin/xp --version`, which has to print the version the engine runs. A bundle that cannot start (the wrong
+   architecture, a missing library) is found out here, while the old version still runs.
+4. **Switch.** The bundle becomes `versions/<version>/` and the symlink `current` is moved to it in one step (a
+   link made beside it and renamed over it). The version before stays, and when the runner did not run from
+   `versions/` yet (the bundle it started from is copied there first), so does the one that ran. The runner then
+   starts again as the new version: under a service manager (`XP_RUNNER_MANAGED=1`, which `install-service` sets) it
+   exits with **75**, a failure, so that `KeepAlive` and `Restart=on-failure` start `current/bin/xp` again; started
+   by hand it starts `current/bin/xp runner start --data-dir ...` itself on the same terminal, waits for it and
+   exits with its code (Dart cannot replace a process; the old one holds nothing).
+5. **Prove or roll back.** `update.json` records the update: the version before, the version after and how many
+   times the new one started without the engine welcoming it. The welcome of the new version clears the record and
+   deletes every version but the new one and the one before. A new version that started `3` times and never got a
+   welcome (it crashes, or the engine refuses it) is replaced at its next start: `current` goes back to the version
+   before, the failed version is remembered in `update.json` so that the runner does not update to it again, and
+   the runner restarts. A newer engine version is another version and is tried.
+
+An update that fails (no bundle on the engine, a wrong digest or size, a bundle that does not unpack or start, no
+`tar`) changes nothing: the runner logs why (`Cannot update to version X: ...`), goes back to taking jobs as the
+version it is and does not try that version again until it restarts.
+
+**Where the bundles come from.** The engine serves the files it finds as `<os>-<arch>/xp.tar.gz`, in the first of
+`<data-dir>/bundles/<engine version>/` and `runners/` next to its own `bin` and `lib` (the bundle of `xpd`). The
+file is the `xp` bundle that `dart build cli -t bin/xp.dart` makes (`bin/xp`, `lib/libsqlite3.*`, ADR 0001) as a
+`.tar.gz` whose top level is `bin` and `lib`. `os` and `arch` are what the runner reports in its hello (`macos` or
+`linux`; `arm64`, `x86_64`). The packaging of a release puts the files there (Phase 18a); until then put them there
+yourself. The engine finds no file: `404`, "This engine has no runner bundle for linux-arm64. Put the xp.tar.gz of
+this version in ...". The SHA-256 is worked out once per file and kept until the file changes.
+
+**Tests.** `runner_update_test.dart` runs the real runner (`buildRunner`, the real `tar`, a real bundle folder whose
+`bin/xp` prints its version) against a fake engine: an outdated runner finishes its job, updates, restarts and
+reconnects with the new version in its hello; a wrong digest switches nothing; an engine without a bundle leaves the
+runner as it was; a new version that fails to start is rolled back. The restart in the tests is an injectable
+`Restarter`.
 
 ### Events
 
@@ -1366,6 +1477,7 @@ the API answered, for scripts; otherwise it prints text and tables.
 | `xp storage report`, `free [--apply] [--category c]`, `retention [--keep n] [--log-days n]` | `/storage` (`free` is a dry run unless you pass `--apply`) |
 | `xp runners pair <name>`, `revoke <runner>` | `POST /runners/pairing-tokens`, `POST /runners/{id}/revoke` (a runner is its name or id); see Runners |
 | `xp runner pair`, `start` | the runner agent of this machine (`POST /runners/pair`, `GET /runners/connect`); see The runner agent |
+| `xp runner install-service`, `uninstall-service`, `service-status` | the LaunchAgent or systemd unit of the runner of this machine, no engine call; see Running as a service |
 | `xp artifacts list <job>`, `download <a> [-o path]` | `/jobs/{id}/artifacts`, `/artifacts/{id}/download` (checks the SHA-256 the engine sends) |
 | `xp mcp` | see below |
 
@@ -1385,6 +1497,7 @@ failed, was cancelled or was interrupted.
 | 69 | the engine cannot be reached, or cannot serve (`502`, `503`: secrets locked) |
 | 70 | the engine failed (`500`) |
 | 73 | a conflict (`409`): an approval decided already, a project added already |
+| 75 | `xp runner start` switched to another version (an update or a rollback); its service manager starts it again, or `xp` started the new version itself and this is its code |
 | 77 | the token is rejected (`401`), or its kind may not do this (`403`) |
 | 78 | not connected: `xp connect` first |
 

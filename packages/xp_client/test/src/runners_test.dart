@@ -33,6 +33,53 @@ void main() {
     });
   });
 
+  group('downloadRunnerBundle', () {
+    test('asks for the bundle of the machine and reads the digest', () async {
+      engine.on('GET', '/runners/bundle', (request, _) {
+        request.response
+          ..headers.set('X-Content-SHA256', 'ABC')
+          ..headers.contentLength = 3
+          ..add([1, 2, 3]);
+        return request.response.close();
+      });
+
+      final download = await client.downloadRunnerBundle(
+        os: 'linux',
+        arch: 'arm64',
+      );
+
+      expect(engine.last.query, {'os': 'linux', 'arch': 'arm64'});
+      expect(engine.last.headers['authorization'], 'Bearer xp_secret');
+      expect(download.sha256, 'abc');
+      expect(download.length, 3);
+      expect(await download.content.expand((chunk) => chunk).toList(), [
+        1,
+        2,
+        3,
+      ]);
+    });
+
+    test('a missing bundle is an ApiException', () async {
+      engine.error(
+        'GET',
+        '/runners/bundle',
+        ApiErrorCode.notFound,
+        'No bundle for linux-arm64.',
+      );
+
+      await expectLater(
+        client.downloadRunnerBundle(os: 'linux', arch: 'arm64'),
+        throwsA(
+          isA<ApiException>().having(
+            (error) => error.message,
+            'message',
+            contains('No bundle'),
+          ),
+        ),
+      );
+    });
+  });
+
   group('createPairingToken', () {
     test('asks for a token for the runner called so', () async {
       final token = PairingToken(

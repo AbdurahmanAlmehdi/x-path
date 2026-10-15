@@ -127,6 +127,7 @@ class TestEngine {
     required this.runnerRepository,
     required this.runnerHub,
     required this.runnerService,
+    required this.runnerBundles,
   });
 
   static Future<TestEngine> start({
@@ -321,6 +322,7 @@ class TestEngine {
       files: dataFiles,
       clock: clock,
     );
+    final runnerBundles = InMemoryRunnerBundles();
     final issued = await tokens.issue(name: 'test', kind: DeviceTokenKind.app);
     final server = await XpdServer.start(
       tokens: tokens,
@@ -389,6 +391,7 @@ class TestEngine {
         ),
         holdsLease: runnerHub.holdsLease,
       ),
+      runnerBundles: runnerBundles,
       clock: clock,
       engineVersion: '9.9.9',
       onError: (error, _) => errors.add(error),
@@ -432,6 +435,7 @@ class TestEngine {
       runnerRepository: runnerRepository,
       runnerHub: runnerHub,
       runnerService: runnerService,
+      runnerBundles: runnerBundles,
     );
   }
 
@@ -510,6 +514,9 @@ class TestEngine {
 
   /// Pairs, lists and revokes runners.
   final RunnerService runnerService;
+
+  /// The runner bundles the engine hands out.
+  final InMemoryRunnerBundles runnerBundles;
 
   /// The files of the folders a project can be added from, by path.
   final Map<String, Map<String, String>> folders;

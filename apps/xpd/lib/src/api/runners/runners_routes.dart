@@ -7,8 +7,9 @@ import 'package:xpd/src/api/middleware.dart';
 import 'package:xpd/src/api/request_body.dart';
 import 'package:xpd/src/api/responses.dart';
 
-/// The runner endpoints (D-08): pairing, listing, revoking, and the artifact
-/// upload. The WebSocket a runner dials out on is `RunnerConnectRoute`.
+/// The runner endpoints (D-08): pairing, listing, revoking, the artifact
+/// upload and the bundle a runner updates itself with (D-24). The WebSocket a
+/// runner dials out on is `RunnerConnectRoute`.
 ///
 /// - `POST /runners/pairing-tokens` and `POST /runners/{id}/revoke` are for
 ///   `app` and `cli` tokens (`403` for the others): a paired runner receives
@@ -17,20 +18,26 @@ import 'package:xpd/src/api/responses.dart';
 ///   is the proof, and an unknown, expired or used one answers `401`.
 /// - `PUT /runners/jobs/{id}/artifacts/{name}` is for a `runner` token that
 ///   holds the lease of the job.
+/// - `GET /runners/bundle?os=&arch=` streams the `xp` bundle of the engine's
+///   own version for that machine, with its SHA-256 and size. A `runner`
+///   token reaches it (ADR 0011); `404` when the engine has no bundle for the
+///   machine.
 /// - Every kind of token can read `GET /runners`, like the other reads. (A
 ///   runner token can read as much as an `mcp` token can; the plan only keeps
 ///   it from approving and from changing gates, D-13.)
 class RunnersRoutes {
   /// Creates the routes.
-  const new(this._runners, this._artifacts);
+  const new(this._runners, this._artifacts, this._bundles);
 
   final RunnerService _runners;
   final RunnerArtifacts _artifacts;
+  final RunnerBundles _bundles;
 
   /// Registers the routes on [router].
   void addTo(Router router) {
     router
       ..get('/runners', _list)
+      ..get('/runners/bundle', _bundle)
       ..post('/runners/pairing-tokens', _createPairingToken)
       ..post('/runners/pair', _pair)
       ..post('/runners/<id>/revoke', _revoke)
@@ -39,6 +46,24 @@ class RunnersRoutes {
 
   Future<Response> _list(Request request) => _guard(() async {
     return jsonResponse(RunnersResponse(await _runners.list()).toJson());
+  });
+
+  /// Streams the bundle. `Content-Length` is its size and `X-Content-SHA256`
+  /// its digest, so the runner can verify what it saved before it switches.
+  Future<Response> _bundle(Request request) => _guard(() async {
+    final query = request.url.queryParameters;
+    final target = RunnerBundleTarget.parse(query['os'], query['arch']);
+    final bundle = await _bundles.find(target);
+    return Response.ok(
+      bundle.open(),
+      headers: {
+        'content-type': 'application/gzip',
+        'content-length': '${bundle.size}',
+        'x-content-sha256': bundle.sha256,
+        'content-disposition':
+            'attachment; filename="xp-${target.folderName}.tar.gz"',
+      },
+    );
   });
 
   Future<Response> _createPairingToken(Request request) => _guard(() async {
@@ -112,6 +137,8 @@ Future<Response> _guard(Future<Response> Function() action) =>
 Future<Response> _guardRunners(Future<Response> Function() action) async {
   try {
     return await action();
+  } on RunnerBundleMissingException catch (error) {
+    return errorResponse(ApiErrorCode.notFound, error.message);
   } on RunnerNotFoundException catch (error) {
     return errorResponse(ApiErrorCode.notFound, error.message);
   } on RunnerForbiddenException catch (error) {

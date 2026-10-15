@@ -18,6 +18,28 @@ import 'package:xpd/src/version.dart';
 /// The port `xpd serve` listens on unless told otherwise.
 const defaultPort = 7480;
 
+/// The folders `xpd serve` looks in for the runner bundles it hands to
+/// runners that have to update (D-24), in order:
+///
+/// 1. `<data-dir>/bundles/<version>`, where the packaging puts the bundles of
+///    this version, and
+/// 2. `runners` next to the `bin` and `lib` of the engine's own bundle, when
+///    [executable] is `<bundle>/bin/xpd`.
+///
+/// Each holds `<os>-<arch>/xp.tar.gz`.
+List<String> runnerBundleRoots({
+  required String dataDirectory,
+  required String version,
+  required String executable,
+}) {
+  final binDirectory = p.dirname(executable);
+  return [
+    p.join(dataDirectory, 'bundles', version),
+    if (executable.isNotEmpty && p.basename(binDirectory) == 'bin')
+      p.join(p.dirname(binDirectory), 'runners'),
+  ];
+}
+
 /// `xpd serve`: runs the engine until SIGINT or SIGTERM.
 class ServeCommand extends XpdCommand {
   /// Creates the command.
@@ -543,6 +565,13 @@ class ServeCommand extends XpdCommand {
         runnerArtifacts: RunnerArtifacts(
           recorder: artifactRecorder,
           holdsLease: runnerHub.holdsLease,
+        ),
+        runnerBundles: DirectoryRunnerBundles(
+          runnerBundleRoots(
+            dataDirectory: directory,
+            version: packageVersion,
+            executable: context.executable,
+          ),
         ),
         clock: const SystemClock(),
         engineVersion: packageVersion,

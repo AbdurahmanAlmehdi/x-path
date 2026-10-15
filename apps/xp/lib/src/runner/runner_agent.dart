@@ -29,6 +29,15 @@ enum AgentExit {
 
   /// The runner was stopped: its jobs were cancelled and nothing was reported.
   stopped,
+
+  /// The engine runs another version than the runner, and the runner finished
+  /// its jobs and took no new one: it is time to update (D-24). See
+  /// [RunnerAgent.updateVersion].
+  updateRequired,
+
+  /// The runner switched to another version (an update or a rollback) and has
+  /// to start again as it. Never returned by the agent itself.
+  updated,
 }
 
 /// Starts the job of a lease that was accepted. `requestSecret` asks the
@@ -69,6 +78,11 @@ class _Lease {
 ///   are wiped, nothing more is reported.
 /// - **Drains** (finish the jobs, take none, exit) and, with `oneShot`, takes
 ///   one job and exits after it.
+/// - **Updates between jobs** (D-24): when the version in the engine's
+///   `welcome` is one the runner should update to (`wantsUpdateTo`), it says
+///   `draining` in its hello, refuses every offer ("updating"), lets the jobs
+///   it holds finish and then ends with [AgentExit.updateRequired]. It never
+///   ends a job to update. Whoever runs the agent updates and starts it again.
 class RunnerAgent {
   /// Creates the agent.
   new({
@@ -88,6 +102,8 @@ class RunnerAgent {
     Backoff? backoff,
     Future<void> Function(Duration)? delay,
     Duration Function(int seconds)? heartbeatUnit,
+    this.wantsUpdateTo,
+    this.onWelcomed,
   }) : _backoff = backoff ?? Backoff(),
        _delay = delay ?? Future<void>.delayed,
        _heartbeatUnit =
@@ -127,6 +143,15 @@ class RunnerAgent {
   /// How long a request for a secret waits for the engine.
   final Duration secretTimeout;
 
+  /// Whether the runner should update to the engine version it is told in the
+  /// `welcome`. `null` never updates (a one-shot runner, a runner that cannot
+  /// update).
+  final bool Function(String engineVersion)? wantsUpdateTo;
+
+  /// Called with the engine version at every welcome: the engine accepted the
+  /// runner, which is what proves a new version works.
+  final void Function(String engineVersion)? onWelcomed;
+
   final _active = <String, _Lease>{};
   final _secrets = <String, Completer<List<int>?>>{};
   final _askedSecrets = <String, SecretRequestFrame>{};
@@ -134,6 +159,7 @@ class RunnerAgent {
   Timer? _heartbeat;
   AgentExit? _exit;
   var _draining = false;
+  String? _updateTo;
   var _tookJob = false;
   Completer<void>? _wake;
 
@@ -143,6 +169,10 @@ class RunnerAgent {
 
   /// Whether the runner takes no more jobs.
   bool get isDraining => _draining;
+
+  /// The engine version the runner has to update to, once [run] ended with
+  /// [AgentExit.updateRequired]; also while it waits for its jobs to finish.
+  String? get updateVersion => _updateTo;
 
   // ------------------------------------------------------------- the loop
 
@@ -228,6 +258,8 @@ class RunnerAgent {
       _exit = AgentExit.oneShotDone;
     } else if (_draining) {
       _exit = AgentExit.drained;
+    } else if (_updateTo != null) {
+      _exit = AgentExit.updateRequired;
     } else {
       return;
     }
@@ -262,6 +294,12 @@ class RunnerAgent {
   Future<void> _serve(RunnerSocket socket) async {
     _socket = socket;
     try {
+      // The runner was told to end while it was connecting: there is no need
+      // to wait for a frame of the engine to notice.
+      if (_exit != null) {
+        unawaited(_closeSocket());
+        return;
+      }
       await for (final text in socket.frames) {
         try {
           await _onText(text);
@@ -326,6 +364,7 @@ class RunnerAgent {
 
   void _welcome(WelcomeFrame frame) {
     _backoff.reset();
+    _decideUpdate(frame.engineVersion);
     _heartbeat?.cancel();
     _heartbeat = Timer.periodic(
       _heartbeatUnit(frame.heartbeatSeconds),
@@ -338,7 +377,7 @@ class RunnerAgent {
         arch: arch,
         cores: cores,
         maxJobs: requestedSlots,
-        draining: _draining,
+        draining: _draining || _updateTo != null,
         leases: [for (final lease in _active.values) lease.ref],
       ),
     );
@@ -347,6 +386,28 @@ class RunnerAgent {
       lease.outbox.resend();
     }
     _askedSecrets.values.forEach(_sendFrame);
+    onWelcomed?.call(frame.engineVersion);
+    // No job runs: the update starts at once.
+    _checkExit();
+  }
+
+  /// Decides at a welcome whether to update, and says so once.
+  void _decideUpdate(String engineVersion) {
+    final wants = wantsUpdateTo?.call(engineVersion) ?? false;
+    final before = _updateTo;
+    _updateTo = wants ? engineVersion : null;
+    if (wants && before != engineVersion) {
+      final running = _active.length;
+      final then = switch (running) {
+        0 => 'the runner updates now',
+        1 => 'the running job finishes, then the runner updates',
+        _ => 'the $running running jobs finish, then the runner updates',
+      };
+      _log(
+        'The engine runs version $engineVersion, this runner $version: no '
+        'new jobs; $then.',
+      );
+    }
   }
 
   void _sendHeartbeat() => _sendFrame(
@@ -368,6 +429,8 @@ class RunnerAgent {
     };
     if (_draining) {
       refusal = 'draining';
+    } else if (_updateTo != null) {
+      refusal = 'updating';
     } else if (unknown.isNotEmpty) {
       refusal = 'unsupported: this runner has no step ${unknown.join(', ')}';
     } else if (_active.length >= slots || _active.containsKey(offer.jobId)) {

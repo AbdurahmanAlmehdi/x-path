@@ -186,6 +186,7 @@ Exit codes:
   69  the engine cannot be reached or cannot serve (secrets locked)
   70  the engine failed
   73  conflict (an approval already decided, a project already added)
+  75  a runner switched to another version; its service manager starts it again
   77  the token is rejected, or its kind may not do this
   78  not connected: run `xp connect <url> --token <token>`
 

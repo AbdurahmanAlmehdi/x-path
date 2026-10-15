@@ -12,6 +12,11 @@ import 'package:path/path.dart' as p;
 /// secrets/                  secret folders, where no tmpfs is available
 /// keychains/                temporary keychains (macOS)
 /// state/                    the process groups of running steps
+/// versions/<version>/       the installed `xp` bundles (`bin/xp`, `lib/`)
+/// current                   a symlink to the version that starts (D-24)
+/// updates/                  bundles on their way in, deleted after
+/// update.json               the update in progress, and the version to avoid
+/// service-logs/             what the LaunchAgent writes (macOS)
 /// ```
 class RunnerPaths {
   /// The layout under [root].
@@ -58,4 +63,26 @@ class RunnerPaths {
 
   /// The record of running process groups.
   String get state => p.join(root, 'state');
+
+  /// The installed bundles of `xp`, one folder per version.
+  String get versions => p.join(root, 'versions');
+
+  /// The folder of the bundle of [version].
+  String versionDirectory(String version) => p.join(versions, version);
+
+  /// The symlink to the version of `versions/` that the runner starts as. The
+  /// service runs `current/bin/xp`; an update switches the link.
+  String get currentLink => p.join(root, 'current');
+
+  /// The `xp` the service runs.
+  String get currentExecutable => p.join(currentLink, 'bin', 'xp');
+
+  /// Where a bundle lands before it is unpacked.
+  String get updates => p.join(root, 'updates');
+
+  /// The record of an update that has not proven itself yet.
+  String get updateState => p.join(root, 'update.json');
+
+  /// Where the LaunchAgent writes the output of the runner.
+  String get serviceLogs => p.join(root, 'service-logs');
 }

@@ -12,7 +12,8 @@ info:
     `{"error": {"code": "...", "message": "..."}}`.
 
     A token of kind `runner` (a paired runner's credential) reaches only the
-    two routes made for runners: `GET /runners/connect` and
+    three routes made for runners: `GET /runners/connect`,
+    `GET /runners/bundle` and
     `PUT /runners/jobs/{id}/artifacts/{name}` (ADR 0011). Every other route
     answers it `403 forbidden`, whatever the route says about other kinds of
     token. `POST /runners/pair` needs no token.
@@ -1709,6 +1710,64 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "426":
           $ref: "#/components/responses/UpgradeRequired"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /runners/bundle:
+    get:
+      operationId: downloadRunnerBundle
+      summary: The runner bundle a runner updates itself with.
+      description: |
+        A runner whose version is not the engine's finishes its jobs and then
+        downloads the `xp` bundle of the engine's own version for its machine
+        (D-24). The body is a `.tar.gz` whose top level is `bin/xp` and `lib/`
+        (what `dart build cli` makes). `Content-Length` is its size and
+        `X-Content-SHA256` its SHA-256 in lowercase hexadecimal; the runner
+        checks both before it switches.
+
+        The engine reads the file from `<data-dir>/bundles/<version>/<os>-<arch>/xp.tar.gz`,
+        else from `runners/<os>-<arch>/xp.tar.gz` next to its own `bin` and
+        `lib`. `404` when there is none: the message says where it goes. A
+        `runner` token reaches this route (ADR 0011), and so do the other
+        kinds.
+      parameters:
+        - name: os
+          in: query
+          required: true
+          description: The operating system the runner reports, for example `macos` or `linux`.
+          schema:
+            type: string
+            pattern: "^[a-z0-9_]{1,32}$"
+        - name: arch
+          in: query
+          required: true
+          description: The processor architecture the runner reports, for example `arm64` or `x86_64`.
+          schema:
+            type: string
+            pattern: "^[a-z0-9_]{1,32}$"
+      responses:
+        "200":
+          description: The bundle.
+          headers:
+            Content-Length:
+              schema:
+                type: integer
+            X-Content-SHA256:
+              schema:
+                type: string
+            Content-Disposition:
+              schema:
+                type: string
+          content:
+            application/gzip:
+              schema:
+                type: string
+                format: binary
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
         "500":
           $ref: "#/components/responses/InternalError"
   /runners/jobs/{id}/artifacts/{name}:

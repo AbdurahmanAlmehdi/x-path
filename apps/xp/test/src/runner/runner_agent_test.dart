@@ -45,8 +45,12 @@ void main() {
     Duration secretTimeout = const Duration(seconds: 5),
     Future<void> Function(Duration)? delay,
     Duration Function(int)? heartbeatUnit,
+    bool Function(String engineVersion)? wantsUpdateTo,
+    void Function(String engineVersion)? onWelcomed,
+    Future<void> Function()? beforeConnect,
   }) => RunnerAgent(
     connect: () async {
+      await beforeConnect?.call();
       final next = connections.removeAt(0);
       if (next is RunnerSocket) return next;
       throw next as Exception;
@@ -74,6 +78,8 @@ void main() {
           waited.add(duration);
         },
     heartbeatUnit: heartbeatUnit ?? ((seconds) => Duration(seconds: seconds)),
+    wantsUpdateTo: wantsUpdateTo,
+    onWelcomed: onWelcomed,
   );
 
   setUp(() {
@@ -90,11 +96,12 @@ void main() {
   Future<void> welcome(
     FakeRunnerSocket fake, {
     int heartbeatSeconds = 30,
+    String engineVersion = '9.9.9',
   }) async {
     fake.engine(
       WelcomeFrame(
         runnerId: 'rnr_1',
-        engineVersion: '9.9.9',
+        engineVersion: engineVersion,
         apiVersion: apiVersion,
         heartbeatSeconds: heartbeatSeconds,
       ),
@@ -583,6 +590,24 @@ void main() {
       expect(await agent0.run(), AgentExit.drained);
     });
 
+    test(
+      'while connecting ends the runner without waiting for the engine',
+      () async {
+        final fake = socket();
+        final connecting = Completer<void>();
+        final agent0 = agent(beforeConnect: () => connecting.future);
+        final running = agent0.run();
+        await pumpEventQueue();
+
+        agent0.drain();
+        connecting.complete();
+
+        expect(await running, AgentExit.drained);
+        expect(fake.closedByRunner, isTrue);
+        expect(fake.sent, isEmpty);
+      },
+    );
+
     test('is announced with the hello of a reconnect', () async {
       final first = socket();
       final second = socket();
@@ -607,6 +632,206 @@ void main() {
           state: JobState.succeeded,
         ),
       );
+      expect(await running, AgentExit.drained);
+    });
+  });
+
+  group('updating (D-24)', () {
+    Future<void> finishJob(
+      FakeRunnerSocket fake,
+      String jobId,
+      int index,
+    ) async {
+      started[index].work.finish();
+      started[index].outbox.finish(state: JobState.succeeded);
+      fake.engine(
+        DoneAckFrame(
+          jobId: jobId,
+          leaseId: 'lse_${index + 1}',
+          state: JobState.succeeded,
+        ),
+      );
+      await pumpEventQueue();
+    }
+
+    test('never updates when it is not asked to', () async {
+      final fake = socket();
+      final agent0 = agent();
+      final running = agent0.run();
+      await pumpEventQueue();
+
+      await welcome(fake, engineVersion: '2.0.0');
+      await offer(fake, 'job_1');
+
+      expect(agent0.updateVersion, isNull);
+      expect(fake.sentOf<HelloFrame>().single.draining, isFalse);
+      expect(started, hasLength(1));
+      agent0.drain();
+      started.single.work.finish();
+      started.single.outbox.finish(state: JobState.succeeded);
+      fake.engine(
+        const DoneAckFrame(
+          jobId: 'job_1',
+          leaseId: 'lse_1',
+          state: JobState.succeeded,
+        ),
+      );
+      expect(await running, AgentExit.drained);
+    });
+
+    test('with no job, updates at once and says draining', () async {
+      final fake = socket();
+      final asked = <String>[];
+      final agent0 = agent(
+        wantsUpdateTo: (version) {
+          asked.add(version);
+          return true;
+        },
+      );
+      final running = agent0.run();
+      await pumpEventQueue();
+
+      await welcome(fake, engineVersion: '2.0.0');
+
+      expect(await running, AgentExit.updateRequired);
+      expect(asked, ['2.0.0']);
+      expect(agent0.updateVersion, '2.0.0');
+      expect(fake.sentOf<HelloFrame>().single.draining, isTrue);
+      expect(fake.closedByRunner, isTrue);
+      expect(
+        log,
+        contains(
+          'The engine runs version 2.0.0, this runner 1.2.3: no new jobs; the '
+          'runner updates now.',
+        ),
+      );
+    });
+
+    test('waits for a running job and takes no new offer meanwhile', () async {
+      final first = socket();
+      final second = socket();
+      var update = false;
+      final agent0 = agent(wantsUpdateTo: (_) => update);
+      var exited = false;
+      final running = agent0.run().whenComplete(() => exited = true);
+      await pumpEventQueue();
+      await welcome(first);
+      await offer(first, 'job_1');
+      expect(started, hasLength(1));
+
+      // The connection drops; the engine now runs another version.
+      update = true;
+      await first.engineCloses();
+      await pumpEventQueue();
+      await welcome(second, engineVersion: '2.0.0');
+
+      expect(second.sentOf<HelloFrame>().single.draining, isTrue);
+      expect(second.sentOf<HelloFrame>().single.leases.single.jobId, 'job_1');
+      expect(
+        log,
+        contains(
+          'The engine runs version 2.0.0, this runner 1.2.3: no new jobs; the '
+          'running job finishes, then the runner updates.',
+        ),
+      );
+      await offer(second, 'job_2', leaseId: 'lse_2');
+      expect(second.sentOf<LeaseRejectFrame>().single.reason, 'updating');
+      await pumpEventQueue();
+      expect(exited, isFalse, reason: 'a job runs');
+      expect(started.single.work.cancelled, isFalse);
+
+      await finishJob(second, 'job_1', 0);
+
+      expect(await running, AgentExit.updateRequired);
+      expect(agent0.updateVersion, '2.0.0');
+      expect(started.single.work.cancelled, isFalse);
+    });
+
+    test('says how many jobs it waits for', () async {
+      final first = socket();
+      final second = socket();
+      var update = false;
+      final agent0 = agent(wantsUpdateTo: (_) => update);
+      final running = agent0.run();
+      await pumpEventQueue();
+      await welcome(first);
+      await offer(first, 'job_1');
+      await offer(first, 'job_2', leaseId: 'lse_2');
+      update = true;
+      await first.engineCloses();
+      await pumpEventQueue();
+
+      await welcome(second, engineVersion: '2.0.0');
+
+      expect(
+        log,
+        contains(
+          'The engine runs version 2.0.0, this runner 1.2.3: no new jobs; the '
+          '2 running jobs finish, then the runner updates.',
+        ),
+      );
+      await finishJob(second, 'job_1', 0);
+      await finishJob(second, 'job_2', 1);
+      expect(await running, AgentExit.updateRequired);
+    });
+
+    test(
+      'goes on taking jobs when the engine goes back to its version',
+      () async {
+        final first = socket();
+        final second = socket();
+        final third = socket();
+        final agent0 = agent(wantsUpdateTo: (version) => version == '2.0.0');
+        final running = agent0.run();
+        await pumpEventQueue();
+        await welcome(first, engineVersion: '1.2.3');
+        await offer(first, 'job_1');
+        await first.engineCloses();
+        await pumpEventQueue();
+        await welcome(second, engineVersion: '2.0.0');
+        expect(second.sentOf<HelloFrame>().single.draining, isTrue);
+        await second.engineCloses();
+        await pumpEventQueue();
+
+        await welcome(third, engineVersion: '1.2.3');
+
+        expect(agent0.updateVersion, isNull);
+        expect(third.sentOf<HelloFrame>().single.draining, isFalse);
+        await offer(third, 'job_2', leaseId: 'lse_2');
+        expect(third.sentOf<LeaseAcceptFrame>().single.jobId, 'job_2');
+        agent0.drain();
+        await finishJob(third, 'job_1', 0);
+        await finishJob(third, 'job_2', 1);
+        expect(await running, AgentExit.drained);
+      },
+    );
+
+    test('tells every welcome to whoever watches a new version', () async {
+      final first = socket();
+      final second = socket();
+      final welcomed = <String>[];
+      final agent0 = agent(onWelcomed: welcomed.add);
+      final running = agent0.run();
+      await pumpEventQueue();
+
+      await welcome(first, engineVersion: '1.2.3');
+      await first.engineCloses();
+      await pumpEventQueue();
+      await welcome(second, engineVersion: '1.2.4');
+
+      expect(welcomed, ['1.2.3', '1.2.4']);
+      agent0.drain();
+      expect(await running, AgentExit.drained);
+    });
+
+    test('a drain beats an update', () async {
+      final fake = socket();
+      final agent0 = agent(wantsUpdateTo: (_) => true)..drain();
+      final running = agent0.run();
+      await pumpEventQueue();
+
+      await welcome(fake, engineVersion: '2.0.0');
+
       expect(await running, AgentExit.drained);
     });
   });

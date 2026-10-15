@@ -1,0 +1,18 @@
+[Unit]
+Description=XPath engine (xpd)
+Documentation=https://xpath.abdurahman.ly
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=%h/.local/lib/xpath/xpd/bin/xpd serve --data-dir %h/.local/share/xpath
+Environment=PATH=/home/linuxbrew/.linuxbrew/bin:/usr/local/bin:%h/.shorebird/bin:%h/.pub-cache/bin:%h/fvm/default/bin:/usr/bin:/bin:/usr/sbin:/sbin
+LoadCredentialEncrypted=xpath-master-key:%h/.config/xpath/xpath-master-key.cred
+Restart=on-failure
+RestartSec=5
+KillMode=mixed
+TimeoutStopSec=30
+
+[Install]
+WantedBy=default.target
