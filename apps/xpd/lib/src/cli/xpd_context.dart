@@ -53,4 +53,21 @@ class XpdContext {
   /// Makes the service manager for a scope, instead of the one of this
   /// machine. Tests use it to keep the unit files in a temporary folder.
   final ServiceManager Function(ServiceScope scope)? serviceManager;
+
+  /// This context with [out], [err] and [environment] replaced.
+  XpdContext copyWith({
+    StringSink? out,
+    StringSink? err,
+    Map<String, String>? environment,
+  }) => XpdContext(
+    out: out ?? this.out,
+    err: err ?? this.err,
+    shutdown: shutdown,
+    environment: environment ?? this.environment,
+    operatingSystem: operatingSystem,
+    ghFallbackPaths: ghFallbackPaths,
+    processes: processes,
+    executable: executable,
+    serviceManager: serviceManager,
+  );
 }

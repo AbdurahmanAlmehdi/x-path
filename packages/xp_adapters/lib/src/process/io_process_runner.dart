@@ -6,10 +6,17 @@ import 'package:xp_engine/xp_engine.dart';
 
 /// A [ProcessRunner] over `dart:io`.
 ///
-/// Arguments are passed as they are, never through a shell.
+/// Arguments are passed as they are, never through a shell. Processes get
+/// the environment of this one, with [environment] and then the variables of
+/// each call on top.
 class IoProcessRunner implements ProcessRunner {
   /// Creates the runner.
-  const new();
+  const new({this.environment});
+
+  /// Variables every process gets, for example a `PATH` with more folders
+  /// than the engine's own. A program name is looked up on the resulting
+  /// `PATH`.
+  final Map<String, String>? environment;
 
   @override
   Future<RunningProcess> start(
@@ -24,7 +31,9 @@ class IoProcessRunner implements ProcessRunner {
           executable,
           arguments,
           workingDirectory: workingDirectory,
-          environment: environment,
+          environment: this.environment == null
+              ? environment
+              : {...?this.environment, ...?environment},
         ),
       );
     } on ProcessException catch (error) {

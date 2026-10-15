@@ -278,6 +278,32 @@ docker run -d --name xpath -p 127.0.0.1:7480:7480 -v xpath-data:/data xpath
 docker exec xpath xpd token create --name laptop --kind cli
 ```
 
+**The Mac app (local install, Phase 18b).** `tool/release/build_mac.sh` builds `dist/XPath.app` (gitignored) for
+this Mac: it runs `bundles.sh` for the Mac's target and the Linux runner targets (`--reuse-bundles` takes the ones in
+`build/release`), `flutter build macos --release`, copies the `xpd` and `xp` bundles (`bin/`, `lib/`) into
+`Contents/Helpers/xpd` and `Contents/Helpers/xp` (the LaunchAgent plist runs `Contents/Helpers/xpd/bin/xpd`, the app
+links `Contents/Helpers/xp/bin/xp`) and the runner archives into `Contents/Resources/runners` (Helpers may hold only
+code; the engine looks there when it runs from the app). It then signs every Mach-O inside, deepest first, then the
+frameworks, then the app with `Release.entitlements`, all with the Hardened Runtime (`--options runtime`) and
+`--timestamp=none`, verifies with `codesign --verify --deep --strict` and runs the signed helpers' `--version`. The
+helpers are signed with `apps/xp_desktop/macos/Runner/Helpers.entitlements`: the Dart AOT runtime maps its snapshot
+as executable memory, and the Hardened Runtime kills it at start (exit 137) without
+`com.apple.security.cs.allow-unsigned-executable-memory`. `libsqlite3` needs nothing: it is signed by the same team,
+so library validation passes. `spctl` rejects the app (Gatekeeper accepts only Developer ID outside the App Store),
+which does not matter for a build that never carried a quarantine flag. The identity is `$XPATH_SIGN_IDENTITY`, by default the owner's Apple Development certificate (SHA-1
+`3B9E9C2FB4D94EFC7AC367C68CF1FC077EBB799F`, team AFBD5TBR5U); a `codesign` that waits more than 60 s (a Keychain
+dialog) is stopped. `--install` then quits a running XPath (SIGTERM, no Apple Event) and replaces
+`/Applications/XPath.app`, nothing else: it does not open the app, register the LaunchAgent or link `xp`. A running
+engine keeps the old `xpd` until it restarts (`launchctl kickstart -k gui/$(id -u)/ly.abdurahman.xpath.xpd`). Not
+done (owner, Goal 3): Developer ID signing, notarization, stapling and the DMG; the macOS 26 `.icon` (Icon Composer)
+is manual, the app uses `docs/design/brand/macos/AppIcon.appiconset`.
+
+**The engine under the app's LaunchAgent.** The plist sets `XPATH_LAUNCHD=1`. `xpd serve` then writes its output,
+each line stamped with the UTC time, to `<data dir>/service-logs/xpd.log` (moved to `xpd.log.1` past 10 MB at a
+start). Whoever starts it, `xpd serve` puts the tool folders that exist and are missing from its `PATH` in front of
+it: `~/.shorebird/bin`, `~/.pub-cache/bin`, `~/fvm/default/bin`, `/opt/homebrew/bin`, `/usr/local/bin` (a plist
+cannot name the home folder). The jobs, the tool probes and every program the engine runs get that `PATH`.
+
 ## Projects and scans
 
 A project is a GitHub repository, keyed by its GitHub repository id (D-05). The folder you pick only
