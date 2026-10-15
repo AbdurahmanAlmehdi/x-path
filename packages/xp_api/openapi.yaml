@@ -786,6 +786,26 @@ paths:
           $ref: "#/components/responses/WorkflowInvalid"
         "500":
           $ref: "#/components/responses/InternalError"
+  /workflows/schema:
+    get:
+      operationId: getWorkflowSchema
+      summary: What a workflow document may name.
+      description: |
+        The schema version, the step types with the keys each takes under
+        `with`, the gates, the capabilities, the matrix axes and the platforms
+        of this engine. Editors offer them; `POST .../workflows/validate`
+        still checks a document.
+      responses:
+        "200":
+          description: The schema.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkflowSchema"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
   /projects/{id}/workflows/validate:
     parameters:
       - $ref: "#/components/parameters/ProjectId"
@@ -2636,6 +2656,45 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/WorkflowIssue"
+    StepType:
+      type: object
+      required: [kind, with]
+      additionalProperties: false
+      properties:
+        kind:
+          type: string
+        with:
+          type: array
+          items:
+            type: string
+    WorkflowSchema:
+      type: object
+      required: [schema, steps, gates, capabilities, matrixAxes, platforms]
+      additionalProperties: false
+      properties:
+        schema:
+          type: integer
+          minimum: 1
+        steps:
+          type: array
+          items:
+            $ref: "#/components/schemas/StepType"
+        gates:
+          type: array
+          items:
+            type: string
+        capabilities:
+          type: array
+          items:
+            type: string
+        matrixAxes:
+          type: array
+          items:
+            type: string
+        platforms:
+          type: array
+          items:
+            type: string
     VersionBump:
       type: string
       enum:

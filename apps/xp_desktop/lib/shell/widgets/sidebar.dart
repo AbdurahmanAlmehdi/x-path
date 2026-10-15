@@ -33,6 +33,7 @@ class Sidebar extends StatelessWidget {
       ProjectDestination(:final projectId) => projectId,
       ReleasesDestination(:final projectId) => projectId,
       TestsDestination(:final projectId) => projectId,
+      WorkflowsDestination(:final projectId) => projectId,
       JobDestination(:final projectId) => projectId,
       HomeDestination() when projects.projects.isNotEmpty =>
         projects.projects.first.id,
@@ -104,6 +105,14 @@ class Sidebar extends StatelessWidget {
                       indent: 12,
                       selected: destination is TestsDestination,
                       onTap: () => show(TestsDestination(project.id)),
+                    ),
+                    SidebarRow(
+                      icon: PhosphorIconsRegular.flowArrow,
+                      selectedIcon: PhosphorIconsFill.flowArrow,
+                      label: l10n.sidebarWorkflows,
+                      indent: 12,
+                      selected: destination is WorkflowsDestination,
+                      onTap: () => show(WorkflowsDestination(project.id)),
                     ),
                   ],
                 ],

@@ -377,6 +377,21 @@ void main() {
     });
   });
 
+  group('schema', () {
+    test('names the step types, gates, capabilities and axes', () {
+      final schema = service.schema();
+
+      expect(schema.schema, 1);
+      expect(schema.steps.map((step) => step.kind), contains('build.android'));
+      final command = schema.steps.firstWhere((step) => step.kind == 'command');
+      expect(command.withKeys, [...command.withKeys]..sort());
+      expect(schema.gates, contains('prod_release'));
+      expect(schema.capabilities, contains('ios-sign'));
+      expect(schema.matrixAxes, ['platform', 'flavor']);
+      expect(schema.platforms, ['android', 'ios']);
+    });
+  });
+
   group('validate', () {
     test('says valid for a good document', () {
       final response = service.validate(_simple);

@@ -118,6 +118,11 @@ class XpClient {
 
   // ------------------------------------------------------------- workflows
 
+  /// `GET /workflows/schema`: what a workflow document may name.
+  Future<WorkflowSchema> getWorkflowSchema() async => WorkflowSchema.fromJson(
+    await _json(await _send('GET', ['workflows', 'schema'])),
+  );
+
   /// `GET /projects/{id}/workflows`.
   Future<List<WorkflowSummary>> listWorkflows(String projectId) async =>
       WorkflowsResponse.fromJson(
