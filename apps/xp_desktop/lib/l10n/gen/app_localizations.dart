@@ -1089,6 +1089,936 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Cancel'**
   String get credentialFormCancel;
+
+  /// Job or step status.
+  ///
+  /// In en, this message translates to:
+  /// **'Queued'**
+  String get statusQueued;
+
+  /// Job or step status.
+  ///
+  /// In en, this message translates to:
+  /// **'Running'**
+  String get statusRunning;
+
+  /// Job or step status.
+  ///
+  /// In en, this message translates to:
+  /// **'Succeeded'**
+  String get statusSucceeded;
+
+  /// Job or step status.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed'**
+  String get statusFailed;
+
+  /// Job or step status.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancelled'**
+  String get statusCancelled;
+
+  /// Job or step status.
+  ///
+  /// In en, this message translates to:
+  /// **'Skipped · already done'**
+  String get statusSkipped;
+
+  /// Job or step status.
+  ///
+  /// In en, this message translates to:
+  /// **'Interrupted'**
+  String get statusInterrupted;
+
+  /// Job or step status.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for a resume'**
+  String get statusWaitingForResume;
+
+  /// Job or step status.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for approval'**
+  String get statusWaitingForApproval;
+
+  /// Release status.
+  ///
+  /// In en, this message translates to:
+  /// **'Draft'**
+  String get releaseDraft;
+
+  /// Release status.
+  ///
+  /// In en, this message translates to:
+  /// **'Building'**
+  String get releaseBuilding;
+
+  /// Release status.
+  ///
+  /// In en, this message translates to:
+  /// **'Uploaded'**
+  String get releaseUploaded;
+
+  /// Release status.
+  ///
+  /// In en, this message translates to:
+  /// **'In review'**
+  String get releaseInReview;
+
+  /// Release status.
+  ///
+  /// In en, this message translates to:
+  /// **'Rejected'**
+  String get releaseRejected;
+
+  /// Release status.
+  ///
+  /// In en, this message translates to:
+  /// **'Approved'**
+  String get releaseApproved;
+
+  /// Release status.
+  ///
+  /// In en, this message translates to:
+  /// **'Live'**
+  String get releaseLive;
+
+  /// Release status.
+  ///
+  /// In en, this message translates to:
+  /// **'Merged'**
+  String get releaseMerged;
+
+  /// Release status.
+  ///
+  /// In en, this message translates to:
+  /// **'Abandoned'**
+  String get releaseAbandoned;
+
+  /// Status of a release in a store.
+  ///
+  /// In en, this message translates to:
+  /// **'Not uploaded'**
+  String get storeNotUploaded;
+
+  /// Status of a release in a store.
+  ///
+  /// In en, this message translates to:
+  /// **'Uploaded'**
+  String get storeUploaded;
+
+  /// Status of a release in a store.
+  ///
+  /// In en, this message translates to:
+  /// **'In review'**
+  String get storeInReview;
+
+  /// Status of a release in a store.
+  ///
+  /// In en, this message translates to:
+  /// **'Rejected'**
+  String get storeRejected;
+
+  /// Status of a release in a store.
+  ///
+  /// In en, this message translates to:
+  /// **'Not approved'**
+  String get storeNotApproved;
+
+  /// Status of a release in a store.
+  ///
+  /// In en, this message translates to:
+  /// **'Pending developer release'**
+  String get storePendingRelease;
+
+  /// Status of a release in a store.
+  ///
+  /// In en, this message translates to:
+  /// **'Approved · not published'**
+  String get storeApprovedUnpublished;
+
+  /// Status of a release in a store.
+  ///
+  /// In en, this message translates to:
+  /// **'Ready for sale'**
+  String get storeReadyForSale;
+
+  /// Status of a release in a store.
+  ///
+  /// In en, this message translates to:
+  /// **'Published'**
+  String get storePublished;
+
+  /// Store name.
+  ///
+  /// In en, this message translates to:
+  /// **'App Store'**
+  String get storeAppStore;
+
+  /// Store name.
+  ///
+  /// In en, this message translates to:
+  /// **'Google Play'**
+  String get storeGooglePlay;
+
+  /// Platform name.
+  ///
+  /// In en, this message translates to:
+  /// **'iOS'**
+  String get platformIos;
+
+  /// Platform name.
+  ///
+  /// In en, this message translates to:
+  /// **'Android'**
+  String get platformAndroid;
+
+  /// Name of a kind of step.
+  ///
+  /// In en, this message translates to:
+  /// **'Check out'**
+  String get stepGitCheckout;
+
+  /// Name of a kind of step.
+  ///
+  /// In en, this message translates to:
+  /// **'Checks'**
+  String get stepGuard;
+
+  /// Name of a kind of step.
+  ///
+  /// In en, this message translates to:
+  /// **'Bump version'**
+  String get stepVersionBump;
+
+  /// Name of a kind of step.
+  ///
+  /// In en, this message translates to:
+  /// **'Build Android'**
+  String get stepBuildAndroid;
+
+  /// Name of a kind of step.
+  ///
+  /// In en, this message translates to:
+  /// **'Build iOS'**
+  String get stepBuildIos;
+
+  /// Name of a kind of step.
+  ///
+  /// In en, this message translates to:
+  /// **'Verify compiled config'**
+  String get stepVerifyConfig;
+
+  /// Name of a kind of step.
+  ///
+  /// In en, this message translates to:
+  /// **'Strip and re-export IPA'**
+  String get stepStripIpa;
+
+  /// Name of a kind of step.
+  ///
+  /// In en, this message translates to:
+  /// **'Shorebird release'**
+  String get stepShorebirdRelease;
+
+  /// Name of a kind of step.
+  ///
+  /// In en, this message translates to:
+  /// **'Shorebird patch'**
+  String get stepShorebirdPatch;
+
+  /// Name of a kind of step.
+  ///
+  /// In en, this message translates to:
+  /// **'Archive symbols'**
+  String get stepSymbols;
+
+  /// Name of a kind of step.
+  ///
+  /// In en, this message translates to:
+  /// **'Tests'**
+  String get stepTest;
+
+  /// Name of a kind of step.
+  ///
+  /// In en, this message translates to:
+  /// **'Analyze'**
+  String get stepAnalyze;
+
+  /// Name of a kind of step.
+  ///
+  /// In en, this message translates to:
+  /// **'Upload to App Store'**
+  String get stepUploadAppStore;
+
+  /// Name of a kind of step.
+  ///
+  /// In en, this message translates to:
+  /// **'Upload to Google Play'**
+  String get stepUploadPlay;
+
+  /// Name of a kind of step.
+  ///
+  /// In en, this message translates to:
+  /// **'Upload to Firebase'**
+  String get stepUploadFirebase;
+
+  /// Name of a kind of step.
+  ///
+  /// In en, this message translates to:
+  /// **'Tag'**
+  String get stepGitTag;
+
+  /// Name of a kind of step.
+  ///
+  /// In en, this message translates to:
+  /// **'Push'**
+  String get stepGitPush;
+
+  /// Name of a kind of step.
+  ///
+  /// In en, this message translates to:
+  /// **'Cut the release branch'**
+  String get stepReleaseBranch;
+
+  /// Name of a kind of step.
+  ///
+  /// In en, this message translates to:
+  /// **'Open the release PR'**
+  String get stepCreatePr;
+
+  /// Name of a kind of step.
+  ///
+  /// In en, this message translates to:
+  /// **'Merge the release PR'**
+  String get stepMergePr;
+
+  /// Name of a kind of step.
+  ///
+  /// In en, this message translates to:
+  /// **'Record the manifest'**
+  String get stepManifest;
+
+  /// Name of a kind of step.
+  ///
+  /// In en, this message translates to:
+  /// **'Approval'**
+  String get stepGate;
+
+  /// Name of a kind of step.
+  ///
+  /// In en, this message translates to:
+  /// **'Command'**
+  String get stepCommand;
+
+  /// A gated action, inside a sentence.
+  ///
+  /// In en, this message translates to:
+  /// **'production release'**
+  String get gateProdRelease;
+
+  /// A gated action, inside a sentence.
+  ///
+  /// In en, this message translates to:
+  /// **'production patch'**
+  String get gateProdPatch;
+
+  /// A gated action, inside a sentence.
+  ///
+  /// In en, this message translates to:
+  /// **'store submission'**
+  String get gateStoreSubmission;
+
+  /// A gated action, inside a sentence.
+  ///
+  /// In en, this message translates to:
+  /// **'push'**
+  String get gatePush;
+
+  /// A gated action, inside a sentence.
+  ///
+  /// In en, this message translates to:
+  /// **'merge'**
+  String get gateMerge;
+
+  /// A gated action, inside a sentence.
+  ///
+  /// In en, this message translates to:
+  /// **'delete'**
+  String get gateDelete;
+
+  /// Toolbar title of the job view before the workflow is known.
+  ///
+  /// In en, this message translates to:
+  /// **'Job'**
+  String get jobTitle;
+
+  /// Where a job runs when the active engine has no name.
+  ///
+  /// In en, this message translates to:
+  /// **'Engine'**
+  String get jobEngine;
+
+  /// Caption of a pipeline stage the workflow does not name.
+  ///
+  /// In en, this message translates to:
+  /// **'Stage {number}'**
+  String jobStage(int number);
+
+  /// A step of a job the engine did not describe.
+  ///
+  /// In en, this message translates to:
+  /// **'Step {number}'**
+  String jobStep(int number);
+
+  /// After a stage caption whose job waits for an approval.
+  ///
+  /// In en, this message translates to:
+  /// **'needs you'**
+  String get jobNeedsYou;
+
+  /// Toolbar status.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} running'**
+  String jobRunningCount(int count);
+
+  /// Runs the job again from its first step.
+  ///
+  /// In en, this message translates to:
+  /// **'Re-run all'**
+  String get jobRerunAll;
+
+  /// Resumes the job at a step.
+  ///
+  /// In en, this message translates to:
+  /// **'Resume from {step}'**
+  String jobResumeFrom(String step);
+
+  /// Cancels the run (asks first).
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get jobCancel;
+
+  /// Hero of a failed run.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed at {step}'**
+  String jobFailedAt(String step);
+
+  /// Under the hero of a running run.
+  ///
+  /// In en, this message translates to:
+  /// **'elapsed {duration} · started {time}'**
+  String jobElapsed(String duration, String time);
+
+  /// Under the hero of a run that stopped.
+  ///
+  /// In en, this message translates to:
+  /// **'ran {duration} · started {time}'**
+  String jobRan(String duration, String time);
+
+  /// Artifacts of the shown job.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 artifact} other{{count} artifacts}}'**
+  String jobArtifacts(int count);
+
+  /// Section label.
+  ///
+  /// In en, this message translates to:
+  /// **'Artifacts'**
+  String get jobArtifactsLabel;
+
+  /// Label over the step list.
+  ///
+  /// In en, this message translates to:
+  /// **'{job} · {runner} · steps'**
+  String jobStepsOf(String job, String runner);
+
+  /// Section label.
+  ///
+  /// In en, this message translates to:
+  /// **'Resume plan'**
+  String get jobResumePlan;
+
+  /// Resume plan: steps that do not run again.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{First step} other{First {count} steps}}'**
+  String jobResumeKept(int count);
+
+  /// Resume plan.
+  ///
+  /// In en, this message translates to:
+  /// **'already done'**
+  String get jobAlreadyDone;
+
+  /// Resume plan: where the resume starts.
+  ///
+  /// In en, this message translates to:
+  /// **'{step} and after'**
+  String jobResumeRuns(String step);
+
+  /// Interrupted banner.
+  ///
+  /// In en, this message translates to:
+  /// **'The engine stopped while this job ran. Finished steps are kept; resume runs the interrupted step again from its start.'**
+  String get jobInterruptedBody;
+
+  /// Interrupted banner of a job waiting for a resume.
+  ///
+  /// In en, this message translates to:
+  /// **'The engine stopped during {step}, which changes something outside the engine, so it never runs again by itself. Check, then resume.'**
+  String jobWaitingForResumeBody(String step);
+
+  /// Interrupted banner: no side-effect step succeeded.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing outside the engine was changed.'**
+  String get jobNothingChanged;
+
+  /// Title of the cancel sheet.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel {run}?'**
+  String cancelRunTitle(String run);
+
+  /// Cancel sheet.
+  ///
+  /// In en, this message translates to:
+  /// **'{job} stops now on {runner} ({duration} in). Its partial output is discarded.'**
+  String cancelRunStops(String job, String runner, String duration);
+
+  /// Cancel sheet.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{The finished job keeps its artifacts; Resume can reuse them.} other{The {count} finished jobs keep their artifacts; Resume can reuse them.}}'**
+  String cancelRunKept(int count);
+
+  /// Cancel sheet.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 job that has not started will not run.} other{{count} jobs that have not started will not run.}}'**
+  String cancelRunNeverStarts(int count);
+
+  /// Closes the cancel sheet.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep running'**
+  String get cancelRunKeep;
+
+  /// Cancels the run.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel run'**
+  String get cancelRunConfirm;
+
+  /// An empty log.
+  ///
+  /// In en, this message translates to:
+  /// **'No output yet'**
+  String get logEmpty;
+
+  /// Placeholder of the log filter.
+  ///
+  /// In en, this message translates to:
+  /// **'Filter log'**
+  String get logFilter;
+
+  /// Scrolls the log to the first error.
+  ///
+  /// In en, this message translates to:
+  /// **'Jump to error'**
+  String get logJumpToError;
+
+  /// Tooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Wrap lines'**
+  String get logWrap;
+
+  /// Tooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Timestamps'**
+  String get logTimestamps;
+
+  /// Keeps the log at its end.
+  ///
+  /// In en, this message translates to:
+  /// **'Follow'**
+  String get logFollow;
+
+  /// Lines of a collapsed step.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 line} other{{count} lines}}'**
+  String logLines(int count);
+
+  /// Title of the dispatch sheet.
+  ///
+  /// In en, this message translates to:
+  /// **'Dispatch'**
+  String get dispatchTitle;
+
+  /// Field label.
+  ///
+  /// In en, this message translates to:
+  /// **'Workflow'**
+  String get dispatchWorkflow;
+
+  /// Dispatch sheet.
+  ///
+  /// In en, this message translates to:
+  /// **'The project has no workflow.'**
+  String get dispatchNoWorkflows;
+
+  /// After the workflow name.
+  ///
+  /// In en, this message translates to:
+  /// **'built-in'**
+  String get dispatchBuiltin;
+
+  /// After the workflow name: the run stops for approvals.
+  ///
+  /// In en, this message translates to:
+  /// **'gated'**
+  String get dispatchGated;
+
+  /// Field label.
+  ///
+  /// In en, this message translates to:
+  /// **'App'**
+  String get dispatchApp;
+
+  /// Field label.
+  ///
+  /// In en, this message translates to:
+  /// **'Flavors'**
+  String get dispatchFlavors;
+
+  /// Field label.
+  ///
+  /// In en, this message translates to:
+  /// **'Platforms'**
+  String get dispatchPlatforms;
+
+  /// Field label.
+  ///
+  /// In en, this message translates to:
+  /// **'Ref'**
+  String get dispatchRef;
+
+  /// Ref kind.
+  ///
+  /// In en, this message translates to:
+  /// **'Branch'**
+  String get dispatchBranch;
+
+  /// Ref kind.
+  ///
+  /// In en, this message translates to:
+  /// **'Tag'**
+  String get dispatchTag;
+
+  /// Field label.
+  ///
+  /// In en, this message translates to:
+  /// **'Version'**
+  String get dispatchVersion;
+
+  /// Version bump.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep'**
+  String get bumpKeep;
+
+  /// Version bump.
+  ///
+  /// In en, this message translates to:
+  /// **'Patch'**
+  String get bumpPatch;
+
+  /// Version bump.
+  ///
+  /// In en, this message translates to:
+  /// **'Minor'**
+  String get bumpMinor;
+
+  /// Version bump.
+  ///
+  /// In en, this message translates to:
+  /// **'Major'**
+  String get bumpMajor;
+
+  /// Beside the version a dispatch releases.
+  ///
+  /// In en, this message translates to:
+  /// **'from {version} in the pubspec at the last scan'**
+  String dispatchFromPubspec(String version);
+
+  /// Label over the preview.
+  ///
+  /// In en, this message translates to:
+  /// **'Will run · {jobs, plural, =1{1 job} other{{jobs} jobs}} in {stages, plural, =1{1 stage} other{{stages} stages}}'**
+  String dispatchWillRun(int jobs, int stages);
+
+  /// Empty preview.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing would run for these flavors and platforms.'**
+  String get dispatchNothing;
+
+  /// A stage that runs on the engine only.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 job} other{{count} jobs}} on {engine}'**
+  String dispatchOnEngine(int count, String engine);
+
+  /// Where a job that can run anywhere lands.
+  ///
+  /// In en, this message translates to:
+  /// **'{engine} first, else {runner} · slot {slot} of {slots}'**
+  String dispatchOnRunner(String engine, String runner, int slot, int slots);
+
+  /// Row of a stage's gates.
+  ///
+  /// In en, this message translates to:
+  /// **'{stage} approval'**
+  String dispatchGateTitle(String stage);
+
+  /// Which gates a stage hits.
+  ///
+  /// In en, this message translates to:
+  /// **'waits for your approval: {gates}'**
+  String dispatchGates(String gates);
+
+  /// Footer of the dispatch sheet.
+  ///
+  /// In en, this message translates to:
+  /// **'Return does not dispatch'**
+  String get dispatchReturnHint;
+
+  /// Closes the dispatch sheet.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get dispatchCancel;
+
+  /// The dispatch button.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{Dispatch 1 job} other{Dispatch {count} jobs}}'**
+  String dispatchButton(int count);
+
+  /// Ledger filter: every flavor.
+  ///
+  /// In en, this message translates to:
+  /// **'All'**
+  String get overviewAll;
+
+  /// Toolbar status.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing running · nothing needs you'**
+  String get overviewQuiet;
+
+  /// Toolbar status: jobs waiting for an approval.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} needs you'**
+  String overviewNeedsYou(int count);
+
+  /// Opens the dispatch sheet.
+  ///
+  /// In en, this message translates to:
+  /// **'Dispatch…'**
+  String get overviewDispatch;
+
+  /// Opens the job view of the release in flight.
+  ///
+  /// In en, this message translates to:
+  /// **'Open job'**
+  String get overviewOpenJob;
+
+  /// Under the hero.
+  ///
+  /// In en, this message translates to:
+  /// **'started {time}'**
+  String overviewStarted(String time);
+
+  /// Caption of the store column.
+  ///
+  /// In en, this message translates to:
+  /// **'In the stores · {version}'**
+  String overviewInStores(String version);
+
+  /// Hero with nothing live.
+  ///
+  /// In en, this message translates to:
+  /// **'No release yet'**
+  String get overviewNoRelease;
+
+  /// Hero with nothing in flight.
+  ///
+  /// In en, this message translates to:
+  /// **'Live on both stores'**
+  String get overviewLiveBoth;
+
+  /// Hero with nothing in flight.
+  ///
+  /// In en, this message translates to:
+  /// **'Live on {store}'**
+  String overviewLiveIn(String store);
+
+  /// Beside the live versions.
+  ///
+  /// In en, this message translates to:
+  /// **'No release in flight'**
+  String get overviewNothingInFlight;
+
+  /// Shows the scan of the project.
+  ///
+  /// In en, this message translates to:
+  /// **'Scan'**
+  String get overviewScan;
+
+  /// Title of the scan sheet.
+  ///
+  /// In en, this message translates to:
+  /// **'Scan'**
+  String get overviewScanTitle;
+
+  /// Closes a sheet.
+  ///
+  /// In en, this message translates to:
+  /// **'Close'**
+  String get overviewClose;
+
+  /// Ledger column.
+  ///
+  /// In en, this message translates to:
+  /// **'Flavor'**
+  String get ledgerFlavor;
+
+  /// Ledger column.
+  ///
+  /// In en, this message translates to:
+  /// **'Local · {branch}'**
+  String ledgerLocal(String branch);
+
+  /// Ledger column.
+  ///
+  /// In en, this message translates to:
+  /// **'Testing'**
+  String get ledgerTesting;
+
+  /// Ledger column.
+  ///
+  /// In en, this message translates to:
+  /// **'Live · {store}'**
+  String ledgerLive(String store);
+
+  /// Ledger column.
+  ///
+  /// In en, this message translates to:
+  /// **'Credentials'**
+  String get ledgerCredentials;
+
+  /// Where the local version comes from.
+  ///
+  /// In en, this message translates to:
+  /// **'pubspec'**
+  String get ledgerPubspec;
+
+  /// The pubspec has no version.
+  ///
+  /// In en, this message translates to:
+  /// **'No version'**
+  String get ledgerNoVersion;
+
+  /// Testing column without any release.
+  ///
+  /// In en, this message translates to:
+  /// **'—'**
+  String get ledgerNoRelease;
+
+  /// Testing column without any release.
+  ///
+  /// In en, this message translates to:
+  /// **'no release yet'**
+  String get ledgerNoReleaseHint;
+
+  /// Testing column.
+  ///
+  /// In en, this message translates to:
+  /// **'Up to date'**
+  String get ledgerUpToDate;
+
+  /// Testing column.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing newer than live'**
+  String get ledgerNothingNewer;
+
+  /// Testing column of a release that builds.
+  ///
+  /// In en, this message translates to:
+  /// **'Not uploaded'**
+  String get ledgerNotUploaded;
+
+  /// Testing column of a release that builds.
+  ///
+  /// In en, this message translates to:
+  /// **'{version} building'**
+  String ledgerWaitsFor(String version);
+
+  /// Live column.
+  ///
+  /// In en, this message translates to:
+  /// **'Not on store'**
+  String get ledgerNotOnStore;
+
+  /// Live column of a production flavor.
+  ///
+  /// In en, this message translates to:
+  /// **'no live release'**
+  String get ledgerNoLiveRelease;
+
+  /// Live column of another flavor.
+  ///
+  /// In en, this message translates to:
+  /// **'not a production flavor'**
+  String get ledgerNotProd;
+
+  /// Credentials column.
+  ///
+  /// In en, this message translates to:
+  /// **'None'**
+  String get ledgerCredentialsNone;
+
+  /// Ledger with every row filtered out.
+  ///
+  /// In en, this message translates to:
+  /// **'No flavor to show.'**
+  String get ledgerNoFlavors;
+
+  /// The docked console.
+  ///
+  /// In en, this message translates to:
+  /// **'Console'**
+  String get consoleTitle;
+
+  /// The collapsed console.
+  ///
+  /// In en, this message translates to:
+  /// **'· last: {job}'**
+  String consoleLast(String job);
 }
 
 class _AppLocalizationsDelegate

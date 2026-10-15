@@ -291,6 +291,84 @@ void main() {
       );
     });
 
+    test('watches a run with its jobs through their events', () async {
+      final run = Run(
+        id: 'run_1',
+        projectId: 'prj_1',
+        workflowId: 'wf_1',
+        workflowVersionId: 'wfv_1',
+        sha: '9a3bc0d',
+        state: RunState.running,
+        locksProject: false,
+        createdAt: at,
+        jobs: const [
+          RunJob(id: 'job_1', name: 'build', stage: 0, state: JobState.running),
+        ],
+      );
+      when(() => harness.client.getRun('run_1')).thenAnswer((_) async => run);
+      when(() => harness.client.getJob('job_1')).thenAnswer((_) async => _job);
+      final loads = await _loadsFor(
+        harness: harness,
+        stream: repository.watchRunJobs('run_1'),
+        events: [
+          const JobStateChanged(
+            jobId: 'job_1',
+            projectId: 'prj_1',
+            state: JobState.running,
+          ),
+          const JobStepChanged(
+            jobId: 'job_1',
+            ordinal: 0,
+            kind: 'guard',
+            state: StepState.running,
+          ),
+          const RunnerLeaseLost(
+            runnerId: 'rnr_1',
+            jobId: 'job_1',
+            projectId: 'prj_1',
+            reason: 'lease lapsed',
+            state: JobState.interrupted,
+          ),
+          ApprovalRequested(
+            approvalId: 'apr_1',
+            projectId: 'prj_1',
+            action: 'push',
+            sha: '9a3bc0d',
+            expiresAt: at,
+          ),
+          const ApprovalDecided(
+            approvalId: 'apr_1',
+            projectId: 'prj_1',
+            action: 'push',
+            state: ApprovalState.approved,
+            decidedBy: _decidedBy,
+          ),
+          const ApprovalExpired(
+            approvalId: 'apr_2',
+            projectId: 'prj_1',
+            action: 'push',
+          ),
+          const JobStepChanged(
+            jobId: 'job_9',
+            ordinal: 0,
+            kind: 'guard',
+            state: StepState.running,
+          ),
+          const ApprovalExpired(
+            approvalId: 'apr_3',
+            projectId: 'prj_9',
+            action: 'push',
+          ),
+          const ProjectRemoved(projectId: 'prj_1'),
+        ],
+      );
+      expect(loads, 7);
+      final cached = await repository.watchRunJobs('run_1').first;
+      expect(cached, Snapshot(RunJobs(run: run, jobs: [_job]), cached: true));
+      expect(cached.value.job('job_1'), _job);
+      expect(cached.value.job('job_2'), isNull);
+    });
+
     test('passes the commands to the engine', () async {
       final client = harness.client;
       const artifacts = <Artifact>[];
@@ -309,6 +387,96 @@ void main() {
       expect(await repository.cancelRun('run_1'), _run);
       expect(await repository.followLogs('job_1', after: 5).toList(), frames);
       expect(await repository.listArtifacts('job_1'), artifacts);
+    });
+  });
+
+  group('WorkflowsRepository', () {
+    late WorkflowsRepository repository;
+
+    final version1 = WorkflowVersionInfo(
+      id: 'wfv_1',
+      version: 1,
+      createdAt: at,
+    );
+    final version2 = WorkflowVersionInfo(
+      id: 'wfv_2',
+      version: 2,
+      createdAt: at,
+    );
+    Workflow workflow(WorkflowVersionInfo version) => Workflow(
+      id: 'wf_1',
+      projectId: 'prj_1',
+      name: 'Dev build',
+      builtin: true,
+      version: version,
+      versions: [version1, version2],
+      yaml: 'stages: []',
+    );
+
+    setUp(() => repository = WorkflowsRepository(harness.session));
+
+    test('lists and reads workflows', () async {
+      final client = harness.client;
+      final summary = WorkflowSummary(
+        id: 'wf_1',
+        projectId: 'prj_1',
+        name: 'Dev build',
+        builtin: true,
+        version: version2,
+      );
+      when(() => client.listWorkflows('prj_1'))
+          .thenAnswer((_) async => [summary]);
+      when(() => client.getWorkflow('prj_1', 'wf_1', version: 1))
+          .thenAnswer((_) async => workflow(version1));
+      expect(await repository.listWorkflows('prj_1'), [summary]);
+      expect(
+        await repository.getWorkflow('prj_1', 'wf_1', version: 1),
+        workflow(version1),
+      );
+    });
+
+    test('reads the version of the workflow a run runs', () async {
+      final client = harness.client;
+      when(() => client.getWorkflow('prj_1', 'wf_1'))
+          .thenAnswer((_) async => workflow(version2));
+      when(() => client.getWorkflow('prj_1', 'wf_1', version: 1))
+          .thenAnswer((_) async => workflow(version1));
+      Run runOf(String versionId) => Run(
+        id: 'run_1',
+        projectId: 'prj_1',
+        workflowId: 'wf_1',
+        workflowVersionId: versionId,
+        sha: '9a3bc0d',
+        state: RunState.running,
+        locksProject: false,
+        createdAt: at,
+        jobs: const [],
+      );
+      expect(await repository.workflowOf(runOf('wfv_2')), workflow(version2));
+      expect(await repository.workflowOf(runOf('wfv_1')), workflow(version1));
+      expect(await repository.workflowOf(runOf('wfv_9')), workflow(version2));
+    });
+
+    test('previews and dispatches a run', () async {
+      final client = harness.client;
+      const request = DispatchRequest(flavors: ['dev']);
+      when(client.listRunners).thenAnswer((_) async => [_runner]);
+      when(() => client.getGates('prj_1'))
+          .thenAnswer((_) async => const ProjectGates({}));
+      when(() => client.listCredentials('prj_1'))
+          .thenAnswer((_) async => [_credential]);
+      when(() => client.dispatchWorkflow('prj_1', 'wf_1', request))
+          .thenAnswer((_) async => _run);
+      final preview = await repository.preview(
+        project: project,
+        workflow: workflow(version2),
+        request: request,
+      );
+      expect(
+        preview,
+        const DispatchPreview(flavors: [], platforms: [], stages: []),
+      );
+      expect(await repository.dispatch('prj_1', 'wf_1', request), _run);
     });
   });
 

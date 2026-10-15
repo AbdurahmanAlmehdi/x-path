@@ -2,10 +2,10 @@ import 'package:material_ui/material_ui.dart';
 import 'package:xp_desktop/theme/theme.dart';
 import 'package:xp_desktop/widgets/xp_spinner.dart';
 
-/// The four kinds of button of the Run Sheet: one [primary] per screen,
+/// The kinds of button of the Run Sheet: one [primary] per screen,
 /// [secondary] and [tertiary] for the rest, [warning] only on the needs-you
-/// bar.
-enum XpButtonKind { primary, secondary, tertiary, warning }
+/// bar, [destructive] for the confirming button of a destructive sheet.
+enum XpButtonKind { primary, secondary, tertiary, warning, destructive }
 
 /// How tall a button is: `size.control.sm` in rows, `md` by default, `lg` in
 /// sheet and dialog footers.
@@ -77,6 +77,13 @@ class _XpButtonState extends State<XpButton> {
         colors.warningHover,
         colors.warningPressed,
         colors.warningOnWarning,
+        null,
+      ),
+      XpButtonKind.destructive => (
+        colors.negativeDefault,
+        colors.negativeHover,
+        colors.negativePressed,
+        colors.negativeOnNegative,
         null,
       ),
       XpButtonKind.secondary => (
@@ -157,7 +164,8 @@ class _XpButtonState extends State<XpButton> {
               style: type.code.copyWith(
                 color:
                     widget.kind == XpButtonKind.primary ||
-                        widget.kind == XpButtonKind.warning
+                        widget.kind == XpButtonKind.warning ||
+                        widget.kind == XpButtonKind.destructive
                     ? foreground
                     : colors.textTertiary,
               ),

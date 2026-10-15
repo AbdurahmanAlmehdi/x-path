@@ -26,7 +26,7 @@ class App extends StatelessWidget {
         engines: services.engines,
         openSession: services.openSession,
       )..add(const EngineConnectionStarted()),
-      child: const AppView(),
+      child: const XpClock(child: AppView()),
     ),
   );
 }
@@ -98,6 +98,7 @@ class EngineScope extends StatelessWidget {
         RepositoryProvider(create: (_) => ReleasesRepository(session)),
         RepositoryProvider(create: (_) => ApprovalsRepository(session)),
         RepositoryProvider(create: (_) => RunnersRepository(session)),
+        RepositoryProvider(create: (_) => WorkflowsRepository(session)),
       ],
       child: MultiBlocProvider(
         providers: [

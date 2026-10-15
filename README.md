@@ -1604,6 +1604,22 @@ sidebar mark are assets, and the icons are Phosphor's.
   The credentials editor lists each credential of a project with its last check, and adds, replaces, checks and
   deletes them; the engine checks a credential before it keeps it, and a `.p8` key, a service account or a keystore
   can be read from a file.
+- **Project overview** (Phase 16a, concept 1A): the release in flight is the hero, drawn as a rail of its run's
+  stages and then its status in each store; with nothing in flight, what is live in each store. Under it, a ledger
+  per app reads each flavor from local (the pubspec at the last scan) to testing (the release in flight) to live in
+  the App Store and Google Play, then its credentials; the console docked at the bottom follows the log of the job
+  that runs (⇧⌘C hides it). The scan of the project is one click away (Scan).
+- **Dispatch** (⌘N): the sheet picks a workflow, the app, flavors, platforms, the ref and the version bump, and
+  previews what would run: each stage's jobs, where each lands (the engine, or the least loaded runner that can run
+  it and the slot it would take) and which gates it stops at. The preview is worked out in the app
+  (`DispatchPreview.plan` in `xp_repositories`) from the workflow, the runners, the gates and the credentials the
+  engine returns, the same way the engine reads them; the engine still plans the run when it is dispatched. The
+  button reads "Dispatch N jobs ⌘↩"; Return never dispatches.
+- **Job view** (concept 2A): the run's pipeline graph over the steps and the log of one job (click a node to show
+  another). The log is grouped by step, with terminal colours, a filter (⌘F), jump to error (⌘E), wrap, timestamps
+  and follow (⌘↓); it resumes from the last line it holds, also after the job is resumed. Cancel (⌘.) asks first and
+  says what stops, what is kept and what never starts; a failed, cancelled or interrupted job offers "Re-run all"
+  (⌘R) and "Resume from <step>" (⌥⌘R, from the step picked in the step list or the first unfinished one).
 - **macOS services** (`packages/xp_macos_services`) are interfaces with fakes (`package:xp_macos_services/testing.dart`):
   the LaunchAgent and the Keychain go through the channel `ly.abdurahman.xpath/macos_services`, implemented in
   `apps/xp_desktop/macos/Runner/MacosServicesChannel.swift`; the `xp` link, the tool check and the bundled engine are

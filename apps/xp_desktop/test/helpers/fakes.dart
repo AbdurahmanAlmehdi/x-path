@@ -13,6 +13,45 @@ class MockEnginesRepository extends Mock implements EnginesRepository;
 
 class MockProjectsRepository extends Mock implements ProjectsRepository;
 
+class MockJobsRepository extends Mock implements JobsRepository;
+
+class MockReleasesRepository extends Mock implements ReleasesRepository;
+
+class MockRunnersRepository extends Mock implements RunnersRepository;
+
+class MockWorkflowsRepository extends Mock implements WorkflowsRepository;
+
+/// A projects repository whose credentials never arrive.
+MockProjectsRepository quietProjects() {
+  final repository = MockProjectsRepository();
+  when(() => repository.watchCredentials(any()))
+      .thenAnswer((_) => const Stream.empty());
+  return repository;
+}
+
+/// A jobs repository whose runs never arrive.
+MockJobsRepository quietJobs() {
+  final repository = MockJobsRepository();
+  when(() => repository.watchRunJobs(any()))
+      .thenAnswer((_) => const Stream.empty());
+  return repository;
+}
+
+/// A releases repository whose releases never arrive.
+MockReleasesRepository quietReleases() {
+  final repository = MockReleasesRepository();
+  when(() => repository.watchReleases(projectId: any(named: 'projectId')))
+      .thenAnswer((_) => const Stream.empty());
+  return repository;
+}
+
+/// A runners repository whose runners never arrive.
+MockRunnersRepository quietRunners() {
+  final repository = MockRunnersRepository();
+  when(repository.watchRunners).thenAnswer((_) => const Stream.empty());
+  return repository;
+}
+
 final at = DateTime.utc(2026, 10, 13, 14, 2);
 
 final localEngine = EngineProfile(
@@ -138,6 +177,9 @@ class SessionHarness {
     when(client.health).thenAnswer((_) async => const HealthResponse());
     when(client.listProjects).thenAnswer((_) async => projects);
     when(() => client.listCredentials(any())).thenAnswer((_) async => []);
+    when(() => client.listReleases(projectId: any(named: 'projectId')))
+        .thenAnswer((_) async => []);
+    when(client.listRunners).thenAnswer((_) async => []);
     session = EngineSession(
       profile: profile,
       client: client,

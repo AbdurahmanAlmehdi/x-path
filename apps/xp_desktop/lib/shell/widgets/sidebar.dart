@@ -21,6 +21,7 @@ class Sidebar extends StatelessWidget {
     final projects = context.watch<ProjectsBloc>().state;
     final selectedProject = switch (destination) {
       ProjectDestination(:final projectId) => projectId,
+      JobDestination(:final projectId) => projectId,
       HomeDestination() when projects.projects.isNotEmpty =>
         projects.projects.first.id,
       _ => null,

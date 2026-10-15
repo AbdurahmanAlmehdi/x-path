@@ -1,5 +1,8 @@
 export 'xp_button.dart';
+export 'xp_clock.dart';
+export 'xp_format.dart';
 export 'xp_layout.dart';
+export 'xp_segmented.dart';
 export 'xp_select.dart';
 export 'xp_spinner.dart';
 export 'xp_status.dart';

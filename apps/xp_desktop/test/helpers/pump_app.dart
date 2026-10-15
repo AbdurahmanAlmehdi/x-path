@@ -7,9 +7,14 @@ import 'package:xp_desktop/l10n/l10n.dart';
 import 'package:xp_desktop/projects/bloc/projects_bloc.dart';
 import 'package:xp_desktop/shell/cubit/shell_cubit.dart';
 import 'package:xp_desktop/theme/theme.dart';
+import 'package:xp_desktop/widgets/widgets.dart';
 import 'package:xp_repositories/xp_repositories.dart';
 
 import 'fakes.dart';
+
+/// The time the widget tests see: 14:08:55 on this Mac, six minutes into
+/// the sample run.
+final testNow = DateTime(2026, 10, 13, 14, 8, 55);
 
 class MockEngineConnectionBloc
     extends MockBloc<EngineConnectionEvent, EngineConnectionState>
@@ -67,15 +72,19 @@ void desktopWindow(WidgetTester tester) {
 
 /// The app's theme and localizations around [home].
 Widget themed(Widget home, {Brightness brightness = Brightness.light}) =>
-    MaterialApp(
-      debugShowCheckedModeBanner: false,
-      theme: appTheme(brightness),
-      localizationsDelegates: const [
-        AppLocalizations.delegate,
-        ...GlobalMaterialLocalizations.delegates,
-      ],
-      supportedLocales: AppLocalizations.supportedLocales,
-      home: home,
+    XpClock(
+      clock: () => testNow,
+      ticking: false,
+      child: MaterialApp(
+        debugShowCheckedModeBanner: false,
+        theme: appTheme(brightness),
+        localizationsDelegates: const [
+          AppLocalizations.delegate,
+          ...GlobalMaterialLocalizations.delegates,
+        ],
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: home,
+      ),
     );
 
 extension PumpApp on WidgetTester {
@@ -88,6 +97,10 @@ extension PumpApp on WidgetTester {
     ShellCubit? shell,
     ProjectsBloc? projects,
     ProjectsRepository? projectsRepository,
+    JobsRepository? jobsRepository,
+    ReleasesRepository? releasesRepository,
+    RunnersRepository? runnersRepository,
+    WorkflowsRepository? workflowsRepository,
     Brightness brightness = Brightness.light,
   }) async {
     desktopWindow(this);
@@ -98,7 +111,19 @@ extension PumpApp on WidgetTester {
             value: services ?? testServices(),
           ),
           RepositoryProvider<ProjectsRepository>.value(
-            value: projectsRepository ?? MockProjectsRepository(),
+            value: projectsRepository ?? quietProjects(),
+          ),
+          RepositoryProvider<JobsRepository>.value(
+            value: jobsRepository ?? quietJobs(),
+          ),
+          RepositoryProvider<ReleasesRepository>.value(
+            value: releasesRepository ?? quietReleases(),
+          ),
+          RepositoryProvider<RunnersRepository>.value(
+            value: runnersRepository ?? quietRunners(),
+          ),
+          RepositoryProvider<WorkflowsRepository>.value(
+            value: workflowsRepository ?? MockWorkflowsRepository(),
           ),
         ],
         child: MultiBlocProvider(

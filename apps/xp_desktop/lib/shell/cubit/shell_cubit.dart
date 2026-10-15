@@ -24,6 +24,19 @@ final class ProjectDestination extends ShellDestination {
   List<Object?> get props => [projectId];
 }
 
+/// The job view of the run [runId], showing [jobId] first if given.
+/// [projectId] keeps the project selected in the sidebar.
+final class JobDestination extends ShellDestination {
+  const new(this.runId, {this.jobId, this.projectId});
+
+  final String runId;
+  final String? jobId;
+  final String? projectId;
+
+  @override
+  List<Object?> get props => [runId, jobId, projectId];
+}
+
 /// Add project.
 final class AddProjectDestination extends ShellDestination {
   const new();
