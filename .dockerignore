@@ -1,0 +1,5 @@
+# The image needs the Linux bundles from tool/release/bundles.sh and the
+# licence only.
+*
+!LICENSE
+!build/release/bundles/linux-*/

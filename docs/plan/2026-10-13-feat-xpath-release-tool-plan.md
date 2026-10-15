@@ -559,7 +559,7 @@ Mataa dev builds through `xp` can start after Phase 13, before the desktop app e
 
 ### Phase 18a: Linux packaging
 
-- **Status:** Not started
+- **Status:** Done
 - **Scope:** Engine and `xp` bundles for macOS arm64/x64 and Linux x64/arm64, Linux tarball,
   `install.sh` (served at `https://xpath.abdurahman.ly/install`), Docker image, release
   workflow for XPath itself.
