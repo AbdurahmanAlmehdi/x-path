@@ -241,3 +241,77 @@ class ValidateWorkflowResponse extends Equatable {
   @override
   List<Object?> get props => [valid, issues];
 }
+
+/// A step type of the engine and the keys it takes under `with`.
+@JsonSerializable()
+class StepType extends Equatable {
+  /// Creates a step type.
+  const new({required this.kind, this.withKeys = const []});
+
+  /// Reads a step type from its JSON form.
+  factory StepType.fromJson(Map<String, dynamic> json) =>
+      _$StepTypeFromJson(json);
+
+  /// The name a step uses as its `kind`, for example `build.android`.
+  final String kind;
+
+  /// The keys a step of this type takes under `with`, sorted.
+  @JsonKey(name: 'with')
+  final List<String> withKeys;
+
+  /// The JSON form.
+  Map<String, dynamic> toJson() => _$StepTypeToJson(this);
+
+  @override
+  List<Object?> get props => [kind, withKeys];
+}
+
+/// The body of `GET /workflows/schema`: what a workflow document of this
+/// engine may name, for editors.
+@JsonSerializable(explicitToJson: true)
+class WorkflowSchema extends Equatable {
+  /// Creates the schema.
+  const new({
+    required this.schema,
+    required this.steps,
+    required this.gates,
+    required this.capabilities,
+    required this.matrixAxes,
+    required this.platforms,
+  });
+
+  /// Reads the schema from its JSON form.
+  factory WorkflowSchema.fromJson(Map<String, dynamic> json) =>
+      _$WorkflowSchemaFromJson(json);
+
+  /// The version of the document the engine reads (`schema: 1`).
+  final int schema;
+
+  /// The step types, by kind.
+  final List<StepType> steps;
+
+  /// The actions a step can be gated on (`gate:`).
+  final List<String> gates;
+
+  /// The capabilities a job can ask for (`capabilities:`).
+  final List<String> capabilities;
+
+  /// The axes a job's matrix can have (`platform`, `flavor`).
+  final List<String> matrixAxes;
+
+  /// The values of the `platform` axis.
+  final List<String> platforms;
+
+  /// The JSON form.
+  Map<String, dynamic> toJson() => _$WorkflowSchemaToJson(this);
+
+  @override
+  List<Object?> get props => [
+    schema,
+    steps,
+    gates,
+    capabilities,
+    matrixAxes,
+    platforms,
+  ];
+}

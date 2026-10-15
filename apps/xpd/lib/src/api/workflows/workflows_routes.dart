@@ -5,8 +5,8 @@ import 'package:xp_engine/xp_engine.dart';
 import 'package:xpd/src/api/request_body.dart';
 import 'package:xpd/src/api/responses.dart';
 
-/// The workflow endpoints of a project: list, create, save a new version,
-/// validate, delete, and dispatch.
+/// The workflow endpoints: the schema documents follow, and per project
+/// list, create, save a new version, validate, delete, and dispatch.
 class WorkflowsRoutes {
   /// Creates the routes over the workflows and the dispatcher.
   const new(this._workflows, this._dispatcher);
@@ -17,6 +17,7 @@ class WorkflowsRoutes {
   /// Registers the routes on [router].
   void addTo(Router router) {
     router
+      ..get('/workflows/schema', _schema)
       ..get('/projects/<id>/workflows', _list)
       ..post('/projects/<id>/workflows', _create)
       // Before `<workflowId>`: `validate` is not a workflow id.
@@ -26,6 +27,9 @@ class WorkflowsRoutes {
       ..delete('/projects/<id>/workflows/<workflowId>', _remove)
       ..post('/projects/<id>/workflows/<workflowId>/dispatch', _dispatch);
   }
+
+  Response _schema(Request request) =>
+      jsonResponse(_workflows.schema().toJson());
 
   Future<Response> _list(Request request, String id) =>
       guardWorkflows(() async {

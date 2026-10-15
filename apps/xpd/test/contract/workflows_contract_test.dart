@@ -76,6 +76,14 @@ void main() {
   });
 
   group('workflows', () {
+    test('GET schema 200 and 401', () async {
+      final response = await client.send('GET', '/workflows/schema');
+      final unauthorized = await engine.request('/workflows/schema', token: '');
+
+      expectContract(response, path: '/workflows/schema', status: 200);
+      expectContract(unauthorized, path: '/workflows/schema', status: 401);
+    });
+
     test('GET list', () async {
       final response = await client.send('GET', client.base);
 

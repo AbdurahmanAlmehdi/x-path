@@ -60,6 +60,18 @@ final class TestsDestination extends ShellDestination {
   List<Object?> get props => [projectId, jobId];
 }
 
+/// The workflows of [projectId] in the builder, showing [workflowId] first
+/// if given.
+final class WorkflowsDestination extends ShellDestination {
+  const new(this.projectId, {this.workflowId});
+
+  final String projectId;
+  final String? workflowId;
+
+  @override
+  List<Object?> get props => [projectId, workflowId];
+}
+
 /// The runners of the engine.
 final class RunnersDestination extends ShellDestination {
   const new();
@@ -116,7 +128,8 @@ class ShellCubit extends Cubit<ShellDestination> {
   String? get projectId => switch (state) {
     ProjectDestination(:final projectId) ||
     ReleasesDestination(:final projectId) ||
-    TestsDestination(:final projectId) => projectId,
+    TestsDestination(:final projectId) ||
+    WorkflowsDestination(:final projectId) => projectId,
     JobDestination(:final projectId) => projectId,
     _ => null,
   };

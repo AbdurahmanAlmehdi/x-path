@@ -4,10 +4,12 @@ import 'package:xp_desktop/widgets/xp_layout.dart';
 
 /// A labelled field: a `type.label` caption over a well
 /// (`surface.sunken`, hairline, `radius.md`) with the accent ring on focus.
+/// Without a [label] the well stands alone, for fields whose caption sits
+/// beside them.
 class XpTextField extends StatelessWidget {
   const new({
-    required this.label,
     required this.controller,
+    this.label,
     this.hint,
     this.obscure = false,
     this.code = false,
@@ -15,10 +17,11 @@ class XpTextField extends StatelessWidget {
     this.enabled = true,
     this.onChanged,
     this.trailing,
+    this.focusNode,
     super.key,
   });
 
-  final String label;
+  final String? label;
   final TextEditingController controller;
   final String? hint;
 
@@ -30,6 +33,7 @@ class XpTextField extends StatelessWidget {
   final int maxLines;
   final bool enabled;
   final ValueChanged<String>? onChanged;
+  final FocusNode? focusNode;
 
   /// Beside the field, for example a "Choose…" button.
   final Widget? trailing;
@@ -49,6 +53,7 @@ class XpTextField extends StatelessWidget {
     );
     final field = TextField(
       controller: controller,
+      focusNode: focusNode,
       obscureText: obscure,
       enabled: enabled,
       maxLines: obscure ? 1 : maxLines,
@@ -72,8 +77,10 @@ class XpTextField extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        XpSectionLabel(label),
-        const SizedBox(height: 6),
+        if (label case final label?) ...[
+          XpSectionLabel(label),
+          const SizedBox(height: 6),
+        ],
         if (trailing case final trailing?)
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,

@@ -134,3 +134,43 @@ Map<String, dynamic> _$ValidateWorkflowResponseToJson(
   'valid': instance.valid,
   'issues': instance.issues.map((e) => e.toJson()).toList(),
 };
+
+StepType _$StepTypeFromJson(Map<String, dynamic> json) => StepType(
+  kind: json['kind'] as String,
+  withKeys:
+      (json['with'] as List<dynamic>?)?.map((e) => e as String).toList() ??
+      const [],
+);
+
+Map<String, dynamic> _$StepTypeToJson(StepType instance) => <String, dynamic>{
+  'kind': instance.kind,
+  'with': instance.withKeys,
+};
+
+WorkflowSchema _$WorkflowSchemaFromJson(Map<String, dynamic> json) =>
+    WorkflowSchema(
+      schema: (json['schema'] as num).toInt(),
+      steps: (json['steps'] as List<dynamic>)
+          .map((e) => StepType.fromJson(e as Map<String, dynamic>))
+          .toList(),
+      gates: (json['gates'] as List<dynamic>).map((e) => e as String).toList(),
+      capabilities: (json['capabilities'] as List<dynamic>)
+          .map((e) => e as String)
+          .toList(),
+      matrixAxes: (json['matrixAxes'] as List<dynamic>)
+          .map((e) => e as String)
+          .toList(),
+      platforms: (json['platforms'] as List<dynamic>)
+          .map((e) => e as String)
+          .toList(),
+    );
+
+Map<String, dynamic> _$WorkflowSchemaToJson(WorkflowSchema instance) =>
+    <String, dynamic>{
+      'schema': instance.schema,
+      'steps': instance.steps.map((e) => e.toJson()).toList(),
+      'gates': instance.gates,
+      'capabilities': instance.capabilities,
+      'matrixAxes': instance.matrixAxes,
+      'platforms': instance.platforms,
+    };

@@ -23,6 +23,24 @@ void main() {
   String errorMessage(RawResponse response) =>
       (response.json['error']! as Map<String, dynamic>)['message']! as String;
 
+  group('GET /workflows/schema', () {
+    test('names what a workflow document may use', () async {
+      final response = await client.send('GET', '/workflows/schema');
+
+      expect(response.statusCode, 200);
+      final schema = WorkflowSchema.fromJson(response.json);
+      expect(schema.schema, 1);
+      expect(schema.steps.map((step) => step.kind), contains('build.ios'));
+      expect(schema.gates, contains('push'));
+    });
+
+    test('needs a token', () async {
+      final response = await engine.request('/workflows/schema', token: '');
+
+      expect(response.statusCode, 401);
+    });
+  });
+
   group('GET /projects/{id}/workflows', () {
     test('lists the built-in workflows of the project', () async {
       final response = await client.send('GET', client.base);

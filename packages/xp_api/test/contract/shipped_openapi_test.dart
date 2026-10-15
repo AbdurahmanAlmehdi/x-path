@@ -336,6 +336,7 @@ void main() {
       );
 
       for (final (method, path) in [
+        ('GET', '/workflows/schema'),
         ('GET', '/projects/prj_1/workflows'),
         ('POST', '/projects/prj_1/workflows'),
         ('POST', '/projects/prj_1/workflows/validate'),
@@ -434,6 +435,22 @@ void main() {
         isEmpty,
       );
       expect(shipped.validateSchema('Run', run.toJson()), isEmpty);
+      expect(
+        shipped.validateSchema(
+          'WorkflowSchema',
+          const WorkflowSchema(
+            schema: 1,
+            steps: [
+              StepType(kind: 'build.android', withKeys: ['artifact']),
+            ],
+            gates: ['prod_release'],
+            capabilities: ['flutter'],
+            matrixAxes: ['platform', 'flavor'],
+            platforms: ['android', 'ios'],
+          ).toJson(),
+        ),
+        isEmpty,
+      );
       expect(
         shipped.validateSchema(
           'ValidateWorkflowResponse',

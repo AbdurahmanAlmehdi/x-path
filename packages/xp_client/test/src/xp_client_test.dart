@@ -108,6 +108,28 @@ void main() {
       expected: 'removed',
     ),
     _Endpoint(
+      'getWorkflowSchema',
+      method: 'GET',
+      path: '/workflows/schema',
+      response: const WorkflowSchema(
+        schema: 1,
+        steps: [StepType(kind: 'test')],
+        gates: ['push'],
+        capabilities: ['flutter'],
+        matrixAxes: ['platform'],
+        platforms: ['android'],
+      ).toJson(),
+      call: (client) => client.getWorkflowSchema(),
+      expected: const WorkflowSchema(
+        schema: 1,
+        steps: [StepType(kind: 'test')],
+        gates: ['push'],
+        capabilities: ['flutter'],
+        matrixAxes: ['platform'],
+        platforms: ['android'],
+      ),
+    ),
+    _Endpoint(
       'listWorkflows',
       method: 'GET',
       path: '/projects/prj_1/workflows',
