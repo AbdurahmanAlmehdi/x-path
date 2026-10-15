@@ -12,6 +12,7 @@ import 'package:xp_client/xp_client.dart';
 /// | 69 | the engine cannot be reached or cannot serve (secrets locked) |
 /// | 70 | the engine failed |
 /// | 73 | a conflict: the approval was decided already, the project exists |
+/// | 75 | a runner switched to another version; its service manager starts it |
 /// | 77 | the token is rejected, or its kind may not do this |
 /// | 78 | not connected: run `xp connect` |
 abstract final class XpExit {
@@ -38,6 +39,11 @@ abstract final class XpExit {
 
   /// Conflict.
   static const conflict = 73;
+
+  /// A runner switched to another version (an update, or a rollback) and has
+  /// to be started again. A service manager does that, because the code is
+  /// not 0 (`sysexits.h` `EX_TEMPFAIL`).
+  static const restart = 75;
 
   /// Permission denied.
   static const permission = 77;

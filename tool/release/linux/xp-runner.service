@@ -1,0 +1,19 @@
+[Unit]
+Description=XPath runner (xp runner)
+Documentation=https://xpath.abdurahman.ly
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=%h/.local/share/xpath/runner/current/bin/xp runner start --data-dir %h/.local/share/xpath/runner
+Environment=PATH=/home/linuxbrew/.linuxbrew/bin:/usr/local/bin:%h/.shorebird/bin:%h/.pub-cache/bin:%h/fvm/default/bin:/usr/bin:/bin:/usr/sbin:/sbin
+Environment=XP_RUNNER_MANAGED=1
+Restart=on-failure
+RestartSec=5
+RestartPreventExitStatus=77 73 78
+KillMode=mixed
+TimeoutStopSec=600
+
+[Install]
+WantedBy=default.target

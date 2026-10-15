@@ -33,6 +33,7 @@ void main() {
       // The right path with the wrong method is not the runner's either.
       ('GET', '/runners/jobs/job_1/artifacts/app.apk'),
       ('POST', '/runners/connect'),
+      ('POST', '/runners/bundle'),
       ('PUT', '/runners/connect'),
       // Nor a route that does not exist: the scope answers before routing.
       ('GET', '/nothing'),
@@ -47,6 +48,7 @@ void main() {
       final error = ErrorResponse.fromJson(response.json).error;
       expect(error.code, ApiErrorCode.forbidden, reason: '$method $path');
       expect(error.message, contains('A runner token reaches only'));
+      expect(error.message, contains('GET /runners/bundle'));
       expect(error.message, contains('$method $path'));
     }
   });
@@ -57,6 +59,17 @@ void main() {
 
     expect(response.statusCode, isNot(403));
     expect(response.statusCode, 426);
+  });
+
+  test('lets the download of the bundle through to the route', () async {
+    // No bundle was put there: the route answers 404, not the scope's 403.
+    final response = await asRunner(
+      'GET',
+      '/runners/bundle?os=linux&arch=arm64',
+    );
+
+    expect(response.statusCode, isNot(403));
+    expect(response.statusCode, 404);
   });
 
   test('lets the upload of an artifact through to the lease check', () async {

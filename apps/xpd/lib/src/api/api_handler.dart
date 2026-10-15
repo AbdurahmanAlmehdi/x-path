@@ -48,6 +48,7 @@ Handler buildApiHandler({
   required RunnerService runners,
   required RunnerConnectRoute runnerConnect,
   required RunnerArtifacts runnerArtifacts,
+  required RunnerBundles runnerBundles,
   required String engineVersion,
   void Function(Object error, StackTrace stackTrace)? onError,
 }) {
@@ -73,7 +74,7 @@ Handler buildApiHandler({
   ApprovalsRoutes(approvals).addTo(router);
   ReleasesRoutes(releases, releaseNotes).addTo(router);
   StorageRoutes(housekeeping).addTo(router);
-  RunnersRoutes(runners, runnerArtifacts).addTo(router);
+  RunnersRoutes(runners, runnerArtifacts, runnerBundles).addTo(router);
   return const Pipeline()
       .addMiddleware(errorMiddleware(onError: onError))
       .addMiddleware(authMiddleware(tokens, publicPaths: publicPaths))

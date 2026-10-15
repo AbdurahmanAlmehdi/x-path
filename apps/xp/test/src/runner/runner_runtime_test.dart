@@ -127,7 +127,7 @@ void main() {
     session.send(
       WelcomeFrame(
         runnerId: 'rnr_1',
-        engineVersion: '9.9.9',
+        engineVersion: packageVersion,
         apiVersion: apiVersion,
         heartbeatSeconds: 1,
       ),
@@ -217,7 +217,7 @@ void main() {
     session.send(
       WelcomeFrame(
         runnerId: 'rnr_1',
-        engineVersion: '9.9.9',
+        engineVersion: packageVersion,
         apiVersion: apiVersion,
       ),
     );
@@ -240,6 +240,64 @@ void main() {
     expect(await running, AgentExit.oneShotDone);
   });
 
+  test('a one-shot runner does not update, whatever the engine runs', () async {
+    final runner = await buildRunner(setup(oneShot: true));
+    final running = runner.run();
+    final session = await engine.connection;
+    session.send(
+      WelcomeFrame(
+        runnerId: 'rnr_1',
+        engineVersion: '9.9.9',
+        apiVersion: apiVersion,
+      ),
+    );
+
+    final hello = await session.next<HelloFrame>();
+
+    expect(hello.draining, isFalse);
+    expect(engine.bundleRequests, isEmpty);
+    runner.drain();
+    expect(await running, AgentExit.drained);
+  });
+
+  test(
+    'drains instead of restarting when told to stop during the update',
+    () async {
+      // The engine has no bundle: the update fails, and the runner, which was
+      // told to drain meanwhile, ends.
+      final runner = await buildRunner(setup());
+      final running = runner.run();
+      final session = await engine.connection;
+      session.send(
+        WelcomeFrame(
+          runnerId: 'rnr_1',
+          engineVersion: '9.9.9',
+          apiVersion: apiVersion,
+        ),
+      );
+      await session.next<HelloFrame>();
+      runner.drain();
+
+      expect(await running, AgentExit.drained);
+    },
+  );
+
+  test('the bundle that runs is the folder of bin/xp', () {
+    RunnerHost on(String executable) => RunnerHost(
+      operatingSystem: 'linux',
+      cores: 1,
+      pid: 1,
+      environment: const {},
+      runner: const IoProcessRunner(),
+      executable: executable,
+    );
+
+    expect(on('/opt/xpath/xp/bin/xp').bundle, '/opt/xpath/xp');
+    expect(on('/sdk/bin/dart').bundle, isNull);
+    expect(on('/opt/xp').bundle, isNull);
+    expect(on('').bundle, isNull);
+  });
+
   test('stops a job that is cancelled, with its process group', () async {
     final marker = File(p.join(directory.path, 'marker'));
     final runner = await buildRunner(setup());
@@ -248,7 +306,7 @@ void main() {
     session.send(
       WelcomeFrame(
         runnerId: 'rnr_1',
-        engineVersion: '9.9.9',
+        engineVersion: packageVersion,
         apiVersion: apiVersion,
       ),
     );
@@ -299,7 +357,7 @@ void main() {
       session.send(
         WelcomeFrame(
           runnerId: 'rnr_1',
-          engineVersion: '9.9.9',
+          engineVersion: packageVersion,
           apiVersion: apiVersion,
         ),
       );

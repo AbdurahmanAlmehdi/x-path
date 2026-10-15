@@ -27,6 +27,8 @@ export 'src/cli/xpd_context.dart';
 export 'src/credentials/credential_checks.dart';
 export 'src/run_xpd.dart';
 export 'src/server/xpd_server.dart';
+export 'src/service/service_commands.dart';
+export 'src/service/xpd_service.dart';
 export 'src/storage/data_directory.dart';
 export 'src/storage/engine_database.dart';
 export 'src/stores/apple_stores.dart';

@@ -289,6 +289,91 @@ void main() {
     });
   });
 
+  group('GET /runners/bundle', () {
+    final bundle = List<int>.generate(2000, (i) => i % 251);
+
+    Future<RawBytes> fetch(String query, {String? token}) => client.engine
+        .download('/runners/bundle$query', token: token ?? client.credential);
+
+    test('streams the bundle with its digest and size', () async {
+      client.engine.runnerBundles.files['linux-arm64'] = bundle;
+
+      final response = await fetch('?os=linux&arch=arm64');
+
+      expect(response.statusCode, 200);
+      expect(response.bytes, bundle);
+      expect(response.headers.contentLength, bundle.length);
+      expect(
+        response.headers.value('x-content-sha256'),
+        sha256.convert(bundle).toString(),
+      );
+      expect(response.headers.contentType?.mimeType, 'application/gzip');
+      expect(
+        response.headers.value('content-disposition'),
+        'attachment; filename="xp-linux-arm64.tar.gz"',
+      );
+    });
+
+    test('is open to a runner token, and to the others', () async {
+      client.engine.runnerBundles.files['macos-arm64'] = bundle;
+
+      for (final token in [
+        client.credential,
+        client.secrets[DeviceTokenKind.runner]!,
+        client.secrets[DeviceTokenKind.cli]!,
+        client.secrets[DeviceTokenKind.app]!,
+      ]) {
+        final response = await fetch('?os=macos&arch=arm64', token: token);
+
+        expect(response.statusCode, 200);
+      }
+    });
+
+    test('answers 404 with where the bundle goes when there is none', () async {
+      final response = await client.send(
+        'GET',
+        '/runners/bundle?os=linux&arch=x86_64',
+        token: client.credential,
+      );
+
+      expect(response.statusCode, 404);
+      expect(errorCode(response), 'not_found');
+      expect(
+        (response.json['error']! as Map<String, dynamic>)['message'],
+        contains('linux-x86_64'),
+      );
+    });
+
+    test('answers 400 for a missing or odd os or arch', () async {
+      for (final query in [
+        '',
+        '?os=linux',
+        '?arch=arm64',
+        '?os=..%2Fetc&arch=arm64',
+        '?os=linux&arch=ARM',
+      ]) {
+        final response = await client.send(
+          'GET',
+          '/runners/bundle$query',
+          token: client.credential,
+        );
+
+        expect(response.statusCode, 400, reason: query);
+        expect(errorCode(response), 'invalid_request', reason: query);
+      }
+    });
+
+    test('answers 401 without a token', () async {
+      final response = await client.send(
+        'GET',
+        '/runners/bundle?os=linux&arch=arm64',
+        token: '',
+      );
+
+      expect(response.statusCode, 401);
+    });
+  });
+
   group('PUT /runners/jobs/{id}/artifacts/{name}', () {
     final bytes = utf8.encode('the apk');
 

@@ -17,6 +17,18 @@ void main() {
     expect(paths.state, '/data/runner/state');
   });
 
+  test('lays out the versions of xp and the link to the current one', () {
+    const paths = RunnerPaths('/data/runner');
+
+    expect(paths.versions, '/data/runner/versions');
+    expect(paths.versionDirectory('1.2.3'), '/data/runner/versions/1.2.3');
+    expect(paths.currentLink, '/data/runner/current');
+    expect(paths.currentExecutable, '/data/runner/current/bin/xp');
+    expect(paths.updates, '/data/runner/updates');
+    expect(paths.updateState, '/data/runner/update.json');
+    expect(paths.serviceLogs, '/data/runner/service-logs');
+  });
+
   group('the default data directory', () {
     test('is named by XP_RUNNER_DATA_DIR', () {
       final paths = RunnerPaths.fromEnvironment({
