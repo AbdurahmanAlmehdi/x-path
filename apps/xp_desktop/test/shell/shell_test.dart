@@ -1,0 +1,232 @@
+import 'package:bloc_test/bloc_test.dart';
+import 'package:flutter/gestures.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:mocktail/mocktail.dart';
+import 'package:xp_api/xp_api.dart';
+import 'package:xp_desktop/add_project/view/add_project_page.dart';
+import 'package:xp_desktop/app/app.dart';
+import 'package:xp_desktop/credentials/view/credentials_page.dart';
+import 'package:xp_desktop/engines/view/engines_page.dart';
+import 'package:xp_desktop/onboarding/view/onboarding_page.dart';
+import 'package:xp_desktop/projects/bloc/projects_bloc.dart';
+import 'package:xp_desktop/projects/view/project_page.dart';
+import 'package:xp_desktop/shell/shell.dart';
+import 'package:xp_repositories/xp_repositories.dart';
+
+import '../helpers/fakes.dart';
+import '../helpers/pump_app.dart';
+
+void main() {
+  setUpAll(() {
+    registerFallbackValue(const EngineCheckRequested());
+  });
+
+  late MockProjectsRepository repository;
+
+  setUp(() {
+    repository = MockProjectsRepository();
+    when(() => repository.watchCredentials(any()))
+        .thenAnswer((_) => const Stream.empty());
+  });
+
+  Future<void> pumpShell(
+    WidgetTester tester, {
+    ShellCubit? shell,
+    ProjectsState projects = const ProjectsState(
+      loaded: true,
+      projects: [mataa, captain],
+    ),
+    EngineConnectionBloc? connection,
+  }) => tester.pumpApp(
+    const AppShell(),
+    shell: shell,
+    projects: projectsIn(projects),
+    connection: connection,
+    projectsRepository: repository,
+  );
+
+  group('AppShell', () {
+    testWidgets('shows the first project at home', (tester) async {
+      await pumpShell(tester);
+      expect(find.byType(ProjectPage), findsOneWidget);
+      expect(find.text('acme/mataa_new_app'), findsOneWidget);
+    });
+
+    testWidgets('shows nothing before the projects load', (tester) async {
+      await pumpShell(tester, projects: const ProjectsState());
+      expect(find.byType(ProjectPage), findsNothing);
+      expect(find.byType(NoProjectsPage), findsNothing);
+    });
+
+    testWidgets('shows the empty state without projects', (tester) async {
+      final shell = ShellCubit();
+      await pumpShell(
+        tester,
+        shell: shell,
+        projects: const ProjectsState(loaded: true),
+      );
+      expect(find.byType(NoProjectsPage), findsOneWidget);
+      expect(find.text('No projects yet'), findsNWidgets(2));
+      await tester.tap(find.text('Add project…').last);
+      await tester.pump();
+      expect(shell.state, const AddProjectDestination());
+    });
+
+    for (final (destination, page) in [
+      (const ProjectDestination('prj_2'), ProjectPage),
+      (const AddProjectDestination(), AddProjectPage),
+      (const CredentialsDestination('prj_1'), CredentialsPage),
+      (const EnginesDestination(), EnginesPage),
+      (const OnboardingDestination(), OnboardingPage),
+    ]) {
+      testWidgets('shows $page for $destination', (tester) async {
+        await pumpShell(tester, shell: ShellCubit(destination));
+        expect(find.byType(page), findsOneWidget);
+      });
+    }
+  });
+
+  group('Sidebar', () {
+    testWidgets('lists the projects with what their scan found', (
+      tester,
+    ) async {
+      await pumpShell(tester);
+      expect(find.text('mataa_new_app'), findsOneWidget);
+      expect(find.text('1 app · 1 warning'), findsOneWidget);
+      expect(find.text('mataa_captain'), findsOneWidget);
+      expect(find.text('2 apps · 1 error'), findsOneWidget);
+    });
+
+    testWidgets('a project without findings shows its apps only', (
+      tester,
+    ) async {
+      await pumpShell(
+        tester,
+        projects: const ProjectsState(
+          loaded: true,
+          projects: [
+            Project(
+              id: 'prj_3',
+              githubRepoId: 3,
+              fullName: 'acme/guest',
+              remote: 'r',
+              defaultBaseBranch: 'main',
+            ),
+          ],
+        ),
+      );
+      expect(find.text('0 apps'), findsOneWidget);
+    });
+
+    testWidgets('says when the engine has no project', (tester) async {
+      await pumpShell(tester, projects: const ProjectsState(loaded: true));
+      expect(find.text('No projects yet'), findsWidgets);
+    });
+
+    testWidgets('navigates', (tester) async {
+      final shell = ShellCubit();
+      await pumpShell(tester, shell: shell);
+      await tester.tap(find.text('mataa_captain'));
+      await tester.pump();
+      expect(shell.state, const ProjectDestination('prj_2'));
+      await tester.tap(find.text('Credentials'));
+      await tester.pump();
+      expect(shell.state, const CredentialsDestination());
+      await tester.tap(find.text('Engines'));
+      await tester.pump();
+      expect(shell.state, const EnginesDestination());
+      await tester.tap(find.text('Add project…'));
+      await tester.pump();
+      expect(shell.state, const AddProjectDestination());
+    });
+
+    testWidgets('highlights a row under the mouse', (tester) async {
+      await pumpShell(tester);
+      final gesture = await tester.createGesture(kind: PointerDeviceKind.mouse);
+      await gesture.addPointer(location: Offset.zero);
+      addTearDown(gesture.removePointer);
+      await gesture.moveTo(tester.getCenter(find.text('Credentials')));
+      await tester.pump();
+      await gesture.moveTo(tester.getCenter(find.text('mataa_captain')));
+      await tester.pump();
+      await gesture.moveTo(Offset.zero);
+      await tester.pump();
+    });
+  });
+
+  group('EngineSwitcher', () {
+    testWidgets('switches engines and opens the engine list', (tester) async {
+      final connection = connectionIn(connectedTo());
+      final shell = ShellCubit();
+      await pumpShell(tester, connection: connection, shell: shell);
+      expect(find.text('This Mac'), findsOneWidget);
+      expect(find.text('connected'), findsOneWidget);
+
+      await tester.tap(find.text('This Mac'));
+      await tester.pumpAndSettle();
+      expect(find.text('mac-mini:7480'), findsOneWidget);
+      await tester.tap(find.text('mac-mini'));
+      await tester.pumpAndSettle();
+      verify(() => connection.add(EngineSelected(macMini.id))).called(1);
+
+      await tester.tap(find.text('This Mac'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Manage engines…'));
+      await tester.pumpAndSettle();
+      expect(shell.state, const EnginesDestination());
+    });
+  });
+
+  group('ConnectionBanner', () {
+    for (final (status, text) in [
+      (EngineStatus.reconnecting, 'This Mac stopped answering'),
+      (EngineStatus.unreachable, 'This Mac is unreachable'),
+      (EngineStatus.secretsLocked, 'The Keychain on This Mac is locked'),
+      (EngineStatus.rejected, 'This Mac refused the token'),
+    ]) {
+      testWidgets('says the engine is ${status.name}', (tester) async {
+        final connection = connectionIn(connectedTo(status: status));
+        final shell = ShellCubit();
+        await tester.pumpApp(
+          const ConnectionBanner(),
+          connection: connection,
+          shell: shell,
+        );
+        expect(find.textContaining(text), findsOneWidget);
+        if (status == EngineStatus.rejected) {
+          expect(find.text('Retry'), findsNothing);
+        } else {
+          await tester.tap(find.text('Retry'));
+          verify(() => connection.add(const EngineCheckRequested())).called(1);
+        }
+        await tester.tap(find.text('Engines…'));
+        expect(shell.state, const EnginesDestination());
+      });
+    }
+
+    testWidgets('is hidden while connected or connecting', (tester) async {
+      for (final status in [EngineStatus.connected, EngineStatus.connecting]) {
+        await tester.pumpApp(
+          const ConnectionBanner(),
+          connection: connectionIn(connectedTo(status: status)),
+        );
+        expect(find.text('Retry'), findsNothing);
+      }
+    });
+
+    testWidgets('follows the status as it changes', (tester) async {
+      final connection = MockEngineConnectionBloc();
+      whenListen(
+        connection,
+        Stream.fromIterable([
+          connectedTo(status: EngineStatus.reconnecting),
+          connectedTo(),
+        ]),
+        initialState: connectedTo(),
+      );
+      await tester.pumpApp(const ConnectionBanner(), connection: connection);
+      await tester.pump();
+      expect(find.text('Retry'), findsNothing);
+    });
+  });
+}

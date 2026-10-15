@@ -7,6 +7,12 @@ tags:
   # Runs only on macOS (Keychain, SMAppService, ...).
   macos:
     test_on: mac-os
+  # Compares a widget with a golden image. The goldens are rendered on macOS
+  # with the bundled fonts; Linux rasterises fonts differently, so they run
+  # on macOS only (`melos run test:coverage` on a Mac). Update them with
+  # `flutter test --update-goldens --tags golden`.
+  golden:
+    test_on: mac-os
   # Needs external tools or services. Skipped unless --run-skipped is given.
   integration:
     skip: "Needs external tools. Run with: dart test --run-skipped -t integration"
