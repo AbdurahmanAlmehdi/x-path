@@ -38,7 +38,7 @@ void main() {
           ],
         ),
       );
-      expect(find.text('⌘N'), findsNWidgets(4));
+      expect(find.text('⌘N'), findsNWidgets(XpButtonKind.values.length));
 
       final gesture = await tester.createGesture(kind: PointerDeviceKind.mouse);
       await gesture.addPointer(location: Offset.zero);

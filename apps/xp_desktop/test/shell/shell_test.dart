@@ -7,9 +7,11 @@ import 'package:xp_desktop/add_project/view/add_project_page.dart';
 import 'package:xp_desktop/app/app.dart';
 import 'package:xp_desktop/credentials/view/credentials_page.dart';
 import 'package:xp_desktop/engines/view/engines_page.dart';
+import 'package:xp_desktop/job/view/job_page.dart';
 import 'package:xp_desktop/onboarding/view/onboarding_page.dart';
+import 'package:xp_desktop/project_overview/view/project_overview_page.dart';
 import 'package:xp_desktop/projects/bloc/projects_bloc.dart';
-import 'package:xp_desktop/projects/view/project_page.dart';
+import 'package:xp_desktop/projects/view/no_projects_page.dart';
 import 'package:xp_desktop/shell/shell.dart';
 import 'package:xp_repositories/xp_repositories.dart';
 
@@ -48,13 +50,13 @@ void main() {
   group('AppShell', () {
     testWidgets('shows the first project at home', (tester) async {
       await pumpShell(tester);
-      expect(find.byType(ProjectPage), findsOneWidget);
-      expect(find.text('acme/mataa_new_app'), findsOneWidget);
+      expect(find.byType(ProjectOverviewPage), findsOneWidget);
+      expect(find.text('main · 1 app'), findsOneWidget);
     });
 
     testWidgets('shows nothing before the projects load', (tester) async {
       await pumpShell(tester, projects: const ProjectsState());
-      expect(find.byType(ProjectPage), findsNothing);
+      expect(find.byType(ProjectOverviewPage), findsNothing);
       expect(find.byType(NoProjectsPage), findsNothing);
     });
 
@@ -73,7 +75,8 @@ void main() {
     });
 
     for (final (destination, page) in [
-      (const ProjectDestination('prj_2'), ProjectPage),
+      (const ProjectDestination('prj_2'), ProjectOverviewPage),
+      (const JobDestination('run_1'), JobPage),
       (const AddProjectDestination(), AddProjectPage),
       (const CredentialsDestination('prj_1'), CredentialsPage),
       (const EnginesDestination(), EnginesPage),
@@ -91,7 +94,13 @@ void main() {
       tester,
     ) async {
       await pumpShell(tester);
-      expect(find.text('mataa_new_app'), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byType(Sidebar),
+          matching: find.text('mataa_new_app'),
+        ),
+        findsOneWidget,
+      );
       expect(find.text('1 app · 1 warning'), findsOneWidget);
       expect(find.text('mataa_captain'), findsOneWidget);
       expect(find.text('2 apps · 1 error'), findsOneWidget);

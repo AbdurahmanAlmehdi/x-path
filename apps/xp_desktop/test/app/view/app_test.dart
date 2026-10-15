@@ -75,7 +75,8 @@ void main() {
       await pumpApp(tester);
       await tester.pumpAndSettle();
       expect(find.byType(AppShell), findsOneWidget);
-      expect(find.text('mataa_new_app'), findsOneWidget);
+      // In the sidebar and as the overview's title.
+      expect(find.text('mataa_new_app'), findsNWidgets(2));
       expect(find.text('This Mac'), findsOneWidget);
     });
 
@@ -111,7 +112,7 @@ void main() {
         expect(next.read<ShellCubit>().state, const HomeDestination());
         expect(next.read<ProjectsRepository>(), isA<ProjectsRepository>());
         expect(harnesses[macMini.id]!.events.hasListener, isTrue);
-        expect(find.text('mataa_captain'), findsOneWidget);
+        expect(find.text('mataa_captain'), findsNWidgets(2));
         expect(find.text('mataa_new_app'), findsNothing);
         expect(find.text('mac-mini'), findsOneWidget);
       },
@@ -125,7 +126,7 @@ void main() {
 
       await tester.tap(find.text('Show mac-mini'));
       await tester.pumpAndSettle();
-      expect(find.text('mataa_captain'), findsOneWidget);
+      expect(find.text('mataa_captain'), findsNWidgets(2));
     });
 
     testWidgets('removes an engine whose token is missing', (tester) async {

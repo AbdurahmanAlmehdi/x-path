@@ -597,4 +597,590 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get credentialFormCancel => 'Cancel';
+
+  @override
+  String get statusQueued => 'Queued';
+
+  @override
+  String get statusRunning => 'Running';
+
+  @override
+  String get statusSucceeded => 'Succeeded';
+
+  @override
+  String get statusFailed => 'Failed';
+
+  @override
+  String get statusCancelled => 'Cancelled';
+
+  @override
+  String get statusSkipped => 'Skipped · already done';
+
+  @override
+  String get statusInterrupted => 'Interrupted';
+
+  @override
+  String get statusWaitingForResume => 'Waiting for a resume';
+
+  @override
+  String get statusWaitingForApproval => 'Waiting for approval';
+
+  @override
+  String get releaseDraft => 'Draft';
+
+  @override
+  String get releaseBuilding => 'Building';
+
+  @override
+  String get releaseUploaded => 'Uploaded';
+
+  @override
+  String get releaseInReview => 'In review';
+
+  @override
+  String get releaseRejected => 'Rejected';
+
+  @override
+  String get releaseApproved => 'Approved';
+
+  @override
+  String get releaseLive => 'Live';
+
+  @override
+  String get releaseMerged => 'Merged';
+
+  @override
+  String get releaseAbandoned => 'Abandoned';
+
+  @override
+  String get storeNotUploaded => 'Not uploaded';
+
+  @override
+  String get storeUploaded => 'Uploaded';
+
+  @override
+  String get storeInReview => 'In review';
+
+  @override
+  String get storeRejected => 'Rejected';
+
+  @override
+  String get storeNotApproved => 'Not approved';
+
+  @override
+  String get storePendingRelease => 'Pending developer release';
+
+  @override
+  String get storeApprovedUnpublished => 'Approved · not published';
+
+  @override
+  String get storeReadyForSale => 'Ready for sale';
+
+  @override
+  String get storePublished => 'Published';
+
+  @override
+  String get storeAppStore => 'App Store';
+
+  @override
+  String get storeGooglePlay => 'Google Play';
+
+  @override
+  String get platformIos => 'iOS';
+
+  @override
+  String get platformAndroid => 'Android';
+
+  @override
+  String get stepGitCheckout => 'Check out';
+
+  @override
+  String get stepGuard => 'Checks';
+
+  @override
+  String get stepVersionBump => 'Bump version';
+
+  @override
+  String get stepBuildAndroid => 'Build Android';
+
+  @override
+  String get stepBuildIos => 'Build iOS';
+
+  @override
+  String get stepVerifyConfig => 'Verify compiled config';
+
+  @override
+  String get stepStripIpa => 'Strip and re-export IPA';
+
+  @override
+  String get stepShorebirdRelease => 'Shorebird release';
+
+  @override
+  String get stepShorebirdPatch => 'Shorebird patch';
+
+  @override
+  String get stepSymbols => 'Archive symbols';
+
+  @override
+  String get stepTest => 'Tests';
+
+  @override
+  String get stepAnalyze => 'Analyze';
+
+  @override
+  String get stepUploadAppStore => 'Upload to App Store';
+
+  @override
+  String get stepUploadPlay => 'Upload to Google Play';
+
+  @override
+  String get stepUploadFirebase => 'Upload to Firebase';
+
+  @override
+  String get stepGitTag => 'Tag';
+
+  @override
+  String get stepGitPush => 'Push';
+
+  @override
+  String get stepReleaseBranch => 'Cut the release branch';
+
+  @override
+  String get stepCreatePr => 'Open the release PR';
+
+  @override
+  String get stepMergePr => 'Merge the release PR';
+
+  @override
+  String get stepManifest => 'Record the manifest';
+
+  @override
+  String get stepGate => 'Approval';
+
+  @override
+  String get stepCommand => 'Command';
+
+  @override
+  String get gateProdRelease => 'production release';
+
+  @override
+  String get gateProdPatch => 'production patch';
+
+  @override
+  String get gateStoreSubmission => 'store submission';
+
+  @override
+  String get gatePush => 'push';
+
+  @override
+  String get gateMerge => 'merge';
+
+  @override
+  String get gateDelete => 'delete';
+
+  @override
+  String get jobTitle => 'Job';
+
+  @override
+  String get jobEngine => 'Engine';
+
+  @override
+  String jobStage(int number) {
+    return 'Stage $number';
+  }
+
+  @override
+  String jobStep(int number) {
+    return 'Step $number';
+  }
+
+  @override
+  String get jobNeedsYou => 'needs you';
+
+  @override
+  String jobRunningCount(int count) {
+    return '$count running';
+  }
+
+  @override
+  String get jobRerunAll => 'Re-run all';
+
+  @override
+  String jobResumeFrom(String step) {
+    return 'Resume from $step';
+  }
+
+  @override
+  String get jobCancel => 'Cancel';
+
+  @override
+  String jobFailedAt(String step) {
+    return 'Failed at $step';
+  }
+
+  @override
+  String jobElapsed(String duration, String time) {
+    return 'elapsed $duration · started $time';
+  }
+
+  @override
+  String jobRan(String duration, String time) {
+    return 'ran $duration · started $time';
+  }
+
+  @override
+  String jobArtifacts(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count artifacts',
+      one: '1 artifact',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get jobArtifactsLabel => 'Artifacts';
+
+  @override
+  String jobStepsOf(String job, String runner) {
+    return '$job · $runner · steps';
+  }
+
+  @override
+  String get jobResumePlan => 'Resume plan';
+
+  @override
+  String jobResumeKept(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'First $count steps',
+      one: 'First step',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get jobAlreadyDone => 'already done';
+
+  @override
+  String jobResumeRuns(String step) {
+    return '$step and after';
+  }
+
+  @override
+  String get jobInterruptedBody =>
+      'The engine stopped while this job ran. Finished steps are kept; resume runs the interrupted step again from its start.';
+
+  @override
+  String jobWaitingForResumeBody(String step) {
+    return 'The engine stopped during $step, which changes something outside the engine, so it never runs again by itself. Check, then resume.';
+  }
+
+  @override
+  String get jobNothingChanged => 'Nothing outside the engine was changed.';
+
+  @override
+  String cancelRunTitle(String run) {
+    return 'Cancel $run?';
+  }
+
+  @override
+  String cancelRunStops(String job, String runner, String duration) {
+    return '$job stops now on $runner ($duration in). Its partial output is discarded.';
+  }
+
+  @override
+  String cancelRunKept(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          'The $count finished jobs keep their artifacts; Resume can reuse them.',
+      one: 'The finished job keeps its artifacts; Resume can reuse them.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String cancelRunNeverStarts(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count jobs that have not started will not run.',
+      one: '1 job that has not started will not run.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get cancelRunKeep => 'Keep running';
+
+  @override
+  String get cancelRunConfirm => 'Cancel run';
+
+  @override
+  String get logEmpty => 'No output yet';
+
+  @override
+  String get logFilter => 'Filter log';
+
+  @override
+  String get logJumpToError => 'Jump to error';
+
+  @override
+  String get logWrap => 'Wrap lines';
+
+  @override
+  String get logTimestamps => 'Timestamps';
+
+  @override
+  String get logFollow => 'Follow';
+
+  @override
+  String logLines(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count lines',
+      one: '1 line',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get dispatchTitle => 'Dispatch';
+
+  @override
+  String get dispatchWorkflow => 'Workflow';
+
+  @override
+  String get dispatchNoWorkflows => 'The project has no workflow.';
+
+  @override
+  String get dispatchBuiltin => 'built-in';
+
+  @override
+  String get dispatchGated => 'gated';
+
+  @override
+  String get dispatchApp => 'App';
+
+  @override
+  String get dispatchFlavors => 'Flavors';
+
+  @override
+  String get dispatchPlatforms => 'Platforms';
+
+  @override
+  String get dispatchRef => 'Ref';
+
+  @override
+  String get dispatchBranch => 'Branch';
+
+  @override
+  String get dispatchTag => 'Tag';
+
+  @override
+  String get dispatchVersion => 'Version';
+
+  @override
+  String get bumpKeep => 'Keep';
+
+  @override
+  String get bumpPatch => 'Patch';
+
+  @override
+  String get bumpMinor => 'Minor';
+
+  @override
+  String get bumpMajor => 'Major';
+
+  @override
+  String dispatchFromPubspec(String version) {
+    return 'from $version in the pubspec at the last scan';
+  }
+
+  @override
+  String dispatchWillRun(int jobs, int stages) {
+    String _temp0 = intl.Intl.pluralLogic(
+      jobs,
+      locale: localeName,
+      other: '$jobs jobs',
+      one: '1 job',
+    );
+    String _temp1 = intl.Intl.pluralLogic(
+      stages,
+      locale: localeName,
+      other: '$stages stages',
+      one: '1 stage',
+    );
+    return 'Will run · $_temp0 in $_temp1';
+  }
+
+  @override
+  String get dispatchNothing =>
+      'Nothing would run for these flavors and platforms.';
+
+  @override
+  String dispatchOnEngine(int count, String engine) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count jobs',
+      one: '1 job',
+    );
+    return '$_temp0 on $engine';
+  }
+
+  @override
+  String dispatchOnRunner(String engine, String runner, int slot, int slots) {
+    return '$engine first, else $runner · slot $slot of $slots';
+  }
+
+  @override
+  String dispatchGateTitle(String stage) {
+    return '$stage approval';
+  }
+
+  @override
+  String dispatchGates(String gates) {
+    return 'waits for your approval: $gates';
+  }
+
+  @override
+  String get dispatchReturnHint => 'Return does not dispatch';
+
+  @override
+  String get dispatchCancel => 'Cancel';
+
+  @override
+  String dispatchButton(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Dispatch $count jobs',
+      one: 'Dispatch 1 job',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get overviewAll => 'All';
+
+  @override
+  String get overviewQuiet => 'Nothing running · nothing needs you';
+
+  @override
+  String overviewNeedsYou(int count) {
+    return '$count needs you';
+  }
+
+  @override
+  String get overviewDispatch => 'Dispatch…';
+
+  @override
+  String get overviewOpenJob => 'Open job';
+
+  @override
+  String overviewStarted(String time) {
+    return 'started $time';
+  }
+
+  @override
+  String overviewInStores(String version) {
+    return 'In the stores · $version';
+  }
+
+  @override
+  String get overviewNoRelease => 'No release yet';
+
+  @override
+  String get overviewLiveBoth => 'Live on both stores';
+
+  @override
+  String overviewLiveIn(String store) {
+    return 'Live on $store';
+  }
+
+  @override
+  String get overviewNothingInFlight => 'No release in flight';
+
+  @override
+  String get overviewScan => 'Scan';
+
+  @override
+  String get overviewScanTitle => 'Scan';
+
+  @override
+  String get overviewClose => 'Close';
+
+  @override
+  String get ledgerFlavor => 'Flavor';
+
+  @override
+  String ledgerLocal(String branch) {
+    return 'Local · $branch';
+  }
+
+  @override
+  String get ledgerTesting => 'Testing';
+
+  @override
+  String ledgerLive(String store) {
+    return 'Live · $store';
+  }
+
+  @override
+  String get ledgerCredentials => 'Credentials';
+
+  @override
+  String get ledgerPubspec => 'pubspec';
+
+  @override
+  String get ledgerNoVersion => 'No version';
+
+  @override
+  String get ledgerNoRelease => '—';
+
+  @override
+  String get ledgerNoReleaseHint => 'no release yet';
+
+  @override
+  String get ledgerUpToDate => 'Up to date';
+
+  @override
+  String get ledgerNothingNewer => 'Nothing newer than live';
+
+  @override
+  String get ledgerNotUploaded => 'Not uploaded';
+
+  @override
+  String ledgerWaitsFor(String version) {
+    return '$version building';
+  }
+
+  @override
+  String get ledgerNotOnStore => 'Not on store';
+
+  @override
+  String get ledgerNoLiveRelease => 'no live release';
+
+  @override
+  String get ledgerNotProd => 'not a production flavor';
+
+  @override
+  String get ledgerCredentialsNone => 'None';
+
+  @override
+  String get ledgerNoFlavors => 'No flavor to show.';
+
+  @override
+  String get consoleTitle => 'Console';
+
+  @override
+  String consoleLast(String job) {
+    return '· last: $job';
+  }
 }
