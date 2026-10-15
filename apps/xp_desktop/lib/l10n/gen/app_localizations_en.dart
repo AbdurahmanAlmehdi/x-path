@@ -1789,4 +1789,462 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get prOpenMergeJob => 'Open merge job';
+
+  @override
+  String get sidebarTests => 'Tests';
+
+  @override
+  String get sidebarRunners => 'Runners';
+
+  @override
+  String sidebarRunnersBusy(int count) {
+    return '$count busy';
+  }
+
+  @override
+  String get sidebarStorage => 'Storage';
+
+  @override
+  String sidebarStorageFreeable(String size) {
+    return '$size free-able';
+  }
+
+  @override
+  String get jobTestResults => 'Test results';
+
+  @override
+  String get timeJustNow => 'just now';
+
+  @override
+  String timeAgo(String duration) {
+    return '$duration ago';
+  }
+
+  @override
+  String timeYesterday(String time) {
+    return 'Yesterday $time';
+  }
+
+  @override
+  String get testsTitle => 'Tests';
+
+  @override
+  String get testsRunThisSession => 'just ended';
+
+  @override
+  String get testsBaselineTag => 'baseline';
+
+  @override
+  String get testsEmptyTitle => 'No test runs yet';
+
+  @override
+  String get testsEmptyBody =>
+      'Run the Tests workflow. Its runs on the base branch become the baseline that later runs are compared with; a run\'s results also open from its job.';
+
+  @override
+  String testsIsBaseline(String branch) {
+    return 'This run is the baseline of $branch';
+  }
+
+  @override
+  String get testsNoBaseline =>
+      'No baseline yet, so every failure counts as new';
+
+  @override
+  String testsComparedToJob(String job) {
+    return 'Compared with the baseline run of $job';
+  }
+
+  @override
+  String testsComparedTo(String branch, String when) {
+    return 'Compared with the baseline of $branch from $when';
+  }
+
+  @override
+  String get testsNoNewFailures => 'No new failures';
+
+  @override
+  String testsNewFailures(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count new failures',
+      one: '1 new failure',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get testsStatNew => 'new failures';
+
+  @override
+  String get testsStatInBaseline => 'in baseline';
+
+  @override
+  String get testsStatFixed => 'fixed';
+
+  @override
+  String get testsStatPassed => 'passed';
+
+  @override
+  String get testsStatFailed => 'failed';
+
+  @override
+  String get testsStatErrored => 'errored';
+
+  @override
+  String get testsStatSkipped => 'skipped';
+
+  @override
+  String get testsStatMissing => 'missing';
+
+  @override
+  String get testsFailed => 'Failed';
+
+  @override
+  String get testsErrored => 'Errored';
+
+  @override
+  String get testsFixed => 'Fixed';
+
+  @override
+  String get testsMissing => 'Not reported';
+
+  @override
+  String get testsNewFailuresTitle => 'New failures';
+
+  @override
+  String get testsStillFailingTitle => 'Failing in the baseline too';
+
+  @override
+  String get testsFixedTitle => 'Fixed since the baseline';
+
+  @override
+  String get testsMissingTitle => 'In the baseline, not in this run';
+
+  @override
+  String testsTruncated(String shown, String total) {
+    return 'Showing $shown of $total failing tests.';
+  }
+
+  @override
+  String get testsAllPassed =>
+      'Every test passed and nothing changed against the baseline.';
+
+  @override
+  String get testsBaselinesTitle => 'Baselines';
+
+  @override
+  String get testsColumnApp => 'App';
+
+  @override
+  String get testsColumnBranch => 'Branch';
+
+  @override
+  String get testsColumnWhen => 'When';
+
+  @override
+  String get testsShowRun => 'Show';
+
+  @override
+  String get runnersTitle => 'Runners';
+
+  @override
+  String runnersSubtitle(int count, int busy) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count runners',
+      one: '1 runner',
+    );
+    return '$_temp0 · $busy busy';
+  }
+
+  @override
+  String get runnersPair => 'Pair runner…';
+
+  @override
+  String get runnersEmptyTitle => 'No runners yet';
+
+  @override
+  String get runnersEmptyBody =>
+      'Pair a Mac or a Linux machine and the engine sends it the jobs that fit its capabilities.';
+
+  @override
+  String get runnersColumnRunner => 'Runner';
+
+  @override
+  String get runnersColumnStatus => 'Status';
+
+  @override
+  String get runnersColumnCapabilities => 'Capabilities';
+
+  @override
+  String get runnersColumnSlots => 'Slots';
+
+  @override
+  String get runnersColumnJobs => 'Jobs';
+
+  @override
+  String get runnersColumnLastHeard => 'Last heard';
+
+  @override
+  String get runnersRevokedTitle => 'Revoked';
+
+  @override
+  String get runnerIdle => 'Online · idle';
+
+  @override
+  String runnerBusy(int used, int slots) {
+    return 'Online · busy $used/$slots';
+  }
+
+  @override
+  String get runnerDraining => 'Draining';
+
+  @override
+  String get runnerLost => 'Lost mid-job';
+
+  @override
+  String get runnerOffline => 'Offline';
+
+  @override
+  String get runnerRevoked => 'Revoked';
+
+  @override
+  String runnerRevokedAt(String when) {
+    return 'Revoked $when';
+  }
+
+  @override
+  String runnerCores(int count) {
+    return '$count cores';
+  }
+
+  @override
+  String get runnerNotProbed => 'Not probed yet';
+
+  @override
+  String get runnerNeverHeard => 'Never';
+
+  @override
+  String get runnerRevoke => 'Revoke…';
+
+  @override
+  String revokeRunnerTitle(String name) {
+    return 'Revoke $name?';
+  }
+
+  @override
+  String get revokeRunnerCredential =>
+      'Its credential stops working and its connection closes.';
+
+  @override
+  String revokeRunnerJobs(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          'The $count jobs it holds are queued again, or wait for a resume if they had a step with side effects.',
+      one: 'The job it holds is queued again, or waits for a resume if it had a step with side effects.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String revokeRunnerName(String name) {
+    return 'The name $name stays taken: pair the machine again under a new name.';
+  }
+
+  @override
+  String get revokeRunnerKeep => 'Keep';
+
+  @override
+  String get revokeRunnerConfirm => 'Revoke';
+
+  @override
+  String get pairRunnerTitle => 'Pair a runner';
+
+  @override
+  String get pairRunnerBody =>
+      'XPath makes a pairing token for the name. It works once, for 15 minutes, and is shown only now.';
+
+  @override
+  String get pairRunnerName => 'Name';
+
+  @override
+  String get pairRunnerCreate => 'Create pairing token';
+
+  @override
+  String get pairRunnerCancel => 'Cancel';
+
+  @override
+  String get pairRunnerDone => 'Done';
+
+  @override
+  String pairRunnerToken(String name) {
+    return 'Pairing token for $name';
+  }
+
+  @override
+  String get pairRunnerCopyToken => 'Copy token';
+
+  @override
+  String get pairRunnerCommand => 'On the runner, run';
+
+  @override
+  String get pairRunnerCopyCommand => 'Copy command';
+
+  @override
+  String pairRunnerExpires(String left, String at) {
+    return 'Works once; expires in $left ($at).';
+  }
+
+  @override
+  String get pairRunnerExpired => 'Expired. Close this and create another.';
+
+  @override
+  String get storageTitle => 'Storage';
+
+  @override
+  String storageChecked(String when) {
+    return 'Measured $when';
+  }
+
+  @override
+  String get storageRefresh => 'Measure again';
+
+  @override
+  String get storageFreeUp => 'Free up space…';
+
+  @override
+  String storageHero(String reclaimable, String used) {
+    return '$reclaimable of $used reclaimable';
+  }
+
+  @override
+  String get storageHeroBody =>
+      'Pinned artifacts, releases not over yet and the newest builds of each flavor are always kept.';
+
+  @override
+  String storageFreed(String size) {
+    return 'Freed $size';
+  }
+
+  @override
+  String storageFreedPart(String category, int count) {
+    return '$category $count';
+  }
+
+  @override
+  String get storageCategoriesTitle => 'What the engine keeps';
+
+  @override
+  String get storageFlavorsTitle => 'Artifacts by app and flavor';
+
+  @override
+  String get storageColumnCategory => 'Category';
+
+  @override
+  String get storageColumnItems => 'Items';
+
+  @override
+  String get storageColumnUsed => 'Used';
+
+  @override
+  String get storageColumnReclaimable => 'Reclaimable';
+
+  @override
+  String get storageColumnProject => 'Project';
+
+  @override
+  String get storageColumnApp => 'App';
+
+  @override
+  String get storageColumnFlavor => 'Flavor';
+
+  @override
+  String get storageColumnBuilds => 'Builds';
+
+  @override
+  String storageBuilds(int builds, int artifacts) {
+    String _temp0 = intl.Intl.pluralLogic(
+      builds,
+      locale: localeName,
+      other: '$builds builds',
+      one: '1 build',
+    );
+    return '$_temp0 · $artifacts files';
+  }
+
+  @override
+  String get storageArtifacts => 'Artifacts';
+
+  @override
+  String get storageLogs => 'Logs';
+
+  @override
+  String get storageWorktrees => 'Worktrees';
+
+  @override
+  String get storageMirrors => 'Mirrors';
+
+  @override
+  String get storageFlutter => 'Flutter SDKs';
+
+  @override
+  String storageArtifactsRule(int keep) {
+    return 'Builds past the newest $keep of each flavor';
+  }
+
+  @override
+  String storageLogsRule(int days) {
+    return 'Logs of jobs older than $days days';
+  }
+
+  @override
+  String get storageWorktreesRule => 'Worktrees of finished jobs';
+
+  @override
+  String get storageMirrorsRule =>
+      'Mirrors of repositories that are no longer projects';
+
+  @override
+  String get storageFlutterRule =>
+      'SDKs in XPath\'s cache that no project pins';
+
+  @override
+  String get storageRetentionTitle => 'Retention';
+
+  @override
+  String get storageRetentionBody =>
+      'Logs past their days go every night; artifacts only with Free up space.';
+
+  @override
+  String get storageKeepPerFlavor => 'Builds kept per flavor';
+
+  @override
+  String get storageLogDays => 'Days of logs';
+
+  @override
+  String get storageSaveRetention => 'Save';
+
+  @override
+  String get storageRetentionInvalid =>
+      'Both need a whole number of at least 1.';
+
+  @override
+  String get freeSpaceTitle => 'Free up space';
+
+  @override
+  String get freeSpaceBody =>
+      'XPath deletes what retention gives back in the categories you pick. It cannot be undone.';
+
+  @override
+  String get freeSpaceKeep => 'Keep everything';
+
+  @override
+  String freeSpaceConfirm(String size) {
+    return 'Free $size';
+  }
 }

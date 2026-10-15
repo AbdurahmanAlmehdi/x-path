@@ -48,6 +48,28 @@ final class ReleasesDestination extends ShellDestination {
   List<Object?> get props => [projectId, releaseId];
 }
 
+/// The tests of [projectId], showing the run of [jobId] if given, else the
+/// latest.
+final class TestsDestination extends ShellDestination {
+  const new(this.projectId, {this.jobId});
+
+  final String projectId;
+  final String? jobId;
+
+  @override
+  List<Object?> get props => [projectId, jobId];
+}
+
+/// The runners of the engine.
+final class RunnersDestination extends ShellDestination {
+  const new();
+}
+
+/// What the engine keeps on its disk.
+final class StorageDestination extends ShellDestination {
+  const new();
+}
+
 /// The approvals inbox, showing [approvalId] first if given.
 final class ApprovalsDestination extends ShellDestination {
   const new({this.approvalId});
@@ -93,7 +115,8 @@ class ShellCubit extends Cubit<ShellDestination> {
   /// The project the destination shows, if it shows one.
   String? get projectId => switch (state) {
     ProjectDestination(:final projectId) ||
-    ReleasesDestination(:final projectId) => projectId,
+    ReleasesDestination(:final projectId) ||
+    TestsDestination(:final projectId) => projectId,
     JobDestination(:final projectId) => projectId,
     _ => null,
   };

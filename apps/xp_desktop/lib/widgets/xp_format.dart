@@ -1,6 +1,8 @@
 /// Formats from the Run Sheet's Formatting guide.
 library;
 
+import 'package:intl/intl.dart';
+
 /// A duration: `0.4s` under a second, `41s`, `6m 12s`, `1h 04m` (seconds
 /// dropped from an hour up).
 String formatDuration(Duration duration) {
@@ -94,4 +96,29 @@ const _months = [
 String formatDateTime(DateTime time) {
   final local = time.toLocal();
   return '${_months[local.month - 1]} ${local.day} ${formatTime(local)}';
+}
+
+/// A count with thousands separators: `1,284`.
+String formatCount(int count) => NumberFormat.decimalPattern().format(count);
+
+/// When something happened, relative to [now] for the last day (Formatting,
+/// Times): `just now`, `4m ago`, `2h ago`; then `Yesterday 14:02`, then
+/// `Oct 11 14:02`.
+String formatRelative(
+  DateTime time,
+  DateTime now, {
+  required String justNow,
+  required String Function(String duration) ago,
+  required String Function(String time) yesterday,
+}) {
+  final since = now.difference(time);
+  if (since < const Duration(minutes: 1)) return justNow;
+  if (since < const Duration(hours: 1)) return ago('${since.inMinutes}m');
+  if (since < const Duration(hours: 24)) return ago('${since.inHours}h');
+  final day = DateTime(now.year, now.month, now.day);
+  final local = time.toLocal();
+  if (!local.isBefore(day.subtract(const Duration(days: 1)))) {
+    return yesterday(formatTime(local));
+  }
+  return formatDateTime(local);
 }

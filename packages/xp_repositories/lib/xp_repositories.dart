@@ -15,6 +15,8 @@ export 'src/runners_repository.dart';
 export 'src/session/engine_session.dart';
 export 'src/session/engine_status.dart';
 export 'src/snapshot.dart';
+export 'src/storage_repository.dart';
+export 'src/tests_repository.dart';
 export 'src/workflows/dispatch_preview.dart';
 export 'src/workflows/workflow_expression.dart';
 export 'src/workflows/workflow_outline.dart';

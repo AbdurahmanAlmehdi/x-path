@@ -2937,6 +2937,744 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Open merge job'**
   String get prOpenMergeJob;
+
+  /// Sidebar row under the selected project.
+  ///
+  /// In en, this message translates to:
+  /// **'Tests'**
+  String get sidebarTests;
+
+  /// Sidebar row: the runners of the engine.
+  ///
+  /// In en, this message translates to:
+  /// **'Runners'**
+  String get sidebarRunners;
+
+  /// No description provided for @sidebarRunnersBusy.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} busy'**
+  String sidebarRunnersBusy(int count);
+
+  /// Sidebar row: what the engine keeps on disk.
+  ///
+  /// In en, this message translates to:
+  /// **'Storage'**
+  String get sidebarStorage;
+
+  /// No description provided for @sidebarStorageFreeable.
+  ///
+  /// In en, this message translates to:
+  /// **'{size} free-able'**
+  String sidebarStorageFreeable(String size);
+
+  /// Opens the tests view at the run of the job.
+  ///
+  /// In en, this message translates to:
+  /// **'Test results'**
+  String get jobTestResults;
+
+  /// A relative time under a minute.
+  ///
+  /// In en, this message translates to:
+  /// **'just now'**
+  String get timeJustNow;
+
+  /// No description provided for @timeAgo.
+  ///
+  /// In en, this message translates to:
+  /// **'{duration} ago'**
+  String timeAgo(String duration);
+
+  /// No description provided for @timeYesterday.
+  ///
+  /// In en, this message translates to:
+  /// **'Yesterday {time}'**
+  String timeYesterday(String time);
+
+  /// Title of the tests view.
+  ///
+  /// In en, this message translates to:
+  /// **'Tests'**
+  String get testsTitle;
+
+  /// A run in the run picker that ended while the app watched.
+  ///
+  /// In en, this message translates to:
+  /// **'just ended'**
+  String get testsRunThisSession;
+
+  /// Marks a baseline in the run picker.
+  ///
+  /// In en, this message translates to:
+  /// **'baseline'**
+  String get testsBaselineTag;
+
+  /// Tests view without runs.
+  ///
+  /// In en, this message translates to:
+  /// **'No test runs yet'**
+  String get testsEmptyTitle;
+
+  /// Tests view without runs.
+  ///
+  /// In en, this message translates to:
+  /// **'Run the Tests workflow. Its runs on the base branch become the baseline that later runs are compared with; a run\'s results also open from its job.'**
+  String get testsEmptyBody;
+
+  /// No description provided for @testsIsBaseline.
+  ///
+  /// In en, this message translates to:
+  /// **'This run is the baseline of {branch}'**
+  String testsIsBaseline(String branch);
+
+  /// A run compared with nothing.
+  ///
+  /// In en, this message translates to:
+  /// **'No baseline yet, so every failure counts as new'**
+  String get testsNoBaseline;
+
+  /// No description provided for @testsComparedToJob.
+  ///
+  /// In en, this message translates to:
+  /// **'Compared with the baseline run of {job}'**
+  String testsComparedToJob(String job);
+
+  /// No description provided for @testsComparedTo.
+  ///
+  /// In en, this message translates to:
+  /// **'Compared with the baseline of {branch} from {when}'**
+  String testsComparedTo(String branch, String when);
+
+  /// Hero of a run without new failures.
+  ///
+  /// In en, this message translates to:
+  /// **'No new failures'**
+  String get testsNoNewFailures;
+
+  /// No description provided for @testsNewFailures.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 new failure} other{{count} new failures}}'**
+  String testsNewFailures(int count);
+
+  /// Under a count.
+  ///
+  /// In en, this message translates to:
+  /// **'new failures'**
+  String get testsStatNew;
+
+  /// Under a count: tests failing as they did in the baseline.
+  ///
+  /// In en, this message translates to:
+  /// **'in baseline'**
+  String get testsStatInBaseline;
+
+  /// Under a count.
+  ///
+  /// In en, this message translates to:
+  /// **'fixed'**
+  String get testsStatFixed;
+
+  /// Under a count.
+  ///
+  /// In en, this message translates to:
+  /// **'passed'**
+  String get testsStatPassed;
+
+  /// Under a count.
+  ///
+  /// In en, this message translates to:
+  /// **'failed'**
+  String get testsStatFailed;
+
+  /// Under a count.
+  ///
+  /// In en, this message translates to:
+  /// **'errored'**
+  String get testsStatErrored;
+
+  /// Under a count.
+  ///
+  /// In en, this message translates to:
+  /// **'skipped'**
+  String get testsStatSkipped;
+
+  /// Under a count: baseline tests this run did not report.
+  ///
+  /// In en, this message translates to:
+  /// **'missing'**
+  String get testsStatMissing;
+
+  /// A test whose expectation failed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed'**
+  String get testsFailed;
+
+  /// A test that threw.
+  ///
+  /// In en, this message translates to:
+  /// **'Errored'**
+  String get testsErrored;
+
+  /// A test that failed in the baseline and passes now.
+  ///
+  /// In en, this message translates to:
+  /// **'Fixed'**
+  String get testsFixed;
+
+  /// A baseline test this run did not report.
+  ///
+  /// In en, this message translates to:
+  /// **'Not reported'**
+  String get testsMissing;
+
+  /// Section label.
+  ///
+  /// In en, this message translates to:
+  /// **'New failures'**
+  String get testsNewFailuresTitle;
+
+  /// Section label.
+  ///
+  /// In en, this message translates to:
+  /// **'Failing in the baseline too'**
+  String get testsStillFailingTitle;
+
+  /// Section label.
+  ///
+  /// In en, this message translates to:
+  /// **'Fixed since the baseline'**
+  String get testsFixedTitle;
+
+  /// Section label.
+  ///
+  /// In en, this message translates to:
+  /// **'In the baseline, not in this run'**
+  String get testsMissingTitle;
+
+  /// No description provided for @testsTruncated.
+  ///
+  /// In en, this message translates to:
+  /// **'Showing {shown} of {total} failing tests.'**
+  String testsTruncated(String shown, String total);
+
+  /// A run with nothing to list.
+  ///
+  /// In en, this message translates to:
+  /// **'Every test passed and nothing changed against the baseline.'**
+  String get testsAllPassed;
+
+  /// Section label: one baseline per app and branch.
+  ///
+  /// In en, this message translates to:
+  /// **'Baselines'**
+  String get testsBaselinesTitle;
+
+  /// Column label.
+  ///
+  /// In en, this message translates to:
+  /// **'App'**
+  String get testsColumnApp;
+
+  /// Column label.
+  ///
+  /// In en, this message translates to:
+  /// **'Branch'**
+  String get testsColumnBranch;
+
+  /// Column label.
+  ///
+  /// In en, this message translates to:
+  /// **'When'**
+  String get testsColumnWhen;
+
+  /// Shows the run of a baseline.
+  ///
+  /// In en, this message translates to:
+  /// **'Show'**
+  String get testsShowRun;
+
+  /// Title of the runners view.
+  ///
+  /// In en, this message translates to:
+  /// **'Runners'**
+  String get runnersTitle;
+
+  /// No description provided for @runnersSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 runner} other{{count} runners}} · {busy} busy'**
+  String runnersSubtitle(int count, int busy);
+
+  /// Opens the pairing sheet.
+  ///
+  /// In en, this message translates to:
+  /// **'Pair runner…'**
+  String get runnersPair;
+
+  /// Runners view without runners.
+  ///
+  /// In en, this message translates to:
+  /// **'No runners yet'**
+  String get runnersEmptyTitle;
+
+  /// Runners view without runners.
+  ///
+  /// In en, this message translates to:
+  /// **'Pair a Mac or a Linux machine and the engine sends it the jobs that fit its capabilities.'**
+  String get runnersEmptyBody;
+
+  /// Column label.
+  ///
+  /// In en, this message translates to:
+  /// **'Runner'**
+  String get runnersColumnRunner;
+
+  /// Column label.
+  ///
+  /// In en, this message translates to:
+  /// **'Status'**
+  String get runnersColumnStatus;
+
+  /// Column label.
+  ///
+  /// In en, this message translates to:
+  /// **'Capabilities'**
+  String get runnersColumnCapabilities;
+
+  /// Column label: jobs held of slots.
+  ///
+  /// In en, this message translates to:
+  /// **'Slots'**
+  String get runnersColumnSlots;
+
+  /// Column label: the jobs a runner holds a lease for.
+  ///
+  /// In en, this message translates to:
+  /// **'Jobs'**
+  String get runnersColumnJobs;
+
+  /// Column label: the last heartbeat.
+  ///
+  /// In en, this message translates to:
+  /// **'Last heard'**
+  String get runnersColumnLastHeard;
+
+  /// Section label.
+  ///
+  /// In en, this message translates to:
+  /// **'Revoked'**
+  String get runnersRevokedTitle;
+
+  /// Runner status.
+  ///
+  /// In en, this message translates to:
+  /// **'Online · idle'**
+  String get runnerIdle;
+
+  /// No description provided for @runnerBusy.
+  ///
+  /// In en, this message translates to:
+  /// **'Online · busy {used}/{slots}'**
+  String runnerBusy(int used, int slots);
+
+  /// Runner status: finishing its jobs and taking no more.
+  ///
+  /// In en, this message translates to:
+  /// **'Draining'**
+  String get runnerDraining;
+
+  /// Runner status: offline while it holds jobs.
+  ///
+  /// In en, this message translates to:
+  /// **'Lost mid-job'**
+  String get runnerLost;
+
+  /// Runner status.
+  ///
+  /// In en, this message translates to:
+  /// **'Offline'**
+  String get runnerOffline;
+
+  /// Runner status.
+  ///
+  /// In en, this message translates to:
+  /// **'Revoked'**
+  String get runnerRevoked;
+
+  /// No description provided for @runnerRevokedAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Revoked {when}'**
+  String runnerRevokedAt(String when);
+
+  /// No description provided for @runnerCores.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} cores'**
+  String runnerCores(int count);
+
+  /// A runner without capabilities.
+  ///
+  /// In en, this message translates to:
+  /// **'Not probed yet'**
+  String get runnerNotProbed;
+
+  /// A runner that never sent a heartbeat.
+  ///
+  /// In en, this message translates to:
+  /// **'Never'**
+  String get runnerNeverHeard;
+
+  /// Opens the revoke confirmation.
+  ///
+  /// In en, this message translates to:
+  /// **'Revoke…'**
+  String get runnerRevoke;
+
+  /// No description provided for @revokeRunnerTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Revoke {name}?'**
+  String revokeRunnerTitle(String name);
+
+  /// Revoke confirmation.
+  ///
+  /// In en, this message translates to:
+  /// **'Its credential stops working and its connection closes.'**
+  String get revokeRunnerCredential;
+
+  /// No description provided for @revokeRunnerJobs.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{The job it holds is queued again, or waits for a resume if it had a step with side effects.} other{The {count} jobs it holds are queued again, or wait for a resume if they had a step with side effects.}}'**
+  String revokeRunnerJobs(int count);
+
+  /// No description provided for @revokeRunnerName.
+  ///
+  /// In en, this message translates to:
+  /// **'The name {name} stays taken: pair the machine again under a new name.'**
+  String revokeRunnerName(String name);
+
+  /// Closes the revoke confirmation.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep'**
+  String get revokeRunnerKeep;
+
+  /// Revokes the runner.
+  ///
+  /// In en, this message translates to:
+  /// **'Revoke'**
+  String get revokeRunnerConfirm;
+
+  /// Title of the pairing sheet.
+  ///
+  /// In en, this message translates to:
+  /// **'Pair a runner'**
+  String get pairRunnerTitle;
+
+  /// Pairing sheet.
+  ///
+  /// In en, this message translates to:
+  /// **'XPath makes a pairing token for the name. It works once, for 15 minutes, and is shown only now.'**
+  String get pairRunnerBody;
+
+  /// Field label: the runner's name.
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get pairRunnerName;
+
+  /// Makes the pairing token.
+  ///
+  /// In en, this message translates to:
+  /// **'Create pairing token'**
+  String get pairRunnerCreate;
+
+  /// Closes the pairing sheet.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get pairRunnerCancel;
+
+  /// Closes the pairing sheet.
+  ///
+  /// In en, this message translates to:
+  /// **'Done'**
+  String get pairRunnerDone;
+
+  /// No description provided for @pairRunnerToken.
+  ///
+  /// In en, this message translates to:
+  /// **'Pairing token for {name}'**
+  String pairRunnerToken(String name);
+
+  /// Copies the pairing token.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy token'**
+  String get pairRunnerCopyToken;
+
+  /// Label over the pairing command.
+  ///
+  /// In en, this message translates to:
+  /// **'On the runner, run'**
+  String get pairRunnerCommand;
+
+  /// Copies the pairing command.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy command'**
+  String get pairRunnerCopyCommand;
+
+  /// No description provided for @pairRunnerExpires.
+  ///
+  /// In en, this message translates to:
+  /// **'Works once; expires in {left} ({at}).'**
+  String pairRunnerExpires(String left, String at);
+
+  /// A pairing token past its 15 minutes.
+  ///
+  /// In en, this message translates to:
+  /// **'Expired. Close this and create another.'**
+  String get pairRunnerExpired;
+
+  /// Title of the storage view.
+  ///
+  /// In en, this message translates to:
+  /// **'Storage'**
+  String get storageTitle;
+
+  /// No description provided for @storageChecked.
+  ///
+  /// In en, this message translates to:
+  /// **'Measured {when}'**
+  String storageChecked(String when);
+
+  /// Reads the storage report again.
+  ///
+  /// In en, this message translates to:
+  /// **'Measure again'**
+  String get storageRefresh;
+
+  /// Opens the free-up-space sheet.
+  ///
+  /// In en, this message translates to:
+  /// **'Free up space…'**
+  String get storageFreeUp;
+
+  /// No description provided for @storageHero.
+  ///
+  /// In en, this message translates to:
+  /// **'{reclaimable} of {used} reclaimable'**
+  String storageHero(String reclaimable, String used);
+
+  /// Under the storage hero.
+  ///
+  /// In en, this message translates to:
+  /// **'Pinned artifacts, releases not over yet and the newest builds of each flavor are always kept.'**
+  String get storageHeroBody;
+
+  /// No description provided for @storageFreed.
+  ///
+  /// In en, this message translates to:
+  /// **'Freed {size}'**
+  String storageFreed(String size);
+
+  /// No description provided for @storageFreedPart.
+  ///
+  /// In en, this message translates to:
+  /// **'{category} {count}'**
+  String storageFreedPart(String category, int count);
+
+  /// Panel title.
+  ///
+  /// In en, this message translates to:
+  /// **'What the engine keeps'**
+  String get storageCategoriesTitle;
+
+  /// Panel title.
+  ///
+  /// In en, this message translates to:
+  /// **'Artifacts by app and flavor'**
+  String get storageFlavorsTitle;
+
+  /// Column label.
+  ///
+  /// In en, this message translates to:
+  /// **'Category'**
+  String get storageColumnCategory;
+
+  /// Column label.
+  ///
+  /// In en, this message translates to:
+  /// **'Items'**
+  String get storageColumnItems;
+
+  /// Column label.
+  ///
+  /// In en, this message translates to:
+  /// **'Used'**
+  String get storageColumnUsed;
+
+  /// Column label.
+  ///
+  /// In en, this message translates to:
+  /// **'Reclaimable'**
+  String get storageColumnReclaimable;
+
+  /// Column label.
+  ///
+  /// In en, this message translates to:
+  /// **'Project'**
+  String get storageColumnProject;
+
+  /// Column label.
+  ///
+  /// In en, this message translates to:
+  /// **'App'**
+  String get storageColumnApp;
+
+  /// Column label.
+  ///
+  /// In en, this message translates to:
+  /// **'Flavor'**
+  String get storageColumnFlavor;
+
+  /// Column label.
+  ///
+  /// In en, this message translates to:
+  /// **'Builds'**
+  String get storageColumnBuilds;
+
+  /// No description provided for @storageBuilds.
+  ///
+  /// In en, this message translates to:
+  /// **'{builds, plural, =1{1 build} other{{builds} builds}} · {artifacts} files'**
+  String storageBuilds(int builds, int artifacts);
+
+  /// Storage category.
+  ///
+  /// In en, this message translates to:
+  /// **'Artifacts'**
+  String get storageArtifacts;
+
+  /// Storage category.
+  ///
+  /// In en, this message translates to:
+  /// **'Logs'**
+  String get storageLogs;
+
+  /// Storage category.
+  ///
+  /// In en, this message translates to:
+  /// **'Worktrees'**
+  String get storageWorktrees;
+
+  /// Storage category.
+  ///
+  /// In en, this message translates to:
+  /// **'Mirrors'**
+  String get storageMirrors;
+
+  /// Storage category.
+  ///
+  /// In en, this message translates to:
+  /// **'Flutter SDKs'**
+  String get storageFlutter;
+
+  /// No description provided for @storageArtifactsRule.
+  ///
+  /// In en, this message translates to:
+  /// **'Builds past the newest {keep} of each flavor'**
+  String storageArtifactsRule(int keep);
+
+  /// No description provided for @storageLogsRule.
+  ///
+  /// In en, this message translates to:
+  /// **'Logs of jobs older than {days} days'**
+  String storageLogsRule(int days);
+
+  /// What housekeeping frees.
+  ///
+  /// In en, this message translates to:
+  /// **'Worktrees of finished jobs'**
+  String get storageWorktreesRule;
+
+  /// What housekeeping frees.
+  ///
+  /// In en, this message translates to:
+  /// **'Mirrors of repositories that are no longer projects'**
+  String get storageMirrorsRule;
+
+  /// What housekeeping frees.
+  ///
+  /// In en, this message translates to:
+  /// **'SDKs in XPath\'s cache that no project pins'**
+  String get storageFlutterRule;
+
+  /// Panel title.
+  ///
+  /// In en, this message translates to:
+  /// **'Retention'**
+  String get storageRetentionTitle;
+
+  /// Retention panel.
+  ///
+  /// In en, this message translates to:
+  /// **'Logs past their days go every night; artifacts only with Free up space.'**
+  String get storageRetentionBody;
+
+  /// Field label.
+  ///
+  /// In en, this message translates to:
+  /// **'Builds kept per flavor'**
+  String get storageKeepPerFlavor;
+
+  /// Field label.
+  ///
+  /// In en, this message translates to:
+  /// **'Days of logs'**
+  String get storageLogDays;
+
+  /// Saves the retention.
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get storageSaveRetention;
+
+  /// Invalid retention.
+  ///
+  /// In en, this message translates to:
+  /// **'Both need a whole number of at least 1.'**
+  String get storageRetentionInvalid;
+
+  /// Title of the free-up-space sheet.
+  ///
+  /// In en, this message translates to:
+  /// **'Free up space'**
+  String get freeSpaceTitle;
+
+  /// Free-up-space sheet.
+  ///
+  /// In en, this message translates to:
+  /// **'XPath deletes what retention gives back in the categories you pick. It cannot be undone.'**
+  String get freeSpaceBody;
+
+  /// Closes the free-up-space sheet.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep everything'**
+  String get freeSpaceKeep;
+
+  /// No description provided for @freeSpaceConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Free {size}'**
+  String freeSpaceConfirm(String size);
 }
 
 class _AppLocalizationsDelegate

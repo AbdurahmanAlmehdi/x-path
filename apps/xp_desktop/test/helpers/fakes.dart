@@ -23,6 +23,10 @@ class MockWorkflowsRepository extends Mock implements WorkflowsRepository;
 
 class MockApprovalsRepository extends Mock implements ApprovalsRepository;
 
+class MockTestsRepository extends Mock implements TestsRepository;
+
+class MockStorageRepository extends Mock implements StorageRepository;
+
 /// An approvals repository whose approvals never arrive.
 MockApprovalsRepository quietApprovals() {
   final repository = MockApprovalsRepository();
@@ -63,6 +67,23 @@ MockReleasesRepository quietReleases() {
 MockRunnersRepository quietRunners() {
   final repository = MockRunnersRepository();
   when(repository.watchRunners).thenAnswer((_) => const Stream.empty());
+  return repository;
+}
+
+/// A tests repository whose baselines and runs never arrive.
+MockTestsRepository quietTests() {
+  final repository = MockTestsRepository();
+  when(() => repository.watchBaselines(any()))
+      .thenAnswer((_) => const Stream.empty());
+  when(() => repository.completedRuns(any()))
+      .thenAnswer((_) => const Stream.empty());
+  return repository;
+}
+
+/// A storage repository whose report never arrives.
+MockStorageRepository quietStorage() {
+  final repository = MockStorageRepository();
+  when(repository.watchStorage).thenAnswer((_) => const Stream.empty());
   return repository;
 }
 
@@ -194,6 +215,14 @@ class SessionHarness {
     when(() => client.listReleases(projectId: any(named: 'projectId')))
         .thenAnswer((_) async => []);
     when(client.listRunners).thenAnswer((_) async => []);
+    when(client.getStorage).thenAnswer(
+      (_) async => StorageReport(
+        generatedAt: at,
+        categories: const [],
+        flavors: const [],
+        retention: const RetentionSettings(),
+      ),
+    );
     when(
       () => client.listApprovals(
         projectId: any(named: 'projectId'),

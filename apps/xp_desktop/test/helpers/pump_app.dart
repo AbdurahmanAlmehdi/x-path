@@ -6,7 +6,9 @@ import 'package:xp_desktop/app/app.dart';
 import 'package:xp_desktop/approvals/bloc/pending_approvals_bloc.dart';
 import 'package:xp_desktop/l10n/l10n.dart';
 import 'package:xp_desktop/projects/bloc/projects_bloc.dart';
+import 'package:xp_desktop/runners/bloc/runners_bloc.dart';
 import 'package:xp_desktop/shell/cubit/shell_cubit.dart';
+import 'package:xp_desktop/storage/bloc/storage_bloc.dart';
 import 'package:xp_desktop/theme/theme.dart';
 import 'package:xp_desktop/widgets/widgets.dart';
 import 'package:xp_repositories/xp_repositories.dart';
@@ -25,6 +27,26 @@ class MockProjectsBloc extends MockBloc<ProjectsEvent, ProjectsState>
     implements ProjectsBloc;
 
 class MockShellCubit extends MockCubit<ShellDestination> implements ShellCubit;
+
+class MockRunnersBloc extends MockBloc<RunnersEvent, RunnersState>
+    implements RunnersBloc;
+
+class MockStorageBloc extends MockBloc<StorageEvent, StorageState>
+    implements StorageBloc;
+
+/// A runners bloc that stays in [state].
+MockRunnersBloc runnersIn(RunnersState state) {
+  final bloc = MockRunnersBloc();
+  whenListen(bloc, const Stream<RunnersState>.empty(), initialState: state);
+  return bloc;
+}
+
+/// A storage bloc that stays in [state].
+MockStorageBloc storageIn(StorageState state) {
+  final bloc = MockStorageBloc();
+  whenListen(bloc, const Stream<StorageState>.empty(), initialState: state);
+  return bloc;
+}
 
 class MockPendingApprovalsBloc
     extends MockBloc<PendingApprovalsEvent, PendingApprovalsState>
@@ -118,7 +140,11 @@ extension PumpApp on WidgetTester {
     RunnersRepository? runnersRepository,
     WorkflowsRepository? workflowsRepository,
     ApprovalsRepository? approvalsRepository,
+    TestsRepository? testsRepository,
+    StorageRepository? storageRepository,
     PendingApprovalsBloc? pendingApprovals,
+    RunnersBloc? runners,
+    StorageBloc? storage,
     Brightness brightness = Brightness.light,
   }) async {
     desktopWindow(this);
@@ -146,6 +172,12 @@ extension PumpApp on WidgetTester {
           RepositoryProvider<ApprovalsRepository>.value(
             value: approvalsRepository ?? quietApprovals(),
           ),
+          RepositoryProvider<TestsRepository>.value(
+            value: testsRepository ?? quietTests(),
+          ),
+          RepositoryProvider<StorageRepository>.value(
+            value: storageRepository ?? quietStorage(),
+          ),
         ],
         child: MultiBlocProvider(
           providers: [
@@ -160,6 +192,12 @@ extension PumpApp on WidgetTester {
               value:
                   pendingApprovals ??
                   pendingIn(const PendingApprovalsState(loaded: true)),
+            ),
+            BlocProvider<RunnersBloc>.value(
+              value: runners ?? runnersIn(const RunnersState(loaded: true)),
+            ),
+            BlocProvider<StorageBloc>.value(
+              value: storage ?? storageIn(const StorageState()),
             ),
           ],
           child: themed(Material(child: widget), brightness: brightness),

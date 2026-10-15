@@ -77,6 +77,78 @@ const _decidedBy = DecidedBy(
   kind: DeviceTokenKind.app,
 );
 
+const _counts = TestCounts(
+  total: 3,
+  passed: 2,
+  failed: 1,
+  errored: 0,
+  skipped: 0,
+);
+
+final _baseline = TestBaseline(
+  appPath: '.',
+  branch: 'main',
+  jobId: 'job_1',
+  createdAt: at,
+  counts: _counts,
+);
+
+final _testRun = TestRunResponse(
+  run: TestRun(
+    id: 'tst_1',
+    jobId: 'job_2',
+    branch: 'feature',
+    appPath: '.',
+    baseline: false,
+    createdAt: at,
+    counts: _counts,
+    diff: const TestRunDiff(
+      comparedTo: 'job_1',
+      newFailures: [TestRef(suite: 'test/a_test.dart', name: 'a')],
+      fixed: [],
+      missing: [],
+      stillFailing: 0,
+    ),
+  ),
+  total: 1,
+  offset: 0,
+  tests: const [
+    TestCase(
+      suite: 'test/a_test.dart',
+      name: 'a',
+      status: TestStatus.failed,
+      message: 'Expected: 1',
+    ),
+  ],
+);
+
+TestRunCompleted _completed({
+  String jobId = 'job_2',
+  String projectId = 'prj_1',
+  bool baseline = false,
+}) => TestRunCompleted(
+  jobId: jobId,
+  projectId: projectId,
+  branch: 'main',
+  baseline: baseline,
+  failures: 1,
+  newFailures: 0,
+);
+
+final _report = StorageReport(
+  generatedAt: at,
+  categories: const [
+    CategoryUsage(
+      category: StorageCategory.artifacts,
+      usedBytes: 100,
+      reclaimableBytes: 40,
+      items: 3,
+    ),
+  ],
+  flavors: const [],
+  retention: const RetentionSettings(),
+);
+
 /// How many values [stream] emits while [events] arrive: one per load.
 Future<int> _loadsFor<T>({
   required Harness harness,
@@ -797,6 +869,102 @@ void main() {
 
       expect(await repository.createPairingToken('a'), token);
       expect(await repository.revoke('rnr_1'), _runner);
+    });
+  });
+
+  group('TestsRepository', () {
+    late TestsRepository repository;
+
+    setUp(() => repository = TestsRepository(harness.session));
+
+    test('watches the baselines through the runs that become one', () async {
+      when(() => harness.client.getTestBaselines('prj_1'))
+          .thenAnswer((_) async => [_baseline]);
+      final loads = await _loadsFor(
+        harness: harness,
+        stream: repository.watchBaselines('prj_1'),
+        events: [
+          _completed(baseline: true),
+          _completed(),
+          _completed(baseline: true, projectId: 'prj_2'),
+          const ProjectRemoved(projectId: 'prj_1'),
+        ],
+      );
+      expect(loads, 2);
+      expect(
+        await repository.watchBaselines('prj_1').first,
+        Snapshot([_baseline], cached: true),
+      );
+    });
+
+    test('watches the run of a job through its own runs', () async {
+      when(() => harness.client.getJobTests('job_2', limit: 1000))
+          .thenAnswer((_) async => _testRun);
+      final loads = await _loadsFor(
+        harness: harness,
+        stream: repository.watchRun('job_2'),
+        events: [
+          _completed(),
+          _completed(jobId: 'job_3'),
+          const ProjectRemoved(projectId: 'prj_1'),
+        ],
+      );
+      expect(loads, 2);
+      expect(
+        await repository.watchRun('job_2').first,
+        Snapshot(_testRun, cached: true),
+      );
+    });
+
+    test('follows the runs of one project as they end', () async {
+      final runs = <TestRunCompleted>[];
+      final subscription = repository.completedRuns('prj_1').listen(runs.add);
+      harness
+        ..send(_completed())
+        ..send(_completed(projectId: 'prj_2'))
+        ..send(const ProjectRemoved(projectId: 'prj_1'));
+      await settle();
+      await subscription.cancel();
+      expect(runs, [_completed()]);
+    });
+  });
+
+  group('StorageRepository', () {
+    late StorageRepository repository;
+
+    setUp(() => repository = StorageRepository(harness.session));
+
+    test('reads the storage once, whatever happens', () async {
+      when(() => harness.client.getStorage()).thenAnswer((_) async => _report);
+      final loads = await _loadsFor(
+        harness: harness,
+        stream: repository.watchStorage(),
+        events: const [ProjectRemoved(projectId: 'prj_1')],
+      );
+      expect(loads, 1);
+      expect(
+        await repository.watchStorage().first,
+        Snapshot(_report, cached: true),
+      );
+    });
+
+    test('passes the commands to the engine', () async {
+      final client = harness.client;
+      const freed = FreeSpaceResult(dryRun: false, categories: []);
+      const settings = RetentionSettings(keepPerFlavor: 3, logDays: 30);
+      when(
+        () => client.freeStorage(
+          const FreeSpaceRequest(
+            dryRun: false,
+            categories: [StorageCategory.logs],
+          ),
+        ),
+      ).thenAnswer((_) async => freed);
+      when(() => client.setRetention(settings))
+          .thenAnswer((_) async => settings);
+
+      expect(await repository.freeSpace([StorageCategory.logs]), freed);
+      expect(await repository.setRetention(settings), settings);
     });
   });
 }
