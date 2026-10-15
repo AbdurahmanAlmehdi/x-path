@@ -240,6 +240,45 @@ void main() {
       );
     });
 
+    test('under the LaunchAgent of the app, logs to a file and puts the '
+        'tool folders on PATH', () async {
+      final home = '${root.path}/home';
+      Directory('$home/.shorebird/bin').createSync(recursive: true);
+      final log = File(serveLogPath(dataDir));
+
+      final exit = run(
+        ['serve', '--port', '0', '--data-dir', dataDir],
+        environment: {
+          launchdEnvironmentKey: '1',
+          'HOME': home,
+          'PATH': '/usr/bin:/bin',
+        },
+      );
+      while (!log.existsSync() ||
+          !log.readAsStringSync().contains('listening on')) {
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+      }
+      shutdown.add(null);
+
+      expect(await exit, 0);
+      expect(out.toString(), isEmpty);
+      final written = log.readAsStringSync();
+      // Homebrew's folders join it too on a Mac that has them.
+      expect(
+        written,
+        contains('xpd runs tools with PATH=$home/.shorebird/bin:'),
+      );
+      expect(written, contains(':/usr/bin:/bin\n'));
+      expect(written, contains('xpd shutting down'));
+      expect(
+        RegExp(
+          r'^\d{4}-\d\d-\d\dT\S+Z xpd listening on ',
+          multiLine: true,
+        ).hasMatch(written),
+        isTrue,
+      );
+    });
+
     test(
       'accepts tokens created while it runs and closes sockets on stop',
       () async {
