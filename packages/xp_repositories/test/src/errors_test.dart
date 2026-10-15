@@ -8,5 +8,9 @@ void main() {
     expect(errorMessage(notFound), 'No such thing.');
     expect(errorMessage(offline), 'Connection refused.');
     expect(errorMessage(StateError('bug')), 'Bad state: bug');
+    expect(
+      errorMessage(const ApprovalAlreadyDecided('Decided already.')),
+      'Decided already.',
+    );
   });
 }

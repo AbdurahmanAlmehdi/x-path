@@ -21,6 +21,20 @@ class MockRunnersRepository extends Mock implements RunnersRepository;
 
 class MockWorkflowsRepository extends Mock implements WorkflowsRepository;
 
+class MockApprovalsRepository extends Mock implements ApprovalsRepository;
+
+/// An approvals repository whose approvals never arrive.
+MockApprovalsRepository quietApprovals() {
+  final repository = MockApprovalsRepository();
+  when(
+    () => repository.watchApprovals(
+      projectId: any(named: 'projectId'),
+      state: any(named: 'state'),
+    ),
+  ).thenAnswer((_) => const Stream.empty());
+  return repository;
+}
+
 /// A projects repository whose credentials never arrive.
 MockProjectsRepository quietProjects() {
   final repository = MockProjectsRepository();
@@ -180,6 +194,12 @@ class SessionHarness {
     when(() => client.listReleases(projectId: any(named: 'projectId')))
         .thenAnswer((_) async => []);
     when(client.listRunners).thenAnswer((_) async => []);
+    when(
+      () => client.listApprovals(
+        projectId: any(named: 'projectId'),
+        state: any(named: 'state'),
+      ),
+    ).thenAnswer((_) async => []);
     session = EngineSession(
       profile: profile,
       client: client,
@@ -217,6 +237,7 @@ AppServices testServices({
   FakeLocalEngine? localEngine,
   FolderPicker? pickFolder,
   FilePicker? pickFile,
+  FakeNeedsYouAlerts? alerts,
 }) => AppServices(
   engines: engines ?? noEngines(),
   openSession:
@@ -228,4 +249,5 @@ AppServices testServices({
   pickFolder: pickFolder ?? () async => null,
   pickFile: pickFile ?? () async => null,
   deviceName: 'MacBook',
+  alerts: alerts ?? FakeNeedsYouAlerts(),
 );

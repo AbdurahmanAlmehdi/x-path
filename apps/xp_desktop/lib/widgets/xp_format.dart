@@ -65,3 +65,33 @@ String formatSize(int bytes) {
       : value.toStringAsFixed(1);
   return '$number ${units[unit]}';
 }
+
+/// What is left until [deadline], for an expiry: `23h 51m`, `42m`, `0m`.
+String formatCountdown(DateTime deadline, DateTime now) {
+  final left = deadline.difference(now);
+  if (left.isNegative) return '0m';
+  final hours = left.inHours;
+  final minutes = left.inMinutes.remainder(60);
+  return hours > 0 ? '${hours}h ${minutes}m' : '${minutes}m';
+}
+
+const _months = [
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
+];
+
+/// A date and time for timelines, in this Mac's time zone: `Oct 13 14:09`.
+String formatDateTime(DateTime time) {
+  final local = time.toLocal();
+  return '${_months[local.month - 1]} ${local.day} ${formatTime(local)}';
+}

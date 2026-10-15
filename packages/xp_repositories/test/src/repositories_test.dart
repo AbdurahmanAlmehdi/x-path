@@ -1,6 +1,7 @@
 import 'package:mocktail/mocktail.dart';
 import 'package:test/test.dart';
 import 'package:xp_api/xp_api.dart';
+import 'package:xp_client/xp_client.dart';
 import 'package:xp_repositories/xp_repositories.dart';
 
 import 'helpers/helpers.dart';
@@ -678,6 +679,64 @@ void main() {
       expect(await repository.deny('apr_1'), _approval);
       expect(await repository.getGates('prj_1'), gates);
       expect(await repository.setGates('prj_1', gates), gates);
+    });
+
+    test('watches one approval through its own events', () async {
+      when(() => harness.client.getApproval('apr_1'))
+          .thenAnswer((_) async => _approval);
+      final loads = await _loadsFor(
+        harness: harness,
+        stream: repository.watchApproval('apr_1'),
+        events: [
+          ...events,
+          const ApprovalExpired(
+            approvalId: 'apr_1',
+            projectId: 'prj_1',
+            action: 'store_submission',
+          ),
+        ],
+      );
+      expect(loads, 3);
+      expect(
+        await repository.watchApproval('apr_1').first,
+        Snapshot(_approval, cached: true),
+      );
+    });
+
+    test('says when another device decided first', () async {
+      final decided = Approval(
+        id: 'apr_1',
+        projectId: 'prj_1',
+        action: 'store_submission',
+        sha: '9a3bc0d',
+        state: ApprovalState.approved,
+        createdAt: at,
+        expiresAt: at,
+        decidedBy: _decidedBy,
+      );
+      when(() => harness.client.approve('apr_1')).thenThrow(
+        ApiException(
+          'The approval apr_1 was approved already.',
+          statusCode: 409,
+          code: ApiErrorCode.alreadyDecided,
+          approval: decided,
+        ),
+      );
+      when(() => harness.client.deny('apr_1')).thenThrow(notFound);
+
+      await expectLater(
+        repository.approve('apr_1'),
+        throwsA(
+          isA<ApprovalAlreadyDecided>()
+              .having((error) => error.approval, 'approval', decided)
+              .having(
+                (error) => error.toString(),
+                'toString',
+                contains('approved already'),
+              ),
+        ),
+      );
+      await expectLater(repository.deny('apr_1'), throwsA(notFound));
     });
   });
 

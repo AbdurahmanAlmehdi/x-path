@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:xp_api/xp_api.dart';
 import 'package:xp_desktop/app/bloc/engine_connection_bloc.dart';
+import 'package:xp_desktop/approvals/widgets/needs_you_bar.dart';
 import 'package:xp_desktop/dispatch/view/dispatch_sheet.dart';
 import 'package:xp_desktop/l10n/l10n.dart';
 import 'package:xp_desktop/project_overview/bloc/project_overview_bloc.dart';
@@ -154,6 +155,7 @@ class _ProjectOverviewViewState extends State<ProjectOverviewView> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              NeedsYouBar(projectId: project.id),
               const ReleaseRail(),
               const XpHairline(),
               Expanded(

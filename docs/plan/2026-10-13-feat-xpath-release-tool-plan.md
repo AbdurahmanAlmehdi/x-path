@@ -531,7 +531,7 @@ Mataa dev builds through `xp` can start after Phase 13, before the desktop app e
 
 ### Phase 16b: Desktop releases and approvals
 
-- **Status:** Not started
+- **Status:** Done
 - **Scope:** Concept 3A (`Release-A-*.dc.html`), `Approvals-Inbox.dc.html`, `Approval-Notification.dc.html`, `MenuBar-Extra.dc.html`. Releases board with store status, manual approved/live buttons and merge;
   approvals inbox with macOS notifications.
 - **Files touched:** `apps/xp_desktop/lib/releases/**`, `apps/xp_desktop/lib/approvals/**`

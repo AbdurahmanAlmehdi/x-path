@@ -2,6 +2,7 @@ import Cocoa
 import FlutterMacOS
 import Security
 import ServiceManagement
+import UserNotifications
 
 /// The macOS side of `packages/xp_macos_services`: the LaunchAgent of the
 /// bundled engine (SMAppService) and the app's own Keychain items.
@@ -144,5 +145,178 @@ enum MacosServicesChannel {
   private static func keychainDelete(_ account: String, _ result: FlutterResult) {
     let status = SecItemDelete(query(account) as CFDictionary)
     result(status == errSecSuccess || status == errSecItemNotFound ? nil : failure(status))
+  }
+}
+
+/// The macOS side of `NeedsYouAlerts` in `packages/xp_macos_services`: the
+/// notifications of approvals that wait and the menu bar extra (a status
+/// item with the `XPathTemplate` image and a native menu). Neither decides
+/// anything: their buttons call back into Dart, which opens the
+/// confirmation sheet in the main window (DECISIONS.md).
+final class NeedsYouChannel: NSObject, UNUserNotificationCenterDelegate {
+  static let name = "ly.abdurahman.xpath/needs_you"
+
+  /// The notification category with the "Review…" and "Later" buttons.
+  static let category = "ly.abdurahman.xpath.approval"
+
+  static let shared = NeedsYouChannel()
+
+  private var channel: FlutterMethodChannel?
+  private var statusItem: NSStatusItem?
+
+  static func register(with messenger: FlutterBinaryMessenger) {
+    let channel = FlutterMethodChannel(name: name, binaryMessenger: messenger)
+    shared.channel = channel
+    // Setting the delegate asks for nothing; it routes the clicks on
+    // notifications, also those that launched the app.
+    UNUserNotificationCenter.current().delegate = shared
+    channel.setMethodCallHandler { call, result in
+      let arguments = call.arguments as? [String: Any] ?? [:]
+      switch call.method {
+      case "notify":
+        shared.notify(arguments)
+        result(nil)
+      case "withdraw":
+        let id = arguments["id"] as? String ?? ""
+        let center = UNUserNotificationCenter.current()
+        center.removeDeliveredNotifications(withIdentifiers: [id])
+        center.removePendingNotificationRequests(withIdentifiers: [id])
+        result(nil)
+      case "menuBar":
+        shared.updateMenuBar(arguments)
+        result(nil)
+      default:
+        result(FlutterMethodNotImplemented)
+      }
+    }
+  }
+
+  // MARK: Notifications
+
+  private func notify(_ arguments: [String: Any]) {
+    let id = arguments["id"] as? String ?? ""
+    let center = UNUserNotificationCenter.current()
+    let review = UNNotificationAction(
+      identifier: "review",
+      title: arguments["review"] as? String ?? "Review…",
+      options: [.foreground]
+    )
+    let later = UNNotificationAction(
+      identifier: "later",
+      title: arguments["later"] as? String ?? "Later",
+      options: []
+    )
+    center.setNotificationCategories([
+      UNNotificationCategory(
+        identifier: Self.category,
+        actions: [review, later],
+        intentIdentifiers: [],
+        options: []
+      )
+    ])
+    // macOS asks the owner once; afterwards this answers at once.
+    center.requestAuthorization(options: [.alert, .sound]) { granted, _ in
+      guard granted else { return }
+      let content = UNMutableNotificationContent()
+      content.title = arguments["title"] as? String ?? ""
+      content.body = arguments["body"] as? String ?? ""
+      content.categoryIdentifier = Self.category
+      content.sound = .default
+      center.add(UNNotificationRequest(identifier: id, content: content, trigger: nil))
+    }
+  }
+
+  func userNotificationCenter(
+    _ center: UNUserNotificationCenter,
+    willPresent notification: UNNotification,
+    withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
+  ) {
+    if #available(macOS 11.0, *) {
+      completionHandler([.banner, .sound])
+    } else {
+      completionHandler([.alert, .sound])
+    }
+  }
+
+  func userNotificationCenter(
+    _ center: UNUserNotificationCenter,
+    didReceive response: UNNotificationResponse,
+    withCompletionHandler completionHandler: @escaping () -> Void
+  ) {
+    let id = response.notification.request.identifier
+    switch response.actionIdentifier {
+    case "review":
+      send("review", id)
+    case UNNotificationDefaultActionIdentifier:
+      send("show", id)
+    default:
+      // "Later" or dismissed: nothing to do.
+      break
+    }
+    completionHandler()
+  }
+
+  // MARK: Menu bar extra
+
+  private func updateMenuBar(_ arguments: [String: Any]) {
+    let item = statusItem ?? NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+    statusItem = item
+    if let button = item.button {
+      let image = NSImage(named: "XPathTemplate")
+      image?.isTemplate = true
+      button.image = image
+      button.imagePosition = .imageLeft
+      button.toolTip = arguments["tooltip"] as? String
+      let needsYou = arguments["needsYou"] as? Bool ?? false
+      button.attributedTitle = NSAttributedString(
+        string: needsYou ? " ●" : "",
+        attributes: [.font: NSFont.systemFont(ofSize: 8)]
+      )
+    }
+    let menu = NSMenu()
+    menu.autoenablesItems = false
+    let header = NSMenuItem(title: arguments["header"] as? String ?? "", action: nil, keyEquivalent: "")
+    header.isEnabled = false
+    menu.addItem(header)
+    for entry in arguments["items"] as? [[String: Any]] ?? [] {
+      let row = NSMenuItem(
+        title: entry["title"] as? String ?? "",
+        action: #selector(review(_:)),
+        keyEquivalent: ""
+      )
+      row.target = self
+      row.representedObject = entry["id"] as? String
+      row.toolTip = entry["detail"] as? String
+      if #available(macOS 14.4, *) {
+        row.subtitle = entry["detail"] as? String
+      }
+      menu.addItem(row)
+    }
+    menu.addItem(.separator())
+    let open = NSMenuItem(
+      title: arguments["openApp"] as? String ?? "",
+      action: #selector(openApp),
+      keyEquivalent: ""
+    )
+    open.target = self
+    menu.addItem(open)
+    item.menu = menu
+  }
+
+  @objc private func review(_ sender: NSMenuItem) {
+    send("review", sender.representedObject as? String)
+  }
+
+  @objc private func openApp() {
+    send("open", nil)
+  }
+
+  /// Brings the main window forward, then tells Dart what was clicked.
+  private func send(_ method: String, _ id: String?) {
+    DispatchQueue.main.async {
+      NSApp.activate(ignoringOtherApps: true)
+      NSApp.windows.first(where: { $0 is MainFlutterWindow })?.makeKeyAndOrderFront(nil)
+      self.channel?.invokeMethod(method, arguments: id.map { ["id": $0] })
+    }
   }
 }

@@ -147,4 +147,5 @@ void registerDispatchFallbacks() {
   registerFallbackValue(mataa);
   registerFallbackValue(prodWorkflow);
   registerFallbackValue(const DispatchRequest());
+  registerFallbackValue(runningRun().run);
 }

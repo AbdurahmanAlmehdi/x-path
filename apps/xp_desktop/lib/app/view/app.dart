@@ -2,6 +2,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:xp_desktop/app/app_services.dart';
 import 'package:xp_desktop/app/bloc/engine_connection_bloc.dart';
+import 'package:xp_desktop/approvals/bloc/pending_approvals_bloc.dart';
+import 'package:xp_desktop/approvals/widgets/needs_you_alerts_listener.dart';
 import 'package:xp_desktop/l10n/l10n.dart';
 import 'package:xp_desktop/onboarding/view/onboarding_page.dart';
 import 'package:xp_desktop/projects/bloc/projects_bloc.dart';
@@ -108,8 +110,13 @@ class EngineScope extends StatelessWidget {
                 ProjectsBloc(projects: context.read<ProjectsRepository>())
                   ..add(const ProjectsSubscriptionRequested()),
           ),
+          BlocProvider(
+            create: (context) => PendingApprovalsBloc(
+              approvals: context.read<ApprovalsRepository>(),
+            )..add(const PendingApprovalsSubscriptionRequested()),
+          ),
         ],
-        child: child,
+        child: NeedsYouAlertsListener(child: child),
       ),
     ),
   );

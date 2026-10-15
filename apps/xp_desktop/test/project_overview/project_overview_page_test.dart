@@ -63,6 +63,16 @@ void main() {
       );
     });
 
+    testWidgets('opens the release in flight', (tester) async {
+      final shell = ShellCubit();
+      await OverviewHarness().pump(tester, shell: shell);
+      await tester.tap(find.text('Open release'));
+      expect(
+        shell.state,
+        const ReleasesDestination('prj_1', releaseId: 'rel_2'),
+      );
+    });
+
     testWidgets('filters the ledger by flavor', (tester) async {
       await OverviewHarness().pump(tester);
       await tester.tap(find.text('dev').first);

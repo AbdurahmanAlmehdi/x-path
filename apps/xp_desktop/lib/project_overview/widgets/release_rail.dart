@@ -72,7 +72,15 @@ class _InFlight extends StatelessWidget {
                 style: type.caption.copyWith(color: colors.textSecondary),
               ),
             ),
-            if (runId != null)
+            XpButton(
+              label: l10n.overviewOpenRelease,
+              kind: XpButtonKind.tertiary,
+              onPressed: () => context.read<ShellCubit>().show(
+                ReleasesDestination(release.projectId, releaseId: release.id),
+              ),
+            ),
+            if (runId != null) ...[
+              const SizedBox(width: 8),
               XpButton(
                 label: l10n.overviewOpenJob,
                 icon: PhosphorIconsRegular.terminalWindow,
@@ -80,6 +88,7 @@ class _InFlight extends StatelessWidget {
                   JobDestination(runId, projectId: release.projectId),
                 ),
               ),
+            ],
           ],
         ),
         const SizedBox(height: 16),
