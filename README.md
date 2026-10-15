@@ -216,6 +216,68 @@ xp runner install-service [--slots 4]                                           
 - **Tests.** The managers, the templates and the commands are unit tests with a fake `ProcessRunner` and temporary
   folders: no test installs a LaunchAgent or a unit, or calls `launchctl` or `systemctl`.
 
+## Releases and installation
+
+`tool/release/bundles.sh` builds a release of XPath into `build/release` (D-23, ADR 0001):
+
+- **Bundles.** `dart build cli` of `xpd` and `xp` for each target in `bundles/<target>/{xpd,xp}` (`bin/`, `lib/` with
+  `libsqlite3`). The targets are `macos-arm64`, `macos-x64`, `linux-x64` and `linux-arm64`; by default every target
+  the machine can build. `dart build cli` cross-compiles to Linux from anywhere but builds macOS only for the
+  machine's own architecture, so an Apple silicon Mac builds `macos-arm64`, `linux-x64` and `linux-arm64`, and
+  `macos-x64` needs an Intel Mac. The host's bundles must print the version of `apps/xpd/pubspec.yaml` (`xp` and
+  `xpd` must agree); the others are checked with `file`.
+- **Runner bundles.** `runners/<os>-<arch>/xp.tar.gz` (top level `bin` and `lib`), named as a runner reports itself
+  (`linux-x86_64`, `linux-arm64`, `macos-arm64`), and copied into `bundles/<target>/xpd/runners/`, where the engine
+  serves them to runners that update (Runner updates).
+- **Assets.** `assets/xpath-<target>.tar.gz` (top folder `xpath-<version>-<target>/` with `VERSION`, `LICENSE`,
+  `install.sh`, `xpd/` and `xp/`), `assets/xp-<target>.tar.gz` (the CLI alone), a `.sha256` for each and
+  `install.sh`. The archives hold plain files owned by root, without macOS extended attributes.
+
+**The release workflow** (`.github/workflows/release.yml`) runs on a pushed tag `v<version>` that has to match
+`apps/xpd/pubspec.yaml`. On Linux only: it builds the Linux targets, runs `smoke_bundle.sh` and the `install.sh`
+test, runs the arm64 bundles on an arm64 runner, builds the Docker image, tests that it answers `/health`, pushes it
+to `ghcr.io/abdurahmanalmehdi/xpath:<version>` (and `latest` unless the version has a `-`) for `linux/amd64` and
+`linux/arm64`, and creates the GitHub Release (a pre-release for a version with a `-`) with the assets. The macOS
+assets come from a Mac afterwards: `tool/release/bundles.sh --upload v<version>` builds every target the Mac can and
+uploads the `*-macos-*` assets to that release (`gh release upload --clobber`). Phase 18b embeds the macOS bundles
+in the app.
+
+**Linux install.** `tool/release/linux/install.sh` is served at `https://xpath.abdurahman.ly/install` (ADR 0005):
+
+```sh
+curl -fsSL https://xpath.abdurahman.ly/install | sh                  # engine and CLI, xpd user service
+curl -fsSL https://xpath.abdurahman.ly/install | sh -s -- --runner   # a runner machine: pair it afterwards
+```
+
+It downloads `xpath-linux-<arch>.tar.gz` of the latest release (`--version` for another) from GitHub Releases and
+refuses it when the SHA-256 does not match its `.sha256`; `--archive` installs a local archive or unpacked folder
+instead, and the `install.sh` inside an unpacked release folder installs that folder. The bundles go to
+`<prefix>/lib/xpath/{xpd,xp}` (`--prefix`, default `~/.local`) and `<prefix>/bin/xpd` and `xp` link to them. They
+are copied beside the old ones and must start (`--version`, so a wrong architecture or C library stops the install)
+before they replace them, so running it again updates in place. With a systemd user session it then runs
+`xpd install-service` (the `xpd.service` user unit of Running as a service) and restarts the service when it was
+installed already; without one it says how to start the engine. The unit it writes has no master key credential, so
+the engine keeps a 0600 `master.key` in its data directory (D-07); for a systemd credential run `xpd install-service
+--master-key-credential <file>` yourself before the first secret is stored. `--runner` prints `xp runner pair` and
+`xp runner install-service`, which writes `xp-runner.service` once the runner is paired. `--no-service` installs the
+files only. Each option has an environment variable (`XPATH_VERSION`, `XPATH_PREFIX`, `XPATH_ARCHIVE`,
+`XPATH_RUNNER=1`, `XPATH_NO_SERVICE=1`); `XPATH_RELEASES_URL` replaces the GitHub Releases URL.
+`tool/release/linux/install_test.sh` tests it with no network against the archive of the machine in
+`build/release/assets`, in a throwaway `HOME` and prefix: an install, an update from the unpacked folder, a download
+from `file://` URLs with and without a version, a wrong SHA-256, a wrong version and the runner mode; on Linux also
+the service step against a fake `systemctl` and `loginctl` (the unit written, `enable --now`, the restart on update).
+
+**Docker.** The `Dockerfile` copies the Linux bundles of `build/release/bundles` (run `bundles.sh` first; `buildx`
+picks the bundle of each platform) into a `debian:trixie-slim` image with `git`, `ssh` and `curl` but no Flutter
+(builds go to runners). It runs `xpd serve --host 0.0.0.0 --port 7480` as the user `xpath` (uid 10001), keeps its
+data (database, `master.key`) in the volume `/data` (`XPATH_DATA_DIR`) and checks `/health` every 30 s.
+
+```sh
+tool/release/bundles.sh && docker build -t xpath .
+docker run -d --name xpath -p 127.0.0.1:7480:7480 -v xpath-data:/data xpath
+docker exec xpath xpd token create --name laptop --kind cli
+```
+
 ## Projects and scans
 
 A project is a GitHub repository, keyed by its GitHub repository id (D-05). The folder you pick only
@@ -1283,8 +1345,9 @@ version it is and does not try that version again until it restarts.
 `<data-dir>/bundles/<engine version>/` and `runners/` next to its own `bin` and `lib` (the bundle of `xpd`). The
 file is the `xp` bundle that `dart build cli -t bin/xp.dart` makes (`bin/xp`, `lib/libsqlite3.*`, ADR 0001) as a
 `.tar.gz` whose top level is `bin` and `lib`. `os` and `arch` are what the runner reports in its hello (`macos` or
-`linux`; `arm64`, `x86_64`). The packaging of a release puts the files there (Phase 18a); until then put them there
-yourself. The engine finds no file: `404`, "This engine has no runner bundle for linux-arm64. Put the xp.tar.gz of
+`linux`; `arm64`, `x86_64`). `tool/release/bundles.sh` puts the runner bundles of every target it built in the
+`runners/` of each engine bundle (see Releases and installation); a bundle it did not build (the macOS ones in an
+archive from CI) can go in `<data-dir>/bundles/<engine version>/`. The engine finds no file: `404`, "This engine has no runner bundle for linux-arm64. Put the xp.tar.gz of
 this version in ...". The SHA-256 is worked out once per file and kept until the file changes.
 
 **Tests.** `runner_update_test.dart` runs the real runner (`buildRunner`, the real `tar`, a real bundle folder whose
@@ -1707,6 +1770,7 @@ has Flutter members, so even `dart pub get` needs the Flutter SDK; every job ins
   bundle, starts it and checks `/health`, the SQLite build hook, token authentication and a clean
   shutdown. It runs when `apps/xpd`, `packages`, `tool/e2e` or the root `pubspec` files change, and
   needs `dart` 3.13, `curl` and `perl`.
+- `release.yml` releases XPath itself on a version tag (see Releases and installation).
 - `semantic_pull_request.yaml`, `spell_check.yaml` and `license_check.yaml` cover the rest. The
   spell check reads `README.md` and `docs/adr`; the planning documents are ignored in
   `.github/cspell.json`.

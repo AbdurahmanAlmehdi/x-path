@@ -1,0 +1,201 @@
+# Releases XPath itself when a version tag (v1.2.3, v1.2.3-beta.1) is pushed:
+# the Linux bundles and archives (tool/release/bundles.sh), a test of
+# install.sh against them, the arm64 bundle run on an arm64 machine, the
+# Docker image (linux/amd64 and linux/arm64) on GitHub Container Registry and
+# the GitHub Release with the archives, their .sha256 files and install.sh.
+#
+# Linux only: GitHub-hosted macOS runners are not used (cost). The macOS
+# assets come from a Mac afterwards: `tool/release/bundles.sh --upload <tag>`
+# builds them and uploads them to the release this workflow made.
+#
+# Flutter 3.47.6 ships Dart 3.13.5; keep both in sync with .fvmrc. The
+# workspace has Flutter members, so even `dart pub get` needs the Flutter SDK.
+name: release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  IMAGE: ghcr.io/abdurahmanalmehdi/xpath
+
+jobs:
+  bundles:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - name: Git Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2.23.0
+        with:
+          flutter-version: "3.47.6"
+          cache: true
+
+      - name: Install Dependencies
+        run: dart pub get
+
+      - name: Check the Tag Against the Version
+        id: version
+        run: |
+          version="$(sed -n 's/^version: *//p' apps/xpd/pubspec.yaml)"
+          if [ "${GITHUB_REF_NAME}" != "v${version}" ]; then
+            echo "The tag ${GITHUB_REF_NAME} is not v${version} (apps/xpd/pubspec.yaml)." >&2
+            exit 1
+          fi
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+
+      - name: Build the Bundles
+        run: tool/release/bundles.sh
+
+      - name: Smoke Test the xpd Bundle
+        run: tool/e2e/smoke_bundle.sh
+
+      - name: Test install.sh
+        run: tool/release/linux/install_test.sh
+
+      # Artifacts drop the executable bit, so the folder travels as one tar.
+      - name: Pack the Build
+        run: tar -cf release.tar build/release
+
+      - name: Upload the Build
+        uses: actions/upload-artifact@v4
+        with:
+          name: release
+          path: release.tar
+          retention-days: 7
+
+  arm64:
+    needs: bundles
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 10
+    steps:
+      - name: Git Checkout
+        uses: actions/checkout@v7
+
+      - name: Download the Build
+        uses: actions/download-artifact@v4
+        with:
+          name: release
+
+      - name: Unpack the Build
+        run: tar -xf release.tar
+
+      - name: Run the arm64 Bundles
+        run: |
+          build/release/bundles/linux-arm64/xpd/bin/xpd --version
+          build/release/bundles/linux-arm64/xp/bin/xp --version
+
+      - name: Test install.sh
+        run: tool/release/linux/install_test.sh
+
+  docker:
+    needs: bundles
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Git Checkout
+        uses: actions/checkout@v7
+
+      - name: Download the Build
+        uses: actions/download-artifact@v4
+        with:
+          name: release
+
+      - name: Unpack the Build
+        run: tar -xf release.tar
+
+      - name: Setup QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Setup Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build the Image for a Test
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64
+          load: true
+          tags: xpath:test
+
+      - name: Test the Image
+        run: |
+          docker run --rm xpath:test xpd --version
+          docker run -d --name xpath -p 127.0.0.1:7480:7480 xpath:test
+          for _ in $(seq 1 30); do
+            [ "$(docker inspect --format '{{.State.Health.Status}}' xpath)" = healthy ] && break
+            sleep 2
+          done
+          docker inspect --format '{{.State.Health.Status}}' xpath | grep -qx healthy
+          test "$(curl -fsS http://127.0.0.1:7480/health)" = '{"status":"ok"}'
+          docker stop xpath
+          test "$(docker inspect --format '{{.State.ExitCode}}' xpath)" = 0
+
+      - name: Log In to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # A pre-release (a version with a "-") does not move `latest`.
+      - name: Choose the Image Tags
+        id: tags
+        env:
+          VERSION: ${{ needs.bundles.outputs.version }}
+        run: |
+          tags="${IMAGE}:${VERSION}"
+          case "${VERSION}" in *-*) ;; *) tags="${tags},${IMAGE}:latest" ;; esac
+          echo "tags=${tags}" >> "$GITHUB_OUTPUT"
+
+      - name: Build and Push the Image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.tags.outputs.tags }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.version=${{ needs.bundles.outputs.version }}
+            org.opencontainers.image.licenses=Apache-2.0
+
+  release:
+    needs: [bundles, arm64, docker]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - name: Download the Build
+        uses: actions/download-artifact@v4
+        with:
+          name: release
+
+      - name: Unpack the Build
+        run: tar -xf release.tar
+
+      - name: Create the GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ needs.bundles.outputs.version }}
+        run: |
+          flags=(--verify-tag --title "XPath ${VERSION}" --generate-notes)
+          case "${VERSION}" in *-*) flags+=(--prerelease) ;; esac
+          gh release create "${GITHUB_REF_NAME}" --repo "${GITHUB_REPOSITORY}" \
+            "${flags[@]}" build/release/assets/*
