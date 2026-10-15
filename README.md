@@ -1568,6 +1568,49 @@ caller speaks the frames of `xp_api`) and `uploadRunnerArtifact` (streams the fi
 The client is tested against fake HTTP servers (`packages/xp_client/test`) and against the real engine in-process
 (`apps/xpd/test/src/client`).
 
+## The desktop app
+
+`apps/xp_desktop` is the macOS app (Phase 15 builds its foundation; the screens of the design follow in Phases 16a to
+17). The design is in `docs/design/` (see `DECISIONS.md`): the Run Sheet tokens are copied into
+`lib/theme/xp_tokens.dart`, the fonts (IBM Plex Sans and Mono, OFL, licence in `assets/fonts/OFL.txt`) and the
+sidebar mark are assets, and the icons are Phosphor's.
+
+- **Layout.** `lib/<feature>/{bloc,view,widgets}` with a barrel per feature; `flutter_bloc` with `bloc_concurrency`
+  (`restartable` for the streams a bloc follows, `droppable` for commands); strings in `lib/l10n/arb/app_en.arb`
+  (`flutter gen-l10n` writes `lib/l10n/gen`, which is committed); light and dark themes from the tokens
+  (`lib/theme/theme.dart`); `test/helpers/pump_app.dart` pumps a widget with the theme, the strings and fakes.
+- **Engines.** The app shows one engine at a time: the one on this Mac ("This Mac", `http://127.0.0.1:7480`, the
+  address of `xpd serve`) or a remote one added by URL and token after the same checks as `xp connect`. Their names
+  and URLs are in `engines.json` in the app's Application Support folder; their tokens (kind `app`, D-06) are in the
+  login Keychain under the service `ly.abdurahman.xpath.app`, account `engine.<id>`. `EngineConnectionBloc` owns the
+  active engine's `EngineSession` (client, the one event stream, status, offline cache); switching engines closes the
+  session, which ends every stream it gave out, and the repository subtree is keyed on the session, so it is built
+  again.
+- **Offline.** The repositories (`packages/xp_repositories`) cache the last answer of each list per engine
+  (`<support>/cache/<engine>/*.json`) and show it first, marked as cached. When the engine stops answering the
+  connection banner says so (reconnecting, then unreachable · cached), the screens keep the cached data and every
+  command is disabled until the engine is back. A locked Keychain on the engine (secrets locked) and a refused
+  token have their own banner.
+- **Onboarding** (the first run, or Engines ▸ Set up this Mac…): (1) registers the bundled engine as a LaunchAgent with
+  `SMAppService` (label `ly.abdurahman.xpath.xpd`, plist `Contents/Library/LaunchAgents/ly.abdurahman.xpath.xpd.plist`,
+  `BundleProgram` `Contents/Helpers/xpd/bin/xpd serve`) and makes the app's token with the bundled
+  `xpd token create --kind app`; (2) links the bundled `xp` (`Contents/Helpers/xp/bin/xp`) into `/usr/local/bin` if the
+  user can write there, else into `~/.local/bin` (no password, no dialog; another `xp` already there is left
+  alone); (3) checks for Xcode (`xcode-select -p`; the Command Line Tools alone do not count), git, fvm, gh and
+  Shorebird in the folders the engine's service searches. The engine and `xp` are copied into the app by the
+  release build (Phase 18b); a development build has neither and says so.
+- **Projects and credentials.** Add project by folder (a folder picker for the local engine, a typed path on a remote
+  one), then the review of the scan (apps, flavors, findings with their fixes): keep it, scan again or remove it.
+  The credentials editor lists each credential of a project with its last check, and adds, replaces, checks and
+  deletes them; the engine checks a credential before it keeps it, and a `.p8` key, a service account or a keystore
+  can be read from a file.
+- **macOS services** (`packages/xp_macos_services`) are interfaces with fakes (`package:xp_macos_services/testing.dart`):
+  the LaunchAgent and the Keychain go through the channel `ly.abdurahman.xpath/macos_services`, implemented in
+  `apps/xp_desktop/macos/Runner/MacosServicesChannel.swift`; the `xp` link, the tool check and the bundled engine are
+  Dart. No test registers an agent, touches a Keychain or writes outside a temporary folder.
+- **No sandbox.** XPath ships outside the Mac App Store (D-23), and it runs the bundled engine, links `xp` and checks
+  tools, so the app is not sandboxed (`macos/Runner/*.entitlements`).
+
 ## Testing
 
 ### Coverage policy
@@ -1601,8 +1644,15 @@ Every package's `dart_test.yaml` declares these tags.
 | `process` | Spawns real child processes. | runs |
 | `macos` | Needs macOS (Keychain, SMAppService, ...). | runs on macOS only |
 | `integration` | Needs external tools or services. | skipped; run with `dart test --run-skipped -t integration` |
+| `golden` | Compares a widget with a golden image (`apps/xp_desktop` only). | runs on macOS only |
 
 Because `integration` tests are skipped by default, they are not part of the coverage run.
+
+**Goldens.** The goldens of the desktop app are drawn with the fonts it bundles (the test helper `loadAppFonts`
+loads IBM Plex and Phosphor), on macOS. Linux draws text with other font hinting, so the `golden` tag has
+`test_on: mac-os` in `apps/xp_desktop/dart_test.yaml`: GitHub CI (Linux) skips them, and the local macOS run of
+`melos run test:coverage` checks them. After a deliberate change, write them again with
+`flutter test --update-goldens --tags golden` in `apps/xp_desktop`, on a Mac.
 
 ## Continuous integration
 

@@ -505,7 +505,7 @@ Mataa dev builds through `xp` can start after Phase 13, before the desktop app e
 
 ### Phase 15: Desktop foundation
 
-- **Status:** Not started
+- **Status:** Done
 - **Scope:** UI per `docs/design/DECISIONS.md` and the Run Sheet tokens (`docs/design/system/project/assets/Handoff/xp_tokens.dart`, IBM Plex fonts, Phosphor icons). `xp_repositories` (engines, projects, jobs, releases, approvals, runners; streams
   plus offline cached snapshot), `xp_macos_services` (SMAppService registration of the bundled
   `xpd` LaunchAgent), app shell with `lib/<feature>/{bloc,view,widgets}`, l10n ARB, light and
