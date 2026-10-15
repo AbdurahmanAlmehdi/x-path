@@ -72,6 +72,10 @@ class AppServices {
     required this.saveFile,
     required this.deviceName,
     required this.alerts,
+    required this.runningApp,
+    required this.appMenu,
+    required this.keychainWiper,
+    required this.dataWiper,
   });
 
   /// The services of this Mac: the engine list and the offline cache in the
@@ -109,6 +113,12 @@ class AppServices {
       },
       deviceName: Platform.localHostname.split('.').first,
       alerts: MethodChannelNeedsYouAlerts(),
+      runningApp: const MethodChannelRunningApp(),
+      appMenu: MethodChannelAppMenu(),
+      keychainWiper: const SystemKeychainWiper(),
+      // "Remove XPath" with "Also delete engine data": the engine's data
+      // folder, and the app's engine list and offline cache.
+      dataWiper: FileSystemDataWiper([engineDataDirectory(home), support]),
     );
   }
 
@@ -127,4 +137,16 @@ class AppServices {
 
   /// The notifications and the menu bar extra of approvals that wait.
   final NeedsYouAlerts alerts;
+
+  /// The app itself: its version, the Trash, quitting.
+  final RunningApp runningApp;
+
+  /// XPath ▸ Settings… (⌘,).
+  final AppMenu appMenu;
+
+  /// Deletes XPath's Keychain items ("Remove XPath").
+  final KeychainWiper keychainWiper;
+
+  /// Deletes the data of the engine and of the app ("Remove XPath").
+  final DataWiper dataWiper;
 }

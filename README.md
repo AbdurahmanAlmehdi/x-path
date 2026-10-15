@@ -327,6 +327,19 @@ found, fails or is not logged in (`gh auth login`), or when the secrets are lock
 looked up on `PATH`, then at `/opt/homebrew/bin/gh` and `/usr/local/bin/gh` (a `launchd` `PATH`
 has neither); `--gh` names it directly. Without a token, adding a project answers `502`. Failures
 of GitHub or git answer `502 upstream_error`, a locked secret store `503 secrets_locked`.
+
+The same token is managed over the API (Phase 18c), so a first run in the app can connect GitHub before it
+has a project (`apps/xpd/lib/src/api/github`, `GitHubTokenService` in `xp_engine`):
+
+| Route | What it does |
+|---|---|
+| `GET /github-token` | `{"stored": false}` without a token; with one it asks GitHub (`GET /user`) and answers `stored`, `status` (`verified`, `rejected`, `unreachable`), the `login`, and a `message` and `fix` when GitHub refused it or could not be reached. |
+| `PUT /github-token` | `{"token": "..."}`: checks the token with GitHub first and stores it under `github.token` only when GitHub accepts it. `422 credential_rejected` when GitHub refuses it, `502 upstream_error` when GitHub cannot be reached; nothing is stored then. |
+| `POST /github-token/import` | What `xpd secrets import-gh` does, over the API: runs `gh auth token` on the engine machine (`gh` on the engine's `PATH`, then `/opt/homebrew/bin/gh` and `/usr/local/bin/gh`), then checks and stores the token as `PUT` does. `422` when `gh` is missing, not logged in or its token is refused. |
+| `DELETE /github-token` | Forgets the token (`204`). |
+
+Only `app` and `cli` tokens may change it (`403` otherwise); runner tokens reach none of these routes (ADR 0011).
+No response, log or error carries the token, and the engine's masker learns it as soon as the engine sees it.
 Adding, scanning and removing announce `project.added`, `project.scanned` and `project.removed` on
 `/events`.
 
@@ -1736,6 +1749,27 @@ sidebar mark are assets, and the icons are Phosphor's.
   Dart. No test registers an agent, touches a Keychain or writes outside a temporary folder.
 - **No sandbox.** XPath ships outside the Mac App Store (D-23), and it runs the bundled engine, links `xp` and checks
   tools, so the app is not sandboxed (`macos/Runner/*.entitlements`).
+- **Settings** (Phase 18c; Settings in the sidebar, or XPath ▸ Settings… ⌘, in the app menu, which reaches Dart over
+  the channel `ly.abdurahman.xpath/app_menu`): the app's version, the engine shown with its version and connection,
+  and the engine's login item on this Mac. **GitHub**: the engine's GitHub token, which adding a project needs: what
+  GitHub says of it (the login, or why it refused it), a field to paste a new one ("Check and save"), "Import from
+  GitHub CLI" (`gh auth token` on the engine machine) and "Remove token". Add project asks the engine for the token
+  when it opens and after a failed add; without one (or with one GitHub refuses) it says so and "Connect GitHub…"
+  opens this section with the cursor in the field.
+- **Remove XPath** (Settings): a sheet with "Also delete engine data" and "Also delete Keychain items". Confirmed, it
+  (1) revokes every runner of the engine on this Mac through its API while it still runs (`revokeLocalRunners`),
+  (2) unregisters the engine's login item (`SMAppService.unregister`, which makes launchd stop it) and waits until
+  `/health` stops answering, (3) removes the `xp` link only where it points into this app, (4) if asked and only
+  once the engine stopped, deletes the engine's data folder (`~/Library/Application Support/XPath`) and the app's
+  Application Support folder (engine list and cache), and (5) if asked, deletes every Keychain item whose service is
+  `ly.abdurahman.xpath` or under it: the runner lists them (names only, never a value), the app's own items go
+  through `SecItemDelete`, the engine's through `security delete-generic-password` (which made them). A step that
+  fails is shown with what macOS or the engine said and the others still run. The sheet then offers "Move to Trash
+  and quit" (`NSWorkspace.recycle` of the bundle) or "Quit XPath", and says to drag the app to the Trash when the
+  Trash refuses. All of it goes through `xp_macos_services` interfaces (`EngineAgent.unregister`,
+  `CliLinker.unlink`, `DataWiper`, `KeychainWiper`, `RunningApp`, `AppMenu`) with fakes; no test removes anything
+  real. An engine started with `--data-dir` or `XPATH_DATA_DIR` elsewhere keeps that folder. Not built (owner,
+  Goal 3): Sparkle and the appcast, and the Homebrew cask with its `zap` stanza.
 
 ## Testing
 

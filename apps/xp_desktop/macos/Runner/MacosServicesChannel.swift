@@ -16,7 +16,22 @@ enum MacosServicesChannel {
   /// The Keychain service of the app's items (engine tokens).
   static let keychainService = "ly.abdurahman.xpath.app"
 
+  /// The prefix of every Keychain service of XPath (ADR 0005).
+  static let keychainPrefix = "ly.abdurahman.xpath"
+
+  /// The app menu: XPath ▸ Settings… goes to Dart through it.
+  static let appMenuName = "ly.abdurahman.xpath/app_menu"
+
+  private static var appMenu: FlutterMethodChannel?
+
+  /// Asks the Dart side to show the settings page.
+  static func openSettings() {
+    NSApp.activate(ignoringOtherApps: true)
+    appMenu?.invokeMethod("settings", arguments: nil)
+  }
+
   static func register(with messenger: FlutterBinaryMessenger) {
+    appMenu = FlutterMethodChannel(name: appMenuName, binaryMessenger: messenger)
     let channel = FlutterMethodChannel(name: name, binaryMessenger: messenger)
     channel.setMethodCallHandler { call, result in
       let arguments = call.arguments as? [String: Any] ?? [:]
@@ -25,6 +40,22 @@ enum MacosServicesChannel {
         result(agentStatus())
       case "agentRegister":
         registerAgent(result)
+      case "agentUnregister":
+        unregisterAgent(result)
+      case "keychainItems":
+        keychainItems(arguments["prefix"] as? String ?? keychainPrefix, result)
+      case "appVersion":
+        let info = Bundle.main.infoDictionary ?? [:]
+        let short = info["CFBundleShortVersionString"] as? String ?? "?"
+        let build = info["CFBundleVersion"] as? String ?? "?"
+        result("\(short) (\(build))")
+      case "appMoveToTrash":
+        NSWorkspace.shared.recycle([Bundle.main.bundleURL]) { _, error in
+          DispatchQueue.main.async { result(error == nil) }
+        }
+      case "appQuit":
+        result(nil)
+        DispatchQueue.main.async { NSApp.terminate(nil) }
       case "openLoginItems":
         if #available(macOS 13.0, *) {
           SMAppService.openSystemSettingsLoginItems()
@@ -95,7 +126,63 @@ enum MacosServicesChannel {
     }
   }
 
+  private static func unregisterAgent(_ result: @escaping FlutterResult) {
+    guard #available(macOS 13.0, *) else {
+      result("unsupported")
+      return
+    }
+    let service = SMAppService.agent(plistName: agentPlist)
+    // Unregistering waits until launchd has stopped the engine.
+    service.unregister { error in
+      DispatchQueue.main.async {
+        let code = (error as NSError?)?.code
+        if error == nil || code == kSMErrorJobNotFound {
+          result(describe(service.status))
+        } else {
+          result(
+            FlutterError(
+              code: "unregister_failed",
+              message: error?.localizedDescription,
+              details: nil
+            )
+          )
+        }
+      }
+    }
+  }
+
   // MARK: Keychain
+
+  /// The service and account of every generic password whose service is
+  /// [prefix] or under it. Only the names: no value is read, so macOS asks
+  /// for nothing.
+  private static func keychainItems(_ prefix: String, _ result: FlutterResult) {
+    let query: [String: Any] = [
+      kSecClass as String: kSecClassGenericPassword,
+      kSecMatchLimit as String: kSecMatchLimitAll,
+      kSecReturnAttributes as String: true,
+    ]
+    var items: CFTypeRef?
+    let status = SecItemCopyMatching(query as CFDictionary, &items)
+    switch status {
+    case errSecSuccess:
+      let all = items as? [[String: Any]] ?? []
+      result(
+        all.compactMap { item -> [String: String]? in
+          guard
+            let service = item[kSecAttrService as String] as? String,
+            service == prefix || service.hasPrefix(prefix + "."),
+            let account = item[kSecAttrAccount as String] as? String
+          else { return nil }
+          return ["service": service, "account": account]
+        }
+      )
+    case errSecItemNotFound:
+      result([])
+    default:
+      result(failure(status))
+    }
+  }
 
   private static func query(_ account: String) -> [String: Any] {
     [

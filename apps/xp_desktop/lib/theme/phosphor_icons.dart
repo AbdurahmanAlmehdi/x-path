@@ -13,6 +13,18 @@ import 'package:flutter/widgets.dart';
 const _package = 'phosphor_flutter';
 
 abstract final class PhosphorIconsRegular {
+  static const gearSix = IconData(
+    0xe272,
+    fontFamily: 'PhosphorRegular',
+    fontPackage: _package,
+    matchTextDirection: true,
+  );
+  static const githubLogo = IconData(
+    0xe576,
+    fontFamily: 'PhosphorRegular',
+    fontPackage: _package,
+    matchTextDirection: true,
+  );
   static const androidLogo = IconData(
     0xe008,
     fontFamily: 'PhosphorRegular',
@@ -436,6 +448,12 @@ abstract final class PhosphorIconsRegular {
 }
 
 abstract final class PhosphorIconsFill {
+  static const gearSix = IconData(
+    0xe272,
+    fontFamily: 'PhosphorFill',
+    fontPackage: _package,
+    matchTextDirection: true,
+  );
   static const androidLogo = IconData(
     0xe008,
     fontFamily: 'PhosphorFill',

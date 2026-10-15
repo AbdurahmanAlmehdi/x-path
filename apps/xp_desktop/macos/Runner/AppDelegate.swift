@@ -10,4 +10,9 @@ class AppDelegate: FlutterAppDelegate {
   override func applicationSupportsSecureRestorableState(_ app: NSApplication) -> Bool {
     return true
   }
+
+  /// XPath ▸ Settings… (⌘,): the Dart side shows the settings page.
+  @IBAction func openSettings(_ sender: Any?) {
+    MacosServicesChannel.openSettings()
+  }
 }

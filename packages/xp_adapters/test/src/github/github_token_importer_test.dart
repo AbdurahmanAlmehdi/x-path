@@ -34,6 +34,24 @@ void main() {
     expect(call.environment, containsPair('GH_PROMPT_DISABLED', '1'));
   });
 
+  test('reads the token without storing it, as a GitHubCliToken', () async {
+    final runner = FakeProcessRunner(
+      (_) => const ProcessOutput(exitCode: 0, stdout: 'gho_abc123\n'),
+    );
+    final GitHubCliToken cli = importerAnswering(runner);
+
+    expect(await cli.read(), 'gho_abc123');
+    expect(secrets.values, isEmpty);
+  });
+
+  test('says how to fix a failure', () {
+    const error = GitHubTokenImportException('gh auth token failed.');
+
+    expect(error, isA<GitHubCliTokenException>());
+    expect(error.fix, contains('gh auth login'));
+    expect('$error', 'GitHubTokenImportException: gh auth token failed.');
+  });
+
   test('runs the configured gh', () async {
     final runner = FakeProcessRunner(
       (_) => const ProcessOutput(exitCode: 0, stdout: 'gho_abc123\n'),

@@ -117,6 +117,17 @@ final class OnboardingDestination extends ShellDestination {
   const new();
 }
 
+/// The settings: the versions, the engine's GitHub token and "Remove
+/// XPath". [github] puts the cursor in the GitHub token field.
+final class SettingsDestination extends ShellDestination {
+  const new({this.github = false});
+
+  final bool github;
+
+  @override
+  List<Object?> get props => [github];
+}
+
 /// Where the shell is. It lives inside the engine's subtree, so switching
 /// engines starts over at [HomeDestination].
 class ShellCubit extends Cubit<ShellDestination> {
