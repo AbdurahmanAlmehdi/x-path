@@ -1183,4 +1183,610 @@ class AppLocalizationsEn extends AppLocalizations {
   String consoleLast(String job) {
     return '· last: $job';
   }
+
+  @override
+  String get sidebarOverview => 'Overview';
+
+  @override
+  String get sidebarReleases => 'Releases';
+
+  @override
+  String get sidebarApprovals => 'Approvals';
+
+  @override
+  String get overviewOpenRelease => 'Open release';
+
+  @override
+  String get needsYou => 'Needs you';
+
+  @override
+  String needsYouMeta(String sha, String left) {
+    return '$sha · expires in $left';
+  }
+
+  @override
+  String needsYouMore(int count) {
+    return '+$count more';
+  }
+
+  @override
+  String get approvalPending => 'Pending';
+
+  @override
+  String get approvalApproved => 'Approved';
+
+  @override
+  String get approvalDenied => 'Denied';
+
+  @override
+  String get approvalExpired => 'Expired';
+
+  @override
+  String approvalTitleRelease(String version) {
+    return 'Release $version to the stores';
+  }
+
+  @override
+  String approvalTitlePatch(String version) {
+    return 'Patch $version';
+  }
+
+  @override
+  String approvalTitleSubmit(String version) {
+    return 'Submit $version to the stores';
+  }
+
+  @override
+  String approvalTitlePush(String version) {
+    return 'Push $version to GitHub';
+  }
+
+  @override
+  String approvalTitleMerge(String version) {
+    return 'Merge the release PR of $version';
+  }
+
+  @override
+  String approvalTitleOther(String action, String version) {
+    return 'Approve the $action of $version';
+  }
+
+  @override
+  String approvalTitleBare(String action) {
+    return 'Approve the $action';
+  }
+
+  @override
+  String get approvalIfYouApprove => 'If you approve';
+
+  @override
+  String approvalIfRelease(String version, String sha) {
+    return 'XPath builds $version from $sha and releases it to the stores.';
+  }
+
+  @override
+  String approvalIfPatch(String version, String sha) {
+    return 'XPath publishes a Shorebird patch of $version built from $sha.';
+  }
+
+  @override
+  String approvalIfSubmit(String version, String sha) {
+    return 'XPath uploads the builds made from $sha and submits $version for store review.';
+  }
+
+  @override
+  String approvalIfPush(String version, String sha) {
+    return 'XPath pushes the release commit $sha and the tag of $version to GitHub.';
+  }
+
+  @override
+  String approvalIfMerge(String version, String branch) {
+    return 'XPath merges the release pull request of $version into $branch with a merge commit.';
+  }
+
+  @override
+  String approvalIfDelete(String sha) {
+    return 'XPath deletes what the job asks to delete, on $sha.';
+  }
+
+  @override
+  String approvalIfOther(String action) {
+    return 'The job goes on with its $action.';
+  }
+
+  @override
+  String approvalIfTarget(String target) {
+    return 'It goes out as $target.';
+  }
+
+  @override
+  String get approvalVoid =>
+      'If the commit, version or flavor change before then, this approval is void.';
+
+  @override
+  String get approvalBaseBranch => 'the base branch';
+
+  @override
+  String approvalExpiresIn(String left, String asked) {
+    return 'expires in $left · $asked';
+  }
+
+  @override
+  String approvalExpiresShort(String left) {
+    return 'expires in $left';
+  }
+
+  @override
+  String approvalExpiredAt(String at) {
+    return 'expired $at';
+  }
+
+  @override
+  String approvalDecidedBy(String who, String at) {
+    return 'by $who · $at';
+  }
+
+  @override
+  String get approvalSomeone => 'another device';
+
+  @override
+  String approvalAskedAt(String time) {
+    return 'asked at $time';
+  }
+
+  @override
+  String get approvalProject => 'Project';
+
+  @override
+  String get approvalFlavor => 'Flavor';
+
+  @override
+  String get approvalVersion => 'Version';
+
+  @override
+  String get approvalCommit => 'Commit';
+
+  @override
+  String get approvalJob => 'Job';
+
+  @override
+  String get approvalGate => 'Gate';
+
+  @override
+  String get approvalReason => 'Reason';
+
+  @override
+  String approvalGateName(String action) {
+    return 'Project gate “$action”';
+  }
+
+  @override
+  String approvalWaits(String step) {
+    return '$step waits for this';
+  }
+
+  @override
+  String get approvalReview => 'Review…';
+
+  @override
+  String get approvalApprove => 'Approve';
+
+  @override
+  String get approvalApproveEllipsis => 'Approve…';
+
+  @override
+  String get approvalDenyEllipsis => 'Deny…';
+
+  @override
+  String get approvalDeny => 'Deny';
+
+  @override
+  String get approvalBack => 'Back';
+
+  @override
+  String get approvalCancel => 'Cancel';
+
+  @override
+  String get approvalClose => 'Close';
+
+  @override
+  String get approvalDenyReason => 'Reason (optional)';
+
+  @override
+  String get approvalDenyReasonHint => 'Why, for the record';
+
+  @override
+  String get approvalReturnHint => 'Return never approves. ⌘↩ approves.';
+
+  @override
+  String get approvalArming => 'Approve arms in a moment';
+
+  @override
+  String approvalDecidedElsewhere(String state, String who) {
+    return 'Already $state by $who. The first decision counts; nothing to do here.';
+  }
+
+  @override
+  String get approvalExpiredElsewhere =>
+      'This approval expired: it counts as denied. Dispatch again to ask anew.';
+
+  @override
+  String get approvalGone => 'This approval cannot be read on this engine.';
+
+  @override
+  String get approvalsTitle => 'Approvals';
+
+  @override
+  String approvalsSubtitle(String engine, int count) {
+    return '$engine · $count pending';
+  }
+
+  @override
+  String get approvalsPending => 'Pending';
+
+  @override
+  String get approvalsDecided => 'Decided';
+
+  @override
+  String get approvalsExpired => 'Expired';
+
+  @override
+  String get approvalsNothingWaits => 'Nothing is waiting';
+
+  @override
+  String get approvalsNone => 'Nothing here';
+
+  @override
+  String notificationBody(String where, String left) {
+    return '$where · expires in $left';
+  }
+
+  @override
+  String get notificationLater => 'Later';
+
+  @override
+  String menuBarTooltip(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'XPath: $count need you',
+      one: 'XPath: 1 needs you',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String menuBarNeedsYou(int count) {
+    return 'Needs you · $count';
+  }
+
+  @override
+  String get menuBarNothing => 'Nothing needs you';
+
+  @override
+  String menuBarReview(String title) {
+    return 'Review: $title…';
+  }
+
+  @override
+  String menuBarLeft(String where, String left) {
+    return '$where · $left left';
+  }
+
+  @override
+  String get menuBarOpen => 'Open XPath';
+
+  @override
+  String get releasesTitle => 'Releases';
+
+  @override
+  String get releasesEmpty =>
+      'A production release dispatched from the overview shows up here.';
+
+  @override
+  String releaseTitle(String version) {
+    return 'Release $version';
+  }
+
+  @override
+  String get releaseRefresh => 'Refresh';
+
+  @override
+  String get releaseRefreshHint =>
+      'Ask the stores now instead of waiting up to ten minutes';
+
+  @override
+  String releaseRejectedBy(String store) {
+    return 'Rejected by $store';
+  }
+
+  @override
+  String get releaseRejectedByBoth => 'Rejected by both stores';
+
+  @override
+  String get lanesTitle => 'Store lanes';
+
+  @override
+  String get storeApproved => 'Approved';
+
+  @override
+  String get storeUnknown => 'Unknown';
+
+  @override
+  String get storeWaitingForReview => 'Waiting for review';
+
+  @override
+  String get storesBoth => 'App Store and Google Play';
+
+  @override
+  String get listAnd => ' and ';
+
+  @override
+  String laneSince(String time) {
+    return 'since $time';
+  }
+
+  @override
+  String get laneNoApiKey => 'no API key';
+
+  @override
+  String get laneNoServiceAccount => 'no service account';
+
+  @override
+  String laneNotTargeted(String store) {
+    return 'This release does not go to $store.';
+  }
+
+  @override
+  String get laneNewBuild => 'New build, same version…';
+
+  @override
+  String laneNewBuildCaption(String version) {
+    return '$version → a new build number';
+  }
+
+  @override
+  String laneReplacedToo(String build) {
+    return 'A new build replaces $build here too, so both stores ship the same build.';
+  }
+
+  @override
+  String get laneMarkApproved => 'Mark approved';
+
+  @override
+  String get laneMarkLive => 'Mark live';
+
+  @override
+  String get laneAddApiKey => 'Add API key…';
+
+  @override
+  String get laneAddServiceAccount => 'Add service account…';
+
+  @override
+  String get laneManualApple =>
+      'No App Store Connect API key for this flavor: the engine cannot read the review, and each mark is recorded as manual';
+
+  @override
+  String get laneManualPlay =>
+      'No Google Play service account for this flavor: the engine cannot read the review, and each mark is recorded as manual';
+
+  @override
+  String laneLiveNow(String version) {
+    return 'Live now $version';
+  }
+
+  @override
+  String laneReplaced(String version) {
+    return 'Replaced $version';
+  }
+
+  @override
+  String newBuildTitle(String version) {
+    return 'Build $version again?';
+  }
+
+  @override
+  String newBuildBody(String build) {
+    return 'The production workflow runs again on the release branch with the same version and the next free build number; $build is never reused. It asks for your approval like any release.';
+  }
+
+  @override
+  String get newBuildConfirm => 'Start new build';
+
+  @override
+  String mergeInto(String branch) {
+    return 'Merge into $branch';
+  }
+
+  @override
+  String get mergeReady => 'Both stores live';
+
+  @override
+  String mergeReadyBranch(String branch, String base) {
+    return '$branch → $base · both stores live';
+  }
+
+  @override
+  String mergeDone(String sha) {
+    return 'Merged · $sha';
+  }
+
+  @override
+  String get mergeAbandoned => 'The release was abandoned';
+
+  @override
+  String get mergeRequested => 'Merge requested';
+
+  @override
+  String get mergeWaitsApproval => 'Merge requested · waits for your approval';
+
+  @override
+  String mergeRejected(String stores) {
+    return '$stores rejected this build';
+  }
+
+  @override
+  String get mergeNoPr => 'The release has no pull request yet';
+
+  @override
+  String get mergeWaitsBoth => 'Waits for both stores to go live';
+
+  @override
+  String mergeWaitsStore(String store) {
+    return 'Waits for $store to go live';
+  }
+
+  @override
+  String mergeMark(String store) {
+    return 'Mark $store live';
+  }
+
+  @override
+  String mergeMust(String store) {
+    return '$store must go live';
+  }
+
+  @override
+  String get timelineTitle => 'Timeline';
+
+  @override
+  String get timelineNewestFirst => 'newest first';
+
+  @override
+  String get timelineDispatched => 'Release dispatched';
+
+  @override
+  String timelineBuild(String build) {
+    return 'Build $build started';
+  }
+
+  @override
+  String timelineStore(String store, String state) {
+    return '$store: $state';
+  }
+
+  @override
+  String timelineApprovalAsked(String title) {
+    return 'Approval requested: $title';
+  }
+
+  @override
+  String timelineApprovalSettled(String title, String state) {
+    return '$title: $state';
+  }
+
+  @override
+  String timelineMerged(String branch) {
+    return 'Merged into $branch';
+  }
+
+  @override
+  String get sourceUpload => 'Upload step';
+
+  @override
+  String get sourceAppStoreConnect => 'App Store Connect API';
+
+  @override
+  String get sourcePlayApi => 'Google Play API';
+
+  @override
+  String get sourceLookup => 'iTunes lookup';
+
+  @override
+  String get sourceManual => 'Marked by hand';
+
+  @override
+  String get notesTitle => 'Release notes';
+
+  @override
+  String notesCommits(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count commits',
+      one: '1 commit',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String notesSince(String tag, int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count commits',
+      one: '1 commit',
+    );
+    return 'since $tag · $_temp0';
+  }
+
+  @override
+  String get notesUntagged => 'The notes are ready once the release is tagged.';
+
+  @override
+  String get notesNothing => 'Nothing changed since the release before.';
+
+  @override
+  String get notesCopySlack => 'Copy for Slack';
+
+  @override
+  String get notesCopyWhatsApp => 'Copy for WhatsApp';
+
+  @override
+  String get copied => 'Copied';
+
+  @override
+  String get minVersionTitle => 'Forced update';
+
+  @override
+  String get minVersionReminder => 'Reminder';
+
+  @override
+  String minVersionLater(String variables, String version) {
+    return 'If this release is a forced update, raise $variables to $version once the stores have it live. Raising it earlier locks out users who have nothing to update to.';
+  }
+
+  @override
+  String minVersionNow(String stores, String variables, String version) {
+    return '$stores live: if this release is a forced update, raise $variables to $version in Firebase Remote Config now.';
+  }
+
+  @override
+  String minVersionRest(String variables, String stores) {
+    return 'Raise $variables once $stores is live.';
+  }
+
+  @override
+  String minVersionBanner(String variables, String version) {
+    return 'If this release is a forced update, raise $variables to $version: every store has it live.';
+  }
+
+  @override
+  String get minVersionNoStores => 'This release goes to no store.';
+
+  @override
+  String get prTitle => 'Release PR';
+
+  @override
+  String get prNone =>
+      'No pull request yet: the release opens one once it is tagged.';
+
+  @override
+  String prTagged(String tag) {
+    return 'Merging adds no tag: $tag was tagged when the build was recorded.';
+  }
+
+  @override
+  String get prUntagged => 'The release is tagged when its build is recorded.';
+
+  @override
+  String prMerged(String sha) {
+    return 'Merged with a merge commit · $sha';
+  }
+
+  @override
+  String get prCopyLink => 'Copy link';
+
+  @override
+  String get prOpenMergeJob => 'Open merge job';
 }

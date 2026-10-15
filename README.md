@@ -1620,6 +1620,27 @@ sidebar mark are assets, and the icons are Phosphor's.
   and follow (⌘↓); it resumes from the last line it holds, also after the job is resumed. Cancel (⌘.) asks first and
   says what stops, what is kept and what never starts; a failed, cancelled or interrupted job offers "Re-run all"
   (⌘R) and "Resume from <step>" (⌥⌘R, from the step picked in the step list or the first unfinished one).
+- **Releases** (Phase 16b, concept 3A; Releases under the selected project, or "Open release" on the overview): the
+  release shown (the one in flight, or the one picked in the toolbar) is the hero, with Merge beside it and why it
+  is not open yet. Under it an App Store lane and a Google Play lane show the steps of each review, from the store
+  statuses the engine keeps (Refresh asks the stores now). A store the engine cannot read (no App Store Connect key
+  or Play service account for the flavor) gets "Mark approved" / "Mark live" (D-14, D-15); a rejected build offers
+  "New build, same version…", which opens the run it starts. Then the timeline (what the engine keeps: the
+  dispatch, each build, the last change in each store, the approvals of its runs), the release notes with "Copy for
+  Slack" / "Copy for WhatsApp", the `min_version_*` reminder (the engine does not know whether a release is a forced
+  update, so it says "if") and the release PR.
+- **Approvals** (D-13): the needs-you bar of a project (the approval that expires first; "Review… ⇧⌘A", "Deny…"), the
+  inbox (Approvals in the sidebar, with the count of what waits; Pending, Decided, Expired) and the confirmation
+  sheet, the only place the app decides. The sheet says what the approval is bound to and "If you approve…"; Approve
+  takes ⌘↩ (or a click) once a one-second arming delay is over, Return never approves, and an approval another device
+  decided first (`409 already_decided`) or that expired ends the sheet with who decided it.
+- **Notifications and the menu bar extra**: an approval that starts waiting while the app runs posts a macOS
+  notification ("Review…", "Later"); the menu bar extra (`XPathTemplate`, a dot while something waits) lists every
+  approval that waits and "Open XPath". Neither decides anything: "Review…" opens the confirmation sheet in the main
+  window, a click on the notification opens the inbox. macOS asks for permission to notify the first time one is
+  posted. Both go through `NeedsYouAlerts` in `packages/xp_macos_services` (channel `ly.abdurahman.xpath/needs_you`,
+  implemented in `MacosServicesChannel.swift`; a native status item with an `NSMenu`); the tests use
+  `FakeNeedsYouAlerts`.
 - **macOS services** (`packages/xp_macos_services`) are interfaces with fakes (`package:xp_macos_services/testing.dart`):
   the LaunchAgent and the Keychain go through the channel `ly.abdurahman.xpath/macos_services`, implemented in
   `apps/xp_desktop/macos/Runner/MacosServicesChannel.swift`; the `xp` link, the tool check and the bundled engine are

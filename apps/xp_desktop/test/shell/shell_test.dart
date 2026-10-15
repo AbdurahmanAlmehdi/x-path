@@ -5,6 +5,7 @@ import 'package:mocktail/mocktail.dart';
 import 'package:xp_api/xp_api.dart';
 import 'package:xp_desktop/add_project/view/add_project_page.dart';
 import 'package:xp_desktop/app/app.dart';
+import 'package:xp_desktop/approvals/approvals.dart';
 import 'package:xp_desktop/credentials/view/credentials_page.dart';
 import 'package:xp_desktop/engines/view/engines_page.dart';
 import 'package:xp_desktop/job/view/job_page.dart';
@@ -12,9 +13,11 @@ import 'package:xp_desktop/onboarding/view/onboarding_page.dart';
 import 'package:xp_desktop/project_overview/view/project_overview_page.dart';
 import 'package:xp_desktop/projects/bloc/projects_bloc.dart';
 import 'package:xp_desktop/projects/view/no_projects_page.dart';
+import 'package:xp_desktop/releases/view/releases_page.dart';
 import 'package:xp_desktop/shell/shell.dart';
 import 'package:xp_repositories/xp_repositories.dart';
 
+import '../helpers/approval_fixtures.dart';
 import '../helpers/fakes.dart';
 import '../helpers/pump_app.dart';
 
@@ -78,6 +81,8 @@ void main() {
       (const ProjectDestination('prj_2'), ProjectOverviewPage),
       (const JobDestination('run_1'), JobPage),
       (const AddProjectDestination(), AddProjectPage),
+      (const ReleasesDestination('prj_1'), ReleasesPage),
+      (const ApprovalsDestination(), ApprovalsPage),
       (const CredentialsDestination('prj_1'), CredentialsPage),
       (const EnginesDestination(), EnginesPage),
       (const OnboardingDestination(), OnboardingPage),
@@ -90,6 +95,37 @@ void main() {
   });
 
   group('Sidebar', () {
+    testWidgets('shows the rows of the selected project and the approvals', (
+      tester,
+    ) async {
+      final shell = ShellCubit(const ProjectDestination('prj_1'));
+      await tester.pumpApp(
+        const Sidebar(),
+        shell: shell,
+        projects: projectsIn(
+          const ProjectsState(loaded: true, projects: [mataa, captain]),
+        ),
+        pendingApprovals: pendingIn(
+          PendingApprovalsState(
+            loaded: true,
+            approvals: [pendingApproval, mergeApproval],
+          ),
+        ),
+      );
+      expect(find.text('1 app · 1 needs you'), findsOneWidget);
+      expect(find.text('2'), findsOneWidget);
+      await tester.tap(find.text('Releases'));
+      await tester.pump();
+      expect(shell.state, const ReleasesDestination('prj_1'));
+      await tester.tap(find.text('Overview'));
+      await tester.pump();
+      expect(shell.state, const ProjectDestination('prj_1'));
+      await tester.tap(find.text('Approvals'));
+      await tester.pump();
+      expect(shell.state, const ApprovalsDestination());
+      expect(find.text('Releases'), findsNothing);
+    });
+
     testWidgets('lists the projects with what their scan found', (
       tester,
     ) async {

@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:xp_desktop/app/app.dart';
+import 'package:xp_desktop/approvals/bloc/pending_approvals_bloc.dart';
 import 'package:xp_desktop/l10n/l10n.dart';
 import 'package:xp_desktop/projects/bloc/projects_bloc.dart';
 import 'package:xp_desktop/shell/cubit/shell_cubit.dart';
@@ -24,6 +25,21 @@ class MockProjectsBloc extends MockBloc<ProjectsEvent, ProjectsState>
     implements ProjectsBloc;
 
 class MockShellCubit extends MockCubit<ShellDestination> implements ShellCubit;
+
+class MockPendingApprovalsBloc
+    extends MockBloc<PendingApprovalsEvent, PendingApprovalsState>
+    implements PendingApprovalsBloc;
+
+/// A pending-approvals bloc that stays in [state].
+MockPendingApprovalsBloc pendingIn(PendingApprovalsState state) {
+  final bloc = MockPendingApprovalsBloc();
+  whenListen(
+    bloc,
+    const Stream<PendingApprovalsState>.empty(),
+    initialState: state,
+  );
+  return bloc;
+}
 
 /// A connection bloc that stays in [state].
 MockEngineConnectionBloc connectionIn(EngineConnectionState state) {
@@ -101,6 +117,8 @@ extension PumpApp on WidgetTester {
     ReleasesRepository? releasesRepository,
     RunnersRepository? runnersRepository,
     WorkflowsRepository? workflowsRepository,
+    ApprovalsRepository? approvalsRepository,
+    PendingApprovalsBloc? pendingApprovals,
     Brightness brightness = Brightness.light,
   }) async {
     desktopWindow(this);
@@ -125,6 +143,9 @@ extension PumpApp on WidgetTester {
           RepositoryProvider<WorkflowsRepository>.value(
             value: workflowsRepository ?? MockWorkflowsRepository(),
           ),
+          RepositoryProvider<ApprovalsRepository>.value(
+            value: approvalsRepository ?? quietApprovals(),
+          ),
         ],
         child: MultiBlocProvider(
           providers: [
@@ -134,6 +155,11 @@ extension PumpApp on WidgetTester {
             BlocProvider<ShellCubit>.value(value: shell ?? ShellCubit()),
             BlocProvider<ProjectsBloc>.value(
               value: projects ?? projectsIn(const ProjectsState(loaded: true)),
+            ),
+            BlocProvider<PendingApprovalsBloc>.value(
+              value:
+                  pendingApprovals ??
+                  pendingIn(const PendingApprovalsState(loaded: true)),
             ),
           ],
           child: themed(Material(child: widget), brightness: brightness),
