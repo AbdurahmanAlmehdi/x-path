@@ -1,4 +1,5 @@
 import 'package:xp_api/xp_api.dart';
+import 'package:xp_repositories/src/run_jobs.dart';
 import 'package:xp_repositories/src/session/engine_session.dart';
 import 'package:xp_repositories/src/snapshot.dart';
 
@@ -39,6 +40,35 @@ class JobsRepository {
       decode: (json) => Run.fromJson(json! as Map<String, dynamic>),
       refreshOn: (event) => switch (event) {
         JobStateChanged(projectId: final project) ||
+        ApprovalRequested(projectId: final project) ||
+        ApprovalDecided(projectId: final project) ||
+        ApprovalExpired(projectId: final project) => project == projectId,
+        _ => false,
+      },
+    );
+  }
+
+  /// One run with every one of its jobs and their steps, kept up to date by
+  /// the events of those jobs and the approvals of its project: what the job
+  /// view draws its pipeline graph from.
+  Stream<Snapshot<RunJobs>> watchRunJobs(String id) {
+    String? projectId;
+    var jobIds = <String>{};
+    return _session.watch(
+      key: 'run-jobs.$id',
+      fetch: (client) async {
+        final run = await client.getRun(id);
+        final jobs = [for (final job in run.jobs) await client.getJob(job.id)];
+        projectId = run.projectId;
+        jobIds = {for (final job in run.jobs) job.id};
+        return RunJobs(run: run, jobs: jobs);
+      },
+      encode: (value) => value.toJson(),
+      decode: (json) => RunJobs.fromJson(json! as Map<String, dynamic>),
+      refreshOn: (event) => switch (event) {
+        JobStateChanged(:final jobId) ||
+        JobStepChanged(:final jobId) ||
+        RunnerLeaseLost(:final jobId) => jobIds.contains(jobId),
         ApprovalRequested(projectId: final project) ||
         ApprovalDecided(projectId: final project) ||
         ApprovalExpired(projectId: final project) => project == projectId,
