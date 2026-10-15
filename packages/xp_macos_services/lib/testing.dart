@@ -2,6 +2,8 @@
 /// touches macOS.
 library;
 
+import 'dart:async';
+
 import 'package:xp_macos_services/xp_macos_services.dart';
 
 /// An [EngineAgent] that answers [registerResult] and records what it was
@@ -142,4 +144,35 @@ class FakeLocalEngine implements LocalEngine {
     if (error case final error?) throw error;
     return token;
   }
+}
+
+/// [NeedsYouAlerts] that records what it was asked and lets the test play
+/// the owner's clicks with [act].
+class FakeNeedsYouAlerts implements NeedsYouAlerts {
+  /// The notices shown, oldest first.
+  final notices = <ApprovalNotice>[];
+
+  /// The approvals whose notification was withdrawn, oldest first.
+  final withdrawn = <String>[];
+
+  /// Every content of the menu bar extra, oldest first.
+  final menus = <MenuBarContent>[];
+
+  final _actions = StreamController<NeedsYouAction>.broadcast();
+
+  /// Plays [action] as if the owner clicked it.
+  void act(NeedsYouAction action) => _actions.add(action);
+
+  @override
+  Future<void> notify(ApprovalNotice notice) async => notices.add(notice);
+
+  @override
+  Future<void> withdraw(String approvalId) async => withdrawn.add(approvalId);
+
+  @override
+  Future<void> updateMenuBar(MenuBarContent content) async =>
+      menus.add(content);
+
+  @override
+  Stream<NeedsYouAction> get actions => _actions.stream;
 }

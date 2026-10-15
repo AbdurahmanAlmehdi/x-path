@@ -12,6 +12,7 @@ class MainFlutterWindow: NSWindow {
 
     RegisterGeneratedPlugins(registry: flutterViewController)
     MacosServicesChannel.register(with: flutterViewController.engine.binaryMessenger)
+    NeedsYouChannel.register(with: flutterViewController.engine.binaryMessenger)
 
     super.awakeFromNib()
   }

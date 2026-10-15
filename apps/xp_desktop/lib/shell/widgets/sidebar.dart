@@ -1,6 +1,7 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:xp_api/xp_api.dart';
+import 'package:xp_desktop/approvals/bloc/pending_approvals_bloc.dart';
 import 'package:xp_desktop/l10n/l10n.dart';
 import 'package:xp_desktop/projects/bloc/projects_bloc.dart';
 import 'package:xp_desktop/shell/cubit/shell_cubit.dart';
@@ -19,8 +20,10 @@ class Sidebar extends StatelessWidget {
     final colors = context.xpColors;
     final destination = context.watch<ShellCubit>().state;
     final projects = context.watch<ProjectsBloc>().state;
+    final pending = context.watch<PendingApprovalsBloc>().state.approvals;
     final selectedProject = switch (destination) {
       ProjectDestination(:final projectId) => projectId,
+      ReleasesDestination(:final projectId) => projectId,
       JobDestination(:final projectId) => projectId,
       HomeDestination() when projects.projects.isNotEmpty =>
         projects.projects.first.id,
@@ -57,14 +60,46 @@ class Sidebar extends StatelessWidget {
                       ),
                     ),
                   ),
-                for (final project in projects.projects)
+                for (final project in projects.projects) ...[
                   _ProjectRow(
                     project: project,
                     selected: project.id == selectedProject,
+                    needsYou: pending
+                        .where((approval) => approval.projectId == project.id)
+                        .length,
                     onTap: () => show(ProjectDestination(project.id)),
                   ),
+                  if (project.id == selectedProject) ...[
+                    SidebarRow(
+                      icon: PhosphorIconsRegular.treeStructure,
+                      selectedIcon: PhosphorIconsFill.treeStructure,
+                      label: l10n.sidebarOverview,
+                      indent: 12,
+                      selected:
+                          destination is ProjectDestination ||
+                          destination is HomeDestination,
+                      onTap: () => show(ProjectDestination(project.id)),
+                    ),
+                    SidebarRow(
+                      icon: PhosphorIconsRegular.package,
+                      selectedIcon: PhosphorIconsFill.package,
+                      label: l10n.sidebarReleases,
+                      indent: 12,
+                      selected: destination is ReleasesDestination,
+                      onTap: () => show(ReleasesDestination(project.id)),
+                    ),
+                  ],
+                ],
                 const SizedBox(height: 18),
                 _Caption(l10n.sidebarEngine),
+                SidebarRow(
+                  icon: PhosphorIconsRegular.handPalm,
+                  selectedIcon: PhosphorIconsFill.handPalm,
+                  label: l10n.sidebarApprovals,
+                  selected: destination is ApprovalsDestination,
+                  count: pending.length,
+                  onTap: () => show(const ApprovalsDestination()),
+                ),
                 SidebarRow(
                   icon: PhosphorIconsRegular.key,
                   selectedIcon: PhosphorIconsFill.key,
@@ -144,6 +179,8 @@ class SidebarRow extends StatefulWidget {
     required this.label,
     required this.onTap,
     this.selected = false,
+    this.indent = 0,
+    this.count = 0,
     super.key,
   });
 
@@ -152,6 +189,13 @@ class SidebarRow extends StatefulWidget {
   final String label;
   final bool selected;
   final VoidCallback onTap;
+
+  /// How far the row sits in, for the rows of the selected project.
+  final double indent;
+
+  /// What waits for the owner here: the needs-you count badge, the only
+  /// warning fill besides the needs-you bar (Colour guide).
+  final int count;
 
   @override
   State<SidebarRow> createState() => _SidebarRowState();
@@ -173,6 +217,7 @@ class _SidebarRowState extends State<SidebarRow> {
         height: context.xpSizes.rowSidebar,
         child: Row(
           children: [
+            SizedBox(width: widget.indent),
             Icon(
               widget.selected ? widget.selectedIcon : widget.icon,
               size: context.xpSizes.iconMd,
@@ -190,6 +235,7 @@ class _SidebarRowState extends State<SidebarRow> {
                         .copyWith(color: colors.textPrimary),
               ),
             ),
+            if (widget.count > 0) _CountBadge(widget.count),
           ],
         ),
       ),
@@ -197,16 +243,42 @@ class _SidebarRowState extends State<SidebarRow> {
   }
 }
 
+/// The needs-you count: `color.warning.default` with its on-colour.
+class _CountBadge extends StatelessWidget {
+  const new(this.count);
+
+  final int count;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 6),
+    decoration: BoxDecoration(
+      color: context.xpColors.warningDefault,
+      borderRadius: BorderRadius.circular(context.xpRadii.full),
+    ),
+    child: Text(
+      '$count',
+      style: context.xpType.label.copyWith(
+        color: context.xpColors.warningOnWarning,
+      ),
+    ),
+  );
+}
+
 class _ProjectRow extends StatefulWidget {
   const new({
     required this.project,
     required this.selected,
     required this.onTap,
+    this.needsYou = 0,
   });
 
   final Project project;
   final bool selected;
   final VoidCallback onTap;
+
+  /// How many approvals of the project wait.
+  final int needsYou;
 
   @override
   State<_ProjectRow> createState() => _ProjectRowState();
@@ -228,7 +300,12 @@ class _ProjectRowState extends State<_ProjectRow> {
         .where((finding) => finding.severity == FindingSeverity.warning)
         .length;
     final apps = l10n.projectApps(project.profile.apps.length);
-    final Widget meta = errors > 0
+    final Widget meta = widget.needsYou > 0
+        ? XpStatusLabel(
+            XpStatus.approvalPending,
+            '$apps · ${l10n.overviewNeedsYou(widget.needsYou)}',
+          )
+        : errors > 0
         ? XpStatusLabel(
             XpStatus.scanError,
             '$apps · ${l10n.projectErrors(errors)}',

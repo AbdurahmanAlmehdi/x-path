@@ -37,6 +37,27 @@ final class JobDestination extends ShellDestination {
   List<Object?> get props => [runId, jobId, projectId];
 }
 
+/// The releases of [projectId], showing [releaseId] first if given.
+final class ReleasesDestination extends ShellDestination {
+  const new(this.projectId, {this.releaseId});
+
+  final String projectId;
+  final String? releaseId;
+
+  @override
+  List<Object?> get props => [projectId, releaseId];
+}
+
+/// The approvals inbox, showing [approvalId] first if given.
+final class ApprovalsDestination extends ShellDestination {
+  const new({this.approvalId});
+
+  final String? approvalId;
+
+  @override
+  List<Object?> get props => [approvalId];
+}
+
 /// Add project.
 final class AddProjectDestination extends ShellDestination {
   const new();
@@ -68,4 +89,12 @@ class ShellCubit extends Cubit<ShellDestination> {
   new([super.initialState = const HomeDestination()]);
 
   void show(ShellDestination destination) => emit(destination);
+
+  /// The project the destination shows, if it shows one.
+  String? get projectId => switch (state) {
+    ProjectDestination(:final projectId) ||
+    ReleasesDestination(:final projectId) => projectId,
+    JobDestination(:final projectId) => projectId,
+    _ => null,
+  };
 }

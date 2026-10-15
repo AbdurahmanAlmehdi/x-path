@@ -2019,6 +2019,924 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'· last: {job}'**
   String consoleLast(String job);
+
+  /// Sidebar row under the selected project.
+  ///
+  /// In en, this message translates to:
+  /// **'Overview'**
+  String get sidebarOverview;
+
+  /// Sidebar row under the selected project.
+  ///
+  /// In en, this message translates to:
+  /// **'Releases'**
+  String get sidebarReleases;
+
+  /// Sidebar row: the approvals inbox.
+  ///
+  /// In en, this message translates to:
+  /// **'Approvals'**
+  String get sidebarApprovals;
+
+  /// Opens the release in flight.
+  ///
+  /// In en, this message translates to:
+  /// **'Open release'**
+  String get overviewOpenRelease;
+
+  /// Lead of the needs-you bar.
+  ///
+  /// In en, this message translates to:
+  /// **'Needs you'**
+  String get needsYou;
+
+  /// After the title on the needs-you bar.
+  ///
+  /// In en, this message translates to:
+  /// **'{sha} · expires in {left}'**
+  String needsYouMeta(String sha, String left);
+
+  /// Opens the inbox when more than one approval waits.
+  ///
+  /// In en, this message translates to:
+  /// **'+{count} more'**
+  String needsYouMore(int count);
+
+  /// Approval state.
+  ///
+  /// In en, this message translates to:
+  /// **'Pending'**
+  String get approvalPending;
+
+  /// Approval state.
+  ///
+  /// In en, this message translates to:
+  /// **'Approved'**
+  String get approvalApproved;
+
+  /// Approval state.
+  ///
+  /// In en, this message translates to:
+  /// **'Denied'**
+  String get approvalDenied;
+
+  /// Approval state.
+  ///
+  /// In en, this message translates to:
+  /// **'Expired'**
+  String get approvalExpired;
+
+  /// What a prod_release approval asks.
+  ///
+  /// In en, this message translates to:
+  /// **'Release {version} to the stores'**
+  String approvalTitleRelease(String version);
+
+  /// What a prod_patch approval asks.
+  ///
+  /// In en, this message translates to:
+  /// **'Patch {version}'**
+  String approvalTitlePatch(String version);
+
+  /// What a store_submission approval asks.
+  ///
+  /// In en, this message translates to:
+  /// **'Submit {version} to the stores'**
+  String approvalTitleSubmit(String version);
+
+  /// What a push approval asks.
+  ///
+  /// In en, this message translates to:
+  /// **'Push {version} to GitHub'**
+  String approvalTitlePush(String version);
+
+  /// What a merge approval asks.
+  ///
+  /// In en, this message translates to:
+  /// **'Merge the release PR of {version}'**
+  String approvalTitleMerge(String version);
+
+  /// An approval of an action the app does not know.
+  ///
+  /// In en, this message translates to:
+  /// **'Approve the {action} of {version}'**
+  String approvalTitleOther(String action, String version);
+
+  /// An approval without a version.
+  ///
+  /// In en, this message translates to:
+  /// **'Approve the {action}'**
+  String approvalTitleBare(String action);
+
+  /// Label over what approving does.
+  ///
+  /// In en, this message translates to:
+  /// **'If you approve'**
+  String get approvalIfYouApprove;
+
+  /// What approving a prod_release does.
+  ///
+  /// In en, this message translates to:
+  /// **'XPath builds {version} from {sha} and releases it to the stores.'**
+  String approvalIfRelease(String version, String sha);
+
+  /// What approving a prod_patch does.
+  ///
+  /// In en, this message translates to:
+  /// **'XPath publishes a Shorebird patch of {version} built from {sha}.'**
+  String approvalIfPatch(String version, String sha);
+
+  /// What approving a store_submission does.
+  ///
+  /// In en, this message translates to:
+  /// **'XPath uploads the builds made from {sha} and submits {version} for store review.'**
+  String approvalIfSubmit(String version, String sha);
+
+  /// What approving a push does.
+  ///
+  /// In en, this message translates to:
+  /// **'XPath pushes the release commit {sha} and the tag of {version} to GitHub.'**
+  String approvalIfPush(String version, String sha);
+
+  /// What approving a merge does.
+  ///
+  /// In en, this message translates to:
+  /// **'XPath merges the release pull request of {version} into {branch} with a merge commit.'**
+  String approvalIfMerge(String version, String branch);
+
+  /// What approving a delete does.
+  ///
+  /// In en, this message translates to:
+  /// **'XPath deletes what the job asks to delete, on {sha}.'**
+  String approvalIfDelete(String sha);
+
+  /// What approving an unknown action does.
+  ///
+  /// In en, this message translates to:
+  /// **'The job goes on with its {action}.'**
+  String approvalIfOther(String action);
+
+  /// The flavor and bundle ID a release goes out as.
+  ///
+  /// In en, this message translates to:
+  /// **'It goes out as {target}.'**
+  String approvalIfTarget(String target);
+
+  /// Under what approving does.
+  ///
+  /// In en, this message translates to:
+  /// **'If the commit, version or flavor change before then, this approval is void.'**
+  String get approvalVoid;
+
+  /// A branch the engine did not name.
+  ///
+  /// In en, this message translates to:
+  /// **'the base branch'**
+  String get approvalBaseBranch;
+
+  /// Beside the badge of a pending approval.
+  ///
+  /// In en, this message translates to:
+  /// **'expires in {left} · {asked}'**
+  String approvalExpiresIn(String left, String asked);
+
+  /// Under a pending approval in the inbox.
+  ///
+  /// In en, this message translates to:
+  /// **'expires in {left}'**
+  String approvalExpiresShort(String left);
+
+  /// Beside the badge of an expired approval.
+  ///
+  /// In en, this message translates to:
+  /// **'expired {at}'**
+  String approvalExpiredAt(String at);
+
+  /// Beside the badge of a decided approval.
+  ///
+  /// In en, this message translates to:
+  /// **'by {who} · {at}'**
+  String approvalDecidedBy(String who, String at);
+
+  /// Who decided, when the engine does not say.
+  ///
+  /// In en, this message translates to:
+  /// **'another device'**
+  String get approvalSomeone;
+
+  /// Under the approval hero.
+  ///
+  /// In en, this message translates to:
+  /// **'asked at {time}'**
+  String approvalAskedAt(String time);
+
+  /// Row of the approval details.
+  ///
+  /// In en, this message translates to:
+  /// **'Project'**
+  String get approvalProject;
+
+  /// Row of the approval details.
+  ///
+  /// In en, this message translates to:
+  /// **'Flavor'**
+  String get approvalFlavor;
+
+  /// Row of the approval details.
+  ///
+  /// In en, this message translates to:
+  /// **'Version'**
+  String get approvalVersion;
+
+  /// Row of the approval details.
+  ///
+  /// In en, this message translates to:
+  /// **'Commit'**
+  String get approvalCommit;
+
+  /// Row of the approval details.
+  ///
+  /// In en, this message translates to:
+  /// **'Job'**
+  String get approvalJob;
+
+  /// Row of the approval details.
+  ///
+  /// In en, this message translates to:
+  /// **'Gate'**
+  String get approvalGate;
+
+  /// Row of the approval details.
+  ///
+  /// In en, this message translates to:
+  /// **'Reason'**
+  String get approvalReason;
+
+  /// The gate an approval comes from.
+  ///
+  /// In en, this message translates to:
+  /// **'Project gate “{action}”'**
+  String approvalGateName(String action);
+
+  /// After the job of a pending approval.
+  ///
+  /// In en, this message translates to:
+  /// **'{step} waits for this'**
+  String approvalWaits(String step);
+
+  /// Opens the confirmation sheet.
+  ///
+  /// In en, this message translates to:
+  /// **'Review…'**
+  String get approvalReview;
+
+  /// Approves, in the confirmation sheet (⌘↩).
+  ///
+  /// In en, this message translates to:
+  /// **'Approve'**
+  String get approvalApprove;
+
+  /// Opens the confirmation sheet from the inbox.
+  ///
+  /// In en, this message translates to:
+  /// **'Approve…'**
+  String get approvalApproveEllipsis;
+
+  /// Opens the denial.
+  ///
+  /// In en, this message translates to:
+  /// **'Deny…'**
+  String get approvalDenyEllipsis;
+
+  /// Denies, in the confirmation sheet.
+  ///
+  /// In en, this message translates to:
+  /// **'Deny'**
+  String get approvalDeny;
+
+  /// Leaves the denial.
+  ///
+  /// In en, this message translates to:
+  /// **'Back'**
+  String get approvalBack;
+
+  /// Closes a sheet without doing anything.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get approvalCancel;
+
+  /// Closes a sheet with nothing left to do.
+  ///
+  /// In en, this message translates to:
+  /// **'Close'**
+  String get approvalClose;
+
+  /// Field of the denial.
+  ///
+  /// In en, this message translates to:
+  /// **'Reason (optional)'**
+  String get approvalDenyReason;
+
+  /// Placeholder of the denial reason.
+  ///
+  /// In en, this message translates to:
+  /// **'Why, for the record'**
+  String get approvalDenyReasonHint;
+
+  /// Footer of the confirmation sheet.
+  ///
+  /// In en, this message translates to:
+  /// **'Return never approves. ⌘↩ approves.'**
+  String get approvalReturnHint;
+
+  /// Tooltip of Approve before the arming delay is over.
+  ///
+  /// In en, this message translates to:
+  /// **'Approve arms in a moment'**
+  String get approvalArming;
+
+  /// An approval another device decided first.
+  ///
+  /// In en, this message translates to:
+  /// **'Already {state} by {who}. The first decision counts; nothing to do here.'**
+  String approvalDecidedElsewhere(String state, String who);
+
+  /// An approval that ran out of time.
+  ///
+  /// In en, this message translates to:
+  /// **'This approval expired: it counts as denied. Dispatch again to ask anew.'**
+  String get approvalExpiredElsewhere;
+
+  /// An approval the engine does not know.
+  ///
+  /// In en, this message translates to:
+  /// **'This approval cannot be read on this engine.'**
+  String get approvalGone;
+
+  /// Toolbar title of the inbox.
+  ///
+  /// In en, this message translates to:
+  /// **'Approvals'**
+  String get approvalsTitle;
+
+  /// Toolbar subtitle of the inbox.
+  ///
+  /// In en, this message translates to:
+  /// **'{engine} · {count} pending'**
+  String approvalsSubtitle(String engine, int count);
+
+  /// Inbox filter.
+  ///
+  /// In en, this message translates to:
+  /// **'Pending'**
+  String get approvalsPending;
+
+  /// Inbox filter.
+  ///
+  /// In en, this message translates to:
+  /// **'Decided'**
+  String get approvalsDecided;
+
+  /// Inbox filter.
+  ///
+  /// In en, this message translates to:
+  /// **'Expired'**
+  String get approvalsExpired;
+
+  /// The inbox without a pending approval.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing is waiting'**
+  String get approvalsNothingWaits;
+
+  /// An inbox filter without an approval.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing here'**
+  String get approvalsNone;
+
+  /// Body of the notification of an approval.
+  ///
+  /// In en, this message translates to:
+  /// **'{where} · expires in {left}'**
+  String notificationBody(String where, String left);
+
+  /// Dismisses the notification of an approval.
+  ///
+  /// In en, this message translates to:
+  /// **'Later'**
+  String get notificationLater;
+
+  /// Tooltip of the menu bar extra.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{XPath: 1 needs you} other{XPath: {count} need you}}'**
+  String menuBarTooltip(int count);
+
+  /// First line of the menu bar extra.
+  ///
+  /// In en, this message translates to:
+  /// **'Needs you · {count}'**
+  String menuBarNeedsYou(int count);
+
+  /// First line of the menu bar extra when nothing waits.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing needs you'**
+  String get menuBarNothing;
+
+  /// A pending approval in the menu bar extra.
+  ///
+  /// In en, this message translates to:
+  /// **'Review: {title}…'**
+  String menuBarReview(String title);
+
+  /// Under a pending approval in the menu bar extra.
+  ///
+  /// In en, this message translates to:
+  /// **'{where} · {left} left'**
+  String menuBarLeft(String where, String left);
+
+  /// Brings the window forward.
+  ///
+  /// In en, this message translates to:
+  /// **'Open XPath'**
+  String get menuBarOpen;
+
+  /// Toolbar title of the releases.
+  ///
+  /// In en, this message translates to:
+  /// **'Releases'**
+  String get releasesTitle;
+
+  /// The releases of a project without one.
+  ///
+  /// In en, this message translates to:
+  /// **'A production release dispatched from the overview shows up here.'**
+  String get releasesEmpty;
+
+  /// Toolbar title of a release.
+  ///
+  /// In en, this message translates to:
+  /// **'Release {version}'**
+  String releaseTitle(String version);
+
+  /// Asks the stores about the release now.
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh'**
+  String get releaseRefresh;
+
+  /// Tooltip of Refresh.
+  ///
+  /// In en, this message translates to:
+  /// **'Ask the stores now instead of waiting up to ten minutes'**
+  String get releaseRefreshHint;
+
+  /// Hero of a release a store rejected.
+  ///
+  /// In en, this message translates to:
+  /// **'Rejected by {store}'**
+  String releaseRejectedBy(String store);
+
+  /// Hero of a release both stores rejected.
+  ///
+  /// In en, this message translates to:
+  /// **'Rejected by both stores'**
+  String get releaseRejectedByBoth;
+
+  /// Label over the lanes.
+  ///
+  /// In en, this message translates to:
+  /// **'Store lanes'**
+  String get lanesTitle;
+
+  /// A step of a store lane.
+  ///
+  /// In en, this message translates to:
+  /// **'Approved'**
+  String get storeApproved;
+
+  /// A store the engine cannot read.
+  ///
+  /// In en, this message translates to:
+  /// **'Unknown'**
+  String get storeUnknown;
+
+  /// An App Store build waiting for its review.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for review'**
+  String get storeWaitingForReview;
+
+  /// Both stores in a sentence.
+  ///
+  /// In en, this message translates to:
+  /// **'App Store and Google Play'**
+  String get storesBoth;
+
+  /// Joins two items of a list.
+  ///
+  /// In en, this message translates to:
+  /// **' and '**
+  String get listAnd;
+
+  /// Time of the current step of a lane.
+  ///
+  /// In en, this message translates to:
+  /// **'since {time}'**
+  String laneSince(String time);
+
+  /// The App Store lane without a key.
+  ///
+  /// In en, this message translates to:
+  /// **'no API key'**
+  String get laneNoApiKey;
+
+  /// The Google Play lane without a service account.
+  ///
+  /// In en, this message translates to:
+  /// **'no service account'**
+  String get laneNoServiceAccount;
+
+  /// A lane the release does not target.
+  ///
+  /// In en, this message translates to:
+  /// **'This release does not go to {store}.'**
+  String laneNotTargeted(String store);
+
+  /// Builds a rejected version again.
+  ///
+  /// In en, this message translates to:
+  /// **'New build, same version…'**
+  String get laneNewBuild;
+
+  /// Beside New build, same version.
+  ///
+  /// In en, this message translates to:
+  /// **'{version} → a new build number'**
+  String laneNewBuildCaption(String version);
+
+  /// The other lane of a rejected release.
+  ///
+  /// In en, this message translates to:
+  /// **'A new build replaces {build} here too, so both stores ship the same build.'**
+  String laneReplacedToo(String build);
+
+  /// Says by hand that Apple approved.
+  ///
+  /// In en, this message translates to:
+  /// **'Mark approved'**
+  String get laneMarkApproved;
+
+  /// Says by hand that the store has it live.
+  ///
+  /// In en, this message translates to:
+  /// **'Mark live'**
+  String get laneMarkLive;
+
+  /// Opens the credentials.
+  ///
+  /// In en, this message translates to:
+  /// **'Add API key…'**
+  String get laneAddApiKey;
+
+  /// Opens the credentials.
+  ///
+  /// In en, this message translates to:
+  /// **'Add service account…'**
+  String get laneAddServiceAccount;
+
+  /// The App Store lane without a key.
+  ///
+  /// In en, this message translates to:
+  /// **'No App Store Connect API key for this flavor: the engine cannot read the review, and each mark is recorded as manual'**
+  String get laneManualApple;
+
+  /// The Google Play lane without a service account.
+  ///
+  /// In en, this message translates to:
+  /// **'No Google Play service account for this flavor: the engine cannot read the review, and each mark is recorded as manual'**
+  String get laneManualPlay;
+
+  /// The version on sale before this release.
+  ///
+  /// In en, this message translates to:
+  /// **'Live now {version}'**
+  String laneLiveNow(String version);
+
+  /// The version this release replaced.
+  ///
+  /// In en, this message translates to:
+  /// **'Replaced {version}'**
+  String laneReplaced(String version);
+
+  /// Title of the New build confirmation.
+  ///
+  /// In en, this message translates to:
+  /// **'Build {version} again?'**
+  String newBuildTitle(String version);
+
+  /// Body of the New build confirmation.
+  ///
+  /// In en, this message translates to:
+  /// **'The production workflow runs again on the release branch with the same version and the next free build number; {build} is never reused. It asks for your approval like any release.'**
+  String newBuildBody(String build);
+
+  /// Confirms New build, same version.
+  ///
+  /// In en, this message translates to:
+  /// **'Start new build'**
+  String get newBuildConfirm;
+
+  /// The Merge button.
+  ///
+  /// In en, this message translates to:
+  /// **'Merge into {branch}'**
+  String mergeInto(String branch);
+
+  /// Under Merge when it is open.
+  ///
+  /// In en, this message translates to:
+  /// **'Both stores live'**
+  String get mergeReady;
+
+  /// Under Merge when it is open.
+  ///
+  /// In en, this message translates to:
+  /// **'{branch} → {base} · both stores live'**
+  String mergeReadyBranch(String branch, String base);
+
+  /// Under the hero of a merged release.
+  ///
+  /// In en, this message translates to:
+  /// **'Merged · {sha}'**
+  String mergeDone(String sha);
+
+  /// Under Merge of an abandoned release.
+  ///
+  /// In en, this message translates to:
+  /// **'The release was abandoned'**
+  String get mergeAbandoned;
+
+  /// Under Merge once it was asked for.
+  ///
+  /// In en, this message translates to:
+  /// **'Merge requested'**
+  String get mergeRequested;
+
+  /// Under Merge while the merge waits at its gate.
+  ///
+  /// In en, this message translates to:
+  /// **'Merge requested · waits for your approval'**
+  String get mergeWaitsApproval;
+
+  /// Under Merge of a rejected release.
+  ///
+  /// In en, this message translates to:
+  /// **'{stores} rejected this build'**
+  String mergeRejected(String stores);
+
+  /// Under Merge without a PR.
+  ///
+  /// In en, this message translates to:
+  /// **'The release has no pull request yet'**
+  String get mergeNoPr;
+
+  /// Under Merge.
+  ///
+  /// In en, this message translates to:
+  /// **'Waits for both stores to go live'**
+  String get mergeWaitsBoth;
+
+  /// Under Merge.
+  ///
+  /// In en, this message translates to:
+  /// **'Waits for {store} to go live'**
+  String mergeWaitsStore(String store);
+
+  /// Under Merge: a store marked by hand.
+  ///
+  /// In en, this message translates to:
+  /// **'Mark {store} live'**
+  String mergeMark(String store);
+
+  /// Under Merge: a store the engine reads.
+  ///
+  /// In en, this message translates to:
+  /// **'{store} must go live'**
+  String mergeMust(String store);
+
+  /// Label of the timeline panel.
+  ///
+  /// In en, this message translates to:
+  /// **'Timeline'**
+  String get timelineTitle;
+
+  /// Beside the timeline label.
+  ///
+  /// In en, this message translates to:
+  /// **'newest first'**
+  String get timelineNewestFirst;
+
+  /// Timeline entry.
+  ///
+  /// In en, this message translates to:
+  /// **'Release dispatched'**
+  String get timelineDispatched;
+
+  /// Timeline entry.
+  ///
+  /// In en, this message translates to:
+  /// **'Build {build} started'**
+  String timelineBuild(String build);
+
+  /// Timeline entry.
+  ///
+  /// In en, this message translates to:
+  /// **'{store}: {state}'**
+  String timelineStore(String store, String state);
+
+  /// Timeline entry.
+  ///
+  /// In en, this message translates to:
+  /// **'Approval requested: {title}'**
+  String timelineApprovalAsked(String title);
+
+  /// Timeline entry.
+  ///
+  /// In en, this message translates to:
+  /// **'{title}: {state}'**
+  String timelineApprovalSettled(String title, String state);
+
+  /// Timeline entry.
+  ///
+  /// In en, this message translates to:
+  /// **'Merged into {branch}'**
+  String timelineMerged(String branch);
+
+  /// Where a store status came from.
+  ///
+  /// In en, this message translates to:
+  /// **'Upload step'**
+  String get sourceUpload;
+
+  /// Where a store status came from.
+  ///
+  /// In en, this message translates to:
+  /// **'App Store Connect API'**
+  String get sourceAppStoreConnect;
+
+  /// Where a store status came from.
+  ///
+  /// In en, this message translates to:
+  /// **'Google Play API'**
+  String get sourcePlayApi;
+
+  /// Where a store status came from.
+  ///
+  /// In en, this message translates to:
+  /// **'iTunes lookup'**
+  String get sourceLookup;
+
+  /// Where a store status came from.
+  ///
+  /// In en, this message translates to:
+  /// **'Marked by hand'**
+  String get sourceManual;
+
+  /// Label of the notes panel.
+  ///
+  /// In en, this message translates to:
+  /// **'Release notes'**
+  String get notesTitle;
+
+  /// Beside the notes label.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 commit} other{{count} commits}}'**
+  String notesCommits(int count);
+
+  /// Beside the notes label.
+  ///
+  /// In en, this message translates to:
+  /// **'since {tag} · {count, plural, =1{1 commit} other{{count} commits}}'**
+  String notesSince(String tag, int count);
+
+  /// The notes of a release without a commit.
+  ///
+  /// In en, this message translates to:
+  /// **'The notes are ready once the release is tagged.'**
+  String get notesUntagged;
+
+  /// Notes without a commit.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing changed since the release before.'**
+  String get notesNothing;
+
+  /// Copies the notes.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy for Slack'**
+  String get notesCopySlack;
+
+  /// Copies the notes.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy for WhatsApp'**
+  String get notesCopyWhatsApp;
+
+  /// A copy button, for a moment after it copied.
+  ///
+  /// In en, this message translates to:
+  /// **'Copied'**
+  String get copied;
+
+  /// Label of the min_version panel.
+  ///
+  /// In en, this message translates to:
+  /// **'Forced update'**
+  String get minVersionTitle;
+
+  /// Lead of the min_version banner.
+  ///
+  /// In en, this message translates to:
+  /// **'Reminder'**
+  String get minVersionReminder;
+
+  /// Before any store is live.
+  ///
+  /// In en, this message translates to:
+  /// **'If this release is a forced update, raise {variables} to {version} once the stores have it live. Raising it earlier locks out users who have nothing to update to.'**
+  String minVersionLater(String variables, String version);
+
+  /// Once a store is live.
+  ///
+  /// In en, this message translates to:
+  /// **'{stores} live: if this release is a forced update, raise {variables} to {version} in Firebase Remote Config now.'**
+  String minVersionNow(String stores, String variables, String version);
+
+  /// The variables to raise later.
+  ///
+  /// In en, this message translates to:
+  /// **'Raise {variables} once {stores} is live.'**
+  String minVersionRest(String variables, String stores);
+
+  /// The banner over a release live in every store.
+  ///
+  /// In en, this message translates to:
+  /// **'If this release is a forced update, raise {variables} to {version}: every store has it live.'**
+  String minVersionBanner(String variables, String version);
+
+  /// A release without a store.
+  ///
+  /// In en, this message translates to:
+  /// **'This release goes to no store.'**
+  String get minVersionNoStores;
+
+  /// Label of the PR panel.
+  ///
+  /// In en, this message translates to:
+  /// **'Release PR'**
+  String get prTitle;
+
+  /// The PR panel without a PR.
+  ///
+  /// In en, this message translates to:
+  /// **'No pull request yet: the release opens one once it is tagged.'**
+  String get prNone;
+
+  /// The PR panel.
+  ///
+  /// In en, this message translates to:
+  /// **'Merging adds no tag: {tag} was tagged when the build was recorded.'**
+  String prTagged(String tag);
+
+  /// The PR panel.
+  ///
+  /// In en, this message translates to:
+  /// **'The release is tagged when its build is recorded.'**
+  String get prUntagged;
+
+  /// The PR panel of a merged release.
+  ///
+  /// In en, this message translates to:
+  /// **'Merged with a merge commit · {sha}'**
+  String prMerged(String sha);
+
+  /// Copies the PR link.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy link'**
+  String get prCopyLink;
+
+  /// Opens the run that merges.
+  ///
+  /// In en, this message translates to:
+  /// **'Open merge job'**
+  String get prOpenMergeJob;
 }
 
 class _AppLocalizationsDelegate

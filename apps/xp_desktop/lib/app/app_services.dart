@@ -63,6 +63,7 @@ class AppServices {
     required this.pickFolder,
     required this.pickFile,
     required this.deviceName,
+    required this.alerts,
   });
 
   /// The services of this Mac: the engine list and the offline cache in the
@@ -93,6 +94,7 @@ class AppServices {
         return PickedFile(name: file.name, bytes: await file.readAsBytes());
       },
       deviceName: Platform.localHostname.split('.').first,
+      alerts: MethodChannelNeedsYouAlerts(),
     );
   }
 
@@ -107,4 +109,7 @@ class AppServices {
 
   /// What this Mac is called, for naming its token.
   final String deviceName;
+
+  /// The notifications and the menu bar extra of approvals that wait.
+  final NeedsYouAlerts alerts;
 }
