@@ -3675,6 +3675,414 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Free {size}'**
   String freeSpaceConfirm(String size);
+
+  /// Sidebar row under the selected project.
+  ///
+  /// In en, this message translates to:
+  /// **'Workflows'**
+  String get sidebarWorkflows;
+
+  /// Title of the workflow builder.
+  ///
+  /// In en, this message translates to:
+  /// **'Workflows'**
+  String get workflowsTitle;
+
+  /// No description provided for @workflowsVersion.
+  ///
+  /// In en, this message translates to:
+  /// **'Version {version}'**
+  String workflowsVersion(int version);
+
+  /// Marks a workflow the engine made.
+  ///
+  /// In en, this message translates to:
+  /// **'Built-in'**
+  String get workflowsBuiltin;
+
+  /// Subtitle of a new workflow.
+  ///
+  /// In en, this message translates to:
+  /// **'Not saved yet'**
+  String get workflowsDraft;
+
+  /// Subtitle part while the YAML differs from what is saved.
+  ///
+  /// In en, this message translates to:
+  /// **'Unsaved changes'**
+  String get workflowsUnsaved;
+
+  /// Accessible label of the workflow picker.
+  ///
+  /// In en, this message translates to:
+  /// **'Workflow'**
+  String get workflowsPick;
+
+  /// Starts a new workflow.
+  ///
+  /// In en, this message translates to:
+  /// **'New'**
+  String get workflowsNew;
+
+  /// Opens a YAML file as a new workflow.
+  ///
+  /// In en, this message translates to:
+  /// **'Import…'**
+  String get workflowsImport;
+
+  /// Saves the YAML to a file.
+  ///
+  /// In en, this message translates to:
+  /// **'Export…'**
+  String get workflowsExport;
+
+  /// Saves a new version of the workflow.
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get workflowsSave;
+
+  /// Saves the document as a new workflow, asking for its name.
+  ///
+  /// In en, this message translates to:
+  /// **'Save as…'**
+  String get workflowsSaveAs;
+
+  /// Shown while a built-in workflow is open.
+  ///
+  /// In en, this message translates to:
+  /// **'Built-in workflows cannot be changed. Save as… keeps your edits as a workflow of your own.'**
+  String get workflowsBuiltinHint;
+
+  /// No description provided for @workflowsSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved {name}, version {version}.'**
+  String workflowsSaved(String name, int version);
+
+  /// No description provided for @workflowsExported.
+  ///
+  /// In en, this message translates to:
+  /// **'Exported to {path}.'**
+  String workflowsExported(String path);
+
+  /// Label of the visual editor's graph.
+  ///
+  /// In en, this message translates to:
+  /// **'Pipeline'**
+  String get workflowsPipeline;
+
+  /// Label of the YAML view.
+  ///
+  /// In en, this message translates to:
+  /// **'YAML'**
+  String get workflowsYaml;
+
+  /// Label of the issue list.
+  ///
+  /// In en, this message translates to:
+  /// **'Issues'**
+  String get workflowsIssuesLabel;
+
+  /// The engine is checking the YAML.
+  ///
+  /// In en, this message translates to:
+  /// **'Checking…'**
+  String get workflowsChecking;
+
+  /// The engine found no issue.
+  ///
+  /// In en, this message translates to:
+  /// **'Valid'**
+  String get workflowsValid;
+
+  /// No description provided for @workflowsIssues.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 issue} other{{count} issues}}'**
+  String workflowsIssues(int count);
+
+  /// The engine could not check the YAML.
+  ///
+  /// In en, this message translates to:
+  /// **'Not checked · engine away'**
+  String get workflowsUnchecked;
+
+  /// Shown over the visual editor while the YAML cannot be read.
+  ///
+  /// In en, this message translates to:
+  /// **'The visual editor waits until the YAML reads as a workflow. Fix the issues in the YAML.'**
+  String get workflowsShapeLocked;
+
+  /// Adds a stage at the end.
+  ///
+  /// In en, this message translates to:
+  /// **'Add stage'**
+  String get workflowsAddStage;
+
+  /// No description provided for @workflowsNewStage.
+  ///
+  /// In en, this message translates to:
+  /// **'stage-{number}'**
+  String workflowsNewStage(int number);
+
+  /// Adds a job to a stage.
+  ///
+  /// In en, this message translates to:
+  /// **'Add job'**
+  String get workflowsAddJob;
+
+  /// Selects the workflow's own fields.
+  ///
+  /// In en, this message translates to:
+  /// **'Workflow'**
+  String get workflowsWorkflow;
+
+  /// No description provided for @workflowsSteps.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{No steps} =1{1 step} other{{count} steps}}'**
+  String workflowsSteps(int count);
+
+  /// Field label.
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get workflowsName;
+
+  /// Field label.
+  ///
+  /// In en, this message translates to:
+  /// **'Description'**
+  String get workflowsDescription;
+
+  /// Chip: the workflow locks the project (lock: project).
+  ///
+  /// In en, this message translates to:
+  /// **'One run at a time per project'**
+  String get workflowsLock;
+
+  /// Label of the workflow's inputs.
+  ///
+  /// In en, this message translates to:
+  /// **'Inputs'**
+  String get workflowsInputs;
+
+  /// Under the list of inputs.
+  ///
+  /// In en, this message translates to:
+  /// **'Inputs are edited in the YAML.'**
+  String get workflowsInputsHint;
+
+  /// The workflow declares no input.
+  ///
+  /// In en, this message translates to:
+  /// **'No inputs'**
+  String get workflowsNoInputs;
+
+  /// No description provided for @workflowsStage.
+  ///
+  /// In en, this message translates to:
+  /// **'Stage {number}'**
+  String workflowsStage(int number);
+
+  /// Field label.
+  ///
+  /// In en, this message translates to:
+  /// **'Stage name'**
+  String get workflowsStageName;
+
+  /// Moves a stage, job or step one place earlier.
+  ///
+  /// In en, this message translates to:
+  /// **'Move earlier'**
+  String get workflowsMoveEarlier;
+
+  /// Moves a stage, job or step one place later.
+  ///
+  /// In en, this message translates to:
+  /// **'Move later'**
+  String get workflowsMoveLater;
+
+  /// Removes the selected stage.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove stage'**
+  String get workflowsRemoveStage;
+
+  /// Removes the selected job.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove job'**
+  String get workflowsRemoveJob;
+
+  /// Removes a step.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove step'**
+  String get workflowsRemoveStep;
+
+  /// Inspector label of a job.
+  ///
+  /// In en, this message translates to:
+  /// **'Job'**
+  String get workflowsJob;
+
+  /// Field label.
+  ///
+  /// In en, this message translates to:
+  /// **'Job id'**
+  String get workflowsJobId;
+
+  /// Field label.
+  ///
+  /// In en, this message translates to:
+  /// **'Job name'**
+  String get workflowsJobName;
+
+  /// Placeholder of the job name field.
+  ///
+  /// In en, this message translates to:
+  /// **'The id with the matrix values by default'**
+  String get workflowsJobNameHint;
+
+  /// Field label of an if expression.
+  ///
+  /// In en, this message translates to:
+  /// **'If'**
+  String get workflowsCondition;
+
+  /// Placeholder of an if field.
+  ///
+  /// In en, this message translates to:
+  /// **'platform == \'ios\''**
+  String get workflowsConditionHint;
+
+  /// Label of a job's matrix.
+  ///
+  /// In en, this message translates to:
+  /// **'Matrix'**
+  String get workflowsMatrix;
+
+  /// Matrix axis: not repeated over.
+  ///
+  /// In en, this message translates to:
+  /// **'None'**
+  String get workflowsAxisNone;
+
+  /// Matrix axis: values the dispatch picks.
+  ///
+  /// In en, this message translates to:
+  /// **'From dispatch'**
+  String get workflowsAxisDispatch;
+
+  /// Matrix axis: values written out.
+  ///
+  /// In en, this message translates to:
+  /// **'Listed'**
+  String get workflowsAxisList;
+
+  /// Placeholder of the listed flavors field.
+  ///
+  /// In en, this message translates to:
+  /// **'prod, dev'**
+  String get workflowsAxisValuesHint;
+
+  /// Label of a job's capabilities.
+  ///
+  /// In en, this message translates to:
+  /// **'Capabilities'**
+  String get workflowsCapabilities;
+
+  /// Label of a job's steps.
+  ///
+  /// In en, this message translates to:
+  /// **'Steps'**
+  String get workflowsStepsLabel;
+
+  /// Adds a step to the job.
+  ///
+  /// In en, this message translates to:
+  /// **'Add step'**
+  String get workflowsAddStep;
+
+  /// Field label.
+  ///
+  /// In en, this message translates to:
+  /// **'Step type'**
+  String get workflowsStepKind;
+
+  /// Field label: the approval in front of a step.
+  ///
+  /// In en, this message translates to:
+  /// **'Gate'**
+  String get workflowsGate;
+
+  /// A step without a gate.
+  ///
+  /// In en, this message translates to:
+  /// **'No gate'**
+  String get workflowsNoGate;
+
+  /// Label of the values a step is told.
+  ///
+  /// In en, this message translates to:
+  /// **'With'**
+  String get workflowsWith;
+
+  /// Placeholder of a with value.
+  ///
+  /// In en, this message translates to:
+  /// **'YAML value'**
+  String get workflowsWithHint;
+
+  /// Inspector of a stage.
+  ///
+  /// In en, this message translates to:
+  /// **'Select a job in the pipeline to edit its matrix and steps.'**
+  String get workflowsSelectJob;
+
+  /// Title of the name dialog.
+  ///
+  /// In en, this message translates to:
+  /// **'Save as a new workflow'**
+  String get workflowsNameTitle;
+
+  /// Name dialog.
+  ///
+  /// In en, this message translates to:
+  /// **'Letters, digits, dots, dashes and underscores; unique in the project.'**
+  String get workflowsNameBody;
+
+  /// Closes a dialog.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get workflowsCancel;
+
+  /// Title of the discard dialog.
+  ///
+  /// In en, this message translates to:
+  /// **'Discard unsaved changes?'**
+  String get workflowsDiscardTitle;
+
+  /// No description provided for @workflowsDiscardBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The changes to {name} are not saved.'**
+  String workflowsDiscardBody(String name);
+
+  /// Closes the discard dialog.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep editing'**
+  String get workflowsKeepEditing;
+
+  /// Drops the unsaved changes.
+  ///
+  /// In en, this message translates to:
+  /// **'Discard'**
+  String get workflowsDiscard;
 }
 
 class _AppLocalizationsDelegate

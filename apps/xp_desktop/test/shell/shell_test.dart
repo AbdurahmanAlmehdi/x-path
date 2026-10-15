@@ -19,12 +19,14 @@ import 'package:xp_desktop/shell/shell.dart';
 import 'package:xp_desktop/storage/storage.dart';
 import 'package:xp_desktop/tests/tests.dart';
 import 'package:xp_desktop/widgets/widgets.dart';
+import 'package:xp_desktop/workflow_builder/workflow_builder.dart';
 import 'package:xp_repositories/xp_repositories.dart';
 
 import '../helpers/approval_fixtures.dart';
 import '../helpers/engine_fixtures.dart';
 import '../helpers/fakes.dart';
 import '../helpers/pump_app.dart';
+import '../workflow_builder/workflow_builder_harness.dart';
 
 void main() {
   setUpAll(() {
@@ -102,6 +104,26 @@ void main() {
     }
   });
 
+  testWidgets('AppShell shows the workflow builder of a project', (
+    tester,
+  ) async {
+    await tester.pumpApp(
+      const AppShell(),
+      shell: ShellCubit(const WorkflowsDestination('prj_1')),
+      projects: projectsIn(
+        const ProjectsState(loaded: true, projects: [mataa, captain]),
+      ),
+      projectsRepository: repository,
+      workflowsRepository: workflowsRepository(),
+    );
+    await settle(tester);
+    expect(find.byType(WorkflowBuilderPage), findsOneWidget);
+    expect(const WorkflowsDestination('prj_1', workflowId: 'wf_1').props, [
+      'prj_1',
+      'wf_1',
+    ]);
+  });
+
   group('Sidebar', () {
     testWidgets('shows the rows of the selected project and the approvals', (
       tester,
@@ -128,6 +150,10 @@ void main() {
       await tester.tap(find.text('Tests'));
       await tester.pump();
       expect(shell.state, const TestsDestination('prj_1'));
+      expect(shell.projectId, 'prj_1');
+      await tester.tap(find.text('Workflows'));
+      await tester.pump();
+      expect(shell.state, const WorkflowsDestination('prj_1'));
       expect(shell.projectId, 'prj_1');
       await tester.tap(find.text('Overview'));
       await tester.pump();

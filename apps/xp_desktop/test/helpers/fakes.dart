@@ -266,6 +266,7 @@ AppServices testServices({
   FakeLocalEngine? localEngine,
   FolderPicker? pickFolder,
   FilePicker? pickFile,
+  FileSaver? saveFile,
   FakeNeedsYouAlerts? alerts,
 }) => AppServices(
   engines: engines ?? noEngines(),
@@ -277,6 +278,7 @@ AppServices testServices({
   localEngine: localEngine ?? FakeLocalEngine(),
   pickFolder: pickFolder ?? () async => null,
   pickFile: pickFile ?? () async => null,
+  saveFile: saveFile ?? (_, _) async => null,
   deviceName: 'MacBook',
   alerts: alerts ?? FakeNeedsYouAlerts(),
 );

@@ -25,6 +25,7 @@ import 'package:xp_desktop/storage/view/storage_page.dart';
 import 'package:xp_desktop/tests/view/tests_page.dart';
 import 'package:xp_desktop/theme/theme.dart';
 import 'package:xp_desktop/widgets/widgets.dart';
+import 'package:xp_desktop/workflow_builder/view/workflow_builder_page.dart';
 
 /// ⇧⌘A (Keyboard guide): reviews the approval of the shown project that
 /// expires first, else opens the approvals inbox.
@@ -83,6 +84,11 @@ class AppShell extends StatelessWidget {
                   projectId: projectId,
                   jobId: jobId,
                 ),
+                WorkflowsDestination(:final projectId, :final workflowId) =>
+                  WorkflowBuilderPage(
+                    projectId: projectId,
+                    workflowId: workflowId,
+                  ),
                 RunnersDestination() => const RunnersPage(),
                 StorageDestination() => const StoragePage(),
                 ApprovalsDestination(:final approvalId) => ApprovalsPage(

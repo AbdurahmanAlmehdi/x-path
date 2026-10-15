@@ -2247,4 +2247,241 @@ class AppLocalizationsEn extends AppLocalizations {
   String freeSpaceConfirm(String size) {
     return 'Free $size';
   }
+
+  @override
+  String get sidebarWorkflows => 'Workflows';
+
+  @override
+  String get workflowsTitle => 'Workflows';
+
+  @override
+  String workflowsVersion(int version) {
+    return 'Version $version';
+  }
+
+  @override
+  String get workflowsBuiltin => 'Built-in';
+
+  @override
+  String get workflowsDraft => 'Not saved yet';
+
+  @override
+  String get workflowsUnsaved => 'Unsaved changes';
+
+  @override
+  String get workflowsPick => 'Workflow';
+
+  @override
+  String get workflowsNew => 'New';
+
+  @override
+  String get workflowsImport => 'Import…';
+
+  @override
+  String get workflowsExport => 'Export…';
+
+  @override
+  String get workflowsSave => 'Save';
+
+  @override
+  String get workflowsSaveAs => 'Save as…';
+
+  @override
+  String get workflowsBuiltinHint =>
+      'Built-in workflows cannot be changed. Save as… keeps your edits as a workflow of your own.';
+
+  @override
+  String workflowsSaved(String name, int version) {
+    return 'Saved $name, version $version.';
+  }
+
+  @override
+  String workflowsExported(String path) {
+    return 'Exported to $path.';
+  }
+
+  @override
+  String get workflowsPipeline => 'Pipeline';
+
+  @override
+  String get workflowsYaml => 'YAML';
+
+  @override
+  String get workflowsIssuesLabel => 'Issues';
+
+  @override
+  String get workflowsChecking => 'Checking…';
+
+  @override
+  String get workflowsValid => 'Valid';
+
+  @override
+  String workflowsIssues(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count issues',
+      one: '1 issue',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get workflowsUnchecked => 'Not checked · engine away';
+
+  @override
+  String get workflowsShapeLocked =>
+      'The visual editor waits until the YAML reads as a workflow. Fix the issues in the YAML.';
+
+  @override
+  String get workflowsAddStage => 'Add stage';
+
+  @override
+  String workflowsNewStage(int number) {
+    return 'stage-$number';
+  }
+
+  @override
+  String get workflowsAddJob => 'Add job';
+
+  @override
+  String get workflowsWorkflow => 'Workflow';
+
+  @override
+  String workflowsSteps(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count steps',
+      one: '1 step',
+      zero: 'No steps',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get workflowsName => 'Name';
+
+  @override
+  String get workflowsDescription => 'Description';
+
+  @override
+  String get workflowsLock => 'One run at a time per project';
+
+  @override
+  String get workflowsInputs => 'Inputs';
+
+  @override
+  String get workflowsInputsHint => 'Inputs are edited in the YAML.';
+
+  @override
+  String get workflowsNoInputs => 'No inputs';
+
+  @override
+  String workflowsStage(int number) {
+    return 'Stage $number';
+  }
+
+  @override
+  String get workflowsStageName => 'Stage name';
+
+  @override
+  String get workflowsMoveEarlier => 'Move earlier';
+
+  @override
+  String get workflowsMoveLater => 'Move later';
+
+  @override
+  String get workflowsRemoveStage => 'Remove stage';
+
+  @override
+  String get workflowsRemoveJob => 'Remove job';
+
+  @override
+  String get workflowsRemoveStep => 'Remove step';
+
+  @override
+  String get workflowsJob => 'Job';
+
+  @override
+  String get workflowsJobId => 'Job id';
+
+  @override
+  String get workflowsJobName => 'Job name';
+
+  @override
+  String get workflowsJobNameHint => 'The id with the matrix values by default';
+
+  @override
+  String get workflowsCondition => 'If';
+
+  @override
+  String get workflowsConditionHint => 'platform == \'ios\'';
+
+  @override
+  String get workflowsMatrix => 'Matrix';
+
+  @override
+  String get workflowsAxisNone => 'None';
+
+  @override
+  String get workflowsAxisDispatch => 'From dispatch';
+
+  @override
+  String get workflowsAxisList => 'Listed';
+
+  @override
+  String get workflowsAxisValuesHint => 'prod, dev';
+
+  @override
+  String get workflowsCapabilities => 'Capabilities';
+
+  @override
+  String get workflowsStepsLabel => 'Steps';
+
+  @override
+  String get workflowsAddStep => 'Add step';
+
+  @override
+  String get workflowsStepKind => 'Step type';
+
+  @override
+  String get workflowsGate => 'Gate';
+
+  @override
+  String get workflowsNoGate => 'No gate';
+
+  @override
+  String get workflowsWith => 'With';
+
+  @override
+  String get workflowsWithHint => 'YAML value';
+
+  @override
+  String get workflowsSelectJob =>
+      'Select a job in the pipeline to edit its matrix and steps.';
+
+  @override
+  String get workflowsNameTitle => 'Save as a new workflow';
+
+  @override
+  String get workflowsNameBody =>
+      'Letters, digits, dots, dashes and underscores; unique in the project.';
+
+  @override
+  String get workflowsCancel => 'Cancel';
+
+  @override
+  String get workflowsDiscardTitle => 'Discard unsaved changes?';
+
+  @override
+  String workflowsDiscardBody(String name) {
+    return 'The changes to $name are not saved.';
+  }
+
+  @override
+  String get workflowsKeepEditing => 'Keep editing';
+
+  @override
+  String get workflowsDiscard => 'Discard';
 }

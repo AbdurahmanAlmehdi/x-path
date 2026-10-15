@@ -5,8 +5,11 @@ import 'package:xp_engine/src/clock/clock.dart';
 import 'package:xp_engine/src/projects/project_exceptions.dart';
 import 'package:xp_engine/src/projects/project_repository.dart';
 import 'package:xp_engine/src/repositories/event_log.dart';
+import 'package:xp_engine/src/scheduler/capability.dart';
 import 'package:xp_engine/src/workflows/builtin_workflows.dart';
+import 'package:xp_engine/src/workflows/gate_action.dart';
 import 'package:xp_engine/src/workflows/step_catalog.dart';
+import 'package:xp_engine/src/workflows/workflow_definition.dart';
 import 'package:xp_engine/src/workflows/workflow_exceptions.dart';
 import 'package:xp_engine/src/workflows/workflow_parser.dart';
 import 'package:xp_engine/src/workflows/workflow_repository.dart';
@@ -39,19 +42,37 @@ class WorkflowService {
   new({
     required this._repository,
     required this._projects,
-    required StepCatalog catalog,
+    required this._catalog,
     required this._events,
     required this._clock,
     Random? random,
-  }) : _parser = WorkflowParser(catalog),
+  }) : _parser = WorkflowParser(_catalog),
        _random = random ?? Random.secure();
 
   final WorkflowRepository _repository;
   final ProjectRepository _projects;
+  final StepCatalog _catalog;
   final WorkflowParser _parser;
   final EventLog _events;
   final Clock _clock;
   final Random _random;
+
+  /// What a workflow document may name: the step types of the engine with
+  /// their `with` keys, the gates, the capabilities and the matrix axes.
+  WorkflowSchema schema() => WorkflowSchema(
+    schema: workflowSchemaVersion,
+    steps: [
+      for (final kind in _catalog.kinds)
+        StepType(
+          kind: kind,
+          withKeys: _catalog.withKeys(kind)!.toList()..sort(),
+        ),
+    ],
+    gates: [for (final action in GateAction.values) action.wire],
+    capabilities: [for (final capability in Capability.values) capability.wire],
+    matrixAxes: matrixAxes,
+    platforms: platformNames,
+  );
 
   /// Checks [yaml] against schema 1 and the step types of the engine.
   ValidateWorkflowResponse validate(String yaml) {

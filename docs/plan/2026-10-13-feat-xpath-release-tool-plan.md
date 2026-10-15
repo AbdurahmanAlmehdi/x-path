@@ -550,7 +550,7 @@ Mataa dev builds through `xp` can start after Phase 13, before the desktop app e
 
 ### Phase 17: Workflow builder
 
-- **Status:** Not started
+- **Status:** Done
 - **Scope:** Visual editor for stages, jobs, steps, matrix, conditions and gates with a live
   YAML view of the same document; validation errors with line numbers; import and export.
 - **Files touched:** `apps/xp_desktop/lib/workflow_builder/**`

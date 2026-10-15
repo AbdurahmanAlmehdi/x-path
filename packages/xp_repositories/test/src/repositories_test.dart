@@ -508,6 +508,44 @@ void main() {
       );
     });
 
+    test('reads the schema, validates, creates and saves', () async {
+      final client = harness.client;
+      const schema = WorkflowSchema(
+        schema: 1,
+        steps: [StepType(kind: 'test')],
+        gates: ['push'],
+        capabilities: ['flutter'],
+        matrixAxes: ['platform'],
+        platforms: ['android'],
+      );
+      const issues = ValidateWorkflowResponse(
+        valid: false,
+        issues: [WorkflowIssue(line: 1, column: 1, message: 'm')],
+      );
+      when(client.getWorkflowSchema).thenAnswer((_) async => schema);
+      when(() => client.validateWorkflow('prj_1', 'y'))
+          .thenAnswer((_) async => issues);
+      when(
+        () => client.createWorkflow(
+          'prj_1',
+          const CreateWorkflowRequest(name: 'mine', yaml: 'y'),
+        ),
+      ).thenAnswer((_) async => workflow(version1));
+      when(() => client.saveWorkflow('prj_1', 'wf_1', 'y'))
+          .thenAnswer((_) async => workflow(version2));
+
+      expect(await repository.schema(), schema);
+      expect(await repository.validate('prj_1', 'y'), issues);
+      expect(
+        await repository.createWorkflow('prj_1', name: 'mine', yaml: 'y'),
+        workflow(version1),
+      );
+      expect(
+        await repository.saveWorkflow('prj_1', 'wf_1', 'y'),
+        workflow(version2),
+      );
+    });
+
     test('reads the version of the workflow a run runs', () async {
       final client = harness.client;
       when(() => client.getWorkflow('prj_1', 'wf_1'))

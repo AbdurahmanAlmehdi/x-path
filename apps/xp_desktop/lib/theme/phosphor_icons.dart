@@ -43,6 +43,12 @@ abstract final class PhosphorIconsRegular {
     fontPackage: _package,
     matchTextDirection: true,
   );
+  static const arrowDown = IconData(
+    0xe03e,
+    fontFamily: 'PhosphorRegular',
+    fontPackage: _package,
+    matchTextDirection: true,
+  );
   static const arrowLineDown = IconData(
     0xe05c,
     fontFamily: 'PhosphorRegular',
@@ -51,6 +57,12 @@ abstract final class PhosphorIconsRegular {
   );
   static const arrowUDownLeft = IconData(
     0xe07e,
+    fontFamily: 'PhosphorRegular',
+    fontPackage: _package,
+    matchTextDirection: true,
+  );
+  static const arrowUp = IconData(
+    0xe08e,
     fontFamily: 'PhosphorRegular',
     fontPackage: _package,
     matchTextDirection: true,
@@ -145,8 +157,20 @@ abstract final class PhosphorIconsRegular {
     fontPackage: _package,
     matchTextDirection: true,
   );
+  static const downloadSimple = IconData(
+    0xe20c,
+    fontFamily: 'PhosphorRegular',
+    fontPackage: _package,
+    matchTextDirection: true,
+  );
   static const eye = IconData(
     0xe220,
+    fontFamily: 'PhosphorRegular',
+    fontPackage: _package,
+    matchTextDirection: true,
+  );
+  static const flowArrow = IconData(
+    0xe6ec,
     fontFamily: 'PhosphorRegular',
     fontPackage: _package,
     matchTextDirection: true,
@@ -546,6 +570,12 @@ abstract final class PhosphorIconsFill {
   );
   static const eye = IconData(
     0xe220,
+    fontFamily: 'PhosphorFill',
+    fontPackage: _package,
+    matchTextDirection: true,
+  );
+  static const flowArrow = IconData(
+    0xe6ec,
     fontFamily: 'PhosphorFill',
     fontPackage: _package,
     matchTextDirection: true,

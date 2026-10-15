@@ -19,6 +19,13 @@ typedef FolderPicker = Future<String?> Function();
 /// Asks the user for a file; `null` when they cancel.
 typedef FilePicker = Future<PickedFile?> Function();
 
+/// Asks the user where to save [contents] (offering [suggestedName]) and
+/// writes it there; the path, or `null` when they cancel.
+typedef FileSaver = Future<String?> Function(
+  String suggestedName,
+  String contents,
+);
+
 /// A file the user picked.
 class PickedFile extends Equatable {
   const new({required this.name, required this.bytes});
@@ -62,6 +69,7 @@ class AppServices {
     required this.localEngine,
     required this.pickFolder,
     required this.pickFile,
+    required this.saveFile,
     required this.deviceName,
     required this.alerts,
   });
@@ -93,6 +101,12 @@ class AppServices {
         if (file == null) return null;
         return PickedFile(name: file.name, bytes: await file.readAsBytes());
       },
+      saveFile: (suggestedName, contents) async {
+        final location = await getSaveLocation(suggestedName: suggestedName);
+        if (location == null) return null;
+        await File(location.path).writeAsString(contents);
+        return location.path;
+      },
       deviceName: Platform.localHostname.split('.').first,
       alerts: MethodChannelNeedsYouAlerts(),
     );
@@ -106,6 +120,7 @@ class AppServices {
   final LocalEngine localEngine;
   final FolderPicker pickFolder;
   final FilePicker pickFile;
+  final FileSaver saveFile;
 
   /// What this Mac is called, for naming its token.
   final String deviceName;

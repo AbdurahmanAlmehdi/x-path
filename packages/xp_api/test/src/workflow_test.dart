@@ -110,4 +110,30 @@ void main() {
       expect(const ValidateWorkflowResponse(valid: true).issues, isEmpty);
     });
   });
+
+  group('WorkflowSchema', () {
+    const schema = WorkflowSchema(
+      schema: 1,
+      steps: [
+        StepType(kind: 'build.android', withKeys: ['artifact', 'flavor']),
+        StepType(kind: 'test'),
+      ],
+      gates: ['prod_release'],
+      capabilities: ['flutter'],
+      matrixAxes: ['platform', 'flavor'],
+      platforms: ['android', 'ios'],
+    );
+
+    test('names the with keys of a step type "with"', () {
+      expect(schema.steps.first.toJson(), {
+        'kind': 'build.android',
+        'with': ['artifact', 'flavor'],
+      });
+      expect(StepType.fromJson(const {'kind': 'test'}), schema.steps.last);
+    });
+
+    test('round-trips through JSON', () {
+      expect(WorkflowSchema.fromJson(schema.toJson()), schema);
+    });
+  });
 }

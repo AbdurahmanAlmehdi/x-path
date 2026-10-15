@@ -23,6 +23,36 @@ class WorkflowsRepository {
     (client) => client.getWorkflow(projectId, workflowId, version: version),
   );
 
+  /// What a workflow document of the engine may name, for the builder.
+  Future<WorkflowSchema> schema() =>
+      _session.call((client) => client.getWorkflowSchema());
+
+  /// The issues the engine finds in [yaml], with their lines. Nothing is
+  /// saved.
+  Future<ValidateWorkflowResponse> validate(String projectId, String yaml) =>
+      _session.call((client) => client.validateWorkflow(projectId, yaml));
+
+  /// Creates the workflow [name] of [projectId] from [yaml], at version 1.
+  Future<Workflow> createWorkflow(
+    String projectId, {
+    required String name,
+    required String yaml,
+  }) => _session.call(
+    (client) => client.createWorkflow(
+      projectId,
+      CreateWorkflowRequest(name: name, yaml: yaml),
+    ),
+  );
+
+  /// Saves [yaml] as the next version of [workflowId] of [projectId].
+  Future<Workflow> saveWorkflow(
+    String projectId,
+    String workflowId,
+    String yaml,
+  ) => _session.call(
+    (client) => client.saveWorkflow(projectId, workflowId, yaml),
+  );
+
   /// The exact version of the workflow that [run] runs.
   Future<Workflow> workflowOf(Run run) async {
     final newest = await getWorkflow(run.projectId, run.workflowId);
