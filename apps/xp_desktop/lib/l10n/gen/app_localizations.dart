@@ -4083,6 +4083,360 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Discard'**
   String get workflowsDiscard;
+
+  /// Sidebar row and app menu item.
+  ///
+  /// In en, this message translates to:
+  /// **'Settings'**
+  String get sidebarSettings;
+
+  /// Title.
+  ///
+  /// In en, this message translates to:
+  /// **'Settings'**
+  String get settingsTitle;
+
+  /// Subtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'XPath on this Mac and the engine it shows.'**
+  String get settingsSubtitle;
+
+  /// Section label.
+  ///
+  /// In en, this message translates to:
+  /// **'About'**
+  String get settingsAbout;
+
+  /// Row label: the app's version.
+  ///
+  /// In en, this message translates to:
+  /// **'App'**
+  String get settingsAppVersion;
+
+  /// Row label: the engine the app shows.
+  ///
+  /// In en, this message translates to:
+  /// **'Engine'**
+  String get settingsEngine;
+
+  /// Row label.
+  ///
+  /// In en, this message translates to:
+  /// **'Engine version'**
+  String get settingsEngineVersion;
+
+  /// The engine's version.
+  ///
+  /// In en, this message translates to:
+  /// **'{version} (API v{api})'**
+  String settingsEngineVersionValue(String version, String api);
+
+  /// Row label.
+  ///
+  /// In en, this message translates to:
+  /// **'Connection'**
+  String get settingsConnection;
+
+  /// Row label: the LaunchAgent.
+  ///
+  /// In en, this message translates to:
+  /// **'Engine on this Mac'**
+  String get settingsLoginItem;
+
+  /// Login item status.
+  ///
+  /// In en, this message translates to:
+  /// **'Runs at login'**
+  String get settingsAgentEnabled;
+
+  /// Login item status.
+  ///
+  /// In en, this message translates to:
+  /// **'Not running'**
+  String get settingsAgentNotRegistered;
+
+  /// Login item status.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for you in Login Items'**
+  String get settingsAgentRequiresApproval;
+
+  /// Login item status.
+  ///
+  /// In en, this message translates to:
+  /// **'Not in this build'**
+  String get settingsAgentNotFound;
+
+  /// Login item status.
+  ///
+  /// In en, this message translates to:
+  /// **'Needs macOS 13'**
+  String get settingsAgentUnsupported;
+
+  /// A value that could not be read.
+  ///
+  /// In en, this message translates to:
+  /// **'Unknown'**
+  String get settingsUnknown;
+
+  /// Section label.
+  ///
+  /// In en, this message translates to:
+  /// **'GitHub'**
+  String get settingsGitHub;
+
+  /// Lead of the GitHub section.
+  ///
+  /// In en, this message translates to:
+  /// **'The engine adds projects, keeps its copies and pushes with one GitHub token, shared by every project. The token stays on the engine machine and is checked with GitHub before it is saved.'**
+  String get settingsGitHubBody;
+
+  /// Status.
+  ///
+  /// In en, this message translates to:
+  /// **'The engine has no GitHub token, so it cannot add projects.'**
+  String get settingsGitHubMissing;
+
+  /// Status.
+  ///
+  /// In en, this message translates to:
+  /// **'Connected to GitHub as {login}.'**
+  String settingsGitHubConnected(String login);
+
+  /// Status without a login.
+  ///
+  /// In en, this message translates to:
+  /// **'Connected to GitHub.'**
+  String get settingsGitHubConnectedNoLogin;
+
+  /// Status.
+  ///
+  /// In en, this message translates to:
+  /// **'GitHub refused the engine\'s token: {message}'**
+  String settingsGitHubRejected(String message);
+
+  /// Status.
+  ///
+  /// In en, this message translates to:
+  /// **'GitHub could not check the engine\'s token: {message}'**
+  String settingsGitHubUnreachable(String message);
+
+  /// While the status loads.
+  ///
+  /// In en, this message translates to:
+  /// **'Asking GitHub…'**
+  String get settingsGitHubChecking;
+
+  /// Field label.
+  ///
+  /// In en, this message translates to:
+  /// **'Token'**
+  String get settingsGitHubToken;
+
+  /// Field hint.
+  ///
+  /// In en, this message translates to:
+  /// **'ghp_… or github_pat_… with the repo scope'**
+  String get settingsGitHubTokenHint;
+
+  /// Saves the pasted token.
+  ///
+  /// In en, this message translates to:
+  /// **'Check and save'**
+  String get settingsGitHubSave;
+
+  /// Takes gh auth token on the engine machine.
+  ///
+  /// In en, this message translates to:
+  /// **'Import from GitHub CLI'**
+  String get settingsGitHubImport;
+
+  /// Note under the buttons.
+  ///
+  /// In en, this message translates to:
+  /// **'Import runs gh auth token on the engine machine; log in there with gh auth login first.'**
+  String get settingsGitHubImportNote;
+
+  /// Forgets the engine's token.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove token'**
+  String get settingsGitHubRemove;
+
+  /// A failed request.
+  ///
+  /// In en, this message translates to:
+  /// **'Not saved: {message}'**
+  String settingsGitHubFailed(String message);
+
+  /// Section label and button.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove XPath'**
+  String get settingsRemove;
+
+  /// Lead of the remove section.
+  ///
+  /// In en, this message translates to:
+  /// **'Stops the engine on this Mac, revokes its runners and removes the xp link. Your repositories are never touched.'**
+  String get settingsRemoveBody;
+
+  /// Opens the confirmation sheet.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove XPath…'**
+  String get settingsRemoveButton;
+
+  /// Title of the sheet.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove XPath from this Mac?'**
+  String get removeTitle;
+
+  /// Lead of the sheet.
+  ///
+  /// In en, this message translates to:
+  /// **'XPath revokes every runner of the engine on this Mac while it still runs, stops the engine and takes it off the login items, and removes the xp link it made. Your repositories are not touched.'**
+  String get removeBody;
+
+  /// Option.
+  ///
+  /// In en, this message translates to:
+  /// **'Also delete engine data'**
+  String get removeDeleteData;
+
+  /// What the option deletes.
+  ///
+  /// In en, this message translates to:
+  /// **'The database, builds, logs and copies in {folders}.'**
+  String removeDeleteDataNote(String folders);
+
+  /// Option.
+  ///
+  /// In en, this message translates to:
+  /// **'Also delete Keychain items'**
+  String get removeDeleteKeychain;
+
+  /// What the option deletes.
+  ///
+  /// In en, this message translates to:
+  /// **'The engine\'s secrets and credentials and the app\'s engine tokens (Keychain services ly.abdurahman.xpath…).'**
+  String get removeDeleteKeychainNote;
+
+  /// Closes the sheet.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep XPath'**
+  String get removeKeep;
+
+  /// Starts removing.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove XPath'**
+  String get removeConfirm;
+
+  /// Step.
+  ///
+  /// In en, this message translates to:
+  /// **'Revoke runners'**
+  String get removeStepRunners;
+
+  /// Step.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop the engine'**
+  String get removeStepEngine;
+
+  /// Step.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove the xp link'**
+  String get removeStepCli;
+
+  /// Step.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete engine data'**
+  String get removeStepData;
+
+  /// Step.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete Keychain items'**
+  String get removeStepKeychain;
+
+  /// Step result.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{No runners to revoke} =1{1 runner revoked} other{{count} runners revoked}}'**
+  String removeRunnersRevoked(int count);
+
+  /// Step result.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{No items} =1{1 item deleted} other{{count} items deleted}}'**
+  String removeKeychainDeleted(int count);
+
+  /// Step result.
+  ///
+  /// In en, this message translates to:
+  /// **'The engine did not stop in time.'**
+  String get removeEngineStillRunning;
+
+  /// Step result.
+  ///
+  /// In en, this message translates to:
+  /// **'Kept: the engine did not stop.'**
+  String get removeDataKept;
+
+  /// Title when done.
+  ///
+  /// In en, this message translates to:
+  /// **'XPath is removed from this Mac'**
+  String get removeDoneTitle;
+
+  /// Lead when done.
+  ///
+  /// In en, this message translates to:
+  /// **'Move XPath to the Trash to finish.'**
+  String get removeDoneBody;
+
+  /// Final button.
+  ///
+  /// In en, this message translates to:
+  /// **'Move to Trash and quit'**
+  String get removeTrashAndQuit;
+
+  /// When the Trash refused.
+  ///
+  /// In en, this message translates to:
+  /// **'XPath could not move itself to the Trash. Quit, then drag XPath from Applications to the Trash.'**
+  String get removeTrashFailed;
+
+  /// Quits without the Trash.
+  ///
+  /// In en, this message translates to:
+  /// **'Quit XPath'**
+  String get removeQuit;
+
+  /// Add project without a GitHub token.
+  ///
+  /// In en, this message translates to:
+  /// **'The engine has no GitHub token, so it cannot add a project. Connect GitHub in Settings first.'**
+  String get addProjectNoGitHub;
+
+  /// Add project with a refused token.
+  ///
+  /// In en, this message translates to:
+  /// **'GitHub refuses the engine\'s token, so it cannot add a project. Save a new one in Settings.'**
+  String get addProjectGitHubRejected;
+
+  /// Opens the GitHub section of Settings.
+  ///
+  /// In en, this message translates to:
+  /// **'Connect GitHub…'**
+  String get addProjectOpenGitHub;
 }
 
 class _AppLocalizationsDelegate

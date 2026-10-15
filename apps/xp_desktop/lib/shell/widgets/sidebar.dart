@@ -162,6 +162,13 @@ class Sidebar extends StatelessWidget {
                       destination is OnboardingDestination,
                   onTap: () => show(const EnginesDestination()),
                 ),
+                SidebarRow(
+                  icon: PhosphorIconsRegular.gearSix,
+                  selectedIcon: PhosphorIconsFill.gearSix,
+                  label: l10n.sidebarSettings,
+                  selected: destination is SettingsDestination,
+                  onTap: () => show(const SettingsDestination()),
+                ),
               ],
             ),
           ),

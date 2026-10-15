@@ -1,24 +1,37 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:xp_api/xp_api.dart';
 import 'package:xp_desktop/add_project/bloc/add_project_bloc.dart';
 import 'package:xp_desktop/app/app_services.dart';
 import 'package:xp_desktop/app/bloc/engine_connection_bloc.dart';
 import 'package:xp_desktop/l10n/l10n.dart';
 import 'package:xp_desktop/projects/widgets/scan_summary.dart';
+import 'package:xp_desktop/settings/bloc/github_token_bloc.dart';
 import 'package:xp_desktop/shell/cubit/shell_cubit.dart';
 import 'package:xp_desktop/shell/widgets/shell_page.dart';
 import 'package:xp_desktop/theme/theme.dart';
 import 'package:xp_desktop/widgets/widgets.dart';
 import 'package:xp_repositories/xp_repositories.dart';
 
-/// Add project by folder, then review what the scan found.
+/// Add project by folder, then review what the scan found. The engine
+/// needs its GitHub token to add a project; without one the form says so
+/// and opens the GitHub section of the settings.
 class AddProjectPage extends StatelessWidget {
   const new({super.key});
 
   @override
-  Widget build(BuildContext context) => BlocProvider(
-    create: (context) =>
-        AddProjectBloc(projects: context.read<ProjectsRepository>()),
+  Widget build(BuildContext context) => MultiBlocProvider(
+    providers: [
+      BlocProvider(
+        create: (context) =>
+            AddProjectBloc(projects: context.read<ProjectsRepository>()),
+      ),
+      BlocProvider(
+        create: (context) =>
+            GitHubTokenBloc(settings: context.read<SettingsRepository>())
+              ..add(const GitHubTokenRequested()),
+      ),
+    ],
     child: const AddProjectView(),
   );
 }
@@ -30,9 +43,13 @@ class AddProjectView extends StatelessWidget {
   Widget build(BuildContext context) =>
       BlocConsumer<AddProjectBloc, AddProjectState>(
         listenWhen: (previous, current) =>
-            current.status == AddProjectStatus.discarded,
-        listener: (context, state) =>
-            context.read<ShellCubit>().show(const HomeDestination()),
+            current.status != previous.status &&
+            (current.status == AddProjectStatus.discarded ||
+                current.status == AddProjectStatus.failed),
+        listener: (context, state) => state.status == AddProjectStatus.failed
+            // A failure may be the token: ask again.
+            ? context.read<GitHubTokenBloc>().add(const GitHubTokenRequested())
+            : context.read<ShellCubit>().show(const HomeDestination()),
         builder: (context, state) => switch (state.status) {
           AddProjectStatus.review ||
           AddProjectStatus.scanning => _Review(state),
@@ -71,6 +88,7 @@ class _FormState extends State<_Form> {
     final engine = context.watch<EngineConnectionBloc>().state.active;
     final local = engine?.isLocal ?? false;
     final adding = widget.state.status == AddProjectStatus.adding;
+    final github = context.watch<GitHubTokenBloc>().state;
     final canCommand = context.canCommand;
     return ShellPage(
       title: l10n.addProjectTitle,
@@ -93,6 +111,31 @@ class _FormState extends State<_Form> {
                   XpMessage(
                     XpStatus.scanInfo,
                     l10n.addProjectRemoteNote(engine?.name ?? ''),
+                  ),
+                ],
+                if (github.needsToken) ...[
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: XpMessage(
+                          XpStatus.credentialMissing,
+                          github.status?.status == CredentialStatus.rejected
+                              ? l10n.addProjectGitHubRejected
+                              : l10n.addProjectNoGitHub,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      XpButton(
+                        key: const Key('addProject.github'),
+                        label: l10n.addProjectOpenGitHub,
+                        icon: PhosphorIconsRegular.githubLogo,
+                        kind: XpButtonKind.primary,
+                        onPressed: () => context.read<ShellCubit>().show(
+                          const SettingsDestination(github: true),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
                 const SizedBox(height: 16),

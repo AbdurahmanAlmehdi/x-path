@@ -207,6 +207,53 @@ class EnginesRepository {
     );
   }
 
+  /// Revokes every runner of the engine on this Mac that is not revoked yet
+  /// (`POST /runners/{id}/revoke`), so that none can reach it again: the
+  /// first step of removing XPath, while the engine still runs. Returns how
+  /// many it revoked; `0` when the app has no token for the local engine.
+  ///
+  /// Throws an [XpClientException] when the engine does not answer or
+  /// refuses.
+  Future<int> revokeLocalRunners() async {
+    final token = await _vault.read(localEngineId);
+    if (token == null) return 0;
+    final client = _clientFactory(localEngineUrl, token);
+    try {
+      var revoked = 0;
+      for (final runner in await client.listRunners()) {
+        if (runner.status == RunnerStatus.revoked) continue;
+        await client.revokeRunner(runner.id);
+        revoked++;
+      }
+      return revoked;
+    } finally {
+      client.close();
+    }
+  }
+
+  /// Waits until the engine on this Mac stops answering `GET /health`,
+  /// asking every [interval] for at most [timeout]. Whether it stopped.
+  Future<bool> waitForLocalEngineToStop({
+    Duration timeout = const Duration(seconds: 35),
+    Duration interval = const Duration(milliseconds: 500),
+    Future<void> Function(Duration duration) delay = Future<void>.delayed,
+  }) async {
+    final client = _clientFactory(localEngineUrl, '');
+    try {
+      for (var waited = Duration.zero; ; waited += interval) {
+        try {
+          await client.health();
+        } on ConnectionException {
+          return true;
+        }
+        if (waited >= timeout) return false;
+        await delay(interval);
+      }
+    } finally {
+      client.close();
+    }
+  }
+
   Future<void> _upsert(EngineProfile profile) async {
     final list = await load();
     await _save(

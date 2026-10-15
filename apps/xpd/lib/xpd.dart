@@ -6,6 +6,7 @@ export 'src/api/approvals/approvals_routes.dart';
 export 'src/api/artifacts/artifacts_routes.dart';
 export 'src/api/credentials/credentials_routes.dart';
 export 'src/api/events_route.dart';
+export 'src/api/github/github_token_routes.dart';
 export 'src/api/jobs/job_logs_route.dart';
 export 'src/api/jobs/jobs_routes.dart';
 export 'src/api/middleware.dart';

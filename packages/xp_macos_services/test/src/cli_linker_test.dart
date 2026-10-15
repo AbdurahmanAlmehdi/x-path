@@ -92,4 +92,39 @@ void main() {
     expect(link.state, CliLinkState.failed);
     expect(link.detail, isNotNull);
   });
+
+  group('unlink', () {
+    test('removes the links to this app and nothing else', () async {
+      await linker.link();
+      final other = p.join(linker.userDirectory, 'xp');
+      Directory(linker.userDirectory).createSync(recursive: true);
+      Link(other).createSync('/somewhere/else/xp');
+
+      expect(await linker.unlink(), const CliLink(CliLinkState.notLinked));
+      expect(
+        FileSystemEntity.typeSync(p.join(system, 'xp'), followLinks: false),
+        FileSystemEntityType.notFound,
+      );
+      expect(Link(other).targetSync(), '/somewhere/else/xp');
+    });
+
+    test('leaves a file called xp alone', () async {
+      File(p.join(system, 'xp')).writeAsStringSync('#!/bin/sh');
+
+      expect(await linker.unlink(), const CliLink(CliLinkState.notLinked));
+      expect(File(p.join(system, 'xp')).existsSync(), isTrue);
+    });
+
+    test('says when the link cannot be removed', () async {
+      await linker.link();
+      Process.runSync('chmod', ['555', system]);
+      addTearDown(() => Process.runSync('chmod', ['755', system]));
+
+      final result = await linker.unlink();
+
+      expect(result.state, CliLinkState.failed);
+      expect(result.path, p.join(system, 'xp'));
+      expect(result.detail, isNotEmpty);
+    });
+  });
 }

@@ -1,6 +1,7 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:xp_api/xp_api.dart';
 import 'package:xp_client/xp_client.dart';
 import 'package:xp_desktop/add_project/add_project.dart';
 import 'package:xp_desktop/shell/cubit/shell_cubit.dart';
@@ -26,10 +27,12 @@ void main() {
     EngineStatus status = EngineStatus.connected,
     bool local = true,
     Future<String?> Function()? pickFolder,
+    SettingsRepository? settings,
   }) => tester.pumpApp(
     const AddProjectPage(),
     shell: shell,
     projectsRepository: projects,
+    settingsRepository: settings,
     services: testServices(pickFolder: pickFolder),
     connection: connectionIn(
       connectedTo(status: status, active: local ? localEngine : macMini),
@@ -37,6 +40,67 @@ void main() {
   );
 
   final folder = find.byKey(const Key('addProject.folder'));
+
+  group('AddProjectPage without a GitHub token', () {
+    testWidgets('says so and opens the GitHub section of the settings', (
+      tester,
+    ) async {
+      final settings = quietSettings(
+        token: const GitHubTokenStatus(stored: false),
+      );
+      await pump(tester, settings: settings);
+      await tester.pumpAndSettle();
+
+      expect(
+        find.textContaining('The engine has no GitHub token'),
+        findsOneWidget,
+      );
+      await tester.tap(find.byKey(const Key('addProject.github')));
+      expect(shell.state, const SettingsDestination(github: true));
+    });
+
+    testWidgets('says when GitHub refuses the token', (tester) async {
+      await pump(
+        tester,
+        settings: quietSettings(
+          token: const GitHubTokenStatus(
+            stored: true,
+            status: CredentialStatus.rejected,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.textContaining("GitHub refuses the engine's token"),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('asks for the token again when adding fails', (tester) async {
+      final settings = quietSettings();
+      when(() => projects.addProject(any())).thenThrow(
+        const ApiException(
+          'There is no GitHub token.',
+          statusCode: 502,
+          code: ApiErrorCode.upstreamError,
+        ),
+      );
+      await pump(tester, settings: settings);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('addProject.github')), findsNothing);
+      when(settings.gitHubToken)
+          .thenAnswer((_) async => const GitHubTokenStatus(stored: false));
+
+      await tester.enterText(folder, '/src/app');
+      await tester.pump();
+      await tester.tap(find.text('Add and scan'));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('addProject.github')), findsOneWidget);
+      verify(settings.gitHubToken).called(2);
+    });
+  });
 
   group('AddProjectPage', () {
     testWidgets('picks a folder, adds it and reviews the scan', (tester) async {

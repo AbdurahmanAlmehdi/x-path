@@ -128,6 +128,7 @@ class TestEngine {
     required this.runnerHub,
     required this.runnerService,
     required this.runnerBundles,
+    required this.githubCli,
   });
 
   static Future<TestEngine> start({
@@ -323,6 +324,7 @@ class TestEngine {
       clock: clock,
     );
     final runnerBundles = InMemoryRunnerBundles();
+    final githubCli = FakeGitHubCliToken();
     final issued = await tokens.issue(name: 'test', kind: DeviceTokenKind.app);
     final server = await XpdServer.start(
       tokens: tokens,
@@ -368,6 +370,12 @@ class TestEngine {
         masker: masker,
         events: events,
         clock: clock,
+      ),
+      githubToken: GitHubTokenService(
+        secrets: credentialSecrets,
+        verifier: credentialVerifiers[CredentialKind.github]!,
+        cli: githubCli,
+        masker: masker,
       ),
       workflows: workflows,
       dispatcher: dispatcher,
@@ -436,6 +444,7 @@ class TestEngine {
       runnerHub: runnerHub,
       runnerService: runnerService,
       runnerBundles: runnerBundles,
+      githubCli: githubCli,
     );
   }
 
@@ -517,6 +526,12 @@ class TestEngine {
 
   /// The runner bundles the engine hands out.
   final InMemoryRunnerBundles runnerBundles;
+
+  /// The GitHub CLI of the engine machine (`POST /github-token/import`).
+  /// The GitHub token itself is checked by
+  /// `credentialVerifiers[CredentialKind.github]` and kept in
+  /// [credentialSecrets].
+  final FakeGitHubCliToken githubCli;
 
   /// The files of the folders a project can be added from, by path.
   final Map<String, Map<String, String>> folders;

@@ -56,6 +56,10 @@ abstract interface class CliLinker {
   /// older or moved XPath app is replaced; anything else named `xp` is left
   /// alone and reported as a [CliLinkState.conflict].
   Future<CliLink> link();
+
+  /// Removes the links to the bundled `xp`, and nothing else: an `xp` that
+  /// is not a link into this app stays. Returns where `xp` stands then.
+  Future<CliLink> unlink();
 }
 
 /// The [CliLinker] of the real file system. It never asks for a password
@@ -133,5 +137,25 @@ class FileSystemCliLinker implements CliLinker {
       }
     }
     return CliLink(CliLinkState.failed, detail: lastError);
+  }
+
+  @override
+  Future<CliLink> unlink() async {
+    for (final directory in [systemDirectory, userDirectory]) {
+      final path = p.join(directory, 'xp');
+      if (FileSystemEntity.isLinkSync(path) &&
+          Link(path).targetSync() == target) {
+        try {
+          await Link(path).delete();
+        } on FileSystemException catch (error) {
+          return CliLink(
+            CliLinkState.failed,
+            path: path,
+            detail: error.osError?.message ?? error.message,
+          );
+        }
+      }
+    }
+    return await status();
   }
 }

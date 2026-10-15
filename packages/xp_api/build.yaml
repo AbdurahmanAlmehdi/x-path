@@ -9,6 +9,7 @@ targets:
           - lib/src/artifact.dart
           - lib/src/credential.dart
           - lib/src/finding.dart
+          - lib/src/github_token.dart
           - lib/src/profile_edits.dart
           - lib/src/health_response.dart
           - lib/src/job.dart

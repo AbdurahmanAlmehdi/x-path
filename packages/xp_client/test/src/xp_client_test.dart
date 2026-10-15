@@ -394,6 +394,43 @@ void main() {
       expected: 'deleted',
     ),
     _Endpoint(
+      'getGitHubToken',
+      method: 'GET',
+      path: '/github-token',
+      response: const GitHubTokenStatus(stored: false).toJson(),
+      call: (client) => client.getGitHubToken(),
+      expected: const GitHubTokenStatus(stored: false),
+    ),
+    _Endpoint(
+      'setGitHubToken',
+      method: 'PUT',
+      path: '/github-token',
+      response: const GitHubTokenStatus(stored: true, login: 'octo').toJson(),
+      call: (client) => client.setGitHubToken('ghp_x'),
+      expected: const GitHubTokenStatus(stored: true, login: 'octo'),
+      body: const SetGitHubTokenRequest('ghp_x').toJson(),
+    ),
+    _Endpoint(
+      'importGitHubToken',
+      method: 'POST',
+      path: '/github-token/import',
+      response: const GitHubTokenStatus(stored: true).toJson(),
+      call: (client) => client.importGitHubToken(),
+      expected: const GitHubTokenStatus(stored: true),
+    ),
+    _Endpoint(
+      'deleteGitHubToken',
+      method: 'DELETE',
+      path: '/github-token',
+      status: 204,
+      response: null,
+      call: (client) async {
+        await client.deleteGitHubToken();
+        return 'deleted';
+      },
+      expected: 'deleted',
+    ),
+    _Endpoint(
       'listApprovals',
       method: 'GET',
       path: '/approvals',

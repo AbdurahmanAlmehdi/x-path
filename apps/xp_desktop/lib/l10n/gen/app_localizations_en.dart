@@ -2484,4 +2484,221 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get workflowsDiscard => 'Discard';
+
+  @override
+  String get sidebarSettings => 'Settings';
+
+  @override
+  String get settingsTitle => 'Settings';
+
+  @override
+  String get settingsSubtitle => 'XPath on this Mac and the engine it shows.';
+
+  @override
+  String get settingsAbout => 'About';
+
+  @override
+  String get settingsAppVersion => 'App';
+
+  @override
+  String get settingsEngine => 'Engine';
+
+  @override
+  String get settingsEngineVersion => 'Engine version';
+
+  @override
+  String settingsEngineVersionValue(String version, String api) {
+    return '$version (API v$api)';
+  }
+
+  @override
+  String get settingsConnection => 'Connection';
+
+  @override
+  String get settingsLoginItem => 'Engine on this Mac';
+
+  @override
+  String get settingsAgentEnabled => 'Runs at login';
+
+  @override
+  String get settingsAgentNotRegistered => 'Not running';
+
+  @override
+  String get settingsAgentRequiresApproval => 'Waiting for you in Login Items';
+
+  @override
+  String get settingsAgentNotFound => 'Not in this build';
+
+  @override
+  String get settingsAgentUnsupported => 'Needs macOS 13';
+
+  @override
+  String get settingsUnknown => 'Unknown';
+
+  @override
+  String get settingsGitHub => 'GitHub';
+
+  @override
+  String get settingsGitHubBody =>
+      'The engine adds projects, keeps its copies and pushes with one GitHub token, shared by every project. The token stays on the engine machine and is checked with GitHub before it is saved.';
+
+  @override
+  String get settingsGitHubMissing =>
+      'The engine has no GitHub token, so it cannot add projects.';
+
+  @override
+  String settingsGitHubConnected(String login) {
+    return 'Connected to GitHub as $login.';
+  }
+
+  @override
+  String get settingsGitHubConnectedNoLogin => 'Connected to GitHub.';
+
+  @override
+  String settingsGitHubRejected(String message) {
+    return 'GitHub refused the engine\'s token: $message';
+  }
+
+  @override
+  String settingsGitHubUnreachable(String message) {
+    return 'GitHub could not check the engine\'s token: $message';
+  }
+
+  @override
+  String get settingsGitHubChecking => 'Asking GitHub…';
+
+  @override
+  String get settingsGitHubToken => 'Token';
+
+  @override
+  String get settingsGitHubTokenHint =>
+      'ghp_… or github_pat_… with the repo scope';
+
+  @override
+  String get settingsGitHubSave => 'Check and save';
+
+  @override
+  String get settingsGitHubImport => 'Import from GitHub CLI';
+
+  @override
+  String get settingsGitHubImportNote =>
+      'Import runs gh auth token on the engine machine; log in there with gh auth login first.';
+
+  @override
+  String get settingsGitHubRemove => 'Remove token';
+
+  @override
+  String settingsGitHubFailed(String message) {
+    return 'Not saved: $message';
+  }
+
+  @override
+  String get settingsRemove => 'Remove XPath';
+
+  @override
+  String get settingsRemoveBody =>
+      'Stops the engine on this Mac, revokes its runners and removes the xp link. Your repositories are never touched.';
+
+  @override
+  String get settingsRemoveButton => 'Remove XPath…';
+
+  @override
+  String get removeTitle => 'Remove XPath from this Mac?';
+
+  @override
+  String get removeBody =>
+      'XPath revokes every runner of the engine on this Mac while it still runs, stops the engine and takes it off the login items, and removes the xp link it made. Your repositories are not touched.';
+
+  @override
+  String get removeDeleteData => 'Also delete engine data';
+
+  @override
+  String removeDeleteDataNote(String folders) {
+    return 'The database, builds, logs and copies in $folders.';
+  }
+
+  @override
+  String get removeDeleteKeychain => 'Also delete Keychain items';
+
+  @override
+  String get removeDeleteKeychainNote =>
+      'The engine\'s secrets and credentials and the app\'s engine tokens (Keychain services ly.abdurahman.xpath…).';
+
+  @override
+  String get removeKeep => 'Keep XPath';
+
+  @override
+  String get removeConfirm => 'Remove XPath';
+
+  @override
+  String get removeStepRunners => 'Revoke runners';
+
+  @override
+  String get removeStepEngine => 'Stop the engine';
+
+  @override
+  String get removeStepCli => 'Remove the xp link';
+
+  @override
+  String get removeStepData => 'Delete engine data';
+
+  @override
+  String get removeStepKeychain => 'Delete Keychain items';
+
+  @override
+  String removeRunnersRevoked(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count runners revoked',
+      one: '1 runner revoked',
+      zero: 'No runners to revoke',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String removeKeychainDeleted(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count items deleted',
+      one: '1 item deleted',
+      zero: 'No items',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get removeEngineStillRunning => 'The engine did not stop in time.';
+
+  @override
+  String get removeDataKept => 'Kept: the engine did not stop.';
+
+  @override
+  String get removeDoneTitle => 'XPath is removed from this Mac';
+
+  @override
+  String get removeDoneBody => 'Move XPath to the Trash to finish.';
+
+  @override
+  String get removeTrashAndQuit => 'Move to Trash and quit';
+
+  @override
+  String get removeTrashFailed =>
+      'XPath could not move itself to the Trash. Quit, then drag XPath from Applications to the Trash.';
+
+  @override
+  String get removeQuit => 'Quit XPath';
+
+  @override
+  String get addProjectNoGitHub =>
+      'The engine has no GitHub token, so it cannot add a project. Connect GitHub in Settings first.';
+
+  @override
+  String get addProjectGitHubRejected =>
+      'GitHub refuses the engine\'s token, so it cannot add a project. Save a new one in Settings.';
+
+  @override
+  String get addProjectOpenGitHub => 'Connect GitHub…';
 }

@@ -27,6 +27,24 @@ class MockTestsRepository extends Mock implements TestsRepository;
 
 class MockStorageRepository extends Mock implements StorageRepository;
 
+class MockSettingsRepository extends Mock implements SettingsRepository;
+
+/// A settings repository of an engine `0.0.1` that has its GitHub token.
+MockSettingsRepository quietSettings({
+  GitHubTokenStatus token = const GitHubTokenStatus(
+    stored: true,
+    status: CredentialStatus.verified,
+    login: 'octo',
+  ),
+}) {
+  final repository = MockSettingsRepository();
+  when(repository.engineVersion).thenAnswer(
+    (_) async => const VersionResponse(version: '0.0.1', apiVersion: '1'),
+  );
+  when(repository.gitHubToken).thenAnswer((_) async => token);
+  return repository;
+}
+
 /// An approvals repository whose approvals never arrive.
 MockApprovalsRepository quietApprovals() {
   final repository = MockApprovalsRepository();
@@ -268,6 +286,10 @@ AppServices testServices({
   FilePicker? pickFile,
   FileSaver? saveFile,
   FakeNeedsYouAlerts? alerts,
+  FakeRunningApp? runningApp,
+  FakeAppMenu? appMenu,
+  FakeKeychainWiper? keychainWiper,
+  FakeDataWiper? dataWiper,
 }) => AppServices(
   engines: engines ?? noEngines(),
   openSession:
@@ -281,4 +303,8 @@ AppServices testServices({
   saveFile: saveFile ?? (_, _) async => null,
   deviceName: 'MacBook',
   alerts: alerts ?? FakeNeedsYouAlerts(),
+  runningApp: runningApp ?? FakeRunningApp(),
+  appMenu: appMenu ?? FakeAppMenu(),
+  keychainWiper: keychainWiper ?? FakeKeychainWiper(),
+  dataWiper: dataWiper ?? FakeDataWiper(),
 );

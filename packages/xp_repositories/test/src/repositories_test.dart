@@ -1005,4 +1005,34 @@ void main() {
       expect(await repository.setRetention(settings), settings);
     });
   });
+
+  group('SettingsRepository', () {
+    late SettingsRepository repository;
+
+    setUp(() => repository = SettingsRepository(harness.session));
+
+    test('passes the requests to the engine', () async {
+      final client = harness.client;
+      const version = VersionResponse(version: '1.0.0', apiVersion: '1');
+      const missing = GitHubTokenStatus(stored: false);
+      const stored = GitHubTokenStatus(
+        stored: true,
+        status: CredentialStatus.verified,
+        login: 'octo',
+      );
+      when(client.version).thenAnswer((_) async => version);
+      when(client.getGitHubToken).thenAnswer((_) async => missing);
+      when(() => client.setGitHubToken('ghp_x'))
+          .thenAnswer((_) async => stored);
+      when(client.importGitHubToken).thenAnswer((_) async => stored);
+      when(client.deleteGitHubToken).thenAnswer((_) async {});
+
+      expect(await repository.engineVersion(), version);
+      expect(await repository.gitHubToken(), missing);
+      expect(await repository.setGitHubToken('ghp_x'), stored);
+      expect(await repository.importGitHubToken(), stored);
+      await repository.clearGitHubToken();
+      verify(client.deleteGitHubToken).called(1);
+    });
+  });
 }

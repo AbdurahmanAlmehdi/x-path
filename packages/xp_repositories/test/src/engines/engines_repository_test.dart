@@ -270,5 +270,95 @@ void main() {
       await repository.remove(localEngineId);
       expect(await repository.load(), const EngineList());
     });
+
+    group('revokeLocalRunners', () {
+      Runner runner(String id, RunnerStatus status) => Runner(
+        id: id,
+        name: id,
+        status: status,
+        capabilities: const [],
+        slots: 1,
+        jobIds: const [],
+        createdAt: DateTime.utc(2026, 10, 16),
+      );
+
+      test('revokes the runners that are not revoked yet', () async {
+        await repository.saveLocal(name: 'This Mac', token: 'xpt_local');
+        when(client.listRunners).thenAnswer(
+          (_) async => [
+            runner('rnr_1', RunnerStatus.online),
+            runner('rnr_2', RunnerStatus.revoked),
+            runner('rnr_3', RunnerStatus.offline),
+          ],
+        );
+        when(() => client.revokeRunner(any()))
+            .thenAnswer((call) async => runner('x', RunnerStatus.revoked));
+
+        expect(await repository.revokeLocalRunners(), 2);
+        expect(made, [(localEngineUrl, 'xpt_local')]);
+        verify(() => client.revokeRunner('rnr_1')).called(1);
+        verify(() => client.revokeRunner('rnr_3')).called(1);
+        verifyNever(() => client.revokeRunner('rnr_2'));
+        verify(client.close).called(1);
+      });
+
+      test('does nothing without a token for the local engine', () async {
+        expect(await repository.revokeLocalRunners(), 0);
+        expect(made, isEmpty);
+      });
+
+      test('closes the client when the engine fails', () async {
+        await repository.saveLocal(name: 'This Mac', token: 'xpt_local');
+        when(client.listRunners)
+            .thenThrow(const ConnectionException('refused'));
+
+        await expectLater(
+          repository.revokeLocalRunners(),
+          throwsA(isA<ConnectionException>()),
+        );
+        verify(client.close).called(1);
+      });
+    });
+
+    group('waitForLocalEngineToStop', () {
+      test('waits until the engine stops answering', () async {
+        var answers = 2;
+        when(client.health).thenAnswer((_) async {
+          if (answers-- > 0) return const HealthResponse();
+          throw const ConnectionException('refused');
+        });
+        final waits = <Duration>[];
+
+        final stopped = await repository.waitForLocalEngineToStop(
+          delay: (duration) async => waits.add(duration),
+        );
+
+        expect(stopped, isTrue);
+        expect(waits, [
+          const Duration(milliseconds: 500),
+          const Duration(milliseconds: 500),
+        ]);
+        expect(made, [(localEngineUrl, '')]);
+        verify(client.close).called(1);
+      });
+
+      test('gives up after the timeout', () async {
+        final waits = <Duration>[];
+
+        final stopped = await repository.waitForLocalEngineToStop(
+          timeout: const Duration(seconds: 1),
+          delay: (duration) async => waits.add(duration),
+        );
+
+        expect(stopped, isFalse);
+        expect(waits, hasLength(2));
+      });
+
+      test('waits for real by default', () async {
+        when(client.health).thenThrow(const ConnectionException('refused'));
+
+        expect(await repository.waitForLocalEngineToStop(), isTrue);
+      });
+    });
   });
 }

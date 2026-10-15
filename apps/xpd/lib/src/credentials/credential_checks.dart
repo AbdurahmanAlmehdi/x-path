@@ -74,6 +74,10 @@ class CredentialChecks {
 
   final HttpGitHubTokenVerifier _github;
 
+  /// The check of GitHub tokens (`GET /user`), which the engine's own
+  /// GitHub token goes through too.
+  CredentialVerifier get githubVerifier => _github;
+
   /// Saves, checks and removes credentials.
   late final CredentialService service;
 

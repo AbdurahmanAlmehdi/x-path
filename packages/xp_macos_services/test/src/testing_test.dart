@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:xp_macos_services/testing.dart';
 import 'package:xp_macos_services/xp_macos_services.dart';
@@ -58,5 +60,50 @@ void main() {
       engine.createAppToken(name: 'x'),
       throwsA(isA<LocalEngineException>()),
     );
+  });
+
+  test('FakeEngineAgent unregisters', () async {
+    final agent = FakeEngineAgent(current: AgentStatus.enabled);
+    expect(await agent.unregister(), AgentStatus.notRegistered);
+    expect(agent.unregistrations, 1);
+    agent.unregisterError = const MacosServiceException('x', 'y');
+    await expectLater(
+      agent.unregister(),
+      throwsA(isA<MacosServiceException>()),
+    );
+  });
+
+  test('FakeCliLinker unlinks', () async {
+    final linker = FakeCliLinker();
+    await linker.link();
+    expect((await linker.unlink()).state, CliLinkState.notLinked);
+    expect(linker.unlinks, 1);
+  });
+
+  test('FakeKeychainWiper and FakeDataWiper answer or fail', () async {
+    final keychain = FakeKeychainWiper();
+    expect(await keychain.wipe(), 3);
+    keychain.error = const MacosServiceException('locked', 'Locked.');
+    await expectLater(keychain.wipe(), throwsA(isA<MacosServiceException>()));
+    expect(keychain.wipes, 2);
+
+    final data = FakeDataWiper();
+    expect(await data.wipe(), ['/engine', '/app']);
+    data.error = const FileSystemException('busy');
+    await expectLater(data.wipe(), throwsA(isA<FileSystemException>()));
+    expect(data.wipes, 2);
+  });
+
+  test('FakeRunningApp and FakeAppMenu record', () async {
+    final app = FakeRunningApp();
+    expect(await app.version(), '0.0.1 (1)');
+    expect(await app.moveToTrash(), isTrue);
+    await app.quit();
+    expect((app.movedToTrash, app.quitted), (true, true));
+
+    final menu = FakeAppMenu();
+    final chosen = menu.settingsRequests.first;
+    menu.chooseSettings();
+    await chosen;
   });
 }

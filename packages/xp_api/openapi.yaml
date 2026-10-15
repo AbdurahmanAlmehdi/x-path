@@ -1559,6 +1559,111 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "500":
           $ref: "#/components/responses/InternalError"
+  /github-token:
+    get:
+      operationId: getGitHubToken
+      summary: Whether the engine has its GitHub token, and what GitHub says of it.
+      description: |
+        The engine has one GitHub token, shared by every project: it adds
+        projects (`POST /projects` answers `502` without one), keeps the
+        mirrors and pushes with it. With a token stored, this asks GitHub
+        who it belongs to (`GET /user`) and answers with the login, or why
+        GitHub refused it or could not be reached. The token is never in a
+        response.
+      responses:
+        "200":
+          description: The status of the token.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GitHubTokenStatus"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "503":
+          $ref: "#/components/responses/SecretsLocked"
+        "500":
+          $ref: "#/components/responses/InternalError"
+    put:
+      operationId: setGitHubToken
+      summary: Check a GitHub token with GitHub, then store it. Only `app` and `cli` tokens may.
+      description: |
+        The token must be accepted by GitHub (`GET /user`) before it replaces
+        the one the engine has; otherwise nothing is stored:
+        `422 credential_rejected` when GitHub refused it, `502
+        upstream_error` when GitHub could not be reached. The token is never
+        logged or returned.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetGitHubTokenRequest"
+      responses:
+        "200":
+          description: Stored; the status of the new token.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GitHubTokenStatus"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "422":
+          $ref: "#/components/responses/CredentialRejected"
+        "502":
+          $ref: "#/components/responses/UpstreamError"
+        "503":
+          $ref: "#/components/responses/SecretsLocked"
+        "500":
+          $ref: "#/components/responses/InternalError"
+    delete:
+      operationId: deleteGitHubToken
+      summary: Forget the GitHub token. Only `app` and `cli` tokens may.
+      responses:
+        "204":
+          description: The engine has no GitHub token now.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/SecretsLocked"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /github-token/import:
+    post:
+      operationId: importGitHubToken
+      summary: Take the token of the GitHub CLI on the engine machine. Only `app` and `cli` tokens may.
+      description: |
+        What `xpd secrets import-gh` does, over the API: the engine runs
+        `gh auth token` (the `gh` on its `PATH`, then
+        `/opt/homebrew/bin/gh` and `/usr/local/bin/gh`), checks the token
+        with GitHub and stores it as `PUT /github-token` does.
+        `422 credential_rejected` when `gh` is missing, not logged in or its
+        token is refused, `502 upstream_error` when GitHub could not be
+        reached; nothing is stored then.
+      responses:
+        "200":
+          description: Stored; the status of the new token.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GitHubTokenStatus"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "422":
+          $ref: "#/components/responses/CredentialRejected"
+        "502":
+          $ref: "#/components/responses/UpstreamError"
+        "503":
+          $ref: "#/components/responses/SecretsLocked"
+        "500":
+          $ref: "#/components/responses/InternalError"
   /runners:
     get:
       operationId: listRunners
@@ -3094,6 +3199,36 @@ components:
         that needs it fails preflight. `unreachable`: the last check could not
         be made, so it says nothing about the credential.
       enum: [unverified, verified, rejected, unreachable]
+    GitHubTokenStatus:
+      type: object
+      description: |
+        The GitHub token of the engine. `status`, `login`, `message` and
+        `fix` are what GitHub said just now; they are absent without a token.
+      required: [stored]
+      properties:
+        stored:
+          type: boolean
+        status:
+          $ref: "#/components/schemas/CredentialStatus"
+        login:
+          type: string
+          description: The GitHub login the token belongs to.
+        message:
+          type: string
+          description: Why the token was refused or could not be checked.
+        fix:
+          type: string
+          description: What to do about `message`.
+      additionalProperties: false
+    SetGitHubTokenRequest:
+      type: object
+      required: [token]
+      properties:
+        token:
+          type: string
+          minLength: 1
+          description: A personal access token with the `repo` scope, or what `gh auth token` prints.
+      additionalProperties: false
     Credential:
       type: object
       description: A credential of a flavor. It never carries the secret.

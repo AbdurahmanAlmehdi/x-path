@@ -40,6 +40,13 @@ abstract interface class EngineAgent {
   /// Throws a [MacosServiceException] when macOS refuses.
   Future<AgentStatus> register();
 
+  /// Unregisters the agent: launchd stops the engine and does not start it
+  /// again. Returns where it stands then. Unregistering an agent that is not
+  /// registered is harmless.
+  ///
+  /// Throws a [MacosServiceException] when macOS refuses.
+  Future<AgentStatus> unregister();
+
   /// Opens System Settings at Login Items, where the user allows an agent
   /// that [AgentStatus.requiresApproval].
   Future<void> openLoginItemsSettings();
@@ -66,6 +73,15 @@ class MethodChannelEngineAgent implements EngineAgent {
   Future<AgentStatus> register() async {
     try {
       return _parse(await channel.invokeMethod<String>('agentRegister'));
+    } on PlatformException catch (error) {
+      throw MacosServiceException.fromPlatform(error);
+    }
+  }
+
+  @override
+  Future<AgentStatus> unregister() async {
+    try {
+      return _parse(await channel.invokeMethod<String>('agentUnregister'));
     } on PlatformException catch (error) {
       throw MacosServiceException.fromPlatform(error);
     }

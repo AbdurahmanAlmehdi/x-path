@@ -31,6 +31,12 @@ class FakeEngineAgent implements EngineAgent {
   /// How often the settings were opened.
   int settingsOpened = 0;
 
+  /// How often [unregister] was called.
+  int unregistrations = 0;
+
+  /// What [unregister] throws, if anything.
+  Exception? unregisterError;
+
   @override
   Future<AgentStatus> status() async => current;
 
@@ -40,6 +46,14 @@ class FakeEngineAgent implements EngineAgent {
     final error = registerError;
     if (error != null) throw error;
     return current = registerResult;
+  }
+
+  @override
+  Future<AgentStatus> unregister() async {
+    unregistrations++;
+    final error = unregisterError;
+    if (error != null) throw error;
+    return current = AgentStatus.notRegistered;
   }
 
   @override
@@ -100,6 +114,15 @@ class FakeCliLinker implements CliLinker {
   Future<CliLink> link() async {
     links++;
     return current = result;
+  }
+
+  /// How often [unlink] was called.
+  int unlinks = 0;
+
+  @override
+  Future<CliLink> unlink() async {
+    unlinks++;
+    return current = const CliLink(CliLinkState.notLinked);
   }
 }
 
@@ -175,4 +198,89 @@ class FakeNeedsYouAlerts implements NeedsYouAlerts {
 
   @override
   Stream<NeedsYouAction> get actions => _actions.stream;
+}
+
+/// A [KeychainWiper] that says it deleted [count] items.
+class FakeKeychainWiper implements KeychainWiper {
+  /// Creates the fake.
+  new({this.count = 3, this.error});
+
+  /// What [wipe] answers.
+  int count;
+
+  /// What [wipe] throws, if anything.
+  Exception? error;
+
+  /// How often [wipe] was called.
+  int wipes = 0;
+
+  @override
+  Future<int> wipe() async {
+    wipes++;
+    if (error case final error?) throw error;
+    return count;
+  }
+}
+
+/// A [DataWiper] that deletes nothing and says it deleted [folders].
+class FakeDataWiper implements DataWiper {
+  /// Creates the fake.
+  new({this.folders = const ['/engine', '/app'], this.error});
+
+  @override
+  final List<String> folders;
+
+  /// What [wipe] throws, if anything.
+  Exception? error;
+
+  /// How often [wipe] was called.
+  int wipes = 0;
+
+  @override
+  Future<List<String>> wipe() async {
+    wipes++;
+    if (error case final error?) throw error;
+    return folders;
+  }
+}
+
+/// A [RunningApp] that records what it was asked.
+class FakeRunningApp implements RunningApp {
+  /// Creates the fake.
+  new({this.appVersion = '0.0.1 (1)', this.trashes = true});
+
+  /// What [version] answers.
+  String appVersion;
+
+  /// What [moveToTrash] answers.
+  bool trashes;
+
+  /// Whether [moveToTrash] was called.
+  bool movedToTrash = false;
+
+  /// Whether [quit] was called.
+  bool quitted = false;
+
+  @override
+  Future<String> version() async => appVersion;
+
+  @override
+  Future<bool> moveToTrash() async {
+    movedToTrash = true;
+    return trashes;
+  }
+
+  @override
+  Future<void> quit() async => quitted = true;
+}
+
+/// An [AppMenu] whose items the test chooses with [chooseSettings].
+class FakeAppMenu implements AppMenu {
+  final _settings = StreamController<void>.broadcast();
+
+  /// Plays XPath ▸ Settings….
+  void chooseSettings() => _settings.add(null);
+
+  @override
+  Stream<void> get settingsRequests => _settings.stream;
 }

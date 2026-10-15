@@ -14,6 +14,7 @@ export 'src/run_jobs.dart';
 export 'src/runners_repository.dart';
 export 'src/session/engine_session.dart';
 export 'src/session/engine_status.dart';
+export 'src/settings_repository.dart';
 export 'src/snapshot.dart';
 export 'src/storage_repository.dart';
 export 'src/tests_repository.dart';
