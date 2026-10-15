@@ -7,8 +7,10 @@ import 'package:xp_desktop/approvals/widgets/needs_you_alerts_listener.dart';
 import 'package:xp_desktop/l10n/l10n.dart';
 import 'package:xp_desktop/onboarding/view/onboarding_page.dart';
 import 'package:xp_desktop/projects/bloc/projects_bloc.dart';
+import 'package:xp_desktop/runners/bloc/runners_bloc.dart';
 import 'package:xp_desktop/shell/cubit/shell_cubit.dart';
 import 'package:xp_desktop/shell/view/app_shell.dart';
+import 'package:xp_desktop/storage/bloc/storage_bloc.dart';
 import 'package:xp_desktop/theme/theme.dart';
 import 'package:xp_desktop/widgets/widgets.dart';
 import 'package:xp_repositories/xp_repositories.dart';
@@ -101,6 +103,8 @@ class EngineScope extends StatelessWidget {
         RepositoryProvider(create: (_) => ApprovalsRepository(session)),
         RepositoryProvider(create: (_) => RunnersRepository(session)),
         RepositoryProvider(create: (_) => WorkflowsRepository(session)),
+        RepositoryProvider(create: (_) => TestsRepository(session)),
+        RepositoryProvider(create: (_) => StorageRepository(session)),
       ],
       child: MultiBlocProvider(
         providers: [
@@ -114,6 +118,16 @@ class EngineScope extends StatelessWidget {
             create: (context) => PendingApprovalsBloc(
               approvals: context.read<ApprovalsRepository>(),
             )..add(const PendingApprovalsSubscriptionRequested()),
+          ),
+          BlocProvider(
+            create: (context) =>
+                RunnersBloc(runners: context.read<RunnersRepository>())
+                  ..add(const RunnersSubscriptionRequested()),
+          ),
+          BlocProvider(
+            create: (context) =>
+                StorageBloc(storage: context.read<StorageRepository>())
+                  ..add(const StorageSubscriptionRequested()),
           ),
         ],
         child: NeedsYouAlertsListener(child: child),

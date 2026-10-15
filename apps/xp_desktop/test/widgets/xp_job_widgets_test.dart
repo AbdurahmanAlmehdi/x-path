@@ -20,6 +20,23 @@ void main() {
       );
     });
 
+    test('counts and relative times', () {
+      expect(formatCount(1284), '1,284');
+      final now = DateTime(2026, 10, 13, 14, 8);
+      String relative(DateTime time) => formatRelative(
+        time,
+        now,
+        justNow: 'just now',
+        ago: (duration) => '$duration ago',
+        yesterday: (time) => 'Yesterday $time',
+      );
+      expect(relative(now.subtract(const Duration(seconds: 20))), 'just now');
+      expect(relative(now.subtract(const Duration(minutes: 4))), '4m ago');
+      expect(relative(now.subtract(const Duration(hours: 2))), '2h ago');
+      expect(relative(DateTime(2026, 10, 12, 9, 30)), 'Yesterday 09:30');
+      expect(relative(DateTime(2026, 10, 11, 9, 30)), 'Oct 11 09:30');
+    });
+
     test('times, SHAs, versions and sizes', () {
       expect(formatTime(DateTime(2026, 10, 13, 9, 5)), '09:05');
       expect(formatClock(DateTime(2026, 10, 13, 9, 5, 7)), '09:05:07');
