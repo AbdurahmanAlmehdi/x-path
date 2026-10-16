@@ -569,7 +569,7 @@ Mataa dev builds through `xp` can start after Phase 13, before the desktop app e
 
 ### Phase 18b: Mac signing and DMG
 
-- **Status:** Done (local). Skipped (owner, Goal 3): Developer ID signing, notarization, stapling, DMG.
+- **Status:** Done (local). Developer ID signing, the DMG, notarization and stapling are implemented (`build_mac.sh --developer-id --dmg --notarize`, the release workflow's `dmg` job); the first notarized DMG waits for the owner's notary credentials (the Developer ID certificate is in the owner's keychain since 2026-10-17) and, for CI, the signing secrets on a public repository.
 - **Scope:** App icon from `docs/design/brand/` (light and dark; derive the transparent symbol and Icon Composer layers first). Embed `xpd` and `xp` in the app, sign inner binaries then the app with Developer
   ID and Hardened Runtime, build the DMG, notarize and staple.
 - **Files touched:** `tool/release/build_mac.sh`, `apps/xp_desktop/macos/**`
