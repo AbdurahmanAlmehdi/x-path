@@ -24,11 +24,8 @@
     ".fvm/**",
     "**/pubspec.lock",
     "apps/xp_desktop/macos/**",
-    "HANDOFF.md",
-    "docs/brainstorm/**",
     "docs/design/**",
-    "docs/plan/**",
-    "docs/research/**"
+    "docs/plan/**"
   ],
   "words": [
     "abdurahman",

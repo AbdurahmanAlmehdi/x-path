@@ -4,14 +4,14 @@ The source of truth for the desktop UI (Phases 15–17) and the brand assets (Ph
 
 ## Sources
 
-| What | Where | Live source |
-|---|---|---|
-| Product brief | `PRODUCT.md` | — |
-| Design system ("Run Sheet") | `system/project/` (README, guides, `assets/Handoff/xp_tokens.dart`, `xp-tokens.json`, `xp-tokens.css`, `tokens.json`) | https://claude.ai/artifact/Ro9wMV4KEsUyG2vdoekip6 |
-| Key screens canvas | `screens/project/*.dc.html` + `screens/project/canvas.json` | https://claude.ai/artifact/SHz8n4TrmZ8RkFohrtCiiz |
-| App icon and logo | `brand/` | Owner-supplied, 1408×1408 |
+| What | Where |
+|---|---|
+| Product brief | `PRODUCT.md` |
+| Design system ("Run Sheet") | `system/project/` (README, guides, `assets/Handoff/xp_tokens.dart`, `xp-tokens.json`, `xp-tokens.css`, `tokens.json`) |
+| Key screens | The owner's design canvas, outside the repository. The frame names below (`Main.dc.html` and so on) are the ones code comments refer to. |
+| App icon and logo | `brand/` (owner-supplied, 1408×1408) |
 
-The `.dc.html` frames are HTML mockups. They link the token CSS under `ds/xpath/...` and the logo through `/_blob/...` URLs, so they only render fully inside the artifact. Read them for structure, copy and states, and take values from `xp_tokens.dart`, never from inline styles.
+Take every value from `xp_tokens.dart`; the frames only fixed structure, copy and states.
 
 ## Chosen concepts (the canvas's recommendations, accepted by the owner)
 

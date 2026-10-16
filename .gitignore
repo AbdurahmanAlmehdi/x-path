@@ -13,3 +13,6 @@ pubspec_overrides.yaml
 
 # The signed XPath.app of tool/release/build_mac.sh.
 dist/
+
+# Local notes for the next agent session; never published.
+HANDOFF.md
