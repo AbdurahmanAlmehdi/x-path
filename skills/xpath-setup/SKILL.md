@@ -28,11 +28,17 @@ Secrets live on the engine machine: the login Keychain on macOS (services starti
 
 ## Install
 
-### macOS: the app (local build)
+### macOS: the app from a release
 
-The notarized download (Developer ID, DMG, Sparkle updates, Homebrew cask) is not published yet.
-Today the Mac app is built from the repository, signed with the user's Apple Development
-certificate:
+Each GitHub Release of `AbdurahmanAlmehdi/x-path` carries `XPath-<version>.dmg`, signed with
+Developer ID and notarized. Open it, drag XPath to Applications, then open XPath and follow the
+setup below. Sparkle updates and a Homebrew cask are not available yet: to update, install the
+newer DMG over the old app.
+
+### macOS: the app built from the repository
+
+For development, or before a release exists, build the app from the repository; it is signed with
+the user's Apple Development certificate:
 
 ```sh
 export PATH="$PWD/.fvm/flutter_sdk/bin:$HOME/.pub-cache/bin:$PATH"
