@@ -339,9 +339,35 @@ dialog) is stopped. `--install` then quits a running XPath (SIGTERM, no Apple Ev
 installed one (`lsregister -f`): they share the bundle id, so macOS could otherwise open a Debug build, whose
 LaunchAgent points at a bundle without `xpd` (launchd `EX_CONFIG`). Nothing else: it does not open the app, register
 the LaunchAgent or link `xp` (onboarding or Settings ▸ Command line tool does). A running
-engine keeps the old `xpd` until it restarts (`launchctl kickstart -k gui/$(id -u)/ly.abdurahman.xpath.xpd`). Not
-done (owner, Goal 3): Developer ID signing, notarization, stapling and the DMG; the macOS 26 `.icon` (Icon Composer)
-is manual, the app uses `docs/design/brand/macos/AppIcon.appiconset`.
+engine keeps the old `xpd` until it restarts (`launchctl kickstart -k gui/$(id -u)/ly.abdurahman.xpath.xpd`). The
+macOS 26 `.icon` (Icon Composer) is manual; the app uses `docs/design/brand/macos/AppIcon.appiconset`.
+
+**The Mac download (DMG).** The same script builds what the release workflow publishes. The app's version
+(`CFBundleShortVersionString`) and the bundled `xpd` and `xp` must all print the version of `apps/xpd/pubspec.yaml`
+(`dart run tool/release_version.dart apply <version> <build>` writes it), and the script checks that before and
+after the build:
+
+- `--developer-id` signs with a "Developer ID Application: … (AFBD5TBR5U)" identity instead (the team is
+  `$XPATH_TEAM_ID`), with a secure timestamp (`--timestamp`, which needs the network) and the Hardened Runtime. It
+  is the one such identity in the keychain, or the one `$XPATH_SIGN_IDENTITY` names; an Apple Distribution or Apple
+  Development identity is refused. Without one it stops before building and says how to create it: Xcode ▸
+  Settings ▸ Accounts ▸ the team ▸ Manage Certificates… ▸ + ▸ Developer ID Application (only the Account Holder can).
+- `--dmg` builds `dist/XPath-<version>.dmg` (the app and a link to `/Applications`), signs it with the same identity,
+  mounts it and checks the signed app and the link inside. Without `--developer-id` it is signed with Apple
+  Development and says that it is for this Mac only, not for distribution.
+- `--notarize` (needs `--developer-id`) submits the app to Apple's notary service with
+  `xcrun notarytool submit --wait` and staples it, then the DMG (with `--dmg`) and staples it too, and runs
+  `spctl -a -vv -t install` on the DMG, which must report "source=Notarized Developer ID". The credentials are a
+  `notarytool store-credentials` keychain profile in `$XPATH_NOTARY_PROFILE`, or an App Store Connect API key:
+  `$XPATH_NOTARY_KEY` (the `.p8` file), `$XPATH_NOTARY_KEY_ID` and `$XPATH_NOTARY_ISSUER`. A rejected submission
+  prints its log.
+- `--upload v<version>` (needs `--dmg` and `--notarize`) attaches the DMG to the existing GitHub Release
+  (`gh release upload --clobber`); the tag must be `v<version>`.
+
+```sh
+tool/release/build_mac.sh --reuse-bundles --dmg                    # local DMG, Apple Development
+XPATH_NOTARY_PROFILE=xpath tool/release/build_mac.sh --developer-id --dmg --notarize
+```
 
 **The engine under the app's LaunchAgent.** The plist sets `XPATH_LAUNCHD=1`. `xpd serve` then writes its output,
 each line stamped with the UTC time, to `<data dir>/service-logs/xpd.log` (moved to `xpd.log.1` past 10 MB at a
