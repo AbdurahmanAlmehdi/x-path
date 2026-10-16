@@ -5,6 +5,7 @@ import 'package:xp_desktop/app/bloc/engine_connection_bloc.dart';
 import 'package:xp_desktop/engines/widgets/add_engine_form.dart';
 import 'package:xp_desktop/l10n/l10n.dart';
 import 'package:xp_desktop/onboarding/bloc/onboarding_bloc.dart';
+import 'package:xp_desktop/onboarding/widgets/cli_link_message.dart';
 import 'package:xp_desktop/onboarding/widgets/onboarding_step.dart';
 import 'package:xp_desktop/shell/widgets/shell_page.dart';
 import 'package:xp_desktop/theme/theme.dart';
@@ -172,7 +173,7 @@ class _Steps extends StatelessWidget {
           title: l10n.onboardingCliTitle,
           body: l10n.onboardingCliBody,
           progress: state.cli,
-          result: _cliResult(l10n, state.cliLink),
+          result: cliLinkMessage(l10n, state.cliLink),
           actions: [
             XpButton(
               label: l10n.onboardingCliButton,
@@ -228,29 +229,4 @@ class _Steps extends StatelessWidget {
       _ => (XpStatus.engineUnreachable, l10n.onboardingEngineNotFound),
     };
   }
-
-  (XpStatus, String)? _cliResult(AppLocalizations l10n, CliLink? link) =>
-      switch (link) {
-        null || CliLink(state: CliLinkState.notLinked) => null,
-        CliLink(state: CliLinkState.linked, :final path?, fellBack: true) => (
-          XpStatus.credentialVerified,
-          l10n.cliLinkedFallback(path),
-        ),
-        CliLink(state: CliLinkState.linked, :final path) => (
-          XpStatus.credentialVerified,
-          l10n.cliLinked(path ?? ''),
-        ),
-        CliLink(state: CliLinkState.missingBinary) => (
-          XpStatus.scanWarning,
-          l10n.cliMissing,
-        ),
-        CliLink(state: CliLinkState.conflict, :final path) => (
-          XpStatus.scanWarning,
-          l10n.cliConflict(path ?? ''),
-        ),
-        CliLink(state: CliLinkState.failed, :final detail) => (
-          XpStatus.scanError,
-          l10n.cliFailed(detail ?? ''),
-        ),
-      };
 }

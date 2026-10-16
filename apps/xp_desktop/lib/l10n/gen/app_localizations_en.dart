@@ -265,6 +265,20 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String cliElsewhere(String path, String pointsTo) {
+    return '$path links to another copy of XPath ($pointsTo). Link xp again to use this one.';
+  }
+
+  @override
+  String get cliNotLinked => 'xp is not linked, so a terminal cannot find it.';
+
+  @override
+  String get cliChecking => 'Looking for xp…';
+
+  @override
+  String get cliRelink => 'Link xp again';
+
+  @override
   String get cliMissing => 'This build has no xp inside it.';
 
   @override
@@ -2591,6 +2605,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String settingsGitHubFailed(String message) {
     return 'Not saved: $message';
   }
+
+  @override
+  String get settingsCli => 'Command line tool';
 
   @override
   String get settingsRemove => 'Remove XPath';

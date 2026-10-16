@@ -108,6 +108,98 @@ void main() {
     });
   });
 
+  group('CommandLineToolSection', () {
+    final status = find.byKey(const Key('settings.cliStatus'));
+    final button = find.byKey(const Key('settings.cliLink'));
+
+    testWidgets('links xp when it is not linked', (tester) async {
+      await pump(tester);
+
+      expect(
+        find.descendant(
+          of: status,
+          matching: find.text(
+            'xp is not linked, so a terminal cannot find it.',
+          ),
+        ),
+        findsOneWidget,
+      );
+      await tester.tap(
+        find.descendant(of: button, matching: find.text('Link xp')),
+      );
+      await tester.pumpAndSettle();
+
+      expect(linker.links, 1);
+      expect(find.text('Linked at /usr/local/bin/xp.'), findsOneWidget);
+      expect(button, findsNothing);
+    });
+
+    testWidgets('links xp again over a link into another copy', (tester) async {
+      linker.current = const CliLink(
+        CliLinkState.elsewhere,
+        path: '/usr/local/bin/xp',
+        pointsTo: '/Volumes/Old/XPath.app/Contents/Helpers/xp/bin/xp',
+      );
+      await pump(tester);
+
+      expect(
+        find.text(
+          '/usr/local/bin/xp links to another copy of XPath '
+          '(/Volumes/Old/XPath.app/Contents/Helpers/xp/bin/xp). Link xp '
+          'again to use this one.',
+        ),
+        findsOneWidget,
+      );
+      await tester.tap(find.text('Link xp again'));
+      await tester.pumpAndSettle();
+
+      expect(linker.links, 1);
+      expect(find.text('Linked at /usr/local/bin/xp.'), findsOneWidget);
+    });
+
+    testWidgets('says when another xp is in the way', (tester) async {
+      linker
+        ..current = const CliLink(
+          CliLinkState.conflict,
+          path: '/usr/local/bin/xp',
+        )
+        ..result = const CliLink(
+          CliLinkState.conflict,
+          path: '/usr/local/bin/xp',
+        );
+      await pump(tester);
+
+      expect(
+        find.text('/usr/local/bin/xp is another xp. XPath left it alone.'),
+        findsOneWidget,
+      );
+      await tester.tap(button);
+      await tester.pumpAndSettle();
+      expect(linker.links, 1);
+      expect(button, findsOneWidget);
+    });
+
+    testWidgets('offers no link when this build has no xp', (tester) async {
+      linker.current = const CliLink(CliLinkState.missingBinary);
+      await pump(tester);
+
+      expect(find.text('This build has no xp inside it.'), findsOneWidget);
+      expect(button, findsNothing);
+    });
+
+    testWidgets('looks for xp while the status loads', (tester) async {
+      await tester.pumpApp(
+        const SettingsPage(),
+        settingsRepository: settings,
+        services: testServices(linker: _SlowLinker()),
+      );
+
+      expect(find.text('Looking for xp…'), findsOneWidget);
+      expect(button, findsNothing);
+      await tester.pumpAndSettle(const Duration(seconds: 1));
+    });
+  });
+
   group('GitHubTokenSection', () {
     final field = find.byKey(const Key('settings.githubToken'));
     final save = find.byKey(const Key('settings.githubSave'));
@@ -323,4 +415,10 @@ void main() {
       expect(app.quitted, isTrue);
     });
   });
+}
+
+class _SlowLinker extends FakeCliLinker {
+  @override
+  Future<CliLink> status() =>
+      Future.delayed(const Duration(seconds: 1), super.status);
 }
