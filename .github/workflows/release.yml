@@ -1,12 +1,28 @@
-# Releases XPath itself when a version tag (v1.2.3, v1.2.3-beta.1) is pushed:
-# the Linux bundles and archives (tool/release/bundles.sh), a test of
-# install.sh against them, the arm64 bundle run on an arm64 machine, the
-# Docker image (linux/amd64 and linux/arm64) on GitHub Container Registry and
-# the GitHub Release with the archives, their .sha256 files and install.sh.
+# Releases XPath itself on every merge to main (CONTRIBUTING.md, "Pull
+# request titles"). Nothing is committed to main; the version lives in the
+# tag:
 #
-# Linux only: GitHub-hosted macOS runners are not used (cost). The macOS
-# assets come from a Mac afterwards: `tool/release/bundles.sh --upload <tag>`
-# builds them and uploads them to the release this workflow made.
+#   version   tool/release_version.dart decides it: the tag already on the
+#             commit (a run again), else the highest vX.Y.Z tag reachable
+#             from it bumped by the Conventional Commits titles of the
+#             first-parent commits since (feat or breaking: minor before 1.0;
+#             anything else: patch). Without a tag the base is the version of
+#             apps/xpd/pubspec.yaml. The build number is the commit count.
+#   bundles   writes that version into the pubspecs and packageVersion
+#             constants of its checkout only, builds the Linux bundles and
+#             archives (tool/release/bundles.sh), runs the smoke test and the
+#             install.sh test.
+#   arm64     runs the arm64 bundles on an arm64 machine.
+#   docker    builds, tests and pushes the image (linux/amd64, linux/arm64).
+#   release   tags the commit vX.Y.Z and creates the GitHub Release with
+#             generated notes and the assets (a pre-release before 1.0 or
+#             with a "-"); on a run again it replaces the assets.
+#   dmg       public repository with the signing secrets only: the Developer
+#             ID signed, notarized DMG (tool/release/build_mac.sh) and the
+#             macOS archives, uploaded to the same release.
+#
+# A tag vX.Y.Z pushed by hand (1.0 is tagged by hand) releases that version.
+# "Run workflow" on main runs again for its HEAD, with an optional version.
 #
 # Flutter 3.47.6 ships Dart 3.13.5; keep both in sync with .fvmrc. The
 # workspace has Flutter members, so even `dart pub get` needs the Flutter SDK.
@@ -14,11 +30,24 @@ name: release
 
 on:
   push:
+    branches:
+      - main
     tags:
       - "v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: >-
+          The version to release (1.0.0, 1.0.0-rc.1). Empty: the tag already
+          on HEAD, else the next version from the commit titles.
+        required: false
+        type: string
 
+# One release at a time and never cancelled: each run reads the tag the one
+# before made. GitHub keeps only the newest waiting run; the version it makes
+# still counts the titles of the merges whose run it replaced.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: release
   cancel-in-progress: false
 
 permissions:
@@ -28,11 +57,49 @@ env:
   IMAGE: ghcr.io/abdurahmanalmehdi/xpath
 
 jobs:
+  version:
+    # Releases come from main or from a tag, never from another branch.
+    if: ${{ github.ref == 'refs/heads/main' || github.ref_type == 'tag' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      version: ${{ steps.next.outputs.version }}
+      tag: ${{ steps.next.outputs.tag }}
+      build: ${{ steps.next.outputs.build }}
+      prerelease: ${{ steps.next.outputs.prerelease }}
+    steps:
+      # The whole history: every tag, and the commit count.
+      - name: Git Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2.23.0
+        with:
+          flutter-version: "3.47.6"
+          cache: true
+
+      - name: Install Dependencies
+        run: dart pub get
+
+      - name: Decide the Version
+        id: next
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          args=(next)
+          if [ "${GITHUB_REF_TYPE}" = tag ]; then
+            args+=(--tag "${GITHUB_REF_NAME}")
+          elif [ -n "${INPUT_VERSION}" ]; then
+            args+=(--tag "v${INPUT_VERSION#v}")
+          fi
+          dart run tool/release_version.dart "${args[@]}" >> "$GITHUB_OUTPUT"
+
   bundles:
+    needs: version
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    outputs:
-      version: ${{ steps.version.outputs.version }}
     steps:
       - name: Git Checkout
         uses: actions/checkout@v7
@@ -46,16 +113,13 @@ jobs:
       - name: Install Dependencies
         run: dart pub get
 
-      - name: Check the Tag Against the Version
-        id: version
-        run: |
-          version="$(sed -n 's/^version: *//p' apps/xpd/pubspec.yaml)"
-          if [ "${GITHUB_REF_NAME}" != "v${version}" ]; then
-            echo "The tag ${GITHUB_REF_NAME} is not v${version} (apps/xpd/pubspec.yaml)." >&2
-            exit 1
-          fi
-          echo "version=${version}" >> "$GITHUB_OUTPUT"
+      - name: Write the Version into the Checkout
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+          BUILD: ${{ needs.version.outputs.build }}
+        run: dart run tool/release_version.dart apply "${VERSION}" "${BUILD}"
 
+      # Also checks that the linux-x64 xpd and xp print the version.
       - name: Build the Bundles
         run: tool/release/bundles.sh
 
@@ -77,7 +141,7 @@ jobs:
           retention-days: 7
 
   arm64:
-    needs: bundles
+    needs: [version, bundles]
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 10
     steps:
@@ -93,20 +157,26 @@ jobs:
         run: tar -xf release.tar
 
       - name: Run the arm64 Bundles
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
         run: |
-          build/release/bundles/linux-arm64/xpd/bin/xpd --version
-          build/release/bundles/linux-arm64/xp/bin/xp --version
+          bundles=build/release/bundles/linux-arm64
+          "${bundles}/xpd/bin/xpd" --version
+          test "$("${bundles}/xpd/bin/xpd" --version | cut -d' ' -f2)" = "${VERSION}"
+          test "$("${bundles}/xp/bin/xp" --version)" = "${VERSION}"
 
       - name: Test install.sh
         run: tool/release/linux/install_test.sh
 
   docker:
-    needs: bundles
+    needs: [version, bundles]
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
       contents: read
       packages: write
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
     steps:
       - name: Git Checkout
         uses: actions/checkout@v7
@@ -135,7 +205,7 @@ jobs:
 
       - name: Test the Image
         run: |
-          docker run --rm xpath:test xpd --version
+          test "$(docker run --rm xpath:test xpd --version | cut -d' ' -f2)" = "${VERSION}"
           docker run -d --name xpath -p 127.0.0.1:7480:7480 xpath:test
           for _ in $(seq 1 30); do
             [ "$(docker inspect --format '{{.State.Health.Status}}' xpath)" = healthy ] && break
@@ -153,14 +223,14 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # A pre-release (a version with a "-") does not move `latest`.
+      # A pre-release (before 1.0, or with a "-") does not move `latest`.
       - name: Choose the Image Tags
         id: tags
         env:
-          VERSION: ${{ needs.bundles.outputs.version }}
+          PRERELEASE: ${{ needs.version.outputs.prerelease }}
         run: |
           tags="${IMAGE}:${VERSION}"
-          case "${VERSION}" in *-*) ;; *) tags="${tags},${IMAGE}:latest" ;; esac
+          [ "${PRERELEASE}" = true ] || tags="${tags},${IMAGE}:latest"
           echo "tags=${tags}" >> "$GITHUB_OUTPUT"
 
       - name: Build and Push the Image
@@ -172,11 +242,11 @@ jobs:
           tags: ${{ steps.tags.outputs.tags }}
           labels: |
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
-            org.opencontainers.image.version=${{ needs.bundles.outputs.version }}
+            org.opencontainers.image.version=${{ needs.version.outputs.version }}
             org.opencontainers.image.licenses=Apache-2.0
 
   release:
-    needs: [bundles, arm64, docker]
+    needs: [version, bundles, arm64, docker]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -190,12 +260,128 @@ jobs:
       - name: Unpack the Build
         run: tar -xf release.tar
 
-      - name: Create the GitHub Release
+      # `gh release create` makes the tag on the commit this run built
+      # (through the API: nothing is pushed). A tag pushed by hand is used as
+      # it is.
+      - name: Tag the Commit and Publish the Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          VERSION: ${{ needs.bundles.outputs.version }}
+          VERSION: ${{ needs.version.outputs.version }}
+          TAG: ${{ needs.version.outputs.tag }}
+          PRERELEASE: ${{ needs.version.outputs.prerelease }}
         run: |
-          flags=(--verify-tag --title "XPath ${VERSION}" --generate-notes)
-          case "${VERSION}" in *-*) flags+=(--prerelease) ;; esac
-          gh release create "${GITHUB_REF_NAME}" --repo "${GITHUB_REPOSITORY}" \
-            "${flags[@]}" build/release/assets/*
+          if gh release view "${TAG}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
+            echo "The release ${TAG} exists: replacing its Linux assets."
+            gh release upload "${TAG}" --repo "${GITHUB_REPOSITORY}" --clobber \
+              build/release/assets/*
+          else
+            flags=(--target "${GITHUB_SHA}" --title "XPath ${VERSION}" --generate-notes)
+            [ "${PRERELEASE}" = true ] && flags+=(--prerelease)
+            gh release create "${TAG}" --repo "${GITHUB_REPOSITORY}" "${flags[@]}" \
+              build/release/assets/*
+          fi
+
+  # GitHub-hosted macOS runners are free only for public repositories. The
+  # job skips itself, with a notice, until every signing secret is set (see
+  # README, "Releases and installation"). The certificate goes into a
+  # keychain of its own that the last step deletes.
+  dmg:
+    needs: [version, release]
+    if: ${{ !github.event.repository.private }}
+    runs-on: macos-latest
+    timeout-minutes: 60
+    permissions:
+      contents: write
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+      BUILD: ${{ needs.version.outputs.build }}
+      TAG: ${{ needs.version.outputs.tag }}
+    steps:
+      - name: Check the Signing Secrets
+        id: secrets
+        env:
+          P12: ${{ secrets.MAC_DEVELOPER_ID_P12_BASE64 }}
+          P12_PASSWORD: ${{ secrets.MAC_DEVELOPER_ID_P12_PASSWORD }}
+          NOTARY_KEY: ${{ secrets.MAC_NOTARY_KEY_P8_BASE64 }}
+          NOTARY_KEY_ID: ${{ secrets.MAC_NOTARY_KEY_ID }}
+          NOTARY_ISSUER_ID: ${{ secrets.MAC_NOTARY_ISSUER_ID }}
+        run: |
+          if [ -n "${P12}" ] && [ -n "${P12_PASSWORD}" ] && [ -n "${NOTARY_KEY}" ] \
+            && [ -n "${NOTARY_KEY_ID}" ] && [ -n "${NOTARY_ISSUER_ID}" ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice title=No DMG for ${TAG}::Set the secrets MAC_DEVELOPER_ID_P12_BASE64, MAC_DEVELOPER_ID_P12_PASSWORD, MAC_NOTARY_KEY_P8_BASE64, MAC_NOTARY_KEY_ID and MAC_NOTARY_ISSUER_ID to build the notarized DMG (README, Releases and installation)."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Git Checkout
+        if: steps.secrets.outputs.ready == 'true'
+        uses: actions/checkout@v7
+
+      - name: Setup Flutter
+        if: steps.secrets.outputs.ready == 'true'
+        uses: subosito/flutter-action@v2.23.0
+        with:
+          flutter-version: "3.47.6"
+          cache: true
+
+      - name: Install Dependencies
+        if: steps.secrets.outputs.ready == 'true'
+        run: dart pub get
+
+      - name: Write the Version into the Checkout
+        if: steps.secrets.outputs.ready == 'true'
+        run: dart run tool/release_version.dart apply "${VERSION}" "${BUILD}"
+
+      - name: Import the Developer ID Certificate
+        if: steps.secrets.outputs.ready == 'true'
+        env:
+          P12: ${{ secrets.MAC_DEVELOPER_ID_P12_BASE64 }}
+          P12_PASSWORD: ${{ secrets.MAC_DEVELOPER_ID_P12_PASSWORD }}
+        run: |
+          keychain="${RUNNER_TEMP}/xpath-signing.keychain-db"
+          password="$(openssl rand -hex 24)"
+          echo "::add-mask::${password}"
+          echo "XPATH_KEYCHAIN=${keychain}" >> "$GITHUB_ENV"
+          (umask 077 && printf '%s' "${P12}" | base64 --decode > "${RUNNER_TEMP}/developer-id.p12")
+          security create-keychain -p "${password}" "${keychain}"
+          security set-keychain-settings -lut 21600 "${keychain}"
+          security unlock-keychain -p "${password}" "${keychain}"
+          security import "${RUNNER_TEMP}/developer-id.p12" -k "${keychain}" -f pkcs12 \
+            -P "${P12_PASSWORD}" -T /usr/bin/codesign
+          rm -f "${RUNNER_TEMP}/developer-id.p12"
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s \
+            -k "${password}" "${keychain}" >/dev/null
+          # shellcheck disable=SC2046
+          security list-keychains -d user -s "${keychain}" \
+            $(security list-keychains -d user | tr -d '"')
+
+      - name: Write the Notary Key
+        if: steps.secrets.outputs.ready == 'true'
+        env:
+          NOTARY_KEY: ${{ secrets.MAC_NOTARY_KEY_P8_BASE64 }}
+        run: |
+          (umask 077 && printf '%s' "${NOTARY_KEY}" | base64 --decode > "${RUNNER_TEMP}/notary.p8")
+          echo "XPATH_NOTARY_KEY=${RUNNER_TEMP}/notary.p8" >> "$GITHUB_ENV"
+
+      - name: Build, Notarize and Upload the DMG
+        if: steps.secrets.outputs.ready == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          XPATH_NOTARY_KEY_ID: ${{ secrets.MAC_NOTARY_KEY_ID }}
+          XPATH_NOTARY_ISSUER: ${{ secrets.MAC_NOTARY_ISSUER_ID }}
+        run: tool/release/build_mac.sh --developer-id --dmg --notarize --upload "${TAG}"
+
+      - name: Upload the macOS Archives
+        if: steps.secrets.outputs.ready == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload "${TAG}" --repo "${GITHUB_REPOSITORY}" --clobber build/release/assets/*-macos-*
+
+      - name: Delete the Keychain and the Keys
+        if: always() && steps.secrets.outputs.ready == 'true'
+        run: |
+          if [ -n "${XPATH_KEYCHAIN:-}" ]; then
+            security delete-keychain "${XPATH_KEYCHAIN}" || true
+          fi
+          rm -f "${RUNNER_TEMP}/developer-id.p12" "${RUNNER_TEMP}/notary.p8"

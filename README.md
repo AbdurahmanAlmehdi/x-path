@@ -235,14 +235,52 @@ xp runner install-service [--slots 4]                                           
   `install.sh`, `xpd/` and `xp/`), `assets/xp-<target>.tar.gz` (the CLI alone), a `.sha256` for each and
   `install.sh`. The archives hold plain files owned by root, without macOS extended attributes.
 
-**The release workflow** (`.github/workflows/release.yml`) runs on a pushed tag `v<version>` that has to match
-`apps/xpd/pubspec.yaml`. On Linux only: it builds the Linux targets, runs `smoke_bundle.sh` and the `install.sh`
-test, runs the arm64 bundles on an arm64 runner, builds the Docker image, tests that it answers `/health`, pushes it
-to `ghcr.io/abdurahmanalmehdi/xpath:<version>` (and `latest` unless the version has a `-`) for `linux/amd64` and
-`linux/arm64`, and creates the GitHub Release (a pre-release for a version with a `-`) with the assets. The macOS
-assets come from a Mac afterwards: `tool/release/bundles.sh --upload v<version>` builds every target the Mac can and
-uploads the `*-macos-*` assets to that release (`gh release upload --clobber`). Phase 18b embeds the macOS bundles
-in the app.
+**The release workflow** (`.github/workflows/release.yml`) publishes a release on every push to `main`, so on every
+merged pull request. Nothing is committed to `main`: the version lives in the tag.
+
+- **Version** (job `version`). `dart run tool/release_version.dart next` decides it. A `vX.Y.Z` tag already on the
+  commit is reused (a run again). Otherwise the highest `vX.Y.Z` tag reachable from the commit is bumped by the
+  [Conventional Commits](https://www.conventionalcommits.org) titles of the first-parent commits since it: the squash
+  commit of each merge, whose title is the pull request title (for a merge commit, the pull request title in its
+  body). A breaking change (`feat!:`, `fix(scope)!:` or a `BREAKING CHANGE:` footer) is minor before 1.0 and major
+  after, `feat:` is minor and everything else is patch, as in the table of CONTRIBUTING.md. When merges queue up,
+  GitHub runs only the newest waiting run, and the largest bump since the last tag wins. Without a tag the base is the
+  version of `apps/xpd/pubspec.yaml` (0.0.1) and only the pushed commit decides. Pre-release tags (`v1.0.0-rc.1`)
+  are never a base. The build number is the number of commits up to the released one (`git rev-list --count`), so
+  it only grows on `main`.
+- **Build** (jobs `bundles`, `arm64`, `docker`). `dart run tool/release_version.dart apply <version> <build>` writes
+  the version into the build checkout only: the `version` of `apps/xpd` and `apps/xp`, `<version>+<build>` in
+  `apps/xp_desktop` (the app's `CFBundleShortVersionString` and `CFBundleVersion`), and the `packageVersion`
+  constants that `xpd --version` and `xp --version` print. The pubspecs in git stay at 0.0.1. Then it builds the
+  Linux targets (`bundles.sh` checks that `xpd` and `xp` print the version), runs `smoke_bundle.sh` and the
+  `install.sh` test, runs the arm64 bundles on an arm64 runner, builds the Docker image, tests that it answers
+  `/health` and prints the version, and pushes it to `ghcr.io/abdurahmanalmehdi/xpath:<version>` for `linux/amd64`
+  and `linux/arm64` (and `latest` for a release that is not a pre-release).
+- **Release** (job `release`). `gh release create` tags the commit `v<version>` through the API (nothing is pushed)
+  and publishes the GitHub Release with generated notes and the assets. Every version before 1.0, and every version
+  with a `-`, is a pre-release. A run again for a commit that has its release replaces the assets.
+- **DMG** (job `dmg`). On a public repository with the signing secrets below, a GitHub-hosted macOS runner writes the
+  version the same way, runs `tool/release/build_mac.sh --developer-id --dmg --notarize --upload v<version>` and
+  uploads the macOS archives (`xpath-macos-arm64.tar.gz`, `xp-macos-arm64.tar.gz` and their `.sha256`) to the same
+  release. Without the secrets it skips itself with a notice; on a private repository it does not run, and the
+  macOS archives come from a Mac: `dart run tool/release_version.dart apply <version> <build>`,
+  `tool/release/bundles.sh --upload v<version>`, then `git checkout -- apps` to drop the version again.
+- **By hand.** A tag `vX.Y.Z` pushed by hand releases that version (1.0 is tagged by hand). Actions ▸ release ▸ Run
+  workflow on `main` runs again for its HEAD, optionally with the version to release. A release never comes from
+  another branch.
+
+**Signing secrets.** The `dmg` job reads five repository secrets and never prints them. It imports the certificate
+into a keychain of its own in the runner's temporary folder, writes the API key there (mode 0600), and deletes the
+keychain and both files at the end, also when a step failed. Set each with `gh secret set <name>`, which reads the
+value from stdin, or under Settings ▸ Secrets and variables ▸ Actions:
+
+| Secret | What it holds | How to make it |
+|---|---|---|
+| `MAC_DEVELOPER_ID_P12_BASE64` | The "Developer ID Application: … (AFBD5TBR5U)" certificate and its private key, a `.p12`, in base64. | Create it in Xcode ▸ Settings ▸ Accounts ▸ the team ▸ Manage Certificates… ▸ + ▸ Developer ID Application (the Account Holder only). Export it with its key from Keychain Access ▸ My Certificates as a `.p12` with a password: `base64 -i developer-id.p12 \| gh secret set MAC_DEVELOPER_ID_P12_BASE64`. Delete the `.p12` afterwards. |
+| `MAC_DEVELOPER_ID_P12_PASSWORD` | The password of that `.p12`. | The one chosen on export. |
+| `MAC_NOTARY_KEY_P8_BASE64` | An App Store Connect API key (`AuthKey_<key id>.p8`) in base64, for `notarytool`. | App Store Connect ▸ Users and Access ▸ Integrations ▸ App Store Connect API ▸ Team Keys ▸ +, access Developer. The `.p8` downloads once: `base64 -i AuthKey_<key id>.p8 \| gh secret set MAC_NOTARY_KEY_P8_BASE64`. |
+| `MAC_NOTARY_KEY_ID` | The key ID of that key. | Shown in its row. |
+| `MAC_NOTARY_ISSUER_ID` | The issuer ID of the team's keys. | Shown above the list of keys. |
 
 **Linux install.** `tool/release/linux/install.sh` is served at `https://xpath.abdurahman.ly/install` (ADR 0005):
 
@@ -252,7 +290,8 @@ curl -fsSL https://xpath.abdurahman.ly/install | sh -s -- --runner   # a runner 
 ```
 
 It downloads `xpath-linux-<arch>.tar.gz` of the latest release (`--version` for another) from GitHub Releases and
-refuses it when the SHA-256 does not match its `.sha256`; `--archive` installs a local archive or unpacked folder
+refuses it when the SHA-256 does not match its `.sha256` (GitHub's latest release is never a pre-release, so before 1.0
+it needs `--version`); `--archive` installs a local archive or unpacked folder
 instead, and the `install.sh` inside an unpacked release folder installs that folder. The bundles go to
 `<prefix>/lib/xpath/{xpd,xp}` (`--prefix`, default `~/.local`) and `<prefix>/bin/xpd` and `xp` link to them. They
 are copied beside the old ones and must start (`--version`, so a wrong architecture or C library stops the install)
@@ -1797,9 +1836,9 @@ packages) in each package with `--min-coverage <threshold>`. It exits non-zero i
 below its threshold. The thresholds are the three `test:coverage:*` scripts in the root
 `pubspec.yaml`: a package not named in `test:coverage:strict` gets the 90% floor.
 
-GitHub CI runs on Linux only (no GitHub-hosted macOS runners) and enforces the same
-thresholds there. `macos`-tagged tests and the macOS gate run locally: run
-`melos run test:coverage` on a Mac before merging to `main`.
+The `gate` workflow enforces the same thresholds on Linux, where the `macos` and `golden` tests
+are skipped. The `macos` workflow runs the whole suite on macOS while the repository is public;
+on a private repository, run `melos run test:coverage` on a Mac before merging to `main`.
 Coverage counts the files that tests import, so keep each package's barrel (`lib/<name>.dart`)
 exporting everything.
 
@@ -1819,32 +1858,39 @@ Because `integration` tests are skipped by default, they are not part of the cov
 
 **Goldens.** The goldens of the desktop app are drawn with the fonts it bundles (the test helper `loadAppFonts`
 loads IBM Plex and Phosphor), on macOS. Linux draws text with other font hinting, so the `golden` tag has
-`test_on: mac-os` in `apps/xp_desktop/dart_test.yaml`: GitHub CI (Linux) skips them, and the local macOS run of
-`melos run test:coverage` checks them. After a deliberate change, write them again with
+`test_on: mac-os` in `apps/xp_desktop/dart_test.yaml`: the Linux `gate` skips them, and the `macos` workflow and the
+local macOS run of `melos run test:coverage` check them. After a deliberate change, write them again with
 `flutter test --update-goldens --tags golden` in `apps/xp_desktop`, on a Mac.
 
 ## Continuous integration
 
-`.github/workflows` has one workflow per package, each filtered to the paths that can affect it
-(the package, the packages it may depend on, the root `pubspec.yaml` and `.fvmrc`). They call the
-reusable workflows of
-[very_good_workflows](https://github.com/VeryGoodOpenSource/very_good_workflows). The workspace
-has Flutter members, so even `dart pub get` needs the Flutter SDK; every job installs Flutter 3.47.6.
+The workflows in `.github/workflows`:
 
-- Every package runs on Linux only, with its coverage gate: Dart packages through the repo's
-  `dart_package.yaml` (`very_good dart test`, as locally), Flutter packages through the VGV
-  `flutter_package` workflow. No GitHub-hosted macOS runners.
-- `layers.yaml` runs the layer check.
-- `smoke_bundle.yaml` runs `tool/e2e/smoke_bundle.sh` on Ubuntu (run it locally on macOS): it builds the `xpd` AOT
-  bundle, starts it and checks `/health`, the SQLite build hook, token authentication and a clean
-  shutdown. It runs when `apps/xpd`, `packages`, `tool/e2e` or the root `pubspec` files change, and
-  needs `dart` 3.13, `curl` and `perl`.
-- `release.yml` releases XPath itself on a version tag (see Releases and installation).
-- `semantic_pull_request.yaml`, `spell_check.yaml` and `license_check.yaml` cover the rest. The
-  spell check reads `README.md` and `docs/adr`; the planning documents are ignored in
+- `gate.yaml`: one job, `gate`, on every pull request and every push to `main`, with no path filters, so it always
+  reports and branch protection can require it. On Ubuntu it runs the full gate of CONTRIBUTING.md: `dart pub get`,
+  `dart analyze --fatal-infos`, `dart format --set-exit-if-changed .`, the layer check, `melos run test:coverage`
+  (every package with its threshold), `melos run test:contract` and `tool/e2e/smoke_bundle.sh`, which builds the
+  `xpd` AOT bundle, starts it and checks `/health`, the SQLite build hook, token authentication and a clean
+  shutdown. It replaced the per-package workflows, each of which ran a part of it.
+- `macos.yaml`: one job, `macos`, on every pull request and every push to `main`, on a GitHub-hosted macOS runner,
+  only while the repository is public (macOS minutes are free for public repositories only; on a private one the
+  job is skipped, which a required check counts as passed). It runs `melos run test:coverage` on macOS, so the
+  `macos` and `golden` tests run too, and `flutter build macos --debug` of the desktop app.
+- `release.yml`: a release of XPath on every push to `main` (see Releases and installation).
+- `semantic_pull_request.yaml` checks that a pull request title follows
+  [Conventional Commits](https://www.conventionalcommits.org): it becomes the squash commit and decides the
+  version. `spell_check.yaml` and `license_check.yaml` cover the rest; the planning documents are ignored in
   `.github/cspell.json`.
 
-Pull request titles follow [Conventional Commits](https://www.conventionalcommits.org).
+The workspace has Flutter members, so even `dart pub get` needs the Flutter SDK; every job installs Flutter 3.47.6.
+The coverage scripts run `very_good` with `--no-optimization`: its test optimizer merges the test files into one and
+drops their file-level `@Tags`, so on Linux the macOS-only tests would run.
+
+**Branch protection** for `main`: require the checks `gate` and `semantic-pull-request / build` (and `macos` once the
+repository is public), and allow squash merging only, with the pull request title as the default commit message
+(Settings ▸ General ▸ Pull Requests). Otherwise a single-commit pull request is merged with its commit message, and
+that decides the version instead of the title. The release workflow creates tags through the API with the workflow
+token; it never pushes to `main`.
 
 ## License
 
