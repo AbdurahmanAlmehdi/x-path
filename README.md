@@ -292,8 +292,12 @@ as executable memory, and the Hardened Runtime kills it at start (exit 137) with
 so library validation passes. `spctl` rejects the app (Gatekeeper accepts only Developer ID outside the App Store),
 which does not matter for a build that never carried a quarantine flag. The identity is `$XPATH_SIGN_IDENTITY`, by default the owner's Apple Development certificate (SHA-1
 `3B9E9C2FB4D94EFC7AC367C68CF1FC077EBB799F`, team AFBD5TBR5U); a `codesign` that waits more than 60 s (a Keychain
-dialog) is stopped. `--install` then quits a running XPath (SIGTERM, no Apple Event) and replaces
-`/Applications/XPath.app`, nothing else: it does not open the app, register the LaunchAgent or link `xp`. A running
+dialog) is stopped. `--install` then quits a running XPath (SIGTERM, no Apple Event), replaces
+`/Applications/XPath.app` and makes LaunchServices forget the build-folder copies
+(`apps/xp_desktop/build/macos/Build/Products/*/XPath.app`, `dist/XPath.app`; `lsregister -u`) and register the
+installed one (`lsregister -f`): they share the bundle id, so macOS could otherwise open a Debug build, whose
+LaunchAgent points at a bundle without `xpd` (launchd `EX_CONFIG`). Nothing else: it does not open the app, register
+the LaunchAgent or link `xp` (onboarding or Settings ▸ Command line tool does). A running
 engine keeps the old `xpd` until it restarts (`launchctl kickstart -k gui/$(id -u)/ly.abdurahman.xpath.xpd`). Not
 done (owner, Goal 3): Developer ID signing, notarization, stapling and the DMG; the macOS 26 `.icon` (Icon Composer)
 is manual, the app uses `docs/design/brand/macos/AppIcon.appiconset`.
@@ -1698,7 +1702,7 @@ sidebar mark are assets, and the icons are Phosphor's.
   `BundleProgram` `Contents/Helpers/xpd/bin/xpd serve`) and makes the app's token with the bundled
   `xpd token create --kind app`; (2) links the bundled `xp` (`Contents/Helpers/xp/bin/xp`) into `/usr/local/bin` if the
   user can write there, else into `~/.local/bin` (no password, no dialog; another `xp` already there is left
-  alone); (3) checks for Xcode (`xcode-select -p`; the Command Line Tools alone do not count), git, fvm, gh and
+  alone, a link into another copy of XPath is replaced); (3) checks for Xcode (`xcode-select -p`; the Command Line Tools alone do not count), git, fvm, gh and
   Shorebird in the folders the engine's service searches. The engine and `xp` are copied into the app by the
   release build (Phase 18b); a development build has neither and says so.
 - **Projects and credentials.** Add project by folder (a folder picker for the local engine, a typed path on a remote
@@ -1751,7 +1755,10 @@ sidebar mark are assets, and the icons are Phosphor's.
   tools, so the app is not sandboxed (`macos/Runner/*.entitlements`).
 - **Settings** (Phase 18c; Settings in the sidebar, or XPath ▸ Settings… ⌘, in the app menu, which reaches Dart over
   the channel `ly.abdurahman.xpath/app_menu`): the app's version, the engine shown with its version and connection,
-  and the engine's login item on this Mac. **GitHub**: the engine's GitHub token, which adding a project needs: what
+  and the engine's login item on this Mac. **Command line tool**: where `xp` is linked, or that it is not, that
+  another `xp` is in the way, or that the link points into another copy of XPath (an old or moved app, a build
+  folder); "Link xp" (or "Link xp again") links it as onboarding does (`CliLinker`, `FakeCliLinker` in the tests).
+  A build without a bundled `xp` says so and offers nothing. **GitHub**: the engine's GitHub token, which adding a project needs: what
   GitHub says of it (the login, or why it refused it), a field to paste a new one ("Check and save"), "Import from
   GitHub CLI" (`gh auth token` on the engine machine) and "Remove token". Add project asks the engine for the token
   when it opens and after a failed add; without one (or with one GitHub refuses) it says so and "Connect GitHub…"

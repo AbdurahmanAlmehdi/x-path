@@ -22,9 +22,13 @@
 #   5. `codesign --verify --deep --strict` checks the app, and the signed
 #      helpers must print their --version.
 #
-# The result is dist/XPath.app. --install then quits a running XPath and
-# replaces /Applications/XPath.app with it. It does nothing else: it does
-# not open the app, register the engine's LaunchAgent or link `xp`.
+# The result is dist/XPath.app. --install then quits a running XPath,
+# replaces /Applications/XPath.app with it, and makes LaunchServices forget
+# the build-folder copies (apps/xp_desktop/build/macos/Build/Products/*/
+# XPath.app, dist/XPath.app): they share the bundle id, so macOS could open
+# a Debug build instead, whose LaunchAgent points at a bundle without xpd.
+# It does nothing else: it does not open the app, register the engine's
+# LaunchAgent or link `xp`.
 #
 # Signing identity: $XPATH_SIGN_IDENTITY, by default the owner's
 # "Apple Development: Abdurahman Ibrahem (L7UMZN6DL6)" (team AFBD5TBR5U).
@@ -43,6 +47,7 @@ bundle_id="ly.abdurahman.xpath"
 dist="$root/dist"
 app="$dist/XPath.app"
 installed="/Applications/XPath.app"
+lsregister="/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
 sign_timeout=60
 reuse=false
 install=false
@@ -56,7 +61,7 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     --reuse-bundles) reuse=true; shift ;;
     --install) install=true; shift ;;
-    -h | --help) sed -n '2,35p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h | --help) sed -n '2,41p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) die "unknown option $1 (see --help)" ;;
   esac
 done
@@ -190,6 +195,16 @@ if [[ "$install" == true ]]; then
   echo "Installing $installed..."
   rm -rf "$installed"
   ditto "$app" "$installed"
+  # The build-folder copies share $bundle_id: unregister them so that
+  # LaunchServices opens (and registers the LaunchAgent of) the installed one.
+  for copy in "$root"/apps/xp_desktop/build/macos/Build/Products/*/XPath.app "$app"; do
+    if [[ -d "$copy" ]]; then
+      "$lsregister" -u "$copy" >/dev/null 2>&1 || true
+    fi
+  done
+  "$lsregister" -f "$installed" >/dev/null 2>&1 \
+    || echo "build_mac: lsregister could not register $installed" >&2
+  echo "LaunchServices now opens $bundle_id from $installed only (build copies unregistered)."
   echo "Installed $installed. A running engine keeps the old xpd until it"
   echo "restarts: launchctl kickstart -k gui/$(id -u)/$bundle_id.xpd"
 fi
