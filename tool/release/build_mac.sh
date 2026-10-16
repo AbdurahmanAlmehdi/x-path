@@ -281,6 +281,24 @@ while IFS= read -r file; do
     *) sign "$file" ;;
   esac
 done < <(find "$app/Contents" -type f \( -perm -u+x -o -name '*.dylib' -o -name '*.so' \) | by_depth)
+# The macOS runner archives the engine hands to Mac runners hold code too, and
+# the notary service looks inside archives: sign what they hold and pack them
+# again (same layout and ownership as bundles.sh), before the app seals them.
+while IFS= read -r archive; do
+  unpacked="$(mktemp -d)"
+  tar -xzf "$archive" -C "$unpacked"
+  while IFS= read -r file; do
+    is_macho "$file" || continue
+    if [[ "$file" == "$unpacked/bin/xp" ]]; then
+      sign --identifier "$bundle_id.xp" --entitlements "$helper_entitlements" "$file"
+    else
+      sign "$file"
+    fi
+  done < <(find "$unpacked" -type f | by_depth)
+  tar --no-mac-metadata --no-xattrs --uid 0 --gid 0 --uname root --gname root \
+    -czf "$archive" -C "$unpacked" bin lib
+  rm -rf "$unpacked"
+done < <(find "$app/Contents/Resources/runners" -path '*/macos-*/xp.tar.gz' 2>/dev/null)
 while IFS= read -r nested; do
   sign "$nested"
 done < <(find "$app/Contents" -depth -type d \
