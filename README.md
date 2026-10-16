@@ -19,6 +19,28 @@ It writes nothing to the repo except release-model git changes.
 > [the plan](docs/plan/2026-10-13-feat-xpath-release-tool-plan.md), [try it locally](docs/guide/try-it-locally.md),
 > [CONTRIBUTING.md](CONTRIBUTING.md) and [SECURITY.md](SECURITY.md).
 
+## Agent skills
+
+`skills/` holds [Agent Skills](https://agentskills.io) that teach a coding agent (Claude Code,
+Cursor, Codex and others) how to work with XPath:
+
+| Skill | For |
+|---|---|
+| `xpath-release` | Operating XPath through `xp` and `xp mcp`: dispatching builds and releases, following logs, reading store status. It never approves a gate. |
+| `xpath-workflows` | Writing and validating workflow YAML. |
+| `xpath-setup` | Installing XPath, tokens, credentials, runners and troubleshooting. It never asks for a secret in chat. |
+| `xpath-contributing` | Changing XPath itself. |
+
+Install them with the [`skills`](https://www.npmjs.com/package/skills) CLI, from the repository of the
+app the agent will release (skills install into the current project):
+
+```sh
+npx skills add AbdurahmanAlmehdi/x-path                                   # pick skills and agents
+npx skills add AbdurahmanAlmehdi/x-path --list                            # list them
+npx skills add AbdurahmanAlmehdi/x-path --skill xpath-release -a claude-code -y
+npx skills add AbdurahmanAlmehdi/x-path --skill '*' -a claude-code -g -y  # all, for every project
+```
+
 ## Repository layout
 
 | Path | What it is |
