@@ -484,6 +484,30 @@ abstract class AppLocalizations {
   /// **'Linked at {path}. Writing /usr/local/bin needs an administrator password, so XPath used ~/.local/bin instead; add it to your PATH if your shell does not have it.'**
   String cliLinkedFallback(String path);
 
+  /// No description provided for @cliElsewhere.
+  ///
+  /// In en, this message translates to:
+  /// **'{path} links to another copy of XPath ({pointsTo}). Link xp again to use this one.'**
+  String cliElsewhere(String path, String pointsTo);
+
+  /// Link status in the settings.
+  ///
+  /// In en, this message translates to:
+  /// **'xp is not linked, so a terminal cannot find it.'**
+  String get cliNotLinked;
+
+  /// Link status while it is read.
+  ///
+  /// In en, this message translates to:
+  /// **'Looking for xp…'**
+  String get cliChecking;
+
+  /// Replaces a link into another copy of XPath.
+  ///
+  /// In en, this message translates to:
+  /// **'Link xp again'**
+  String get cliRelink;
+
   /// Link result.
   ///
   /// In en, this message translates to:
@@ -4269,6 +4293,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Not saved: {message}'**
   String settingsGitHubFailed(String message);
+
+  /// Section label.
+  ///
+  /// In en, this message translates to:
+  /// **'Command line tool'**
+  String get settingsCli;
 
   /// Section label and button.
   ///

@@ -8,6 +8,10 @@ enum CliLinkState {
   /// A link to the bundled `xp` is in place.
   linked,
 
+  /// A link into another copy of XPath (an older or moved app, or a build
+  /// folder) is in place. [CliLinker.link] replaces it.
+  elsewhere,
+
   /// Nothing links to the bundled `xp`.
   notLinked,
 
@@ -26,7 +30,13 @@ enum CliLinkState {
 /// The outcome of linking `xp`, and why the link is where it is.
 class CliLink extends Equatable {
   /// Creates the outcome.
-  const new(this.state, {this.path, this.fellBack = false, this.detail});
+  const new(
+    this.state, {
+    this.path,
+    this.fellBack = false,
+    this.detail,
+    this.pointsTo,
+  });
 
   /// What happened.
   final CliLinkState state;
@@ -42,13 +52,20 @@ class CliLink extends Equatable {
   /// What the file system said, when something failed.
   final String? detail;
 
+  /// Where the link at [path] points, for [CliLinkState.elsewhere].
+  final String? pointsTo;
+
   @override
-  List<Object?> get props => [state, path, fellBack, detail];
+  List<Object?> get props => [state, path, fellBack, detail, pointsTo];
 }
 
 /// Links the `xp` inside the app into a folder on the user's `PATH`.
 abstract interface class CliLinker {
-  /// Whether a link to the bundled `xp` is in place.
+  /// Where `xp` stands: [CliLinkState.linked] when a link to the bundled
+  /// `xp` is in place; else [CliLinkState.missingBinary] when this build has
+  /// none to link to; else the first `xp` found, a link into another XPath
+  /// ([CliLinkState.elsewhere]) or anything else ([CliLinkState.conflict]);
+  /// else [CliLinkState.notLinked].
   Future<CliLink> status();
 
   /// Makes the link: in `/usr/local/bin` if the user can write there (Intel
@@ -94,7 +111,8 @@ class FileSystemCliLinker implements CliLinker {
 
   @override
   Future<CliLink> status() async {
-    for (final directory in [systemDirectory, userDirectory]) {
+    final directories = [systemDirectory, userDirectory];
+    for (final directory in directories) {
       final path = p.join(directory, 'xp');
       if (FileSystemEntity.isLinkSync(path) &&
           Link(path).targetSync() == target) {
@@ -104,6 +122,23 @@ class FileSystemCliLinker implements CliLinker {
           fellBack: directory == userDirectory,
         );
       }
+    }
+    if (!File(target).existsSync()) {
+      return CliLink(CliLinkState.missingBinary, path: target);
+    }
+    for (final directory in directories) {
+      final path = p.join(directory, 'xp');
+      final type = FileSystemEntity.typeSync(path, followLinks: false);
+      if (type == FileSystemEntityType.notFound) continue;
+      if (type == FileSystemEntityType.link && _isXPathLink(path)) {
+        return CliLink(
+          CliLinkState.elsewhere,
+          path: path,
+          fellBack: directory == userDirectory,
+          pointsTo: Link(path).targetSync(),
+        );
+      }
+      return CliLink(CliLinkState.conflict, path: path);
     }
     return const CliLink(CliLinkState.notLinked);
   }

@@ -77,6 +77,49 @@ void main() {
     expect(Link(path).existsSync(), isFalse);
   });
 
+  group('status', () {
+    const old = '/Volumes/Old/XPath.app/Contents/Helpers/xp/bin/xp';
+
+    test('finds a link into another XPath app', () async {
+      Directory(linker.userDirectory).createSync(recursive: true);
+      final path = p.join(linker.userDirectory, 'xp');
+      Link(path).createSync(old);
+
+      expect(
+        await linker.status(),
+        CliLink(
+          CliLinkState.elsewhere,
+          path: path,
+          fellBack: true,
+          pointsTo: old,
+        ),
+      );
+      expect(
+        await linker.link(),
+        CliLink(CliLinkState.linked, path: p.join(system, 'xp')),
+      );
+    });
+
+    test('finds another xp in the system folder first', () async {
+      final path = p.join(system, 'xp');
+      Link(path).createSync('/opt/other/xp');
+      Directory(linker.userDirectory).createSync(recursive: true);
+      Link(p.join(linker.userDirectory, 'xp')).createSync(old);
+
+      expect(await linker.status(), CliLink(CliLinkState.conflict, path: path));
+    });
+
+    test('says when this build has no xp', () async {
+      Link(p.join(system, 'xp')).createSync(old);
+      File(target).deleteSync();
+
+      expect(
+        await linker.status(),
+        CliLink(CliLinkState.missingBinary, path: target),
+      );
+    });
+  });
+
   test('says when there is no xp to link', () async {
     File(target).deleteSync();
     expect(
@@ -100,7 +143,10 @@ void main() {
       Directory(linker.userDirectory).createSync(recursive: true);
       Link(other).createSync('/somewhere/else/xp');
 
-      expect(await linker.unlink(), const CliLink(CliLinkState.notLinked));
+      expect(
+        await linker.unlink(),
+        CliLink(CliLinkState.conflict, path: other),
+      );
       expect(
         FileSystemEntity.typeSync(p.join(system, 'xp'), followLinks: false),
         FileSystemEntityType.notFound,
@@ -111,7 +157,10 @@ void main() {
     test('leaves a file called xp alone', () async {
       File(p.join(system, 'xp')).writeAsStringSync('#!/bin/sh');
 
-      expect(await linker.unlink(), const CliLink(CliLinkState.notLinked));
+      expect(
+        await linker.unlink(),
+        CliLink(CliLinkState.conflict, path: p.join(system, 'xp')),
+      );
       expect(File(p.join(system, 'xp')).existsSync(), isTrue);
     });
 

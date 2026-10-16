@@ -140,6 +140,14 @@ void main() {
       ),
       (const CliLink(CliLinkState.missingBinary), 'This build has no xp'),
       (
+        const CliLink(
+          CliLinkState.elsewhere,
+          path: '/usr/local/bin/xp',
+          pointsTo: '/Volumes/Old/XPath.app/Contents/Helpers/xp/bin/xp',
+        ),
+        'links to another copy of XPath',
+      ),
+      (
         const CliLink(CliLinkState.conflict, path: '/usr/local/bin/xp'),
         'is another xp',
       ),

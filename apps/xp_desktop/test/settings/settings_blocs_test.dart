@@ -169,6 +169,43 @@ void main() {
     );
   });
 
+  group('CommandLineToolBloc', () {
+    const linked = CliLink(CliLinkState.linked, path: '/usr/local/bin/xp');
+    const elsewhere = CliLink(
+      CliLinkState.elsewhere,
+      path: '/usr/local/bin/xp',
+      pointsTo: '/Volumes/Old/XPath.app/Contents/Helpers/xp/bin/xp',
+    );
+    late FakeCliLinker linker;
+
+    setUp(() => linker = FakeCliLinker(current: elsewhere));
+
+    test('events compare by value', () {
+      expect(const CommandLineToolRequested().props, isEmpty);
+      expect(const CommandLineToolLinkRequested().props, isEmpty);
+    });
+
+    blocTest<CommandLineToolBloc, CommandLineToolState>(
+      'reads where xp stands',
+      build: () => CommandLineToolBloc(linker: linker),
+      act: (bloc) => bloc.add(const CommandLineToolRequested()),
+      expect: () => const [CommandLineToolState(link: elsewhere)],
+      verify: (_) => expect(linker.links, 0),
+    );
+
+    blocTest<CommandLineToolBloc, CommandLineToolState>(
+      'links xp',
+      build: () => CommandLineToolBloc(linker: linker),
+      seed: () => const CommandLineToolState(link: elsewhere),
+      act: (bloc) => bloc.add(const CommandLineToolLinkRequested()),
+      expect: () => const [
+        CommandLineToolState(link: elsewhere, linking: true),
+        CommandLineToolState(link: linked),
+      ],
+      verify: (_) => expect(linker.links, 1),
+    );
+  });
+
   group('RemoveXPathBloc', () {
     late MockEnginesRepository engines;
     late FakeEngineAgent agent;
