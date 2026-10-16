@@ -523,7 +523,7 @@ Mataa dev builds through `xp` can start after Phase 13, before the desktop app e
 ### Phase 16a: Desktop jobs
 
 - **Status:** Done
-- **Scope:** Concepts 1A (`Main.dc.html`) and 2A (`Job-A-*.dc.html`) from `docs/design/screens/project/`. Project overview (flavors with local, TestFlight/Play and live versions), dispatch
+- **Scope:** Concepts 1A (`Main.dc.html`) and 2A (`Job-A-*.dc.html`) from the owner's design canvas (see `docs/design/DECISIONS.md`). Project overview (flavors with local, TestFlight/Play and live versions), dispatch
   sheet (`Dispatch-Sheet.dc.html`), live job view (steps, logs with resume, cancel, resume-from-step).
 - **Files touched:** `apps/xp_desktop/lib/project_overview/**`, `apps/xp_desktop/lib/dispatch/**`, `apps/xp_desktop/lib/job/**`
 - **Acceptance criteria:** goldens for the job view in light and dark.

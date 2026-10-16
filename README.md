@@ -14,8 +14,10 @@ You point it at a repo, it scans the app, and from then on it builds, tests, sig
 and tracks releases to App Store Connect, Google Play, Firebase App Distribution and Shorebird.
 It writes nothing to the repo except release-model git changes.
 
-> **Status:** pre-1.0, under construction. The workspace, tooling and CI are in place; the
-> features land phase by phase. See [the plan](docs/plan/2026-10-13-feat-xpath-release-tool-plan.md).
+> **Status:** pre-1.0. The engine, the `xp` CLI, `xp mcp`, remote runners and the macOS app work
+> end to end against fake stores; acceptance on real apps and the notarized download come next. See
+> [the plan](docs/plan/2026-10-13-feat-xpath-release-tool-plan.md), [try it locally](docs/guide/try-it-locally.md),
+> [CONTRIBUTING.md](CONTRIBUTING.md) and [SECURITY.md](SECURITY.md).
 
 ## Repository layout
 
