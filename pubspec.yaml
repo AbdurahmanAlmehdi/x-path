@@ -71,12 +71,15 @@ melos:
     # The three scripts below are the thresholds. A new package lands in
     # `floor` (Dart) or `flutter` (Flutter) at 90% unless it is added to the
     # `strict` scope. Generated code is excluded; integration tests are
-    # skipped by dart_test.yaml; macos-tagged tests only run on macOS.
+    # skipped by dart_test.yaml; macos- and golden-tagged tests only run on
+    # macOS. --no-optimization: the very_good test optimizer merges the test
+    # files into one and drops their file-level @Tags, so on Linux (the
+    # `gate` workflow) the macOS-only tests would run.
     test:coverage:strict:
       private: true
       exec:
         command: >-
-          very_good dart test --coverage --min-coverage 100
+          very_good dart test --no-optimization --coverage --min-coverage 100
           --exclude-coverage '**/*.g.dart' --show-uncovered
         concurrency: 1
       packageFilters:
@@ -90,7 +93,7 @@ melos:
       private: true
       exec:
         command: >-
-          very_good dart test --coverage --min-coverage 90
+          very_good dart test --no-optimization --coverage --min-coverage 90
           --exclude-coverage '**/*.g.dart' --show-uncovered
         concurrency: 1
       packageFilters:
@@ -106,7 +109,7 @@ melos:
       private: true
       exec:
         command: >-
-          very_good test --coverage --min-coverage 90
+          very_good test --no-optimization --coverage --min-coverage 90
           --exclude-coverage '**/*.g.dart' --show-uncovered
         concurrency: 1
       packageFilters:

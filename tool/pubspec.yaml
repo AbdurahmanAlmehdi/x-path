@@ -1,5 +1,5 @@
 name: xp_tool
-description: Repository tooling for XPath (layer check).
+description: Repository tooling for XPath (layer check, release version).
 version: 0.0.1
 publish_to: none
 resolution: workspace

@@ -27,13 +27,15 @@
 #     install.sh               tool/release/linux/install.sh
 #
 # Every engine bundle carries the runner bundles of every target built in the
-# same run, so build all targets together. GitHub CI (Linux only) builds the
-# Linux targets; the macOS ones come from a Mac:
+# same run, so build all targets together. The release workflow builds the
+# Linux targets, and its dmg job the macOS ones on a public repository; else
+# they come from a Mac:
 #
 #   tool/release/bundles.sh --upload v1.2.3
 #
 # builds every target this Mac can, then uploads the macOS assets to the
-# existing GitHub Release v1.2.3 (`gh release upload --clobber`).
+# existing GitHub Release v1.2.3 (`gh release upload --clobber`). The
+# version must be the checkout's (`dart run tool/release_version.dart apply`).
 #
 # Needs the repo's Dart (3.13) first on PATH and `dart pub get` done.
 set -euo pipefail
@@ -53,7 +55,7 @@ while [[ $# -gt 0 ]]; do
     --targets) targets="${2:?--targets needs a value}"; shift 2 ;;
     --out) out="${2:?--out needs a value}"; shift 2 ;;
     --upload) upload="${2:?--upload needs a tag}"; shift 2 ;;
-    -h | --help) sed -n '2,38p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h | --help) sed -n '2,40p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) die "unknown option $1 (see --help)" ;;
   esac
 done

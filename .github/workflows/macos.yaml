@@ -1,0 +1,56 @@
+# The macOS gate: what the Linux `gate` cannot run. Every package's tests
+# with their coverage thresholds on macOS, so the `macos`-tagged tests (the
+# Keychain) and the desktop goldens (`golden`, drawn on macOS) run too, and a
+# debug build of the desktop app (`flutter build macos`, the Swift side).
+#
+# GitHub-hosted macOS runners are free only for public repositories, so the
+# job runs only when the repository is public. On a private one it is skipped,
+# and a skipped job counts as passed for a required check.
+#
+# Flutter 3.47.6 ships Dart 3.13.5; keep both in sync with .fvmrc. Keep melos
+# at the version of pubspec.lock.
+name: macos
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  macos:
+    name: macos
+    if: ${{ !github.event.repository.private }}
+    runs-on: macos-latest
+    timeout-minutes: 60
+    steps:
+      - name: Git Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2.23.0
+        with:
+          flutter-version: "3.47.6"
+          cache: true
+
+      - name: Install melos and very_good_cli
+        run: |
+          dart pub global activate melos 8.9.0
+          dart pub global activate very_good_cli 1.5.0
+
+      - name: Install Dependencies
+        run: dart pub get
+
+      - name: Test with Coverage
+        run: melos run test:coverage
+
+      - name: Build the Desktop App
+        working-directory: apps/xp_desktop
+        run: flutter build macos --debug
