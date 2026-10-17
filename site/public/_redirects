@@ -1,0 +1,5 @@
+# The Linux installer: tool/release/linux/install.sh of the latest release (curl -L follows).
+/install https://github.com/AbdurahmanAlmehdi/x-path/releases/latest/download/install.sh 302
+/install.sh https://github.com/AbdurahmanAlmehdi/x-path/releases/latest/download/install.sh 302
+# The latest release, where the DMG and the Linux archives are.
+/download https://github.com/AbdurahmanAlmehdi/x-path/releases/latest 302

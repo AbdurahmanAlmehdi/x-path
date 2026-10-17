@@ -17,4 +17,6 @@ jobs:
       config: .github/cspell.json
       includes: |
         **/*.md
+        site/**/*.html
+        site/**/*.txt
       modified_files_only: false

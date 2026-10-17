@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>XPath vs Codemagic: self-hosted or hosted Flutter releases</title>
+<meta name="description" content="An honest comparison of XPath, a self-hosted release tool for Flutter apps, and Codemagic, the hosted CI/CD service: hosting, cost, secrets, Mac build machines, store uploads, Shorebird, agents and approvals.">
+<link rel="canonical" href="https://xpath.abdurahman.ly/vs/codemagic/">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#F6F5F1" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#141412" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="XPath">
+<meta property="og:title" content="XPath vs Codemagic: self-hosted or hosted Flutter releases">
+<meta property="og:description" content="Where each one runs, what it costs, where your secrets live, and who should pick which.">
+<meta property="og:url" content="https://xpath.abdurahman.ly/vs/codemagic/">
+<meta property="og:image" content="https://xpath.abdurahman.ly/assets/brand/social-preview.png">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta property="og:image:alt" content="The XPath symbol: an outlined X whose stroke runs on into a node and an arrow.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="XPath vs Codemagic: self-hosted or hosted Flutter releases">
+<meta name="twitter:description" content="Where each one runs, what it costs, where your secrets live, and who should pick which.">
+<meta name="twitter:image" content="https://xpath.abdurahman.ly/assets/brand/social-preview.png">
+<link rel="preload" href="/assets/fonts/XPSans-Regular.woff" as="font" type="font/woff" crossorigin>
+<link rel="stylesheet" href="/assets/xp-tokens.css">
+<link rel="stylesheet" href="/assets/site.css">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "url": "https://xpath.abdurahman.ly/vs/codemagic/",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "Is XPath a replacement for Codemagic?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "For releasing Flutter apps from a Mac you own, yes: XPath builds, signs, uploads to App Store Connect, Google Play and Firebase App Distribution, runs Shorebird releases and patches, and tracks store review. It does not replace Codemagic's hosted machines, its support for other frameworks, or its team accounts."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Can I use XPath without a Mac?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Only for Android. iOS builds need a Mac with Xcode, and App Store uploads run on the XPath engine, which then has to be a Mac. Without any Mac, a hosted service such as Codemagic is the practical choice for iOS."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Which one costs less?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "XPath has no price: it is free under Apache-2.0, and you supply the machines and keep them running. Codemagic includes 500 macOS M2 build minutes a month on its free plan, then charges per minute on pay-as-you-go ($0.095 per minute on an M2 Mac mini) or a fixed yearly price from $3,990. Which costs less depends on how many minutes you build and what your own time and hardware are worth."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Where do my signing keys live?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "With XPath, on the machine that runs the engine: the macOS Keychain or an encrypted file on Linux. A paired runner receives the keystore only for the job it runs. With Codemagic, you store signing files and keys in Codemagic as secret environment variables, which it encrypts and passes to the build machine while a build runs."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Can I use both?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Yes. XPath's scan notices Codemagic workflow files in a repository and leaves them alone, so you can keep Codemagic for pull-request checks and release from your own Mac with XPath, or the other way round."
+      }
+    }
+  ]
+}
+</script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="/" aria-label="XPath home"><span class="mark" aria-hidden="true"></span>XPath</a>
+    <nav aria-label="Main">
+      <ul class="nav">
+        <li><a href="/#how">How it works</a></li>
+        <li><a href="/#safety">Safety</a></li>
+        <li><a href="/#install">Install</a></li>
+        <li><a href="/vs/codemagic/" aria-current="page">vs Codemagic</a></li>
+        <li><a href="https://github.com/AbdurahmanAlmehdi/x-path">GitHub</a></li>
+      </ul>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+<section class="hero" aria-labelledby="title">
+  <div class="wrap">
+    <p class="label">Comparison</p>
+    <h1 id="title">XPath vs Codemagic</h1>
+    <p class="lede">Codemagic is a hosted CI/CD service for mobile apps: your builds run on its Mac minis and Linux machines, and you pay by the build minute or a fixed yearly price. XPath is open source software you run on your own Mac or Linux box: builds run on your hardware, your keys stay there, and there is no bill.</p>
+    <p class="lede muted">Pick Codemagic if you have no Mac or want build capacity you don't maintain. Pick XPath if you already release from a Mac and want the release, its keys and its approvals on that machine.</p>
+    <p class="meta">Codemagic facts checked 17 October 2026 against Codemagic's own pages. <a href="#sources">Sources</a></p>
+  </div>
+</section>
+
+<section aria-labelledby="table-title">
+  <div class="wrap">
+    <p class="label">Side by side</p>
+    <h2 id="table-title">How XPath and Codemagic differ</h2>
+    <section class="table-scroll" aria-label="Comparison table, scrolls sideways on small screens" tabindex="0">
+      <table>
+        <caption>XPath 1.0 compared with Codemagic as documented on 17 October 2026.</caption>
+        <thead>
+          <tr><th scope="col">Topic</th><th scope="col">XPath</th><th scope="col">Codemagic</th></tr>
+        </thead>
+        <tbody>
+          <tr><th scope="row">What it is</th><td>A release tool for Flutter apps: build, test, sign, upload, tag, track store review, merge.</td><td>A cloud CI/CD service for mobile apps: Flutter, React Native, native iOS and Android, Unity, Kotlin Multiplatform, .NET MAUI and Ionic.<sup><a href="#s1">1</a></sup></td></tr>
+          <tr><th scope="row">Hosting</th><td>Self-hosted. The engine runs on your Mac, a Linux machine or in Docker; other Macs and Linux boxes join as runners.</td><td>Hosted by Codemagic. Dedicated servers and custom regions are available on request.<sup><a href="#s2">2</a></sup></td></tr>
+          <tr><th scope="row">Cost model</th><td>Free, Apache-2.0. You pay for and look after your own machines.</td><td>Free plan: 500 macOS M2 minutes a month, 1 concurrent build. Pay as you go: $0.095/min (Mac mini M2), $0.114/min (M4), $0.045/min (Linux, Windows), $49 a month per extra concurrency. Fixed price from $3,990 a year (M2, 3 concurrent builds). Enterprise from $12,000 a year.<sup><a href="#s2">2</a></sup></td></tr>
+          <tr><th scope="row">Where secrets live</th><td>On the engine machine: macOS Keychain (large secrets in a file encrypted with a Keychain key) or an XChaCha20-Poly1305 file on Linux. Runners get the keystore and Shorebird key only for the job they run.</td><td>In Codemagic, as secret environment variables at app or team level, encrypted and passed to the build machine while a build runs.<sup><a href="#s3">3</a></sup></td></tr>
+          <tr><th scope="row">macOS build machines</th><td>Yours. Any Mac with Xcode runs iOS jobs, one signing job at a time per Mac.</td><td>Codemagic's Apple silicon Mac minis, M2 and M4.<sup><a href="#s1">1</a> <a href="#s2">2</a></sup></td></tr>
+          <tr><th scope="row">Store uploads</th><td>App Store Connect (API key or Apple ID), Google Play, Firebase App Distribution. Store status is followed until live.</td><td>App Store Connect, including TestFlight and App Store review submission; Google Play tracks, drafts and staged rollout; Firebase App Distribution.<sup><a href="#s5">5</a> <a href="#s6">6</a> <a href="#s7">7</a></sup></td></tr>
+          <tr><th scope="row">Shorebird</th><td>Releases and patches; a patch builds with the Flutter version of its release.</td><td>Releases and patches for Android and iOS, with a Shorebird token stored as a secret.<sup><a href="#s4">4</a></sup></td></tr>
+          <tr><th scope="row">AI agents and MCP</th><td><code>xp mcp</code>, an MCP server with read, edit and dispatch tools, plus agent skills (<code>npx skills add AbdurahmanAlmehdi/x-path</code>).</td><td><code>codemagic init</code> installs Codemagic skills into AI agents on your machine; Codemagic also has a REST API.<sup><a href="#s8">8</a></sup></td></tr>
+          <tr><th scope="row">Approvals</th><td>Gates inside the workflow: cutting a release, pushing, store submission, merging. Only the app or the CLI can approve; agent tokens get <code>403</code>. Approvals are bound to the commit and version and expire after 24 hours.</td><td>Release timing per store: <code>release_type: MANUAL</code> (the default) leaves an approved iOS version for you to release; Google Play releases can be uploaded as drafts.<sup><a href="#s5">5</a> <a href="#s6">6</a> <a href="#s9">9</a></sup></td></tr>
+          <tr><th scope="row">Setup effort</th><td>Install the app or run the install script, connect GitHub, add the project and its credentials. You keep Xcode, Flutter and the machine itself up to date and online.</td><td>Connect the repository and configure <code>codemagic.yaml</code> or, for Flutter, the Workflow Editor. Codemagic maintains the build machines.<sup><a href="#s1">1</a></sup></td></tr>
+          <tr><th scope="row">Team features</th><td>No user accounts. Each person or device gets its own token; approvals are made from the app or the CLI.</td><td>Unlimited team members on paid plans (1 on the free plan), team-level secrets, SSO on Enterprise.<sup><a href="#s2">2</a> <a href="#s3">3</a></sup></td></tr>
+        </tbody>
+      </table>
+    </section>
+  </div>
+</section>
+
+<section aria-labelledby="pick">
+  <div class="wrap">
+    <p class="label">Who should pick which</p>
+    <h2 id="pick">Who should pick which</h2>
+    <div class="cols">
+      <div>
+        <h3>Pick Codemagic if</h3>
+        <ul class="plain">
+          <li>you have no Mac, or the Macs you have are not free to build;</li>
+          <li>you want many builds in parallel without buying hardware;</li>
+          <li>you don't want to maintain Xcode, Flutter versions or a machine that has to stay online;</li>
+          <li>a team shares one account with members, roles and SSO;</li>
+          <li>you ship apps in React Native, Unity or native code too.</li>
+        </ul>
+      </div>
+      <div>
+        <h3>Pick XPath if</h3>
+        <ul class="plain">
+          <li>you already release Flutter apps from a Mac and want that Mac to do it the same way every time;</li>
+          <li>your keystores and store keys should not leave your machine;</li>
+          <li>you want an AI agent to start builds and releases but never approve one;</li>
+          <li>you want the store review and the release branch followed through to the merge;</li>
+          <li>you would rather not pay per build minute.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section aria-labelledby="faq">
+  <div class="wrap">
+    <p class="label">FAQ</p>
+    <h2 id="faq">Questions about XPath and Codemagic</h2>
+    <div class="faq">
+      <div><h3>Is XPath a replacement for Codemagic?</h3><p>For releasing Flutter apps from a Mac you own, yes: XPath builds, signs, uploads to App Store Connect, Google Play and Firebase App Distribution, runs Shorebird releases and patches, and tracks store review. It does not replace Codemagic's hosted machines, its support for other frameworks, or its team accounts.</p></div>
+      <div><h3>Can I use XPath without a Mac?</h3><p>Only for Android. iOS builds need a Mac with Xcode, and App Store uploads run on the XPath engine, which then has to be a Mac. Without any Mac, a hosted service such as Codemagic is the practical choice for iOS.</p></div>
+      <div><h3>Which one costs less?</h3><p>XPath has no price: it is free under Apache-2.0, and you supply the machines and keep them running. Codemagic includes 500 macOS M2 build minutes a month on its free plan, then charges per minute on pay-as-you-go ($0.095 per minute on an M2 Mac mini) or a fixed yearly price from $3,990. Which costs less depends on how many minutes you build and what your own time and hardware are worth.</p></div>
+      <div><h3>Where do my signing keys live?</h3><p>With XPath, on the machine that runs the engine: the macOS Keychain or an encrypted file on Linux. A paired runner receives the keystore only for the job it runs. With Codemagic, you store signing files and keys in Codemagic as secret environment variables, which it encrypts and passes to the build machine while a build runs.</p></div>
+      <div><h3>Can I use both?</h3><p>Yes. XPath's scan notices Codemagic workflow files in a repository and leaves them alone, so you can keep Codemagic for pull-request checks and release from your own Mac with XPath, or the other way round.</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="sources" aria-labelledby="sources-title">
+  <div class="wrap sources">
+    <h2 id="sources-title" class="label">Sources, checked 17 October 2026</h2>
+    <p>Codemagic's prices and features change; check their pages before you decide. XPath facts come from its <a href="https://github.com/AbdurahmanAlmehdi/x-path#readme">README</a> and <a href="https://github.com/AbdurahmanAlmehdi/x-path/blob/main/SECURITY.md">SECURITY.md</a>. XPath is not affiliated with Codemagic.</p>
+    <ol>
+      <li id="s1"><a href="https://docs.codemagic.io/getting-started/about-codemagic/">Codemagic docs: Welcome to Codemagic</a> (what it is, frameworks, codemagic.yaml and the Workflow Editor, Apple silicon M2 machines)</li>
+      <li id="s2"><a href="https://codemagic.io/pricing/">Codemagic pricing</a> (free plan, pay-as-you-go rates, concurrency, fixed and Enterprise prices, team members, dedicated servers)</li>
+      <li id="s3"><a href="https://docs.codemagic.io/yaml-basic-configuration/configuring-environment-variables/">Codemagic docs: Configuring environment variables</a> (secret variables, app and team level)</li>
+      <li id="s4"><a href="https://docs.codemagic.io/flutter-distributing/shorebird/">Codemagic docs: Code push with Shorebird</a></li>
+      <li id="s5"><a href="https://docs.codemagic.io/yaml-publishing/app-store-connect/">Codemagic docs: App Store Connect publishing</a> (TestFlight, App Store review, <code>release_type</code>)</li>
+      <li id="s6"><a href="https://docs.codemagic.io/yaml-publishing/google-play/">Codemagic docs: Google Play publishing</a> (tracks, <code>submit_as_draft</code>, <code>rollout_fraction</code>)</li>
+      <li id="s7"><a href="https://docs.codemagic.io/yaml-distributing/firebase-app-distribution/">Codemagic docs: Firebase App Distribution</a></li>
+      <li id="s8"><a href="https://docs.codemagic.io/troubleshooting/codemagic-init/">Codemagic docs: Codemagic knowledge for AI agents</a></li>
+      <li id="s9"><a href="https://help.codemagic.io/articles/5483007174-how-do-i-automatically-submit-and-release-production-apps-to-the-app-store-and-google-play-from-my-codemagic-pipeline">Codemagic help: automatically submit and release production apps</a> (what <code>release_type</code> values do)</li>
+    </ol>
+  </div>
+</section>
+</main>
+
+<footer class="foot">
+  <div class="wrap">
+    <ul>
+      <li><a href="/">Home</a></li>
+      <li><a href="https://github.com/AbdurahmanAlmehdi/x-path">GitHub</a></li>
+      <li><a href="https://github.com/AbdurahmanAlmehdi/x-path/releases">Releases</a></li>
+      <li><a href="https://github.com/AbdurahmanAlmehdi/x-path#readme">Docs</a></li>
+      <li><a href="https://github.com/AbdurahmanAlmehdi/x-path/blob/main/CONTRIBUTING.md">Contributing</a></li>
+      <li><a href="https://github.com/AbdurahmanAlmehdi/x-path/blob/main/SECURITY.md">Security</a></li>
+    </ul>
+    <p>XPath is open source under the <a href="https://github.com/AbdurahmanAlmehdi/x-path/blob/main/LICENSE">Apache License 2.0</a>. Made by <a href="https://github.com/AbdurahmanAlmehdi">Abdurahman Almehdi</a>.</p>
+  </div>
+</footer>
+</body>
+</html>

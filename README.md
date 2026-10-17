@@ -1923,7 +1923,9 @@ The workflows in `.github/workflows`:
   only while the repository is public (macOS minutes are free for public repositories only; on a private one the
   job is skipped, which a required check counts as passed). It runs `melos run test:coverage` on macOS, so the
   `macos` and `golden` tests run too, and `flutter build macos --debug` of the desktop app.
-- `release.yml`: a release of XPath on every push to `main` (see Releases and installation).
+- `release.yml`: a release of XPath on every push to `main` that changes more than `site/` (see Releases and
+  installation).
+- `site.yaml`: on a pull request that touches `site/`, checks the website (see Website). It never deploys.
 - `semantic_pull_request.yaml` checks that a pull request title follows
   [Conventional Commits](https://www.conventionalcommits.org): it becomes the squash commit and decides the
   version. `spell_check.yaml` and `license_check.yaml` cover the rest; the planning documents are ignored in
@@ -1938,6 +1940,46 @@ repository is public), and allow squash merging only, with the pull request titl
 (Settings ▸ General ▸ Pull Requests). Otherwise a single-commit pull request is merged with its commit message, and
 that decides the version instead of the title. The release workflow creates tags through the API with the workflow
 token; it never pushes to `main`.
+
+## Website
+
+`site/` is <https://xpath.abdurahman.ly>: plain HTML and CSS in `site/public`, no build step and no JavaScript. It is
+served by Cloudflare Workers static assets (`site/wrangler.jsonc`: the Worker `x-path`, `not_found_handling:
+"404-page"` so unknown paths get `404.html` with status 404, and the custom domain `xpath.abdurahman.ly`).
+
+- **Pages.** `/` and `/vs/codemagic/`, plus `404.html`, `robots.txt` (search engines and AI crawlers allowed),
+  `sitemap.xml` and `llms.txt`. `_redirects` sends `/install` (and `/install.sh`) to `install.sh` of the latest
+  release, which is what `curl -fsSL https://xpath.abdurahman.ly/install | sh` downloads, and `/download` to the
+  latest release. `_headers` sets the security headers and the cache time of `assets/`.
+- **Assets.** `assets/xp-tokens.css` is a copy of `docs/design/system/project/assets/Handoff/xp-tokens.css`; copy it
+  again when the tokens change (the check fails otherwise). The fonts are IBM Plex Sans and Mono from
+  `apps/xp_desktop/assets/fonts`, cut to Latin and renamed "XP Sans" and "XP Mono", as the OFL asks of a modified
+  copy. The screenshots in `assets/shots` are crops of the desktop goldens in `apps/xp_desktop/test/**/goldens`,
+  converted to WebP; crop again after a deliberate UI change, leaving out the shortcut glyphs the test font draws as
+  boxes and the sample project names.
+- **Deploys.** Cloudflare Workers Builds deploys on every push to `main` that changes `site/`; nothing here holds a
+  Cloudflare secret. A merge that only changes `site/` publishes no XPath release (`release.yml` ignores it), but
+  its title still counts towards the version of the next release. The Worker's settings in the Cloudflare
+  dashboard (Workers & Pages ▸ `x-path` ▸ Settings ▸ Build, connected to this repository):
+
+  | Setting | Value |
+  |---|---|
+  | Worker name | `x-path` (must match `name` in `site/wrangler.jsonc`) |
+  | Production branch | `main` |
+  | Root directory | `site` |
+  | Build command | none |
+  | Deploy command | `npx wrangler deploy` |
+  | Build watch paths | include `site/*` |
+  | Branch control: builds for non-production branches | off |
+
+  The zone `abdurahman.ly` must be on the same Cloudflare account, with no DNS record on `xpath.abdurahman.ly`
+  (the custom domain creates its own).
+- **Checks.** `site.yaml` runs on pull requests that touch `site/`: `node site/check.mjs` (internal links and
+  fragments, image attributes, canonical URLs against the sitemap, JSON-LD that parses and a FAQPage that matches the
+  visible FAQ, `_redirects`, the token copy), `html-validate` and `wrangler deploy --dry-run`. `spell_check.yaml`
+  includes the pages.
+- **Preview.** `cd site && npx wrangler dev` serves it as Cloudflare does (redirects, headers, the 404 page) on
+  <http://localhost:8787>; any static server on `site/public` shows the pages. The current Wrangler needs Node 22.
 
 ## License
 

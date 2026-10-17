@@ -1,6 +1,6 @@
 # Releases XPath itself on every merge to main (CONTRIBUTING.md, "Pull
-# request titles"). Nothing is committed to main; the version lives in the
-# tag:
+# request titles"), except a merge that only changes the website (site/).
+# Nothing is committed to main; the version lives in the tag:
 #
 #   version   tool/release_version.dart decides it: the tag already on the
 #             commit (a run again), else the highest vX.Y.Z tag reachable
@@ -34,6 +34,10 @@ on:
       - main
     tags:
       - "v*"
+    # A push to main that only changes the website publishes no release: Cloudflare deploys site/ by
+    # itself. GitHub does not apply path filters to tag pushes, so a tag still releases.
+    paths-ignore:
+      - "site/**"
   workflow_dispatch:
     inputs:
       version:

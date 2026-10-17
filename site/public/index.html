@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>XPath: self-hosted release tool for Flutter apps</title>
+<meta name="description" content="XPath is an open source, self-hosted release tool for Flutter apps. It builds, signs, uploads, tags and tracks your iOS and Android releases from your own Mac or Linux box.">
+<link rel="canonical" href="https://xpath.abdurahman.ly/">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#F6F5F1" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#141412" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="XPath">
+<meta property="og:title" content="XPath: self-hosted release tool for Flutter apps">
+<meta property="og:description" content="Build, sign, upload, tag and track iOS and Android releases of your Flutter apps from your own Mac or Linux box. Open source, Apache-2.0.">
+<meta property="og:url" content="https://xpath.abdurahman.ly/">
+<meta property="og:image" content="https://xpath.abdurahman.ly/assets/brand/social-preview.png">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta property="og:image:alt" content="The XPath symbol: an outlined X whose stroke runs on into a node and an arrow.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="XPath: self-hosted release tool for Flutter apps">
+<meta name="twitter:description" content="Build, sign, upload, tag and track iOS and Android releases of your Flutter apps from your own Mac or Linux box. Open source, Apache-2.0.">
+<meta name="twitter:image" content="https://xpath.abdurahman.ly/assets/brand/social-preview.png">
+<link rel="preload" href="/assets/fonts/XPSans-Regular.woff" as="font" type="font/woff" crossorigin>
+<link rel="stylesheet" href="/assets/xp-tokens.css">
+<link rel="stylesheet" href="/assets/site.css">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "SoftwareApplication",
+      "@id": "https://xpath.abdurahman.ly/#app",
+      "name": "XPath",
+      "description": "Open source, self-hosted release tool for Flutter apps. It builds, tests, signs, uploads, tags and tracks iOS and Android releases to App Store Connect, Google Play, Firebase App Distribution and Shorebird, from your own Mac or Linux machine. It comes as a macOS app, the xp command line, an MCP server for AI agents (xp mcp) and remote runners.",
+      "url": "https://xpath.abdurahman.ly/",
+      "applicationCategory": "DeveloperApplication",
+      "operatingSystem": "macOS, Linux",
+      "softwareVersion": "1.0.0",
+      "license": "https://www.apache.org/licenses/LICENSE-2.0",
+      "isAccessibleForFree": true,
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "USD"
+      },
+      "downloadUrl": "https://github.com/AbdurahmanAlmehdi/x-path/releases/latest",
+      "installUrl": "https://xpath.abdurahman.ly/#install",
+      "releaseNotes": "https://github.com/AbdurahmanAlmehdi/x-path/releases",
+      "screenshot": "https://xpath.abdurahman.ly/assets/shots/releases-light.webp",
+      "image": "https://xpath.abdurahman.ly/assets/brand/social-preview.png",
+      "sameAs": [
+        "https://github.com/AbdurahmanAlmehdi/x-path"
+      ],
+      "author": {
+        "@type": "Person",
+        "name": "Abdurahman Almehdi",
+        "url": "https://github.com/AbdurahmanAlmehdi"
+      }
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://xpath.abdurahman.ly/#site",
+      "name": "XPath",
+      "url": "https://xpath.abdurahman.ly/",
+      "about": { "@id": "https://xpath.abdurahman.ly/#app" }
+    }
+  ]
+}
+</script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="/" aria-label="XPath home"><span class="mark" aria-hidden="true"></span>XPath</a>
+    <nav aria-label="Main">
+      <ul class="nav">
+        <li><a href="#how">How it works</a></li>
+        <li><a href="#safety">Safety</a></li>
+        <li><a href="#install">Install</a></li>
+        <li><a href="/vs/codemagic/">vs Codemagic</a></li>
+        <li><a href="https://github.com/AbdurahmanAlmehdi/x-path">GitHub</a></li>
+      </ul>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+<section class="hero" aria-labelledby="title">
+  <div class="wrap">
+    <p class="label">Release tool for Flutter apps</p>
+    <h1 id="title">Ship your Flutter apps to the App Store and Google Play from your own Mac</h1>
+    <p class="lede">XPath is a self-hosted, open source release tool for Flutter apps. It builds, signs, uploads, tags and tracks your iOS and Android releases from your Mac or your own Linux box, with a Mac app, a command line, an MCP server for agents and remote runners.</p>
+    <p class="lede muted">An agent can start a release. Only you can approve it.</p>
+    <div class="actions">
+      <a class="btn primary" href="https://github.com/AbdurahmanAlmehdi/x-path/releases/latest">Download for Mac</a>
+      <a class="btn" href="#install">Install on Linux or Docker</a>
+    </div>
+    <p class="meta">Apache-2.0 · macOS app (Apple silicon) · Linux x64 and arm64 · Docker</p>
+    <!-- [NEED: one measured figure from the owner's own releases, e.g. minutes from dispatch to both store uploads for one prod release on a named Mac model] -->
+    <figure>
+      <div class="shot">
+        <picture>
+          <source srcset="/assets/shots/overview-dark.webp" media="(prefers-color-scheme: dark)">
+          <img src="/assets/shots/overview-light.webp" width="1440" height="182" alt="XPath's project overview: release 5.4.1 (3283) is building. Preflight passed on This Mac in 41 seconds, the iOS build has run 6 minutes 12 seconds on This Mac, the Android build finished on linux-builder-01, upload and tag wait. On the right, the App Store has not received the build yet and Google Play is in review.">
+        </picture>
+      </div>
+      <figcaption>A production release in flight: one row per stage, which machine each job runs on, and where each store stands. Screens on this page are the app's own test renders, with sample data.</figcaption>
+    </figure>
+  </div>
+</section>
+
+<section aria-labelledby="what">
+  <div class="wrap">
+    <p class="label">What it is</p>
+    <h2 id="what">What is XPath?</h2>
+    <p>XPath is a release tool for Flutter apps that you run yourself. You point it at a GitHub repository; it scans the app's flavors, bundle IDs and signing setup without writing to your folder, then builds, tests, signs and uploads releases to App Store Connect, Google Play, Firebase App Distribution and Shorebird. It tags each release, opens the release pull request, follows each store's review until the build is live, and merges once both stores have it.</p>
+    <p>A headless engine, <code>xpd</code>, does the work and keeps the secrets. Four clients talk to it: the macOS app, the <code>xp</code> command line, <code>xp mcp</code> for AI agents, and <code>xp runner</code> on other Macs and Linux machines. XPath is free and licensed under Apache-2.0. It is not related to XPath, the XML query language.</p>
+  </div>
+</section>
+
+<section aria-labelledby="who">
+  <div class="wrap">
+    <p class="label">Who it is for</p>
+    <h2 id="who">For Flutter developers who already release from a Mac</h2>
+    <!-- [NEED: a short first-person line from the owner on what he ships with XPath (no app or company names), and how long he has used it] -->
+    <ul class="rows">
+      <li><h3>You ship a Flutter app to both stores</h3><p>Today that means Xcode's Organizer, the Play Console, a version bump by hand and a script only you can run. XPath turns that into one dispatch with the same steps every time.</p></li>
+      <li><h3>Your signing keys should stay on your machine</h3><p>Keystores, App Store Connect keys and Play service accounts live in your Keychain or an encrypted file on the machine that runs the engine. Nothing is uploaded to a build service.</p></li>
+      <li><h3>You let a coding agent work in the repo</h3><p>The agent can dispatch builds, read logs and edit workflows through <code>xp mcp</code>. It cannot approve a production release, a push or a merge.</p></li>
+      <li><h3>Not a fit if you have no Mac</h3><p>iOS builds and App Store uploads need a Mac with Xcode. If you have no Mac, or you want build capacity someone else maintains, a hosted CI fits better. See <a href="/vs/codemagic/">XPath vs Codemagic</a>.</p></li>
+    </ul>
+  </div>
+</section>
+
+<section id="how" aria-labelledby="flow">
+  <div class="wrap">
+    <p class="label">How a release flows</p>
+    <h2 id="flow">One production release, start to merge</h2>
+    <p>The built-in <code>prod-release</code> workflow runs these stages in order. Steps that push, upload or talk to GitHub run on the engine; the build can go to any paired runner with the right tools. A stage marked <span class="badge attention">you approve</span> waits for you.</p>
+    <ol class="rail">
+      <li>
+        <p class="label">Dispatch</p>
+        <p>Pick the app, flavors, platforms and version bump. XPath previews every job, the machine it lands on and the approvals it will stop at, then allocates the build number once: higher than anything in the stores, the tags or its own counter, and never reused.</p>
+      </li>
+      <li>
+        <p class="label">Prepare <span class="badge attention">you approve</span></p>
+        <p>Bumps the version in <code>pubspec.yaml</code> and the plists, cuts <code>release/5.4.1</code> and pushes it. The cut and the push each wait for your approval.</p>
+      </li>
+      <li>
+        <p class="label">Check</p>
+        <p>Guards fail early with a fix: version files in sync, build number not used before, credentials valid, the App Store version train still open, Play's target API level.</p>
+      </li>
+      <li>
+        <p class="label">Build</p>
+        <p><code>flutter build</code> or <code>shorebird release</code> with the Flutter version the app pins in <code>.fvmrc</code>, then the symbols and a manifest with the SHA-256 of every artifact.</p>
+        <p class="where">This Mac, or a paired runner</p>
+      </li>
+      <li>
+        <p class="label">Upload</p>
+        <p>App Store Connect, Google Play and Firebase App Distribution, for the stores the flavor has credentials for. An upload that Apple rejected after altool exited 0 still fails the step.</p>
+      </li>
+      <li>
+        <p class="label">Finalize</p>
+        <p>Tags <code>v5.4.1+3283</code>, pushes the tag and opens the release pull request.</p>
+      </li>
+      <li>
+        <p class="label">Stores</p>
+        <p>XPath asks each store for its status at most every ten minutes: uploaded, in review, approved, live. A rejection gets "New build, same version" with the next build number.</p>
+      </li>
+      <li>
+        <p class="label">Merge <span class="badge attention">you approve</span></p>
+        <p>Once every store it targets is live, the release branch can merge into <code>main</code> with a merge commit, of exactly the commit that was tagged.</p>
+      </li>
+    </ol>
+    <figure>
+      <div class="shot">
+        <picture>
+          <source srcset="/assets/shots/job-log-dark.webp" media="(prefers-color-scheme: dark)">
+          <img src="/assets/shots/job-log-light.webp" width="1159" height="288" loading="lazy" decoding="async" alt="The log of an iOS build job, grouped by step: check out took 4 seconds, bump version 21 seconds, and the build iOS step shows flutter build ipa with the release flavor, build name 5.4.1 and build number 3283, a CocoaPods warning, and Xcode archive done in 312.4 seconds.">
+        </picture>
+      </div>
+      <figcaption>The log of a build job, grouped by step. Every line is masked against your known secrets before it is stored or shown.</figcaption>
+    </figure>
+  </div>
+</section>
+
+<section aria-labelledby="features">
+  <div class="wrap">
+    <p class="label">What it does</p>
+    <h2 id="features">What XPath handles for you</h2>
+    <ul class="rows split">
+      <li><h3>Scan</h3><p>Reads the repository as text, with no tool installed and no write: apps in a monorepo, flavors from Gradle, Xcode schemes and <code>flavorizr.yaml</code>, bundle IDs, signing team, Shorebird app IDs, the <code>.fvmrc</code> pin. Problems come back as findings with a fix, such as an iOS bundle ID one character away from the Android one.</p></li>
+      <li><h3>Builds</h3><p>Each app builds with the Flutter version it pins, through fvm or XPath's own cache. A build only takes files written after it started, so a stale APK from an earlier run is never uploaded. Artifacts are kept with their SHA-256 until housekeeping frees the space.</p></li>
+      <li><h3>Stores</h3><p>App Store Connect with an API key or an Apple ID, Google Play with a service account, Firebase App Distribution with no Node and no Firebase CLI. Each credential is checked with the service before it is saved, every day after, and again before a build.</p></li>
+      <li><h3>Shorebird</h3><p>Releases and patches. A patch builds with the Flutter version the release was built with, not the app's current pin.</p></li>
+      <li><h3>Tests</h3><p><code>flutter test</code> and <code>flutter analyze</code> as steps. A test run fails only on new failures against the last green run of the base branch, so the failures you already know about do not block a release.</p></li>
+      <li><h3>Workflows</h3><p>YAML documents with stages, a platform and flavor matrix, conditions and approval gates, edited in a visual builder or as text. Validation points at the line and column; every save is a new version, and each job records the version it ran.</p></li>
+      <li><h3>Runners</h3><p>Pair another Mac for iOS or a Linux box for Android with a one-time token. Runners dial out to the engine, so nothing connects to them, and they take jobs that fit their tools and free slots.</p></li>
+      <li><h3>Releases</h3><p>An App Store lane and a Play lane, a timeline, release notes grouped by commit type with "Copy for Slack" and "Copy for WhatsApp", and a reminder about <code>min_version</code> flags once a store is live.</p></li>
+      <li><h3>Notifications</h3><p>macOS notifications and a menu bar item when something waits for you; an optional Slack webhook per project, masked like the logs.</p></li>
+      <li><h3>Clients</h3><p>The Mac app, the <code>xp</code> command line with <code>--json</code> on every command, <code>xp mcp</code> for agents, and a Docker image for the engine on a server.</p></li>
+    </ul>
+    <figure>
+      <div class="shot">
+        <picture>
+          <source srcset="/assets/shots/releases-dark.webp" media="(prefers-color-scheme: dark)">
+          <img src="/assets/shots/releases-light.webp" width="1440" height="575" loading="lazy" decoding="async" alt="A release in review: an App Store lane at waiting for review and a Google Play lane in review, both with 5.3.7 live now. Below, a timeline of the approval, the store reviews and the build; release notes with copy buttons for Slack and WhatsApp; a forced-update reminder; and the release pull request. The merge button waits for both stores to go live.">
+        </picture>
+      </div>
+      <figcaption>A release in review in both stores. Merge stays off until both lanes are live.</figcaption>
+    </figure>
+    <figure>
+      <div class="shot">
+        <picture>
+          <source srcset="/assets/shots/workflows-dark.webp" media="(prefers-color-scheme: dark)">
+          <img src="/assets/shots/workflows-light.webp" width="1440" height="848" loading="lazy" decoding="async" alt="The workflow builder: a pipeline with a check stage and a build stage, the build job's matrix, capabilities and steps, one of which uploads to Google Play behind a store submission gate; the YAML of the same workflow on the right, marked valid.">
+        </picture>
+      </div>
+      <figcaption>The workflow builder and the YAML it writes, side by side.</figcaption>
+    </figure>
+    <div class="cols">
+      <figure>
+        <div class="shot">
+          <picture>
+            <source srcset="/assets/shots/tests-dark.webp" media="(prefers-color-scheme: dark)">
+            <img src="/assets/shots/tests-light.webp" width="1440" height="690" loading="lazy" decoding="async" alt="A test run with one new failure compared with the baseline of main: one failure that the baseline has too, three tests fixed since the baseline and one test missing from this run.">
+          </picture>
+        </div>
+        <figcaption>A test run compared with the baseline: one new failure fails it, known ones do not.</figcaption>
+      </figure>
+      <figure>
+        <div class="shot">
+          <img src="/assets/shots/dispatch-light.webp" width="598" height="444" loading="lazy" decoding="async" alt="The dispatch sheet for a production release of the prod flavor on iOS and Android from main, keeping version 5.4.1. It lists four jobs in three stages: the iOS build on This Mac, the Android build on This Mac or linux-builder-01, the upload with an approval for store submission, and a finalize job.">
+        </div>
+        <figcaption>Dispatch previews every job, where it lands and which approval it waits for.</figcaption>
+      </figure>
+    </div>
+    <figure>
+      <div class="shot">
+        <img src="/assets/shots/runners-light.webp" width="1440" height="330" loading="lazy" decoding="async" alt="The runners list: a Mac mini online and busy with one of three slots, with ios-sign, android and flutter capabilities; a Linux builder online and idle with android, flutter and swift-linux; an old Mac lost mid-job; and a revoked runner.">
+      </div>
+      <figcaption>Runners, with what each machine can build and how many jobs it is running.</figcaption>
+    </figure>
+  </div>
+</section>
+
+<section id="safety" aria-labelledby="safety-title">
+  <div class="wrap">
+    <p class="label">Safety</p>
+    <h2 id="safety-title">Your keys stay on your machine. Agents can't approve.</h2>
+    <div class="cols">
+      <div>
+        <h3>Secrets</h3>
+        <ul class="plain">
+          <li>On macOS, secrets live in your login Keychain; large ones such as keystores go to a file encrypted with a key kept in the Keychain. On Linux, an XChaCha20-Poly1305 encrypted file.</li>
+          <li>Every log line is masked against the secrets the engine knows. Secrets never go on a command line and the API never returns one once it is saved.</li>
+          <li>A runner gets the keystore or the Shorebird key only for the job it leased, once per key, and wipes it when the job ends. The GitHub token and store credentials never leave the engine.</li>
+          <li>XPath writes nothing to your repository except the release commits, branch and tag. No telemetry: the daily update check is one anonymous request to GitHub's release list, and <code>XP_NO_UPDATE_CHECK=1</code> turns it off.</li>
+        </ul>
+      </div>
+      <div>
+        <h3>Approvals</h3>
+        <ul class="plain">
+          <li>Each device gets its own token, stored as a SHA-256 hash: <code>app</code>, <code>cli</code>, <code>mcp</code> or <code>runner</code>. Only <code>app</code> and <code>cli</code> tokens approve.</li>
+          <li><code>xp mcp</code> has no tool to approve, deny, merge or change a gate, and the engine answers <code>403</code> to an <code>mcp</code> token that tries.</li>
+          <li>An approval is bound to the project, the commit and the version. If any of them changes it no longer counts, and one nobody decides expires after 24 hours.</li>
+          <li>In the app, Return never approves. Approve takes ⌘ Return after a one-second delay, from a sheet that says what happens if you approve.</li>
+        </ul>
+      </div>
+    </div>
+    <p>Found a security problem? Report it privately, as <a href="https://github.com/AbdurahmanAlmehdi/x-path/blob/main/SECURITY.md">SECURITY.md</a> describes.</p>
+  </div>
+</section>
+
+<section aria-labelledby="agents">
+  <div class="wrap">
+    <p class="label">Agents</p>
+    <h2 id="agents">Let your coding agent run the release, up to the gate</h2>
+    <p><code>xp mcp</code> is an MCP server for agents such as Claude Code. It can list projects, read runs, jobs, log tails, test results and store status, validate and save workflows, and dispatch them. When a production release reaches a gate, the run waits; the agent tells you, you approve in the app or with <code>xp approvals approve</code>, and the agent carries on.</p>
+<pre><code>claude mcp add xpath -- xp mcp</code></pre>
+    <p>Agent skills teach Claude Code, Cursor, Codex and other agents how to release with XPath, write workflows, set it up and change it. Install them from the repository of the app the agent will release:</p>
+<pre><code>npx skills add AbdurahmanAlmehdi/x-path</code></pre>
+  </div>
+</section>
+
+<section id="install" aria-labelledby="install-title">
+  <div class="wrap">
+    <p class="label">Install</p>
+    <h2 id="install-title">Install XPath</h2>
+    <div class="install">
+      <div>
+        <h3>Mac app</h3>
+        <p>Download <code>XPath-&lt;version&gt;.dmg</code> from the latest release. It is signed with Developer ID and notarized by Apple, for Apple silicon Macs. The app carries the engine and the <code>xp</code> command. On first launch it starts the engine as a login item, links <code>xp</code> into your <code>PATH</code> and checks for Xcode, git, fvm, gh and Shorebird.</p>
+        <p><a class="btn primary" href="https://github.com/AbdurahmanAlmehdi/x-path/releases/latest">Download for Mac</a></p>
+        <p class="muted">You need Xcode, git and the Flutter toolchain your apps use. Shorebird only for over-the-air patches.</p>
+      </div>
+      <div>
+        <h3>Linux</h3>
+        <p>The engine and the command line for x64 and arm64. The script downloads the latest release, checks its SHA-256, installs into <code>~/.local</code> and, where systemd runs a user session, starts <code>xpd</code> as a user service. Run it again to update.</p>
+<pre><code>curl -fsSL https://xpath.abdurahman.ly/install | sh</code></pre>
+        <p>A machine that only runs jobs for an engine elsewhere:</p>
+<pre><code>curl -fsSL https://xpath.abdurahman.ly/install | sh -s -- --runner</code></pre>
+      </div>
+      <div>
+        <h3>Docker</h3>
+        <p>The engine for <code>linux/amd64</code> and <code>linux/arm64</code>. The image has no Flutter: builds go to paired runners.</p>
+<pre><code>docker run -d --name xpath -p 127.0.0.1:7480:7480 \
+  -v xpath-data:/data ghcr.io/abdurahmanalmehdi/xpath:latest
+docker exec xpath xpd token create --name laptop --kind cli</code></pre>
+      </div>
+      <div>
+        <h3>Then</h3>
+        <ul class="plain">
+          <li>Connect GitHub: paste a token or import it from the GitHub CLI.</li>
+          <li>Add a project by its folder or <code>owner/name</code>, and review the scan.</li>
+          <li>Add credentials per flavor. Each is checked before it is saved.</li>
+          <li>Dispatch a dev build.</li>
+        </ul>
+        <p>The <a href="https://github.com/AbdurahmanAlmehdi/x-path#readme">README</a> covers every option, the API and the workflow format.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section aria-labelledby="faq">
+  <div class="wrap">
+    <p class="label">Questions</p>
+    <h2 id="faq">Questions people ask</h2>
+    <div class="faq">
+      <div><h3>Does XPath need a Mac?</h3><p>For iOS, yes. iOS builds need a Mac with Xcode, and App Store uploads run on the engine, so the engine must run on a Mac to ship to the App Store. An engine on Linux or in Docker can build and ship Android, and can send iOS builds to a paired Mac runner.</p></div>
+      <div><h3>How much does XPath cost?</h3><p>Nothing. XPath is open source under Apache-2.0. You run it on hardware you already have, and you still need your own Apple Developer and Google Play developer accounts.</p></div>
+      <div><h3>Is XPath a CI service?</h3><p>No. It is software you install, and it runs only on your machines. It is narrower than a general CI: it does Flutter releases, from version bump and build to store review and merge.</p></div>
+      <div><h3>Does my app's repository need changes?</h3><p>No. XPath reads your repository and keeps its own mirror to build from. It writes only the release commit, branch, tag and pull request that a production release makes.</p></div>
+      <div><h3>Who makes XPath?</h3><p>Abdurahman Almehdi, who built it to ship his own Flutter apps. Contributions are welcome under the rules in <a href="https://github.com/AbdurahmanAlmehdi/x-path/blob/main/CONTRIBUTING.md">CONTRIBUTING.md</a>.</p></div>
+    </div>
+  </div>
+</section>
+</main>
+
+<footer class="foot">
+  <div class="wrap">
+    <ul>
+      <li><a href="https://github.com/AbdurahmanAlmehdi/x-path">GitHub</a></li>
+      <li><a href="https://github.com/AbdurahmanAlmehdi/x-path/releases">Releases</a></li>
+      <li><a href="https://github.com/AbdurahmanAlmehdi/x-path#readme">Docs</a></li>
+      <li><a href="https://github.com/AbdurahmanAlmehdi/x-path/blob/main/CONTRIBUTING.md">Contributing</a></li>
+      <li><a href="https://github.com/AbdurahmanAlmehdi/x-path/blob/main/SECURITY.md">Security</a></li>
+      <li><a href="/vs/codemagic/">XPath vs Codemagic</a></li>
+      <li><a href="/llms.txt">llms.txt</a></li>
+    </ul>
+    <p>XPath is open source under the <a href="https://github.com/AbdurahmanAlmehdi/x-path/blob/main/LICENSE">Apache License 2.0</a>. Made by <a href="https://github.com/AbdurahmanAlmehdi">Abdurahman Almehdi</a>.</p>
+    <p>App Store and Apple are trademarks of Apple Inc. Google Play and Firebase are trademarks of Google LLC. Flutter is a trademark of Google LLC. XPath is not affiliated with them.</p>
+  </div>
+</footer>
+</body>
+</html>
