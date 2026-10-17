@@ -20,6 +20,15 @@
 	<string>$(FLUTTER_BUILD_NAME)</string>
 	<key>CFBundleVersion</key>
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
+	<!--
+	Render with Skia (Metal) instead of Impeller. Impeller on macOS crashes
+	the raster thread (null texture in Canvas::SetupRenderPass) when the
+	window's frame size changes back and forth, e.g. on a display or Space
+	change while XPath is in the background: flutter/flutter#185394, fix in
+	flutter/flutter#192522. Remove this key once a Flutter stable ships it.
+	-->
+	<key>FLTEnableImpeller</key>
+	<false/>
 	<key>LSMinimumSystemVersion</key>
 	<string>$(MACOSX_DEPLOYMENT_TARGET)</string>
 	<key>NSHumanReadableCopyright</key>
