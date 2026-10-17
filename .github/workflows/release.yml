@@ -166,6 +166,8 @@ jobs:
           test "$("${bundles}/xp/bin/xp" --version)" = "${VERSION}"
 
       - name: Test install.sh
+        env:
+          XPATH_VERSION: ${{ needs.version.outputs.version }}
         run: tool/release/linux/install_test.sh
 
   docker:
