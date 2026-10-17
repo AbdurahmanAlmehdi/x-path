@@ -1,10 +1,12 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:xp_desktop/theme/theme.dart';
+import 'package:xp_desktop/widgets/xp_clock.dart';
 
 /// An icon that turns: the running arc once per `motion.duration.spin`, or
 /// the reconnecting arrows once per `motion.duration.pulse` ([slow]).
 ///
-/// Under Reduce Motion it stands still (Status, "Running treatment").
+/// Under Reduce Motion it stands still (Status, "Running treatment"), and
+/// while the app is not in front (`XpClock.isLive`).
 class XpSpinner extends StatefulWidget {
   const new({
     required this.icon,
@@ -33,7 +35,8 @@ class _XpSpinnerState extends State<XpSpinner>
   void didChangeDependencies() {
     super.didChangeDependencies();
     final motion = context.xpMotion;
-    final still = MediaQuery.disableAnimationsOf(context);
+    final still =
+        MediaQuery.disableAnimationsOf(context) || !XpClock.isLive(context);
     _controller.duration = widget.slow
         ? motion.durationPulse
         : motion.durationSpin;
