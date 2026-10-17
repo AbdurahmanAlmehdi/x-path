@@ -71,11 +71,11 @@ Pull requests are squash-merged, and the title becomes the commit on `main`. Eve
 publishes a release, and the title decides its version, so use
 [Conventional Commits](https://www.conventionalcommits.org):
 
-| Title starts with | Version change before 1.0 |
+| Title starts with | Version change |
 |---|---|
-| `feat:` | minor (0.4.2 → 0.5.0) |
-| `fix:`, `perf:` | patch (0.4.2 → 0.4.3) |
-| `feat!:` or a `BREAKING CHANGE:` footer | minor before 1.0, major after |
+| `feat:` | minor (1.4.2 → 1.5.0) |
+| `fix:`, `perf:` | patch (1.4.2 → 1.4.3) |
+| `feat!:` or a `BREAKING CHANGE:` footer | major (1.4.2 → 2.0.0) |
 | `docs:`, `test:`, `ci:`, `chore:`, `refactor:`, `build:`, `style:` | patch |
 
 Write the title as a short description of what changes for a user, in the present tense:
