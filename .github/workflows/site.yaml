@@ -1,0 +1,49 @@
+# Checks the website (site/, served at https://xpath.abdurahman.ly) on pull requests that touch it. It never
+# deploys: Cloudflare Workers Builds deploys site/ when it changes on main (see "Website" in the README).
+#
+#   check.mjs      internal links and #fragments, images, canonical URLs and the sitemap, JSON-LD (it must
+#                  parse; the FAQPage must match the visible FAQ), _redirects, and that the design tokens are
+#                  a copy of docs/design/system/project/assets/Handoff/xp-tokens.css
+#   html-validate  the HTML itself
+#   wrangler       site/wrangler.jsonc, with a dry run of the deploy (no account needed)
+name: site
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+on:
+  pull_request:
+    paths:
+      - "site/**"
+      - "docs/design/system/project/assets/Handoff/xp-tokens.css"
+      - ".github/workflows/site.yaml"
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      WRANGLER_SEND_METRICS: "false"
+    steps:
+      - name: Git Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+
+      - name: Links, JSON-LD, sitemap and tokens
+        run: node site/check.mjs
+
+      - name: HTML
+        run: npx -y html-validate@9.7.1 "site/public/**/*.html"
+
+      - name: Wrangler config
+        working-directory: site
+        run: npx -y wrangler@4 deploy --dry-run
