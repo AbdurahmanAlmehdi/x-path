@@ -50,8 +50,9 @@ Tests are part of the change, not a follow-up.
 - Store APIs, GitHub and Shorebird are tested against the fakes in `tool/e2e/fake_stores` or fake
   HTTP servers. Never use real credentials, real store accounts or a real Keychain in a test.
 - Tests that need macOS or real processes carry the tags described in the README.
-- Desktop goldens are drawn on macOS. After a deliberate UI change, update them with
-  `flutter test --update-goldens --tags golden` in `apps/xp_desktop`.
+- Desktop goldens are drawn on macOS and pass when at most 0.1% of their pixels differ, as Macs draw
+  text slightly differently (see Goldens in the README). After a deliberate UI change, update them
+  with `flutter test --update-goldens --tags golden` in `apps/xp_desktop`.
 
 Run the full check before you push:
 
