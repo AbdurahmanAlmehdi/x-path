@@ -30,7 +30,9 @@ esac
 target="$os-$arch"
 archive="$assets/xpath-$target.tar.gz"
 [[ -f "$archive" ]] || { echo "install_test: no $archive; run tool/release/bundles.sh first" >&2; exit 1; }
-version="$(sed -n 's/^version: *//p' "$root/apps/xpd/pubspec.yaml")"
+# XPATH_VERSION: the release version, when this checkout's pubspecs still say
+# the development one (a release job that did not write the version in).
+version="${XPATH_VERSION:-$(sed -n 's/^version: *//p' "$root/apps/xpd/pubspec.yaml")}"
 
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
