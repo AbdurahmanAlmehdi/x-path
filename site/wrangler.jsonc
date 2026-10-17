@@ -13,5 +13,8 @@
     { "pattern": "xpath.abdurahman.ly", "custom_domain": true }
   ],
   "workers_dev": false,
-  "preview_urls": false
+  // Pull requests get their own preview link (Workers Builds runs
+  // `npx wrangler preview` on non-production branches).
+  "preview_urls": true,
+  "previews": {}
 }
