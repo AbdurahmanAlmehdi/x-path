@@ -1906,7 +1906,12 @@ Because `integration` tests are skipped by default, they are not part of the cov
 **Goldens.** The goldens of the desktop app are drawn with the fonts it bundles (the test helper `loadAppFonts`
 loads IBM Plex and Phosphor), on macOS. Linux draws text with other font hinting, so the `golden` tag has
 `test_on: mac-os` in `apps/xp_desktop/dart_test.yaml`: the Linux `gate` skips them, and the `macos` workflow and the
-local macOS run of `melos run test:coverage` check them. After a deliberate change, write them again with
+local macOS run of `melos run test:coverage` check them. Two Macs do not draw text identically either: GitHub's
+macOS runner differed from the Mac the goldens were drawn on by up to 0.03% of the pixels (408 of 1440 x 900). So
+`apps/xp_desktop/test/flutter_test_config.dart` compares goldens with `TolerantGoldenComparator`
+(`test/helpers/tolerant_golden_comparator.dart`), which passes a golden when at most 0.1% of its pixels differ
+(about 1,300) and fails above that with the usual images in `failures/`. A changed label, colour or layout moves
+more pixels than that. After a deliberate change, write them again with
 `flutter test --update-goldens --tags golden` in `apps/xp_desktop`, on a Mac.
 
 ## Continuous integration
