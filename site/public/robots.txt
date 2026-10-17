@@ -1,0 +1,36 @@
+# xpath.abdurahman.ly: everything here is public. Search engines and AI crawlers are welcome,
+# for search, for answers to user questions and for training. User-agent names checked
+# 17 October 2026 against each operator's documentation.
+
+User-agent: *
+Allow: /
+
+# Search
+User-agent: Googlebot
+User-agent: Bingbot
+User-agent: Applebot
+Allow: /
+
+# OpenAI: GPTBot (training), OAI-SearchBot (ChatGPT search), ChatGPT-User (user requests)
+User-agent: GPTBot
+User-agent: OAI-SearchBot
+User-agent: ChatGPT-User
+Allow: /
+
+# Anthropic: ClaudeBot (training), Claude-SearchBot (search), Claude-User (user requests)
+User-agent: ClaudeBot
+User-agent: Claude-SearchBot
+User-agent: Claude-User
+Allow: /
+
+# Perplexity: PerplexityBot (search), Perplexity-User (user requests)
+User-agent: PerplexityBot
+User-agent: Perplexity-User
+Allow: /
+
+# Google and Apple AI use of what Googlebot and Applebot crawl
+User-agent: Google-Extended
+User-agent: Applebot-Extended
+Allow: /
+
+Sitemap: https://xpath.abdurahman.ly/sitemap.xml

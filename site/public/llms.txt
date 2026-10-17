@@ -1,0 +1,35 @@
+# XPath
+
+> XPath is an open source (Apache-2.0), self-hosted release tool for Flutter apps. It builds, tests, signs, uploads, tags and tracks iOS and Android releases to App Store Connect, Google Play, Firebase App Distribution and Shorebird, from your own Mac or Linux machine. It has a macOS app, the `xp` command line, `xp mcp` (an MCP server for AI agents) and `xp runner` (remote runners on other Macs and Linux machines). Not related to the XPath XML query language.
+
+Key facts:
+
+- A headless engine, `xpd`, owns projects, secrets, jobs and store status; every client talks to it over HTTP/JSON and one WebSocket.
+- Secrets stay on the engine machine: the macOS Keychain, or an XChaCha20-Poly1305 encrypted file on Linux. Logs are masked; secrets never go on a command line.
+- Production releases stop at approval gates. Only `app` and `cli` device tokens can approve; an `mcp` token (an AI agent) gets 403.
+- iOS builds and App Store uploads need a Mac. A Linux or Docker engine ships Android and can send iOS builds to a paired Mac runner.
+- Install: the notarized DMG on GitHub Releases (Apple silicon), `curl -fsSL https://xpath.abdurahman.ly/install | sh` on Linux, or the image `ghcr.io/abdurahmanalmehdi/xpath`.
+
+## Pages
+
+- [XPath home](https://xpath.abdurahman.ly/): what XPath does, how a production release flows, safety, install
+- [XPath vs Codemagic](https://xpath.abdurahman.ly/vs/codemagic/): self-hosted XPath compared with Codemagic's hosted CI/CD, with sources
+
+## Docs
+
+- [README](https://raw.githubusercontent.com/AbdurahmanAlmehdi/x-path/main/README.md): architecture, install, the engine API, workflows, runners, releases, the CLI and `xp mcp`
+- [SECURITY.md](https://raw.githubusercontent.com/AbdurahmanAlmehdi/x-path/main/SECURITY.md): how XPath protects secrets, and how to report a vulnerability
+- [CONTRIBUTING.md](https://raw.githubusercontent.com/AbdurahmanAlmehdi/x-path/main/CONTRIBUTING.md): setup, tests, pull request titles
+- [OpenAPI description](https://raw.githubusercontent.com/AbdurahmanAlmehdi/x-path/main/packages/xp_api/openapi.yaml): every engine route and the runner protocol frames
+
+## Agent skills
+
+- [xpath-release](https://raw.githubusercontent.com/AbdurahmanAlmehdi/x-path/main/skills/xpath-release/SKILL.md): operate XPath through `xp` and `xp mcp`; never approves a gate
+- [xpath-workflows](https://raw.githubusercontent.com/AbdurahmanAlmehdi/x-path/main/skills/xpath-workflows/SKILL.md): write and validate workflow YAML
+- [xpath-setup](https://raw.githubusercontent.com/AbdurahmanAlmehdi/x-path/main/skills/xpath-setup/SKILL.md): install XPath, tokens, credentials, runners, troubleshooting
+- [xpath-contributing](https://raw.githubusercontent.com/AbdurahmanAlmehdi/x-path/main/skills/xpath-contributing/SKILL.md): change XPath itself
+
+## Optional
+
+- [Repository](https://github.com/AbdurahmanAlmehdi/x-path): source code and issues
+- [Releases](https://github.com/AbdurahmanAlmehdi/x-path/releases): the DMG, Linux archives with SHA-256 files, and install.sh
