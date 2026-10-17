@@ -2,7 +2,7 @@
 // Deployed by Cloudflare Workers Builds (root directory `site`, deploy command
 // `npx wrangler deploy`); see "Website" in the README.
 {
-  "name": "xpath-site",
+  "name": "x-path",
   "compatibility_date": "2026-05-01",
   "assets": {
     "directory": "./public",

@@ -1944,7 +1944,7 @@ token; it never pushes to `main`.
 ## Website
 
 `site/` is <https://xpath.abdurahman.ly>: plain HTML and CSS in `site/public`, no build step and no JavaScript. It is
-served by Cloudflare Workers static assets (`site/wrangler.jsonc`: the Worker `xpath-site`, `not_found_handling:
+served by Cloudflare Workers static assets (`site/wrangler.jsonc`: the Worker `x-path`, `not_found_handling:
 "404-page"` so unknown paths get `404.html` with status 404, and the custom domain `xpath.abdurahman.ly`).
 
 - **Pages.** `/` and `/vs/codemagic/`, plus `404.html`, `robots.txt` (search engines and AI crawlers allowed),
@@ -1960,11 +1960,11 @@ served by Cloudflare Workers static assets (`site/wrangler.jsonc`: the Worker `x
 - **Deploys.** Cloudflare Workers Builds deploys on every push to `main` that changes `site/`; nothing here holds a
   Cloudflare secret. A merge that only changes `site/` publishes no XPath release (`release.yml` ignores it), but
   its title still counts towards the version of the next release. The Worker's settings in the Cloudflare
-  dashboard (Workers & Pages ▸ `xpath-site` ▸ Settings ▸ Build, connected to this repository):
+  dashboard (Workers & Pages ▸ `x-path` ▸ Settings ▸ Build, connected to this repository):
 
   | Setting | Value |
   |---|---|
-  | Worker name | `xpath-site` (must match `name` in `site/wrangler.jsonc`) |
+  | Worker name | `x-path` (must match `name` in `site/wrangler.jsonc`) |
   | Production branch | `main` |
   | Root directory | `site` |
   | Build command | none |
