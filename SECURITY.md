@@ -5,7 +5,7 @@ reports about it seriously and handle them before anything else.
 
 ## Supported versions
 
-XPath is before 1.0, and every merge to `main` publishes a release. Only the latest release gets
+Every merge to `main` publishes a release. Only the latest release gets
 security fixes; update to it before reporting.
 
 ## Reporting a vulnerability

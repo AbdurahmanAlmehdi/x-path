@@ -184,11 +184,11 @@ squash-merged, the title becomes the commit on `main`, and **every merge to `mai
 release whose version the title decides** (Conventional Commits; the table is in
 `CONTRIBUTING.md`):
 
-| Title starts with | Version change before 1.0 |
+| Title starts with | Version change |
 |---|---|
 | `feat:` | minor |
 | `fix:`, `perf:` | patch |
-| `feat!:` or a `BREAKING CHANGE:` footer | minor before 1.0, major after |
+| `feat!:` or a `BREAKING CHANGE:` footer | major |
 | `docs:`, `test:`, `ci:`, `chore:`, `refactor:`, `build:`, `style:` | patch |
 
 Write the title as what changes for a user, in the present tense:

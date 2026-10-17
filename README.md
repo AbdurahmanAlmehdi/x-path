@@ -14,9 +14,9 @@ You point it at a repo, it scans the app, and from then on it builds, tests, sig
 and tracks releases to App Store Connect, Google Play, Firebase App Distribution and Shorebird.
 It writes nothing to the repo except release-model git changes.
 
-> **Status:** pre-1.0. The engine, the `xp` CLI, `xp mcp`, remote runners and the macOS app work
-> end to end against fake stores; acceptance on real apps and the notarized download come next. See
-> [the plan](docs/plan/2026-10-13-feat-xpath-release-tool-plan.md), [try it locally](docs/guide/try-it-locally.md),
+> **Status:** 1.0. The engine, the `xp` CLI, `xp mcp`, remote runners and the macOS app are released
+> together; download the notarized DMG, the Linux bundles or the Docker image from
+> [Releases](https://github.com/AbdurahmanAlmehdi/x-path/releases). See [try it locally](docs/guide/try-it-locally.md),
 > [CONTRIBUTING.md](CONTRIBUTING.md) and [SECURITY.md](SECURITY.md).
 
 ## Agent skills
@@ -1699,8 +1699,7 @@ failed, was cancelled or was interrupted.
 **The update check.** Once a day `xp` asks GitHub for the latest release of `AbdurahmanAlmehdi/x-path` and prints a
 line on standard error if it is newer than the running version. It is a plain unauthenticated `GET` of the public
 release list with a fixed `User-Agent`: it sends no version, machine, user or engine address (D-24: no telemetry),
-caches the answer for a day in `update-check.json` beside `xp.json`, fails silently (the repository is private until
-1.0, so for now it always does), runs beside the command, is never waited for more than a moment, and does not run
+caches the answer for a day in `update-check.json` beside `xp.json`, fails silently, runs beside the command, is never waited for more than a moment, and does not run
 for `--json` or `xp mcp`. `XP_NO_UPDATE_CHECK=1` turns it off.
 
 ## `xp mcp`
