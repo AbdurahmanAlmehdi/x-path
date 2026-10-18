@@ -5,6 +5,7 @@ import 'package:mason_logger/mason_logger.dart';
 import 'package:xp/src/config/client_secret_store.dart';
 import 'package:xp/src/config/token_vault.dart';
 import 'package:xp/src/config/xp_config.dart';
+import 'package:xp/src/secret_prompt.dart';
 import 'package:xp/src/update/update_check.dart';
 import 'package:xp_client/xp_client.dart';
 
@@ -24,6 +25,7 @@ class XpContext {
     required this.stdin,
     required this.stdout,
     this.logIdle = const Duration(milliseconds: 750),
+    this.secretPrompt = const TerminalSecretPrompt(),
   });
 
   /// The context of the real process.
@@ -69,7 +71,8 @@ class XpContext {
   /// Looks for a newer release.
   final UpdateCheck updateCheck;
 
-  /// Standard input, which `xp mcp` reads its requests from.
+  /// Standard input, which `xp mcp` reads its requests from and the
+  /// `--*-stdin` options of `xp credentials` read a secret from.
   final Stream<List<int>> stdin;
 
   /// Standard output, which `xp mcp` writes its answers to.
@@ -78,4 +81,7 @@ class XpContext {
   /// How long `xp logs` (without `-f`) waits for another line before it takes
   /// the log to be complete.
   final Duration logIdle;
+
+  /// Asks the person at the terminal for a secret (`xp credentials add`).
+  final SecretPrompt secretPrompt;
 }

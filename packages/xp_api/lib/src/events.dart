@@ -58,13 +58,16 @@ sealed class EngineEvent extends Equatable {
     ),
     CredentialSaved.eventType => CredentialSaved(
       credentialId: payload['credentialId'] as String,
-      projectId: payload['projectId'] as String,
+      name: payload['name'] as String?,
+      projectId: payload['projectId'] as String?,
       kind: CredentialKind.fromWire(payload['kind'] as String)!,
       replaced: payload['replaced'] as bool,
     ),
     CredentialVerified.eventType => CredentialVerified(
       credentialId: payload['credentialId'] as String,
-      projectId: payload['projectId'] as String,
+      projectId: payload['projectId'] as String?,
+      app: payload['app'] as String?,
+      flavor: payload['flavor'] as String?,
       kind: CredentialKind.fromWire(payload['kind'] as String)!,
       status: CredentialStatus.values.firstWhere(
         (status) => status.wire == payload['status'],
@@ -72,13 +75,35 @@ sealed class EngineEvent extends Equatable {
     ),
     CredentialExpired.eventType => CredentialExpired(
       credentialId: payload['credentialId'] as String,
-      projectId: payload['projectId'] as String,
+      name: payload['name'] as String?,
+      projectId: payload['projectId'] as String?,
+      app: payload['app'] as String?,
+      flavor: payload['flavor'] as String?,
       kind: CredentialKind.fromWire(payload['kind'] as String)!,
       message: payload['message'] as String,
     ),
     CredentialRemoved.eventType => CredentialRemoved(
       credentialId: payload['credentialId'] as String,
+      projectId: payload['projectId'] as String?,
+      kind: CredentialKind.fromWire(payload['kind'] as String)!,
+    ),
+    CredentialRenamed.eventType => CredentialRenamed(
+      credentialId: payload['credentialId'] as String,
+      kind: CredentialKind.fromWire(payload['kind'] as String)!,
+      name: payload['name'] as String,
+    ),
+    CredentialAssigned.eventType => CredentialAssigned(
+      credentialId: payload['credentialId'] as String,
       projectId: payload['projectId'] as String,
+      app: payload['app'] as String,
+      flavor: payload['flavor'] as String,
+      kind: CredentialKind.fromWire(payload['kind'] as String)!,
+    ),
+    CredentialUnassigned.eventType => CredentialUnassigned(
+      credentialId: payload['credentialId'] as String,
+      projectId: payload['projectId'] as String,
+      app: payload['app'] as String,
+      flavor: payload['flavor'] as String,
       kind: CredentialKind.fromWire(payload['kind'] as String)!,
     ),
     WorkflowSaved.eventType => WorkflowSaved(
@@ -478,15 +503,15 @@ final class TestRunCompleted extends EngineEvent {
   ];
 }
 
-/// A credential was saved: verified and stored, new or replacing an earlier
-/// one.
+/// A credential was saved: verified and stored, new or with a new secret.
 final class CredentialSaved extends EngineEvent {
   /// Creates the event.
   const new({
     required this.credentialId,
-    required this.projectId,
     required this.kind,
     required this.replaced,
+    this.name,
+    this.projectId,
   });
 
   /// The wire name of this event.
@@ -495,13 +520,17 @@ final class CredentialSaved extends EngineEvent {
   /// The credential.
   final String credentialId;
 
-  /// The project of its flavor.
-  final String projectId;
+  /// Its name.
+  final String? name;
+
+  /// The project of the flavor it was saved for, when it was saved through
+  /// the deprecated `PUT /projects/{id}/credentials`.
+  final String? projectId;
 
   /// What it is for.
   final CredentialKind kind;
 
-  /// Whether it replaced a credential of the same flavor and kind.
+  /// Whether it got a new secret (the credential existed already).
   final bool replaced;
 
   @override
@@ -510,23 +539,27 @@ final class CredentialSaved extends EngineEvent {
   @override
   Map<String, dynamic> get payload => {
     'credentialId': credentialId,
-    'projectId': projectId,
+    'name': ?name,
+    'projectId': ?projectId,
     'kind': kind.wire,
     'replaced': replaced,
   };
 
   @override
-  List<Object?> get props => [credentialId, projectId, kind, replaced];
+  List<Object?> get props => [credentialId, name, projectId, kind, replaced];
 }
 
-/// A credential was checked again, on request or by the daily health check.
+/// A credential, or its assignment to a flavor, was checked again, on
+/// request or by the daily health check.
 final class CredentialVerified extends EngineEvent {
   /// Creates the event.
   const new({
     required this.credentialId,
-    required this.projectId,
     required this.kind,
     required this.status,
+    this.projectId,
+    this.app,
+    this.flavor,
   });
 
   /// The wire name of this event.
@@ -535,8 +568,14 @@ final class CredentialVerified extends EngineEvent {
   /// The credential.
   final String credentialId;
 
-  /// The project of its flavor.
-  final String projectId;
+  /// The project of the flavor, for the check of an assignment.
+  final String? projectId;
+
+  /// The path of the app of the flavor, for the check of an assignment.
+  final String? app;
+
+  /// The flavor, for the check of an assignment.
+  final String? flavor;
 
   /// What it is for.
   final CredentialKind kind;
@@ -550,24 +589,37 @@ final class CredentialVerified extends EngineEvent {
   @override
   Map<String, dynamic> get payload => {
     'credentialId': credentialId,
-    'projectId': projectId,
+    'projectId': ?projectId,
+    'app': ?app,
+    'flavor': ?flavor,
     'kind': kind.wire,
     'status': status.wire,
   };
 
   @override
-  List<Object?> get props => [credentialId, projectId, kind, status];
+  List<Object?> get props => [
+    credentialId,
+    projectId,
+    app,
+    flavor,
+    kind,
+    status,
+  ];
 }
 
-/// A credential that was accepted before is refused now: it expired or was
-/// revoked. Jobs that need it fail preflight until it is replaced.
+/// A credential, or its assignment to a flavor, that was accepted before is
+/// refused now: it expired, was revoked, or lost access to the flavor's app.
+/// Jobs that need it fail preflight until it is replaced.
 final class CredentialExpired extends EngineEvent {
   /// Creates the event.
   const new({
     required this.credentialId,
-    required this.projectId,
     required this.kind,
     required this.message,
+    this.name,
+    this.projectId,
+    this.app,
+    this.flavor,
   });
 
   /// The wire name of this event.
@@ -576,8 +628,17 @@ final class CredentialExpired extends EngineEvent {
   /// The credential.
   final String credentialId;
 
-  /// The project of its flavor.
-  final String projectId;
+  /// Its name.
+  final String? name;
+
+  /// The project of the flavor, when an assignment is refused.
+  final String? projectId;
+
+  /// The path of the app of the flavor, when an assignment is refused.
+  final String? app;
+
+  /// The flavor, when an assignment is refused.
+  final String? flavor;
 
   /// What it is for.
   final CredentialKind kind;
@@ -591,23 +652,30 @@ final class CredentialExpired extends EngineEvent {
   @override
   Map<String, dynamic> get payload => {
     'credentialId': credentialId,
-    'projectId': projectId,
+    'name': ?name,
+    'projectId': ?projectId,
+    'app': ?app,
+    'flavor': ?flavor,
     'kind': kind.wire,
     'message': message,
   };
 
   @override
-  List<Object?> get props => [credentialId, projectId, kind, message];
+  List<Object?> get props => [
+    credentialId,
+    name,
+    projectId,
+    app,
+    flavor,
+    kind,
+    message,
+  ];
 }
 
 /// A credential was deleted, with its secret.
 final class CredentialRemoved extends EngineEvent {
   /// Creates the event.
-  const new({
-    required this.credentialId,
-    required this.projectId,
-    required this.kind,
-  });
+  const new({required this.credentialId, required this.kind, this.projectId});
 
   /// The wire name of this event.
   static const eventType = 'credential.removed';
@@ -615,8 +683,9 @@ final class CredentialRemoved extends EngineEvent {
   /// The credential.
   final String credentialId;
 
-  /// The project of its flavor.
-  final String projectId;
+  /// The project it was removed from, when it was removed through the
+  /// deprecated `DELETE /projects/{id}/credentials/{credentialId}`.
+  final String? projectId;
 
   /// What it was for.
   final CredentialKind kind;
@@ -627,12 +696,137 @@ final class CredentialRemoved extends EngineEvent {
   @override
   Map<String, dynamic> get payload => {
     'credentialId': credentialId,
-    'projectId': projectId,
+    'projectId': ?projectId,
     'kind': kind.wire,
   };
 
   @override
   List<Object?> get props => [credentialId, projectId, kind];
+}
+
+/// A credential got a new name. Its id, secret and assignments stay.
+final class CredentialRenamed extends EngineEvent {
+  /// Creates the event.
+  const new({
+    required this.credentialId,
+    required this.kind,
+    required this.name,
+  });
+
+  /// The wire name of this event.
+  static const eventType = 'credential.renamed';
+
+  /// The credential.
+  final String credentialId;
+
+  /// What it is for.
+  final CredentialKind kind;
+
+  /// The new name.
+  final String name;
+
+  @override
+  String get type => eventType;
+
+  @override
+  Map<String, dynamic> get payload => {
+    'credentialId': credentialId,
+    'kind': kind.wire,
+    'name': name,
+  };
+
+  @override
+  List<Object?> get props => [credentialId, kind, name];
+}
+
+/// A flavor uses a credential for its kind now.
+final class CredentialAssigned extends EngineEvent {
+  /// Creates the event.
+  const new({
+    required this.credentialId,
+    required this.projectId,
+    required this.app,
+    required this.flavor,
+    required this.kind,
+  });
+
+  /// The wire name of this event.
+  static const eventType = 'credential.assigned';
+
+  /// The credential.
+  final String credentialId;
+
+  /// The project of the flavor.
+  final String projectId;
+
+  /// The path of the app of the flavor.
+  final String app;
+
+  /// The flavor.
+  final String flavor;
+
+  /// The kind.
+  final CredentialKind kind;
+
+  @override
+  String get type => eventType;
+
+  @override
+  Map<String, dynamic> get payload => {
+    'credentialId': credentialId,
+    'projectId': projectId,
+    'app': app,
+    'flavor': flavor,
+    'kind': kind.wire,
+  };
+
+  @override
+  List<Object?> get props => [credentialId, projectId, app, flavor, kind];
+}
+
+/// A flavor no longer uses a credential for its kind (it has none now).
+final class CredentialUnassigned extends EngineEvent {
+  /// Creates the event.
+  const new({
+    required this.credentialId,
+    required this.projectId,
+    required this.app,
+    required this.flavor,
+    required this.kind,
+  });
+
+  /// The wire name of this event.
+  static const eventType = 'credential.unassigned';
+
+  /// The credential.
+  final String credentialId;
+
+  /// The project of the flavor.
+  final String projectId;
+
+  /// The path of the app of the flavor.
+  final String app;
+
+  /// The flavor.
+  final String flavor;
+
+  /// The kind.
+  final CredentialKind kind;
+
+  @override
+  String get type => eventType;
+
+  @override
+  Map<String, dynamic> get payload => {
+    'credentialId': credentialId,
+    'projectId': projectId,
+    'app': app,
+    'flavor': flavor,
+    'kind': kind.wire,
+  };
+
+  @override
+  List<Object?> get props => [credentialId, projectId, app, flavor, kind];
 }
 
 /// A workflow was created, or got a new version.

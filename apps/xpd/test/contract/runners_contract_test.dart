@@ -360,17 +360,20 @@ void main() {
           ),
         ],
       );
-      await client.engine.credentialRepository.save(
-        const CredentialRecord(
-          id: 'crd_1',
+      await client.engine.credentialRepository.put(
+        const AssignedCredential(
           flavor: CredentialFlavor(
             id: 'flv_1',
             projectId: 'prj_1',
             appPath: '.',
             name: 'prod',
           ),
-          kind: CredentialKind.keystore,
-          secretKey: 'ks',
+          credential: CredentialRecord(
+            id: 'crd_1',
+            name: 'Upload key',
+            kind: CredentialKind.keystore,
+            secretKey: 'ks',
+          ),
         ),
       );
       await client.engine.credentialSecrets.write('ks', 'bytes');

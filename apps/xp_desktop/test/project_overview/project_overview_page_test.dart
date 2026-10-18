@@ -239,6 +239,41 @@ void main() {
       expect(find.text('no live release'), findsNWidgets(2));
     });
 
+    testWidgets('sums up the credentials of each flavor and opens them', (
+      tester,
+    ) async {
+      await OverviewHarness(
+        credentials: const [
+          Credential(
+            id: 'crd_1',
+            name: 'Team App Store key',
+            projectId: 'prj_1',
+            app: '.',
+            flavor: 'prod',
+            kind: CredentialKind.ascKey,
+            status: CredentialStatus.verified,
+          ),
+          Credential(
+            id: 'crd_2',
+            projectId: 'prj_1',
+            app: '.',
+            flavor: 'prod',
+            kind: CredentialKind.playSa,
+            status: CredentialStatus.verified,
+          ),
+        ],
+      ).pump(tester);
+      expect(
+        find.text('Team App Store key, Google Play service account'),
+        findsOneWidget,
+      );
+      expect(find.text('Assign…'), findsOneWidget, reason: 'dev has none');
+      await tester.tap(find.byKey(const Key('ledger.credentials...dev')));
+      await tester.pumpAndSettle();
+      expect(find.text('Credentials of dev'), findsOneWidget);
+      expect(find.text('Not assigned'), findsNWidgets(7));
+    });
+
     testWidgets('says what it cannot show', (tester) async {
       final harness = OverviewHarness();
       when(() => harness.releasesRepository.watchReleases(projectId: 'prj_1'))

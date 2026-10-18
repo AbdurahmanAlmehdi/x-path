@@ -16,7 +16,10 @@ Never ask the user to paste a token, password, key or service account into the c
 put one in a command you run, a file you write or a log. Tell the user **where** to enter it:
 
 - store credentials: the XPath app, **Credentials** ▸ **Add credential…** (the engine checks each
-  with the service it is for and stores nothing if the check fails);
+  with the service it is for and stores nothing if the check fails), or `xp credentials add` in
+  their own terminal, which asks for a password or token without showing it or reads it from
+  standard input (`--token-stdin` and the like), and reads keys from files (`--p8`,
+  `--service-account`, `--keystore`), never from an argument;
 - the GitHub token: the app, **Settings** ▸ **GitHub**, or `xpd secrets import-gh` in their own
   terminal;
 - device tokens and pairing tokens: printed once by a command the user runs in their own
@@ -144,12 +147,16 @@ stored, its status and its login.
 
 ## Credentials
 
-A credential belongs to a flavor (an app path and a flavor name; `.` and `default` for an app
-without flavors) and has a kind; a flavor has one of each kind. The kinds, their fields and where
-the user gets each are in [references/credentials.md](references/credentials.md).
+Credentials are the engine's and have names (ADR 0013): the user adds one once ("Personal Apple
+Dev Account") and assigns it to the flavors that use it, of any project. A flavor (an app path and
+a flavor name; `.` and `default` for an app without flavors) uses at most one credential of each
+kind. The kinds, their fields, where the user gets each and the `xp credentials` commands are in
+[references/credentials.md](references/credentials.md).
 
-Each shows **Verified**, **Rejected** or **Not checked**. The engine checks every credential
-daily and before each build; only `rejected` stops a job (at its `credentials` guard).
+Each credential shows **Verified**, **Rejected** or **Not checked**, and so does each assignment
+(can the credential reach that flavor's app). The engine checks them daily and before each build;
+only `rejected` stops a job (at its `credentials` guard). The GitHub token is not a named
+credential: the engine has one (**Settings** ▸ **GitHub**).
 
 ## Projects
 

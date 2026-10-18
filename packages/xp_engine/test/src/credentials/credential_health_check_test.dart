@@ -4,6 +4,7 @@ import 'package:test/test.dart';
 import 'package:xp_api/xp_api.dart';
 import 'package:xp_engine/xp_engine.dart';
 
+import '../../helpers/approval_harness.dart';
 import '../../helpers/credential_harness.dart';
 import '../../helpers/job_harness.dart';
 
@@ -49,14 +50,14 @@ void main() {
         },
       );
 
-  Future<Credential> saveKey() async => (await service.save(
-    'prj_1',
-    SaveCredentialRequest(
-      flavor: 'prod',
+  Future<NamedCredential> saveKey() => service.create(
+    CreateCredentialRequest(
+      name: 'Key',
       kind: CredentialKind.ascKey,
       material: credentialFields(CredentialKind.ascKey),
     ),
-  )).credential;
+    by: tokenOf(DeviceTokenKind.app),
+  );
 
   setUp(() async {
     clock = ManualClock(DateTime.utc(2026, 10, 13, 9));
@@ -122,7 +123,7 @@ void main() {
 
       final record = (await repository.get(saved.id))!;
       expect(record.status, CredentialStatus.rejected);
-      expect(record.checkedAt, clock.now());
+      expect(record.check.checkedAt, clock.now());
     },
   );
 
@@ -130,7 +131,7 @@ void main() {
     await repository.save(
       const CredentialRecord(
         id: 'crd_1',
-        flavor: testFlavor,
+        name: 'Key',
         kind: CredentialKind.ascKey,
         secretKey: 'credential.crd_1',
       ),
@@ -144,6 +145,27 @@ void main() {
 
     expect(asc.checked, hasLength(1));
   });
+
+  test(
+    'catches up at start for an assignment that was never checked',
+    () async {
+      final saved = await saveKey();
+      final record = (await repository.get(saved.id))!;
+      await repository.assign(
+        AssignedCredential(flavor: testFlavor, credential: record),
+      );
+      clock.advance(const Duration(hours: 1));
+
+      await check().start();
+
+      expect(asc.checked, hasLength(2));
+      final assignment = (await repository.assignment(
+        testFlavor.id,
+        CredentialKind.ascKey,
+      ))!;
+      expect(assignment.check.checkedAt, clock.now());
+    },
+  );
 
   test('checks again when the timer fires', () async {
     await saveKey();
@@ -268,6 +290,5 @@ class _SlowVerifier extends FakeCredentialVerifier {
 
 class _BrokenRepository extends InMemoryCredentialRepository {
   @override
-  Future<List<CredentialRecord>> list({String? projectId, String? flavorId}) =>
-      throw StateError('disk on fire');
+  Future<List<CredentialRecord>> list() => throw StateError('disk on fire');
 }

@@ -20,6 +20,9 @@ class PlayServiceAccountVerifier implements CredentialVerifier {
   CredentialKind get kind => CredentialKind.playSa;
 
   @override
+  bool get checksTarget => true;
+
+  @override
   Future<VerificationResult> verify(
     CredentialMaterial material,
     CredentialTarget target,
@@ -72,6 +75,9 @@ class FirebaseServiceAccountVerifier implements CredentialVerifier {
 
   @override
   CredentialKind get kind => CredentialKind.firebaseSa;
+
+  @override
+  bool get checksTarget => false;
 
   @override
   Future<VerificationResult> verify(

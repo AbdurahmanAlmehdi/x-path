@@ -149,7 +149,7 @@ class Notifier {
   /// rejected, or `null` if there is none.
   Future<Uri?> _webhookOf(String projectId) async {
     final usable = [
-      for (final record in await _credentials.list(projectId: projectId))
+      for (final record in await _credentials.assignments(projectId: projectId))
         if (record.kind == CredentialKind.slack &&
             record.status != CredentialStatus.rejected)
           record,

@@ -184,7 +184,9 @@ void main() {
           ),
           _dispatchError(
             allOf(
-              contains('The flavor "dev" has no firebase_sa credential saved'),
+              contains(
+                'The flavor "dev" has no firebase_sa credential assigned',
+              ),
               startsWith('Line '),
             ),
           ),

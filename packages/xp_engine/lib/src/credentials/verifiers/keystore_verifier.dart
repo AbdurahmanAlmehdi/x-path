@@ -54,6 +54,9 @@ class KeystoreVerifier implements CredentialVerifier {
   CredentialKind get kind => CredentialKind.keystore;
 
   @override
+  bool get checksTarget => false;
+
+  @override
   Future<VerificationResult> verify(
     CredentialMaterial material,
     CredentialTarget target,

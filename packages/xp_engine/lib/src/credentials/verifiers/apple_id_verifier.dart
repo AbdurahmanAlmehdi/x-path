@@ -53,6 +53,9 @@ class AppleIdVerifier implements CredentialVerifier {
   CredentialKind get kind => CredentialKind.appleId;
 
   @override
+  bool get checksTarget => false;
+
+  @override
   Future<VerificationResult> verify(
     CredentialMaterial material,
     CredentialTarget target,

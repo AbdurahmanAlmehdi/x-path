@@ -12,5 +12,7 @@ void main() {
       errorMessage(const ApprovalAlreadyDecided('Decided already.')),
       'Decided already.',
     );
+    expect(errorMessage(const CredentialInUse('In use.')), 'In use.');
+    expect('${const CredentialInUse('In use.')}', 'CredentialInUse: In use.');
   });
 }

@@ -587,6 +587,7 @@ void main() {
 
   group('credentials', () {
     late String projectId;
+    late String mcp;
 
     Future<RawResponse> send(
       String method,
@@ -594,20 +595,36 @@ void main() {
       Object? body,
       String? token,
     }) => engine.request(
-      '/projects/$projectId/credentials$path',
+      path,
       method: method,
       token: token,
       body: body == null ? null : jsonEncode(body),
     );
 
-    Map<String, Object?> github([String token = 'ghp_x']) => {
-      'flavor': 'default',
-      'kind': 'github',
-      'token': token,
+    Future<RawResponse> check(
+      String method,
+      String path,
+      String template, {
+      Object? body,
+      String? token,
+    }) async {
+      final response = await send(method, path, body: body, token: token);
+      expectContract(response, path: template, method: method);
+      return response;
+    }
+
+    Map<String, Object?> shorebird([String name = 'Studio']) => {
+      'name': name,
+      'kind': 'shorebird',
+      'token': 'sb_api_x',
     };
 
-    Future<String> saveGithub() async =>
-        (await send('PUT', '', body: github())).json['id']! as String;
+    Future<String> create([String name = 'Studio']) async =>
+        (await send('POST', '/credentials', body: shorebird(name))).json['id']!
+            as String;
+
+    String assignPath([String flavor = 'default']) =>
+        '/projects/$projectId/flavors/$flavor/credentials/shorebird';
 
     setUp(() async {
       engine.folders['/work/app'] = projectFiles;
@@ -621,150 +638,320 @@ void main() {
         CredentialFlavor(
           id: 'flv_1',
           projectId: projectId,
+          projectName: 'acme/app',
           appPath: '.',
           name: 'default',
         ),
       );
+      mcp = (await engine.tokens.issue(
+        name: 'agent',
+        kind: DeviceTokenKind.mcp,
+      )).secret;
     });
 
-    test('PUT 201 and 200', () async {
-      final created = await send('PUT', '', body: github());
-      final replaced = await send('PUT', '', body: github('ghp_y'));
-
+    test('POST /credentials 201, 400, 403, 409, 422, 502, 503', () async {
+      const template = '/credentials';
+      final created = await check(
+        'POST',
+        template,
+        template,
+        body: shorebird(),
+      );
       expect(created.statusCode, 201);
-      expect(replaced.statusCode, 200);
-      for (final response in [created, replaced]) {
-        expectContract(
-          response,
-          path: '/projects/$projectId/credentials',
-          method: 'PUT',
+      for (final (status, body, token) in [
+        (400, <String, Object?>{'name': 'x', 'kind': 'github'}, null),
+        (403, shorebird('Other'), mcp),
+        (409, shorebird('STUDIO'), null),
+      ]) {
+        final response = await check(
+          'POST',
+          template,
+          template,
+          body: body,
+          token: token,
         );
-      }
-    });
-
-    test('PUT 200 for a credential that was refused before', () async {
-      final id = await saveGithub();
-      engine.credentialVerifiers[CredentialKind.github]!.answers.add(
-        const VerificationResult.rejected('Revoked.', fix: 'Replace it.'),
-      );
-      final verified = await send('POST', '/$id/verify');
-
-      expect(verified.json['status'], 'rejected');
-      expectContract(
-        verified,
-        path: '/projects/$projectId/credentials/$id/verify',
-        method: 'POST',
-      );
-    });
-
-    test('PUT 400, 401, 404, 422, 502 and 503', () async {
-      engine.credentialVerifiers[CredentialKind.slack]!.answers.addAll([
-        const VerificationResult.rejected('No.', fix: 'Fix it.'),
-        const VerificationResult.unreachable('Offline.'),
-      ]);
-      final slack = {
-        'flavor': 'default',
-        'kind': 'slack',
-        'webhookUrl': 'https://hooks.slack.com/services/T/B/X',
-      };
-      final responses = <int, RawResponse>{
-        400: await send('PUT', '', body: {'flavor': 'default'}),
-        401: await send('PUT', '', body: github(), token: ''),
-        404: await send('PUT', '', body: {...github(), 'flavor': 'nope'}),
-        422: await send('PUT', '', body: slack),
-        502: await send('PUT', '', body: slack),
-      };
-      engine.credentialSecrets.failure = const SecretsLockedException('locked');
-      responses[503] = await send('PUT', '', body: github());
-
-      for (final MapEntry(key: status, value: response) in responses.entries) {
         expect(response.statusCode, status);
-        expectContract(
-          response,
-          path: '/projects/$projectId/credentials',
-          method: 'PUT',
-        );
       }
+      engine.credentialVerifiers[CredentialKind.shorebird]!.answers.addAll([
+        const VerificationResult.rejected('No.'),
+        const VerificationResult.unreachable('Down.'),
+      ]);
+      expect(
+        (await check(
+          'POST',
+          template,
+          template,
+          body: shorebird('A'),
+        )).statusCode,
+        422,
+      );
+      expect(
+        (await check(
+          'POST',
+          template,
+          template,
+          body: shorebird('B'),
+        )).statusCode,
+        502,
+      );
+      engine.credentialSecrets.failure = const SecretsLockedException('l');
+      expect(
+        (await check(
+          'POST',
+          template,
+          template,
+          body: shorebird('C'),
+        )).statusCode,
+        503,
+      );
     });
 
-    test('request bodies match their schema', () {
+    test('GET /credentials and /credentials/{id} 200 and 404', () async {
+      final id = await create();
+      await send(
+        'PUT',
+        assignPath(),
+        body: {'credentialId': id, 'allFlavors': true},
+      );
+
+      final list = await check(
+        'GET',
+        '/credentials',
+        '/credentials',
+        token: mcp,
+      );
+      final one = await check(
+        'GET',
+        '/credentials/$id',
+        '/credentials/{credentialId}',
+      );
+      final none = await check(
+        'GET',
+        '/credentials/crd_nope',
+        '/credentials/{credentialId}',
+      );
+
       expect(
-        contract.validateSchema('SaveCredentialRequest', github()),
+        [list.statusCode, one.statusCode, none.statusCode],
+        [200, 200, 404],
+      );
+    });
+
+    test('PATCH, PUT and verify of /credentials/{id}', () async {
+      final id = await create();
+      await create('Other');
+      const template = '/credentials/{credentialId}';
+      final path = '/credentials/$id';
+
+      final statuses = [
+        (await check(
+          'PATCH',
+          path,
+          template,
+          body: {'name': 'New'},
+        )).statusCode,
+        (await check(
+          'PATCH',
+          path,
+          template,
+          body: {'name': 'other'},
+        )).statusCode,
+        (await check('PATCH', path, template, body: {'name': ''})).statusCode,
+        (await check(
+          'PATCH',
+          path,
+          template,
+          body: {'name': 'x'},
+          token: mcp,
+        )).statusCode,
+        (await check(
+          'PATCH',
+          '/credentials/crd_nope',
+          template,
+          body: {'name': 'x'},
+        )).statusCode,
+        (await check(
+          'PUT',
+          path,
+          template,
+          body: {'token': 'sb_api_y'},
+        )).statusCode,
+        (await check(
+          'PUT',
+          path,
+          template,
+          body: {'kind': 'slack', 'webhookUrl': 'x'},
+        )).statusCode,
+        (await check(
+          'POST',
+          '$path/verify',
+          '/credentials/{credentialId}/verify',
+        )).statusCode,
+        (await check(
+          'POST',
+          '$path/verify',
+          '/credentials/{credentialId}/verify',
+          token: mcp,
+        )).statusCode,
+      ];
+
+      expect(statuses, [200, 409, 400, 403, 404, 200, 400, 200, 403]);
+      engine.credentialVerifiers[CredentialKind.shorebird]!.answers.add(
+        const VerificationResult.rejected('No.'),
+      );
+      expect(
+        (await check(
+          'PUT',
+          path,
+          template,
+          body: {'token': 'sb_api_z'},
+        )).statusCode,
+        422,
+      );
+    });
+
+    test('DELETE /credentials/{id} 409 with the usages, 204', () async {
+      final id = await create();
+      await send('PUT', assignPath(), body: {'credentialId': id});
+      const template = '/credentials/{credentialId}';
+
+      final inUse = await check('DELETE', '/credentials/$id', template);
+      final forced = await check(
+        'DELETE',
+        '/credentials/$id?force=true',
+        template,
+      );
+      final gone = await check('DELETE', '/credentials/$id', template);
+
+      expect(
+        [inUse.statusCode, forced.statusCode, gone.statusCode],
+        [409, 204, 404],
+      );
+      expect(inUse.json['usedBy'], hasLength(1));
+    });
+
+    test('PUT and DELETE of a flavor credential', () async {
+      final id = await create();
+      const template = '/projects/{id}/flavors/{flavor}/credentials/{kind}';
+
+      final assigned = await check(
+        'PUT',
+        assignPath(),
+        template,
+        body: {'credentialId': id, 'allFlavors': true, 'replace': true},
+      );
+      final forbidden = await check(
+        'PUT',
+        assignPath(),
+        template,
+        body: {'credentialId': id},
+        token: mcp,
+      );
+      final bad = await check(
+        'PUT',
+        assignPath(),
+        template,
+        body: {'allFlavors': true},
+      );
+      final unknown = await check(
+        'PUT',
+        assignPath('nope'),
+        template,
+        body: {'credentialId': id},
+      );
+      final unassigned = await check('DELETE', assignPath(), template);
+      final none = await check('DELETE', assignPath(), template);
+
+      expect(
+        [
+          assigned.statusCode,
+          forbidden.statusCode,
+          bad.statusCode,
+          unknown.statusCode,
+          unassigned.statusCode,
+          none.statusCode,
+        ],
+        [200, 403, 400, 404, 204, 404],
+      );
+    });
+
+    test('GET /projects/{id}/credentials 200, 400, 404', () async {
+      final id = await create();
+      await send('PUT', assignPath(), body: {'credentialId': id});
+      const template = '/projects/{id}/credentials';
+      final base = '/projects/$projectId/credentials';
+
+      final statuses = [
+        (await check('GET', base, template, token: mcp)).statusCode,
+        (await check('GET', '$base?app=x', template)).statusCode,
+        (await check('GET', '$base?flavor=nope', template)).statusCode,
+      ];
+
+      expect(statuses, [200, 400, 404]);
+    });
+
+    test('the deprecated routes keep their contract', () async {
+      final base = '/projects/$projectId/credentials';
+      const template = '/projects/{id}/credentials';
+      Map<String, Object?> legacy([String token = 'sb_api_x']) => {
+        'flavor': 'default',
+        'kind': 'shorebird',
+        'token': token,
+      };
+
+      final created = await check('PUT', base, template, body: legacy());
+      final replaced = await check(
+        'PUT',
+        base,
+        template,
+        body: legacy('sb_api_y'),
+      );
+      final github = await check(
+        'PUT',
+        base,
+        template,
+        body: {'flavor': 'default', 'kind': 'github', 'token': 'ghp_x'},
+      );
+      final forbidden = await check(
+        'PUT',
+        base,
+        template,
+        body: legacy(),
+        token: mcp,
+      );
+      final id = created.json['id']! as String;
+      final verified = await check(
+        'POST',
+        '$base/$id/verify',
+        '/projects/{id}/credentials/{credentialId}/verify',
+      );
+      final removed = await check(
+        'DELETE',
+        '$base/$id',
+        '/projects/{id}/credentials/{credentialId}',
+      );
+      final gone = await check(
+        'DELETE',
+        '$base/$id',
+        '/projects/{id}/credentials/{credentialId}',
+      );
+
+      expect(
+        [
+          created.statusCode,
+          replaced.statusCode,
+          github.statusCode,
+          forbidden.statusCode,
+          verified.statusCode,
+          removed.statusCode,
+          gone.statusCode,
+        ],
+        [201, 200, 200, 403, 200, 204, 404],
+      );
+      expect(
+        contract.validateSchema('SaveCredentialRequest', legacy()),
         isEmpty,
       );
-    });
-
-    test('GET lists, narrows and fails', () async {
-      await saveGithub();
-
-      final all = await send('GET', '');
-      final one = await send('GET', '?flavor=default');
-      final bad = await send('GET', '?app=apps/x');
-      final missing = await send('GET', '?flavor=nope');
-      final unauthorized = await send('GET', '', token: '');
-
-      expect(all.statusCode, 200);
-      expect(bad.statusCode, 400);
-      expect(missing.statusCode, 404);
-      expect(unauthorized.statusCode, 401);
-      for (final response in [all, one, bad, missing, unauthorized]) {
-        expectContract(response, path: '/projects/$projectId/credentials');
-      }
-    });
-
-    test('POST verify 503 when the secrets are locked', () async {
-      // A listing reads no secret; the status comes from a check.
-      final id = await saveGithub();
-      engine.credentialSecrets.failure = const SecretsLockedException('locked');
-
-      final response = await send('POST', '/$id/verify');
-
-      expect(response.statusCode, 503);
-      expectContract(
-        response,
-        path: '/projects/$projectId/credentials/$id/verify',
-        method: 'POST',
-      );
-    });
-
-    test('POST verify 200, 401 and 404', () async {
-      final id = await saveGithub();
-
-      final ok = await send('POST', '/$id/verify');
-      final unauthorized = await send('POST', '/$id/verify', token: '');
-      final missing = await send('POST', '/crd_nope/verify');
-
-      expect(
-        [ok.statusCode, unauthorized.statusCode, missing.statusCode],
-        [200, 401, 404],
-      );
-      for (final response in [ok, unauthorized, missing]) {
-        expectContract(
-          response,
-          path: '/projects/$projectId/credentials/$id/verify',
-          method: 'POST',
-        );
-      }
-    });
-
-    test('DELETE 204, 401 and 404', () async {
-      final id = await saveGithub();
-
-      final unauthorized = await send('DELETE', '/$id', token: '');
-      final deleted = await send('DELETE', '/$id');
-      final missing = await send('DELETE', '/$id');
-
-      expect(
-        [unauthorized.statusCode, deleted.statusCode, missing.statusCode],
-        [401, 204, 404],
-      );
-      for (final response in [unauthorized, deleted, missing]) {
-        expectContract(
-          response,
-          path: '/projects/$projectId/credentials/$id',
-          method: 'DELETE',
-        );
-      }
     });
   });
 

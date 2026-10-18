@@ -241,14 +241,25 @@ class NoticeFactory {
   // ----------------------------------------------------------- credentials
 
   Future<Notice> _credentialExpired(CredentialExpired event) async {
-    final project = await _projectName(event.projectId);
+    final projectId = event.projectId;
+    final where = projectId == null
+        ? null
+        : [
+            await _projectName(projectId),
+            if (event.app case final app? when app != '.') app,
+            ?event.flavor,
+          ].join(' ');
+    final name = event.name == null ? '' : ' "${event.name}"';
     return Notice(
       kind: NotificationKind.credentialExpired,
       level: NotificationLevel.error,
-      title: 'Credential expired: ${event.kind.wire}',
-      body: _clean('$project: ${event.message}'),
-      key: 'credential_expired:${event.credentialId}',
-      projectId: event.projectId,
+      title: 'Credential expired: ${event.kind.wire}$name',
+      body: _clean(where == null ? event.message : '$where: ${event.message}'),
+      key: [
+        'credential_expired:${event.credentialId}',
+        if (event.flavor != null) '$projectId:${event.app}:${event.flavor}',
+      ].join(':'),
+      projectId: projectId,
     );
   }
 

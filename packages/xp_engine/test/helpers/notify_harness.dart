@@ -144,19 +144,23 @@ class NotifyHarness {
   );
 
   /// Saves a Slack credential for [flavor] whose webhook is [url].
-  Future<CredentialRecord> addSlack({
+  Future<AssignedCredential> addSlack({
     String flavor = 'prod',
     String url = 'https://hooks.slack.com/services/T0/B0/XYZ',
     CredentialStatus status = CredentialStatus.verified,
   }) async {
-    final record = CredentialRecord(
-      id: 'crd_${flavor}_slack',
+    final record = AssignedCredential(
       flavor: demoFlavor(flavor),
-      kind: CredentialKind.slack,
-      secretKey: 'credential.$flavor.slack',
-      status: status,
+      credential: CredentialRecord(
+        id: 'crd_${flavor}_slack',
+        name: 'Slack $flavor',
+        kind: CredentialKind.slack,
+        secretKey: 'credential.$flavor.slack',
+        check: CredentialCheck(status: status),
+      ),
+      check: CredentialCheck(status: status),
     );
-    await credentials.save(record);
+    await credentials.put(record);
     await secrets.write(record.secretKey, url);
     return record;
   }

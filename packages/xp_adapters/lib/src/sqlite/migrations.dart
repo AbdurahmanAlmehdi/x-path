@@ -18,6 +18,7 @@ const engineMigrations = <Migration>[
   Migration(version: 11, sql: _v11),
   Migration(version: 12, sql: _v12),
   Migration(version: 13, sql: _v13),
+  Migration(version: 14, sql: _v14, notes: _v14Notes),
 ];
 
 // Timestamps are integer microseconds since the Unix epoch (UTC), so that
@@ -395,4 +396,111 @@ CREATE TABLE pairing_token (
   used_at INTEGER
 ) STRICT;
 CREATE INDEX idx_pairing_token_expires ON pairing_token (expires_at);
+''';
+
+// Named credentials (ADR 0013). A credential is the engine's, not a flavor's:
+// it has a name, unique regardless of case, and the result of its own check
+// (does it authenticate). A flavor uses at most one credential of each kind
+// (`credential_assignment`, only of the credential's kind), and each
+// assignment keeps the result of its own check (can the credential reach the
+// flavor's bundle id, package or app). Deleting a flavor or a credential
+// deletes its assignments.
+//
+// Every `credential_ref` row becomes a credential with the same id, secret
+// key, account and check, named "<kind> · <project> [<app> ]<flavor>" (cut to
+// 80 characters; a name that is not unique gets the id after it), and an
+// assignment to its flavor with the same check. Secrets are not touched and
+// identical ones are not merged. `github` rows are dropped: every one of them
+// named the engine's GitHub token (`github.token`), which stays.
+const _v14Notes = '''
+SELECT 'Named ' || count(*) || ' credential(s) after their flavor and '
+  || 'assigned each to it (ADR 0013).'
+FROM credential_ref WHERE kind != 'github' HAVING count(*) > 0
+UNION ALL
+SELECT 'Dropped ' || count(*) || ' per-flavor GitHub credential reference(s): '
+  || 'each named the engine''s GitHub token (github.token), which stays the '
+  || 'one GitHub token of the engine.'
+FROM credential_ref WHERE kind = 'github' HAVING count(*) > 0
+''';
+
+const _v14 = '''
+CREATE TABLE credential (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL CHECK (length(name) BETWEEN 1 AND 80),
+  kind TEXT NOT NULL CHECK (kind IN (
+    'asc_key', 'apple_id', 'play_sa', 'firebase_sa', 'keystore', 'shorebird',
+    'slack'
+  )),
+  secret_key TEXT NOT NULL,
+  account TEXT,
+  status TEXT NOT NULL DEFAULT 'unverified'
+    CHECK (status IN ('unverified', 'verified', 'rejected', 'unreachable')),
+  verified_at INTEGER,
+  checked_at INTEGER,
+  message TEXT,
+  fix TEXT,
+  UNIQUE (id, kind)
+) STRICT;
+CREATE UNIQUE INDEX idx_credential_name ON credential (name COLLATE NOCASE);
+
+CREATE TABLE credential_assignment (
+  flavor_id TEXT NOT NULL REFERENCES flavor (id) ON DELETE CASCADE,
+  kind TEXT NOT NULL,
+  credential_id TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'unverified'
+    CHECK (status IN ('unverified', 'verified', 'rejected', 'unreachable')),
+  verified_at INTEGER,
+  checked_at INTEGER,
+  message TEXT,
+  fix TEXT,
+  PRIMARY KEY (flavor_id, kind),
+  FOREIGN KEY (credential_id, kind) REFERENCES credential (id, kind)
+    ON DELETE CASCADE
+) STRICT;
+CREATE INDEX idx_credential_assignment_credential
+  ON credential_assignment (credential_id, kind);
+
+WITH named AS (
+  SELECT ref.rowid AS position, ref.id, ref.kind, ref.secret_key, ref.account,
+    ref.status, ref.verified_at, ref.checked_at, ref.message, ref.fix,
+    rtrim(substr(
+      CASE ref.kind
+        WHEN 'asc_key' THEN 'App Store Connect API key'
+        WHEN 'apple_id' THEN 'Apple ID'
+        WHEN 'play_sa' THEN 'Google Play service account'
+        WHEN 'firebase_sa' THEN 'Firebase service account'
+        WHEN 'keystore' THEN 'Android keystore'
+        WHEN 'shorebird' THEN 'Shorebird API key'
+        WHEN 'slack' THEN 'Slack webhook'
+      END
+      || ' · ' || CASE project.full_name WHEN '' THEN project.id
+        ELSE project.full_name END
+      || CASE app.path WHEN '.' THEN '' ELSE ' ' || app.path END
+      || ' ' || flavor.name,
+      1, 80
+    )) AS base
+  FROM credential_ref AS ref
+  JOIN flavor ON flavor.id = ref.flavor_id
+  JOIN app ON app.id = flavor.app_id
+  JOIN project ON project.id = app.project_id
+  WHERE ref.kind != 'github'
+), numbered AS (
+  SELECT *, count(*) OVER (PARTITION BY lower(base)) AS sharing FROM named
+)
+INSERT INTO credential (id, name, kind, secret_key, account, status,
+  verified_at, checked_at, message, fix)
+SELECT id,
+  CASE WHEN sharing = 1 THEN base
+    ELSE rtrim(substr(base, 1, 77 - length(id))) || ' (' || id || ')' END,
+  kind, secret_key, account, status, verified_at, checked_at, message, fix
+FROM numbered ORDER BY position;
+
+INSERT INTO credential_assignment (flavor_id, kind, credential_id, status,
+  verified_at, checked_at)
+SELECT flavor_id, kind, id, status, verified_at, checked_at
+FROM credential_ref WHERE kind != 'github' ORDER BY rowid;
+
+DROP INDEX idx_credential_ref_flavor_kind;
+DROP INDEX idx_credential_ref_flavor;
+DROP TABLE credential_ref;
 ''';

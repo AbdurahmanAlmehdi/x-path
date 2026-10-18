@@ -865,19 +865,19 @@ abstract class AppLocalizations {
   /// Subtitle.
   ///
   /// In en, this message translates to:
-  /// **'Checked every day and before each build. The secrets stay on the engine machine.'**
+  /// **'Shared by every project on this engine. Checked every day and before each build; the secrets stay on the engine machine.'**
   String get credentialsSubtitle;
 
   /// Empty state.
   ///
   /// In en, this message translates to:
-  /// **'Add a project first: credentials belong to its flavors.'**
+  /// **'Add a project to give its flavors credentials.'**
   String get credentialsNoProject;
 
   /// Empty state.
   ///
   /// In en, this message translates to:
-  /// **'No credentials yet.'**
+  /// **'No credentials yet. Add one, then assign it to the flavors that need it.'**
   String get credentialsEmpty;
 
   /// Opens the credential form.
@@ -892,17 +892,71 @@ abstract class AppLocalizations {
   /// **'Check now'**
   String get credentialsVerify;
 
-  /// Opens the form for the same flavor and kind.
+  /// Opens the form that replaces the secret of a credential.
   ///
   /// In en, this message translates to:
-  /// **'Replace…'**
+  /// **'Replace secret…'**
   String get credentialsReplace;
 
-  /// Deletes a credential.
+  /// Asks before deleting a credential.
   ///
   /// In en, this message translates to:
-  /// **'Delete'**
+  /// **'Delete…'**
   String get credentialsDelete;
+
+  /// Asks for a new name for a credential.
+  ///
+  /// In en, this message translates to:
+  /// **'Rename…'**
+  String get credentialsRename;
+
+  /// Column.
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get credentialsColumnName;
+
+  /// Column: the flavors that use a credential.
+  ///
+  /// In en, this message translates to:
+  /// **'Used by'**
+  String get credentialsColumnUsedBy;
+
+  /// Column: the credentials a flavor uses.
+  ///
+  /// In en, this message translates to:
+  /// **'Credentials'**
+  String get credentialsColumnAssigned;
+
+  /// How many flavors use a credential; which ones on hover.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{Not used} =1{1 flavor} other{{count} flavors}}'**
+  String credentialsUsedBy(int count);
+
+  /// Section of the flavors of a project.
+  ///
+  /// In en, this message translates to:
+  /// **'Flavors'**
+  String get credentialsFlavorsTitle;
+
+  /// Section lead.
+  ///
+  /// In en, this message translates to:
+  /// **'Each flavor uses at most one credential of each kind. Several flavors, of any project, can share one.'**
+  String get credentialsFlavorsHelp;
+
+  /// A flavor uses no credential.
+  ///
+  /// In en, this message translates to:
+  /// **'None assigned'**
+  String get credentialsNoneAssigned;
+
+  /// Opens the credentials of a flavor.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage…'**
+  String get credentialsManage;
 
   /// Column.
   ///
@@ -1012,11 +1066,47 @@ abstract class AppLocalizations {
   /// **'The engine checks it with the place it is for before it keeps it. Nothing is stored if the check fails.'**
   String get credentialFormHelp;
 
-  /// Field label.
+  /// Form title.
   ///
   /// In en, this message translates to:
-  /// **'Flavor'**
-  String get fieldFlavor;
+  /// **'Replace the secret of {name}'**
+  String credentialFormReplaceTitle(String name);
+
+  /// Form lead.
+  ///
+  /// In en, this message translates to:
+  /// **'Its name and the flavors that use it stay. The engine checks the new secret first; nothing changes if the check fails. The old secret is not shown.'**
+  String get credentialFormReplaceHelp;
+
+  /// Field label: the name of a credential.
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get fieldCredentialName;
+
+  /// Example credential name.
+  ///
+  /// In en, this message translates to:
+  /// **'Team App Store key'**
+  String get fieldCredentialNameHint;
+
+  /// Field label: team or individual App Store Connect key.
+  ///
+  /// In en, this message translates to:
+  /// **'Key type'**
+  String get fieldKeyKind;
+
+  /// App Store Connect key type.
+  ///
+  /// In en, this message translates to:
+  /// **'Team key'**
+  String get keyKindTeam;
+
+  /// App Store Connect key type.
+  ///
+  /// In en, this message translates to:
+  /// **'Individual key'**
+  String get keyKindIndividual;
 
   /// Field label.
   ///
@@ -1113,6 +1203,168 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Cancel'**
   String get credentialFormCancel;
+
+  /// Dialog title.
+  ///
+  /// In en, this message translates to:
+  /// **'Rename {name}'**
+  String renameCredentialTitle(String name);
+
+  /// Dialog lead.
+  ///
+  /// In en, this message translates to:
+  /// **'Its secret and the flavors that use it stay.'**
+  String get renameCredentialHelp;
+
+  /// Renames the credential.
+  ///
+  /// In en, this message translates to:
+  /// **'Rename'**
+  String get renameCredentialConfirm;
+
+  /// Dialog title.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete {name}?'**
+  String deleteCredentialTitle(String name);
+
+  /// What deleting a credential does.
+  ///
+  /// In en, this message translates to:
+  /// **'Its secret is deleted from the engine machine.'**
+  String get deleteCredentialSecret;
+
+  /// Deleting an unused credential.
+  ///
+  /// In en, this message translates to:
+  /// **'No flavor uses it.'**
+  String get deleteCredentialUnused;
+
+  /// Deleting a credential in use; the flavors follow.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 flavor uses it. It will have no {kind} until you assign another:} other{{count} flavors use it. They will have no {kind} until you assign another:}}'**
+  String deleteCredentialUsed(int count, String kind);
+
+  /// Closes the dialog.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep it'**
+  String get deleteCredentialKeep;
+
+  /// Deletes the credential.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get deleteCredentialConfirm;
+
+  /// Unassigns the credential everywhere, then deletes it.
+  ///
+  /// In en, this message translates to:
+  /// **'Unassign and delete'**
+  String get deleteCredentialConfirmInUse;
+
+  /// Sheet title.
+  ///
+  /// In en, this message translates to:
+  /// **'Credentials of {flavor}'**
+  String flavorCredentialsTitle(String flavor);
+
+  /// Sheet lead.
+  ///
+  /// In en, this message translates to:
+  /// **'The credential this flavor uses for each kind, with what the last checks found: does it work, and can it reach this flavor\'s app.'**
+  String get flavorCredentialsHelp;
+
+  /// The flavor has no credential of a kind.
+  ///
+  /// In en, this message translates to:
+  /// **'Not assigned'**
+  String get flavorCredentialsNotAssigned;
+
+  /// Opens the picker of a kind.
+  ///
+  /// In en, this message translates to:
+  /// **'Assign…'**
+  String get flavorCredentialsAssign;
+
+  /// Opens the picker of a kind.
+  ///
+  /// In en, this message translates to:
+  /// **'Change…'**
+  String get flavorCredentialsChange;
+
+  /// Unassigns the credential; it stays.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove from this flavor'**
+  String get flavorCredentialsRemove;
+
+  /// Picker field.
+  ///
+  /// In en, this message translates to:
+  /// **'Credential'**
+  String get flavorCredentialsCredential;
+
+  /// Picker choice: a new credential.
+  ///
+  /// In en, this message translates to:
+  /// **'Add new…'**
+  String get flavorCredentialsAddNew;
+
+  /// Picker field.
+  ///
+  /// In en, this message translates to:
+  /// **'Use for'**
+  String get flavorCredentialsUseFor;
+
+  /// Picker scope.
+  ///
+  /// In en, this message translates to:
+  /// **'This flavor'**
+  String get flavorCredentialsThisFlavor;
+
+  /// Picker scope.
+  ///
+  /// In en, this message translates to:
+  /// **'Every flavor of {app}'**
+  String flavorCredentialsEveryFlavor(String app);
+
+  /// Picker option: the other flavors give up their credential.
+  ///
+  /// In en, this message translates to:
+  /// **'Replace existing'**
+  String get flavorCredentialsReplace;
+
+  /// Picker note.
+  ///
+  /// In en, this message translates to:
+  /// **'Flavors that have their own {kind} keep it.'**
+  String flavorCredentialsReplaceOff(String kind);
+
+  /// Picker note.
+  ///
+  /// In en, this message translates to:
+  /// **'Every flavor of the app uses this {kind}, even those that have their own.'**
+  String flavorCredentialsReplaceOn(String kind);
+
+  /// Assigns the chosen credential.
+  ///
+  /// In en, this message translates to:
+  /// **'Assign'**
+  String get flavorCredentialsConfirm;
+
+  /// Adds the new credential, then assigns it.
+  ///
+  /// In en, this message translates to:
+  /// **'Check, save and assign'**
+  String get flavorCredentialsCreate;
+
+  /// After assigning to every flavor without replacing.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{{flavors} kept its own credential. Tick “Replace existing” to change it too.} other{{flavors} kept their own credentials. Tick “Replace existing” to change them too.}}'**
+  String flavorCredentialsKept(int count, String flavors);
 
   /// Job or step status.
   ///
@@ -2025,6 +2277,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'None'**
   String get ledgerCredentialsNone;
+
+  /// Credentials column of a flavor without any.
+  ///
+  /// In en, this message translates to:
+  /// **'Assign…'**
+  String get ledgerCredentialsAssign;
+
+  /// Tooltip of the credentials column.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage the credentials of this flavor'**
+  String get ledgerCredentialsManage;
 
   /// Ledger with every row filtered out.
   ///

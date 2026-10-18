@@ -135,6 +135,7 @@ extension PumpApp on WidgetTester {
     ShellCubit? shell,
     ProjectsBloc? projects,
     ProjectsRepository? projectsRepository,
+    CredentialsRepository? credentialsRepository,
     JobsRepository? jobsRepository,
     ReleasesRepository? releasesRepository,
     RunnersRepository? runnersRepository,
@@ -157,6 +158,9 @@ extension PumpApp on WidgetTester {
           ),
           RepositoryProvider<ProjectsRepository>.value(
             value: projectsRepository ?? quietProjects(),
+          ),
+          RepositoryProvider<CredentialsRepository>.value(
+            value: credentialsRepository ?? quietCredentials(),
           ),
           RepositoryProvider<JobsRepository>.value(
             value: jobsRepository ?? quietJobs(),

@@ -83,6 +83,52 @@ void main() {
     });
   });
 
+  group('resolveCredential', () {
+    const named = NamedCredential(
+      id: 'crd_9',
+      name: 'crd_1',
+      kind: CredentialKind.slack,
+      status: CredentialStatus.verified,
+    );
+
+    setUp(
+      () =>
+          when(() => client.listNamedCredentials())
+              .thenAnswer((_) async => [sample.ascCredential, named]),
+    );
+
+    test('finds an id', () async {
+      expect((await resolveCredential(client, 'crd_9')).name, 'crd_1');
+    });
+
+    test('takes an id before a name that looks like one', () async {
+      expect((await resolveCredential(client, 'crd_1')).name, 'Acme ASC');
+    });
+
+    test('finds a name regardless of case', () async {
+      expect((await resolveCredential(client, 'ACME asc')).id, 'crd_1');
+    });
+
+    test('finds a name that starts like an id but is none', () async {
+      when(() => client.listNamedCredentials())
+          .thenAnswer((_) async => [named]);
+
+      expect((await resolveCredential(client, 'CRD_1')).id, 'crd_9');
+      expect((await resolveCredential(client, 'crd_1')).id, 'crd_9');
+    });
+
+    test('says when nothing matches', () async {
+      await expectLater(
+        resolveCredential(client, 'nope'),
+        throwsA(
+          isA<ReferenceException>()
+              .having((e) => e.notFound, 'notFound', isTrue)
+              .having((e) => '$e', 'message', contains('xp credentials list')),
+        ),
+      );
+    });
+  });
+
   group('resolveWorkflow', () {
     test('passes an id through', () async {
       expect(await resolveWorkflow(client, 'prj_1', 'wf_3'), 'wf_3');

@@ -6,37 +6,54 @@ import 'package:xp_repositories/xp_repositories.dart';
 
 sealed class CredentialsEvent extends Equatable {
   const new();
-}
-
-/// Starts following the credentials of [projectId].
-final class CredentialsSubscriptionRequested extends CredentialsEvent {
-  const new(this.projectId);
-
-  final String projectId;
-
-  @override
-  List<Object?> get props => [projectId];
-}
-
-/// Checks and saves [request].
-final class CredentialSaveRequested extends CredentialsEvent {
-  const new(this.request);
-
-  final SaveCredentialRequest request;
-
-  @override
-  List<Object?> get props => [request];
-}
-
-/// The form opened or closed: forget the last save.
-final class CredentialFormReset extends CredentialsEvent {
-  const new();
 
   @override
   List<Object?> get props => [];
 }
 
-/// Checks [credentialId] again now.
+/// Starts following the named credentials of the engine.
+final class CredentialsSubscriptionRequested extends CredentialsEvent {
+  const new();
+}
+
+/// Checks and stores the new credential of [request].
+final class CredentialCreateRequested extends CredentialsEvent {
+  const new(this.request);
+
+  final CreateCredentialRequest request;
+
+  @override
+  List<Object?> get props => [request];
+}
+
+/// Checks the secret of [request] and gives it to [credentialId].
+final class CredentialReplaceRequested extends CredentialsEvent {
+  const new(this.credentialId, this.request);
+
+  final String credentialId;
+  final ReplaceCredentialRequest request;
+
+  @override
+  List<Object?> get props => [credentialId, request];
+}
+
+/// The form opened or closed: forget the last save.
+final class CredentialFormReset extends CredentialsEvent {
+  const new();
+}
+
+/// Gives [credentialId] the name [name].
+final class CredentialRenameRequested extends CredentialsEvent {
+  const new(this.credentialId, this.name);
+
+  final String credentialId;
+  final String name;
+
+  @override
+  List<Object?> get props => [credentialId, name];
+}
+
+/// Checks [credentialId], and where it is used, again now.
 final class CredentialVerifyRequested extends CredentialsEvent {
   const new(this.credentialId);
 
@@ -46,21 +63,35 @@ final class CredentialVerifyRequested extends CredentialsEvent {
   List<Object?> get props => [credentialId];
 }
 
-/// Deletes [credentialId].
+/// Deletes [credentialId]; with [force], unassigns it from the flavors that
+/// use it first.
 final class CredentialDeleteRequested extends CredentialsEvent {
-  const new(this.credentialId);
+  const new(this.credentialId, {this.force = false});
 
   final String credentialId;
+  final bool force;
 
   @override
-  List<Object?> get props => [credentialId];
+  List<Object?> get props => [credentialId, force];
 }
 
 enum CredentialSaveStatus { idle, saving, saved, failed }
 
+/// A credential the engine did not delete because flavors use it.
+class CredentialConflict extends Equatable {
+  const new(this.credentialId, this.usedBy);
+
+  final String credentialId;
+
+  /// The flavors that use it.
+  final List<CredentialUsage> usedBy;
+
+  @override
+  List<Object?> get props => [credentialId, usedBy];
+}
+
 class CredentialsState extends Equatable {
   const new({
-    this.projectId,
     this.loaded = false,
     this.credentials = const [],
     this.cached = false,
@@ -68,11 +99,13 @@ class CredentialsState extends Equatable {
     this.saveError,
     this.busy,
     this.error,
+    this.inUse,
   });
 
-  final String? projectId;
   final bool loaded;
-  final List<Credential> credentials;
+
+  /// The named credentials, by name.
+  final List<NamedCredential> credentials;
 
   /// Whether [credentials] came from the offline cache.
   final bool cached;
@@ -83,19 +116,22 @@ class CredentialsState extends Equatable {
   /// Why the engine refused to save (nothing was stored).
   final String? saveError;
 
-  /// The credential being checked or deleted.
+  /// The credential being renamed, checked or deleted.
   final String? busy;
 
-  /// What the engine said when a check or a delete failed.
+  /// What the engine said when a command failed.
   final String? error;
+
+  /// The credential the engine did not delete because flavors use it.
+  final CredentialConflict? inUse;
 
   CredentialsState copyWith({
     CredentialSaveStatus? save,
     String? saveError,
     String? busy,
     String? error,
+    CredentialConflict? inUse,
   }) => CredentialsState(
-    projectId: projectId,
     loaded: loaded,
     credentials: credentials,
     cached: cached,
@@ -103,11 +139,11 @@ class CredentialsState extends Equatable {
     saveError: saveError,
     busy: busy,
     error: error,
+    inUse: inUse,
   );
 
   @override
   List<Object?> get props => [
-    projectId,
     loaded,
     credentials,
     cached,
@@ -115,56 +151,90 @@ class CredentialsState extends Equatable {
     saveError,
     busy,
     error,
+    inUse,
   ];
 }
 
-/// The credentials editor of one project: the list with each check's
-/// result, adding or replacing one (the engine checks it first and stores
-/// nothing it refuses), checking again and deleting.
+/// The named credentials of the engine: the list with each check's result
+/// and the flavors that use each; adding one or replacing its secret (the
+/// engine checks it first and stores nothing it refuses), renaming,
+/// checking again and deleting.
 class CredentialsBloc extends Bloc<CredentialsEvent, CredentialsState> {
-  new({required this._projects}) : super(const CredentialsState()) {
+  new({required this._credentials}) : super(const CredentialsState()) {
     on<CredentialsSubscriptionRequested>(
       _onSubscribe,
       transformer: restartable(),
     );
-    on<CredentialSaveRequested>(_onSave, transformer: droppable());
+    on<CredentialCreateRequested>(
+      (event, emit) =>
+          _save(emit, () => _credentials.createCredential(event.request)),
+      transformer: droppable(),
+    );
+    on<CredentialReplaceRequested>(
+      (event, emit) => _save(
+        emit,
+        () => _credentials.replaceSecret(event.credentialId, event.request),
+      ),
+      transformer: droppable(),
+    );
     on<CredentialFormReset>(
       (_, emit) => emit(state.copyWith(save: CredentialSaveStatus.idle)),
     );
-    on<CredentialVerifyRequested>(_onVerify, transformer: droppable());
-    on<CredentialDeleteRequested>(_onDelete, transformer: droppable());
+    on<CredentialRenameRequested>(
+      (event, emit) => _command(
+        event.credentialId,
+        emit,
+        () => _credentials.renameCredential(event.credentialId, event.name),
+      ),
+      transformer: droppable(),
+    );
+    on<CredentialVerifyRequested>(
+      (event, emit) => _command(
+        event.credentialId,
+        emit,
+        () => _credentials.verifyCredential(event.credentialId),
+      ),
+      transformer: droppable(),
+    );
+    on<CredentialDeleteRequested>(
+      (event, emit) => _command(
+        event.credentialId,
+        emit,
+        () => _credentials.deleteCredential(
+          event.credentialId,
+          force: event.force,
+        ),
+      ),
+      transformer: droppable(),
+    );
   }
 
-  final ProjectsRepository _projects;
+  final CredentialsRepository _credentials;
 
   Future<void> _onSubscribe(
     CredentialsSubscriptionRequested event,
     Emitter<CredentialsState> emit,
-  ) async {
-    emit(CredentialsState(projectId: event.projectId));
-    await emit.forEach<Snapshot<List<Credential>>>(
-      _projects.watchCredentials(event.projectId),
-      onData: (snapshot) => CredentialsState(
-        projectId: event.projectId,
-        loaded: true,
-        credentials: snapshot.value,
-        cached: snapshot.cached,
-        save: state.save,
-        busy: state.busy,
-      ),
-      onError: (error, _) => state.copyWith(error: errorMessage(error)),
-    );
-  }
+  ) => emit.forEach<Snapshot<List<NamedCredential>>>(
+    _credentials.watchCredentials(),
+    onData: (snapshot) => CredentialsState(
+      loaded: true,
+      credentials: snapshot.value,
+      cached: snapshot.cached,
+      save: state.save,
+      saveError: state.saveError,
+      busy: state.busy,
+      inUse: state.inUse,
+    ),
+    onError: (error, _) => state.copyWith(error: errorMessage(error)),
+  );
 
-  Future<void> _onSave(
-    CredentialSaveRequested event,
+  Future<void> _save(
     Emitter<CredentialsState> emit,
+    Future<void> Function() save,
   ) async {
-    final projectId = state.projectId;
-    if (projectId == null) return;
     emit(state.copyWith(save: CredentialSaveStatus.saving));
     try {
-      await _projects.saveCredential(projectId, event.request);
+      await save();
       emit(state.copyWith(save: CredentialSaveStatus.saved));
     } on Exception catch (error) {
       emit(
@@ -176,34 +246,19 @@ class CredentialsBloc extends Bloc<CredentialsEvent, CredentialsState> {
     }
   }
 
-  Future<void> _onVerify(
-    CredentialVerifyRequested event,
-    Emitter<CredentialsState> emit,
-  ) => _command(
-    event.credentialId,
-    emit,
-    () => _projects.verifyCredential(state.projectId!, event.credentialId),
-  );
-
-  Future<void> _onDelete(
-    CredentialDeleteRequested event,
-    Emitter<CredentialsState> emit,
-  ) => _command(
-    event.credentialId,
-    emit,
-    () => _projects.deleteCredential(state.projectId!, event.credentialId),
-  );
-
   Future<void> _command(
     String credentialId,
     Emitter<CredentialsState> emit,
     Future<void> Function() run,
   ) async {
-    if (state.projectId == null) return;
     emit(state.copyWith(busy: credentialId));
     try {
       await run();
       emit(state.copyWith());
+    } on CredentialInUse catch (error) {
+      emit(
+        state.copyWith(inUse: CredentialConflict(credentialId, error.usedBy)),
+      );
     } on Exception catch (error) {
       emit(state.copyWith(error: errorMessage(error)));
     }

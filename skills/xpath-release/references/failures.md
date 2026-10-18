@@ -8,10 +8,10 @@ CLI maps them to exit codes; `xp mcp` returns the message with `isError`.
 | Code | Meaning |
 |---|---|
 | 0 | success |
-| 1 | the command ran, and the job it followed, the free-up or the download failed |
+| 1 | the command ran, and the job it followed, the free-up, the download or the credential check failed |
 | 64 | usage error (also a `400` from the engine) |
 | 65 | the engine refused the content: an invalid workflow, a rejected credential (`422`) |
-| 66 | no such project, job, run, approval, release or artifact (`404`) |
+| 66 | no such project, job, run, approval, release, artifact or credential (`404`), or a file `xp` cannot read |
 | 69 | the engine cannot be reached, or cannot serve (`502`, `503`: secrets locked) |
 | 70 | the engine failed (`500`) |
 | 73 | a conflict (`409`): an approval decided already, a project added already |

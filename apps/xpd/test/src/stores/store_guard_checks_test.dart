@@ -39,9 +39,13 @@ void main() {
         [_bundleId, _package],
       )
       ..execute(
-        'INSERT INTO credential_ref (id, flavor_id, kind, secret_key) VALUES '
-        "('c1', 'prod', 'asc_key', 'asc.prod'), "
-        "('c2', 'prod', 'play_sa', 'play.prod')",
+        'INSERT INTO credential (id, name, kind, secret_key) VALUES '
+        "('c1', 'c1', 'asc_key', 'asc.prod'), "
+        "('c2', 'c2', 'play_sa', 'play.prod')",
+      )
+      ..execute(
+        'INSERT INTO credential_assignment (flavor_id, kind, credential_id) '
+        "VALUES ('prod', 'asc_key', 'c1'), ('prod', 'play_sa', 'c2')",
       );
     secrets = MemorySecretStore();
     asc = await FakeAscServer.start(now: clock.now);

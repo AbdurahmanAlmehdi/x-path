@@ -1,3 +1,4 @@
+import 'package:xp_api/xp_api.dart';
 import 'package:xp_client/xp_client.dart';
 
 /// A name the user typed matches no project, workflow or runner, or more than
@@ -66,6 +67,28 @@ Future<String> resolveRunner(XpClient client, String reference) async {
   }
   throw ReferenceException(
     'No runner "$reference". Give the name it was paired with, or its id.',
+    notFound: true,
+  );
+}
+
+/// The named credential called [reference]: the id (`crd_...`) of one, or
+/// its name regardless of case.
+Future<NamedCredential> resolveCredential(
+  XpClient client,
+  String reference,
+) async {
+  final credentials = await client.listNamedCredentials();
+  if (reference.startsWith('crd_')) {
+    for (final credential in credentials) {
+      if (credential.id == reference) return credential;
+    }
+  }
+  final wanted = reference.toLowerCase();
+  for (final credential in credentials) {
+    if (credential.name.toLowerCase() == wanted) return credential;
+  }
+  throw ReferenceException(
+    'No credential "$reference". See: xp credentials list',
     notFound: true,
   );
 }

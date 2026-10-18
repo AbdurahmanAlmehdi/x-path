@@ -23,11 +23,17 @@ void main() {
       [id, 'app_1', id, 'lib/main.dart', androidAppId],
     );
     if (credentialKind != null) {
-      database.connection.execute(
-        'INSERT INTO credential_ref (id, flavor_id, kind, secret_key) '
-        'VALUES (?, ?, ?, ?)',
-        ['cred_$id', id, credentialKind, 'play.$id'],
-      );
+      database.connection
+        ..execute(
+          'INSERT INTO credential (id, name, kind, secret_key) '
+          'VALUES (?, ?, ?, ?)',
+          ['cred_$id', 'cred_$id', credentialKind, 'play.$id'],
+        )
+        ..execute(
+          'INSERT INTO credential_assignment (flavor_id, kind, credential_id) '
+          'VALUES (?, ?, ?)',
+          [id, credentialKind, 'cred_$id'],
+        );
     }
   }
 

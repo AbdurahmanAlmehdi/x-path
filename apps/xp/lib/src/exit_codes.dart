@@ -5,10 +5,10 @@ import 'package:xp_client/xp_client.dart';
 /// | code | meaning |
 /// |---|---|
 /// | 0 | success |
-/// | 1 | the command ran, and what it watched ended badly (a job failed) |
+/// | 1 | the command ran, and what it watched ended badly (a failed job) |
 /// | 64 | usage error: unknown command, missing or invalid arguments |
 /// | 65 | the engine refused the content: an invalid workflow |
-/// | 66 | no such project, job, run, approval, release or artifact |
+/// | 66 | no such project, job, run, release, artifact, credential or file |
 /// | 69 | the engine cannot be reached or cannot serve (secrets locked) |
 /// | 70 | the engine failed |
 /// | 73 | a conflict: the approval was decided already, the project exists |

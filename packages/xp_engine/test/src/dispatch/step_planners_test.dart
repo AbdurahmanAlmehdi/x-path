@@ -782,7 +782,7 @@ stages:
             flavors: ['dev'],
           ),
         ),
-        _fails(contains('has no play_sa credential saved')),
+        _fails(contains('has no play_sa credential assigned')),
       );
       await harness.saveCredential('dev', CredentialKind.playSa);
       await expectLater(

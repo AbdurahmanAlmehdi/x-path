@@ -179,7 +179,7 @@ class DispatchHarness {
     String flavor,
     CredentialKind kind, {
     String? account,
-  }) => credentials.save(
+  }) => credentials.put(
     demoCredential(demoFlavor(flavor), kind, account: account),
   );
 

@@ -14,9 +14,13 @@
 #   - creates an `app`, a `cli` and an `mcp` token, and runs
 #     `xp connect --token <cli> --mcp-token <mcp>` (XP_TEST_FILE_SECRETS: the
 #     tokens go to a file in a temporary config folder, never to the Keychain),
+#   - adds a named Slack credential with `xp credentials add` (the webhook on
+#     stdin) and assigns it with `xp credentials assign` (ADR 0013),
 #   - runs `xp mcp` as a stdio subprocess and speaks MCP JSON-RPC to it:
 #     initialize, tools/list (no tool that approves, denies, merges or changes
-#     a gate), tools/call dispatch_workflow for `prod-release`, then get_run
+#     a gate, and `list_credentials` the only credential tool, which shows
+#     the credential without its secret; the MCP token gets 403 on adding
+#     one), tools/call dispatch_workflow for `prod-release`, then get_run
 #     until the run waits for approval, then get_approval,
 #   - checks that the MCP token gets 403 on approve, on deny and on loosening
 #     the gate, and that the approval is still pending,

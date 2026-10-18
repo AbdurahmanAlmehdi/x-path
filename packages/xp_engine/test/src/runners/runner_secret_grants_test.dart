@@ -6,21 +6,24 @@ void main() {
   late InMemoryCredentialRepository credentials;
   late RunnerSecretGrants grants;
 
-  CredentialRecord record(
+  AssignedCredential record(
     String id,
     CredentialKind kind,
     String secretKey, {
     String project = 'prj_1',
-  }) => CredentialRecord(
-    id: id,
+  }) => AssignedCredential(
     flavor: CredentialFlavor(
       id: 'flv_$id',
       projectId: project,
       appPath: '.',
       name: id,
     ),
-    kind: kind,
-    secretKey: secretKey,
+    credential: CredentialRecord(
+      id: id,
+      name: id,
+      kind: kind,
+      secretKey: secretKey,
+    ),
   );
 
   StepRecord step(Map<String, dynamic> input) => StepRecord(
@@ -34,12 +37,12 @@ void main() {
   setUp(() async {
     credentials = InMemoryCredentialRepository();
     grants = RunnerSecretGrants(credentials);
-    await credentials.save(record('a', CredentialKind.keystore, 'ks-a'));
-    await credentials.save(
+    await credentials.put(record('a', CredentialKind.keystore, 'ks-a'));
+    await credentials.put(
       record('b', CredentialKind.keystore, 'ks-b', project: 'prj_2'),
     );
-    await credentials.save(record('c', CredentialKind.ascKey, 'asc'));
-    await credentials.save(record('d', CredentialKind.shorebird, 'shorebird'));
+    await credentials.put(record('c', CredentialKind.ascKey, 'asc'));
+    await credentials.put(record('d', CredentialKind.shorebird, 'shorebird'));
   });
 
   test('grants the keystore and its passwords that the steps name', () async {
@@ -109,7 +112,7 @@ void main() {
   });
 
   test('never grants the Shorebird key of another project', () async {
-    await credentials.save(
+    await credentials.put(
       record('e', CredentialKind.shorebird, 'shorebird-2', project: 'prj_2'),
     );
 

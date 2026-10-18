@@ -5,6 +5,7 @@ import 'package:mason_logger/mason_logger.dart';
 import 'package:xp/src/commands/approvals_commands.dart';
 import 'package:xp/src/commands/artifacts_commands.dart';
 import 'package:xp/src/commands/connect_command.dart';
+import 'package:xp/src/commands/credentials_commands.dart';
 import 'package:xp/src/commands/projects_commands.dart';
 import 'package:xp/src/commands/releases_commands.dart';
 import 'package:xp/src/commands/runners_commands.dart';
@@ -54,6 +55,7 @@ class XpCommandRunner extends CompletionCommandRunner<int> {
       );
     addCommand(ConnectCommand(_context));
     addCommand(projectsCommand(_context));
+    addCommand(credentialsCommand(_context));
     addCommand(workflowsCommand(_context));
     addCommand(DispatchCommand(_context));
     addCommand(runsCommand(_context));
@@ -179,10 +181,12 @@ const _secretOptions = {'token', 'mcp-token'};
 const _exitCodes = '''
 Exit codes:
   0   success
-  1   the command ran, and the job or free-up it watched failed
+  1   the command ran, and the job, free-up or credential check it watched
+      failed
   64  usage error
   65  the engine refused the content (an invalid workflow)
-  66  no such project, job, run, approval, release or artifact
+  66  no such project, job, run, approval, release, artifact or credential,
+      or a file that cannot be read
   69  the engine cannot be reached or cannot serve (secrets locked)
   70  the engine failed
   73  conflict (an approval already decided, a project already added)

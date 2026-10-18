@@ -1,3 +1,5 @@
+import 'package:xp_api/xp_api.dart';
+
 /// A credential operation failed. The message never contains a secret.
 class CredentialException implements Exception {
   /// Creates an exception with [message] and, if there is one, what to do.
@@ -41,4 +43,27 @@ class CredentialRejectedException extends CredentialException {
 class CredentialUnreachableException extends CredentialException {
   /// Creates an exception with [message] and [fix].
   const new(super.message, {super.fix});
+}
+
+/// Another credential has the name already (names are unique regardless of
+/// case).
+class CredentialConflictException extends CredentialException {
+  /// Creates an exception with [message].
+  const new(super.message);
+}
+
+/// The credential is used by flavors, so it was not deleted.
+class CredentialInUseException extends CredentialException {
+  /// Creates an exception for the flavors [usedBy].
+  const new(super.message, this.usedBy);
+
+  /// The flavors that use the credential.
+  final List<CredentialUsage> usedBy;
+}
+
+/// The device token's kind may not change credentials: only the app and `xp`
+/// do (an MCP client reads them; a runner does not reach them).
+class CredentialForbiddenException extends CredentialException {
+  /// Creates an exception with [message].
+  const new(super.message);
 }

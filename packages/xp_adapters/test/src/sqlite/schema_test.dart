@@ -61,7 +61,8 @@ void main() {
         'project',
         'app',
         'flavor',
-        'credential_ref',
+        'credential',
+        'credential_assignment',
         'workflow',
         'workflow_version',
         'release',
@@ -87,8 +88,12 @@ void main() {
     insertWorkflowVersion();
     db
       ..execute(
-        'INSERT INTO credential_ref (id, flavor_id, kind, secret_key) '
-        "VALUES ('c1', 'f1', 'asc_key', 'k')",
+        'INSERT INTO credential (id, name, kind, secret_key) '
+        "VALUES ('c1', 'Key', 'asc_key', 'k')",
+      )
+      ..execute(
+        'INSERT INTO credential_assignment (flavor_id, kind, credential_id) '
+        "VALUES ('f1', 'asc_key', 'c1')",
       )
       ..execute(
         'INSERT INTO approval (id, project_id, action, state) '
@@ -99,7 +104,7 @@ void main() {
     for (final table in [
       'app',
       'flavor',
-      'credential_ref',
+      'credential_assignment',
       'workflow',
       'workflow_version',
       'approval',
@@ -221,8 +226,8 @@ void main() {
     insertFlavor();
     expect(
       () => db.execute(
-        'INSERT INTO credential_ref (id, flavor_id, kind, secret_key) '
-        "VALUES ('c', 'f1', 'password', 'k')",
+        'INSERT INTO credential (id, name, kind, secret_key) '
+        "VALUES ('c', 'c', 'password', 'k')",
       ),
       throwsA(isA<SqliteException>()),
     );

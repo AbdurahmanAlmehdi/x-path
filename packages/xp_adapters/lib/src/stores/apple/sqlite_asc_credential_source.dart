@@ -1,10 +1,10 @@
 import 'package:xp_adapters/src/sqlite/sqlite_database.dart';
 import 'package:xp_engine/xp_engine.dart';
 
-/// Finds the API key of an app through the `asc_key` credential reference of
-/// the flavor with its iOS bundle id.
+/// Finds the API key of an app through the `asc_key` credential assigned to
+/// the flavor with its iOS bundle id (ADR 0013).
 ///
-/// The reference's `secret_key` names a secret in the secret store whose value
+/// The credential's `secret_key` names a secret in the secret store whose value
 /// is the JSON of an [AscKey] (`AscKey.toSecret`). The credential endpoints
 /// write it (Phase 10c); a flavor without the reference, such as an Apple ID
 /// flavor, has no key here.
@@ -21,10 +21,12 @@ class SqliteAscCredentialSource implements AscCredentialSource {
   @override
   Future<AscKey?> forBundleId(String bundleId) async {
     final rows = _database.connection.select(
-      'SELECT credential_ref.secret_key FROM credential_ref '
-      'JOIN flavor ON flavor.id = credential_ref.flavor_id '
-      "WHERE flavor.ios_bundle_id = ? AND credential_ref.kind = 'asc_key' "
-      'ORDER BY credential_ref.rowid LIMIT 1',
+      'SELECT credential.secret_key FROM credential_assignment '
+      'JOIN credential ON credential.id = credential_assignment.credential_id '
+      'JOIN flavor ON flavor.id = credential_assignment.flavor_id '
+      'WHERE flavor.ios_bundle_id = ? '
+      "AND credential_assignment.kind = 'asc_key' "
+      'ORDER BY credential_assignment.rowid LIMIT 1',
       [bundleId],
     );
     if (rows.isEmpty) return null;

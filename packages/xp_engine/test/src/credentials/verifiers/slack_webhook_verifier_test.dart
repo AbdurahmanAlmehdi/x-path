@@ -10,6 +10,7 @@ void main() {
 
   test('is the verifier of Slack webhooks', () {
     expect(verifier.kind, CredentialKind.slack);
+    expect(verifier.checksTarget, isFalse);
   });
 
   test('accepts the shape of an incoming webhook', () async {

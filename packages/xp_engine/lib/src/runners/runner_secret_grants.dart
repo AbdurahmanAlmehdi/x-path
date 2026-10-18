@@ -44,7 +44,9 @@ class RunnerSecretGrants {
     };
     if (named.isEmpty) return const {};
     final grantable = <String>{
-      for (final credential in await _credentials.list(projectId: projectId))
+      for (final credential in await _credentials.assignments(
+        projectId: projectId,
+      ))
         if (credential.kind == CredentialKind.keystore) ...[
           credential.secretKey,
           KeystoreMaterial.storePasswordKey(credential.secretKey),

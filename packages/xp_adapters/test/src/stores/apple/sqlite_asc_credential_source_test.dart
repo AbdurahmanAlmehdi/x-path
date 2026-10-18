@@ -30,11 +30,17 @@ void main() {
   );
 
   void addCredential(String id, String flavor, String kind, String secretKey) =>
-      database.connection.execute(
-        'INSERT INTO credential_ref (id, flavor_id, kind, secret_key) '
-        'VALUES (?, ?, ?, ?)',
-        [id, flavor, kind, secretKey],
-      );
+      database.connection
+        ..execute(
+          'INSERT INTO credential (id, name, kind, secret_key) '
+          'VALUES (?, ?, ?, ?)',
+          [id, id, kind, secretKey],
+        )
+        ..execute(
+          'INSERT INTO credential_assignment (flavor_id, kind, credential_id) '
+          'VALUES (?, ?, ?)',
+          [flavor, kind, id],
+        );
 
   setUp(() {
     database = SqliteDatabase.openInMemory();

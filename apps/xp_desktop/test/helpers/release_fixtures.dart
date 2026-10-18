@@ -60,6 +60,7 @@ final Release liveRelease = release(
 
 const verifiedKey = Credential(
   id: 'crd_1',
+  name: 'Team App Store key',
   projectId: 'prj_1',
   app: '.',
   flavor: 'prod',

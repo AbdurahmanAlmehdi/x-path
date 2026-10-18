@@ -10,10 +10,12 @@ const databaseFileName = 'xpath.db';
 ///
 /// A new directory is private to the user (0700) and so is a new database
 /// file (0600); SQLite gives its `-wal` and `-shm` files the same mode.
-/// `runProcess` runs `chmod`; tests replace it.
+/// `runProcess` runs `chmod`; tests replace it. [onNote] hears what a
+/// migration does to the data that is there.
 Future<SqliteDatabase> openEngineDatabase(
   String directory, {
   Future<ProcessResult> Function(String, List<String>) runProcess = Process.run,
+  void Function(String note)? onNote,
 }) async {
   Future<void> chmod(String mode, String path) async {
     final result = await runProcess('chmod', [mode, path]);
@@ -32,5 +34,5 @@ Future<SqliteDatabase> openEngineDatabase(
     file.createSync();
     await chmod('600', file.path);
   }
-  return SqliteDatabase.open(file.path);
+  return SqliteDatabase.open(file.path, onNote: onNote);
 }

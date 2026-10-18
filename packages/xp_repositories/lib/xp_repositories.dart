@@ -3,6 +3,7 @@ library;
 
 export 'src/approvals_repository.dart';
 export 'src/cache/snapshot_cache.dart';
+export 'src/credentials_repository.dart';
 export 'src/engines/engine_profile.dart';
 export 'src/engines/engines_repository.dart';
 export 'src/engines/token_vault.dart';

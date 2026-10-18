@@ -38,7 +38,10 @@ abstract class XpdCommand extends Command<int> {
   Future<T> withDatabase<T>(
     Future<T> Function(SqliteDatabase database) action,
   ) async {
-    final database = await openEngineDatabase(dataDirectory);
+    final database = await openEngineDatabase(
+      dataDirectory,
+      onNote: (note) => context.err.writeln('xpd: $note'),
+    );
     try {
       return await action(database);
     } finally {

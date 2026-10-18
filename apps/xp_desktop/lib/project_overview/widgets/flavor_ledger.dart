@@ -1,5 +1,6 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:xp_api/xp_api.dart';
+import 'package:xp_desktop/credentials/widgets/credential_labels.dart';
 import 'package:xp_desktop/l10n/l10n.dart';
 import 'package:xp_desktop/project_overview/bloc/project_overview_bloc.dart';
 import 'package:xp_desktop/project_overview/widgets/release_rail.dart';
@@ -17,6 +18,7 @@ class FlavorLedger extends StatelessWidget {
     required this.credentials,
     this.filter,
     this.onScan,
+    this.onCredentials,
     super.key,
   });
 
@@ -34,6 +36,9 @@ class FlavorLedger extends StatelessWidget {
 
   /// Shows the scan of the project; `null` hides the button.
   final VoidCallback? onScan;
+
+  /// Shows the credentials of a flavor; `null` leaves the cells inert.
+  final ValueChanged<String>? onCredentials;
 
   @override
   Widget build(BuildContext context) {
@@ -114,7 +119,7 @@ class FlavorLedger extends StatelessWidget {
               2: FlexColumnWidth(1.2),
               3: FlexColumnWidth(1.2),
               4: FlexColumnWidth(1.2),
-              5: FixedColumnWidth(120),
+              5: FixedColumnWidth(150),
             },
             children: [
               TableRow(
@@ -266,16 +271,43 @@ class FlavorLedger extends StatelessWidget {
     final mine = [
       for (final credential in credentials)
         if (credential.app == app.path && credential.flavor == flavor.name)
-          credential.status,
+          credential,
     ];
-    final (status, label) = mine.isEmpty
+    final status = worstStatus(mine.map((credential) => credential.status));
+    final (token, label) = status == null
         ? (XpStatus.credentialMissing, l10n.ledgerCredentialsNone)
-        : mine.contains(CredentialStatus.rejected)
-        ? (XpStatus.credentialExpired, l10n.credentialRejected)
-        : mine.every((status) => status == CredentialStatus.verified)
-        ? (XpStatus.credentialVerified, l10n.credentialVerified)
-        : (XpStatus.credentialExpiring, l10n.credentialUnchecked);
-    return XpStatusLabel(status, label);
+        : credentialStatusLabel(l10n, status);
+    final summary = _Value(
+      label,
+      Text(
+        mine.isEmpty
+            ? l10n.ledgerCredentialsAssign
+            : mine
+                  .map(
+                    (credential) =>
+                        credential.name ??
+                        credentialKindLabel(l10n, credential.kind),
+                  )
+                  .join(', '),
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
+      ),
+      status: token,
+    );
+    final onCredentials = this.onCredentials;
+    if (onCredentials == null) return summary;
+    return Tooltip(
+      message: l10n.ledgerCredentialsManage,
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        child: GestureDetector(
+          key: Key('ledger.credentials.${app.path}.${flavor.name}'),
+          behavior: HitTestBehavior.opaque,
+          onTap: () => onCredentials(flavor.name),
+          child: summary,
+        ),
+      ),
+    );
   }
 }
 
@@ -292,7 +324,7 @@ class _Cell extends StatelessWidget {
 /// A ledger value: the version in `type.code-lg` (or a quiet word when
 /// there is none) over a line that says where it comes from.
 class _Value extends StatelessWidget {
-  const new(this.value, this.detail, {this.none = false});
+  const new(this.value, this.detail, {this.none = false, this.status});
 
   factory none(String value, String detail) =>
       _Value(value, Text(detail), none: true);
@@ -301,18 +333,25 @@ class _Value extends StatelessWidget {
   final Widget detail;
   final bool none;
 
+  /// Shows [value] as the label of this status instead.
+  final XpStatus? status;
+
   @override
   Widget build(BuildContext context) {
     final colors = context.xpColors;
+    final status = this.status;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          value,
-          style: none
-              ? context.xpType.body.copyWith(color: colors.textSecondary)
-              : context.xpType.codeLg.copyWith(color: colors.textPrimary),
-        ),
+        if (status != null)
+          XpStatusLabel(status, value)
+        else
+          Text(
+            value,
+            style: none
+                ? context.xpType.body.copyWith(color: colors.textSecondary)
+                : context.xpType.codeLg.copyWith(color: colors.textPrimary),
+          ),
         DefaultTextStyle.merge(
           style: context.xpType.caption.copyWith(color: colors.textSecondary),
           child: detail,

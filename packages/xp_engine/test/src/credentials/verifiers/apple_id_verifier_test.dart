@@ -35,6 +35,7 @@ void main() {
 
   test('is the verifier of Apple IDs', () {
     expect(verifier().kind, CredentialKind.appleId);
+    expect(verifier().checksTarget, isFalse);
   });
 
   test('accepts an Apple ID altool can list providers for', () async {

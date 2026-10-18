@@ -44,8 +44,9 @@ class GitHubTokenForbiddenException implements Exception {
 }
 
 /// The GitHub token of the engine: one, shared by every project, under
-/// [githubTokenSecretKey] (where `xpd secrets import-gh` and a `github`
-/// credential put it too).
+/// [githubTokenSecretKey] (where `xpd secrets import-gh` and the deprecated
+/// per-flavor save of a `github` token put it too). It is not a named
+/// credential (ADR 0013).
 ///
 /// A token is checked with GitHub before it is stored, as every credential
 /// is; nothing here returns or logs it, and the [OutputMasker] learns it as
