@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:path/path.dart' as p;
 import 'package:xp_api/xp_api.dart';
@@ -199,7 +200,13 @@ class EngineSession {
         final value = await call(fetch);
         if (controller.isClosed) return;
         controller.add(Snapshot(value));
-        await cache.write(key, encode(value));
+        try {
+          await cache.write(key, encode(value));
+        } on FileSystemException {
+          // The cache only serves the read-only view while the engine is
+          // away; a write that fails (a full disk, a removed folder) must not
+          // turn a good answer into an error on screen.
+        }
       } on ConnectionException {
         // The status says so; the last value stays.
       } on ApiException catch (error) {

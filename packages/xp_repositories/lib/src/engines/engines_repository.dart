@@ -268,9 +268,14 @@ class EnginesRepository {
     );
   }
 
+  /// Makes every temporary file name of this repository different.
+  var _saves = 0;
+
   Future<void> _save(EngineList list) async {
     await Directory(directory).create(recursive: true);
-    final temporary = File('${_file.path}.tmp');
+    // Its own temporary file, so two saves at once cannot rename each
+    // other's away.
+    final temporary = File('${_file.path}.$pid.${_saves++}.tmp');
     await temporary.writeAsString(
       const JsonEncoder.withIndent('  ').convert({
         'active': list.activeId,
