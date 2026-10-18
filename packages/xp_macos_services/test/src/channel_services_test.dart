@@ -57,6 +57,26 @@ void main() {
       );
     });
 
+    test('restarts the agent', () async {
+      answer = (_) => 'requiresApproval';
+      expect(await agent.restart(), AgentStatus.requiresApproval);
+      expect(calls.single.method, 'agentRestart');
+    });
+
+    test('reports what macOS refused on a restart', () async {
+      answer = (_) => throw PlatformException(code: 'register_failed');
+      await expectLater(
+        agent.restart(),
+        throwsA(
+          isA<MacosServiceException>().having(
+            (error) => error.code,
+            'code',
+            'register_failed',
+          ),
+        ),
+      );
+    });
+
     test('unregisters the agent', () async {
       answer = (_) => 'notRegistered';
       expect(await agent.unregister(), AgentStatus.notRegistered);

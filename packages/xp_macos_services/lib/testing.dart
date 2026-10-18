@@ -56,6 +56,23 @@ class FakeEngineAgent implements EngineAgent {
     return current = AgentStatus.notRegistered;
   }
 
+  /// What [restart] answers.
+  AgentStatus restartResult = AgentStatus.enabled;
+
+  /// What [restart] throws, if anything.
+  Exception? restartError;
+
+  /// How often [restart] was called.
+  int restarts = 0;
+
+  @override
+  Future<AgentStatus> restart() async {
+    restarts++;
+    final error = restartError;
+    if (error != null) throw error;
+    return current = restartResult;
+  }
+
   @override
   Future<void> openLoginItemsSettings() async => settingsOpened++;
 }

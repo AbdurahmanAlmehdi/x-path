@@ -172,6 +172,78 @@ abstract class AppLocalizations {
   /// **'Engines…'**
   String get bannerEngines;
 
+  /// Banner: the local engine does not answer.
+  ///
+  /// In en, this message translates to:
+  /// **'The engine on this Mac isn\'t running.'**
+  String get bannerLocalStopped;
+
+  /// Banner: the app brings the local engine back.
+  ///
+  /// In en, this message translates to:
+  /// **'Starting the engine on this Mac…'**
+  String get bannerLocalStarting;
+
+  /// Starts the engine on this Mac again (banner, Settings).
+  ///
+  /// In en, this message translates to:
+  /// **'Start engine'**
+  String get localEngineStart;
+
+  /// Start engine failed: no engine in the bundle, or macOS cannot find its login item.
+  ///
+  /// In en, this message translates to:
+  /// **'This copy of XPath has no engine macOS can start. Open XPath from Applications, or install it again.'**
+  String get localEngineNoEngine;
+
+  /// Start engine failed: the login item needs the owner's OK.
+  ///
+  /// In en, this message translates to:
+  /// **'macOS is waiting for you. Allow XPath in System Settings ▸ General ▸ Login Items, then start the engine.'**
+  String get localEngineNeedsApproval;
+
+  /// Start engine failed.
+  ///
+  /// In en, this message translates to:
+  /// **'Running the engine needs macOS 13 or later.'**
+  String get localEngineUnsupported;
+
+  /// Start engine failed.
+  ///
+  /// In en, this message translates to:
+  /// **'macOS did not start the engine: {message}'**
+  String localEngineRefused(String message);
+
+  /// Start engine failed: no answer in time.
+  ///
+  /// In en, this message translates to:
+  /// **'The engine did not answer within 30 seconds. Its log is in ~/Library/Application Support/XPath/service-logs/xpd.log.'**
+  String get localEngineTimedOut;
+
+  /// Start engine failed.
+  ///
+  /// In en, this message translates to:
+  /// **'The engine runs, but XPath could not make a new token for this app: {message}'**
+  String localEngineToken(String message);
+
+  /// Settings: the engine on this Mac answers.
+  ///
+  /// In en, this message translates to:
+  /// **'Running'**
+  String get localEngineRunning;
+
+  /// Settings: the engine on this Mac does not answer.
+  ///
+  /// In en, this message translates to:
+  /// **'Not running'**
+  String get localEngineNotRunning;
+
+  /// Settings: the engine on this Mac is being started.
+  ///
+  /// In en, this message translates to:
+  /// **'Starting…'**
+  String get localEngineStarting;
+
   /// Tooltip of a command disabled because the engine cannot be reached.
   ///
   /// In en, this message translates to:

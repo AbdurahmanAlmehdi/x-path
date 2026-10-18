@@ -131,6 +131,12 @@ class EnginesRepository {
     return profile;
   }
 
+  /// Replaces the app token of the engine on this Mac with [token], without
+  /// changing which engine the app shows: after the engine refused the old
+  /// one.
+  Future<void> saveLocalToken(String token) =>
+      _vault.write(localEngineId, token);
+
   /// Checks the engine at [url] with [token] as `xp connect` does, then saves
   /// it as [name] and makes it active.
   ///
@@ -226,6 +232,31 @@ class EnginesRepository {
         revoked++;
       }
       return revoked;
+    } finally {
+      client.close();
+    }
+  }
+
+  /// Waits until the engine on this Mac answers `GET /health`, asking every
+  /// [interval] for at most [timeout]. Whether it answers. With a zero
+  /// [timeout] it asks once.
+  Future<bool> waitForLocalEngine({
+    Duration timeout = const Duration(seconds: 30),
+    Duration interval = const Duration(milliseconds: 500),
+    Future<void> Function(Duration duration) delay = Future<void>.delayed,
+  }) async {
+    final client = _clientFactory(localEngineUrl, '');
+    try {
+      for (var waited = Duration.zero; ; waited += interval) {
+        try {
+          await client.health();
+          return true;
+        } on XpClientException {
+          // Not up yet.
+        }
+        if (waited >= timeout) return false;
+        await delay(interval);
+      }
     } finally {
       client.close();
     }

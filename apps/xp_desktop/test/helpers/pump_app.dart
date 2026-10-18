@@ -5,6 +5,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:xp_desktop/app/app.dart';
 import 'package:xp_desktop/approvals/bloc/pending_approvals_bloc.dart';
 import 'package:xp_desktop/l10n/l10n.dart';
+import 'package:xp_desktop/local_engine/local_engine.dart';
 import 'package:xp_desktop/projects/bloc/projects_bloc.dart';
 import 'package:xp_desktop/runners/bloc/runners_bloc.dart';
 import 'package:xp_desktop/shell/cubit/shell_cubit.dart';
@@ -22,6 +23,16 @@ final testNow = DateTime(2026, 10, 13, 14, 8, 55);
 class MockEngineConnectionBloc
     extends MockBloc<EngineConnectionEvent, EngineConnectionState>
     implements EngineConnectionBloc;
+
+class MockLocalEngineBloc extends MockBloc<LocalEngineEvent, LocalEngineState>
+    implements LocalEngineBloc;
+
+/// A local-engine bloc that stays in [state].
+MockLocalEngineBloc localEngineIn(LocalEngineState state) {
+  final bloc = MockLocalEngineBloc();
+  whenListen(bloc, const Stream<LocalEngineState>.empty(), initialState: state);
+  return bloc;
+}
 
 class MockProjectsBloc extends MockBloc<ProjectsEvent, ProjectsState>
     implements ProjectsBloc;
@@ -132,6 +143,7 @@ extension PumpApp on WidgetTester {
     Widget widget, {
     AppServices? services,
     EngineConnectionBloc? connection,
+    LocalEngineBloc? localEngine,
     ShellCubit? shell,
     ProjectsBloc? projects,
     ProjectsRepository? projectsRepository,
@@ -191,6 +203,9 @@ extension PumpApp on WidgetTester {
           providers: [
             BlocProvider<EngineConnectionBloc>.value(
               value: connection ?? connectionIn(connectedTo()),
+            ),
+            BlocProvider<LocalEngineBloc>.value(
+              value: localEngine ?? localEngineIn(const LocalEngineState()),
             ),
             BlocProvider<ShellCubit>.value(value: shell ?? ShellCubit()),
             BlocProvider<ProjectsBloc>.value(

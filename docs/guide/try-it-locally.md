@@ -173,6 +173,22 @@ To upload, either:
 - open **Workflows**, pick **Dev build**, **Save as…** a copy, set the default of
   `firebaseAppIds` / `appleAppIds` in the YAML and dispatch that copy from the app.
 
+## If the engine is not running
+
+When the engine on this Mac stops (an upgrade stopped it, or the app was moved), XPath tries once
+to start it again on its own. If that does not work, the banner says **The engine on this Mac isn't
+running.** Press **Start engine** in the banner, or in **Settings ▸ About** next to **Engine on this
+Mac**. You do not need to remove This Mac or set it up again: the engine keeps its data and the app
+keeps its token.
+
+If it still does not start, the banner says why:
+
+- **macOS is waiting for you**: press **Open Login Items…**, allow XPath, then **Start engine**.
+- **This copy of XPath has no engine**: open XPath from `/Applications` (not from the DMG or a
+  build folder), or install it again.
+- **No answer within 30 seconds**: read
+  `~/Library/Application Support/XPath/service-logs/xpd.log`.
+
 ## Remove XPath
 
 **Settings ▸ Remove XPath…** revokes the paired runners, stops and unregisters the engine, and
@@ -184,4 +200,6 @@ Trash and quit**.
 
 `brew upgrade --cask xpath` (or a newer DMG), then restart the engine with
 `launchctl kickstart -k gui/$(id -u)/ly.abdurahman.xpath.xpd`; the engine and your data are kept.
+If `kickstart` says the service cannot be found, open XPath: it starts the engine again (or press
+**Start engine**, see above).
 A local build updates with `git pull` and `tool/release/build_mac.sh --install` again.

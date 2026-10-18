@@ -5,7 +5,9 @@ import 'package:mocktail/mocktail.dart';
 import 'package:xp_api/xp_api.dart';
 import 'package:xp_client/xp_client.dart';
 import 'package:xp_desktop/l10n/l10n.dart';
+import 'package:xp_desktop/local_engine/local_engine.dart';
 import 'package:xp_desktop/settings/settings.dart';
+import 'package:xp_desktop/widgets/widgets.dart';
 import 'package:xp_macos_services/testing.dart';
 import 'package:xp_macos_services/xp_macos_services.dart';
 import 'package:xp_repositories/xp_repositories.dart';
@@ -45,11 +47,16 @@ void main() {
     WidgetTester tester, {
     bool github = false,
     EngineStatus status = EngineStatus.connected,
+    LocalEngineBloc? localEngine,
+    List<EngineProfile>? engineList,
   }) async {
     await tester.pumpApp(
       SettingsPage(github: github),
       settingsRepository: settings,
-      connection: connectionIn(connectedTo(status: status)),
+      connection: connectionIn(
+        connectedTo(status: status, engines: engineList),
+      ),
+      localEngine: localEngine,
       services: testServices(
         engines: engines,
         agent: agent,
@@ -87,6 +94,81 @@ void main() {
 
       expect(find.text('Cannot reach the engine.'), findsOneWidget);
       expect(find.text('Waiting for you in Login Items'), findsOneWidget);
+    });
+
+    group('Engine on this Mac', () {
+      LocalEngineState failed(LocalEngineFailure failure) => LocalEngineState(
+        running: false,
+        progress: LocalEngineProgress.failed,
+        failure: failure,
+      );
+
+      testWidgets('asks whether it runs, and says it does', (tester) async {
+        final local = localEngineIn(const LocalEngineState(running: true));
+        await pump(tester, localEngine: local);
+
+        verify(() => local.add(const LocalEngineChecked())).called(1);
+        expect(find.text('Running'), findsOneWidget);
+        expect(find.byKey(const Key('settings.startEngine')), findsNothing);
+      });
+
+      testWidgets('starts it when it does not run', (tester) async {
+        final local = localEngineIn(const LocalEngineState(running: false));
+        await pump(tester, localEngine: local);
+
+        expect(find.text('Not running'), findsOneWidget);
+        await tester.tap(find.byKey(const Key('settings.startEngine')));
+        verify(
+          () => local.add(
+            const LocalEngineStartRequested(tokenName: 'XPath app on MacBook'),
+          ),
+        ).called(1);
+      });
+
+      testWidgets('shows the start in progress', (tester) async {
+        await pump(
+          tester,
+          localEngine: localEngineIn(
+            const LocalEngineState(
+              running: false,
+              progress: LocalEngineProgress.starting,
+            ),
+          ),
+        );
+
+        expect(find.text('Starting…'), findsOneWidget);
+        final button = tester.widget<XpButton>(
+          find.byKey(const Key('settings.startEngine')),
+        );
+        expect(button.busy, isTrue);
+        expect(button.onPressed, isNull);
+      });
+
+      testWidgets('says why it did not start and opens Login Items', (
+        tester,
+      ) async {
+        final local = localEngineIn(failed(LocalEngineFailure.needsApproval));
+        await pump(tester, localEngine: local);
+
+        expect(find.textContaining('Login Items, then start'), findsOneWidget);
+        await tester.tap(find.text('Open Login Items…'));
+        verify(() => local.add(const LocalEngineLoginItemsRequested()))
+            .called(1);
+      });
+
+      testWidgets('offers no start without an engine set up on this Mac', (
+        tester,
+      ) async {
+        agent.current = AgentStatus.notRegistered;
+        await pump(
+          tester,
+          engineList: [macMini],
+          localEngine: localEngineIn(const LocalEngineState(running: false)),
+        );
+
+        expect(find.text('Not running'), findsOneWidget);
+        expect(find.byKey(const Key('settings.startEngine')), findsNothing);
+      });
     });
 
     test('names every login item status', () async {
