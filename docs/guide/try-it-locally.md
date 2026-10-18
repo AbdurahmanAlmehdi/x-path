@@ -1,14 +1,29 @@
 # Try XPath locally
 
 This guide gets XPath running on your own Mac, connects your own accounts and runs a first dev
-build of `mataa_new_app`. It uses the local build of the app: signed with your Apple Development
-certificate, not notarized, no auto-update. Everything stays on this Mac; nothing in the repository
+build of `mataa_new_app`. Everything stays on this Mac; nothing in the repository
 of your app is written except the release tags and commits a prod release makes.
 
 You need macOS 13 or later, Xcode, git, and the Flutter toolchain your app uses (fvm if the app pins
 Flutter with `.fvmrc`). Shorebird is only needed for over-the-air patches.
 
-## 1. Build and install the app
+## 1. Install the app
+
+Install the notarized release with Homebrew (it asks you to trust the tap once):
+
+```bash
+brew trust abdurahmanalmehdi/tap
+```
+
+```bash
+brew install --cask abdurahmanalmehdi/tap/xpath
+```
+
+Later releases: `brew upgrade --cask xpath`. Without Homebrew, download `XPath-<version>.dmg` from the
+[latest release](https://github.com/AbdurahmanAlmehdi/x-path/releases/latest) and drag XPath to
+Applications.
+
+### Or build it from the repository
 
 From the XPath repository, with the repository's Flutter first on PATH:
 
@@ -165,8 +180,8 @@ removes the `xp` link if it points into the app. Tick **Also delete engine data*
 Keychain items** to remove everything (your repositories are never touched), then press **Move to
 Trash and quit**.
 
-## Not in this build
+## Updating
 
-Developer ID signing, notarization, the DMG, Sparkle updates and the Homebrew cask are not part of
-the local build. To update, pull the repository and run `tool/release/build_mac.sh --install`
-again; the engine and your data are kept.
+`brew upgrade --cask xpath` (or a newer DMG), then restart the engine with
+`launchctl kickstart -k gui/$(id -u)/ly.abdurahman.xpath.xpd`; the engine and your data are kept.
+A local build updates with `git pull` and `tool/release/build_mac.sh --install` again.

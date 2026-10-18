@@ -33,10 +33,18 @@ Secrets live on the engine machine: the login Keychain on macOS (services starti
 
 ### macOS: the app from a release
 
-Each GitHub Release of `AbdurahmanAlmehdi/x-path` carries `XPath-<version>.dmg`, signed with
-Developer ID and notarized. Open it, drag XPath to Applications, then open XPath and follow the
-setup below. Sparkle updates and a Homebrew cask are not available yet: to update, install the
-newer DMG over the old app.
+Install the notarized app with Homebrew. Homebrew asks to trust a third-party tap once:
+
+```sh
+brew trust abdurahmanalmehdi/tap
+brew install --cask abdurahmanalmehdi/tap/xpath
+```
+
+Add `--adopt` when XPath.app is already in /Applications from the DMG, so Homebrew takes it over.
+Update with `brew upgrade --cask xpath`, then restart the engine (below). Without Homebrew, each
+GitHub Release of `AbdurahmanAlmehdi/x-path` carries `XPath-<version>.dmg`, signed with Developer ID
+and notarized: open it and drag XPath to Applications. Then open XPath and follow the setup below.
+Sparkle updates are not available yet.
 
 ### macOS: the app built from the repository
 
