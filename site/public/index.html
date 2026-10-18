@@ -299,6 +299,9 @@
         <h3>Mac app</h3>
         <p>Download <code>XPath-&lt;version&gt;.dmg</code> from the latest release. It is signed with Developer ID and notarized by Apple, for Apple silicon Macs. The app carries the engine and the <code>xp</code> command. On first launch it starts the engine as a login item, links <code>xp</code> into your <code>PATH</code> and checks for Xcode, git, fvm, gh and Shorebird.</p>
         <p><a class="btn primary" href="https://github.com/AbdurahmanAlmehdi/x-path/releases/latest">Download for Mac</a></p>
+        <p>Or with Homebrew. It asks you to trust a third-party tap once:</p>
+<pre><code>brew trust abdurahmanalmehdi/tap
+brew install --cask abdurahmanalmehdi/tap/xpath</code></pre>
         <p class="muted">You need Xcode, git and the Flutter toolchain your apps use. Shorebird only for over-the-air patches.</p>
       </div>
       <div>
