@@ -42,6 +42,8 @@ enum MacosServicesChannel {
         registerAgent(result)
       case "agentUnregister":
         unregisterAgent(result)
+      case "agentRestart":
+        restartAgent(result)
       case "keychainItems":
         keychainItems(arguments["prefix"] as? String ?? keychainPrefix, result)
       case "appVersion":
@@ -95,7 +97,7 @@ enum MacosServicesChannel {
     }
   }
 
-  private static func registerAgent(_ result: FlutterResult) {
+  private static func registerAgent(_ result: @escaping FlutterResult) {
     guard #available(macOS 13.0, *) else {
       result("unsupported")
       return
@@ -123,6 +125,38 @@ enum MacosServicesChannel {
           )
         )
       }
+    }
+  }
+
+  /// Starts the engine again when it does not answer. `SMAppService` keeps
+  /// its own record of the agent, apart from launchd: after a
+  /// `launchctl bootout` (an old Homebrew upgrade did that) the status still
+  /// reads `.enabled` though launchd has no job, and registering again is
+  /// not enough. A registration can also name a copy of the app that moved
+  /// or was replaced. So an enabled agent is unregistered (which waits
+  /// until launchd has dropped the job) and registered again from this
+  /// bundle. One waiting in Login Items is left for the user to allow; any
+  /// other state is registered as the first time.
+  private static func restartAgent(_ result: @escaping FlutterResult) {
+    guard #available(macOS 13.0, *) else {
+      result("unsupported")
+      return
+    }
+    let service = SMAppService.agent(plistName: agentPlist)
+    switch service.status {
+    case .requiresApproval:
+      result("requiresApproval")
+    case .enabled:
+      service.unregister { error in
+        if let error = error {
+          // A job launchd already lost may answer "not found"; register
+          // again either way, and let that answer for the outcome.
+          NSLog("XPath: unregistering the engine before a restart: %@", error.localizedDescription)
+        }
+        DispatchQueue.main.async { registerAgent(result) }
+      }
+    default:
+      registerAgent(result)
     }
   }
 
