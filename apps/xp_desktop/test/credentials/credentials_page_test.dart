@@ -18,41 +18,55 @@ import '../helpers/pump_app.dart';
 void main() {
   setUpAll(() {
     registerFallbackValue(
-      const SaveCredentialRequest(
-        flavor: 'f',
+      const CreateCredentialRequest(
+        name: 'n',
         kind: CredentialKind.slack,
         material: {},
       ),
     );
+    registerFallbackValue(const ReplaceCredentialRequest({}));
   });
 
-  late MockProjectsRepository repository;
-  late StreamController<Snapshot<List<Credential>>> credentials;
+  late MockCredentialsRepository credentials;
+  late MockProjectsRepository projects;
+  late StreamController<Snapshot<List<NamedCredential>>> named;
+  late StreamController<Snapshot<List<Credential>>> assignments;
   late ShellCubit shell;
-  late List<SaveCredentialRequest> saved;
+  late List<Object> sent;
 
   setUp(() {
-    repository = MockProjectsRepository();
-    credentials = StreamController.broadcast();
+    credentials = MockCredentialsRepository();
+    projects = MockProjectsRepository();
+    named = StreamController.broadcast();
+    assignments = StreamController.broadcast();
     shell = ShellCubit(const CredentialsDestination());
-    saved = [];
-    when(() => repository.watchCredentials(any()))
-        .thenAnswer((_) => credentials.stream);
-    when(() => repository.saveCredential('prj_1', any()))
+    sent = [];
+    when(credentials.watchCredentials).thenAnswer((_) => named.stream);
+    when(() => projects.watchCredentials(any()))
+        .thenAnswer((_) => assignments.stream);
+    when(() => credentials.createCredential(any()))
         .thenAnswer((invocation) async {
-          saved.add(invocation.positionalArguments[1] as SaveCredentialRequest);
-          return ascKey;
+          sent.add(invocation.positionalArguments.single as Object);
+          return teamKey;
         });
-    when(() => repository.verifyCredential('prj_1', any()))
-        .thenAnswer((_) async => ascKey);
-    when(() => repository.deleteCredential('prj_1', any()))
+    when(() => credentials.replaceSecret(any(), any()))
+        .thenAnswer((invocation) async {
+          sent.add(invocation.positionalArguments[1] as Object);
+          return teamKey;
+        });
+    when(() => credentials.renameCredential(any(), any()))
+        .thenAnswer((_) async => teamKey);
+    when(() => credentials.verifyCredential(any()))
+        .thenAnswer((_) async => teamKey);
+    when(() => credentials.deleteCredential(any(), force: any(named: 'force')))
         .thenAnswer((_) async {});
   });
 
   Future<void> pump(
     WidgetTester tester, {
-    List<Credential> list = const [],
-    List<Project> projects = const [mataa, captain],
+    List<NamedCredential> list = const [],
+    List<Credential> assigned = const [],
+    List<Project> projectList = const [mataa, captain],
     String? projectId,
     EngineStatus status = EngineStatus.connected,
     FilePicker? pickFile,
@@ -60,32 +74,43 @@ void main() {
     await tester.pumpApp(
       CredentialsPage(projectId: projectId),
       shell: shell,
-      projectsRepository: repository,
+      credentialsRepository: credentials,
+      projectsRepository: projects,
       services: testServices(pickFile: pickFile),
       connection: connectionIn(connectedTo(status: status)),
-      projects: projectsIn(ProjectsState(loaded: true, projects: projects)),
+      projects: projectsIn(ProjectsState(loaded: true, projects: projectList)),
     );
     await tester.pump();
-    credentials.add(Snapshot(list));
+    named.add(Snapshot(list));
+    assignments.add(Snapshot(assigned));
     await tester.pumpAndSettle();
   }
 
   Finder field(String name) => find.byKey(Key('credentialForm.$name'));
 
-  Future<void> chooseKind(WidgetTester tester, String label) async {
-    await tester.tap(field('kind'));
+  Future<void> choose(WidgetTester tester, Finder select, String label) async {
+    await tester.tap(select);
     await tester.pumpAndSettle();
     await tester.tap(find.text(label).last);
     await tester.pumpAndSettle();
   }
 
+  Future<void> tapIn(WidgetTester tester, String id, String label) async {
+    await tester.tap(
+      find.descendant(of: find.byKey(ValueKey(id)), matching: find.text(label)),
+    );
+    await tester.pumpAndSettle();
+  }
+
   group('CredentialsPage', () {
-    testWidgets('lists credentials with their checks', (tester) async {
-      await pump(tester, list: [ascKey, playKey, slackHook]);
+    testWidgets('lists the named credentials with their checks and users', (
+      tester,
+    ) async {
+      await pump(tester, list: [teamKey, playAccountKey, slackWebhook]);
+      expect(find.text('Team App Store key'), findsOneWidget);
       expect(find.text('App Store Connect API key'), findsOneWidget);
-      expect(find.text('FANNAK'), findsOneWidget);
+      expect(find.text('ABC123DEF4'), findsOneWidget);
       expect(find.text('Verified'), findsOneWidget);
-      expect(find.text('apps/x · prod'), findsOneWidget);
       expect(find.text('Rejected'), findsOneWidget);
       expect(
         find.text(
@@ -95,26 +120,14 @@ void main() {
         findsOneWidget,
       );
       expect(find.text('Not checked'), findsOneWidget);
-    });
-
-    testWidgets('checks and deletes', (tester) async {
-      await pump(tester, list: [ascKey]);
-      await tester.tap(find.text('Check now'));
-      await tester.pumpAndSettle();
-      verify(() => repository.verifyCredential('prj_1', 'crd_1')).called(1);
-      await tester.tap(find.text('Delete'));
-      await tester.pumpAndSettle();
-      verify(() => repository.deleteCredential('prj_1', 'crd_1')).called(1);
-    });
-
-    testWidgets('says when there is none, or no project', (tester) async {
-      await pump(tester);
-      expect(find.text('No credentials yet.'), findsOneWidget);
-      await pump(tester, projects: const []);
+      expect(find.text('2 flavors'), findsOneWidget);
+      expect(find.text('1 flavor'), findsOneWidget);
+      expect(find.text('Not used'), findsOneWidget);
       expect(
-        find.text('Add a project first: credentials belong to its flavors.'),
+        find.byTooltip('acme/mataa_new_app · prod\nacme/mataa_new_app · dev'),
         findsOneWidget,
       );
+      expect(find.byTooltip('prj_2 · apps/captain · default'), findsOneWidget);
     });
 
     testWidgets('adds an App Store Connect key, reading the .p8 file', (
@@ -129,30 +142,29 @@ void main() {
       );
       await tester.tap(find.text('Add credential…'));
       await tester.pumpAndSettle();
-      expect(find.text('Check and save'), findsOneWidget);
+      expect(find.text('Add a credential'), findsOneWidget);
 
       await tester.tap(find.text('Check and save'));
-      expect(saved, isEmpty, reason: 'the fields are empty');
+      expect(sent, isEmpty, reason: 'the fields are empty');
 
-      await tester.enterText(field('keyId'), 'ABC123');
-      await tester.enterText(field('issuerId'), 'issuer');
+      await tester.enterText(field('name'), '  Team key ');
+      await tester.enterText(field('keyId'), 'ABC123DEF4');
+      await tester.enterText(field('issuerId'), 'issuer-fake');
       await tester.tap(find.text('Choose file…'));
       await tester.pumpAndSettle();
-      await tester.tap(field('flavor'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('dev').last);
-      await tester.pumpAndSettle();
+      await choose(tester, field('keyKind'), 'Individual key');
       await tester.tap(find.text('Check and save'));
       await tester.pumpAndSettle();
 
-      expect(saved, [
-        const SaveCredentialRequest(
-          flavor: 'dev',
+      expect(sent, [
+        const CreateCredentialRequest(
+          name: 'Team key',
           kind: CredentialKind.ascKey,
           material: {
-            'keyId': 'ABC123',
-            'issuerId': 'issuer',
+            'keyId': 'ABC123DEF4',
+            'issuerId': 'issuer-fake',
             'privateKey': '-----BEGIN PRIVATE KEY-----',
+            'keyKind': 'individual',
           },
         ),
       ]);
@@ -167,42 +179,46 @@ void main() {
       );
       await tester.tap(find.text('Add credential…'));
       await tester.pumpAndSettle();
-      await chooseKind(tester, 'Android keystore');
+      await choose(tester, field('kind'), 'Android keystore');
       await tester.tap(find.text('Choose file…'));
       await tester.pumpAndSettle();
       expect(find.text('upload.jks · 3 bytes'), findsOneWidget);
-      await tester.enterText(field('storePassword'), 'secret');
+      await tester.enterText(field('name'), 'Upload key');
+      await tester.enterText(field('storePassword'), 'fake-store-pass');
       await tester.enterText(field('keyAlias'), 'upload');
       await tester.pump();
       await tester.tap(find.text('Check and save'));
       await tester.pumpAndSettle();
-      expect(saved.single.material, {
+      expect((sent.single as CreateCredentialRequest).material, {
         'keystore': 'AQID',
-        'storePassword': 'secret',
+        'storePassword': 'fake-store-pass',
         'keyAlias': 'upload',
       });
     });
 
-    testWidgets('every kind has its fields; a cancelled pick changes nothing', (
-      tester,
-    ) async {
+    testWidgets('every named kind has its fields; a cancelled pick changes '
+        'nothing', (tester) async {
       await pump(tester);
       await tester.tap(find.text('Add credential…'));
+      await tester.pumpAndSettle();
+      await tester.tap(field('kind'));
+      await tester.pumpAndSettle();
+      expect(find.text('GitHub token'), findsNothing);
+      await tester.tap(find.text('App Store Connect API key').last);
       await tester.pumpAndSettle();
       for (final (label, fields) in [
         ('Apple ID', ['appleId', 'password']),
         ('Google Play service account', ['serviceAccount']),
         ('Firebase service account', ['serviceAccount']),
         ('Shorebird API key', ['token']),
-        ('GitHub token', ['token']),
         ('Slack webhook', ['webhookUrl']),
       ]) {
-        await chooseKind(tester, label);
+        await choose(tester, field('kind'), label);
         for (final name in fields) {
           expect(field(name), findsOneWidget, reason: '$label $name');
         }
       }
-      await chooseKind(tester, 'Google Play service account');
+      await choose(tester, field('kind'), 'Google Play service account');
       await tester.tap(find.text('Choose file…'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Cancel'));
@@ -210,19 +226,24 @@ void main() {
       expect(find.text('Check and save'), findsNothing);
     });
 
-    testWidgets('shows why the engine refused, and replaces a credential', (
+    testWidgets('shows why the engine refused, and replaces a secret', (
       tester,
     ) async {
-      when(() => repository.saveCredential('prj_1', any())).thenThrow(
+      when(() => credentials.replaceSecret(any(), any())).thenThrow(
         const ApiException(
           'The key was revoked.',
           statusCode: 422,
           code: ApiErrorCode.credentialRejected,
         ),
       );
-      await pump(tester, list: [ascKey]);
-      await tester.tap(find.text('Replace…'));
-      await tester.pumpAndSettle();
+      await pump(tester, list: [teamKey]);
+      await tapIn(tester, 'crd_1', 'Replace secret…');
+      expect(
+        find.text('Replace the secret of Team App Store key'),
+        findsOneWidget,
+      );
+      expect(field('name'), findsNothing);
+      expect(field('kind'), findsNothing);
       await tester.enterText(field('keyId'), 'K');
       await tester.enterText(field('issuerId'), 'I');
       await tester.enterText(field('privateKey'), 'P');
@@ -230,51 +251,204 @@ void main() {
       await tester.tap(find.text('Check and save'));
       await tester.pumpAndSettle();
       expect(find.text('Not saved: The key was revoked.'), findsOneWidget);
+
+      when(() => credentials.replaceSecret(any(), any()))
+          .thenAnswer((invocation) async {
+            sent.add(invocation.positionalArguments[1] as Object);
+            return teamKey;
+          });
+      await tester.tap(find.text('Check and save'));
+      await tester.pumpAndSettle();
+      expect(sent, [
+        const ReplaceCredentialRequest({
+          'keyId': 'K',
+          'issuerId': 'I',
+          'privateKey': 'P',
+          'keyKind': 'team',
+        }),
+      ]);
+      expect(find.text('Check and save'), findsNothing, reason: 'closed');
     });
 
-    testWidgets('replaces a credential of a flavor the scan no longer has', (
+    testWidgets('renames a credential', (tester) async {
+      await pump(tester, list: [teamKey]);
+      await tapIn(tester, 'crd_1', 'Rename…');
+      expect(find.text('Rename Team App Store key'), findsOneWidget);
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+      verifyNever(() => credentials.renameCredential(any(), any()));
+
+      await tapIn(tester, 'crd_1', 'Rename…');
+      await tester.enterText(
+        find.byKey(const Key('renameCredential.name')),
+        ' Old team key ',
+      );
+      await tester.pump();
+      await tester.tap(find.text('Rename'));
+      await tester.pumpAndSettle();
+      verify(() => credentials.renameCredential('crd_1', 'Old team key'))
+          .called(1);
+    });
+
+    testWidgets('checks a credential again', (tester) async {
+      await pump(tester, list: [teamKey]);
+      await tapIn(tester, 'crd_1', 'Check now');
+      verify(() => credentials.verifyCredential('crd_1')).called(1);
+    });
+
+    testWidgets('deletes an unused credential after a simple confirmation', (
       tester,
     ) async {
-      await pump(tester, list: [playKey]);
-      await tester.tap(find.text('Replace…'));
+      await pump(tester, list: [slackWebhook]);
+      await tapIn(tester, 'crd_3', 'Delete…');
+      expect(find.text('Delete Releases channel?'), findsOneWidget);
+      expect(find.text('No flavor uses it.'), findsOneWidget);
+      await tester.tap(find.text('Keep it'));
       await tester.pumpAndSettle();
-      expect(find.text('Google Play service account'), findsNWidgets(2));
+      verifyNever(
+        () => credentials.deleteCredential(any(), force: any(named: 'force')),
+      );
+
+      await tapIn(tester, 'crd_3', 'Delete…');
+      await tester.tap(find.text('Delete'));
+      await tester.pumpAndSettle();
+      verify(() => credentials.deleteCredential('crd_3')).called(1);
+    });
+
+    testWidgets('deletes a credential in use only once the owner saw where', (
+      tester,
+    ) async {
+      await pump(tester, list: [teamKey]);
+      await tapIn(tester, 'crd_1', 'Delete…');
+      expect(
+        find.text(
+          '2 flavors use it. They will have no App Store Connect API key '
+          'until you assign another:',
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('acme/mataa_new_app · prod'), findsOneWidget);
+      expect(find.text('acme/mataa_new_app · dev'), findsOneWidget);
+      await tester.tap(find.text('Unassign and delete'));
+      await tester.pumpAndSettle();
+      verify(() => credentials.deleteCredential('crd_1', force: true))
+          .called(1);
+    });
+
+    testWidgets('asks again when a credential came into use meanwhile', (
+      tester,
+    ) async {
+      when(() => credentials.deleteCredential('crd_3')).thenThrow(
+        CredentialInUse('In use.', usedBy: teamKey.usedBy.sublist(0, 1)),
+      );
+      await pump(tester, list: [slackWebhook]);
+      await tapIn(tester, 'crd_3', 'Delete…');
+      await tester.tap(find.text('Delete'));
+      await tester.pumpAndSettle();
+      expect(
+        find.text(
+          '1 flavor uses it. It will have no Slack webhook until you assign '
+          'another:',
+        ),
+        findsOneWidget,
+      );
+      await tester.tap(find.text('Unassign and delete'));
+      await tester.pumpAndSettle();
+      verify(() => credentials.deleteCredential('crd_3', force: true))
+          .called(1);
+    });
+
+    testWidgets('says when there is none, or no project', (tester) async {
+      await pump(tester);
+      expect(
+        find.text(
+          'No credentials yet. Add one, then assign it to the flavors that '
+          'need it.',
+        ),
+        findsOneWidget,
+      );
+      await pump(tester, projectList: const []);
+      expect(
+        find.text('Add a project to give its flavors credentials.'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('shows the flavors of a project with their credentials', (
+      tester,
+    ) async {
+      await pump(tester, list: [teamKey], assigned: [ascKey, devAscKey]);
+      expect(find.text('Flavors'), findsOneWidget);
+      expect(find.text('App Store Connect API key: '), findsNWidgets(2));
+      expect(find.text('Team App Store key'), findsNWidgets(3));
+      expect(find.text('Verified'), findsNWidgets(2));
+      expect(find.text('Rejected'), findsOneWidget);
+      verify(() => projects.watchCredentials('prj_1')).called(1);
+
+      await tester.tap(find.text('Manage…').first);
+      await tester.pumpAndSettle();
+      expect(find.text('Credentials of prod'), findsOneWidget);
     });
 
     testWidgets('names flavors by app when a project has several apps', (
       tester,
     ) async {
       await pump(tester, projectId: 'prj_2');
-      await tester.tap(find.text('Add credential…'));
-      await tester.pumpAndSettle();
       expect(find.text('captain · default'), findsOneWidget);
+      expect(find.text('None assigned'), findsNWidgets(2));
+      expect(find.text('None'), findsNWidgets(2));
+    });
+
+    testWidgets('says when the project has no app', (tester) async {
+      await pump(
+        tester,
+        projectList: const [
+          Project(
+            id: 'prj_3',
+            githubRepoId: 3,
+            fullName: 'acme/empty',
+            remote: 'r',
+            defaultBaseBranch: 'main',
+          ),
+        ],
+      );
+      expect(find.text('No Flutter app found.'), findsOneWidget);
     });
 
     testWidgets('switches project', (tester) async {
       await pump(tester);
-      await tester.tap(find.byKey(const Key('credentials.project')));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('acme/mataa_captain').last);
-      await tester.pumpAndSettle();
+      await choose(
+        tester,
+        find.byKey(const Key('credentials.project')),
+        'acme/mataa_captain',
+      );
       expect(shell.state, const CredentialsDestination('prj_2'));
     });
 
     testWidgets('is read-only while the engine is away', (tester) async {
-      await pump(tester, list: [ascKey], status: EngineStatus.unreachable);
+      await pump(tester, list: [teamKey], status: EngineStatus.unreachable);
       await tester.tap(find.text('Add credential…'));
-      await tester.tap(find.text('Check now'));
-      await tester.tap(find.text('Replace…'));
-      await tester.tap(find.text('Delete'));
-      await tester.pumpAndSettle();
+      for (final label in [
+        'Check now',
+        'Rename…',
+        'Replace secret…',
+        'Delete…',
+      ]) {
+        await tapIn(tester, 'crd_1', label);
+      }
       expect(find.text('Check and save'), findsNothing);
-      verifyNever(() => repository.verifyCredential(any(), any()));
+      expect(find.text('Rename Team App Store key'), findsNothing);
+      verifyNever(() => credentials.verifyCredential(any()));
     });
 
     testWidgets('shows what failed', (tester) async {
-      await pump(tester, list: [ascKey]);
-      credentials.addError(const ConnectionException('gone'));
+      await pump(tester, list: [teamKey]);
+      assignments.addError(const ConnectionException('away'));
       await tester.pumpAndSettle();
-      expect(find.text('gone'), findsOneWidget);
+      expect(find.text('away'), findsOneWidget);
+      named.addError(const ConnectionException('gone'));
+      await tester.pumpAndSettle();
+      expect(find.text('gone'), findsNWidgets(2));
     });
   });
 }

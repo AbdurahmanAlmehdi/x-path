@@ -473,17 +473,20 @@ void main() {
     };
 
     Future<(FakeRunner, String)> signing() async {
-      await h.credentials.save(
-        const CredentialRecord(
-          id: 'crd_1',
+      await h.credentials.put(
+        const AssignedCredential(
           flavor: CredentialFlavor(
             id: 'flv_1',
             projectId: 'prj_1',
             appPath: '.',
             name: 'prod',
           ),
-          kind: CredentialKind.keystore,
-          secretKey: 'ks',
+          credential: CredentialRecord(
+            id: 'crd_1',
+            name: 'crd_1',
+            kind: CredentialKind.keystore,
+            secretKey: 'ks',
+          ),
         ),
       );
       await h.secrets.writeBytes('ks', [0xff, 0xfe, 0x00, 0x01]);
@@ -542,17 +545,20 @@ void main() {
     });
 
     test('gives the Shorebird key of a step once, masked (ADR 0012)', () async {
-      await h.credentials.save(
-        const CredentialRecord(
-          id: 'crd_2',
+      await h.credentials.put(
+        const AssignedCredential(
           flavor: CredentialFlavor(
             id: 'flv_1',
             projectId: 'prj_1',
             appPath: '.',
             name: 'prod',
           ),
-          kind: CredentialKind.shorebird,
-          secretKey: 'sb',
+          credential: CredentialRecord(
+            id: 'crd_2',
+            name: 'crd_2',
+            kind: CredentialKind.shorebird,
+            secretKey: 'sb',
+          ),
         ),
       );
       await h.secrets.write('sb', 'sb_api_secret');

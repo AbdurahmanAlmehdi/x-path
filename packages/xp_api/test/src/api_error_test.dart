@@ -12,6 +12,7 @@ void main() {
           ApiErrorCode.forbidden: 403,
           ApiErrorCode.notFound: 404,
           ApiErrorCode.conflict: 409,
+          ApiErrorCode.credentialInUse: 409,
           ApiErrorCode.alreadyDecided: 409,
           ApiErrorCode.resyncRequired: 409,
           ApiErrorCode.credentialRejected: 422,

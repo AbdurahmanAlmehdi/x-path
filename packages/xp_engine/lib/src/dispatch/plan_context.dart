@@ -164,7 +164,7 @@ class JobContext {
   final CredentialFlavor? credentialFlavor;
 
   /// The credentials the flavor has.
-  final List<CredentialRecord> credentials;
+  final List<AssignedCredential> credentials;
 
   /// The job (its id as planned) that `commitFrom` names, by the id the
   /// workflow gives it.
@@ -178,7 +178,7 @@ class JobContext {
   };
 
   /// The credential of [kind], if the flavor has one.
-  CredentialRecord? credential(CredentialKind kind) =>
+  AssignedCredential? credential(CredentialKind kind) =>
       credentials.where((record) => record.kind == kind).firstOrNull;
 }
 
@@ -186,7 +186,7 @@ class JobContext {
 /// `flavor.credentials.play_sa`, ...).
 Map<String, Object?> flavorScope(
   FlavorProfile flavor,
-  Iterable<CredentialRecord> credentials,
+  Iterable<AssignedCredential> credentials,
 ) => {
   'name': flavor.name,
   'implicit': flavor.implicit,

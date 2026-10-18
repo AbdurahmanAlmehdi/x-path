@@ -334,6 +334,166 @@ void main() {
       expected: sample.artifact,
     ),
     _Endpoint(
+      'listNamedCredentials',
+      method: 'GET',
+      path: '/credentials',
+      response: const NamedCredentialsResponse([sample.namedCredential])
+          .toJson(),
+      call: (client) => client.listNamedCredentials(),
+      expected: const [sample.namedCredential],
+    ),
+    _Endpoint(
+      'getNamedCredential',
+      method: 'GET',
+      path: '/credentials/crd_1',
+      response: sample.namedCredential.toJson(),
+      call: (client) => client.getNamedCredential('crd_1'),
+      expected: sample.namedCredential,
+    ),
+    _Endpoint(
+      'createCredential',
+      method: 'POST',
+      path: '/credentials',
+      status: 201,
+      response: sample.namedCredential.toJson(),
+      call: (client) => client.createCredential(
+        const CreateCredentialRequest(
+          name: 'Play publisher',
+          kind: CredentialKind.playSa,
+          material: {'serviceAccount': '{}'},
+        ),
+      ),
+      expected: sample.namedCredential,
+      body: {
+        'name': 'Play publisher',
+        'kind': 'play_sa',
+        'serviceAccount': '{}',
+      },
+    ),
+    _Endpoint(
+      'renameCredential',
+      method: 'PATCH',
+      path: '/credentials/crd_1',
+      response: sample.namedCredential.toJson(),
+      call: (client) => client.renameCredential('crd_1', 'Play publisher'),
+      expected: sample.namedCredential,
+      body: {'name': 'Play publisher'},
+    ),
+    _Endpoint(
+      'replaceCredentialSecret',
+      method: 'PUT',
+      path: '/credentials/crd_1',
+      response: sample.namedCredential.toJson(),
+      call: (client) => client.replaceCredentialSecret(
+        'crd_1',
+        const ReplaceCredentialRequest({'serviceAccount': '{}'}),
+      ),
+      expected: sample.namedCredential,
+      body: {'serviceAccount': '{}'},
+    ),
+    _Endpoint(
+      'verifyNamedCredential',
+      method: 'POST',
+      path: '/credentials/crd_1/verify',
+      response: sample.namedCredential.toJson(),
+      call: (client) => client.verifyNamedCredential('crd_1'),
+      expected: sample.namedCredential,
+    ),
+    _Endpoint(
+      'deleteNamedCredential',
+      method: 'DELETE',
+      path: '/credentials/crd_1',
+      status: 204,
+      response: null,
+      call: (client) async {
+        await client.deleteNamedCredential('crd_1');
+        return 'deleted';
+      },
+      expected: 'deleted',
+    ),
+    _Endpoint(
+      'deleteNamedCredential with force',
+      method: 'DELETE',
+      path: '/credentials/crd_1',
+      query: {'force': 'true'},
+      status: 204,
+      response: null,
+      call: (client) async {
+        await client.deleteNamedCredential('crd_1', force: true);
+        return 'deleted';
+      },
+      expected: 'deleted',
+    ),
+    _Endpoint(
+      'assignCredential',
+      method: 'PUT',
+      path: '/projects/prj_1/flavors/prod/credentials/play_sa',
+      response: const AssignCredentialResponse(assigned: [sample.credential])
+          .toJson(),
+      call: (client) => client.assignCredential(
+        'prj_1',
+        flavor: 'prod',
+        kind: CredentialKind.playSa,
+        request: const AssignCredentialRequest(credentialId: 'crd_1'),
+      ),
+      expected: const AssignCredentialResponse(assigned: [sample.credential]),
+      body: {'credentialId': 'crd_1', 'allFlavors': false, 'replace': false},
+    ),
+    _Endpoint(
+      'assignCredential of an app below the root',
+      method: 'PUT',
+      path: '/projects/prj_1/flavors/prod/credentials/play_sa',
+      query: {'app': 'apps/shop'},
+      response: const AssignCredentialResponse(assigned: [sample.credential])
+          .toJson(),
+      call: (client) => client.assignCredential(
+        'prj_1',
+        app: 'apps/shop',
+        flavor: 'prod',
+        kind: CredentialKind.playSa,
+        request: const AssignCredentialRequest(
+          credentialId: 'crd_1',
+          allFlavors: true,
+        ),
+      ),
+      expected: const AssignCredentialResponse(assigned: [sample.credential]),
+      body: {'credentialId': 'crd_1', 'allFlavors': true, 'replace': false},
+    ),
+    _Endpoint(
+      'unassignCredential',
+      method: 'DELETE',
+      path: '/projects/prj_1/flavors/prod/credentials/play_sa',
+      status: 204,
+      response: null,
+      call: (client) async {
+        await client.unassignCredential(
+          'prj_1',
+          flavor: 'prod',
+          kind: CredentialKind.playSa,
+        );
+        return 'unassigned';
+      },
+      expected: 'unassigned',
+    ),
+    _Endpoint(
+      'unassignCredential of an app below the root',
+      method: 'DELETE',
+      path: '/projects/prj_1/flavors/prod/credentials/play_sa',
+      query: {'app': 'apps/shop'},
+      status: 204,
+      response: null,
+      call: (client) async {
+        await client.unassignCredential(
+          'prj_1',
+          app: 'apps/shop',
+          flavor: 'prod',
+          kind: CredentialKind.playSa,
+        );
+        return 'unassigned';
+      },
+      expected: 'unassigned',
+    ),
+    _Endpoint(
       'listCredentials',
       method: 'GET',
       path: '/projects/prj_1/credentials',

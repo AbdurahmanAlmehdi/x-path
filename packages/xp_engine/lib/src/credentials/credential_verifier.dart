@@ -42,6 +42,7 @@ class VerificationResult extends Equatable {
 }
 
 /// The flavor a credential is checked for: a check may use its identifiers.
+/// An empty target is the check of the credential on its own.
 class CredentialTarget extends Equatable {
   /// Creates a target.
   const new({this.iosBundleId, this.androidAppId});
@@ -64,6 +65,10 @@ class CredentialTarget extends Equatable {
 /// Checks the credentials of one kind with the store or tool they are for,
 /// with a cheap read that changes nothing.
 ///
+/// A credential is checked on its own with an empty [CredentialTarget] (does
+/// it authenticate), and, when [checksTarget], once more for each flavor that
+/// uses it with the flavor's identifiers (can it reach the flavor's app).
+///
 /// A verifier turns the failures it expects into a [VerificationResult]; it
 /// does not throw them. `xp_engine` has the verifiers that need nothing but
 /// its own ports, `xp_adapters` the ones that need a CLI or HTTP of their own.
@@ -71,7 +76,11 @@ abstract interface class CredentialVerifier {
   /// The kind it checks.
   CredentialKind get kind;
 
-  /// Checks [material], which is of [kind].
+  /// Whether a check with a flavor's [CredentialTarget] finds out more than
+  /// one without: whether the credential reaches the flavor's app.
+  bool get checksTarget;
+
+  /// Checks [material], which is of [kind], for [target].
   Future<VerificationResult> verify(
     CredentialMaterial material,
     CredentialTarget target,
@@ -80,11 +89,15 @@ abstract interface class CredentialVerifier {
 
 /// A [CredentialVerifier] that answers what the test says.
 class FakeCredentialVerifier implements CredentialVerifier {
-  /// Creates a verifier of [kind] that accepts everything.
-  new(this.kind);
+  /// Creates a verifier of [kind] that accepts everything; it checks targets
+  /// if [checksTarget].
+  new(this.kind, {this.checksTarget = false});
 
   @override
   final CredentialKind kind;
+
+  @override
+  bool checksTarget;
 
   /// What the next calls answer, in order; when empty the verifier accepts.
   final answers = <VerificationResult>[];

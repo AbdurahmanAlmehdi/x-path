@@ -481,14 +481,15 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get credentialsSubtitle =>
-      'Checked every day and before each build. The secrets stay on the engine machine.';
+      'Shared by every project on this engine. Checked every day and before each build; the secrets stay on the engine machine.';
 
   @override
   String get credentialsNoProject =>
-      'Add a project first: credentials belong to its flavors.';
+      'Add a project to give its flavors credentials.';
 
   @override
-  String get credentialsEmpty => 'No credentials yet.';
+  String get credentialsEmpty =>
+      'No credentials yet. Add one, then assign it to the flavors that need it.';
 
   @override
   String get credentialsAdd => 'Add credential…';
@@ -497,10 +498,47 @@ class AppLocalizationsEn extends AppLocalizations {
   String get credentialsVerify => 'Check now';
 
   @override
-  String get credentialsReplace => 'Replace…';
+  String get credentialsReplace => 'Replace secret…';
 
   @override
-  String get credentialsDelete => 'Delete';
+  String get credentialsDelete => 'Delete…';
+
+  @override
+  String get credentialsRename => 'Rename…';
+
+  @override
+  String get credentialsColumnName => 'Name';
+
+  @override
+  String get credentialsColumnUsedBy => 'Used by';
+
+  @override
+  String get credentialsColumnAssigned => 'Credentials';
+
+  @override
+  String credentialsUsedBy(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count flavors',
+      one: '1 flavor',
+      zero: 'Not used',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get credentialsFlavorsTitle => 'Flavors';
+
+  @override
+  String get credentialsFlavorsHelp =>
+      'Each flavor uses at most one credential of each kind. Several flavors, of any project, can share one.';
+
+  @override
+  String get credentialsNoneAssigned => 'None assigned';
+
+  @override
+  String get credentialsManage => 'Manage…';
 
   @override
   String get credentialsColumnFlavor => 'Flavor';
@@ -560,7 +598,28 @@ class AppLocalizationsEn extends AppLocalizations {
       'The engine checks it with the place it is for before it keeps it. Nothing is stored if the check fails.';
 
   @override
-  String get fieldFlavor => 'Flavor';
+  String credentialFormReplaceTitle(String name) {
+    return 'Replace the secret of $name';
+  }
+
+  @override
+  String get credentialFormReplaceHelp =>
+      'Its name and the flavors that use it stay. The engine checks the new secret first; nothing changes if the check fails. The old secret is not shown.';
+
+  @override
+  String get fieldCredentialName => 'Name';
+
+  @override
+  String get fieldCredentialNameHint => 'Team App Store key';
+
+  @override
+  String get fieldKeyKind => 'Key type';
+
+  @override
+  String get keyKindTeam => 'Team key';
+
+  @override
+  String get keyKindIndividual => 'Individual key';
 
   @override
   String get fieldKind => 'Kind';
@@ -611,6 +670,121 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get credentialFormCancel => 'Cancel';
+
+  @override
+  String renameCredentialTitle(String name) {
+    return 'Rename $name';
+  }
+
+  @override
+  String get renameCredentialHelp =>
+      'Its secret and the flavors that use it stay.';
+
+  @override
+  String get renameCredentialConfirm => 'Rename';
+
+  @override
+  String deleteCredentialTitle(String name) {
+    return 'Delete $name?';
+  }
+
+  @override
+  String get deleteCredentialSecret =>
+      'Its secret is deleted from the engine machine.';
+
+  @override
+  String get deleteCredentialUnused => 'No flavor uses it.';
+
+  @override
+  String deleteCredentialUsed(int count, String kind) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          '$count flavors use it. They will have no $kind until you assign another:',
+      one: '1 flavor uses it. It will have no $kind until you assign another:',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get deleteCredentialKeep => 'Keep it';
+
+  @override
+  String get deleteCredentialConfirm => 'Delete';
+
+  @override
+  String get deleteCredentialConfirmInUse => 'Unassign and delete';
+
+  @override
+  String flavorCredentialsTitle(String flavor) {
+    return 'Credentials of $flavor';
+  }
+
+  @override
+  String get flavorCredentialsHelp =>
+      'The credential this flavor uses for each kind, with what the last checks found: does it work, and can it reach this flavor\'s app.';
+
+  @override
+  String get flavorCredentialsNotAssigned => 'Not assigned';
+
+  @override
+  String get flavorCredentialsAssign => 'Assign…';
+
+  @override
+  String get flavorCredentialsChange => 'Change…';
+
+  @override
+  String get flavorCredentialsRemove => 'Remove from this flavor';
+
+  @override
+  String get flavorCredentialsCredential => 'Credential';
+
+  @override
+  String get flavorCredentialsAddNew => 'Add new…';
+
+  @override
+  String get flavorCredentialsUseFor => 'Use for';
+
+  @override
+  String get flavorCredentialsThisFlavor => 'This flavor';
+
+  @override
+  String flavorCredentialsEveryFlavor(String app) {
+    return 'Every flavor of $app';
+  }
+
+  @override
+  String get flavorCredentialsReplace => 'Replace existing';
+
+  @override
+  String flavorCredentialsReplaceOff(String kind) {
+    return 'Flavors that have their own $kind keep it.';
+  }
+
+  @override
+  String flavorCredentialsReplaceOn(String kind) {
+    return 'Every flavor of the app uses this $kind, even those that have their own.';
+  }
+
+  @override
+  String get flavorCredentialsConfirm => 'Assign';
+
+  @override
+  String get flavorCredentialsCreate => 'Check, save and assign';
+
+  @override
+  String flavorCredentialsKept(int count, String flavors) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          '$flavors kept their own credentials. Tick “Replace existing” to change them too.',
+      one:
+          '$flavors kept its own credential. Tick “Replace existing” to change it too.',
+    );
+    return '$_temp0';
+  }
 
   @override
   String get statusQueued => 'Queued';
@@ -1186,6 +1360,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get ledgerCredentialsNone => 'None';
+
+  @override
+  String get ledgerCredentialsAssign => 'Assign…';
+
+  @override
+  String get ledgerCredentialsManage => 'Manage the credentials of this flavor';
 
   @override
   String get ledgerNoFlavors => 'No flavor to show.';

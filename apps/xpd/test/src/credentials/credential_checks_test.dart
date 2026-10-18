@@ -14,6 +14,14 @@ import '../../helpers/credential_fakes.dart';
 
 const _bundleId = 'com.mataa.app';
 
+final _owner = DeviceToken(
+  id: 'tok_app',
+  name: 'Mac',
+  kind: DeviceTokenKind.app,
+  hash: 'h',
+  createdAt: DateTime.utc(2026),
+);
+
 /// The whole of the credential checks against the fake stores: the real
 /// clients, the real SQLite repository and the real verifiers, with the
 /// programs (`altool`, `keytool`, `shorebird`) behind a fake process runner.
@@ -35,13 +43,14 @@ void main() {
   late CredentialChecks checks;
 
   Future<Credential> save(Map<String, Object?> material) async =>
-      (await checks.service.save(
+      (await checks.service.saveForFlavor(
         'prj_1',
         SaveCredentialRequest(
           flavor: 'prod',
           kind: CredentialKind.fromWire(material['kind']! as String)!,
           material: {...material}..remove('kind'),
         ),
+        by: _owner,
       )).credential;
 
   Map<String, Object?> ascKey({String keyId = fakeAscKeyId}) => {
@@ -183,7 +192,13 @@ void main() {
         (await apple.credentials.forBundleId(_bundleId))?.keyId,
         fakeAscKeyId,
       );
-      expect(asc.requests.single.uri.queryParameters['limit'], '1');
+      // The key on its own, then the key for the flavor's app.
+      expect(asc.requests, hasLength(3));
+      expect(asc.requests.first.uri.queryParameters['limit'], '1');
+      expect(
+        asc.requests.last.uri.queryParameters['filter[bundleId]'],
+        _bundleId,
+      );
     });
 
     test('is refused with a fix when Apple does not know the key', () async {
@@ -318,7 +333,7 @@ void main() {
 
       final record = (await checks.repository.get(credential.id))!;
       expect(record.status, CredentialStatus.rejected);
-      expect(record.message, contains('Google refused'));
+      expect(record.check.message, contains('Google refused'));
     });
   });
 
@@ -414,6 +429,45 @@ void main() {
       expect(checks.health.isRunning, isTrue);
       checks.close();
       expect(checks.health.isRunning, isFalse);
+    });
+
+    test('a named key shared by flavors is checked for each app', () async {
+      database.connection.execute(
+        'INSERT INTO flavor (id, app_id, name, entrypoint, ios_bundle_id) '
+        "VALUES ('flv_dev', 'app_1', 'dev', 'lib/main.dart', 'com.other.app')",
+      );
+      final key = await checks.service.create(
+        CreateCredentialRequest(
+          name: 'Personal Apple Dev Account',
+          kind: CredentialKind.ascKey,
+          material: {...ascKey()}..remove('kind'),
+        ),
+        by: _owner,
+      );
+
+      final assigned = await checks.service.assign(
+        'prj_1',
+        app: '.',
+        flavor: 'prod',
+        kind: CredentialKind.ascKey,
+        request: AssignCredentialRequest(
+          credentialId: key.id,
+          allFlavors: true,
+        ),
+        by: _owner,
+      );
+
+      expect(
+        {
+          for (final credential in assigned.assigned)
+            credential.flavor: credential.assignmentStatus,
+        },
+        {'dev': CredentialStatus.rejected, 'prod': CredentialStatus.verified},
+      );
+      expect(
+        (await checks.guardCheck.run(guardRequest())).status,
+        GuardStatus.passed,
+      );
     });
 
     test('checks every day', () {

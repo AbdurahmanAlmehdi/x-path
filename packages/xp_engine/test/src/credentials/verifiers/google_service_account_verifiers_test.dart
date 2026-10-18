@@ -22,6 +22,7 @@ void main() {
 
     test('is the verifier of Play service accounts', () {
       expect(verifier.kind, CredentialKind.playSa);
+      expect(verifier.checksTarget, isTrue);
     });
 
     test('accepts an account that can read the internal track', () async {
@@ -104,6 +105,7 @@ void main() {
 
     test('is the verifier of Firebase service accounts', () {
       expect(verifier.kind, CredentialKind.firebaseSa);
+      expect(verifier.checksTarget, isFalse);
     });
 
     test('accepts an account Google gives a token', () async {

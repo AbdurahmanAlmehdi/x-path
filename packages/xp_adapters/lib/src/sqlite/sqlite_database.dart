@@ -31,7 +31,9 @@ class SqliteDatabase {
   ///
   /// The connection uses `journal_mode=WAL`, `busy_timeout` of [busyTimeout]
   /// and `foreign_keys=ON`. When an existing database has to be migrated, a
-  /// copy of it is first written to `<path>.bak-v<old version>`.
+  /// copy of it is first written to `<path>.bak-v<old version>`. [onNote]
+  /// hears what a migration says it does to the data that is there
+  /// ([Migration.notes]).
   ///
   /// Throws a [DatabaseOpenException] if the file cannot be opened, was
   /// written by a newer engine or a migration fails, and an [ArgumentError]
@@ -40,21 +42,25 @@ class SqliteDatabase {
     String path, {
     Duration busyTimeout = const Duration(seconds: 5),
     List<Migration> migrations = engineMigrations,
+    void Function(String note)? onNote,
   }) => _open(
     () => sqlite3.open(path),
     path: path,
     busyTimeout: busyTimeout,
     migrations: migrations,
+    onNote: onNote,
   );
 
   /// Opens an empty database that lives in memory, migrated to the newest
   /// schema in [migrations]. For tests.
   static SqliteDatabase openInMemory({
     List<Migration> migrations = engineMigrations,
+    void Function(String note)? onNote,
   }) => _open(
     sqlite3.openInMemory,
     busyTimeout: Duration.zero,
     migrations: migrations,
+    onNote: onNote,
   );
 
   /// The one connection. Use it for statements; use [transaction] to group
@@ -77,6 +83,7 @@ class SqliteDatabase {
     required Duration busyTimeout,
     required List<Migration> migrations,
     String? path,
+    void Function(String note)? onNote,
   }) {
     for (var i = 0; i < migrations.length; i++) {
       if (migrations[i].version != i + 1) {
@@ -91,7 +98,7 @@ class SqliteDatabase {
     try {
       connection = connect();
       _configure(connection, busyTimeout);
-      _migrate(connection, migrations, path);
+      _migrate(connection, migrations, path, onNote);
       return ._(connection);
     } on Object catch (error) {
       connection?.close();
@@ -116,6 +123,7 @@ class SqliteDatabase {
     Database connection,
     List<Migration> migrations,
     String? path,
+    void Function(String note)? onNote,
   ) {
     final current = connection.userVersion;
     final latest = migrations.length;
@@ -135,6 +143,11 @@ class SqliteDatabase {
       _inTransaction(connection, () {
         // Another process may have migrated since we looked.
         if (connection.userVersion >= migration.version) return;
+        if (migration.notes case final notes?) {
+          for (final row in connection.select(notes)) {
+            onNote?.call(row.columnAt(0) as String);
+          }
+        }
         connection
           ..execute(migration.sql)
           ..userVersion = migration.version;

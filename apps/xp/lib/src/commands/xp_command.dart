@@ -11,7 +11,13 @@ import 'package:xp_client/xp_client.dart';
 /// A command that groups subcommands, for example `xp projects`.
 class XpGroup extends Command<int> {
   /// Creates the group.
-  new(this._context, this.name, this.description, List<Command<int>> commands) {
+  new(
+    this._context,
+    this.name,
+    this.description,
+    List<Command<int>> commands, {
+    this.aliases = const [],
+  }) {
     commands.forEach(addSubcommand);
   }
 
@@ -22,6 +28,9 @@ class XpGroup extends Command<int> {
 
   @override
   final String description;
+
+  @override
+  final List<String> aliases;
 
   @override
   void printUsage() => _context.logger.info(usage);

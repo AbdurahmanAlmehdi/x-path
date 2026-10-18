@@ -35,6 +35,9 @@ class ShorebirdCliVerifier implements CredentialVerifier {
   CredentialKind get kind => CredentialKind.shorebird;
 
   @override
+  bool get checksTarget => false;
+
+  @override
   Future<VerificationResult> verify(
     CredentialMaterial material,
     CredentialTarget target,

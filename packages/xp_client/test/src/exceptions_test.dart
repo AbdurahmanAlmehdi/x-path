@@ -17,6 +17,33 @@ void main() {
       expect(error.toString(), 'ApiException(403 forbidden): No.');
     });
 
+    test('reads the flavors that use a credential it did not delete', () {
+      final error = ApiException.fromResponse(
+        409,
+        '{"error": {"code": "credential_in_use", "message": "Used."}, '
+        '"usedBy": [{"projectId": "prj_1", "app": ".", "flavor": "prod", '
+        '"status": "verified"}]}',
+      );
+
+      expect(error.isCredentialInUse, isTrue);
+      expect(error.isForbidden, isFalse);
+      expect(error.usedBy, const [
+        CredentialUsage(
+          projectId: 'prj_1',
+          app: '.',
+          flavor: 'prod',
+          status: CredentialStatus.verified,
+        ),
+      ]);
+      expect(
+        ApiException.fromResponse(
+          403,
+          '{"error": {"code": "forbidden", "message": "No."}}',
+        ).usedBy,
+        isEmpty,
+      );
+    });
+
     test('a code it does not know is no envelope', () {
       final error = ApiException.fromResponse(
         400,

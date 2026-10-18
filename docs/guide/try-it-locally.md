@@ -91,10 +91,19 @@ From a terminal the same import is:
 
 ## 5. Add your credentials
 
-Open **Credentials** in the sidebar and press **Add credential…** once per credential. Pick the
-**Flavor** it belongs to and the **Kind**, fill the fields and press **Check and save**. The engine
-checks each one with the service it is for and stores nothing if the check fails. The secrets stay
-on this Mac.
+Credentials have names and are shared: add each one once, then give it to the flavors that use it.
+One App Store Connect key can serve both `dev` and `prod`, and two Shorebird keys are told apart by
+their names. The secrets stay on this Mac.
+
+1. Open **Credentials** in the sidebar and press **Add credential…** once per credential. Give it a
+   **Name** you will recognise (for example "Personal Apple Dev Account"), pick the **Kind**, fill
+   the fields and press **Check and save**. The engine checks it with the service it is for and
+   stores nothing if the check fails.
+2. Under **Flavors**, pick **mataa_new_app** and press **Manage…** on a flavor (or click the
+   credentials of a flavor on the project overview). For each kind, **Assign…** picks an existing
+   credential or **Add new…**. **Use for** says whether it is for **This flavor** or **Every flavor
+   of** the app; flavors that already have a credential of that kind keep it unless **Replace
+   existing** is ticked.
 
 | Kind | Fields | Where to get it |
 |---|---|---|
@@ -104,10 +113,24 @@ on this Mac.
 | Firebase service account | Service account key (JSON) | A service account with the Firebase App Distribution Admin role in the app's Firebase project. |
 | Android keystore | Keystore, Store password, Key alias, Key password | Your release `.jks`/`.keystore`. Keystores of any size are fine. |
 | Shorebird API key | Token | `shorebird login:ci` prints one (`sb_api_…`). Only for flavors with Shorebird on. |
-| GitHub token | Token | Same token as step 3; usually set there once for the whole engine. |
+| Slack webhook | Webhook URL | A Slack incoming webhook for the channel that should hear about releases. |
 
-Each row shows **Verified**, **Rejected** or **Not checked**. **Check now** checks again; the engine
-also checks every day and before each build.
+The GitHub token is not on this list: the engine has one, set in step 3.
+
+Each credential shows **Verified**, **Rejected** or **Not checked**, and how many flavors use it.
+Each flavor also shows whether its credentials reach its app (an App Store Connect key must see the
+flavor's bundle ID, a Play service account its package). **Check now** checks again; the engine also
+checks every day and before each build. Deleting a credential that flavors use lists them and asks
+first.
+
+From a terminal, `xp credentials` does the same, without ever taking a secret as an argument:
+
+```sh
+xp credentials add --kind asc_key --name "Personal Apple Dev Account" \
+  --key-id ABC123DEF4 --issuer-id <issuer id> --p8 ~/keys/AuthKey_ABC123DEF4.p8
+xp credentials assign "Personal Apple Dev Account" --project mataa_new_app --all-flavors
+xp credentials list
+```
 
 ## 6. Run a dev build
 

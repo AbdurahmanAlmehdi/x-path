@@ -10,8 +10,8 @@
 #   - starts a fake Firebase App Distribution and a fake GitHub on loopback
 #     ports, and `xpd serve` pointed at them (XPD_TEST_*; its secrets in a file,
 #     never in the Keychain), in a temporary data directory,
-#   - adds the fixture as a project over HTTP, saves a Firebase service
-#     account and dispatches the built-in `dev-build` workflow for Android,
+#   - adds the fixture as a project over HTTP, adds a named Firebase service
+#     account and assigns it to `dev` (ADR 0013), and dispatches the built-in `dev-build` workflow for Android,
 #   - waits for the job and checks that it stored an APK and a manifest.json,
 #     that Firebase received exactly that APK as the version of the job, and
 #   - dispatches `prod-release` twice and checks that the second queues behind

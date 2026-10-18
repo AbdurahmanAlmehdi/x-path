@@ -5,7 +5,9 @@ import 'package:xp_engine/src/stores/apple/app_store_connect.dart';
 import 'package:xp_engine/src/stores/apple/asc_exceptions.dart';
 
 /// Checks an App Store Connect API key by reading one app with it: a `401` is
-/// a key that expired or was revoked.
+/// a key that expired or was revoked. For a flavor with an iOS bundle id, the
+/// key must also see the app with that bundle id (the app exists in App Store
+/// Connect, in the team of the key).
 class AscKeyVerifier implements CredentialVerifier {
   /// Creates the verifier. `connect` makes the client for a key.
   const new(this._connect);
@@ -16,13 +18,27 @@ class AscKeyVerifier implements CredentialVerifier {
   CredentialKind get kind => CredentialKind.ascKey;
 
   @override
+  bool get checksTarget => true;
+
+  @override
   Future<VerificationResult> verify(
     CredentialMaterial material,
     CredentialTarget target,
   ) async {
     final key = (material as AscKeyMaterial).key;
     try {
-      await _connect(key).verifyAccess();
+      final connect = _connect(key);
+      await connect.verifyAccess();
+      final bundleId = target.iosBundleId;
+      if (bundleId != null && await connect.findApp(bundleId) == null) {
+        return VerificationResult.rejected(
+          'The API key ${key.keyId} sees no app with the bundle id $bundleId '
+          'in App Store Connect.',
+          fix:
+              'Create the app in App Store Connect, or use a key of the team '
+              'that owns it.',
+        );
+      }
       return VerificationResult.verified(account: key.keyId);
     } on FormatException catch (error) {
       return VerificationResult.rejected(

@@ -37,6 +37,7 @@ void main() {
 
   test('is the verifier of keystores', () {
     expect(verifier().kind, CredentialKind.keystore);
+    expect(verifier().checksTarget, isFalse);
   });
 
   test('accepts a keystore keytool can list the alias of', () async {

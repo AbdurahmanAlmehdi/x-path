@@ -56,15 +56,18 @@ CredentialFlavor demoFlavor(String name, {String project = 'prj_1'}) =>
       name: name,
     );
 
-/// A credential of [kind] for the flavor [flavor].
-CredentialRecord demoCredential(
+/// A credential of [kind] that the flavor [flavor] uses.
+AssignedCredential demoCredential(
   CredentialFlavor flavor,
   CredentialKind kind, {
   String? account,
-}) => CredentialRecord(
-  id: 'crd_${flavor.name}_${kind.wire}',
+}) => AssignedCredential(
   flavor: flavor,
-  kind: kind,
-  secretKey: 'credential.${flavor.name}.${kind.wire}',
-  account: account,
+  credential: CredentialRecord(
+    id: 'crd_${flavor.name}_${kind.wire}',
+    name: '${kind.label} ${flavor.projectId} ${flavor.name}',
+    kind: kind,
+    secretKey: 'credential.${flavor.name}.${kind.wire}',
+    account: account,
+  ),
 );

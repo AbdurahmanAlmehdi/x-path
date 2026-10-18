@@ -8,7 +8,7 @@ import 'package:xp_client/xp_client.dart';
 
 /// What `xp mcp` tells the agent about itself when it connects.
 const mcpInstructions = '''
-XPath releases Flutter apps. These tools read projects, workflows, runs, jobs, logs, releases, approvals, test runs and storage; create and edit projects and workflows (a workflow is checked first and its errors come back with their lines); and dispatch workflows.
+XPath releases Flutter apps. These tools read projects, workflows, runs, jobs, logs, releases, approvals, test runs, storage and credentials (never a secret); create and edit projects and workflows (a workflow is checked first and its errors come back with their lines); and dispatch workflows.
 
 Gated actions (a production release, a production OTA patch, a store submission, a push, a merge, a delete) wait for the owner's approval. This server can never approve or deny: when a dispatched run reaches a gate, get_run shows it as waiting_for_approval with the pending approval ids; tell the owner, who approves in the XPath app or with `xp approvals approve <id>`, and poll get_approval until its state is no longer pending. Expired counts as denied.
 
@@ -466,6 +466,41 @@ List<McpTool> buildXpTools(
       {'project': project},
       (args) async => (await client.getGates(await projectId(args))).toJson(),
       required: ['project'],
+      readOnly: true,
+    ),
+    tool(
+      'list_credentials',
+      'List the named credentials of the engine, never a secret: name, kind, '
+          'account, the status of their own check, and usedBy (the project, '
+          'app and flavor that use each, with the status of that assignment '
+          'and a message and fix when a check refused it). Read-only: the '
+          'owner adds, assigns and removes credentials in the XPath app or '
+          'with `xp credentials`.',
+      {
+        'project': text(
+          'Only the credentials this project uses, and only its flavors: id '
+          '(prj_...), owner/name or name.',
+        ),
+      },
+      (args) async {
+        final reference = args.optionalString('project');
+        final credentials = await client.listNamedCredentials();
+        if (reference == null) {
+          return [for (final credential in credentials) credential.toJson()];
+        }
+        final id = await resolveProject(client, reference);
+        return [
+          for (final credential in credentials)
+            if (credential.usedBy.any((usage) => usage.projectId == id))
+              {
+                ...credential.toJson(),
+                'usedBy': [
+                  for (final usage in credential.usedBy)
+                    if (usage.projectId == id) usage.toJson(),
+                ],
+              },
+        ];
+      },
       readOnly: true,
     ),
     tool(

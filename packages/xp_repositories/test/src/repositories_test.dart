@@ -71,6 +71,52 @@ const _credential = Credential(
   status: CredentialStatus.verified,
 );
 
+const _named = NamedCredential(
+  id: 'crd_1',
+  name: 'Team key',
+  kind: CredentialKind.ascKey,
+  status: CredentialStatus.verified,
+);
+
+/// One event of each credential kind of event.
+const _credentialEvents = <EngineEvent>[
+  CredentialSaved(
+    credentialId: 'crd_1',
+    kind: CredentialKind.ascKey,
+    replaced: false,
+  ),
+  CredentialVerified(
+    credentialId: 'crd_1',
+    kind: CredentialKind.ascKey,
+    status: CredentialStatus.verified,
+  ),
+  CredentialExpired(
+    credentialId: 'crd_1',
+    kind: CredentialKind.ascKey,
+    message: 'Expired.',
+  ),
+  CredentialRemoved(credentialId: 'crd_9', kind: CredentialKind.ascKey),
+  CredentialRenamed(
+    credentialId: 'crd_1',
+    kind: CredentialKind.ascKey,
+    name: 'Renamed',
+  ),
+  CredentialAssigned(
+    credentialId: 'crd_1',
+    projectId: 'prj_9',
+    app: '.',
+    flavor: 'prod',
+    kind: CredentialKind.ascKey,
+  ),
+  CredentialUnassigned(
+    credentialId: 'crd_1',
+    projectId: 'prj_9',
+    app: '.',
+    flavor: 'prod',
+    kind: CredentialKind.ascKey,
+  ),
+];
+
 const _decidedBy = DecidedBy(
   tokenId: 'tok_1',
   name: 'My Mac',
@@ -199,45 +245,19 @@ void main() {
       expect(cached, const Snapshot([project], cached: true));
     });
 
-    test('watches the credentials of one project', () async {
+    test('watches the credentials of one project through every credential '
+        'event', () async {
       when(() => harness.client.listCredentials('prj_1'))
           .thenAnswer((_) async => [_credential]);
       final loads = await _loadsFor(
         harness: harness,
         stream: repository.watchCredentials('prj_1'),
-        events: const [
-          CredentialSaved(
-            credentialId: 'crd_1',
-            projectId: 'prj_1',
-            kind: CredentialKind.ascKey,
-            replaced: false,
-          ),
-          CredentialVerified(
-            credentialId: 'crd_1',
-            projectId: 'prj_1',
-            kind: CredentialKind.ascKey,
-            status: CredentialStatus.verified,
-          ),
-          CredentialExpired(
-            credentialId: 'crd_1',
-            projectId: 'prj_1',
-            kind: CredentialKind.ascKey,
-            message: 'Expired.',
-          ),
-          CredentialRemoved(
-            credentialId: 'crd_1',
-            projectId: 'prj_1',
-            kind: CredentialKind.ascKey,
-          ),
-          CredentialRemoved(
-            credentialId: 'crd_9',
-            projectId: 'prj_9',
-            kind: CredentialKind.ascKey,
-          ),
-          ProjectRemoved(projectId: 'prj_1'),
+        events: [
+          ..._credentialEvents,
+          const ProjectRemoved(projectId: 'prj_1'),
         ],
       );
-      expect(loads, 5);
+      expect(loads, 1 + _credentialEvents.length);
       expect(
         await repository.watchCredentials('prj_1').first,
         const Snapshot([_credential], cached: true),
@@ -246,32 +266,159 @@ void main() {
 
     test('passes the commands to the engine', () async {
       final client = harness.client;
-      const request = SaveCredentialRequest(
-        flavor: 'prod',
-        kind: CredentialKind.slack,
-        material: {'webhookUrl': 'https://hooks.slack.com/services/T/B/X'},
+      const response = AssignCredentialResponse(
+        assigned: [_credential],
+        kept: [_credential],
       );
       when(() => client.getProject('prj_1')).thenAnswer((_) async => project);
       when(() => client.addProject(const AddProjectRequest(path: '/src/app')))
           .thenAnswer((_) async => project);
       when(() => client.scanProject('prj_1')).thenAnswer((_) async => project);
       when(() => client.removeProject('prj_1')).thenAnswer((_) async {});
-      when(() => client.saveCredential('prj_1', request))
-          .thenAnswer((_) async => _credential);
-      when(() => client.verifyCredential('prj_1', 'crd_1'))
-          .thenAnswer((_) async => _credential);
-      when(() => client.deleteCredential('prj_1', 'crd_1'))
-          .thenAnswer((_) async {});
+      when(
+        () => client.assignCredential(
+          'prj_1',
+          app: 'apps/x',
+          flavor: 'prod',
+          kind: CredentialKind.ascKey,
+          request: const AssignCredentialRequest(
+            credentialId: 'crd_1',
+            allFlavors: true,
+            replace: true,
+          ),
+        ),
+      ).thenAnswer((_) async => response);
+      when(
+        () => client.unassignCredential(
+          'prj_1',
+          flavor: 'dev',
+          kind: CredentialKind.slack,
+        ),
+      ).thenAnswer((_) async {});
 
       expect(await repository.getProject('prj_1'), project);
       expect(await repository.addProject('/src/app'), project);
       expect(await repository.scanProject('prj_1'), project);
       await repository.removeProject('prj_1');
-      expect(await repository.saveCredential('prj_1', request), _credential);
-      expect(await repository.verifyCredential('prj_1', 'crd_1'), _credential);
-      await repository.deleteCredential('prj_1', 'crd_1');
+      expect(
+        await repository.assignCredential(
+          'prj_1',
+          app: 'apps/x',
+          flavor: 'prod',
+          kind: CredentialKind.ascKey,
+          credentialId: 'crd_1',
+          allFlavors: true,
+          replace: true,
+        ),
+        response,
+      );
+      await repository.unassignCredential(
+        'prj_1',
+        app: '.',
+        flavor: 'dev',
+        kind: CredentialKind.slack,
+      );
       verify(() => client.removeProject('prj_1')).called(1);
-      verify(() => client.deleteCredential('prj_1', 'crd_1')).called(1);
+      verify(
+        () => client.unassignCredential(
+          'prj_1',
+          flavor: 'dev',
+          kind: CredentialKind.slack,
+        ),
+      ).called(1);
+    });
+  });
+
+  group('CredentialsRepository', () {
+    late CredentialsRepository repository;
+
+    setUp(() => repository = CredentialsRepository(harness.session));
+
+    test(
+      'watches the named credentials through every credential event',
+      () async {
+        when(() => harness.client.listNamedCredentials())
+            .thenAnswer((_) async => [_named]);
+        final loads = await _loadsFor(
+          harness: harness,
+          stream: repository.watchCredentials(),
+          events: [
+            ..._credentialEvents,
+            const ProjectRemoved(projectId: 'prj_1'),
+          ],
+        );
+        expect(loads, 1 + _credentialEvents.length);
+        expect(
+          await repository.watchCredentials().first,
+          const Snapshot([_named], cached: true),
+        );
+      },
+    );
+
+    test('passes the commands to the engine', () async {
+      final client = harness.client;
+      const create = CreateCredentialRequest(
+        name: 'Team key',
+        kind: CredentialKind.shorebird,
+        material: {'token': 'sb_api_fake'},
+      );
+      const replace = ReplaceCredentialRequest({'token': 'sb_api_fake2'});
+      when(() => client.createCredential(create))
+          .thenAnswer((_) async => _named);
+      when(() => client.renameCredential('crd_1', 'New name'))
+          .thenAnswer((_) async => _named);
+      when(() => client.replaceCredentialSecret('crd_1', replace))
+          .thenAnswer((_) async => _named);
+      when(() => client.verifyNamedCredential('crd_1'))
+          .thenAnswer((_) async => _named);
+      when(() => client.deleteNamedCredential('crd_1', force: true))
+          .thenAnswer((_) async {});
+
+      expect(await repository.createCredential(create), _named);
+      expect(await repository.renameCredential('crd_1', 'New name'), _named);
+      expect(await repository.replaceSecret('crd_1', replace), _named);
+      expect(await repository.verifyCredential('crd_1'), _named);
+      await repository.deleteCredential('crd_1', force: true);
+      verify(() => client.deleteNamedCredential('crd_1', force: true))
+          .called(1);
+    });
+
+    test(
+      'says which flavors keep a credential in use from being deleted',
+      () async {
+        const usage = CredentialUsage(
+          projectId: 'prj_1',
+          project: 'acme/app',
+          app: '.',
+          flavor: 'prod',
+          status: CredentialStatus.verified,
+        );
+        when(() => harness.client.deleteNamedCredential('crd_1')).thenThrow(
+          const ApiException(
+            'It is in use.',
+            statusCode: 409,
+            code: ApiErrorCode.credentialInUse,
+            usedBy: [usage],
+          ),
+        );
+        await expectLater(
+          repository.deleteCredential('crd_1'),
+          throwsA(
+            isA<CredentialInUse>()
+                .having((error) => error.message, 'message', 'It is in use.')
+                .having((error) => error.usedBy, 'usedBy', [usage]),
+          ),
+        );
+      },
+    );
+
+    test('passes on any other refusal', () async {
+      when(() => harness.client.deleteNamedCredential('crd_1'))
+          .thenThrow(notFound);
+      await expectLater(
+        repository.deleteCredential('crd_1'),
+        throwsA(notFound),
+      );
     });
   });
 

@@ -32,6 +32,9 @@ class HttpGitHubTokenVerifier implements CredentialVerifier {
   CredentialKind get kind => CredentialKind.github;
 
   @override
+  bool get checksTarget => false;
+
+  @override
   Future<VerificationResult> verify(
     CredentialMaterial material,
     CredentialTarget target,

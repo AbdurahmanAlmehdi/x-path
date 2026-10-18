@@ -570,7 +570,7 @@ class WorkflowDispatcher {
           );
     final credentials = credentialFlavor == null
         ? const <Never>[]
-        : await _credentials.list(flavorId: credentialFlavor.id);
+        : await _credentials.assignments(flavorId: credentialFlavor.id);
     final worktree = ReleaseWorktree(
       path: run.worktreeAt(run.mirror, id),
       mirror: run.mirror,

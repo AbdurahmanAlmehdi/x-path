@@ -80,6 +80,52 @@ void main() {
           projectId: 'prj_1',
           kind: CredentialKind.slack,
         ),
+        const CredentialSaved(
+          credentialId: 'crd_2',
+          name: 'Personal Apple Dev Account',
+          kind: CredentialKind.ascKey,
+          replaced: false,
+        ),
+        const CredentialVerified(
+          credentialId: 'crd_2',
+          projectId: 'prj_1',
+          app: '.',
+          flavor: 'prod',
+          kind: CredentialKind.ascKey,
+          status: CredentialStatus.verified,
+        ),
+        const CredentialExpired(
+          credentialId: 'crd_2',
+          name: 'Personal Apple Dev Account',
+          projectId: 'prj_1',
+          app: '.',
+          flavor: 'prod',
+          kind: CredentialKind.ascKey,
+          message: 'No app.',
+        ),
+        const CredentialRemoved(
+          credentialId: 'crd_2',
+          kind: CredentialKind.ascKey,
+        ),
+        const CredentialRenamed(
+          credentialId: 'crd_2',
+          kind: CredentialKind.ascKey,
+          name: 'Mataa Apple Dev Account',
+        ),
+        const CredentialAssigned(
+          credentialId: 'crd_2',
+          projectId: 'prj_1',
+          app: '.',
+          flavor: 'dev',
+          kind: CredentialKind.ascKey,
+        ),
+        const CredentialUnassigned(
+          credentialId: 'crd_2',
+          projectId: 'prj_1',
+          app: '.',
+          flavor: 'dev',
+          kind: CredentialKind.ascKey,
+        ),
         const WorkflowSaved(
           workflowId: 'wf_1',
           projectId: 'prj_1',
@@ -235,6 +281,9 @@ void main() {
         CredentialVerified() => 'verified',
         CredentialExpired() => 'expired',
         CredentialRemoved() => 'removed credential',
+        CredentialRenamed() => 'renamed credential',
+        CredentialAssigned() => 'assigned credential',
+        CredentialUnassigned() => 'unassigned credential',
         WorkflowSaved() => 'workflow saved',
         WorkflowRemoved() => 'workflow removed',
         RunDispatched() => 'run',
@@ -342,6 +391,40 @@ void main() {
           ),
         ),
         'removed credential',
+      );
+      expect(
+        describe(
+          const CredentialRenamed(
+            credentialId: 'c',
+            kind: CredentialKind.slack,
+            name: 'n',
+          ),
+        ),
+        'renamed credential',
+      );
+      expect(
+        describe(
+          const CredentialAssigned(
+            credentialId: 'c',
+            projectId: 'p',
+            app: '.',
+            flavor: 'f',
+            kind: CredentialKind.slack,
+          ),
+        ),
+        'assigned credential',
+      );
+      expect(
+        describe(
+          const CredentialUnassigned(
+            credentialId: 'c',
+            projectId: 'p',
+            app: '.',
+            flavor: 'f',
+            kind: CredentialKind.slack,
+          ),
+        ),
+        'unassigned credential',
       );
       expect(
         describe(

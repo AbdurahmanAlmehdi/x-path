@@ -711,6 +711,74 @@ void main() {
     });
   });
 
+  group('list_credentials', () {
+    setUp(
+      () => when(
+        () => client.listNamedCredentials(),
+      ).thenAnswer((_) async => [sample.ascCredential, sample.slackCredential]),
+    );
+
+    test('lists every credential with its assignments, no secret', () async {
+      final result = await call('list_credentials');
+
+      expect(result.isError, isFalse);
+      final listed = decoded(result)! as List;
+      expect(listed, hasLength(2));
+      final asc = listed.first as Map;
+      expect(asc['name'], 'Acme ASC');
+      expect(asc['kind'], 'asc_key');
+      expect(asc['status'], 'verified');
+      expect(asc['account'], 'KEY123');
+      expect(asc['usedBy'], [
+        {
+          'projectId': 'prj_1',
+          'project': 'acme/app',
+          'app': '.',
+          'flavor': 'prod',
+          'status': 'verified',
+        },
+        {
+          'projectId': 'prj_2',
+          'app': '.',
+          'flavor': 'default',
+          'status': 'rejected',
+          'message': 'The key cannot see com.acme.other.',
+          'fix': 'Give the key access to the app.',
+        },
+      ]);
+      for (final secret in [
+        'password',
+        'privateKey',
+        'token',
+        'webhookUrl',
+        'serviceAccount',
+        'storePassword',
+      ]) {
+        expect(result.text, isNot(contains(secret)));
+      }
+    });
+
+    test('with a project keeps its credentials and its flavors', () async {
+      final result = await call('list_credentials', {'project': 'acme/app'});
+
+      final listed = decoded(result)! as List;
+      expect(listed, hasLength(1));
+      final asc = listed.single as Map;
+      expect(asc['id'], 'crd_1');
+      expect((asc['usedBy'] as List).single, containsPair('flavor', 'prod'));
+    });
+
+    test('is read-only, and there is no tool that changes one', () {
+      expect(tools['list_credentials']!.readOnly, isTrue);
+      expect(
+        tools.keys.where(
+          (name) => name.contains('credential') && name != 'list_credentials',
+        ),
+        isEmpty,
+      );
+    });
+  });
+
   test('get_storage_report reads', () async {
     when(() => client.getStorage())
         .thenAnswer((_) async => sample.storageReport());
