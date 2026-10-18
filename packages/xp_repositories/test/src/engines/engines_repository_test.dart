@@ -159,6 +159,17 @@ void main() {
       expect(made, isEmpty);
     });
 
+    test(
+      'replaces the local token without changing the active engine',
+      () async {
+        await repository.saveLocal(name: 'This Mac', token: 'xpt_old');
+        await repository.select(remote.id);
+        await repository.saveLocalToken('xpt_new');
+        expect(await repository.token(localEngineId), 'xpt_new');
+        expect((await repository.load()).activeId, remote.id);
+      },
+    );
+
     test('checks and adds a remote engine, local first', () async {
       final local = await repository.saveLocal(name: 'This Mac', token: 't');
       final added = await repository.addRemote(
@@ -318,6 +329,61 @@ void main() {
         );
         verify(client.close).called(1);
       });
+    });
+
+    group('waitForLocalEngine', () {
+      test('waits until the engine answers', () async {
+        var refusals = 2;
+        when(client.health).thenAnswer((_) async {
+          if (refusals-- > 0) throw const ConnectionException('refused');
+          return const HealthResponse();
+        });
+        final waits = <Duration>[];
+
+        final up = await repository.waitForLocalEngine(
+          delay: (duration) async => waits.add(duration),
+        );
+
+        expect(up, isTrue);
+        expect(waits, [
+          const Duration(milliseconds: 500),
+          const Duration(milliseconds: 500),
+        ]);
+        expect(made, [(localEngineUrl, '')]);
+        verify(client.close).called(1);
+      });
+
+      test('gives up after the timeout', () async {
+        when(client.health).thenThrow(const ConnectionException('refused'));
+        final waits = <Duration>[];
+
+        final up = await repository.waitForLocalEngine(
+          timeout: const Duration(seconds: 1),
+          delay: (duration) async => waits.add(duration),
+        );
+
+        expect(up, isFalse);
+        expect(waits, hasLength(2));
+        verify(client.close).called(1);
+      });
+
+      test(
+        'asks once with a zero timeout, and waits for real by default',
+        () async {
+          when(client.health).thenThrow(const ConnectionException('refused'));
+          expect(
+            await repository.waitForLocalEngine(timeout: Duration.zero),
+            isFalse,
+          );
+          expect(
+            await repository.waitForLocalEngine(
+              timeout: const Duration(milliseconds: 1),
+              interval: const Duration(milliseconds: 1),
+            ),
+            isFalse,
+          );
+        },
+      );
     });
 
     group('waitForLocalEngineToStop', () {

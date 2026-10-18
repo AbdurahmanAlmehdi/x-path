@@ -10,6 +10,7 @@ import 'package:xp_desktop/approvals/approvals.dart';
 import 'package:xp_desktop/credentials/view/credentials_page.dart';
 import 'package:xp_desktop/engines/view/engines_page.dart';
 import 'package:xp_desktop/job/view/job_page.dart';
+import 'package:xp_desktop/local_engine/local_engine.dart';
 import 'package:xp_desktop/onboarding/view/onboarding_page.dart';
 import 'package:xp_desktop/project_overview/view/project_overview_page.dart';
 import 'package:xp_desktop/projects/bloc/projects_bloc.dart';
@@ -318,13 +319,15 @@ void main() {
 
   group('ConnectionBanner', () {
     for (final (status, text) in [
-      (EngineStatus.reconnecting, 'This Mac stopped answering'),
-      (EngineStatus.unreachable, 'This Mac is unreachable'),
-      (EngineStatus.secretsLocked, 'The Keychain on This Mac is locked'),
-      (EngineStatus.rejected, 'This Mac refused the token'),
+      (EngineStatus.reconnecting, 'mac-mini stopped answering'),
+      (EngineStatus.unreachable, 'mac-mini is unreachable'),
+      (EngineStatus.secretsLocked, 'The Keychain on mac-mini is locked'),
+      (EngineStatus.rejected, 'mac-mini refused the token'),
     ]) {
       testWidgets('says the engine is ${status.name}', (tester) async {
-        final connection = connectionIn(connectedTo(status: status));
+        final connection = connectionIn(
+          connectedTo(status: status, active: macMini),
+        );
         final shell = ShellCubit();
         await tester.pumpApp(
           const ConnectionBanner(),
@@ -351,6 +354,107 @@ void main() {
         );
         expect(find.text('Retry'), findsNothing);
       }
+    });
+
+    group('for the engine on this Mac', () {
+      final unreachable = connectedTo(status: EngineStatus.unreachable);
+
+      testWidgets('says it is not running and starts it', (tester) async {
+        final local = localEngineIn(const LocalEngineState(running: false));
+        final shell = ShellCubit();
+        await tester.pumpApp(
+          const ConnectionBanner(),
+          connection: connectionIn(unreachable),
+          localEngine: local,
+          shell: shell,
+        );
+        expect(
+          find.text("The engine on this Mac isn't running."),
+          findsOneWidget,
+        );
+        expect(find.text('Retry'), findsNothing);
+        expect(find.text('Open Login Items…'), findsNothing);
+        await tester.tap(find.text('Start engine'));
+        verify(
+          () => local.add(
+            const LocalEngineStartRequested(tokenName: 'XPath app on MacBook'),
+          ),
+        ).called(1);
+        await tester.tap(find.text('Engines…'));
+        expect(shell.state, const EnginesDestination());
+      });
+
+      testWidgets('shows the start in progress', (tester) async {
+        await tester.pumpApp(
+          const ConnectionBanner(),
+          connection: connectionIn(unreachable),
+          localEngine: localEngineIn(
+            const LocalEngineState(progress: LocalEngineProgress.starting),
+          ),
+        );
+        expect(find.text('Starting the engine on this Mac…'), findsOneWidget);
+        final button = tester.widget<XpButton>(
+          find.byKey(const Key('banner.startEngine')),
+        );
+        expect(button.busy, isTrue);
+        expect(button.onPressed, isNull);
+      });
+
+      for (final (failure, message, text) in [
+        (LocalEngineFailure.noEngine, null, 'This copy of XPath has no engine'),
+        (LocalEngineFailure.unsupported, null, 'needs macOS 13'),
+        (
+          LocalEngineFailure.refused,
+          'Operation not permitted',
+          'macOS did not start the engine: Operation not permitted',
+        ),
+        (LocalEngineFailure.timedOut, null, 'within 30 seconds'),
+        (
+          LocalEngineFailure.token,
+          'locked',
+          'could not make a new token for this app: locked',
+        ),
+      ]) {
+        testWidgets('says why it did not start: ${failure.name}', (
+          tester,
+        ) async {
+          await tester.pumpApp(
+            const ConnectionBanner(),
+            connection: connectionIn(unreachable),
+            localEngine: localEngineIn(
+              LocalEngineState(
+                running: false,
+                progress: LocalEngineProgress.failed,
+                failure: failure,
+                message: message,
+              ),
+            ),
+          );
+          expect(find.textContaining(text), findsOneWidget);
+          expect(find.text('Start engine'), findsOneWidget);
+        });
+      }
+
+      testWidgets('opens Login Items when macOS waits for the owner', (
+        tester,
+      ) async {
+        final local = localEngineIn(
+          const LocalEngineState(
+            running: false,
+            progress: LocalEngineProgress.failed,
+            failure: LocalEngineFailure.needsApproval,
+          ),
+        );
+        await tester.pumpApp(
+          const ConnectionBanner(),
+          connection: connectionIn(unreachable),
+          localEngine: local,
+        );
+        expect(find.textContaining('Login Items, then start'), findsOneWidget);
+        await tester.tap(find.text('Open Login Items…'));
+        verify(() => local.add(const LocalEngineLoginItemsRequested()))
+            .called(1);
+      });
     });
 
     testWidgets('follows the status as it changes', (tester) async {

@@ -5,6 +5,7 @@ import 'package:xp_desktop/app/bloc/engine_connection_bloc.dart';
 import 'package:xp_desktop/approvals/bloc/pending_approvals_bloc.dart';
 import 'package:xp_desktop/approvals/widgets/needs_you_alerts_listener.dart';
 import 'package:xp_desktop/l10n/l10n.dart';
+import 'package:xp_desktop/local_engine/local_engine.dart';
 import 'package:xp_desktop/onboarding/view/onboarding_page.dart';
 import 'package:xp_desktop/projects/bloc/projects_bloc.dart';
 import 'package:xp_desktop/runners/bloc/runners_bloc.dart';
@@ -15,8 +16,9 @@ import 'package:xp_desktop/theme/theme.dart';
 import 'package:xp_desktop/widgets/widgets.dart';
 import 'package:xp_repositories/xp_repositories.dart';
 
-/// The app: the [services] it reaches outside Flutter, and the
-/// `EngineConnectionBloc` that owns the active engine.
+/// The app: the [services] it reaches outside Flutter, the
+/// `EngineConnectionBloc` that owns the active engine, and the
+/// `LocalEngineBloc` that keeps the engine on this Mac running.
 class App extends StatelessWidget {
   const new({required this.services, super.key});
 
@@ -25,11 +27,22 @@ class App extends StatelessWidget {
   @override
   Widget build(BuildContext context) => RepositoryProvider.value(
     value: services,
-    child: BlocProvider(
-      create: (_) => EngineConnectionBloc(
-        engines: services.engines,
-        openSession: services.openSession,
-      )..add(const EngineConnectionStarted()),
+    child: MultiBlocProvider(
+      providers: [
+        BlocProvider(
+          create: (_) => EngineConnectionBloc(
+            engines: services.engines,
+            openSession: services.openSession,
+          )..add(const EngineConnectionStarted()),
+        ),
+        BlocProvider(
+          create: (_) => LocalEngineBloc(
+            agent: services.agent,
+            localEngine: services.localEngine,
+            engines: services.engines,
+          ),
+        ),
+      ],
       child: const XpClock(child: AppView()),
     ),
   );
@@ -49,7 +62,7 @@ class AppView extends StatelessWidget {
       ...GlobalMaterialLocalizations.delegates,
     ],
     supportedLocales: AppLocalizations.supportedLocales,
-    home: const AppHome(),
+    home: const LocalEngineListener(child: AppHome()),
   );
 }
 

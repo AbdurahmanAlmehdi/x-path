@@ -210,7 +210,13 @@ xp runner install-service [--slots 4]                                           
   (Phase 15); with the app installed the app owns the service and `xpd install-service` is not needed. The command
   is the way to run the engine without the app (a headless Mac mini, a Mac with the CLI only). It reads
   `launchctl print` first and refuses to replace a label that another registration owns, naming it; `--force` takes
-  it over.
+  it over. `SMAppService` keeps its own record of the app's agent, apart from launchd: after a `launchctl bootout`
+  (older Homebrew casks did that on upgrade) it still reads "enabled" while launchd has no job, `launchctl
+  kickstart` finds nothing and `launchctl bootstrap` of the plist fails (`Bootstrap failed: 5`: a `BundleProgram`
+  job has to come from `SMAppService`). The app repairs that itself: when the engine on this Mac does not answer, it
+  unregisters and registers the agent again from the running bundle (which also fixes a registration that names a
+  moved or replaced copy of the app). It tries once on its own; the banner and Settings ▸ About offer **Start
+  engine** (see The desktop app).
 - **Linux: systemd.** A user unit by default, `~/.config/systemd/user/xpd.service` and `xp-runner.service`, enabled
   and started with `systemctl --user daemon-reload` and `enable --now`; `--system --run-as <user>` writes a system
   unit in `/etc/systemd/system` that runs as that user (run it as root). A user service stops when the user logs out;
@@ -1866,6 +1872,17 @@ sidebar mark are assets, and the icons are Phosphor's.
   connection banner says so (reconnecting, then unreachable · cached), the screens keep the cached data and every
   command is disabled until the engine is back. A locked Keychain on the engine (secrets locked) and a refused
   token have their own banner.
+- **The engine on this Mac heals itself.** When "This Mac" is the active engine and turns unreachable (at launch or
+  later), `LocalEngineBloc` starts it once on its own: if `/health` does not answer, `EngineAgent.restart`
+  (`agentRestart` in `MacosServicesChannel.swift`) unregisters an "enabled" agent and registers it again (a
+  `notRegistered` or `notFound` one is registered; one waiting in Login Items is left for the owner), the app waits
+  up to 30 s for `/health`, then reconnects with the token it has in the Keychain (the engine's database is the
+  same, so is the token; a new `app` token is made only if the engine refuses the old one). One automatic try per
+  episode (until the engine answers again), and after a failed one the next waits 1 minute, then 2, 4, up to 30;
+  each step is logged (`dart:developer`, `xpath.local_engine`). The banner then reads "The engine on this Mac isn't
+  running." with **Start engine** (progress, and why it failed: Login Items approval with **Open Login Items…**, a
+  copy of the app without an engine, macOS refusing, no answer in 30 s); Settings ▸ About shows "Engine on this Mac:
+  Running / Not running" with the same button. Remote engines keep Retry and Engines….
 - **Onboarding** (the first run, or Engines ▸ Set up this Mac…): (1) registers the bundled engine as a LaunchAgent with
   `SMAppService` (label `ly.abdurahman.xpath.xpd`, plist `Contents/Library/LaunchAgents/ly.abdurahman.xpath.xpd.plist`,
   `BundleProgram` `Contents/Helpers/xpd/bin/xpd serve`) and makes the app's token with the bundled

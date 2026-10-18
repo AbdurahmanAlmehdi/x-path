@@ -2,6 +2,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:xp_desktop/app/bloc/engine_connection_bloc.dart';
 import 'package:xp_desktop/l10n/l10n.dart';
+import 'package:xp_desktop/local_engine/local_engine.dart';
 import 'package:xp_desktop/shell/cubit/shell_cubit.dart';
 import 'package:xp_desktop/shell/widgets/engine_status_text.dart';
 import 'package:xp_desktop/theme/theme.dart';
@@ -12,7 +13,9 @@ import 'package:xp_repositories/xp_repositories.dart';
 /// reconnecting, unreachable (the screens show the cached snapshot,
 /// read-only), secrets locked, or a refused token. Built like the needs-you
 /// bar of `Main.dc.html`, in the status's own pair; nothing shows while
-/// connected or during the first check.
+/// connected or during the first check. When the engine on this Mac is
+/// unreachable it says the engine isn't running and offers "Start engine"
+/// (with its progress, and why it failed) instead of Retry.
 class ConnectionBanner extends StatelessWidget {
   const new({super.key});
 
@@ -21,9 +24,17 @@ class ConnectionBanner extends StatelessWidget {
     final state = context.watch<EngineConnectionBloc>().state;
     final engine = state.active?.name ?? '';
     final l10n = context.l10n;
+    final localDown =
+        state.active?.isLocal == true &&
+        state.status == EngineStatus.unreachable;
+    final local = context.watch<LocalEngineBloc>().state;
     final message = switch (state.status) {
       EngineStatus.connected || EngineStatus.connecting => null,
       EngineStatus.reconnecting => l10n.bannerReconnecting(engine),
+      EngineStatus.unreachable when localDown =>
+        local.starting
+            ? l10n.bannerLocalStarting
+            : localEngineFailureText(l10n, local) ?? l10n.bannerLocalStopped,
       EngineStatus.unreachable => l10n.bannerUnreachable(engine),
       EngineStatus.secretsLocked => l10n.bannerSecretsLocked(engine),
       EngineStatus.rejected => l10n.bannerRejected(engine),
@@ -54,7 +65,32 @@ class ConnectionBanner extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 12),
-            if (state.status != EngineStatus.rejected)
+            if (localDown) ...[
+              if (local.failure == LocalEngineFailure.needsApproval) ...[
+                XpButton(
+                  label: l10n.onboardingOpenLoginItems,
+                  size: XpButtonSize.small,
+                  onPressed: () => context.read<LocalEngineBloc>().add(
+                    const LocalEngineLoginItemsRequested(),
+                  ),
+                ),
+                const SizedBox(width: 8),
+              ],
+              XpButton(
+                key: const Key('banner.startEngine'),
+                label: l10n.localEngineStart,
+                kind: XpButtonKind.primary,
+                size: XpButtonSize.small,
+                busy: local.starting,
+                onPressed: local.starting
+                    ? null
+                    : () => context.read<LocalEngineBloc>().add(
+                        LocalEngineStartRequested(
+                          tokenName: LocalEngineListener.tokenName(context),
+                        ),
+                      ),
+              ),
+            ] else if (state.status != EngineStatus.rejected)
               XpButton(
                 label: l10n.bannerRetry,
                 size: XpButtonSize.small,

@@ -57,6 +57,50 @@ class AppLocalizationsEn extends AppLocalizations {
   String get bannerEngines => 'Engines…';
 
   @override
+  String get bannerLocalStopped => 'The engine on this Mac isn\'t running.';
+
+  @override
+  String get bannerLocalStarting => 'Starting the engine on this Mac…';
+
+  @override
+  String get localEngineStart => 'Start engine';
+
+  @override
+  String get localEngineNoEngine =>
+      'This copy of XPath has no engine macOS can start. Open XPath from Applications, or install it again.';
+
+  @override
+  String get localEngineNeedsApproval =>
+      'macOS is waiting for you. Allow XPath in System Settings ▸ General ▸ Login Items, then start the engine.';
+
+  @override
+  String get localEngineUnsupported =>
+      'Running the engine needs macOS 13 or later.';
+
+  @override
+  String localEngineRefused(String message) {
+    return 'macOS did not start the engine: $message';
+  }
+
+  @override
+  String get localEngineTimedOut =>
+      'The engine did not answer within 30 seconds. Its log is in ~/Library/Application Support/XPath/service-logs/xpd.log.';
+
+  @override
+  String localEngineToken(String message) {
+    return 'The engine runs, but XPath could not make a new token for this app: $message';
+  }
+
+  @override
+  String get localEngineRunning => 'Running';
+
+  @override
+  String get localEngineNotRunning => 'Not running';
+
+  @override
+  String get localEngineStarting => 'Starting…';
+
+  @override
   String get readOnlyHint => 'Read-only while the engine is away';
 
   @override

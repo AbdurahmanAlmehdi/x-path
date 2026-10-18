@@ -5,6 +5,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:xp_desktop/app/app_services.dart';
 import 'package:xp_desktop/app/bloc/engine_connection_bloc.dart';
 import 'package:xp_desktop/l10n/l10n.dart';
+import 'package:xp_desktop/local_engine/local_engine.dart';
 import 'package:xp_desktop/settings/bloc/command_line_tool_bloc.dart';
 import 'package:xp_desktop/settings/bloc/github_token_bloc.dart';
 import 'package:xp_desktop/settings/bloc/remove_xpath_bloc.dart';
@@ -140,8 +141,19 @@ String agentStatusLabel(AppLocalizations l10n, AgentStatus? status) =>
       null => l10n.settingsUnknown,
     };
 
-class _About extends StatelessWidget {
+class _About extends StatefulWidget {
   const new();
+
+  @override
+  State<_About> createState() => _AboutState();
+}
+
+class _AboutState extends State<_About> {
+  @override
+  void initState() {
+    super.initState();
+    context.read<LocalEngineBloc>().add(const LocalEngineChecked());
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -190,20 +202,94 @@ class _About extends StatelessWidget {
                   engineStatusLabel(l10n, connection.status),
                 ),
               ),
-              _Row(
-                l10n.settingsLoginItem,
-                Text(
-                  agentStatusLabel(l10n, state.agentStatus),
-                  style: context.xpType.body.copyWith(
-                    color: context.xpColors.textPrimary,
-                  ),
-                ),
-                last: true,
+              _LocalEngineRow(
+                agentStatus: state.agentStatus,
+                setUp: connection.engines.any((engine) => engine.isLocal),
               ),
             ],
           ),
         ),
       ],
+    );
+  }
+}
+
+/// "Engine on this Mac": Running or Not running, from whether it answers,
+/// with "Start engine" when it is set up and does not answer. Until that is
+/// known, or when this Mac has no engine set up, what its login item says.
+class _LocalEngineRow extends StatelessWidget {
+  const new({required this.agentStatus, required this.setUp});
+
+  final AgentStatus? agentStatus;
+  final bool setUp;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    final local = context.watch<LocalEngineBloc>().state;
+    final bloc = context.read<LocalEngineBloc>();
+    final failure = localEngineFailureText(l10n, local);
+    final Widget value = switch (local.running) {
+      _ when local.starting => XpStatusLabel(
+        XpStatus.engineReconnecting,
+        l10n.localEngineStarting,
+      ),
+      true => XpStatusLabel(XpStatus.engineConnected, l10n.localEngineRunning),
+      false when setUp => XpStatusLabel(
+        XpStatus.engineUnreachable,
+        l10n.localEngineNotRunning,
+      ),
+      _ => Text(
+        agentStatusLabel(l10n, agentStatus),
+        style: context.xpType.body.copyWith(
+          color: context.xpColors.textPrimary,
+        ),
+      ),
+    };
+    final canStart = setUp && local.running == false;
+    return _Row(
+      l10n.settingsLoginItem,
+      failure == null
+          ? value
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                value,
+                const SizedBox(height: 6),
+                XpMessage(XpStatus.engineUnreachable, failure),
+              ],
+            ),
+      trailing: !canStart && !local.starting
+          ? null
+          : Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (local.failure == LocalEngineFailure.needsApproval) ...[
+                  XpButton(
+                    label: l10n.onboardingOpenLoginItems,
+                    size: XpButtonSize.small,
+                    onPressed: () =>
+                        bloc.add(const LocalEngineLoginItemsRequested()),
+                  ),
+                  const SizedBox(width: 8),
+                ],
+                XpButton(
+                  key: const Key('settings.startEngine'),
+                  label: l10n.localEngineStart,
+                  kind: XpButtonKind.primary,
+                  size: XpButtonSize.small,
+                  busy: local.starting,
+                  onPressed: local.starting
+                      ? null
+                      : () => bloc.add(
+                          LocalEngineStartRequested(
+                            tokenName: LocalEngineListener.tokenName(context),
+                          ),
+                        ),
+                ),
+              ],
+            ),
+      last: true,
     );
   }
 }

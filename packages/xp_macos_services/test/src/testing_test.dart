@@ -73,6 +73,17 @@ void main() {
     );
   });
 
+  test('FakeEngineAgent restarts', () async {
+    final agent = FakeEngineAgent(current: AgentStatus.enabled)
+      ..restartResult = AgentStatus.requiresApproval;
+    expect(await agent.restart(), AgentStatus.requiresApproval);
+    expect(await agent.status(), AgentStatus.requiresApproval);
+    expect(agent.restarts, 1);
+    agent.restartError = const MacosServiceException('x', 'y');
+    await expectLater(agent.restart(), throwsA(isA<MacosServiceException>()));
+    expect(agent.restarts, 2);
+  });
+
   test('FakeCliLinker unlinks', () async {
     final linker = FakeCliLinker();
     await linker.link();

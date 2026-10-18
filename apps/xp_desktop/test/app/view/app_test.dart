@@ -2,10 +2,12 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:xp_api/xp_api.dart';
+import 'package:xp_client/xp_client.dart';
 import 'package:xp_desktop/app/app.dart';
 import 'package:xp_desktop/projects/bloc/projects_bloc.dart';
 import 'package:xp_desktop/shell/shell.dart';
 import 'package:xp_macos_services/testing.dart';
+import 'package:xp_macos_services/xp_macos_services.dart';
 import 'package:xp_repositories/xp_repositories.dart';
 
 import '../../helpers/fakes.dart';
@@ -16,6 +18,11 @@ void main() {
   late EngineList list;
   late Map<String, SessionHarness> harnesses;
   late Map<String, List<Project>> projectsOf;
+
+  setUpAll(() {
+    registerFallbackValue(Uri());
+    registerFallbackValue(Duration.zero);
+  });
 
   setUp(() {
     engines = MockEnginesRepository();
@@ -137,6 +144,51 @@ void main() {
       await tester.pumpAndSettle();
       verify(() => engines.remove(localEngineId)).called(1);
       expect(find.text('No token for mac-mini'), findsOneWidget);
+    });
+
+    testWidgets('brings the engine on this Mac back on its own at launch, '
+        'with the token it has', (tester) async {
+      final agent = FakeEngineAgent(current: AgentStatus.enabled);
+      var running = false;
+      when(() => engines.waitForLocalEngine(timeout: any(named: 'timeout')))
+          .thenAnswer((invocation) async {
+            final timeout = invocation.namedArguments[#timeout] as Duration;
+            // Registering again (the restart) starts it.
+            if (timeout > Duration.zero && agent.restarts > 0) running = true;
+            return running;
+          });
+      when(() => engines.check(any(), any())).thenAnswer((_) async {});
+      await tester.pumpWidget(
+        App(
+          services: testServices(
+            engines: engines,
+            agent: agent,
+            openSession: (profile, token) {
+              final harness = harnesses[profile.id] = SessionHarness(
+                profile,
+                projects: projectsOf[profile.id]!,
+              );
+              when(harness.client.health).thenAnswer((_) async {
+                if (!running) throw const ConnectionException('refused');
+                return const HealthResponse();
+              });
+              return harness.session;
+            },
+          ),
+        ),
+      );
+      desktopWindow(tester);
+      await tester.pumpAndSettle();
+
+      expect(agent.restarts, 1);
+      verify(() => engines.check(localEngineUrl, 'xpt')).called(1);
+      verifyNever(() => engines.saveLocalToken(any()));
+      final context = tester.element(find.byType(AppShell));
+      expect(
+        context.read<EngineConnectionBloc>().state.status,
+        EngineStatus.connected,
+      );
+      expect(find.text('Start engine'), findsNothing);
     });
   });
 

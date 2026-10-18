@@ -11,11 +11,18 @@ tail -n 100 ~/Library/Application\ Support/XPath/service-logs/xpd.log   # the en
 
 ## The engine does not answer
 
-- **Under the app (macOS).** Open XPath: the connection banner says whether the engine is
-  reconnecting, unreachable, has locked secrets or refused the token. **Settings** ▸ **About**
-  shows whether the engine runs at login. If it was turned off in System Settings ▸ General ▸
-  Login Items, allow XPath there and press **Start engine** again. Read
-  `service-logs/xpd.log` in the data directory.
+- **Under the app (macOS).** Open XPath: when the engine on this Mac does not answer, the app
+  tries once to start it again on its own (it registers the login item again and reconnects with
+  the token it has). If that fails, the banner says "The engine on this Mac isn't running." Press
+  **Start engine** there, or in **Settings** ▸ **About** next to **Engine on this Mac** (Running /
+  Not running). Do not remove This Mac and set it up again: the engine's data and the app's token
+  are kept. The banner says why a start failed: allow XPath in System Settings ▸ General ▸ Login
+  Items (**Open Login Items…**) and press **Start engine** again; open the copy in
+  `/Applications`; or read `service-logs/xpd.log` in the data directory.
+- **`launchctl print gui/$(id -u)/ly.abdurahman.xpath.xpd` says "Could not find service"** while
+  the app's login item reads enabled (a `launchctl bootout`, for example by an old Homebrew
+  upgrade): `launchctl kickstart` and `launchctl bootstrap` cannot bring it back (`Bootstrap failed:
+  5`, the job belongs to `SMAppService`). Open XPath, or press **Start engine**.
 - **After an install over a running engine** the old `xpd` keeps running until it restarts:
 
   ```sh
