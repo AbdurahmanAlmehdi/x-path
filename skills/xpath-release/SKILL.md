@@ -244,6 +244,10 @@ and a `guard` step lists every check with its `status`, `message` and `fix`. The
 Report the message and the fix the engine gave. Do not retry a store upload, a tag or a push by
 re-dispatching; resume the job so `alreadyDone` is asked first.
 
+When a credential is the cause, `list_credentials` (with `project`) shows which named credential
+each flavor uses and what its last checks found, never a secret. Agents cannot add, assign or
+remove credentials: tell the owner, who uses the app or `xp credentials`.
+
 ## More
 
 - Workflow documents, inputs and step kinds: skill `xpath-workflows`.

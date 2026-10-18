@@ -203,13 +203,16 @@ class _E2e {
       return;
     }
 
-    await _put('/projects/$projectId/credentials', {
-      'app': '.',
-      'flavor': 'dev',
-      'kind': 'firebase_sa',
-      'serviceAccount': _firebase!.serviceAccountJson(),
-    });
-    _log('saved the Firebase service account for dev');
+    await _addCredential(
+      projectId,
+      flavor: 'dev',
+      name: 'Firebase · e2e',
+      fields: {
+        'kind': 'firebase_sa',
+        'serviceAccount': _firebase!.serviceAccountJson(),
+      },
+    );
+    _log('added the Firebase service account and assigned it to dev');
 
     final workflows = await _get('/projects/$projectId/workflows');
     final byName = {
@@ -455,20 +458,17 @@ class _E2e {
     _log('the runner is online');
 
     // --- the jobs
-    await _put('/projects/$projectId/credentials', {
-      'app': '.',
-      'flavor': 'dev',
-      'kind': 'keystore',
-      'keystore': base64Encode(utf8.encode(_fakeKeystore)),
-      'storePassword': _fakeStorePassword,
-      'keyAlias': 'upload',
-    });
-    final credentials =
-        (await _get('/projects/$projectId/credentials'))['credentials'] as List;
-    final keystoreId =
-        (credentials.firstWhere((c) => (c as Map)['kind'] == 'keystore')
-                as Map)['id']!
-            as String;
+    final keystoreId = await _addCredential(
+      projectId,
+      flavor: 'dev',
+      name: 'Upload keystore · e2e',
+      fields: {
+        'kind': 'keystore',
+        'keystore': base64Encode(utf8.encode(_fakeKeystore)),
+        'storePassword': _fakeStorePassword,
+        'keyAlias': 'upload',
+      },
+    );
     final secretKey = 'credential.$keystoreId';
 
     Future<String> workflow(String name, String jobs) async {
@@ -905,6 +905,8 @@ class _E2e {
     await _startRunner(xp, runnerData, environment, capability: 'android');
     _log('the runner is online and can build Android; the engine cannot');
 
+    // The deprecated per-flavor route on purpose: it still creates a named
+    // credential and its assignment (ADR 0013).
     await _put('/projects/$projectId/credentials', {
       'app': '.',
       'flavor': 'dev',
@@ -1115,6 +1117,49 @@ class _E2e {
     );
     _log('xp connect saved the tokens; the CLI reads the project');
 
+    // A named credential added and assigned with the CLI (ADR 0013); its
+    // secret goes in on stdin, never in the arguments.
+    const webhook = 'https://hooks.slack.com/services/T0/B0/E2ESECRET';
+    final process = await Process.start(
+      xp,
+      [
+        'credentials',
+        'add',
+        '--kind',
+        'slack',
+        '--name',
+        'Team Slack · e2e',
+        '--webhook-url-stdin',
+      ],
+      environment: environment,
+      includeParentEnvironment: false,
+    );
+    final addOut = process.stdout.transform(utf8.decoder).join();
+    final addErr = process.stderr.transform(utf8.decoder).join();
+    process.stdin.write(webhook);
+    await process.stdin.close();
+    final addExit = await process.exitCode;
+    _expect(
+      addExit == 0 && !'${await addOut}${await addErr}'.contains('E2ESECRET'),
+      'xp credentials add exits 0 and never prints the secret, not $addExit: '
+      '${await addErr}',
+    );
+    final assigned = await runXp([
+      'credentials',
+      'assign',
+      'team slack · e2e',
+      '--project',
+      projectId,
+      '--flavor',
+      'dev',
+    ]);
+    _expect(
+      assigned.exitCode == 0,
+      'xp credentials assign exits 0, not ${assigned.exitCode}: '
+      '${assigned.stderr}',
+    );
+    _log('xp added a named Slack credential and assigned it to dev');
+
     final session = await _McpSession.start(xp, environment);
     try {
       final initialized = await session.request('initialize', {
@@ -1160,6 +1205,31 @@ class _E2e {
         'the MCP tools include dispatch and the approval poll: $names',
       );
       _log('xp mcp offers ${names.length} tools, none that approves');
+
+      // Credentials are read-only to agents (ADR 0013): the MCP tool lists
+      // them without a secret, and the MCP token cannot add one.
+      _expect(
+        names.contains('list_credentials') &&
+            names
+                .where((name) => name.contains('credential'))
+                .every((name) => name == 'list_credentials'),
+        'the only credential tool is list_credentials: $names',
+      );
+      final credentials = await session.toolList('list_credentials');
+      _expect(
+        '$credentials'.contains('Team Slack · e2e') &&
+            '$credentials'.contains('dev') &&
+            !'$credentials'.contains('E2ESECRET'),
+        'list_credentials shows the credential, not its secret: $credentials',
+      );
+      await _call(
+        'POST',
+        '/credentials',
+        {'name': 'Agent', 'kind': 'slack', 'webhookUrl': 'https://x'},
+        expect: 403,
+        token: mcpToken,
+      );
+      _log('the MCP token reads the credentials and cannot add one');
 
       final projects = await session.toolList('list_projects');
       _expect(
@@ -1523,22 +1593,31 @@ class _E2e {
     final appleVersion = _asc!.addVersion(appleAppId, '1.0.0');
     final playApp = _play!.addApp(androidId!)..addRelease('internal', [41]);
 
-    await _put('/projects/$projectId/credentials', {
-      'app': '.',
-      'flavor': 'prod',
-      'kind': 'asc_key',
-      'keyId': fakeAscKeyId,
-      'issuerId': fakeAscIssuerId,
-      'privateKey': fakeAscPrivateKeyPem,
-      'keyKind': 'team',
-    });
-    await _put('/projects/$projectId/credentials', {
-      'app': '.',
-      'flavor': 'prod',
-      'kind': 'play_sa',
-      'serviceAccount': _play!.serviceAccountJson(),
-    });
-    _log('saved the App Store Connect key and the Play service account');
+    await _addCredential(
+      projectId,
+      flavor: 'prod',
+      name: 'App Store Connect · e2e',
+      fields: {
+        'kind': 'asc_key',
+        'keyId': fakeAscKeyId,
+        'issuerId': fakeAscIssuerId,
+        'privateKey': fakeAscPrivateKeyPem,
+        'keyKind': 'team',
+      },
+    );
+    await _addCredential(
+      projectId,
+      flavor: 'prod',
+      name: 'Play publisher · e2e',
+      fields: {
+        'kind': 'play_sa',
+        'serviceAccount': _play!.serviceAccountJson(),
+      },
+    );
+    _log(
+      'added the App Store Connect key and the Play service account, '
+      'assigned to prod and checked for its bundle id and package',
+    );
 
     final workflows = await _get('/projects/$projectId/workflows');
     final byName = {
@@ -2136,6 +2215,37 @@ class _E2e {
   String _pemBody(String pem) => _pemLines(pem).join();
 
   // ---------------------------------------------------------------- HTTP
+
+  /// Adds a named credential (`POST /credentials`) and assigns it to the
+  /// flavor [flavor] of the root app (ADR 0013); the assignment must be
+  /// accepted for the flavor. Returns the id of the credential.
+  Future<String> _addCredential(
+    String projectId, {
+    required String flavor,
+    required String name,
+    required Map<String, Object?> fields,
+  }) async {
+    final created = await _call('POST', '/credentials', {
+      'name': name,
+      ...fields,
+    }, expect: 201);
+    final id = created['id']! as String;
+    final kind = fields['kind']! as String;
+    final assigned = await _call(
+      'PUT',
+      '/projects/$projectId/flavors/$flavor/credentials/$kind',
+      {'credentialId': id},
+    );
+    final statuses = [
+      for (final credential in assigned['assigned'] as List)
+        (credential as Map)['status'],
+    ];
+    _expect(
+      statuses.length == 1 && statuses.single == 'verified',
+      'the $kind credential "$name" is accepted for $flavor, not $statuses',
+    );
+    return id;
+  }
 
   Future<Map<String, dynamic>> _get(String path) => _call('GET', path, null);
 

@@ -21,6 +21,7 @@ final class ApiException extends XpClientException {
     required this.statusCode,
     this.code,
     this.approval,
+    this.usedBy = const [],
   });
 
   /// Reads the error out of the [body] of a response with [statusCode].
@@ -32,6 +33,7 @@ final class ApiException extends XpClientException {
       final json = jsonDecode(body);
       final envelope = ErrorResponse.fromJson(json as Map<String, dynamic>);
       final approval = json['approval'];
+      final usedBy = json['usedBy'];
       return ApiException(
         envelope.error.message,
         statusCode: statusCode,
@@ -39,6 +41,12 @@ final class ApiException extends XpClientException {
         approval: approval is Map<String, dynamic>
             ? Approval.fromJson(approval)
             : null,
+        usedBy: usedBy is List<dynamic>
+            ? [
+                for (final usage in usedBy)
+                  CredentialUsage.fromJson(usage as Map<String, dynamic>),
+              ]
+            : const [],
       );
     } on Object {
       return ApiException(
@@ -58,6 +66,13 @@ final class ApiException extends XpClientException {
   /// The approval as it stands, when the error is
   /// [ApiErrorCode.alreadyDecided].
   final Approval? approval;
+
+  /// The flavors that use the credential, when the error is
+  /// [ApiErrorCode.credentialInUse].
+  final List<CredentialUsage> usedBy;
+
+  /// Whether the credential was not deleted because flavors use it.
+  bool get isCredentialInUse => code == ApiErrorCode.credentialInUse;
 
   /// Whether the token is missing, unknown or revoked.
   bool get isUnauthorized => code == ApiErrorCode.unauthorized;

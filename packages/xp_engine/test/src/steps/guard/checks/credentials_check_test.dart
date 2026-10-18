@@ -5,19 +5,29 @@ import 'package:xp_engine/xp_engine.dart';
 import '../../../../helpers/credential_harness.dart';
 import '../../../../helpers/guard_harness.dart';
 
-CredentialRecord _record(
+AssignedCredential _record(
   CredentialKind kind,
   CredentialStatus status, {
   String? message,
   String? fix,
-}) => CredentialRecord(
-  id: 'crd_${kind.wire}',
-  flavor: testFlavor,
-  kind: kind,
-  secretKey: 'credential.${kind.wire}',
-  status: status,
-  message: message,
-  fix: fix,
+  CredentialStatus assignment = CredentialStatus.verified,
+  String? assignmentMessage,
+  String? assignmentFix,
+  CredentialFlavor flavor = testFlavor,
+}) => AssignedCredential(
+  flavor: flavor,
+  credential: CredentialRecord(
+    id: 'crd_${kind.wire}_${flavor.name}',
+    name: '${kind.label} ${flavor.name}',
+    kind: kind,
+    secretKey: 'credential.${kind.wire}',
+    check: CredentialCheck(status: status, message: message, fix: fix),
+  ),
+  check: CredentialCheck(
+    status: assignment,
+    message: assignmentMessage,
+    fix: assignmentFix,
+  ),
 );
 
 void main() {
@@ -48,11 +58,11 @@ void main() {
     expect(result.message, contains('needs no credentials'));
   });
 
-  test('passes when every credential was accepted', () async {
-    await repository.save(
+  test('passes when every credential and assignment was accepted', () async {
+    await repository.put(
       _record(CredentialKind.ascKey, CredentialStatus.verified),
     );
-    await repository.save(
+    await repository.put(
       _record(CredentialKind.slack, CredentialStatus.verified),
     );
 
@@ -63,7 +73,7 @@ void main() {
   });
 
   test('says "credential" for one', () async {
-    await repository.save(
+    await repository.put(
       _record(CredentialKind.ascKey, CredentialStatus.verified),
     );
 
@@ -71,7 +81,7 @@ void main() {
   });
 
   test('fails with the reason and the fix of a refused credential', () async {
-    await repository.save(
+    await repository.put(
       _record(
         CredentialKind.ascKey,
         CredentialStatus.rejected,
@@ -83,27 +93,53 @@ void main() {
     final result = await run();
 
     expect(result.status, GuardStatus.failed);
-    expect(result.message, contains('asc_key: App Store Connect refused'));
+    expect(
+      result.message,
+      contains(
+        'asc_key "App Store Connect API key prod": App Store Connect refused',
+      ),
+    );
     expect(result.fix, 'asc_key: Create a new key.');
   });
 
+  test("fails when the credential cannot reach the flavor's app", () async {
+    await repository.put(
+      _record(
+        CredentialKind.playSa,
+        CredentialStatus.verified,
+        assignment: CredentialStatus.rejected,
+        assignmentMessage: 'Google Play does not know com.mataa.app.',
+        assignmentFix: 'Invite the service account.',
+      ),
+    );
+
+    final result = await run();
+
+    expect(result.status, GuardStatus.failed);
+    expect(result.message, contains('Google Play does not know'));
+    expect(result.fix, 'play_sa: Invite the service account.');
+  });
+
   test('fails for a refusal that came without a reason', () async {
-    await repository.save(
+    await repository.put(
       _record(CredentialKind.appleId, CredentialStatus.rejected),
     );
 
     final result = await run();
 
     expect(result.status, GuardStatus.failed);
-    expect(result.message, 'apple_id: refused at the last check.');
+    expect(
+      result.message,
+      'apple_id "Apple ID prod": refused at the last check.',
+    );
     expect(result.fix, '');
   });
 
   test('only looks at the kinds the job needs', () async {
-    await repository.save(
+    await repository.put(
       _record(CredentialKind.slack, CredentialStatus.rejected, message: 'x'),
     );
-    await repository.save(
+    await repository.put(
       _record(CredentialKind.ascKey, CredentialStatus.verified),
     );
 
@@ -112,8 +148,8 @@ void main() {
     expect(result.status, GuardStatus.passed);
   });
 
-  test('fails for a needed kind that is not saved', () async {
-    await repository.save(
+  test('fails for a needed kind that is not assigned', () async {
+    await repository.put(
       _record(CredentialKind.ascKey, CredentialStatus.verified),
     );
 
@@ -122,16 +158,24 @@ void main() {
     );
 
     expect(result.status, GuardStatus.failed);
-    expect(result.message, 'firebase_sa: no credential is saved.');
-    expect(result.fix, contains('Save firebase_sa'));
+    expect(
+      result.message,
+      'firebase_sa: no credential is assigned to the flavor.',
+    );
+    expect(result.fix, contains('Assign a credential of firebase_sa'));
+    expect(result.fix, contains('xp credentials assign'));
   });
 
   test('warns, and does not stop the job, when it could not check', () async {
-    await repository.save(
+    await repository.put(
       _record(CredentialKind.ascKey, CredentialStatus.unreachable),
     );
-    await repository.save(
-      _record(CredentialKind.slack, CredentialStatus.unverified),
+    await repository.put(
+      _record(
+        CredentialKind.slack,
+        CredentialStatus.verified,
+        assignment: CredentialStatus.unverified,
+      ),
     );
 
     final result = await run();
@@ -139,27 +183,26 @@ void main() {
     expect(result.status, GuardStatus.warned);
     expect(
       result.message,
-      'Not confirmed: asc_key (could not be reached), slack (never checked).',
+      'Not confirmed: asc_key "App Store Connect API key prod" (could not be '
+      'reached), slack "Slack webhook prod" (never checked).',
     );
+    expect(result.fix, contains('xp credentials verify'));
   });
 
   test('only looks at the credentials of its own flavor', () async {
-    repository.flavors.add(
-      const CredentialFlavor(
-        id: 'flv_2',
-        projectId: 'prj_1',
-        appPath: '.',
-        name: 'dev',
-      ),
+    const dev = CredentialFlavor(
+      id: 'flv_2',
+      projectId: 'prj_1',
+      appPath: '.',
+      name: 'dev',
     );
-    await repository.save(
-      CredentialRecord(
-        id: 'crd_other',
-        flavor: repository.flavors.last,
-        kind: CredentialKind.ascKey,
-        secretKey: 'k',
-        status: CredentialStatus.rejected,
+    repository.flavors.add(dev);
+    await repository.put(
+      _record(
+        CredentialKind.ascKey,
+        CredentialStatus.rejected,
         message: 'x',
+        flavor: dev,
       ),
     );
 

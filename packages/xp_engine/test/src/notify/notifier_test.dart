@@ -66,15 +66,18 @@ void main() {
     });
 
     test('a credential of another kind is not a webhook', () async {
-      await h.credentials.save(
-        CredentialRecord(
-          id: 'crd_gh',
+      await h.credentials.put(
+        AssignedCredential(
           flavor: demoFlavorOf('prod'),
-          kind: CredentialKind.github,
-          secretKey: 'credential.prod.github',
+          credential: const CredentialRecord(
+            id: 'crd_gh',
+            name: 'Shorebird',
+            kind: CredentialKind.shorebird,
+            secretKey: 'credential.prod.shorebird',
+          ),
         ),
       );
-      await h.secrets.write('credential.prod.github', 'ghp_x');
+      await h.secrets.write('credential.prod.shorebird', 'sb_api_x');
 
       h.events.append(failed);
       await h.settle();

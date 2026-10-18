@@ -201,3 +201,59 @@ final runner = Runner(
   createdAt: DateTime.utc(2026, 10, 14, 9),
   revokedAt: DateTime.utc(2026, 10, 14, 10),
 );
+
+final ascCredential = NamedCredential(
+  id: 'crd_1',
+  name: 'Acme ASC',
+  kind: CredentialKind.ascKey,
+  status: CredentialStatus.verified,
+  account: 'KEY123',
+  checkedAt: at,
+  usedBy: const [
+    CredentialUsage(
+      projectId: 'prj_1',
+      project: 'acme/app',
+      app: '.',
+      flavor: 'prod',
+      status: CredentialStatus.verified,
+    ),
+    CredentialUsage(
+      projectId: 'prj_2',
+      app: '.',
+      flavor: 'default',
+      status: CredentialStatus.rejected,
+      message: 'The key cannot see com.acme.other.',
+      fix: 'Give the key access to the app.',
+    ),
+  ],
+);
+
+const slackCredential = NamedCredential(
+  id: 'crd_2',
+  name: 'Team Slack',
+  kind: CredentialKind.slack,
+  status: CredentialStatus.rejected,
+  message: 'Slack answered 404.',
+  fix: 'Make a new webhook.',
+);
+
+/// The credential the flavor [flavor] of `prj_1` uses.
+Credential assigned(
+  String flavor, {
+  String id = 'crd_1',
+  String? name = 'Acme ASC',
+  CredentialKind kind = CredentialKind.ascKey,
+  CredentialStatus status = CredentialStatus.verified,
+  String? message,
+  String? fix,
+}) => Credential(
+  id: id,
+  name: name,
+  projectId: 'prj_1',
+  app: '.',
+  flavor: flavor,
+  kind: kind,
+  status: status,
+  message: message,
+  fix: fix,
+);

@@ -8,6 +8,7 @@ import 'package:xp/src/command_runner.dart';
 import 'package:xp/src/config/token_vault.dart';
 import 'package:xp/src/config/xp_config.dart';
 import 'package:xp/src/context.dart';
+import 'package:xp/src/secret_prompt.dart';
 import 'package:xp/src/update/update_check.dart';
 import 'package:xp_api/xp_api.dart';
 import 'package:xp_client/xp_client.dart';
@@ -64,6 +65,22 @@ class MemoryTokenVault implements TokenVault {
   }
 }
 
+/// A terminal that answers the questions it is asked from [answers], in
+/// order, and keeps the questions.
+class FakeSecretPrompt implements SecretPrompt {
+  @override
+  bool interactive = false;
+
+  final answers = <String>[];
+  final questions = <String>[];
+
+  @override
+  String ask(String question) {
+    questions.add(question);
+    return answers.removeAt(0);
+  }
+}
+
 class FakeUpdateCheck implements UpdateCheck {
   String? newer;
   int calls = 0;
@@ -103,6 +120,7 @@ class TestEnv {
       stdin: stdin.stream,
       stdout: stdout,
       logIdle: const Duration(milliseconds: 50),
+      secretPrompt: prompt,
     );
     runner = XpCommandRunner(context: context);
   }
@@ -116,6 +134,7 @@ class TestEnv {
   final client = MockXpClient();
   final vault = MemoryTokenVault();
   final update = FakeUpdateCheck();
+  final prompt = FakeSecretPrompt();
   final connections = <Connection>[];
   final stdin = StreamController<List<int>>();
   final stdoutController = StreamController<List<int>>();
@@ -144,4 +163,14 @@ void registerFallbacks() {
   registerFallbackValue(const ProfileEdits());
   registerFallbackValue(ReleaseStore.apple);
   registerFallbackValue(StoreState.live);
+  registerFallbackValue(
+    const CreateCredentialRequest(
+      name: 'n',
+      kind: CredentialKind.slack,
+      material: {},
+    ),
+  );
+  registerFallbackValue(const ReplaceCredentialRequest({}));
+  registerFallbackValue(const AssignCredentialRequest(credentialId: 'crd_0'));
+  registerFallbackValue(CredentialKind.slack);
 }

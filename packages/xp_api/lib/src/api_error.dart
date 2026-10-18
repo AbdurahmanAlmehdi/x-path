@@ -33,6 +33,11 @@ enum ApiErrorCode {
   @JsonValue('conflict')
   conflict(409),
 
+  /// The credential is used by flavors, so it is not deleted without
+  /// `force`. The response lists them (`usedBy`).
+  @JsonValue('credential_in_use')
+  credentialInUse(409),
+
   /// The approval was decided already (first decision wins, D-13), or it
   /// expired. The response carries the approval as it stands.
   @JsonValue('already_decided')

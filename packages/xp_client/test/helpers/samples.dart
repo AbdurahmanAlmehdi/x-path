@@ -51,6 +51,22 @@ const credential = Credential(
   status: CredentialStatus.verified,
 );
 
+const usage = CredentialUsage(
+  projectId: 'prj_1',
+  project: 'acme/app',
+  app: '.',
+  flavor: 'prod',
+  status: CredentialStatus.verified,
+);
+
+const namedCredential = NamedCredential(
+  id: 'crd_1',
+  name: 'Play publisher',
+  kind: CredentialKind.playSa,
+  status: CredentialStatus.verified,
+  usedBy: [usage],
+);
+
 final approval = Approval(
   id: 'apr_1',
   projectId: 'prj_1',

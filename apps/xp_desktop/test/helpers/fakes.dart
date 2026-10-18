@@ -13,6 +13,8 @@ class MockEnginesRepository extends Mock implements EnginesRepository;
 
 class MockProjectsRepository extends Mock implements ProjectsRepository;
 
+class MockCredentialsRepository extends Mock implements CredentialsRepository;
+
 class MockJobsRepository extends Mock implements JobsRepository;
 
 class MockReleasesRepository extends Mock implements ReleasesRepository;
@@ -62,6 +64,13 @@ MockProjectsRepository quietProjects() {
   final repository = MockProjectsRepository();
   when(() => repository.watchCredentials(any()))
       .thenAnswer((_) => const Stream.empty());
+  return repository;
+}
+
+/// A credentials repository whose credentials never arrive.
+MockCredentialsRepository quietCredentials() {
+  final repository = MockCredentialsRepository();
+  when(repository.watchCredentials).thenAnswer((_) => const Stream.empty());
   return repository;
 }
 
@@ -191,15 +200,35 @@ const captain = Project(
   ],
 );
 
+/// The credential `prod` of `mataa` uses for its App Store Connect key.
 final ascKey = Credential(
   id: 'crd_1',
+  name: 'Team App Store key',
   projectId: 'prj_1',
   app: '.',
   flavor: 'prod',
   kind: CredentialKind.ascKey,
   status: CredentialStatus.verified,
-  account: 'FANNAK',
+  account: 'ABC123DEF4',
   checkedAt: at,
+  credentialStatus: CredentialStatus.verified,
+  assignmentStatus: CredentialStatus.verified,
+);
+
+/// The same key for `dev`, which it cannot reach.
+const devAscKey = Credential(
+  id: 'crd_1',
+  name: 'Team App Store key',
+  projectId: 'prj_1',
+  app: '.',
+  flavor: 'dev',
+  kind: CredentialKind.ascKey,
+  status: CredentialStatus.rejected,
+  account: 'ABC123DEF4',
+  message: 'The key cannot see com.mataaa.dev.',
+  fix: 'Give the key access to the app.',
+  credentialStatus: CredentialStatus.verified,
+  assignmentStatus: CredentialStatus.rejected,
 );
 
 const playKey = Credential(
@@ -211,6 +240,60 @@ const playKey = Credential(
   status: CredentialStatus.rejected,
   message: 'The service account has no access.',
   fix: 'Give it the Release manager role.',
+);
+
+/// The named App Store Connect key, used by `prod` and `dev` of `mataa`.
+final teamKey = NamedCredential(
+  id: 'crd_1',
+  name: 'Team App Store key',
+  kind: CredentialKind.ascKey,
+  status: CredentialStatus.verified,
+  account: 'ABC123DEF4',
+  checkedAt: at,
+  usedBy: const [
+    CredentialUsage(
+      projectId: 'prj_1',
+      project: 'acme/mataa_new_app',
+      app: '.',
+      flavor: 'prod',
+      status: CredentialStatus.verified,
+    ),
+    CredentialUsage(
+      projectId: 'prj_1',
+      project: 'acme/mataa_new_app',
+      app: '.',
+      flavor: 'dev',
+      status: CredentialStatus.rejected,
+      message: 'The key cannot see com.mataaa.dev.',
+    ),
+  ],
+);
+
+/// A named Play service account the store refuses, used by `captain`.
+const playAccountKey = NamedCredential(
+  id: 'crd_2',
+  name: 'Play release manager',
+  kind: CredentialKind.playSa,
+  status: CredentialStatus.rejected,
+  account: 'release@acme-fake.iam.gserviceaccount.com',
+  message: 'The service account has no access.',
+  fix: 'Give it the Release manager role.',
+  usedBy: [
+    CredentialUsage(
+      projectId: 'prj_2',
+      app: 'apps/captain',
+      flavor: 'default',
+      status: CredentialStatus.unverified,
+    ),
+  ],
+);
+
+/// A named Slack webhook nobody uses, never checked.
+const slackWebhook = NamedCredential(
+  id: 'crd_3',
+  name: 'Releases channel',
+  kind: CredentialKind.slack,
+  status: CredentialStatus.unreachable,
 );
 
 const slackHook = Credential(
@@ -230,6 +313,7 @@ class SessionHarness {
     when(client.health).thenAnswer((_) async => const HealthResponse());
     when(client.listProjects).thenAnswer((_) async => projects);
     when(() => client.listCredentials(any())).thenAnswer((_) async => []);
+    when(client.listNamedCredentials).thenAnswer((_) async => []);
     when(() => client.listReleases(projectId: any(named: 'projectId')))
         .thenAnswer((_) async => []);
     when(client.listRunners).thenAnswer((_) async => []);

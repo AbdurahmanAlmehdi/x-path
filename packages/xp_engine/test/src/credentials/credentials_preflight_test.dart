@@ -5,6 +5,7 @@ import 'package:test/test.dart';
 import 'package:xp_api/xp_api.dart';
 import 'package:xp_engine/xp_engine.dart';
 
+import '../../helpers/approval_harness.dart';
 import '../../helpers/credential_harness.dart';
 import '../../helpers/guard_harness.dart';
 import '../../helpers/job_harness.dart';
@@ -28,6 +29,10 @@ void main() {
     repository = InMemoryCredentialRepository([testFlavor]);
     secrets = BytesSecretStore();
     asc = FakeAppStoreConnect();
+    asc.apps['com.mataa.app'] = const AscApp(
+      id: '1',
+      bundleId: 'com.mataa.app',
+    );
     altool = FakeProcessRunner(
       (call) => ProcessOutput(
         exitCode: 0,
@@ -106,14 +111,33 @@ void main() {
     return await runner.whenFinished(job.id);
   }
 
+  /// Adds a credential of [kind] for the flavor, or replaces its secret.
   Future<void> save(CredentialKind kind) async {
-    await credentials.save(
-      'prj_1',
-      SaveCredentialRequest(
-        flavor: 'prod',
+    final owner = tokenOf(DeviceTokenKind.app);
+    final assigned = await repository.assignment('flv_1', kind);
+    if (assigned != null) {
+      await credentials.replace(
+        assigned.id,
+        ReplaceCredentialRequest(credentialFields(kind)),
+        by: owner,
+      );
+      return;
+    }
+    final created = await credentials.create(
+      CreateCredentialRequest(
+        name: kind.label,
         kind: kind,
         material: credentialFields(kind),
       ),
+      by: owner,
+    );
+    await credentials.assign(
+      'prj_1',
+      app: '.',
+      flavor: 'prod',
+      kind: kind,
+      request: AssignCredentialRequest(credentialId: created.id),
+      by: owner,
     );
   }
 
@@ -174,6 +198,23 @@ void main() {
       utf8.decode(utf8.encode(job.steps.first.message!)),
       isNot(contains('abcd-efgh')),
     );
+  });
+
+  test("a key that cannot see the flavor's app fails preflight", () async {
+    await save(CredentialKind.ascKey);
+    // The app moves to another team: the key no longer sees it.
+    asc.apps.clear();
+    clock.advance(const Duration(days: 1));
+    await credentials.checkAll();
+
+    final job = await release();
+
+    expect(job.state, JobState.failed);
+    expect(
+      job.steps.first.message,
+      contains('sees no app with the bundle id com.mataa.app'),
+    );
+    expect(build.runs, isEmpty);
   });
 
   test('replacing the credential lets the job through again', () async {

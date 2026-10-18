@@ -10,12 +10,14 @@ typedef PeriodicTimerFactory = Timer Function(
   void Function(Timer timer) callback,
 );
 
-/// Checks every credential once a day (`xpd serve`), so that an expired ASC
-/// key or a revoked app-specific password shows up before a release needs it:
-/// the `credentials` guard check fails a job on what is recorded.
+/// Checks every credential and every assignment once a day (`xpd serve`), so
+/// that an expired ASC key, a revoked app-specific password or a key that
+/// lost access to an app shows up before a release needs it: the
+/// `credentials` guard check fails a job on what is recorded.
 ///
-/// [start] checks at once if any credential was not checked within the last
-/// [interval] (an engine that was off for a day catches up on start), then
+/// [start] checks at once if any credential or assignment was not checked
+/// within the last [interval] (an engine that was off for a day catches up
+/// on start), then
 /// every [interval]. Checks never overlap.
 class CredentialHealthCheck {
   /// Creates the health check.
@@ -81,8 +83,13 @@ class CredentialHealthCheck {
 
   Future<bool> _isDue() async {
     final cutoff = _clock.now().subtract(interval);
-    for (final record in await _repository.list()) {
-      final checked = record.checkedAt;
+    final checks = [
+      for (final record in await _repository.list()) record.check,
+      for (final assignment in await _repository.assignments())
+        assignment.check,
+    ];
+    for (final check in checks) {
+      final checked = check.checkedAt;
       if (checked == null || !checked.isAfter(cutoff)) return true;
     }
     return false;

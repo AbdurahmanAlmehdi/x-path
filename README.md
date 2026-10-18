@@ -155,7 +155,8 @@ project, app, time and the baseline index; version 8 gives `credential_ref` the 
 one credential per flavor and kind; version 9 adds `run` and gives `job` its run, stage, name and capabilities;
 version 10 gives `approval` its run, job, decision and expiry; version 11 gives `release` its flavor, branch, pull request,
 builds and the status in each store; version 12 adds `housekeeping_setting`; version 13 gives `runner` its credential,
-what it reported and when it was revoked, and adds `pairing_token`.
+what it reported and when it was revoked, and adds `pairing_token`; version 14 replaces `credential_ref` with the
+named `credential` and `credential_assignment` (see Credentials, ADR 0013).
 
 Secrets (`packages/xp_secrets`) live on the engine machine behind the `SecretStore` interface of
 `xp_engine`; `createSecretStore` picks the implementation for the platform.
@@ -724,11 +725,11 @@ Phase 10a adds the Apple side of the stores (D-14): the App Store Connect REST c
 Nothing here calls Apple in a test: the adapters run against `tool/e2e/fake_stores/asc` (below) and altool is
 only ever faked or read from captured output.
 
-- **The ASC API key is one secret.** The `secret_key` of an `asc_key` credential reference names a secret in the
+- **The ASC API key is one secret.** The `secret_key` of an `asc_key` credential names a secret in the
   secret store whose value is JSON (`AscKey.toSecret`):
   `{"keyId": "ABC123DEF4", "issuerId": "<uuid>", "keyKind": "team" | "individual", "privateKey": "<.p8 text>"}`.
   `keyKind` defaults to `team`. The credential endpoints (see Credentials) write it. An Apple ID flavor has an
-  `apple_id` reference instead, and no REST access.
+  `apple_id` credential instead, and no REST access.
 - **Tokens** (`AscTokenProvider`) are ES256 JWTs signed in pure Dart (`pointycastle`, RFC 6979 nonces, raw
   `r || s`): header `alg`, `kid`, `typ`; claims `iat`, `exp` (15 minutes, Apple's maximum is 20), `aud:
   appstoreconnect-v1`, and `iss` for a team key or `sub: user` with no `iss` for an individual key. One token is
@@ -753,7 +754,7 @@ only ever faked or read from captured output.
   (`PENDING_DEVELOPER_RELEASE`, `PENDING_APPLE_RELEASE`, `PROCESSING_FOR_APP_STORE`, ...) are the closed trains.
   **`StoreBuildNumbers`** (the `buildNumberReuse` guard check) is every build number App Store Connect has for the
   app, expired builds included; it needs an API key, and answers for iOS only (Google Play's half is in the next section).
-  `SqliteAscCredentialSource` finds the key through the `asc_key` reference of the flavor with the bundle id.
+  `SqliteAscCredentialSource` finds the key through the `asc_key` credential assigned to the flavor with the bundle id.
   `xpd serve` wires all of it in `apps/xpd/lib/src/stores/apple_stores.dart`; the `appStoreTrain` check and the
   step are registered there, and `buildNumberReuse` over both stores' numbers in `store_guard_checks.dart`.
 - **`upload.appStore`** (side effect, macOS only, always on the engine, D-09) runs `xcrun altool --upload-package
@@ -795,11 +796,11 @@ of the `buildNumberReuse` guard check and the `playTargetSdk` guard check. Inter
 `packages/xp_engine/lib/src/stores/play`, the HTTP adapters in `packages/xp_adapters/lib/src/stores/play`. Nothing
 here calls Google in a test: the adapters run against `tool/e2e/fake_stores/play` (below).
 
-- **The service account is one secret.** The `secret_key` of a `play_sa` credential reference names a secret in the
+- **The service account is one secret.** The `secret_key` of a `play_sa` credential names a secret in the
   secret store whose value is the JSON key file Google Cloud gives out, as it is (`PlayServiceAccount`): it needs
   `client_email` and `private_key`, uses `token_uri` (default `https://oauth2.googleapis.com/token`) and
   `private_key_id`, and ignores the rest. The credential endpoints (see Credentials) write it. A flavor with no
-  `play_sa` reference has no service account: XPath cannot upload for it, `upload.play` fails with "upload the
+  `play_sa` credential assigned has no service account: XPath cannot upload for it, `upload.play` fails with "upload the
   bundle by hand", and the build numbers of Play are unknown (the endpoint behind "Play: live" is Phase 12b, the desktop's button Phase 16b).
   Setting up the account: enable the Google Play Android Developer API in the Cloud project, create the service
   account and a JSON key, and invite its email in the Play Console (Users and permissions) with permission to
@@ -939,53 +940,93 @@ when it is there (the fixtures are reconstructed from the documentation and say 
 
 ### Credentials
 
-A credential belongs to a flavor (an app path and a flavor name, `.` and `default` for an app without flavors) and has
-a kind (the `kind` of the `credential_ref` table). A flavor has one credential of each kind. `credential_ref` gained
-`account` (who it belongs to, never secret), `status`, `checked_at`, `message` and `fix` (migration 8, with a unique
-index on the flavor and kind). The secret itself is only in the secret store, under the `secret_key` of the reference
-(`credential.<id>`; the GitHub token, which the whole engine shares, stays under `github.token`, and a secret that
-another credential keeps is not deleted with this one). What each kind stores and how it is checked:
+Credentials are the engine's, with names (ADR 0013). A **named credential** (the `credential` table) has an id
+(`crd_...`, which never changes), a name that is unique regardless of case ("Personal Apple Dev Account", "Mataa Apple
+Dev Account"), a kind, its secret, the `account` it belongs to when that is not secret, and the result of its own check
+(does it authenticate). Any flavor of any project may use it: a flavor (an app path and a flavor name, `.` and
+`default` for an app without flavors) uses **at most one credential of each kind** (`credential_assignment`, only of
+the credential's kind), and each assignment keeps the result of its own check (can the credential reach this
+flavor's bundle id, package or app). So one Apple key serves the dev and the prod flavor, and two Shorebird keys are
+told apart by name. Renaming a credential or giving it a new secret keeps its id and every assignment. The secret is
+only in the secret store, under the `secret_key` of the credential (`credential.<id>`; a secret another credential
+keeps is not deleted with this one). Identical secrets under two names stay two credentials.
 
-| Kind | Secret store | Check (cheap, changes nothing) |
-|---|---|---|
-| `asc_key` | JSON `{keyId, issuerId, keyKind, privateKey}` | `GET /v1/apps?limit=1` with a signed token; a `401` is an expired or revoked key |
-| `apple_id` | the app-specific password; the Apple ID is the `account` | `xcrun altool --list-providers -u <id> -p @env:XPATH_ASC_APP_PASSWORD`; a password that is not shaped like `abcd-efgh-ijkl-mnop` is refused unasked |
-| `play_sa` | the JSON key file | token exchange, then `tracks.releases.list` of the internal track of the flavor's application id |
-| `firebase_sa` | the JSON key file | token exchange with the `cloud-platform` scope |
-| `keystore` | the bytes; `<key>.storePassword`, `<key>.keyPassword`; the alias is the `account` | `keytool -list -keystore <0600 temp file> -storepass:env XPATH_KEYSTORE_STOREPASS -alias <alias>` |
-| `shorebird` | the `sb_api_*` key | `shorebird account whoami --json` with `SHOREBIRD_TOKEN` |
-| `github` | the token | `GET /user` |
-| `slack` | the webhook URL | its shape only (`https://hooks.slack.com/services/T/B/X`); no message is sent |
+The GitHub token is not a named credential: the engine has one, under `github.token`, set with `PUT /github-token`
+(see GitHub). A `slack` webhook is named and assigned per flavor like the others; a notice of a project goes to the
+first webhook a flavor of the project uses and no check refused.
 
-A check ends `verified`, `rejected` (the place said no: expired, revoked, wrong password, a missing role) or
-`unreachable` (no network, a missing tool: it says nothing about the credential). Only `rejected` blocks a job. The
-keytool check proves the store password and the alias; `keytool` has no check for the key password. The password of an
-Apple ID and of a keystore reach the program through the environment, never the arguments, and every secret value is
-given to the log masker as soon as it arrives.
+What each kind stores and how it is checked:
+
+| Kind | Secret store | Check of the credential (cheap, changes nothing) | Check of an assignment |
+|---|---|---|---|
+| `asc_key` | JSON `{keyId, issuerId, keyKind, privateKey}` | `GET /v1/apps?limit=1` with a signed token; a `401` is an expired or revoked key | the key sees the app with the flavor's iOS bundle id (`GET /v1/apps?filter[bundleId]=`) |
+| `apple_id` | the app-specific password; the Apple ID is the `account` | `xcrun altool --list-providers -u <id> -p @env:XPATH_ASC_APP_PASSWORD`; a password that is not shaped like `abcd-efgh-ijkl-mnop` is refused unasked | the credential's |
+| `play_sa` | the JSON key file | token exchange | `tracks.releases.list` of the internal track of the flavor's application id |
+| `firebase_sa` | the JSON key file | token exchange with the `cloud-platform` scope | the credential's (the app ids belong to the steps) |
+| `keystore` | the bytes; `<key>.storePassword`, `<key>.keyPassword`; the alias is the `account` | `keytool -list -keystore <0600 temp file> -storepass:env XPATH_KEYSTORE_STOREPASS -alias <alias>` | the credential's |
+| `shorebird` | the `sb_api_*` key | `shorebird account whoami --json` with `SHOREBIRD_TOKEN` | the credential's |
+| `slack` | the webhook URL | its shape only (`https://hooks.slack.com/services/T/B/X`); no message is sent | the credential's |
+
+A check ends `verified`, `rejected` (the place said no: expired, revoked, wrong password, a missing role, an app the
+key cannot see) or `unreachable` (no network, a missing tool: it says nothing about the credential). A kind whose
+check does not look at the flavor, and a credential its own check did not accept, gives each assignment the
+credential's status. Only `rejected` blocks a job. The keytool check proves the store password and the alias;
+`keytool` has no check for the key password. The password of an Apple ID and of a keystore reach the program through
+the environment, never the arguments, and every secret value is given to the log masker as soon as it arrives.
+
+Only `app` and `cli` tokens change credentials; an `mcp` token reads them (`403 forbidden` otherwise) and a `runner`
+token reaches none of these routes (ADR 0011).
 
 | Route | What it does |
 |---|---|
-| `GET /projects/{id}/credentials` | The credentials of the project, oldest first; `?flavor=` (and `?app=`, `.` by default) for one flavor. No secret is ever returned. |
-| `PUT /projects/{id}/credentials` | `{"app": ".", "flavor": "prod", "kind": "asc_key", ...}` with the secret fields of the kind (see `SaveCredentialRequest`; `packages/xp_api/openapi.yaml` has one schema per kind). Verifies, then stores the secret and the reference. `201` for a new credential, `200` for a replacement. `422 credential_rejected` says why and how to fix it and **stores nothing** (the old credential stays); `502 upstream_error` when the check could not be made, also stores nothing. |
-| `POST /projects/{id}/credentials/{credentialId}/verify` | Checks it again now and keeps the result. A credential that is refused now is still a `200` with `status: rejected`. |
-| `DELETE /projects/{id}/credentials/{credentialId}` | Deletes the reference and the secret. |
+| `GET /credentials` | The named credentials by name, each with `usedBy`: the flavors that use it, with the check of each assignment. No secret is ever returned. |
+| `POST /credentials` | `{"name": "...", "kind": "asc_key", ...}` with the secret fields of the kind (`CreateCredentialRequest`; `packages/xp_api/openapi.yaml` has one schema per kind). Verifies, then stores the secret and the credential: `201`. No flavor uses it yet. `409 conflict` for a name that is taken in any case; `422 credential_rejected` says why and how to fix it and **stores nothing**; `502 upstream_error` when the check could not be made, also stores nothing. |
+| `GET /credentials/{id}` | One credential with `usedBy`. |
+| `PATCH /credentials/{id}` | `{"name": "..."}`: renames it; `409` for a name that is taken. |
+| `PUT /credentials/{id}` | The secret fields of its kind: a new secret, checked first (`422`/`502` change nothing). The name and the assignments stay, and the assignments are checked again. |
+| `POST /credentials/{id}/verify` | Checks the credential and each assignment now and keeps the results. A refusal is still a `200`, with `status: rejected`. |
+| `DELETE /credentials/{id}` | Deletes it and its secret. A credential that flavors use answers `409 credential_in_use` with `usedBy`, and is deleted only with `?force=true`, which unassigns it first. |
+| `GET /projects/{id}/credentials` | The credential each flavor of the project uses, by app, flavor and kind: `id`, `name`, `account`, `credentialStatus` (the credential's check), `assignmentStatus` (the assignment's) and `status`, `message`, `fix` as preflight sees them (a refusal of either is a refusal). `?flavor=` (and `?app=`, `.` by default) for one flavor. |
+| `PUT /projects/{id}/flavors/{flavor}/credentials/{kind}` | `{"credentialId": "crd_...", "allFlavors": false, "replace": false}`, `?app=` for an app below the root. The flavor uses the credential for the kind from now on; with `allFlavors` every flavor of the app does too, except those that have another credential of the kind: they keep it (`kept` in the answer) unless `replace`. Each assignment is checked at once; a refusal does not undo it, it fails preflight until fixed. |
+| `DELETE /projects/{id}/flavors/{flavor}/credentials/{kind}` | The flavor stops using its credential of the kind; the credential stays. |
 
-Saving, verifying, expiring and deleting announce `credential.saved`, `credential.verified`, `credential.expired` (a
-credential that was `verified` and is `rejected` now, once) and `credential.removed` on `/events`; the events carry
-ids and kinds, never a secret. The server logs no request, and a failure names the field that is wrong, not its value.
+**Deprecated, kept so that no client breaks:** `PUT /projects/{id}/credentials` takes the per-flavor body of before
+(`{"app": ".", "flavor": "prod", "kind": "asc_key", ...}`, optionally with a `name`): the credential is checked as
+`POST /credentials` checks it; if the flavor's credential of the kind is used by that flavor alone it gets the new
+secret (`200`, same id), otherwise a new named credential is created (`201`) and the flavor uses it, called `name` or
+"<kind> · <project> <app> <flavor>". A `github` token there becomes the engine's GitHub token.
+`POST /projects/{id}/credentials/{credentialId}/verify` verifies the credential and answers as the first flavor of the
+project that uses it sees it, and `DELETE /projects/{id}/credentials/{credentialId}` unassigns it from the project's
+flavors and deletes it when no other flavor uses it.
 
-**The daily health check** (`CredentialHealthCheck`, started by `xpd serve`) checks every credential of every project
-every 24 hours and records the result. When the engine starts it also checks at once if any credential was last checked
-more than a day ago, so a Mac mini that was off catches up; this does not delay the engine, which is listening
-already. Checks never overlap, and a failed run (locked secrets, say) is reported to stderr and tried again at the
-next tick.
+Creating, replacing, renaming, checking, expiring, deleting, assigning and unassigning announce `credential.saved`,
+`credential.renamed`, `credential.verified`, `credential.expired` (a credential or an assignment that was `verified`
+and is `rejected` now, once), `credential.removed`, `credential.assigned` and `credential.unassigned` on `/events`; the
+events carry ids, names, places and kinds, never a secret. The server logs no request, and a failure names the field
+that is wrong, not its value.
 
-**Preflight.** The `credentials` guard check reads the recorded results of the flavor named in the step input
-(`flavorId`; `credentialKinds` narrows it to what the job needs, and a kind that is listed but not saved fails). A
-`rejected` credential fails the `guard` step with the reason and the fix, so the job stops before any build step runs; an
-`unreachable` or never-checked one is a warning. The acceptance tests are `credentials_preflight_test.dart` in
-`xp_engine` (an expired ASC key and a revoked app-specific password, through `JobRunner` with the guard first and a
-build step that must stay `pending`) and `credential_checks_test.dart` in `xpd` (the same against the fake ASC server).
+**The migration** (schema version 14) turns every `credential_ref` row of before into a named credential with the
+same id, secret key, account and check, called "<kind> · <project> [<app> ]<flavor>" (for example "App Store Connect
+API key · acme/shop prod"; cut to 80 characters, and a name that two rows would share gets the id after it), and an
+assignment to its flavor with the same check. Secrets are neither read nor touched, and identical ones are not merged:
+rename them, assign one to the flavors and delete the others. The per-flavor `github` rows are dropped: each of them
+named the engine's GitHub token (`github.token`, the key they were saved under), which stays the one GitHub token, so
+nothing is lost. `xpd` logs what the migration did on stderr (`xpd: Named 5 credential(s) ...`, `xpd: Dropped 2
+per-flavor GitHub credential reference(s) ...`), and the database before it is kept as `xpath.db.bak-v13`.
+
+**The daily health check** (`CredentialHealthCheck`, started by `xpd serve`) checks every credential and every
+assignment every 24 hours and records the results. When the engine starts it also checks at once if any of them was
+last checked more than a day ago, so a Mac mini that was off catches up; this does not delay the engine, which is
+listening already. Checks never overlap, and a failed run (locked secrets, say) is reported to stderr and tried again
+at the next tick.
+
+**Preflight.** The `credentials` guard check reads the recorded results of the credentials assigned to the flavor named
+in the step input (`flavorId`; `credentialKinds` narrows it to what the job needs, and a kind that is listed but not
+assigned fails). A credential or an assignment that is `rejected` fails the `guard` step with the reason and the fix,
+so the job stops before any build step runs; an `unreachable` or never-checked one is a warning. The acceptance tests
+are `credentials_preflight_test.dart` in `xp_engine` (an expired ASC key, a revoked app-specific password and a key
+that cannot see the flavor's app, through `JobRunner` with the guard first and a build step that must stay `pending`)
+and `credential_checks_test.dart` in `xpd` (the same against the fake ASC server, and one key shared by two flavors).
 
 ## Workflows and the scheduler
 
@@ -1574,7 +1615,7 @@ expired, and secrets that are locked (D-10, from `SecretStore.statusChanges`). E
 
 - a `notification.raised` event (`kind`, `level`, `title`, `body`, and the project, release, job or approval it
   is about), which the macOS app shows as a notification (Phase 16b; the engine only raises the event); and
-- a Slack message to the webhook of the project's `slack` credential, if it has one (the webhook URL comes from
+- a Slack message to the webhook of a `slack` credential assigned to a flavor of the project, if it has one (the webhook URL comes from
   the secret store, `HttpSlackWebhook` posts it with `package:http`). The text goes through the secret masker and
   is cut to 600 characters. A message is tried again after 1, 5 and 30 seconds (or as long as Slack's
   `Retry-After` says, at most a minute); one that still fails is reported on stderr and dropped. Messages of one
@@ -1661,6 +1702,8 @@ the API answered, for scripts; otherwise it prints text and tables.
 |---|---|
 | `xp connect <url> --token T [--mcp-token T]` | `/health`, `/version`, `GET /projects` |
 | `xp projects list`, `show <p>`, `add <folder or owner/name>`, `scan <p>`, `remove <p>` | `/projects` |
+| `xp credentials list`, `show <c>`, `add --kind <kind> --name <name> [options of the kind]`, `rename <c> <new name>`, `replace <c> [options of its kind]`, `verify <c>`, `remove <c> [--force]` | `/credentials`; a credential is its id (`crd_...`) or its name in any case; see Credentials below |
+| `xp credentials assign <c> --project <p> (--flavor <f> \| --all-flavors) [--app <path>] [--replace]`, `unassign <c> --project <p> --flavor <f> [--app <path>]` | `PUT` and `DELETE /projects/{id}/flavors/{flavor}/credentials/{kind}`, the kind being the credential's |
 | `xp workflows list <p>`, `show <p> <w> [--version n]`, `validate <p> -f file`, `create <p> <name> -f file`, `edit <p> <w> -f file` | `/projects/{id}/workflows` (`validate` exits 65 and prints `line:column: message`) |
 | `xp dispatch <p> <w> [--ref --app --flavor --platform --bump --version --release-version --input k=v]` | `POST .../dispatch` |
 | `xp runs show <run>`, `cancel <run>` | `/runs/{id}`; `show` names the approval a waiting run needs |
@@ -1680,15 +1723,38 @@ the API answered, for scripts; otherwise it prints text and tables.
 the job until it ends, reconnecting with the last line it printed if the connection drops, and exits 1 if the job
 failed, was cancelled or was interrupted.
 
+**Credentials.** `xp credentials` (also `xp credential`) manages the named credentials any flavor may use, one per
+kind. `add` and `replace` take the options of the kind: `asc_key` `--key-id`, `--issuer-id`, `--p8 <file>` and
+`--key-kind team|individual`; `apple_id` `--apple-id`; `play_sa` and `firebase_sa` `--service-account <JSON key
+file>`; `keystore` `--keystore <file>` and `--key-alias`; `shorebird` and `slack` none. A secret is never an
+argument: at a terminal `xp` asks for it without showing what you type, otherwise it reads it from standard input
+with its flag (`--password-stdin`, `--store-password-stdin`, `--key-password-stdin`, `--token-stdin`,
+`--webhook-url-stdin`), one per command since standard input is read once. A keystore's key password is optional
+(empty: the store password). Without a terminal and without the flag the command stops with a usage error that
+names the flag. `--kind github` is refused: the engine has one GitHub token, set in the app's Settings or with
+`xpd secrets import-gh`.
+
+```sh
+xp credentials add --kind asc_key --name "Acme ASC" --key-id ABC123 --issuer-id <issuer> --p8 AuthKey_ABC123.p8
+printf %s "$SHOREBIRD_TOKEN" | xp credentials add --kind shorebird --name Shorebird --token-stdin
+xp credentials assign "Acme ASC" --project acme/app --all-flavors
+xp credentials remove "Acme ASC" --force
+```
+
+`remove` refuses a credential that flavors use, lists them and exits 73; `--force` removes it from every flavor
+first. `assign --all-flavors` leaves a flavor that has another credential of the kind as it is unless `--replace`,
+and lists the flavors that kept theirs. `verify` checks the credential and every flavor that uses it, and exits 1
+when a check refuses it.
+
 **Exit codes.**
 
 | Code | Meaning |
 |---|---|
 | 0 | success |
-| 1 | the command ran, and the job it followed, the free-up or the download failed |
+| 1 | the command ran, and the job it followed, the free-up, the download or the credential check failed |
 | 64 | usage error (also a `400` from the engine) |
 | 65 | the engine refused the content: an invalid workflow, a rejected credential (`422`) |
-| 66 | no such project, job, run, approval, release or artifact (`404`) |
+| 66 | no such project, job, run, approval, release, artifact or credential (`404`), or a file `xp` cannot read |
 | 69 | the engine cannot be reached, or cannot serve (`502`, `503`: secrets locked) |
 | 70 | the engine failed (`500`) |
 | 73 | a conflict (`409`): an approval decided already, a project added already |
@@ -1720,7 +1786,7 @@ The tools (all of them answer with JSON text, or with `isError` and a message):
 
 | Kind | Tools |
 |---|---|
-| Read | `list_projects`, `get_project`, `list_workflows`, `get_workflow`, `get_run`, `get_job`, `get_job_log_tail`, `list_artifacts`, `get_job_tests`, `get_test_baselines`, `list_releases`, `get_release`, `get_release_notes`, `list_approvals`, `get_approval`, `get_gates`, `get_storage_report` |
+| Read | `list_projects`, `get_project`, `list_workflows`, `get_workflow`, `get_run`, `get_job`, `get_job_log_tail`, `list_artifacts`, `get_job_tests`, `get_test_baselines`, `list_releases`, `get_release`, `get_release_notes`, `list_approvals`, `get_approval`, `get_gates`, `get_storage_report`, `list_credentials` (names, kinds, accounts, checks and the flavors that use each; never a secret; no tool adds, assigns or removes one) |
 | Create and edit | `add_project`, `scan_project`, `update_project`, `validate_workflow`, `create_workflow`, `update_workflow` (a document is validated first; with issues nothing is saved and they come back with `line` and `column`) |
 | Run | `dispatch_workflow` |
 
@@ -1795,13 +1861,17 @@ sidebar mark are assets, and the icons are Phosphor's.
   release build (Phase 18b); a development build has neither and says so.
 - **Projects and credentials.** Add project by folder (a folder picker for the local engine, a typed path on a remote
   one), then the review of the scan (apps, flavors, findings with their fixes): keep it, scan again or remove it.
-  The credentials editor lists each credential of a project with its last check, and adds, replaces, checks and
-  deletes them; the engine checks a credential before it keeps it, and a `.p8` key, a service account or a keystore
-  can be read from a file.
+  The Credentials page lists the named credentials of the engine (name, kind, account, last check, "used by N
+  flavors"), and adds, renames, replaces the secret of, checks and deletes them; deleting one that flavors use lists
+  them and asks first. The engine checks a credential before it keeps it, and a `.p8` key, a service account or a
+  keystore can be read from a file. Under the list, each flavor of a project shows the credential it uses for each
+  kind, with the check of the assignment, and a sheet to choose an existing credential or add a new one, for this
+  flavor or every flavor of the app, replacing what the others have only when "Replace existing" is ticked.
 - **Project overview** (Phase 16a, concept 1A): the release in flight is the hero, drawn as a rail of its run's
   stages and then its status in each store; with nothing in flight, what is live in each store. Under it, a ledger
   per app reads each flavor from local (the pubspec at the last scan) to testing (the release in flight) to live in
-  the App Store and Google Play, then its credentials; the console docked at the bottom follows the log of the job
+  the App Store and Google Play, then the names of its credentials (a click opens the sheet that assigns
+  them); the console docked at the bottom follows the log of the job
   that runs (⇧⌘C hides it). The scan of the project is one click away (Scan).
 - **Dispatch** (⌘N): the sheet picks a workflow, the app, flavors, platforms, the ref and the version bump, and
   previews what would run: each stage's jobs, where each lands (the engine, or the least loaded runner that can run

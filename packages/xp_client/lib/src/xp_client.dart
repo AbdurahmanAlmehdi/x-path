@@ -327,7 +327,104 @@ class XpClient {
 
   // ----------------------------------------------------------- credentials
 
-  /// `GET /projects/{id}/credentials`, of one [app] or [flavor] if given.
+  /// `GET /credentials`: the named credentials of the engine, with the
+  /// flavors that use each.
+  Future<List<NamedCredential>> listNamedCredentials() async =>
+      NamedCredentialsResponse.fromJson(
+        await _json(await _send('GET', ['credentials'])),
+      ).credentials;
+
+  /// `GET /credentials/{id}`.
+  Future<NamedCredential> getNamedCredential(String id) async =>
+      NamedCredential.fromJson(
+        await _json(await _send('GET', ['credentials', id])),
+      );
+
+  /// `POST /credentials`: verifies a credential and stores it under its
+  /// name. No flavor uses it yet.
+  Future<NamedCredential> createCredential(
+    CreateCredentialRequest request,
+  ) async => NamedCredential.fromJson(
+    await _json(await _send('POST', ['credentials'], body: request.toJson())),
+  );
+
+  /// `PATCH /credentials/{id}`: renames the credential.
+  Future<NamedCredential> renameCredential(String id, String name) async =>
+      NamedCredential.fromJson(
+        await _json(
+          await _send('PATCH', [
+            'credentials',
+            id,
+          ], body: RenameCredentialRequest(name).toJson()),
+        ),
+      );
+
+  /// `PUT /credentials/{id}`: verifies a new secret for the credential and
+  /// stores it. The name and the assignments stay.
+  Future<NamedCredential> replaceCredentialSecret(
+    String id,
+    ReplaceCredentialRequest request,
+  ) async => NamedCredential.fromJson(
+    await _json(
+      await _send('PUT', ['credentials', id], body: request.toJson()),
+    ),
+  );
+
+  /// `POST /credentials/{id}/verify`: checks the credential and its
+  /// assignments again.
+  Future<NamedCredential> verifyNamedCredential(String id) async =>
+      NamedCredential.fromJson(
+        await _json(await _send('POST', ['credentials', id, 'verify'])),
+      );
+
+  /// `DELETE /credentials/{id}`. Throws an [ApiException] with
+  /// `credential_in_use` and the flavors ([ApiException.usedBy]) when
+  /// flavors use it, unless [force].
+  Future<void> deleteNamedCredential(String id, {bool force = false}) async {
+    await _send(
+      'DELETE',
+      ['credentials', id],
+      query: {if (force) 'force': 'true'},
+    );
+  }
+
+  /// `PUT /projects/{id}/flavors/{flavor}/credentials/{kind}`: the flavor
+  /// [flavor] of the app at [app] uses the credential of [request] for
+  /// [kind]; every flavor of the app with [AssignCredentialRequest.allFlavors].
+  Future<AssignCredentialResponse> assignCredential(
+    String projectId, {
+    required String flavor,
+    required CredentialKind kind,
+    required AssignCredentialRequest request,
+    String app = '.',
+  }) async => AssignCredentialResponse.fromJson(
+    await _json(
+      await _send(
+        'PUT',
+        ['projects', projectId, 'flavors', flavor, 'credentials', kind.wire],
+        query: {if (app != '.') 'app': app},
+        body: request.toJson(),
+      ),
+    ),
+  );
+
+  /// `DELETE /projects/{id}/flavors/{flavor}/credentials/{kind}`: the flavor
+  /// stops using its credential of [kind].
+  Future<void> unassignCredential(
+    String projectId, {
+    required String flavor,
+    required CredentialKind kind,
+    String app = '.',
+  }) async {
+    await _send(
+      'DELETE',
+      ['projects', projectId, 'flavors', flavor, 'credentials', kind.wire],
+      query: {if (app != '.') 'app': app},
+    );
+  }
+
+  /// `GET /projects/{id}/credentials`: the credential each flavor uses, of
+  /// one [app] or [flavor] if given.
   Future<List<Credential>> listCredentials(
     String projectId, {
     String? app,
@@ -342,7 +439,9 @@ class XpClient {
     ),
   ).credentials;
 
-  /// `PUT /projects/{id}/credentials`: verifies a credential and stores it.
+  /// `PUT /projects/{id}/credentials` (deprecated by the engine; use
+  /// [createCredential] and [assignCredential]): verifies a credential and
+  /// makes the flavor use it.
   Future<Credential> saveCredential(
     String projectId,
     SaveCredentialRequest request,
@@ -356,7 +455,8 @@ class XpClient {
     ),
   );
 
-  /// `POST /projects/{id}/credentials/{credentialId}/verify`.
+  /// `POST /projects/{id}/credentials/{credentialId}/verify` (deprecated by
+  /// the engine; use [verifyNamedCredential]).
   Future<Credential> verifyCredential(
     String projectId,
     String credentialId,
@@ -372,7 +472,8 @@ class XpClient {
     ),
   );
 
-  /// `DELETE /projects/{id}/credentials/{credentialId}`.
+  /// `DELETE /projects/{id}/credentials/{credentialId}` (deprecated by the
+  /// engine; use [unassignCredential] and [deleteNamedCredential]).
   Future<void> deleteCredential(String projectId, String credentialId) async {
     await _send('DELETE', ['projects', projectId, 'credentials', credentialId]);
   }

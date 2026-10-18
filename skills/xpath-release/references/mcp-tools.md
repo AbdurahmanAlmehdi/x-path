@@ -4,7 +4,8 @@ The tools of `xp mcp`, from `apps/xp/lib/src/mcp/xp_tools.dart`. Every tool answ
 text, or with `isError` and a message. `project` is an id (`prj_...`), `owner/name` or `name`;
 `workflow` is an id (`wf_...`) or a name.
 
-There is no tool to approve, deny, merge, abandon, delete, change a gate, cancel or resume. The
+There is no tool to approve, deny, merge, abandon, delete, change a gate, cancel or resume, nor to
+add, assign or remove a credential (the owner does that in the app or with `xp credentials`). The
 server tells the agent so when it connects.
 
 ## Read
@@ -28,6 +29,7 @@ server tells the agent so when it connects.
 | `get_approval` | **`approval`** (`apr_...`) | One approval. Poll it while it is `pending`. |
 | `get_gates` | **`project`** | Which actions of the project wait for an approval. Read-only. |
 | `get_storage_report` | none | What the engine keeps on disk and what could be freed. |
+| `list_credentials` | `project` (only the credentials it uses, and only its flavors) | The named credentials, never a secret: `id`, `name`, `kind`, `account`, `status` (`unverified`, `verified`, `rejected`, `unreachable`), `message`, `fix`, and `usedBy` (`projectId`, `project`, `app`, `flavor`, and the `status`, `message` and `fix` of that assignment). Read-only. |
 
 ## Create and edit
 

@@ -298,8 +298,17 @@ void main() {
       );
 
       for (final (method, path) in [
+        ('GET', '/credentials'),
+        ('POST', '/credentials'),
+        ('GET', '/credentials/crd_1'),
+        ('PATCH', '/credentials/crd_1'),
+        ('PUT', '/credentials/crd_1'),
+        ('DELETE', '/credentials/crd_1'),
+        ('POST', '/credentials/crd_1/verify'),
         ('GET', '/projects/prj_1/credentials'),
         ('PUT', '/projects/prj_1/credentials'),
+        ('PUT', '/projects/prj_1/flavors/prod/credentials/asc_key'),
+        ('DELETE', '/projects/prj_1/flavors/prod/credentials/asc_key'),
         ('POST', '/projects/prj_1/credentials/crd_1/verify'),
         ('DELETE', '/projects/prj_1/credentials/crd_1'),
       ]) {
@@ -324,6 +333,153 @@ void main() {
           contentType: 'application/json',
         ),
         isEmpty,
+      );
+      expect(
+        shipped.validateResponse(
+          method: 'DELETE',
+          path: '/credentials/crd_1',
+          statusCode: 409,
+          body: jsonEncode({
+            ...ErrorResponse.of(ApiErrorCode.credentialInUse, 'm').toJson(),
+            'usedBy': [
+              const CredentialUsage(
+                projectId: 'prj_1',
+                project: 'acme/shop',
+                app: '.',
+                flavor: 'prod',
+                status: CredentialStatus.verified,
+              ).toJson(),
+            ],
+          }),
+          contentType: 'application/json',
+        ),
+        isEmpty,
+      );
+    });
+
+    test('describes the named credentials and their requests', () {
+      final at = DateTime.utc(2026, 10, 18);
+      final named = NamedCredential(
+        id: 'crd_1',
+        name: 'Personal Apple Dev Account',
+        kind: CredentialKind.ascKey,
+        status: CredentialStatus.verified,
+        account: 'ABC123DEF4',
+        verifiedAt: at,
+        checkedAt: at,
+        usedBy: [
+          CredentialUsage(
+            projectId: 'prj_1',
+            project: 'acme/shop',
+            app: '.',
+            flavor: 'prod',
+            status: CredentialStatus.rejected,
+            checkedAt: at,
+            message: 'm',
+            fix: 'f',
+          ),
+        ],
+      );
+      expect(
+        shipped.validateSchema(
+          'NamedCredentialsResponse',
+          NamedCredentialsResponse([named]).toJson(),
+        ),
+        isEmpty,
+      );
+      const flavor = Credential(
+        id: 'crd_1',
+        name: 'Personal Apple Dev Account',
+        projectId: 'prj_1',
+        app: '.',
+        flavor: 'prod',
+        kind: CredentialKind.ascKey,
+        status: CredentialStatus.rejected,
+        credentialStatus: CredentialStatus.verified,
+        assignmentStatus: CredentialStatus.rejected,
+      );
+      expect(
+        shipped.validateSchema(
+          'AssignCredentialResponse',
+          const AssignCredentialResponse(
+            assigned: [flavor],
+            kept: [flavor],
+          ).toJson(),
+        ),
+        isEmpty,
+      );
+      expect(
+        shipped.validateSchema(
+          'AssignCredentialRequest',
+          const AssignCredentialRequest(
+            credentialId: 'crd_1',
+            allFlavors: true,
+            replace: true,
+          ).toJson(),
+        ),
+        isEmpty,
+      );
+      expect(
+        shipped.validateSchema(
+          'RenameCredentialRequest',
+          const RenameCredentialRequest('n').toJson(),
+        ),
+        isEmpty,
+      );
+      for (final request in <Map<String, Object?>>[
+        {
+          'name': 'n',
+          'kind': 'asc_key',
+          'keyId': 'ABC123DEF4',
+          'issuerId': 'uuid',
+          'privateKey': 'p8',
+        },
+        {
+          'name': 'n',
+          'kind': 'apple_id',
+          'appleId': 'a@b.co',
+          'password': 'abcd-efgh-ijkl-mnop',
+        },
+        {'name': 'n', 'kind': 'firebase_sa', 'serviceAccount': '{}'},
+        {
+          'name': 'n',
+          'kind': 'keystore',
+          'keystore': 'AQID',
+          'storePassword': 'x',
+          'keyAlias': 'upload',
+        },
+        {'name': 'n', 'kind': 'shorebird', 'token': 'sb_api_x'},
+        {'name': 'n', 'kind': 'slack', 'webhookUrl': 'https://h'},
+      ]) {
+        expect(
+          shipped.validateSchema('CreateCredentialRequest', request),
+          isEmpty,
+          reason: '$request',
+        );
+        final fields = {...request}..remove('name');
+        expect(
+          shipped.validateSchema('ReplaceCredentialRequest', fields),
+          isEmpty,
+          reason: '$fields',
+        );
+      }
+      for (final request in <Map<String, Object?>>[
+        {'kind': 'shorebird', 'token': 'x'},
+        {'name': 'n', 'kind': 'github', 'token': 'x'},
+        {'name': 'n', 'kind': 'shorebird', 'token': 'x', 'extra': 1},
+      ]) {
+        expect(
+          shipped.validateSchema('CreateCredentialRequest', request),
+          isNotEmpty,
+          reason: '$request',
+        );
+      }
+      expect(
+        shipped.validateSchema('ReplaceCredentialRequest', {
+          'token': 'x',
+          'extra': 1,
+        }),
+        isNotEmpty,
       );
     });
 
@@ -750,6 +906,7 @@ void main() {
         {
           'flavor': 'prod',
           'kind': 'slack',
+          'name': 'Team Slack',
           'webhookUrl': 'https://hooks.slack.com/services/T/B/X',
         },
       ];
@@ -1289,6 +1446,25 @@ void main() {
         const CredentialRemoved(
           credentialId: 'crd_1',
           projectId: 'prj_1',
+          kind: CredentialKind.ascKey,
+        ),
+        const CredentialRenamed(
+          credentialId: 'crd_1',
+          kind: CredentialKind.ascKey,
+          name: 'Personal Apple Dev Account',
+        ),
+        const CredentialAssigned(
+          credentialId: 'crd_1',
+          projectId: 'prj_1',
+          app: '.',
+          flavor: 'prod',
+          kind: CredentialKind.ascKey,
+        ),
+        const CredentialUnassigned(
+          credentialId: 'crd_1',
+          projectId: 'prj_1',
+          app: '.',
+          flavor: 'prod',
           kind: CredentialKind.ascKey,
         ),
         const WorkflowSaved(

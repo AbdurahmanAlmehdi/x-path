@@ -129,6 +129,7 @@ void main() {
         for (final command in [
           'connect',
           'projects',
+          'credentials',
           'workflows',
           'dispatch',
           'runs',
@@ -157,6 +158,8 @@ void main() {
                 (entry.key == 'help' || entry.key.contains('completion'))) {
               continue;
             }
+            // An alias prints the usage of the command it stands for.
+            if (entry.key != entry.value.name) continue;
             paths.add([...prefix, entry.key]);
             walk(entry.value.subcommands, [...prefix, entry.key]);
           }

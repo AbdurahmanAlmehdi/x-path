@@ -576,17 +576,247 @@ paths:
           $ref: "#/components/responses/NotFound"
         "500":
           $ref: "#/components/responses/InternalError"
+  /credentials:
+    get:
+      operationId: listNamedCredentials
+      summary: The named credentials of the engine.
+      description: |
+        By name. Any flavor of any project may use a credential; `usedBy`
+        lists the flavors that do, each with the check of its assignment.
+        A credential never shows its secret: only who it belongs to
+        (`account`, when that is not secret), what the last check found
+        (`status`, `checkedAt`, `verifiedAt`) and, if the check did not accept
+        it, why (`message`) and what to do (`fix`). The GitHub token is not a
+        named credential (`/github-token`).
+      responses:
+        "200":
+          description: The credentials.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NamedCredentialsResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+    post:
+      operationId: createCredential
+      summary: Verify a credential and store it under a name.
+      description: |
+        The store or tool the credential is for must accept it, else nothing
+        is stored: `422 credential_rejected` says why and what to do (an
+        expired ASC key, a revoked app-specific password, a service account
+        Google does not know, a wrong keystore password, a Shorebird key
+        without the `sb_api_` prefix). If the check cannot be made (the store
+        is not reachable, a tool is missing) the answer is `502
+        upstream_error` and nothing is stored either. The secret goes to the
+        engine's secret store (D-07) and is never returned, logged or sent in
+        an event.
+
+        Names are unique regardless of case (`409 conflict`). Identical
+        secrets under two names stay two credentials. A new credential is
+        used by no flavor; assign it with
+        `PUT /projects/{id}/flavors/{flavor}/credentials/{kind}`. Only `app`
+        and `cli` tokens may create credentials (`403 forbidden`).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCredentialRequest"
+      responses:
+        "201":
+          description: The credential was accepted and stored.
+          headers:
+            Location:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NamedCredential"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/CredentialRejected"
+        "502":
+          $ref: "#/components/responses/UpstreamError"
+        "503":
+          $ref: "#/components/responses/SecretsLocked"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /credentials/{credentialId}:
+    parameters:
+      - $ref: "#/components/parameters/CredentialId"
+    get:
+      operationId: getNamedCredential
+      summary: A named credential, with the flavors that use it.
+      responses:
+        "200":
+          description: The credential.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NamedCredential"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+    patch:
+      operationId: renameCredential
+      summary: Rename a credential.
+      description: |
+        The id, the secret and every assignment stay. Names are unique
+        regardless of case (`409 conflict`). Only `app` and `cli` tokens.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RenameCredentialRequest"
+      responses:
+        "200":
+          description: The credential with its new name.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NamedCredential"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "500":
+          $ref: "#/components/responses/InternalError"
+    put:
+      operationId: replaceCredentialSecret
+      summary: Verify a new secret for a credential and store it.
+      description: |
+        The body holds the secret fields of the credential's kind (as for
+        `POST /credentials`). The new secret is checked first and nothing
+        changes if it is refused (`422`) or cannot be checked (`502`). The id,
+        the name and every assignment stay; the assignments are checked
+        again with the new secret. Only `app` and `cli` tokens.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReplaceCredentialRequest"
+      responses:
+        "200":
+          description: The credential with its new secret checked.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NamedCredential"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/CredentialRejected"
+        "502":
+          $ref: "#/components/responses/UpstreamError"
+        "503":
+          $ref: "#/components/responses/SecretsLocked"
+        "500":
+          $ref: "#/components/responses/InternalError"
+    delete:
+      operationId: deleteNamedCredential
+      summary: Delete a credential and its secret.
+      description: |
+        A credential that flavors use is not deleted unless `force=true`:
+        the answer is `409 credential_in_use` with the flavors (`usedBy`).
+        With `force=true` those flavors give it up (they have no credential
+        of the kind afterwards) and it is deleted. Only `app` and `cli`
+        tokens.
+      parameters:
+        - name: force
+          in: query
+          required: false
+          description: "`true` deletes a credential that flavors use."
+          schema:
+            type: string
+            enum: ["true", "false"]
+      responses:
+        "204":
+          description: The credential is gone.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/CredentialInUse"
+        "503":
+          $ref: "#/components/responses/SecretsLocked"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /credentials/{credentialId}/verify:
+    parameters:
+      - $ref: "#/components/parameters/CredentialId"
+    post:
+      operationId: verifyNamedCredential
+      summary: Check a credential and its assignments again now.
+      description: |
+        Runs the check of the credential's kind with the stored secret
+        (does it authenticate) and, for every flavor that uses it, the check
+        of the assignment (can it reach the flavor's bundle id, package or
+        app), and keeps the results, like the daily health check. A refusal
+        is still a `200`: the credential or the usage has `status: rejected`
+        with `message` and `fix`. Something that was accepted before and is
+        refused now is announced as `credential.expired`, and a job that needs
+        it fails preflight (the `credentials` guard check) until it is
+        fixed. Only `app` and `cli` tokens.
+      responses:
+        "200":
+          description: The credential with the results of the checks.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NamedCredential"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "503":
+          $ref: "#/components/responses/SecretsLocked"
+        "500":
+          $ref: "#/components/responses/InternalError"
   /projects/{id}/credentials:
     parameters:
       - $ref: "#/components/parameters/ProjectId"
     get:
       operationId: listCredentials
-      summary: The credentials of the flavors of a project.
+      summary: The credential each flavor of a project uses, by kind.
       description: |
-        Oldest first. A credential never shows its secret: only who it belongs
-        to (`account`, when that is not secret), what the last check found
-        (`status`, `checkedAt`, `verifiedAt`) and, if the check did not accept
-        it, why (`message`) and what to do (`fix`).
+        One entry per flavor and kind that has a credential: the named
+        credential (`id`, `name`, `account`) with both checks: the
+        credential's own (`credentialStatus`: does it authenticate) and the
+        assignment's (`assignmentStatus`: can it reach this flavor's bundle
+        id, package or app). `status`, `message` and `fix` combine them as
+        preflight does: a refusal of either is a refusal.
 
         With `flavor` (and `app`, `.` unless given) only the credentials of
         that flavor.
@@ -621,22 +851,23 @@ paths:
           $ref: "#/components/responses/InternalError"
     put:
       operationId: saveCredential
-      summary: Verify a credential and store it, new or replacing.
+      deprecated: true
+      summary: Verify a credential and use it for a flavor (deprecated).
       description: |
-        The store or tool the credential is for must accept it, else nothing
-        is stored: `422 credential_rejected` says why and what to do (an
-        expired ASC key, a revoked app-specific password, a service account
-        Google does not know, a wrong keystore password, a Shorebird key
-        without the `sb_api_` prefix). If the check cannot be made (the store
-        is not reachable, a tool is missing) the answer is `502
-        upstream_error` and nothing is stored either.
+        Deprecated: create the credential with `POST /credentials` and assign
+        it with `PUT /projects/{id}/flavors/{flavor}/credentials/{kind}`.
+        This route stays for clients of the per-flavor credentials.
 
-        A flavor has one credential of each kind: saving again replaces it
-        (`200`); the first save answers `201`. The secret goes to the engine's
-        secret store (D-07) and is never returned, logged or sent in an event.
+        The credential is checked as `POST /credentials` checks it, and
+        nothing is stored if it is refused (`422`) or cannot be checked
+        (`502`). If the flavor's credential of the kind is used by this
+        flavor alone, it gets the new secret (`200`, same id and name).
+        Otherwise a new named credential is created (`201`), called `name`
+        or "<kind> · <project> <app> <flavor>", and the flavor uses it; other
+        flavors keep what they have. A `github` token becomes the engine's
+        GitHub token (`/github-token`) and no named credential.
 
-        The body names the flavor (`app`, default `.`, and `flavor`), the
-        `kind` and the secret fields of that kind.
+        Only `app` and `cli` tokens.
       requestBody:
         required: true
         content:
@@ -645,13 +876,13 @@ paths:
               $ref: "#/components/schemas/SaveCredentialRequest"
       responses:
         "200":
-          description: The credential replaced an earlier one and was accepted.
+          description: The flavor's credential got the new secret.
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Credential"
         "201":
-          description: The credential was accepted and stored.
+          description: A named credential was created and the flavor uses it.
           headers:
             Location:
               schema:
@@ -664,8 +895,12 @@ paths:
           $ref: "#/components/responses/InvalidRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
         "422":
           $ref: "#/components/responses/CredentialRejected"
         "502":
@@ -674,21 +909,90 @@ paths:
           $ref: "#/components/responses/SecretsLocked"
         "500":
           $ref: "#/components/responses/InternalError"
+  /projects/{id}/flavors/{flavor}/credentials/{kind}:
+    parameters:
+      - $ref: "#/components/parameters/ProjectId"
+      - $ref: "#/components/parameters/FlavorName"
+      - $ref: "#/components/parameters/CredentialKindPath"
+      - name: app
+        in: query
+        required: false
+        description: The path of the app of the flavor; `.` unless given.
+        schema:
+          type: string
+    put:
+      operationId: assignCredential
+      summary: Use a named credential for a flavor, or every flavor of its app.
+      description: |
+        The flavor uses the credential `credentialId` (of this `kind`) from
+        now on, instead of any it had. With `allFlavors` every other flavor of
+        the app uses it too, except a flavor that has another credential of
+        the kind: it keeps it (`kept`) unless `replace`. Nothing else
+        changes.
+
+        Each assignment is checked at once (can the credential reach the
+        flavor's bundle id, package or app) and the result is kept with it:
+        a refusal does not undo the assignment, it fails preflight until
+        fixed. Only `app` and `cli` tokens.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AssignCredentialRequest"
+      responses:
+        "200":
+          description: The flavors that use the credential now, and those that kept theirs.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AssignCredentialResponse"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "503":
+          $ref: "#/components/responses/SecretsLocked"
+        "500":
+          $ref: "#/components/responses/InternalError"
+    delete:
+      operationId: unassignCredential
+      summary: Stop using a credential of this kind for the flavor.
+      description: |
+        The flavor has no credential of the kind afterwards; the credential
+        stays, with its other assignments. Only `app` and `cli` tokens.
+      responses:
+        "204":
+          description: The flavor has no credential of the kind now.
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
   /projects/{id}/credentials/{credentialId}/verify:
     parameters:
       - $ref: "#/components/parameters/ProjectId"
       - $ref: "#/components/parameters/CredentialId"
     post:
       operationId: verifyCredential
-      summary: Check a credential again now.
+      deprecated: true
+      summary: Check a credential again now (deprecated).
       description: |
-        Runs the check of the credential's kind with the stored secret and
-        keeps the result, like the daily health check. A credential that the
-        store now refuses is still a `200`: the body has `status: rejected`
-        with `message` and `fix`. A credential that was accepted before and is
-        refused now is announced as `credential.expired`, and a job that needs
-        it fails preflight (the `credentials` guard check) until it is
-        replaced.
+        Deprecated: use `POST /credentials/{credentialId}/verify`.
+
+        Checks the credential and its assignments as that route does and
+        answers with the credential as the first flavor of this project that
+        uses it sees it. `404` when no flavor of the project uses it. Only
+        `app` and `cli` tokens.
       responses:
         "200":
           description: The credential with the result of the check.
@@ -698,6 +1002,8 @@ paths:
                 $ref: "#/components/schemas/Credential"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
         "503":
@@ -710,15 +1016,22 @@ paths:
       - $ref: "#/components/parameters/CredentialId"
     delete:
       operationId: deleteCredential
-      summary: Delete a credential and its secret.
+      deprecated: true
+      summary: Stop using a credential in a project (deprecated).
       description: |
-        The secret goes too, unless another credential keeps it under the same
-        key (the engine has one GitHub token).
+        Deprecated: use `DELETE /projects/{id}/flavors/{flavor}/credentials/{kind}`
+        and `DELETE /credentials/{credentialId}`.
+
+        The flavors of this project give the credential up; if no other
+        flavor uses it, it is deleted with its secret. `404` when no flavor of
+        the project uses it. Only `app` and `cli` tokens.
       responses:
         "204":
-          description: The credential is gone.
+          description: The project no longer uses the credential.
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
         "503":
@@ -2036,7 +2349,29 @@ components:
       description: The credential id, for example `crd_1a2b3c4d5e6f7a8b`.
       schema:
         type: string
+    FlavorName:
+      name: flavor
+      in: path
+      required: true
+      description: The flavor name; `default` for an app without flavors.
+      schema:
+        type: string
+    CredentialKindPath:
+      name: kind
+      in: path
+      required: true
+      description: The kind of credential; not `github` (the engine has one GitHub token).
+      schema:
+        $ref: "#/components/schemas/CredentialKind"
   responses:
+    CredentialInUse:
+      description: |
+        The credential is used by flavors, so it was not deleted; `usedBy`
+        lists them. Delete with `force=true` to unassign them too.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/CredentialInUseResponse"
     WorkflowInvalid:
       description: |
         The workflow document has issues, or the dispatch asks for something
@@ -2141,6 +2476,7 @@ components:
         - forbidden
         - not_found
         - conflict
+        - credential_in_use
         - already_decided
         - resync_required
         - credential_rejected
@@ -2179,6 +2515,25 @@ components:
               type: string
         approval:
           $ref: "#/components/schemas/Approval"
+    CredentialInUseResponse:
+      type: object
+      required: [error, usedBy]
+      additionalProperties: false
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          additionalProperties: false
+          properties:
+            code:
+              $ref: "#/components/schemas/ErrorCode"
+            message:
+              type: string
+        usedBy:
+          type: array
+          description: The flavors that use the credential.
+          items:
+            $ref: "#/components/schemas/CredentialUsage"
     HealthResponse:
       type: object
       required: [status]
@@ -2215,7 +2570,8 @@ components:
             `project.scanned`, `project.removed`, `job.state_changed`,
             `job.step_changed`, `test_run.completed`, `credential.saved`,
             `credential.verified`, `credential.expired`, `credential.removed`,
-            `workflow.saved`, `workflow.removed`, `run.dispatched`,
+            `credential.renamed`, `credential.assigned`,
+            `credential.unassigned`, `workflow.saved`, `workflow.removed`, `run.dispatched`,
             `approval.requested`, `approval.decided`, `approval.expired`,
             `project.gates_changed`, `release.created`,
             `release.state_changed`, `release.store_changed`,
@@ -3231,12 +3587,20 @@ components:
       additionalProperties: false
     Credential:
       type: object
-      description: A credential of a flavor. It never carries the secret.
+      description: |
+        The credential a flavor uses for one kind: the named credential
+        assigned to it. It never carries the secret. `status`, `message` and
+        `fix` combine the check of the credential (`credentialStatus`) and
+        the check of the assignment (`assignmentStatus`) as preflight does.
       required: [id, projectId, app, flavor, kind, status]
       additionalProperties: false
       properties:
         id:
           type: string
+          description: The id of the named credential.
+        name:
+          type: string
+          description: The name of the named credential.
         projectId:
           type: string
         app:
@@ -3252,8 +3616,7 @@ components:
           type: string
           description: |
             Who it belongs to, when that is not secret: the Apple ID, the key
-            id, the service account email, the keystore alias, the GitHub
-            login.
+            id, the service account email, the keystore alias.
         verifiedAt:
           type: string
           format: date-time
@@ -3268,6 +3631,10 @@ components:
         fix:
           type: string
           description: What to do about `message`.
+        credentialStatus:
+          $ref: "#/components/schemas/CredentialStatus"
+        assignmentStatus:
+          $ref: "#/components/schemas/CredentialStatus"
     CredentialsResponse:
       type: object
       required: [credentials]
@@ -3277,17 +3644,130 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/Credential"
-    AscKeyCredentialRequest:
+    CredentialUsage:
       type: object
-      required: [flavor, kind, keyId, issuerId, privateKey]
+      description: |
+        A flavor that uses a named credential, with the check of the
+        assignment: can the credential reach the flavor's bundle id, package
+        or app.
+      required: [projectId, app, flavor, status]
       additionalProperties: false
       properties:
+        projectId:
+          type: string
+        project:
+          type: string
+          description: The name of the project (`owner/repository`).
         app:
           type: string
+          description: The path of the app of the flavor; `.` for the root.
         flavor:
           type: string
+        status:
+          $ref: "#/components/schemas/CredentialStatus"
+        verifiedAt:
+          type: string
+          format: date-time
+        checkedAt:
+          type: string
+          format: date-time
+        message:
+          type: string
+        fix:
+          type: string
+    NamedCredential:
+      type: object
+      description: |
+        A credential of the engine with a name; any flavor of any project may
+        use it. It never carries the secret. `status`, `message` and `fix`
+        are what the last check of the credential itself found (does it
+        authenticate).
+      required: [id, name, kind, status, usedBy]
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          description: The id, for example `crd_1a2b3c4d5e6f7a8b`. It never changes.
+        name:
+          type: string
+          maxLength: 80
+          description: Unique regardless of case.
         kind:
-          const: asc_key
+          $ref: "#/components/schemas/CredentialKind"
+        status:
+          $ref: "#/components/schemas/CredentialStatus"
+        account:
+          type: string
+          description: |
+            Who it belongs to, when that is not secret: the Apple ID, the key
+            id, the service account email, the keystore alias.
+        verifiedAt:
+          type: string
+          format: date-time
+        checkedAt:
+          type: string
+          format: date-time
+        message:
+          type: string
+        fix:
+          type: string
+        usedBy:
+          type: array
+          items:
+            $ref: "#/components/schemas/CredentialUsage"
+    NamedCredentialsResponse:
+      type: object
+      required: [credentials]
+      additionalProperties: false
+      properties:
+        credentials:
+          type: array
+          items:
+            $ref: "#/components/schemas/NamedCredential"
+    RenameCredentialRequest:
+      type: object
+      required: [name]
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 80
+    AssignCredentialRequest:
+      type: object
+      required: [credentialId]
+      additionalProperties: false
+      properties:
+        credentialId:
+          type: string
+          description: The named credential the flavor uses, of the kind in the path.
+        allFlavors:
+          type: boolean
+          description: Every flavor of the app uses it too. `false` unless given.
+        replace:
+          type: boolean
+          description: |
+            With `allFlavors`, the other flavors give up the credential of the
+            kind they have. `false` unless given: they keep it.
+    AssignCredentialResponse:
+      type: object
+      required: [assigned, kept]
+      additionalProperties: false
+      properties:
+        assigned:
+          type: array
+          description: The flavors that use the credential now, with their checks.
+          items:
+            $ref: "#/components/schemas/Credential"
+        kept:
+          type: array
+          description: The flavors that kept another credential of the kind.
+          items:
+            $ref: "#/components/schemas/Credential"
+    AscKeyFields:
+      type: object
+      required: [keyId, issuerId, privateKey]
+      properties:
         keyId:
           type: string
         issuerId:
@@ -3299,17 +3779,10 @@ components:
           type: string
           enum: [team, individual]
           description: "`team` unless told otherwise."
-    AppleIdCredentialRequest:
+    AppleIdFields:
       type: object
-      required: [flavor, kind, appleId, password]
-      additionalProperties: false
+      required: [appleId, password]
       properties:
-        app:
-          type: string
-        flavor:
-          type: string
-        kind:
-          const: apple_id
         appleId:
           type: string
         password:
@@ -3317,31 +3790,17 @@ components:
           description: |
             An app-specific password (`abcd-efgh-ijkl-mnop`), not the password
             of the Apple ID.
-    ServiceAccountCredentialRequest:
+    ServiceAccountFields:
       type: object
-      required: [flavor, kind, serviceAccount]
-      additionalProperties: false
+      required: [serviceAccount]
       properties:
-        app:
-          type: string
-        flavor:
-          type: string
-        kind:
-          enum: [play_sa, firebase_sa]
         serviceAccount:
           type: string
           description: The text of the JSON key file of the service account.
-    KeystoreCredentialRequest:
+    KeystoreFields:
       type: object
-      required: [flavor, kind, keystore, storePassword, keyAlias]
-      additionalProperties: false
+      required: [keystore, storePassword, keyAlias]
       properties:
-        app:
-          type: string
-        flavor:
-          type: string
-        kind:
-          const: keystore
         keystore:
           type: string
           description: The keystore file, base64 encoded.
@@ -3352,45 +3811,185 @@ components:
         keyPassword:
           type: string
           description: The store password unless given.
-    TokenCredentialRequest:
+    TokenFields:
       type: object
-      required: [flavor, kind, token]
-      additionalProperties: false
+      required: [token]
       properties:
-        app:
-          type: string
-        flavor:
-          type: string
-        kind:
-          enum: [shorebird, github]
         token:
           type: string
-          description: |
-            A Shorebird API key (`sb_api_*`) or a GitHub token. The engine has
-            one GitHub token, shared by every project.
-    SlackCredentialRequest:
+          description: A Shorebird API key (`sb_api_*`), or a GitHub token in the deprecated route.
+    SlackFields:
       type: object
-      required: [flavor, kind, webhookUrl]
-      additionalProperties: false
+      required: [webhookUrl]
+      properties:
+        webhookUrl:
+          type: string
+    CreateCredentialRequest:
+      description: |
+        The name, the kind and the secret fields of that kind. `github` is not
+        a named credential: use `PUT /github-token`.
+      oneOf:
+        - allOf:
+            - $ref: "#/components/schemas/AscKeyFields"
+            - type: object
+              required: [name, kind]
+              properties:
+                name:
+                  type: string
+                kind:
+                  const: asc_key
+          unevaluatedProperties: false
+        - allOf:
+            - $ref: "#/components/schemas/AppleIdFields"
+            - type: object
+              required: [name, kind]
+              properties:
+                name:
+                  type: string
+                kind:
+                  const: apple_id
+          unevaluatedProperties: false
+        - allOf:
+            - $ref: "#/components/schemas/ServiceAccountFields"
+            - type: object
+              required: [name, kind]
+              properties:
+                name:
+                  type: string
+                kind:
+                  enum: [play_sa, firebase_sa]
+          unevaluatedProperties: false
+        - allOf:
+            - $ref: "#/components/schemas/KeystoreFields"
+            - type: object
+              required: [name, kind]
+              properties:
+                name:
+                  type: string
+                kind:
+                  const: keystore
+          unevaluatedProperties: false
+        - allOf:
+            - $ref: "#/components/schemas/TokenFields"
+            - type: object
+              required: [name, kind]
+              properties:
+                name:
+                  type: string
+                kind:
+                  const: shorebird
+          unevaluatedProperties: false
+        - allOf:
+            - $ref: "#/components/schemas/SlackFields"
+            - type: object
+              required: [name, kind]
+              properties:
+                name:
+                  type: string
+                kind:
+                  const: slack
+          unevaluatedProperties: false
+    ReplaceCredentialRequest:
+      description: |
+        The secret fields of the credential's kind. A `kind`, if given, must
+        be the credential's.
+      oneOf:
+        - allOf:
+            - $ref: "#/components/schemas/AscKeyFields"
+            - $ref: "#/components/schemas/OptionalKind"
+          unevaluatedProperties: false
+        - allOf:
+            - $ref: "#/components/schemas/AppleIdFields"
+            - $ref: "#/components/schemas/OptionalKind"
+          unevaluatedProperties: false
+        - allOf:
+            - $ref: "#/components/schemas/ServiceAccountFields"
+            - $ref: "#/components/schemas/OptionalKind"
+          unevaluatedProperties: false
+        - allOf:
+            - $ref: "#/components/schemas/KeystoreFields"
+            - $ref: "#/components/schemas/OptionalKind"
+          unevaluatedProperties: false
+        - allOf:
+            - $ref: "#/components/schemas/TokenFields"
+            - $ref: "#/components/schemas/OptionalKind"
+          unevaluatedProperties: false
+        - allOf:
+            - $ref: "#/components/schemas/SlackFields"
+            - $ref: "#/components/schemas/OptionalKind"
+          unevaluatedProperties: false
+    OptionalKind:
+      type: object
+      properties:
+        kind:
+          $ref: "#/components/schemas/CredentialKind"
+    SaveCredentialRequest:
+      description: |
+        Deprecated with `PUT /projects/{id}/credentials`. Which flavor
+        (`app`, default `.`, and `flavor`) and kind, an optional `name` for
+        the credential it creates, and the secret fields of that kind.
+      oneOf:
+        - allOf:
+            - $ref: "#/components/schemas/AscKeyFields"
+            - $ref: "#/components/schemas/FlavorSelector"
+            - type: object
+              properties:
+                kind:
+                  const: asc_key
+          unevaluatedProperties: false
+        - allOf:
+            - $ref: "#/components/schemas/AppleIdFields"
+            - $ref: "#/components/schemas/FlavorSelector"
+            - type: object
+              properties:
+                kind:
+                  const: apple_id
+          unevaluatedProperties: false
+        - allOf:
+            - $ref: "#/components/schemas/ServiceAccountFields"
+            - $ref: "#/components/schemas/FlavorSelector"
+            - type: object
+              properties:
+                kind:
+                  enum: [play_sa, firebase_sa]
+          unevaluatedProperties: false
+        - allOf:
+            - $ref: "#/components/schemas/KeystoreFields"
+            - $ref: "#/components/schemas/FlavorSelector"
+            - type: object
+              properties:
+                kind:
+                  const: keystore
+          unevaluatedProperties: false
+        - allOf:
+            - $ref: "#/components/schemas/TokenFields"
+            - $ref: "#/components/schemas/FlavorSelector"
+            - type: object
+              properties:
+                kind:
+                  enum: [shorebird, github]
+          unevaluatedProperties: false
+        - allOf:
+            - $ref: "#/components/schemas/SlackFields"
+            - $ref: "#/components/schemas/FlavorSelector"
+            - type: object
+              properties:
+                kind:
+                  const: slack
+          unevaluatedProperties: false
+    FlavorSelector:
+      type: object
+      required: [flavor, kind]
       properties:
         app:
           type: string
         flavor:
           type: string
         kind:
-          const: slack
-        webhookUrl:
+          $ref: "#/components/schemas/CredentialKind"
+        name:
           type: string
-    SaveCredentialRequest:
-      description: |
-        Which flavor and kind, and the secret fields of that kind.
-      oneOf:
-        - $ref: "#/components/schemas/AscKeyCredentialRequest"
-        - $ref: "#/components/schemas/AppleIdCredentialRequest"
-        - $ref: "#/components/schemas/ServiceAccountCredentialRequest"
-        - $ref: "#/components/schemas/KeystoreCredentialRequest"
-        - $ref: "#/components/schemas/TokenCredentialRequest"
-        - $ref: "#/components/schemas/SlackCredentialRequest"
+          maxLength: 80
     ApprovalState:
       type: string
       enum: [pending, approved, denied, expired]

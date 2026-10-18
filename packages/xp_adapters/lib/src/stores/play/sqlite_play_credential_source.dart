@@ -2,9 +2,9 @@ import 'package:xp_adapters/src/sqlite/sqlite_database.dart';
 import 'package:xp_engine/xp_engine.dart';
 
 /// Finds the service account of an app through the `play_sa` credential
-/// reference of the flavor with its Android application id.
+/// assigned to the flavor with its Android application id (ADR 0013).
 ///
-/// The reference's `secret_key` names a secret in the secret store whose value
+/// The credential's `secret_key` names a secret in the secret store whose value
 /// is the JSON key file of the service account (`PlayServiceAccount`). The
 /// credential endpoints write it (Phase 10c); a flavor without the reference
 /// has no account here, and its release is uploaded by hand (D-15).
@@ -21,10 +21,12 @@ class SqlitePlayCredentialSource implements PlayCredentialSource {
   @override
   Future<PlayServiceAccount?> forAndroidAppId(String androidAppId) async {
     final rows = _database.connection.select(
-      'SELECT credential_ref.secret_key FROM credential_ref '
-      'JOIN flavor ON flavor.id = credential_ref.flavor_id '
-      "WHERE flavor.android_app_id = ? AND credential_ref.kind = 'play_sa' "
-      'ORDER BY credential_ref.rowid LIMIT 1',
+      'SELECT credential.secret_key FROM credential_assignment '
+      'JOIN credential ON credential.id = credential_assignment.credential_id '
+      'JOIN flavor ON flavor.id = credential_assignment.flavor_id '
+      'WHERE flavor.android_app_id = ? '
+      "AND credential_assignment.kind = 'play_sa' "
+      'ORDER BY credential_assignment.rowid LIMIT 1',
       [androidAppId],
     );
     if (rows.isEmpty) return null;

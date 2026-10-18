@@ -13,6 +13,9 @@ class SlackWebhookVerifier implements CredentialVerifier {
   CredentialKind get kind => CredentialKind.slack;
 
   @override
+  bool get checksTarget => false;
+
+  @override
   Future<VerificationResult> verify(
     CredentialMaterial material,
     CredentialTarget target,

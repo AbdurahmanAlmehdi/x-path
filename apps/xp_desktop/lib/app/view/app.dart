@@ -98,6 +98,7 @@ class EngineScope extends StatelessWidget {
     child: MultiRepositoryProvider(
       providers: [
         RepositoryProvider(create: (_) => ProjectsRepository(session)),
+        RepositoryProvider(create: (_) => CredentialsRepository(session)),
         RepositoryProvider(create: (_) => JobsRepository(session)),
         RepositoryProvider(create: (_) => ReleasesRepository(session)),
         RepositoryProvider(create: (_) => ApprovalsRepository(session)),
