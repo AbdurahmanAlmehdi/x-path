@@ -15,7 +15,8 @@ and tracks releases to App Store Connect, Google Play, Firebase App Distribution
 It writes nothing to the repo except release-model git changes.
 
 > **Status:** 1.0. The engine, the `xp` CLI, `xp mcp`, remote runners and the macOS app are released
-> together; download the notarized DMG, the Linux bundles or the Docker image from
+> together; install the notarized Mac app with `brew trust abdurahmanalmehdi/tap && brew install --cask
+> abdurahmanalmehdi/tap/xpath`, or download the DMG, the Linux bundles or the Docker image from
 > [Releases](https://github.com/AbdurahmanAlmehdi/x-path/releases). See [try it locally](docs/guide/try-it-locally.md),
 > [CONTRIBUTING.md](CONTRIBUTING.md) and [SECURITY.md](SECURITY.md).
 
@@ -242,6 +243,20 @@ xp runner install-service [--slots 4]                                           
   folders: no test installs a LaunchAgent or a unit, or calls `launchctl` or `systemctl`.
 
 ## Releases and installation
+
+**Installing.** On a Mac, the notarized app from Homebrew (the tap
+[AbdurahmanAlmehdi/homebrew-tap](https://github.com/AbdurahmanAlmehdi/homebrew-tap); Homebrew asks you to trust a
+third-party tap once):
+
+```sh
+brew trust abdurahmanalmehdi/tap
+brew install --cask abdurahmanalmehdi/tap/xpath   # --adopt takes over an XPath.app installed from the DMG
+brew upgrade --cask xpath                         # later releases
+```
+
+or `XPath-<version>.dmg` from the [latest release](https://github.com/AbdurahmanAlmehdi/x-path/releases/latest). On
+Linux, `curl -fsSL https://xpath.abdurahman.ly/install | sh`; or the Docker image below. The rest of this section is
+how those are built.
 
 `tool/release/bundles.sh` builds a release of XPath into `build/release` (D-23, ADR 0001):
 

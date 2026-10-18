@@ -8,7 +8,7 @@ Key facts:
 - Secrets stay on the engine machine: the macOS Keychain, or an XChaCha20-Poly1305 encrypted file on Linux. Logs are masked; secrets never go on a command line.
 - Production releases stop at approval gates. Only `app` and `cli` device tokens can approve; an `mcp` token (an AI agent) gets 403.
 - iOS builds and App Store uploads need a Mac. A Linux or Docker engine ships Android and can send iOS builds to a paired Mac runner.
-- Install: the notarized DMG on GitHub Releases (Apple silicon), `curl -fsSL https://xpath.abdurahman.ly/install | sh` on Linux, or the image `ghcr.io/abdurahmanalmehdi/xpath`.
+- Install: the notarized DMG on GitHub Releases (Apple silicon) or `brew trust abdurahmanalmehdi/tap && brew install --cask abdurahmanalmehdi/tap/xpath`, `curl -fsSL https://xpath.abdurahman.ly/install | sh` on Linux, or the image `ghcr.io/abdurahmanalmehdi/xpath`.
 
 ## Pages
 
