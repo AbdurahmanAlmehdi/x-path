@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:mocktail/mocktail.dart';
 import 'package:test/test.dart';
@@ -376,8 +377,42 @@ void main() {
         expect(values, isEmpty);
         expect(done, isTrue);
       });
+
+      test('a cache that cannot be written does not turn the answer into '
+          'an error', () async {
+        final broken = EngineSession(
+          profile: remote,
+          client: harness.client,
+          cache: _BrokenCache(),
+          heartbeat: () => const Stream.empty(),
+        );
+        final values = <Snapshot<int>>[];
+        final errors = <Object>[];
+        broken
+            .watch<int>(
+              key: 'count',
+              fetch: (client) async => 1,
+              encode: (value) => value,
+              decode: (json) => json! as int,
+              refreshOn: (_) => false,
+            )
+            .listen(values.add, onError: errors.add);
+        await settle();
+        expect(values, [const Snapshot(1)]);
+        expect(errors, isEmpty);
+        await broken.close();
+      });
     });
   });
+}
+
+class _BrokenCache implements SnapshotCache {
+  @override
+  Future<Object?> read(String key) async => null;
+
+  @override
+  Future<void> write(String key, Object? value) =>
+      Future.error(const FileSystemException('Cannot rename file'));
 }
 
 class _SlowCache implements SnapshotCache {

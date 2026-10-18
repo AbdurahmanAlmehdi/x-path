@@ -38,7 +38,10 @@ class MemorySnapshotCache implements SnapshotCache {
 /// A [SnapshotCache] that keeps one JSON file per key in [directory].
 ///
 /// A file is written next to its final name and renamed, so a crash never
-/// leaves half a file. A file that is not JSON reads as missing.
+/// leaves half a file. A file that is not JSON reads as missing. Writes to
+/// one file run one after another, each through its own temporary file, so
+/// two views saving the same key at once never trip over each other and the
+/// last write wins.
 class FileSnapshotCache implements SnapshotCache {
   /// Creates a cache in [directory], which is created when it is first
   /// written.
@@ -62,12 +65,37 @@ class FileSnapshotCache implements SnapshotCache {
     }
   }
 
+  /// The last write still running for each file, by path.
+  static final _writes = <String, Future<void>>{};
+
+  /// Makes every temporary file name of this process different.
+  static var _sequence = 0;
+
   @override
-  Future<void> write(String key, Object? value) async {
+  Future<void> write(String key, Object? value) {
     final file = _file(key);
+    final text = jsonEncode(value);
+    final before = _writes[file.path] ?? Future<void>.value();
+    final next = before
+        .then<void>((_) {}, onError: (Object _) {})
+        .then((_) => _replace(file, text));
+    _writes[file.path] = next;
+    return next.whenComplete(() {
+      if (identical(_writes[file.path], next)) {
+        _writes.removeWhere((path, _) => path == file.path);
+      }
+    });
+  }
+
+  Future<void> _replace(File file, String text) async {
     await file.parent.create(recursive: true);
-    final temporary = File('${file.path}.tmp');
-    await temporary.writeAsString(jsonEncode(value));
-    await temporary.rename(file.path);
+    final temporary = File('${file.path}.$pid.${_sequence++}.tmp');
+    try {
+      await temporary.writeAsString(text);
+      await temporary.rename(file.path);
+    } on FileSystemException {
+      if (temporary.existsSync()) await temporary.delete();
+      rethrow;
+    }
   }
 }
