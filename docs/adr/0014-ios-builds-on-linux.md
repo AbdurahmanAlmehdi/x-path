@@ -44,6 +44,15 @@ and debug or profile builds are rejected at plan time on an `ios-linux` runner.
 whenever the credential is an `asc_key`, on any engine; altool remains for `apple_id` credentials.
 It no longer needs `ios-sign`. Uploads stay on the engine (D-09 unchanged on this point).
 
+**No iOS Simulator in Linux workflows.** Integration tests and screenshots run on an Android
+emulator; workflow validation refuses an iOS Simulator target in a job that can run on Linux.
+
+**Gaps are closed upstream.** Flavors, app extensions, storyboards beyond Flutter's template and
+multi-size or alternate app icons are delegated to omarchy-apple-dev; until each lands, the job is
+rejected at plan time on an `ios-linux` runner and the scan says the app needs a Mac for iOS.
+Shorebird iOS stays on `ios-sign`; whether to ask Shorebird for Linux support or fork it is decided
+separately.
+
 **XPath never fetches Apple software.** The user installs omarchy-apple-dev and supplies
 `Xcode.xip`; XPath probes, pins and records the toolchain but does not download, bundle or
 redistribute any Apple SDK.

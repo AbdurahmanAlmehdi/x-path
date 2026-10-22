@@ -48,14 +48,17 @@ ASC_KEY_ID=… ASC_ISSUER_ID=… ASC_KEY_PATH=… ASC_EXPORT_OPTIONS=… ASC_ENT
 
 These stay on a Mac, or are rejected on a Linux runner with a clear reason:
 
-- **Needs Apple hardware or the Apple portal:** the iOS Simulator (and tests or screenshots that
-  need it), Flutter macOS apps and the XPath DMG, Instruments, creating the App Store Connect app
-  record, creating a Developer ID certificate.
+- **Needs Apple hardware or the Apple portal:** the iOS Simulator, Flutter macOS apps and the
+  XPath DMG, Instruments, creating the App Store Connect app record, creating a Developer ID
+  certificate. Integration tests and screenshots are not offered on iOS in a Linux workflow; they
+  run on an Android emulator instead (see "No iOS Simulator in Linux workflows").
 - **Not built yet:** Shorebird iOS; debug and profile builds; flavors (build configurations);
   plugins without a `Package.swift` (CocoaPods only); app extensions; entitlements beyond
   Associated Domains, push, Sign in with Apple and best-effort app groups; storyboards beyond
   Flutter's template; multi-size and alternate app icons; ad hoc and enterprise distribution;
-  Apple ID password uploads; Flutter older than 3.47 (3.47.6 is the verified version).
+  Apple ID password uploads; Flutter older than 3.47 (3.47.6 is the verified version). Flavors,
+  extensions, storyboards and icons are delegated upstream; Shorebird iOS has its own track (see
+  "Upstream work").
 - **Built but not yet run on a real build:** full-mode Flutter upload through `flutter/ship.sh`,
   obfuscation with the Linux `gen_snapshot`, dSYMs from a real SwiftBuild, strip-frameworks on a
   real app, export options against App Store Connect. Full Xcode-SDK mode is tested on
@@ -124,8 +127,9 @@ These stay on a Mac, or are rejected on a Linux runner with a clear reason:
       `build/ios-linux/dSYMs` and the Dart symbols directory.
 - [ ] `ios.stripAndReexport` on Linux: `flutter/tools/strip-frameworks.py` on the payload, then
       `flutter/ship.sh` again. Only after upstream #77 is merged and pinned.
-- [ ] Rejected at plan time on an `ios-linux` runner, with the reason: `--flavor`, Shorebird iOS,
-      debug and profile builds.
+- [ ] Rejected at plan time on an `ios-linux` runner, with the reason: `--flavor`, app extensions,
+      Shorebird iOS, debug and profile builds, an iOS Simulator target. Each rejection names the
+      upstream task that lifts it.
 - [ ] The job's toolchain record says "Linux, omarchy-apple-dev `<commit>`" next to Flutter's
       version (`build_toolchain.dart`).
 - [ ] Unit tests for the argument mapping; e2e on a Linux runner with stubbed `build.sh` and
@@ -164,10 +168,62 @@ These stay on a Mac, or are rejected on a Linux runner with a clear reason:
   stays on the engine. Needs a small upstream change so `asc.py identity` (or `flutter/ship.sh`)
   takes a given profile.
 
-## Follow-ups upstream
+## No iOS Simulator in Linux workflows
 
-Flavors in `flutter/build.sh`; reading `Runner.entitlements` by default; a checker that lists
-plugins without a `Package.swift`; a receipt for a full-mode Flutter TestFlight upload.
+XPath has no Simulator step: `test` runs `flutter test` on the host, which works on Linux.
+Integration tests and screenshots that need a device run on an Android emulator; iOS ones are not
+offered when the iOS build runs on Linux.
+
+- [ ] Workflow validation refuses an iOS Simulator or iOS device target in a step kind that has
+      one (none today; a future integration-test or screenshot step) unless its job declares
+      `ios-sign`, with the reason and the Android emulator as the alternative. A `command` step
+      that calls `xcrun simctl` itself cannot be detected; the docs say it needs `ios-sign`.
+- [ ] Device tests and screenshots, when they are added as step kinds, take an Android emulator
+      target and the `android` capability.
+- [ ] `skills/xpath-workflows` says so, with an Android emulator example.
+
+## Upstream work
+
+Delegated to omarchy-apple-dev (one feature per PR, as its CONTRIBUTING.md asks). Until each lands,
+XPath's scan reports the app as needing a Mac for iOS, and plan time rejects the job on an
+`ios-linux` runner with the reason. Each item is done when it is merged upstream, pinned by the
+runner, and the matching rejection is removed.
+
+- [ ] **Flavors (build configurations and schemes).** `flutter/build.sh` takes the first
+      `PRODUCT_BUNDLE_IDENTIFIER` in the pbxproj. It needs the `Release-<flavor>` configuration and
+      its xcconfig (bundle id, display name, `$(...)` settings in Info.plist) and `-dFlavor` for
+      `flutter assemble`. XPath then maps `--flavor` to it. The largest blocker for apps with
+      flavors.
+- [ ] **App extensions** (widgets, share, notification service) in the Flutter path: build each
+      target as its own product, embed it under `PlugIns/`, sign it with its own profile.
+      `asc.py identity` and the top-level `ship.sh` already handle `PlugIns/*.appex`.
+- [ ] **Storyboards beyond Flutter's template.** The Linux `ibtool` stops on a feature it does not
+      compile; each missing feature is a change there.
+- [ ] **Multi-size and alternate app icons.** A multi-size AppIcon can leave App Store processing
+      stuck; alternate icons are dropped. Both are `actool` work.
+- [ ] Reading `ios/Runner/Runner.entitlements` by default, and more entitlements than Associated
+      Domains, push, Sign in with Apple and app groups.
+- [ ] A checker that lists plugins without a `Package.swift`, for the scan.
+- [ ] A receipt for a full-mode Flutter TestFlight upload with `flutter/ship.sh`.
+- [ ] If the profile decision is (b): `asc.py identity` or `flutter/ship.sh` takes a given profile.
+
+### Shorebird iOS on Linux (to decide)
+
+`shorebird release ios` and `shorebird patch ios` need macOS today: the Shorebird CLI refuses iOS
+elsewhere, and a release and its patches are built with Shorebird's own engine and Dart fork, whose
+iOS `gen_snapshot` and patch tools are macOS binaries. omarchy-apple-dev solves the same problem for
+stock Flutter by building a Linux-hosted `gen_snapshot` from the Dart SDK at Flutter's pinned
+revision.
+
+- [ ] Decide between:
+  - **A feature request to Shorebird** for Linux-hosted iOS releases and patches, offering the
+    omarchy-apple-dev approach and our help. Nothing to maintain; depends on their priorities.
+  - **Our own fork** of the Shorebird CLI plus a Linux build of Shorebird's iOS `gen_snapshot` and
+    patch tools. Works on our schedule, but has to be rebuilt and checked for every Shorebird and
+    Flutter release, and a patch must be byte-compatible with what Shorebird's updater expects.
+  - Recommended order: the feature request first; a fork only if it is declined and Linux
+    Shorebird iOS is still needed. Check the licences of the CLI and the engine fork first.
+- [ ] Until then Shorebird iOS keeps requiring `ios-sign` (a Mac).
 
 ## Acceptance
 
