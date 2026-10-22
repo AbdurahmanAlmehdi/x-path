@@ -39,6 +39,13 @@ void main() {
       lastHeartbeat: created.add(const Duration(minutes: 1)),
       createdAt: created,
       revokedAt: created.add(const Duration(days: 1)),
+      missing: const [
+        MissingCapability(
+          capability: 'android',
+          reason: 'no JDK: java not found',
+          fix: 'install JDK 17 or set JAVA_HOME',
+        ),
+      ],
     );
 
     test('leaves out what it lacks', () {
@@ -57,6 +64,13 @@ void main() {
       expect(Runner.fromJson(minimal.toJson()), minimal);
       expect(Runner.fromJson(full.toJson()), full);
       expect(full.toJson()['status'], 'online');
+      expect(full.toJson()['missing'], [
+        {
+          'capability': 'android',
+          'reason': 'no JDK: java not found',
+          'fix': 'install JDK 17 or set JAVA_HOME',
+        },
+      ]);
     });
   });
 

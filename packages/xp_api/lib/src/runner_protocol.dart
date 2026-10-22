@@ -375,6 +375,52 @@ final class ProbeResult extends Equatable {
   List<Object?> get props => [id, status, exitCode, stdout, stderr];
 }
 
+/// A capability a machine does not offer, why, and what gives it.
+///
+/// The engine derives it from the probe results, like the capabilities, so
+/// the engine, the runner and `xp runner doctor` say the same thing.
+final class MissingCapability extends Equatable {
+  /// Creates the finding.
+  const new({
+    required this.capability,
+    required this.reason,
+    required this.fix,
+  });
+
+  /// Reads the finding from its JSON form.
+  factory fromJson(Map<String, dynamic> json) => MissingCapability(
+    capability: _required<String>(json, 'capability'),
+    reason: _required<String>(json, 'reason'),
+    fix: _required<String>(json, 'fix'),
+  );
+
+  /// The wire name of the capability, for example `android`.
+  final String capability;
+
+  /// Why it is missing, one sentence without its full stop, for example `no
+  /// JDK: java not found`.
+  final String reason;
+
+  /// What gives it, one sentence without its full stop, for example `install
+  /// JDK 17 or set JAVA_HOME`.
+  final String fix;
+
+  /// The reason and the fix as two sentences: `no JDK: java not found.
+  /// Install JDK 17 or set JAVA_HOME.`
+  String get explanation =>
+      '$reason. ${fix[0].toUpperCase()}${fix.substring(1)}.';
+
+  /// The JSON form.
+  Map<String, dynamic> toJson() => {
+    'capability': capability,
+    'reason': reason,
+    'fix': fix,
+  };
+
+  @override
+  List<Object?> get props => [capability, reason, fix];
+}
+
 /// One line of output in a [LogChunkFrame].
 final class ChunkLine extends Equatable {
   /// Creates the line.
@@ -999,6 +1045,7 @@ sealed class EngineFrame extends Equatable {
     return switch (type) {
       WelcomeFrame.frameType => WelcomeFrame.fromJson(json),
       ProbeFrame.frameType => ProbeFrame.fromJson(json),
+      ProbedFrame.frameType => ProbedFrame.fromJson(json),
       LeaseOfferFrame.frameType => LeaseOfferFrame.fromJson(json),
       HeartbeatAckFrame.frameType => HeartbeatAckFrame.fromJson(json),
       ChunkAckFrame.frameType => ChunkAckFrame.fromJson(json),
@@ -1112,6 +1159,41 @@ final class ProbeFrame extends EngineFrame {
 
   @override
   List<Object?> get props => [probeId, commands];
+}
+
+/// What the engine concluded from a [ProbeResultFrame]: the capabilities it
+/// stored for the runner, and why it has no others. Sent after every probe.
+final class ProbedFrame extends EngineFrame {
+  /// Creates the frame.
+  const new({required this.capabilities, this.missing = const []});
+
+  /// Reads the frame from its JSON form.
+  factory fromJson(Map<String, dynamic> json) => ProbedFrame(
+    capabilities: _list<String>(json, 'capabilities'),
+    missing: _objects(json, 'missing', MissingCapability.fromJson),
+  );
+
+  /// The wire name of this frame.
+  static const frameType = 'probed';
+
+  /// The wire names of what the runner can do, sorted.
+  final List<String> capabilities;
+
+  /// What it cannot do on its operating system, and why.
+  final List<MissingCapability> missing;
+
+  @override
+  String get type => frameType;
+
+  @override
+  Map<String, dynamic> toJson() => {
+    'type': frameType,
+    'capabilities': capabilities,
+    'missing': [for (final item in missing) item.toJson()],
+  };
+
+  @override
+  List<Object?> get props => [capabilities, missing];
 }
 
 /// Offers the runner a job. The lease holds until [expiresAt] unless the

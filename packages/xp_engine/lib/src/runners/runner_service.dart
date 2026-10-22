@@ -190,6 +190,7 @@ class RunnerService {
         ? RunnerStatus.revoked
         : _presence.statusOf(record.id),
     jobIds: _presence.jobsOf(record.id),
+    missing: _presence.missingOf(record.id),
   );
 
   void _requireOwner(DeviceToken by, String action) {

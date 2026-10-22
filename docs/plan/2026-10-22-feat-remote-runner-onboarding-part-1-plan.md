@@ -82,7 +82,7 @@ once and opens one pull request.
 
 ### Phase R1: The runner says what it offers and why not
 
-- **Status:** Not started
+- **Status:** Done
 - **Scope:** At start, the runner prints what it offers and, for each capability it does not
   offer, the reason and the fix. The engine prints the same reasons for itself.
 - **Files touched:** `packages/xp_engine/lib/src/runners/{runner_probe,runner_hub}.dart`,

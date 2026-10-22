@@ -20,7 +20,9 @@ void main() {
       expect(probe.commands.map((c) => c.id), [
         'os',
         'git',
+        'flutter_tools',
         'android_sdk',
+        'java',
         'xcode_select',
         'xcodebuild',
         'swift',
@@ -30,6 +32,8 @@ void main() {
         [
           'uname -s',
           'git --version',
+          'sh -c',
+          'sh -c',
           'sh -c',
           'xcode-select -p',
           'xcodebuild -version',
@@ -45,7 +49,9 @@ void main() {
       expect(byId['xcodebuild']!.onlyOn, 'macos');
       expect(byId['xcodebuild']!.requires, 'xcode_select');
       expect(byId['swift']!.onlyOn, 'linux');
+      expect(byId['flutter_tools']!.onlyOn, 'linux');
       expect(byId['git']!.onlyOn, isNull);
+      expect(byId['java']!.onlyOn, isNull);
     });
 
     test('the Android script looks where the engine looks', () {
@@ -59,6 +65,20 @@ void main() {
         'build-tools',
       ]) {
         expect(RunnerProbe.androidSdkScript, contains(place));
+      }
+    });
+
+    test('the JDK script looks where Flutter looks', () {
+      for (final place in const [
+        r'$JAVA_HOME/bin/java',
+        'Android Studio.app/Contents/jbr',
+        'android-studio/jbr',
+        'exec java -version',
+      ]) {
+        expect(RunnerProbe.javaScript, contains(place));
+      }
+      for (final tool in const ['curl', 'unzip', 'xz']) {
+        expect(RunnerProbe.flutterToolsScript, contains(tool));
       }
     });
 
@@ -172,6 +192,175 @@ void main() {
       ]);
 
       expect(findings.capabilities, {Capability.flutter, Capability.iosSign});
+    });
+
+    test('Linux needs curl, unzip and xz for flutter', () {
+      final findings = probe.evaluate([
+        ...linuxProbe().where((r) => r.id != 'flutter_tools'),
+        exited('flutter_tools', code: 1, stdout: 'unzip xz\n'),
+      ]);
+
+      expect(findings.capabilities, {Capability.android});
+      expect(
+        findings.missing.first,
+        const MissingCapability(
+          capability: 'flutter',
+          reason: 'no unzip, xz: the Flutter SDK download needs them',
+          fix: 'install them (apt-get install unzip xz-utils)',
+        ),
+      );
+    });
+
+    test('a JDK older than 17 or without a version does not count', () {
+      List<ProbeResult> withJava(ProbeResult java) => [
+        ...linuxProbe().where((r) => r.id != 'java'),
+        java,
+      ];
+
+      for (final (java, reason) in [
+        (javaProbe(11), 'no JDK: JDK 11 is older than 17'),
+        (
+          const ProbeResult(
+            id: 'java',
+            status: ProbeStatus.exited,
+            exitCode: 0,
+            stderr: 'java version "1.8.0_381"',
+          ),
+          'no JDK: JDK 8 is older than 17',
+        ),
+        (exited('java'), 'no JDK: java printed no version'),
+      ]) {
+        final findings = probe.evaluate(withJava(java));
+        expect(findings.capabilities, {Capability.flutter});
+        expect(findings.missing.first.reason, reason);
+      }
+      expect(
+        probe.evaluate(withJava(javaProbe(21))).capabilities,
+        contains(Capability.android),
+      );
+    });
+
+    group('missing', () {
+      String describe(List<ProbeResult> results) => probe
+          .evaluate(results)
+          .missing
+          .map((m) => '${m.capability}: ${m.explanation}')
+          .join('\n');
+
+      test('a Linux box without a JDK, swift or an SDK says why', () {
+        expect(
+          describe([
+            ...linuxProbe(android: false).where((r) => r.id != 'java'),
+            exited('java', code: 127),
+          ]),
+          'android: no Android SDK in ANDROID_HOME, ANDROID_SDK_ROOT or '
+          '~/Android/Sdk. Install the Android command-line tools or set '
+          'ANDROID_HOME.\n'
+          'android: no JDK: java not found. Install JDK 17 (apt-get install '
+          'openjdk-17-jdk-headless) or set JAVA_HOME.\n'
+          'swift-linux: no Swift: swift not found. Install Swift for Linux '
+          'from swift.org.',
+        );
+      });
+
+      test('a Mac never lists swift-linux, and says why it cannot sign', () {
+        expect(
+          describe(macProbe(xcode: false, android: true)),
+          'ios-sign: no Xcode selected: xcode-select not found. Install '
+          'Xcode and choose it in Xcode, Settings, Locations, Command Line '
+          'Tools.',
+        );
+        expect(
+          describe([
+            ...macProbe(android: true).where((r) => r.id != 'xcodebuild'),
+            const ProbeResult(
+              id: 'xcodebuild',
+              status: ProbeStatus.exited,
+              exitCode: 69,
+              stderr: 'You have not agreed to the Xcode license agreements.\n',
+            ),
+          ]),
+          'ios-sign: Xcode does not answer: You have not agreed to the Xcode '
+          'license agreements. Open Xcode once to finish its setup and '
+          'accept its licence.',
+        );
+      });
+
+      test('the reason comes from the result that failed', () {
+        String gitReason(ProbeResult git) =>
+            probe.evaluate([git]).missing.first.reason;
+
+        expect(
+          gitReason(
+            const ProbeResult(id: 'git', status: ProbeStatus.notStarted),
+          ),
+          'no git: git not found',
+        );
+        expect(
+          gitReason(const ProbeResult(id: 'git', status: ProbeStatus.timedOut)),
+          'no git: git did not answer in time',
+        );
+        expect(
+          gitReason(const ProbeResult(id: 'git', status: ProbeStatus.skipped)),
+          'no git: git was not checked',
+        );
+        expect(
+          gitReason(
+            const ProbeResult(
+              id: 'git',
+              status: ProbeStatus.exited,
+              exitCode: 1,
+              stderr: '\n  xcrun: error: invalid active developer path\nmore',
+            ),
+          ),
+          'no git: xcrun: error: invalid active developer path',
+        );
+        expect(
+          gitReason(exited('git', code: 2, stdout: 'odd\n')),
+          'no git: odd',
+        );
+        expect(gitReason(exited('git', code: 3)), 'no git: git exited with 3');
+        expect(probe.evaluate(const []).missing.first.fix, 'install git');
+      });
+
+      test('a failed check of the Linux tools says so', () {
+        final findings = probe.evaluate([
+          ...linuxProbe().where((r) => r.id != 'flutter_tools'),
+          const ProbeResult(id: 'flutter_tools', status: ProbeStatus.timedOut),
+        ]);
+
+        expect(
+          findings.missing.first.explanation,
+          'no curl, unzip or xz: the check for them did not answer in time. '
+          'Install them (apt-get install curl unzip xz-utils).',
+        );
+        expect(
+          probe
+              .evaluate([
+                ...linuxProbe().where((r) => r.id != 'flutter_tools'),
+                exited('flutter_tools', code: 1, stdout: 'curl\n'),
+              ])
+              .missing
+              .first
+              .fix,
+          'install it (apt-get install curl)',
+        );
+      });
+
+      test('an Xcode that prints no version cannot sign', () {
+        expect(
+          probe
+              .evaluate([
+                exited('os', stdout: 'Darwin'),
+                exited('xcode_select', stdout: '/x'),
+                exited('xcodebuild', stdout: 'nothing useful'),
+              ])
+              .missing
+              .last
+              .reason,
+          'Xcode does not answer: xcodebuild printed no Xcode version',
+        );
+      });
     });
 
     test('findings compare by value', () {

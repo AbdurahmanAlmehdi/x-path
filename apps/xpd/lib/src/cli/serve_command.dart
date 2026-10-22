@@ -416,22 +416,22 @@ class ServeCommand extends XpdCommand {
         events: events,
         clock: const SystemClock(),
       );
-      final capabilities = await LocalCapabilities(
+      final findings = await LocalCapabilities(
         runner: runner,
-        prober: ToolProber(runner: runner, isMacOS: isMacOS),
-        android: DirectoryAndroidSdk(
-          environment: context.environment,
-          home: context.environment['HOME'],
-        ),
-        isMacOS: isMacOS,
+        operatingSystem: isMacOS ? 'macos' : 'linux',
       ).probe();
+      final capabilities = findings.capabilities;
       final can = capabilities.isEmpty
           ? 'no capability'
           : capabilities.map((capability) => capability.wire).join(', ');
       context.out.writeln(
         'xpd runs jobs here with $slots slot${slots == 1 ? '' : 's'} and $can',
       );
+      for (final missing in findings.missing) {
+        context.out.writeln('no ${missing.capability}: ${missing.explanation}');
+      }
       final runRepository = SqliteRunRepository(database);
+      final runnerRepository = SqliteRunnerRepository(database);
       scheduler = Scheduler(
         runner: jobs,
         records: jobRepository,
@@ -440,6 +440,7 @@ class ServeCommand extends XpdCommand {
         runners: [
           LocalRunner(jobs: jobs, capabilities: capabilities, slots: slots),
         ],
+        paired: runnerRepository,
         onError: (error, stackTrace) =>
             context.err.writeln('error: scheduler: $error\n$stackTrace'),
       );
@@ -546,7 +547,6 @@ class ServeCommand extends XpdCommand {
         tokens: SqliteDeviceTokenRepository(database),
         clock: const SystemClock(),
       );
-      final runnerRepository = SqliteRunnerRepository(database);
       final runnerHub = RunnerHub(
         runners: runnerRepository,
         projects: projectRepository,

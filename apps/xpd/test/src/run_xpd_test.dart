@@ -428,6 +428,29 @@ void main() {
       await exit;
     });
 
+    test('says what it cannot do and why', () async {
+      // Only perl, which the engine needs to start: no git, no sh.
+      final bin = Directory('${root.path}/bin')..createSync();
+      Link(
+        '${bin.path}/perl',
+      ).createSync(Process.runSync('which', ['perl']).stdout.toString().trim());
+      final exit = run(
+        ['serve', '--port', '0', '--data-dir', dataDir],
+        environment: {'PATH': bin.path},
+      );
+      await startServing(exit);
+
+      expect(out.toString(), contains('and no capability\n'));
+      expect(
+        out.toString(),
+        contains('no flutter: no git: git not found. Install git.\n'),
+      );
+      expect(out.toString(), contains('no android: no JDK: java not found.'));
+
+      shutdown.add(null);
+      await exit;
+    });
+
     test(
       'counts slots in the singular, and by default a quarter of the cores',
       () async {

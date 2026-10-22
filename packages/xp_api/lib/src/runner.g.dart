@@ -26,6 +26,9 @@ Runner _$RunnerFromJson(Map<String, dynamic> json) => Runner(
   revokedAt: json['revokedAt'] == null
       ? null
       : DateTime.parse(json['revokedAt'] as String),
+  missing: (json['missing'] as List<dynamic>?)
+      ?.map((e) => MissingCapability.fromJson(e as Map<String, dynamic>))
+      .toList(),
 );
 
 Map<String, dynamic> _$RunnerToJson(Runner instance) => <String, dynamic>{
@@ -33,6 +36,7 @@ Map<String, dynamic> _$RunnerToJson(Runner instance) => <String, dynamic>{
   'name': instance.name,
   'status': _$RunnerStatusEnumMap[instance.status]!,
   'capabilities': instance.capabilities,
+  'missing': ?instance.missing?.map((e) => e.toJson()).toList(),
   'slots': instance.slots,
   'jobIds': instance.jobIds,
   'os': ?instance.os,

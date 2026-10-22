@@ -3682,6 +3682,12 @@ abstract class AppLocalizations {
   /// **'Not probed yet'**
   String get runnerNotProbed;
 
+  /// A capability the engine did not find on a runner; explanation is the engine's reason and fix.
+  ///
+  /// In en, this message translates to:
+  /// **'No {capability}: {explanation}'**
+  String runnerMissingCapability(String capability, String explanation);
+
   /// A runner that never sent a heartbeat.
   ///
   /// In en, this message translates to:

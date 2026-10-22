@@ -3,6 +3,7 @@
 
 import 'package:equatable/equatable.dart';
 import 'package:json_annotation/json_annotation.dart';
+import 'package:xp_api/src/runner_protocol.dart';
 
 part 'runner.g.dart';
 
@@ -29,7 +30,7 @@ enum RunnerStatus {
 }
 
 /// A machine that runs jobs for the engine (D-08, D-19).
-@JsonSerializable(includeIfNull: false)
+@JsonSerializable(includeIfNull: false, explicitToJson: true)
 class Runner extends Equatable {
   /// Creates a runner.
   const new({
@@ -46,6 +47,7 @@ class Runner extends Equatable {
     this.cores,
     this.lastHeartbeat,
     this.revokedAt,
+    this.missing,
   });
 
   /// Reads a runner from its JSON form.
@@ -65,6 +67,10 @@ class Runner extends Equatable {
   /// connection, never from what the runner says about itself (D-19). Empty
   /// until the first probe.
   final List<String> capabilities;
+
+  /// What it cannot do, why, and what gives it, from the same probe as
+  /// [capabilities]. Kept in memory only: present while it is connected.
+  final List<MissingCapability>? missing;
 
   /// How many jobs it runs at once. `ios-sign` jobs run one at a time
   /// whatever this is.
@@ -114,6 +120,7 @@ class Runner extends Equatable {
     lastHeartbeat,
     createdAt,
     revokedAt,
+    missing,
   ];
 }
 

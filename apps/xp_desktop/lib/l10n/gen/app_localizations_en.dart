@@ -2263,6 +2263,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get runnerNotProbed => 'Not probed yet';
 
   @override
+  String runnerMissingCapability(String capability, String explanation) {
+    return 'No $capability: $explanation';
+  }
+
+  @override
   String get runnerNeverHeard => 'Never';
 
   @override

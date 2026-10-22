@@ -347,6 +347,8 @@ void main() {
       stream.send(
         ProbeResultFrame(probeId: probe.probeId, results: macProbeResults),
       );
+      final probed = await take<ProbedFrame>();
+      expect(probed.missing.map((m) => m.capability), ['android']);
       await client.waitOnline();
       final job = await client.engine.jobs.create(
         workflowVersionId: 'wfv_1',

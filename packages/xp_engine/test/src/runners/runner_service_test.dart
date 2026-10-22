@@ -202,6 +202,8 @@ void main() {
       expect(runners.first.jobIds, [jobId]);
       expect(runners.first.capabilities, ['flutter', 'ios-sign']);
       expect(runners.first.slots, 2);
+      expect(runners.first.missing!.map((m) => m.capability), ['android']);
+      expect(runners[1].missing, isNull);
       expect((await h.service.get(offline.id)).status, RunnerStatus.offline);
       expect((await h.service.get(online.id)).jobIds, [jobId]);
       expect((await h.service.get(revoked.id)).revokedAt, isNotNull);

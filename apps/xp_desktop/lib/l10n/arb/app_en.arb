@@ -1206,6 +1206,11 @@
   "@runnerCores": {"placeholders": {"count": {"type": "int"}}},
   "runnerNotProbed": "Not probed yet",
   "@runnerNotProbed": {"description": "A runner without capabilities."},
+  "runnerMissingCapability": "No {capability}: {explanation}",
+  "@runnerMissingCapability": {
+    "description": "A capability the engine did not find on a runner; explanation is the engine's reason and fix.",
+    "placeholders": {"capability": {"type": "String"}, "explanation": {"type": "String"}}
+  },
   "runnerNeverHeard": "Never",
   "@runnerNeverHeard": {"description": "A runner that never sent a heartbeat."},
   "runnerRevoke": "Revoke…",

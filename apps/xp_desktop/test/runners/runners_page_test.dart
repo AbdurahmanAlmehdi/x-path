@@ -117,6 +117,62 @@ void main() {
       expect(find.text('Revoked'), findsOneWidget);
     });
 
+    testWidgets('says inline what a runner lacks and why', (tester) async {
+      when(repository.watchRunners).thenAnswer(
+        (_) => Stream.value(
+          Snapshot([
+            Runner(
+              id: 'rnr_9',
+              name: 'aws',
+              status: RunnerStatus.online,
+              capabilities: const ['flutter'],
+              slots: 2,
+              jobIds: const [],
+              createdAt: testNow,
+              missing: const [
+                MissingCapability(
+                  capability: 'android',
+                  reason: 'no JDK: java not found',
+                  fix: 'install JDK 17 or set JAVA_HOME',
+                ),
+              ],
+            ),
+            Runner(
+              id: 'rnr_8',
+              name: 'bare',
+              status: RunnerStatus.online,
+              capabilities: const [],
+              slots: 1,
+              jobIds: const [],
+              createdAt: testNow,
+              missing: const [
+                MissingCapability(
+                  capability: 'flutter',
+                  reason: 'no git: git not found',
+                  fix: 'install git',
+                ),
+              ],
+            ),
+          ]),
+        ),
+      );
+      await pump(tester);
+
+      expect(find.text('flutter'), findsOneWidget);
+      expect(
+        find.text(
+          'No android: no JDK: java not found. Install JDK 17 or set '
+          'JAVA_HOME.',
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.text('No flutter: no git: git not found. Install git.'),
+        findsOneWidget,
+      );
+      expect(find.text('Not probed yet'), findsNothing);
+    });
+
     testWidgets('revokes a runner after asking', (tester) async {
       when(() => repository.revoke('rnr_1'))
           .thenAnswer((_) async => revokedRunner);

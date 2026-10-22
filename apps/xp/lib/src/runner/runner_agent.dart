@@ -4,11 +4,11 @@ import 'dart:convert';
 import 'package:xp/src/runner/backoff.dart';
 import 'package:xp/src/runner/job/lease_outbox.dart';
 import 'package:xp/src/runner/job/leased_job.dart';
-import 'package:xp/src/runner/probe_executor.dart';
 import 'package:xp/src/runner/runner_socket.dart';
 import 'package:xp/src/runner/secrets/lease_secret_store.dart';
 import 'package:xp_api/xp_api.dart';
 import 'package:xp_client/xp_client.dart';
+import 'package:xp_engine/xp_engine.dart' show ProbeExecutor;
 
 /// Why [RunnerAgent.run] ended.
 enum AgentExit {
@@ -67,7 +67,9 @@ class _Lease {
 /// - **Says hello** (version, system, cores, the most jobs it will run, the
 ///   leases it still holds), **runs the probe** the engine sends, and gets
 ///   jobs only after that. It never claims capabilities; the engine derives
-///   them from the probe.
+///   them from the probe and says what it found (`probed`), which the runner
+///   prints the first time and whenever it changes: what it offers and, for
+///   each capability it lacks, why and what gives it.
 /// - **Takes leases** within its slots (an `ios-sign` job never runs beside
 ///   another), refuses the others with a reason, and refuses all of them
 ///   while draining. **Heartbeats** every `heartbeatSeconds` of the welcome,
@@ -160,6 +162,8 @@ class RunnerAgent {
   AgentExit? _exit;
   var _draining = false;
   String? _updateTo;
+  String? _engineVersion;
+  ProbedFrame? _offers;
   var _tookJob = false;
   Completer<void>? _wake;
 
@@ -338,6 +342,8 @@ class RunnerAgent {
         _welcome(frame);
       case ProbeFrame():
         await _probed(frame);
+      case ProbedFrame():
+        _found(frame);
       case LeaseOfferFrame():
         _offered(frame);
       case HeartbeatAckFrame():
@@ -364,6 +370,7 @@ class RunnerAgent {
 
   void _welcome(WelcomeFrame frame) {
     _backoff.reset();
+    _engineVersion = frame.engineVersion;
     _decideUpdate(frame.engineVersion);
     _heartbeat?.cancel();
     _heartbeat = Timer.periodic(
@@ -417,6 +424,24 @@ class RunnerAgent {
   Future<void> _probed(ProbeFrame frame) async {
     final results = await _probe.run(frame.commands);
     _sendFrame(ProbeResultFrame(probeId: frame.probeId, results: results));
+  }
+
+  /// Says what the engine found this runner offers: after the first probe,
+  /// then only when it changes.
+  void _found(ProbedFrame frame) {
+    final first = _offers == null;
+    if (frame == _offers) return;
+    _offers = frame;
+    final offers = frame.capabilities.isEmpty
+        ? 'This runner offers nothing yet, so it will get no jobs. Run: xp '
+              'runner doctor'
+        : 'The engine runs $_engineVersion; this runner offers '
+              '${frame.capabilities.join(', ')}, $slots '
+              'slot${slots == 1 ? '' : 's'}.';
+    _log(first ? 'Connected. $offers' : offers);
+    for (final missing in frame.missing) {
+      _log('No ${missing.capability}: ${missing.explanation}');
+    }
   }
 
   // ----------------------------------------------------------------- leases

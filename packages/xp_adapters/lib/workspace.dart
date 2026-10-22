@@ -2,5 +2,4 @@
 /// search for the Android SDK.
 library;
 
-export 'src/workspace/directory_android_sdk.dart';
 export 'src/workspace/directory_workspace.dart';

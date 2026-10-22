@@ -29,6 +29,7 @@ List<ProbeResult> macProbe({
     status: ProbeStatus.exited,
     exitCode: android ? 0 : 1,
   ),
+  javaProbe(),
   ProbeResult(
     id: 'xcode_select',
     status: xcode ? ProbeStatus.exited : ProbeStatus.notStarted,
@@ -44,6 +45,14 @@ List<ProbeResult> macProbe({
   const ProbeResult(id: 'swift', status: ProbeStatus.skipped),
 ];
 
+/// The result of the `java` probe command of a machine with JDK [version].
+ProbeResult javaProbe([int version = 17]) => ProbeResult(
+  id: 'java',
+  status: ProbeStatus.exited,
+  exitCode: 0,
+  stderr: 'openjdk version "$version.0.12" 2024-07-16\n',
+);
+
 /// The results of the probe of a Linux machine.
 List<ProbeResult> linuxProbe({bool android = true, bool swift = false}) => [
   const ProbeResult(
@@ -58,11 +67,17 @@ List<ProbeResult> linuxProbe({bool android = true, bool swift = false}) => [
     exitCode: 0,
     stdout: 'git version 2.43.0\n',
   ),
+  const ProbeResult(
+    id: 'flutter_tools',
+    status: ProbeStatus.exited,
+    exitCode: 0,
+  ),
   ProbeResult(
     id: 'android_sdk',
     status: ProbeStatus.exited,
     exitCode: android ? 0 : 1,
   ),
+  javaProbe(),
   const ProbeResult(id: 'xcode_select', status: ProbeStatus.skipped),
   const ProbeResult(id: 'xcodebuild', status: ProbeStatus.skipped),
   ProbeResult(

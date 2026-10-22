@@ -5,7 +5,6 @@ import 'dart:math';
 import 'package:test/test.dart';
 import 'package:xp/src/runner/backoff.dart';
 import 'package:xp/src/runner/job/lease_outbox.dart';
-import 'package:xp/src/runner/probe_executor.dart';
 import 'package:xp/src/runner/runner_agent.dart';
 import 'package:xp/src/runner/runner_socket.dart';
 import 'package:xp/src/runner/secrets/lease_secret_store.dart';
@@ -199,6 +198,84 @@ void main() {
         await running;
       },
     );
+  });
+
+  group('what the engine found', () {
+    const noJdk = MissingCapability(
+      capability: 'android',
+      reason: 'no JDK: java not found',
+      fix:
+          'install JDK 17 (apt-get install openjdk-17-jdk-headless) or set '
+          'JAVA_HOME',
+    );
+
+    test('is printed after the connection, with the reason for each missing '
+        'capability', () async {
+      final fake = socket();
+      final running = agent().run();
+      await pumpEventQueue();
+      await welcome(fake, engineVersion: '1.1.2');
+
+      fake.engine(
+        const ProbedFrame(capabilities: ['flutter'], missing: [noJdk]),
+      );
+      await pumpEventQueue();
+
+      expect(noJdk.explanation, startsWith('no JDK: java not found. Install'));
+      const connected = 'Connected. The engine runs 1.1.2;';
+      expect(log, [
+        '$connected this runner offers flutter, 2 slots.',
+        'No android: ${noJdk.explanation}',
+      ]);
+      await fake.engineCloses(runnerRevokedCloseCode);
+      await running;
+    });
+
+    test('is printed again only when it changes', () async {
+      final first = socket();
+      final second = socket();
+      final third = socket();
+      final running = agent(slots: 1).run();
+      await pumpEventQueue();
+      await welcome(first, engineVersion: '1.1.2');
+      first.engine(const ProbedFrame(capabilities: ['flutter']));
+      await pumpEventQueue();
+      await first.engineCloses(1006);
+      await pumpEventQueue();
+      await welcome(second, engineVersion: '1.1.2');
+      second.engine(const ProbedFrame(capabilities: ['flutter']));
+      await pumpEventQueue();
+      await second.engineCloses(1006);
+      await pumpEventQueue();
+      await welcome(third, engineVersion: '1.1.2');
+      third.engine(const ProbedFrame(capabilities: ['android', 'flutter']));
+      await pumpEventQueue();
+
+      expect(log.where((line) => line.contains('offers')), [
+        'Connected. The engine runs 1.1.2; this runner offers flutter, 1 slot.',
+        'The engine runs 1.1.2; this runner offers android, flutter, 1 slot.',
+      ]);
+      await third.engineCloses(runnerRevokedCloseCode);
+      await running;
+    });
+
+    test('says plainly when the runner offers nothing', () async {
+      final fake = socket();
+      final running = agent().run();
+      await pumpEventQueue();
+      await welcome(fake);
+
+      fake.engine(const ProbedFrame(capabilities: [], missing: [noJdk]));
+      await pumpEventQueue();
+
+      expect(
+        log.first,
+        'Connected. This runner offers nothing yet, so it will get no jobs. '
+        'Run: xp runner doctor',
+      );
+      await fake.engineCloses(runnerRevokedCloseCode);
+      await running;
+    });
   });
 
   group('the heartbeat', () {

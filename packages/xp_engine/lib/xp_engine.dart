@@ -90,6 +90,7 @@ export 'src/releases/release_watcher.dart';
 export 'src/repositories/device_token_repository.dart';
 export 'src/repositories/event_log.dart';
 export 'src/runners/lease_sweeper.dart';
+export 'src/runners/probe_executor.dart';
 export 'src/runners/remote_runner.dart';
 export 'src/runners/remote_step_policy.dart';
 export 'src/runners/runner_artifacts.dart';

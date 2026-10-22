@@ -36,6 +36,10 @@ abstract interface class RunnerPresence {
   /// The jobs the runner [runnerId] holds a lease for.
   List<String> jobsOf(String runnerId);
 
+  /// What the runner [runnerId] cannot do and why, from its last probe;
+  /// `null` while it is not connected.
+  List<MissingCapability>? missingOf(String runnerId);
+
   /// The runner was revoked: closes its connection and ends its leases.
   Future<void> revoked(RunnerRecord runner);
 }
@@ -86,6 +90,7 @@ class _Session {
   DateTime? probeDeadline;
   DateTime? cooldownUntil;
   RemoteRunner? remote;
+  List<MissingCapability> missing = const [];
 }
 
 /// The runners that are connected, the leases they hold and the rules that
@@ -217,6 +222,13 @@ class RunnerHub implements RemoteLeases, RemoteJobs, RunnerPresence {
     for (final lease in _leases.values)
       if (lease.runnerId == runnerId) lease.jobId,
   ]..sort();
+
+  @override
+  List<MissingCapability>? missingOf(String runnerId) {
+    final session = _sessions[runnerId];
+    if (session == null || !session.probed) return null;
+    return session.missing;
+  }
 
   @override
   int slotsOf(String runnerId) {
@@ -707,9 +719,18 @@ class RunnerHub implements RemoteLeases, RemoteJobs, RunnerPresence {
       ..probeId = null
       ..probeDeadline = null;
     final before = session.record.capabilities;
-    final found = _probe.evaluate(frame.results).capabilities;
+    final findings = _probe.evaluate(frame.results);
+    final found = findings.capabilities;
     await _save(session, (stored) => stored.copyWith(capabilities: found));
     final record = session.record;
+    session.missing = findings.missing;
+    _send(
+      session,
+      ProbedFrame(
+        capabilities: RunnerRecord.wireNames(found),
+        missing: findings.missing,
+      ),
+    );
     if (!(before.length == found.length && before.containsAll(found))) {
       _events.append(
         RunnerCapabilitiesChanged(

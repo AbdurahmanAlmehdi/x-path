@@ -212,6 +212,28 @@ void main() {
       expect((await h.runners.get(mac.id))!.capabilities, found(mac));
     });
 
+    test('the runner hears what it offers and why not, after the '
+        'probe', () async {
+      final runner = await h.pair();
+      await runner.hello();
+      expect(runner.link.sentOf<ProbedFrame>(), isEmpty);
+
+      await runner.answerProbe(macProbe());
+
+      final probed = runner.link.sentOf<ProbedFrame>().single;
+      expect(probed.capabilities, ['flutter', 'ios-sign']);
+      expect(probed.missing.map((m) => m.capability), ['android']);
+      expect(h.hub.missingOf(runner.id), probed.missing);
+    });
+
+    test('nothing is missing for a runner that is not connected', () async {
+      final runner = await h.pair();
+      await runner.hello();
+
+      expect(h.hub.missingOf(runner.id), isNull);
+      expect(h.hub.missingOf('rnr_nobody'), isNull);
+    });
+
     test('an answer to another probe is ignored', () async {
       final runner = await h.pair();
       await runner.hello();

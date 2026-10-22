@@ -2106,8 +2106,10 @@ paths:
         3. The engine sends `probe`; the runner runs the commands and answers
            `probe_result`. The engine derives the capabilities from the
            results (`ios-sign`, `android`, `flutter`, `swift-linux`) and
-           ignores anything the runner claims. Until then the runner gets no
-           job. It probes again at every connection.
+           ignores anything the runner claims, then sends `probed`: the
+           capabilities it stored and, for each one it did not find, the
+           reason and the fix. Until then the runner gets no job. It probes
+           again at every connection.
         4. The engine sends `lease_offer` for a queued job that fits. The
            runner answers `lease_accept` or `lease_reject`. The lease lasts
            90 s and every `heartbeat` (every 30 s, idle runners too) renews
@@ -4465,6 +4467,27 @@ components:
         revokedAt:
           type: string
           format: date-time
+        missing:
+          type: array
+          description: >-
+            What the last probe did not find, why, and what gives it. Kept in
+            memory: present only while the runner is connected.
+          items:
+            $ref: "#/components/schemas/MissingCapability"
+    MissingCapability:
+      type: object
+      required: [capability, reason, fix]
+      additionalProperties: false
+      properties:
+        capability:
+          type: string
+          enum: [ios-sign, android, flutter, swift-linux]
+        reason:
+          type: string
+          description: One sentence without its full stop.
+        fix:
+          type: string
+          description: One sentence without its full stop.
     RunnersResponse:
       type: object
       required: [runners]
@@ -4817,6 +4840,22 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/ProbeCommand"
+    ProbedFrame:
+      type: object
+      required: [type, capabilities, missing]
+      additionalProperties: false
+      properties:
+        type:
+          const: probed
+        capabilities:
+          type: array
+          items:
+            type: string
+            enum: [ios-sign, android, flutter, swift-linux]
+        missing:
+          type: array
+          items:
+            $ref: "#/components/schemas/MissingCapability"
     LeaseRepository:
       type: object
       description: >-
@@ -4978,6 +5017,7 @@ components:
       oneOf:
         - $ref: "#/components/schemas/WelcomeFrame"
         - $ref: "#/components/schemas/ProbeFrame"
+        - $ref: "#/components/schemas/ProbedFrame"
         - $ref: "#/components/schemas/LeaseOfferFrame"
         - $ref: "#/components/schemas/HeartbeatAckFrame"
         - $ref: "#/components/schemas/ChunkAckFrame"

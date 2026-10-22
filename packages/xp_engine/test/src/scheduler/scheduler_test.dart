@@ -340,6 +340,65 @@ void main() {
       );
     });
 
+    test(
+      'name the paired runners that could do a job and are offline',
+      () async {
+        final paired = InMemoryRunnerRepository();
+        final created = DateTime.utc(2026, 10, 22, 9);
+        await paired.add(
+          RunnerRecord(
+            id: 'rnr_aws',
+            name: 'AWS Instance',
+            tokenId: 'tok_aws',
+            createdAt: created,
+            capabilities: const {Capability.flutter, Capability.iosSign},
+            lastHeartbeat: DateTime.utc(2026, 10, 22, 14, 2, 30),
+          ),
+        );
+        await paired.add(
+          RunnerRecord(
+            id: 'rnr_new',
+            name: 'never seen',
+            tokenId: 'tok_new',
+            createdAt: created,
+            capabilities: const {Capability.iosSign},
+          ),
+        );
+        await paired.add(
+          RunnerRecord(
+            id: 'rnr_gone',
+            name: 'gone',
+            tokenId: 'tok_gone',
+            createdAt: created,
+            capabilities: const {Capability.iosSign},
+            revokedAt: created,
+          ),
+        );
+        f.scheduler = Scheduler(
+          runner: f.harness.runner,
+          records: f.harness.jobs,
+          runs: f.runs,
+          events: f.harness.events,
+          runners: [f.local()],
+          paired: paired,
+        );
+        final ids = await f.run([
+          const _Spec('ios', needs: ['ios-sign']),
+          const _Spec('linux', needs: ['swift-linux']),
+        ]);
+
+        await f.scheduler.pump();
+
+        expect(
+          await f.message(ids['ios']!),
+          'No connected runner can do ios-sign. AWS Instance offers ios-sign; '
+          'offline since 2026-10-22 14:02 UTC. never seen offers ios-sign; '
+          'offline.',
+        );
+        expect(await f.message(ids['linux']!), 'No runner can do swift-linux.');
+      },
+    );
+
     test('say it once, not on every pass', () async {
       f.build([f.local()]);
       final ids = await f.run([
