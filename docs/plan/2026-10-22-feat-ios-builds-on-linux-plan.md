@@ -15,6 +15,22 @@ workflow, iOS steps included, run on Linux, using
 toolchain. It is opt-in and experimental per runner; Macs keep working as they do. The decision
 record is [ADR 0014](../adr/0014-ios-builds-on-linux.md).
 
+## Goal
+
+Set up once, then trigger and approve releases remotely on a Linux machine, with no Mac in the
+loop: not for a build step, not for setup. A job that needs a Mac part-way through does not meet
+the goal. So:
+
+- The plan-time rejections below are a safety net, not the design. For the apps this is for, every
+  rejection that applies is a prerequisite to remove upstream before the move, not a step left on a
+  Mac.
+- Setup needs no Mac either: `Xcode.xip` is downloaded in a browser on any OS, and the Apple
+  Distribution certificate is created through the App Store Connect API on Linux (a new one,
+  rather than exporting the Mac's from Keychain; Apple limits how many a team has, so check the
+  count first).
+- Releases are triggered and approved with `xp` (or an agent over `xp mcp`) against the Linux
+  engine, reached remotely through TLS as for any remote engine.
+
 ## What omarchy-apple-dev provides
 
 omarchy-apple-dev (MIT) builds, signs and uploads iOS apps on Linux with Swift 6.4, xtool,
@@ -80,6 +96,9 @@ These stay on a Mac, or are rejected on a Linux runner with a clear reason:
 ### Phase 0: ADR and a spike on real hardware (no product code)
 
 - [ ] ADR 0014 accepted, including the open decision below.
+- [ ] Blocker audit of each app that is to move: flavors, plugins without a `Package.swift`, app
+      extensions, entitlements, storyboards, app icons, Shorebird use. The result orders the
+      "Upstream work" list; an app moves only when its list is empty.
 - [ ] On an Omarchy machine with `install-toolchain.sh` done: a workflow of `command` steps runs
       `flutter/setup.sh`, `flutter/build.sh` and `flutter/ship.sh --upload` on a real app.
 - [ ] **Gate:** a build of a real app reaches `VALID` in App Store Connect and installs from
@@ -230,5 +249,7 @@ revision.
 - A `prod-release` workflow, unchanged, runs end to end with a Linux engine and a Linux
   `ios-linux` runner on a real app: Android and iOS built, both uploaded, dSYMs and Dart symbols
   archived, the iOS build `VALID` in App Store Connect.
+- No Mac is involved at any point for that app, setup included: triggered and approved remotely
+  with `xp`, signed with a certificate created on Linux.
 - With only a Mac runner, behaviour is unchanged.
 - Jobs that cannot run on Linux fail at plan time with the reason, never mid-build.
