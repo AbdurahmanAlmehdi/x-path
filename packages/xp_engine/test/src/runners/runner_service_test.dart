@@ -12,6 +12,120 @@ void main() {
   Future<DeviceToken> token(DeviceTokenKind kind) async =>
       (await h.tokens.issue(name: kind.name, kind: kind)).token;
 
+  group('the runner URL', () {
+    test('is unset at first, then every pairing token carries it', () async {
+      expect(await h.service.runnerUrl(), const RunnerUrl());
+      expect(
+        (await h.service.createPairingToken(name: 'a', by: h.owner)).engineUrl,
+        isNull,
+      );
+
+      final set = await h.service.setRunnerUrl(
+        ' https://mac.tailnet.ts.net/ ',
+        by: h.owner,
+      );
+
+      expect(set, const RunnerUrl(url: 'https://mac.tailnet.ts.net'));
+      expect(await h.service.runnerUrl(), set);
+      expect(
+        (await h.service.createPairingToken(name: 'b', by: h.owner)).engineUrl,
+        'https://mac.tailnet.ts.net',
+      );
+    });
+
+    test('is cleared by null or a blank one', () async {
+      await h.service.setRunnerUrl('https://a.example', by: h.owner);
+
+      expect(
+        await h.service.setRunnerUrl(null, by: h.owner),
+        const RunnerUrl(),
+      );
+      expect((await h.service.runnerUrl()).url, isNull);
+
+      await h.service.setRunnerUrl('https://a.example', by: h.owner);
+      await h.service.setRunnerUrl('  ', by: h.owner);
+      expect((await h.service.runnerUrl()).url, isNull);
+    });
+
+    test(
+      'warns about plain http that leaves this machine or the tailnet',
+      () async {
+        for (final quiet in [
+          'http://127.0.0.1:7480',
+          'http://localhost:7480',
+          'http://[::1]:7480',
+          'http://100.64.0.1:7480',
+          'http://100.127.255.1',
+          'http://mac.tailnet.ts.net',
+          'https://xpath.example.com',
+        ]) {
+          expect(
+            (await h.service.setRunnerUrl(quiet, by: h.owner)).warning,
+            isNull,
+            reason: quiet,
+          );
+        }
+        for (final loud in [
+          'http://xpath.example.com',
+          'http://192.168.1.4:7480',
+          'http://100.128.0.1',
+          'http://100.63.0.1',
+        ]) {
+          final set = await h.service.setRunnerUrl(loud, by: h.owner);
+          expect(set.warning, contains('signing material'), reason: loud);
+          expect((await h.service.runnerUrl()).warning, set.warning);
+        }
+      },
+    );
+
+    test('refuses what is not an absolute http or https URL', () async {
+      for (final bad in [
+        'mac.tailnet.ts.net',
+        'ftp://a.example',
+        'https://user:pass@a.example',
+        'https://a.example?x=1',
+        'https://a.example#x',
+        'http://',
+        'https://[',
+      ]) {
+        await expectLater(
+          h.service.setRunnerUrl(bad, by: h.owner),
+          throwsA(isA<RunnerInvalidException>()),
+          reason: bad,
+        );
+      }
+    });
+
+    test('is changed only by the app and the cli', () async {
+      await h.service.setRunnerUrl(
+        'https://a.example',
+        by: await token(DeviceTokenKind.cli),
+      );
+      await expectLater(
+        h.service.setRunnerUrl(
+          'https://b.example',
+          by: await token(DeviceTokenKind.mcp),
+        ),
+        throwsA(
+          isA<RunnerForbiddenException>().having(
+            (e) => e.message,
+            'message',
+            contains('change the runner URL'),
+          ),
+        ),
+      );
+      expect((await h.service.runnerUrl()).url, 'https://a.example');
+    });
+
+    test('the in-memory settings forget a cleared value', () async {
+      final settings = InMemoryEngineSettingRepository();
+      await settings.write('k', 'v');
+      expect(await settings.read('k'), 'v');
+      await settings.write('k', null);
+      expect(await settings.read('k'), isNull);
+    });
+  });
+
   group('createPairingToken', () {
     test('is single use, lasts 15 minutes and keeps only a hash', () async {
       final made = await h.service.createPairingToken(

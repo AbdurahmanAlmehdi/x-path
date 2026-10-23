@@ -1051,9 +1051,15 @@ void main() {
       final token = PairingToken(token: 'xpp_1', name: 'a', expiresAt: at);
       when(() => client.createPairingToken('a')).thenAnswer((_) async => token);
       when(() => client.revokeRunner('rnr_1')).thenAnswer((_) async => _runner);
+      const url = RunnerUrl(url: 'https://mac.tailnet.ts.net');
+      when(() => client.runnerUrl()).thenAnswer((_) async => url);
+      when(() => client.setRunnerUrl('https://mac.tailnet.ts.net'))
+          .thenAnswer((_) async => url);
 
       expect(await repository.createPairingToken('a'), token);
       expect(await repository.revoke('rnr_1'), _runner);
+      expect(await repository.runnerUrl(), url);
+      expect(await repository.setRunnerUrl('https://mac.tailnet.ts.net'), url);
     });
   });
 

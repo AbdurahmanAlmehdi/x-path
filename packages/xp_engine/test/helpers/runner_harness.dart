@@ -343,6 +343,7 @@ class RunnerHarness {
       pairing: pairing,
       tokens: tokens,
       presence: hub,
+      settings: InMemoryEngineSettingRepository(),
       events: jobs.events,
       clock: jobs.clock,
     );

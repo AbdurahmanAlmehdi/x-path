@@ -18,8 +18,12 @@ XpGroup runnersCommand(XpContext context) => XpGroup(
     RunnersListCommand(context),
     RunnersPairCommand(context),
     RunnersRevokeCommand(context),
+    RunnersUrlCommand(context),
   ],
 );
+
+/// Where the guide says how runners reach the engine.
+const reachingTheEngine = 'docs/guide/runners.md#reaching-the-engine';
 
 /// `xp runners list [--all]`.
 class RunnersListCommand extends XpCommand {
@@ -115,21 +119,41 @@ class RunnersPairCommand extends XpCommand {
   Future<int> execute(XpClient client) async {
     final [name] = positionals(['name']);
     final token = await client.createPairingToken(name);
+    final engine =
+        token.engineUrl ??
+        client.baseUrl.toString().replaceFirst(RegExp(r'/+$'), '');
+    final local = token.engineUrl == null && _isLoopback(client.baseUrl.host);
+    final heading =
+        'Pairing token for the runner "${token.name}". On the runner '
+        'machine, within 15 minutes:';
     final expiry =
         'It works once and is shown only now. It expires at '
         '${formatTime(token.expiresAt)} UTC (15 minutes).';
+    const loopback =
+        'This address only works on this machine. Set the address runners '
+        'use: xp runners url <url>';
     emit(
       token.toJson(),
       () => [
-        'Pairing token for the runner "${token.name}":',
-        '',
-        token.token,
+        heading,
+        '  xp runner pair --engine $engine --token ${token.token}',
         '',
         expiry,
+        if (local) ...[
+          '',
+          loopback,
+          'How runners reach the engine: $reachingTheEngine',
+        ],
       ].join('\n'),
     );
     return XpExit.ok;
   }
+
+  static bool _isLoopback(String host) =>
+      host == 'localhost' ||
+      host == '::1' ||
+      host == '[::1]' ||
+      host.startsWith('127.');
 }
 
 /// `xp runners revoke <runner>`.
@@ -161,6 +185,64 @@ class RunnersRevokeCommand extends XpCommand {
           'are queued again, or wait for a resume when they had a step with '
           'side effects.',
     );
+    return XpExit.ok;
+  }
+}
+
+/// `xp runners url [<url> | --clear]`.
+class RunnersUrlCommand extends XpCommand {
+  /// Creates the command.
+  new(super.context) {
+    argParser.addFlag(
+      'clear',
+      negatable: false,
+      help: 'Forget the runner URL.',
+    );
+  }
+
+  @override
+  String get name => 'url';
+
+  @override
+  String get description =>
+      'Show or set the address runners reach the engine at. Pairing commands '
+      'carry it.';
+
+  @override
+  String get invocation => 'xp runners url [<url> | --clear]';
+
+  @override
+  Future<int> execute(XpClient client) async {
+    final rest = argResults!.rest;
+    final clear = argResults!.flag('clear');
+    if (rest.length > 1) usageException('Unexpected "${rest[1]}".');
+    if (clear && rest.isNotEmpty) {
+      usageException('Give a URL or --clear, not both.');
+    }
+    final RunnerUrl url;
+    if (clear) {
+      url = await client.setRunnerUrl(null);
+    } else if (rest.isEmpty) {
+      url = await client.runnerUrl();
+    } else {
+      url = await client.setRunnerUrl(rest.single);
+    }
+    emit(url.toJson(), () {
+      final set = url.url;
+      if (set == null) {
+        return 'No runner URL is set: pairing commands use the address this '
+            'CLI reaches the engine at. Set one: xp runners url <url>\n'
+            'How runners reach the engine: $reachingTheEngine';
+      }
+      const moved =
+          'Runners paired already keep their address; pair them again to '
+          'move them.';
+      return [
+        'Runners reach the engine at $set.',
+        if (rest.isNotEmpty) moved,
+      ].join('\n');
+    });
+    if (url.warning case final warning?) logger.warn(warning);
     return XpExit.ok;
   }
 }

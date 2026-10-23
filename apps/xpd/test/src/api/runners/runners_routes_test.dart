@@ -18,6 +18,76 @@ void main() {
 
   Map<String, Object> pairingBody(String name) => {'name': name};
 
+  group('/settings/runner-url', () {
+    test('is set, read, carried by pairing tokens and cleared', () async {
+      final empty = await client.send('GET', '/settings/runner-url');
+      expect(empty.statusCode, 200);
+      expect(empty.json, <String, dynamic>{});
+
+      final set = await client.send(
+        'PUT',
+        '/settings/runner-url',
+        body: {'url': 'https://mac.tailnet.ts.net'},
+      );
+      expect(set.statusCode, 200);
+      expect(set.json, {'url': 'https://mac.tailnet.ts.net'});
+
+      final read = await client.send(
+        'GET',
+        '/settings/runner-url',
+        kind: DeviceTokenKind.mcp,
+      );
+      expect(read.json, {'url': 'https://mac.tailnet.ts.net'});
+      final token = await client.send(
+        'POST',
+        '/runners/pairing-tokens',
+        body: pairingBody('linux-box'),
+      );
+      expect(token.json['engineUrl'], 'https://mac.tailnet.ts.net');
+
+      final cleared = await client.send(
+        'PUT',
+        '/settings/runner-url',
+        body: {'url': null},
+      );
+      expect(cleared.json, <String, dynamic>{});
+    });
+
+    test('warns about plain http that leaves the machine', () async {
+      final response = await client.send(
+        'PUT',
+        '/settings/runner-url',
+        kind: DeviceTokenKind.cli,
+        body: {'url': 'http://xpath.example.com'},
+      );
+
+      expect(response.statusCode, 200);
+      expect(response.json['warning'], contains('signing material'));
+    });
+
+    test(
+      'answers 400 for a bad URL or body and 403 for an mcp token',
+      () async {
+        for (final body in ['{}', '{"url": 3}', '{"url": "ftp://a"}']) {
+          final response = await client.send(
+            'PUT',
+            '/settings/runner-url',
+            rawBody: body,
+          );
+          expect(response.statusCode, 400, reason: body);
+          expect(errorCode(response), 'invalid_request');
+        }
+        final mcp = await client.send(
+          'PUT',
+          '/settings/runner-url',
+          kind: DeviceTokenKind.mcp,
+          body: {'url': 'https://a.example'},
+        );
+        expect(mcp.statusCode, 403);
+      },
+    );
+  });
+
   group('POST /runners/pairing-tokens', () {
     test('answers 201 with a single-use token for 15 minutes', () async {
       final response = await client.send(

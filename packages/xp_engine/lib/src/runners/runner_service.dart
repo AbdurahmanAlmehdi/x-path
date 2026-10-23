@@ -3,6 +3,7 @@ import 'dart:math';
 
 import 'package:xp_api/xp_api.dart';
 import 'package:xp_engine/src/clock/clock.dart';
+import 'package:xp_engine/src/repositories/engine_setting_repository.dart';
 import 'package:xp_engine/src/repositories/event_log.dart';
 import 'package:xp_engine/src/runners/runner_exceptions.dart';
 import 'package:xp_engine/src/runners/runner_hub.dart';
@@ -20,6 +21,10 @@ final _namePattern = RegExp(r'^[A-Za-z0-9][A-Za-z0-9 ._-]{0,63}$');
 /// receives signing material, so an agent must not be able to pair one).
 /// Exchanging it creates the runner and its credential, a device token of
 /// kind `runner`; the engine keeps only the hashes of both secrets.
+///
+/// The owner sets the runner URL, the address runners reach the engine at,
+/// and every pairing token carries it, so the pairing command works on the
+/// runner machine.
 class RunnerService {
   /// Creates the service. [random] is for tests; it must be cryptographically
   /// secure otherwise.
@@ -28,10 +33,14 @@ class RunnerService {
     required this._pairing,
     required this._tokens,
     required this._presence,
+    required this._settings,
     required this._events,
     required this._clock,
     Random? random,
   }) : _random = random ?? Random.secure();
+
+  /// The key of the runner URL in the engine settings.
+  static const runnerUrlKey = 'runner_url';
 
   /// How long a pairing token works.
   static const pairingLifetime = Duration(minutes: 15);
@@ -43,6 +52,7 @@ class RunnerService {
   final PairingTokenRepository _pairing;
   final TokenService _tokens;
   final RunnerPresence _presence;
+  final EngineSettingRepository _settings;
   final EventLog _events;
   final Clock _clock;
   final Random _random;
@@ -82,7 +92,74 @@ class RunnerService {
         expiresAt: expiresAt,
       ),
     );
-    return PairingToken(token: secret, name: trimmed, expiresAt: expiresAt);
+    return PairingToken(
+      token: secret,
+      name: trimmed,
+      expiresAt: expiresAt,
+      engineUrl: await _settings.read(runnerUrlKey),
+    );
+  }
+
+  /// The runner URL, with the warning its address deserves.
+  Future<RunnerUrl> runnerUrl() async {
+    final url = await _settings.read(runnerUrlKey);
+    return RunnerUrl(url: url, warning: url == null ? null : _warning(url));
+  }
+
+  /// Sets the runner URL to [url], or clears it for `null`, for the token
+  /// [by].
+  ///
+  /// The URL must be an absolute `http` or `https` URL with a host and no
+  /// user info, query or fragment; a trailing `/` is dropped. A plain `http`
+  /// URL that is not on this machine or a tailnet is accepted with a warning:
+  /// the socket carries signing material.
+  ///
+  /// Throws a [RunnerForbiddenException] unless [by] is an `app` or `cli`
+  /// token, and a [RunnerInvalidException] for a URL that is not one.
+  Future<RunnerUrl> setRunnerUrl(String? url, {required DeviceToken by}) async {
+    _requireOwner(by, 'change the runner URL');
+    if (url == null || url.trim().isEmpty) {
+      await _settings.write(runnerUrlKey, null);
+      return const RunnerUrl();
+    }
+    final parsed = Uri.tryParse(url.trim());
+    if (parsed == null ||
+        !parsed.hasScheme ||
+        !const {'http', 'https'}.contains(parsed.scheme) ||
+        parsed.host.isEmpty ||
+        parsed.userInfo.isNotEmpty ||
+        parsed.hasQuery ||
+        parsed.hasFragment) {
+      throw RunnerInvalidException(
+        '"$url" is not a runner URL. Give the absolute http or https address '
+        'runners reach the engine at, for example '
+        'https://mac.tailnet.ts.net, without a user name or password.',
+      );
+    }
+    final text = parsed.toString().replaceFirst(RegExp(r'/+$'), '');
+    await _settings.write(runnerUrlKey, text);
+    return RunnerUrl(url: text, warning: _warning(text));
+  }
+
+  /// Why [url] may be a bad idea, or `null`.
+  static String? _warning(String url) {
+    final uri = Uri.parse(url);
+    if (uri.scheme != 'http' || _private(uri.host)) return null;
+    return 'This plain http address is not on this machine or a tailnet, '
+        'and the runner connection carries signing material. Put TLS in '
+        'front of the engine, or use Tailscale or an SSH tunnel.';
+  }
+
+  /// Whether [host] is this machine or a tailnet: loopback, `100.64.0.0/10`
+  /// or a `*.ts.net` name.
+  static bool _private(String host) {
+    final name = host.toLowerCase();
+    if (name == 'localhost' || name.endsWith('.ts.net')) return true;
+    if (name == '::1' || name == '[::1]') return true;
+    final octets = name.split('.').map(int.tryParse).toList();
+    if (octets.length != 4 || octets.contains(null)) return false;
+    final [first!, second!, _, _] = octets;
+    return first == 127 || (first == 100 && second >= 64 && second < 128);
   }
 
   /// Exchanges the pairing token [secret] for a runner and its credential.

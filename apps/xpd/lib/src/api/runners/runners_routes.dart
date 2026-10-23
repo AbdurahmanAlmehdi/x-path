@@ -22,6 +22,9 @@ import 'package:xpd/src/api/responses.dart';
 ///   own version for that machine, with its SHA-256 and size. A `runner`
 ///   token reaches it (ADR 0011); `404` when the engine has no bundle for the
 ///   machine.
+/// - `GET /settings/runner-url` reads the address runners reach the engine
+///   at, which pairing tokens carry; `PUT` sets or clears it, for `app` and
+///   `cli` tokens only.
 /// - Every kind of token can read `GET /runners`, like the other reads. (A
 ///   runner token can read as much as an `mcp` token can; the plan only keeps
 ///   it from approving and from changing gates, D-13.)
@@ -41,6 +44,8 @@ class RunnersRoutes {
       ..post('/runners/pairing-tokens', _createPairingToken)
       ..post('/runners/pair', _pair)
       ..post('/runners/<id>/revoke', _revoke)
+      ..get('/settings/runner-url', _runnerUrl)
+      ..put('/settings/runner-url', _setRunnerUrl)
       ..put('/runners/jobs/<id>/artifacts/<name>', _upload);
   }
 
@@ -82,6 +87,18 @@ class RunnersRoutes {
     final body = await readJsonBody(request, PairRunnerRequest.fromJson);
     final paired = await _runners.pair(body.pairingToken);
     return jsonResponse(paired.toJson(), statusCode: 201);
+  });
+
+  Future<Response> _runnerUrl(Request request) =>
+      _guard(() async => jsonResponse((await _runners.runnerUrl()).toJson()));
+
+  Future<Response> _setRunnerUrl(Request request) => _guard(() async {
+    final body = await readJsonBody(request, SetRunnerUrlRequest.fromJson);
+    final set = await _runners.setRunnerUrl(
+      body.url,
+      by: deviceTokenOf(request),
+    );
+    return jsonResponse(set.toJson());
   });
 
   Future<Response> _revoke(Request request, String id) => _guard(() async {

@@ -69,6 +69,77 @@ void main() {
     );
   });
 
+  group('RunnerUrlBloc', () {
+    late MockRunnersRepository runners;
+    const url = RunnerUrl(url: 'https://mac.tailnet.ts.net');
+
+    setUp(() => runners = quietRunners());
+
+    test('events compare by value', () {
+      expect(const RunnerUrlRequested().props, isEmpty);
+      expect(const RunnerUrlCleared().props, isEmpty);
+      expect(const RunnerUrlSaved('https://a').props, ['https://a']);
+      expect(const RunnerUrlState().busy, isFalse);
+      expect(
+        const RunnerUrlState(command: RunnerUrlCommand.saving).busy,
+        isTrue,
+      );
+    });
+
+    blocTest<RunnerUrlBloc, RunnerUrlState>(
+      'reads the runner URL',
+      setUp: () => when(runners.runnerUrl).thenAnswer((_) async => url),
+      build: () => RunnerUrlBloc(runners: runners),
+      act: (bloc) => bloc.add(const RunnerUrlRequested()),
+      expect: () => const [
+        RunnerUrlState(command: RunnerUrlCommand.loading),
+        RunnerUrlState(url: url),
+      ],
+    );
+
+    blocTest<RunnerUrlBloc, RunnerUrlState>(
+      'saves a trimmed URL and counts it',
+      setUp: () =>
+          when(() => runners.setRunnerUrl('https://mac.tailnet.ts.net'))
+              .thenAnswer((_) async => url),
+      build: () => RunnerUrlBloc(runners: runners),
+      act: (bloc) =>
+          bloc.add(const RunnerUrlSaved(' https://mac.tailnet.ts.net ')),
+      expect: () => const [
+        RunnerUrlState(command: RunnerUrlCommand.saving),
+        RunnerUrlState(url: url, saved: 1),
+      ],
+    );
+
+    blocTest<RunnerUrlBloc, RunnerUrlState>(
+      'clears it',
+      setUp: () =>
+          when(() => runners.setRunnerUrl(null))
+              .thenAnswer((_) async => const RunnerUrl()),
+      build: () => RunnerUrlBloc(runners: runners),
+      seed: () => const RunnerUrlState(url: url),
+      act: (bloc) => bloc.add(const RunnerUrlCleared()),
+      expect: () => const [
+        RunnerUrlState(command: RunnerUrlCommand.clearing, url: url),
+        RunnerUrlState(url: RunnerUrl(), saved: 1),
+      ],
+    );
+
+    blocTest<RunnerUrlBloc, RunnerUrlState>(
+      'keeps what it had and says why the engine refused',
+      setUp: () => when(() => runners.setRunnerUrl('ftp://a')).thenThrow(
+        const ApiException('"ftp://a" is not a runner URL.', statusCode: 400),
+      ),
+      build: () => RunnerUrlBloc(runners: runners),
+      seed: () => const RunnerUrlState(url: url),
+      act: (bloc) => bloc.add(const RunnerUrlSaved('ftp://a')),
+      expect: () => const [
+        RunnerUrlState(command: RunnerUrlCommand.saving, url: url),
+        RunnerUrlState(url: url, error: '"ftp://a" is not a runner URL.'),
+      ],
+    );
+  });
+
   group('GitHubTokenBloc', () {
     late MockSettingsRepository settings;
 

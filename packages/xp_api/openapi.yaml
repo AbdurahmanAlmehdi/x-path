@@ -2032,6 +2032,56 @@ paths:
           $ref: "#/components/responses/Conflict"
         "500":
           $ref: "#/components/responses/InternalError"
+  /settings/runner-url:
+    get:
+      operationId: getRunnerUrl
+      summary: The address runners reach the engine at.
+      description: |
+        Every pairing token carries it as `engineUrl`, so the `xp runner pair`
+        command it goes with works on the runner machine.
+      responses:
+        "200":
+          description: The runner URL, if one is set.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RunnerUrl"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/InternalError"
+    put:
+      operationId: setRunnerUrl
+      summary: Set or clear the runner URL. Only `app` and `cli` tokens may.
+      description: |
+        An absolute `http` or `https` URL with a host and no user info, query
+        or fragment; a trailing `/` is dropped. A plain `http` URL that is not
+        loopback, a tailnet address (`100.64.0.0/10`) or a `*.ts.net` name is
+        accepted with a `warning`: the runner connection carries signing
+        material. Runners paired already keep the URL they were paired with.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetRunnerUrlRequest"
+      responses:
+        "200":
+          description: The runner URL now.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RunnerUrl"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/InternalError"
   /runners/pair:
     post:
       operationId: pairRunner
@@ -4519,6 +4569,31 @@ components:
         expiresAt:
           type: string
           format: date-time
+        engineUrl:
+          type: string
+          description: >-
+            The runner URL the owner set (`/settings/runner-url`), for the
+            `xp runner pair --engine` command. Absent when none is set.
+    RunnerUrl:
+      type: object
+      additionalProperties: false
+      properties:
+        url:
+          type: string
+          description: The absolute http or https URL. Absent when none is set.
+        warning:
+          type: string
+          description: >-
+            Why the URL may be a bad idea though it was accepted, for example
+            a plain http URL that leaves this machine and the tailnet.
+    SetRunnerUrlRequest:
+      type: object
+      required: [url]
+      additionalProperties: false
+      properties:
+        url:
+          type: [string, "null"]
+          description: The runner URL, or null to clear it.
     PairRunnerRequest:
       type: object
       required: [pairingToken]

@@ -242,7 +242,7 @@ Details:
 
 ### Phase R4: A runner URL for pairing
 
-- **Status:** Not started
+- **Status:** Done
 - **Scope:** Both pairing flows print a command that works on the runner machine.
 - **Files touched:** `packages/xp_adapters/lib/src/sqlite/migrations.dart` and a new snapshot
   golden, an `EngineSettingRepository` interface in `packages/xp_engine/lib/src/` and a

@@ -11,6 +11,7 @@ export 'src/sqlite/sqlite_database.dart';
 export 'src/sqlite/sqlite_device_token_repository.dart';
 export 'src/sqlite/sqlite_event_log.dart';
 export 'src/sqlite/sqlite_gate_config_repository.dart';
+export 'src/sqlite/sqlite_engine_setting_repository.dart';
 export 'src/sqlite/sqlite_housekeeping_repository.dart';
 export 'src/sqlite/sqlite_job_repository.dart';
 export 'src/sqlite/sqlite_pairing_token_repository.dart';

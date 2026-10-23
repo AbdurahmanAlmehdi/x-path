@@ -2344,7 +2344,14 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get pairRunnerExpired => 'Expired. Close this and create another.';
+  String get pairRunnerExpired => 'Expired before it was used.';
+
+  @override
+  String get pairRunnerNewToken => 'New token';
+
+  @override
+  String get pairRunnerLoopback =>
+      'This address only works on this Mac. Set the address runners reach the engine at; pairing commands carry it.';
 
   @override
   String get storageTitle => 'Storage';
@@ -2777,6 +2784,35 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsUnknown => 'Unknown';
+
+  @override
+  String get settingsRunners => 'Runners';
+
+  @override
+  String get settingsRunnerUrl => 'Runner URL';
+
+  @override
+  String get settingsRunnerUrlBody =>
+      'The address runners on other machines reach this engine at, for example a Tailscale name. Every pairing command carries it.';
+
+  @override
+  String get settingsRunnerUrlUnset =>
+      'No runner URL is set: pairing commands use the address this app reaches the engine at.';
+
+  @override
+  String settingsRunnerUrlSet(String url) {
+    return 'Runners reach the engine at $url.';
+  }
+
+  @override
+  String get settingsRunnerUrlNote =>
+      'Runners paired already keep their address; pair them again to move them. See docs/guide/runners.md, Reaching the engine.';
+
+  @override
+  String get settingsRunnerUrlSave => 'Save';
+
+  @override
+  String get settingsRunnerUrlClear => 'Clear';
 
   @override
   String get settingsGitHub => 'GitHub';

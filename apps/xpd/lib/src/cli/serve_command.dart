@@ -573,6 +573,7 @@ class ServeCommand extends XpdCommand {
         pairing: SqlitePairingTokenRepository(database),
         tokens: tokenService,
         presence: runnerHub,
+        settings: SqliteEngineSettingRepository(database),
         events: events,
         clock: const SystemClock(),
       );

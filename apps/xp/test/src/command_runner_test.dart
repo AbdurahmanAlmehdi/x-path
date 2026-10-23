@@ -178,7 +178,7 @@ void main() {
       test('lists, pairs and revokes runners', () {
         expect(
           env.runner.commands['runners']!.subcommands.keys,
-          unorderedEquals(['list', 'pair', 'revoke']),
+          unorderedEquals(['list', 'pair', 'revoke', 'url']),
         );
       });
 

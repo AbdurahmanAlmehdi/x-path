@@ -289,11 +289,113 @@ void main() {
         if (name == 'a') {
           expect(find.textContaining('expires in 3m'), findsOneWidget);
         } else {
-          expect(find.textContaining('Expired.'), findsOneWidget);
+          expect(find.text('Expired before it was used.'), findsOneWidget);
+          expect(find.text('New token'), findsOneWidget);
         }
         await tester.tap(find.text('Done'));
         await tester.pumpAndSettle();
       }
+    });
+
+    testWidgets('makes a new token for the same name once one expired', (
+      tester,
+    ) async {
+      final tokens = [
+        PairingToken(
+          token: 'xpp_old',
+          name: 'b',
+          expiresAt: testNow.subtract(const Duration(minutes: 1)),
+        ),
+        PairingToken(
+          token: 'xpp_new',
+          name: 'b',
+          expiresAt: testNow.add(const Duration(minutes: 15)),
+        ),
+      ];
+      when(() => repository.createPairingToken('b'))
+          .thenAnswer((_) async => tokens.removeAt(0));
+      await pump(tester);
+      await tester.tap(find.text('Pair runner…'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField), 'b');
+      await tester.pump();
+      await tester.tap(find.text('Create pairing token'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('New token'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('xpp_new'), findsOneWidget);
+      expect(find.text('New token'), findsNothing);
+    });
+
+    testWidgets('uses the runner URL the token carries, without a warning', (
+      tester,
+    ) async {
+      when(() => repository.createPairingToken('aws')).thenAnswer(
+        (_) async => PairingToken(
+          token: 'xpp_secret',
+          name: 'aws',
+          expiresAt: testNow.add(const Duration(minutes: 15)),
+          engineUrl: 'https://mac.tailnet.ts.net',
+        ),
+      );
+      await pump(tester);
+      await tester.tap(find.text('Pair runner…'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField), 'aws');
+      await tester.pump();
+      await tester.tap(find.text('Create pairing token'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text(
+          'xp runner pair --engine https://mac.tailnet.ts.net --token '
+          'xpp_secret',
+        ),
+        findsOneWidget,
+      );
+      expect(find.textContaining('only works on this Mac'), findsNothing);
+    });
+
+    testWidgets('warns about a loopback address and sets the runner URL in '
+        'place', (tester) async {
+      when(() => repository.createPairingToken('aws')).thenAnswer(
+        (_) async => PairingToken(
+          token: 'xpp_secret',
+          name: 'aws',
+          expiresAt: testNow.add(const Duration(minutes: 15)),
+        ),
+      );
+      when(() => repository.setRunnerUrl('https://mac.tailnet.ts.net'))
+          .thenAnswer(
+            (_) async => const RunnerUrl(url: 'https://mac.tailnet.ts.net'),
+          );
+      await pump(tester);
+      await tester.tap(find.text('Pair runner…'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField), 'aws');
+      await tester.pump();
+      await tester.tap(find.text('Create pairing token'));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('only works on this Mac'), findsOneWidget);
+
+      await tester.enterText(
+        find.byKey(const Key('settings.runnerUrl')),
+        'https://mac.tailnet.ts.net',
+      );
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('settings.runnerUrlSave')));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text(
+          'xp runner pair --engine https://mac.tailnet.ts.net --token '
+          'xpp_secret',
+        ),
+        findsOneWidget,
+      );
+      expect(find.textContaining('only works on this Mac'), findsNothing);
     });
 
     testWidgets('says why the engine refused, and cancels', (tester) async {

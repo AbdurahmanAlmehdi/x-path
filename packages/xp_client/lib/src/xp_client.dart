@@ -694,6 +694,22 @@ class XpClient {
         ),
       );
 
+  /// `GET /settings/runner-url`: the address runners reach the engine at.
+  Future<RunnerUrl> runnerUrl() async => RunnerUrl.fromJson(
+    await _json(await _send('GET', ['settings', 'runner-url'])),
+  );
+
+  /// `PUT /settings/runner-url`: sets the runner URL to [url], or clears it
+  /// for `null`. Only `app` and `cli` tokens may.
+  Future<RunnerUrl> setRunnerUrl(String? url) async => RunnerUrl.fromJson(
+    await _json(
+      await _send('PUT', [
+        'settings',
+        'runner-url',
+      ], body: SetRunnerUrlRequest(url: url).toJson()),
+    ),
+  );
+
   /// `POST /runners/pair`: exchanges the pairing token [pairingToken] for the
   /// runner and its credential. Needs no token, so this client's token is not
   /// sent.

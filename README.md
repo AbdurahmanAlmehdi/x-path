@@ -1286,8 +1286,12 @@ side: the protocol, the leases, the probe and the endpoints. The runner agent, `
 
 ### Pairing
 
+Setting up a runner step by step, and how a runner on another machine reaches the engine:
+[docs/guide/runners.md](docs/guide/runners.md).
+
 ```sh
-xp runners pair mac-mini        # on any machine with a cli token: prints a pairing token, once
+xp runners url https://mac.tailnet.ts.net   # the address runners reach the engine at; pairing commands carry it
+xp runners pair mac-mini        # on any machine with a cli token: prints the pairing command, once
 # on the runner machine: xp runner pair --engine <url> --token <pairing token> exchanges it for the credential
 xp runners revoke mac-mini      # kills the credential, the connection and the leases
 ```

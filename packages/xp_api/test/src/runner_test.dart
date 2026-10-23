@@ -120,6 +120,42 @@ void main() {
     });
   });
 
+  group('runner URL', () {
+    test('round-trips, leaving out what it lacks', () {
+      const url = RunnerUrl(url: 'http://a.example', warning: 'Plain http.');
+
+      expect(const RunnerUrl().toJson(), <String, dynamic>{});
+      expect(RunnerUrl.fromJson(url.toJson()), url);
+    });
+
+    test('the request to set it needs the url key, null clears', () {
+      const clear = SetRunnerUrlRequest(url: null);
+
+      expect(clear.toJson(), {'url': null});
+      expect(SetRunnerUrlRequest.fromJson(const {'url': null}), clear);
+      expect(
+        SetRunnerUrlRequest.fromJson(const {'url': 'https://a.example'}).url,
+        'https://a.example',
+      );
+      expect(
+        () => SetRunnerUrlRequest.fromJson(const {}),
+        throwsA(isA<Exception>()),
+      );
+    });
+
+    test('a pairing token carries it when set', () {
+      final token = PairingToken(
+        token: 'xpp_secret',
+        name: 'mac-mini',
+        expiresAt: created,
+        engineUrl: 'https://mac.tailnet.ts.net',
+      );
+
+      expect(token.toJson()['engineUrl'], 'https://mac.tailnet.ts.net');
+      expect(PairingToken.fromJson(token.toJson()), token);
+    });
+  });
+
   group('pairing', () {
     test('the request for a pairing token names the runner', () {
       const request = CreatePairingTokenRequest(name: 'mac-mini');

@@ -201,10 +201,15 @@ class CreatePairingTokenRequest extends Equatable {
 
 /// A pairing token (D-08): single use, valid for 15 minutes. It is shown
 /// once and only its hash is kept.
-@JsonSerializable()
+@JsonSerializable(includeIfNull: false)
 class PairingToken extends Equatable {
   /// Creates a pairing token.
-  const new({required this.token, required this.name, required this.expiresAt});
+  const new({
+    required this.token,
+    required this.name,
+    required this.expiresAt,
+    this.engineUrl,
+  });
 
   /// Reads a pairing token from its JSON form.
   factory PairingToken.fromJson(Map<String, dynamic> json) =>
@@ -219,11 +224,61 @@ class PairingToken extends Equatable {
   /// When it stops working, in UTC.
   final DateTime expiresAt;
 
+  /// The address runners reach the engine at (the runner URL the owner set),
+  /// for the `xp runner pair --engine` command; `null` when none is set.
+  final String? engineUrl;
+
   /// The JSON form.
   Map<String, dynamic> toJson() => _$PairingTokenToJson(this);
 
   @override
-  List<Object?> get props => [token, name, expiresAt];
+  List<Object?> get props => [token, name, expiresAt, engineUrl];
+}
+
+/// The address runners reach the engine at: the body of `GET` and `PUT
+/// /settings/runner-url`.
+@JsonSerializable(includeIfNull: false)
+class RunnerUrl extends Equatable {
+  /// Creates the setting.
+  const new({this.url, this.warning});
+
+  /// Reads the setting from its JSON form.
+  factory RunnerUrl.fromJson(Map<String, dynamic> json) =>
+      _$RunnerUrlFromJson(json);
+
+  /// The absolute `http` or `https` URL, or `null` when none is set.
+  final String? url;
+
+  /// Why the URL may be a bad idea though it was accepted, for example a
+  /// plain `http` URL that leaves this network; one sentence.
+  final String? warning;
+
+  /// The JSON form.
+  Map<String, dynamic> toJson() => _$RunnerUrlToJson(this);
+
+  @override
+  List<Object?> get props => [url, warning];
+}
+
+/// The body of `PUT /settings/runner-url`.
+@JsonSerializable(checked: true)
+class SetRunnerUrlRequest extends Equatable {
+  /// Creates a request; a `null` [url] clears the setting.
+  const new({required this.url});
+
+  /// Reads a request from its JSON form.
+  factory SetRunnerUrlRequest.fromJson(Map<String, dynamic> json) =>
+      _$SetRunnerUrlRequestFromJson(json);
+
+  /// The runner URL, or `null` to clear it. The key must be there.
+  @JsonKey(required: true)
+  final String? url;
+
+  /// The JSON form.
+  Map<String, dynamic> toJson() => _$SetRunnerUrlRequestToJson(this);
+
+  @override
+  List<Object?> get props => [url];
 }
 
 /// The body of `POST /runners/pair`.
