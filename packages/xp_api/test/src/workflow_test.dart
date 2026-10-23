@@ -40,12 +40,59 @@ void main() {
           },
         ],
         'yaml': 'schema: 1',
+        'inputs': <Object?>[],
       });
     });
 
     test('round-trips through JSON', () {
       expect(Workflow.fromJson(workflow.toJson()), workflow);
       expect(WorkflowVersionInfo.fromJson(version.toJson()), version);
+    });
+
+    test('carries its typed inputs', () {
+      final typed = Workflow(
+        id: 'wf_1',
+        projectId: 'prj_1',
+        name: 'n',
+        builtin: false,
+        version: version,
+        versions: [version],
+        yaml: 'schema: 1',
+        inputs: const [
+          WorkflowInput(
+            name: 'track',
+            type: InputType.choice,
+            description: 'Where it goes.',
+            options: ['internal', 'beta'],
+            defaultValue: 'internal',
+          ),
+          WorkflowInput(
+            name: 'release',
+            type: InputType.release,
+            required: true,
+          ),
+          WorkflowInput(name: 'loose'),
+        ],
+      );
+
+      expect(Workflow.fromJson(typed.toJson()), typed);
+      expect(typed.toJson()['inputs'], [
+        {
+          'name': 'track',
+          'type': 'choice',
+          'description': 'Where it goes.',
+          'options': ['internal', 'beta'],
+          'default': 'internal',
+          'required': false,
+        },
+        {'name': 'release', 'type': 'release', 'required': true},
+        {'name': 'loose', 'required': false},
+      ]);
+      expect(Workflow.fromJson(workflow.toJson()..remove('inputs')), workflow);
+      expect(
+        [for (final type in InputType.values) type.wire],
+        ['string', 'boolean', 'choice', 'json', 'release'],
+      );
     });
   });
 

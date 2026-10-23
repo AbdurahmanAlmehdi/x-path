@@ -165,9 +165,12 @@ class _Reader {
       }
       _checkKeys(value, 'input "$name"', const {
         'description',
+        'type',
+        'options',
         'default',
         'required',
       });
+      final (type, options) = _inputType(value);
       final requiredNode = value.nodes['required'];
       var isRequired = false;
       if (requiredNode != null) {
@@ -180,17 +183,61 @@ class _Reader {
       if (isRequired && value.nodes.containsKey('default')) {
         _issueAt(value, 'An input with a default cannot be required.');
       }
-      inputs.add(
-        InputDefinition(
-          name: name,
-          position: _position(key),
-          description: _optionalText(value, 'description'),
-          defaultValue: _plain(value.nodes['default']),
-          required: isRequired,
-        ),
+      final input = InputDefinition(
+        name: name,
+        position: _position(key),
+        type: type,
+        options: options,
+        description: _optionalText(value, 'description'),
+        defaultValue: _plain(value.nodes['default']),
+        required: isRequired,
       );
+      if (value.nodes['default'] case final node?) {
+        if (input.problemOf(input.defaultValue) case final problem?) {
+          _issueAt(node, 'The default of "$name" $problem.');
+        }
+      }
+      inputs.add(input);
     }
     return inputs;
+  }
+
+  /// The `type` of an input and the `options` of a choice (UX-04).
+  (InputType?, List<String>?) _inputType(YamlMap input) {
+    final typeNode = input.nodes['type'];
+    InputType? type;
+    if (typeNode != null) {
+      type = InputType.values
+          .where((candidate) => '${typeNode.value}' == candidate.wire)
+          .firstOrNull;
+      if (type == null || typeNode is! YamlScalar) {
+        _issueAt(
+          typeNode,
+          '"type" is one of '
+          '${InputType.values.map((type) => type.wire).join(', ')}.',
+        );
+        type = null;
+      }
+    }
+    final optionsNode = input.nodes['options'];
+    List<String>? options;
+    if (optionsNode != null) {
+      if (optionsNode is YamlList &&
+          optionsNode.nodes.isNotEmpty &&
+          optionsNode.nodes.every(
+            (option) => option is YamlScalar && option.value is String,
+          )) {
+        options = [for (final option in optionsNode.nodes) '${option.value}'];
+      } else {
+        _issueAt(optionsNode, '"options" is a list of strings.');
+      }
+      if (type != InputType.choice) {
+        _issueAt(optionsNode, '"options" go with "type: choice".');
+      }
+    } else if (type == InputType.choice) {
+      _issueAt(input, 'A choice input needs "options".');
+    }
+    return (type, options);
   }
 
   // ---------------------------------------------------------------- stages

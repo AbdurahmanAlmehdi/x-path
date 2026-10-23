@@ -284,6 +284,12 @@ class WorkflowService {
     version: _info(chosen),
     versions: [for (final version in versions) _info(version)],
     yaml: chosen.yaml,
+    inputs: [
+      for (final input
+          in _parser.parse(chosen.yaml).definition?.inputs ??
+              const <InputDefinition>[])
+        input.toWire(),
+    ],
   );
 
   WorkflowVersionInfo _info(WorkflowVersionRecord version) =>

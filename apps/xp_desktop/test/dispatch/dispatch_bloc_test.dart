@@ -69,6 +69,7 @@ DispatchPreview previewOf(int jobs, {List<String> flavors = const ['prod']}) =>
 
 void main() {
   late MockWorkflowsRepository workflows;
+  late MockReleasesRepository releases;
 
   setUpAll(() {
     registerFallbackValue(mataa);
@@ -78,6 +79,11 @@ void main() {
 
   setUp(() {
     workflows = MockWorkflowsRepository();
+    releases = quietReleases();
+    when(() => workflows.lastInputs(any(), any()))
+        .thenAnswer((_) async => const {});
+    when(() => workflows.rememberInputs(any(), any(), any()))
+        .thenAnswer((_) async {});
     when(() => workflows.listWorkflows('prj_1'))
         .thenAnswer((_) async => [prodSummary, devBuild]);
     when(() => workflows.getWorkflow('prj_1', 'wf_prod'))
@@ -93,7 +99,8 @@ void main() {
     ).thenAnswer((_) async => previewOf(2));
   });
 
-  DispatchBloc build() => DispatchBloc(workflows: workflows, project: mataa);
+  DispatchBloc build() =>
+      DispatchBloc(workflows: workflows, releases: releases, project: mataa);
 
   Future<void> settle() =>
       Future<void>.delayed(const Duration(milliseconds: 5));
@@ -118,7 +125,11 @@ void main() {
         remote: 'r',
         defaultBaseBranch: 'dev',
       );
-      final bloc = DispatchBloc(workflows: workflows, project: empty);
+      final bloc = DispatchBloc(
+        workflows: workflows,
+        releases: releases,
+        project: empty,
+      );
       expect(bloc.state.app, '.');
       expect(bloc.state.copyWith(ref: '  ').request.ref, isNull);
     });
@@ -136,6 +147,8 @@ void main() {
       VersionBump.patch,
     ]);
     expect(const DispatchSubmitted().props, isEmpty);
+    expect(const DispatchInputChanged('a', 1).props, ['a', 1, true]);
+    expect(const DispatchVersionChanged('1.2.3').props, ['1.2.3']);
   });
 
   group('DispatchBloc', () {
@@ -333,6 +346,171 @@ void main() {
       },
       wait: const Duration(milliseconds: 20),
       verify: (_) => verifyNever(() => workflows.dispatch(any(), any(), any())),
+    );
+  });
+
+  group('inputs', () {
+    final typed = Workflow(
+      id: 'wf_typed',
+      projectId: 'prj_1',
+      name: 'typed',
+      builtin: false,
+      version: prodWorkflow.version,
+      versions: prodWorkflow.versions,
+      yaml: bumping,
+      inputs: const [
+        WorkflowInput(name: 'notes', type: InputType.string),
+        WorkflowInput(name: 'ids', type: InputType.json),
+        WorkflowInput(name: 'release', type: InputType.release),
+      ],
+    );
+
+    Release release(String version, int build, ReleaseState state, int day) =>
+        Release(
+          id: 'rel_$build',
+          projectId: 'prj_1',
+          app: '.',
+          flavor: 'prod',
+          version: version,
+          build: build,
+          state: state,
+          stores: const [],
+          builds: const [],
+          mergeEnabled: false,
+          createdAt: DateTime.utc(2026, 10, day),
+          updatedAt: DateTime.utc(2026, 10, day),
+        );
+
+    setUp(() {
+      when(() => workflows.getWorkflow('prj_1', 'wf_typed'))
+          .thenAnswer((_) async => typed);
+      when(() => workflows.lastInputs('prj_1', 'wf_typed'))
+          .thenAnswer((_) async => {'notes': 'Last time', 'unknown': 1});
+      when(() => releases.watchReleases(projectId: 'prj_1')).thenAnswer(
+        (_) => Stream.value(
+          Snapshot([
+            release('5.4.0', 3200, ReleaseState.live, 1),
+            release('5.4.1', 3283, ReleaseState.uploaded, 9),
+            release('5.5.0', 3300, ReleaseState.building, 12),
+          ]),
+        ),
+      );
+      when(() => workflows.dispatch('prj_1', 'wf_typed', any()))
+          .thenAnswer((_) async => runningRun().run);
+    });
+
+    blocTest<DispatchBloc, DispatchState>(
+      'start from the last dispatch, pick the newest release, and send '
+      'what is set with the version typed',
+      build: build,
+      act: (bloc) async {
+        bloc.add(const DispatchWorkflowChanged('wf_typed'));
+        await settle();
+        bloc
+          ..add(const DispatchInputChanged('ids', {'dev': '1'}))
+          ..add(const DispatchVersionChanged(' 5.6.0 '));
+        await settle();
+        bloc.add(const DispatchSubmitted());
+      },
+      wait: const Duration(milliseconds: 20),
+      verify: (bloc) {
+        final state = bloc.state;
+        expect(state.releases?.map((r) => r.build), [3283, 3200]);
+        expect(state.noReleases, isFalse);
+        const sent = DispatchRequest(
+          app: '.',
+          ref: 'main',
+          version: '5.6.0',
+          releaseVersion: '5.4.1+3283',
+          inputs: {
+            'notes': 'Last time',
+            'ids': {'dev': '1'},
+            'release': '5.4.1+3283',
+          },
+        );
+        expect(state.request, sent);
+        verify(() => workflows.dispatch('prj_1', 'wf_typed', sent)).called(1);
+        verify(() => workflows.rememberInputs('prj_1', 'wf_typed', sent.inputs))
+            .called(1);
+      },
+    );
+
+    blocTest<DispatchBloc, DispatchState>(
+      'wait for JSON that parses, and for a release to pick',
+      setUp: () =>
+          when(() => releases.watchReleases(projectId: 'prj_1'))
+              .thenAnswer((_) => Stream.value(const Snapshot(<Release>[]))),
+      build: build,
+      act: (bloc) async {
+        bloc.add(const DispatchWorkflowChanged('wf_typed'));
+        await settle();
+        bloc.add(const DispatchInputChanged('ids', null, valid: false));
+      },
+      wait: const Duration(milliseconds: 20),
+      verify: (bloc) {
+        final state = bloc.state;
+        expect(state.noReleases, isTrue);
+        expect(state.invalidInputs, {'ids'});
+        expect(state.canDispatch, isFalse);
+        expect(state.copyWith(invalidInputs: const {}).invalidInputs, isEmpty);
+      },
+    );
+
+    blocTest<DispatchBloc, DispatchState>(
+      'a JSON input that parses again counts again',
+      build: build,
+      act: (bloc) async {
+        bloc.add(const DispatchWorkflowChanged('wf_typed'));
+        await settle();
+        bloc
+          ..add(const DispatchInputChanged('ids', null, valid: false))
+          ..add(const DispatchInputChanged('ids', [1]));
+      },
+      wait: const Duration(milliseconds: 20),
+      verify: (bloc) {
+        expect(bloc.state.invalidInputs, isEmpty);
+        expect(bloc.state.request.inputs['ids'], [1]);
+      },
+    );
+
+    test('a choice without a default sends the option it shows', () {
+      final state = build().state.copyWith(
+        workflow: Workflow(
+          id: 'wf_choice',
+          projectId: 'prj_1',
+          name: 'choice',
+          builtin: false,
+          version: prodWorkflow.version,
+          versions: prodWorkflow.versions,
+          yaml: bumping,
+          inputs: const [
+            WorkflowInput(
+              name: 'track',
+              type: InputType.choice,
+              options: ['internal', 'beta'],
+            ),
+            WorkflowInput(
+              name: 'kept',
+              type: InputType.choice,
+              options: ['a', 'b'],
+              defaultValue: 'b',
+            ),
+          ],
+        ),
+      );
+
+      expect(state.request.inputs, {'track': 'internal'});
+    });
+
+    blocTest<DispatchBloc, DispatchState>(
+      'a release that does not come is no release yet',
+      setUp: () =>
+          when(() => releases.watchReleases(projectId: 'prj_1'))
+              .thenAnswer((_) => const Stream.empty()),
+      build: build,
+      act: (bloc) => bloc.add(const DispatchWorkflowChanged('wf_typed')),
+      wait: const Duration(milliseconds: 20),
+      verify: (bloc) => expect(bloc.state.noReleases, isTrue),
     );
   });
 }

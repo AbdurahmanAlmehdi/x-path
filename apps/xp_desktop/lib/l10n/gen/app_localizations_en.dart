@@ -1314,6 +1314,30 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get dispatchVersionHint => 'or x.y.z';
+
+  @override
+  String get dispatchInputs => 'Inputs';
+
+  @override
+  String get dispatchYes => 'Yes';
+
+  @override
+  String get dispatchNo => 'No';
+
+  @override
+  String get dispatchJsonInvalid => 'Not valid JSON.';
+
+  @override
+  String get dispatchNoReleases =>
+      'No releases yet: this workflow needs a release that reached a store.';
+
+  @override
+  String dispatchRelease(String version, String flavor) {
+    return '$version · $flavor';
+  }
+
+  @override
   String dispatchWillRun(int jobs, int stages) {
     String _temp0 = intl.Intl.pluralLogic(
       jobs,

@@ -21,6 +21,36 @@ Map<String, dynamic> _$WorkflowVersionInfoToJson(
   'createdAt': instance.createdAt.toIso8601String(),
 };
 
+WorkflowInput _$WorkflowInputFromJson(Map<String, dynamic> json) =>
+    WorkflowInput(
+      name: json['name'] as String,
+      type: $enumDecodeNullable(_$InputTypeEnumMap, json['type']),
+      description: json['description'] as String?,
+      options: (json['options'] as List<dynamic>?)
+          ?.map((e) => e as String)
+          .toList(),
+      defaultValue: json['default'],
+      required: json['required'] as bool? ?? false,
+    );
+
+Map<String, dynamic> _$WorkflowInputToJson(WorkflowInput instance) =>
+    <String, dynamic>{
+      'name': instance.name,
+      'type': ?_$InputTypeEnumMap[instance.type],
+      'description': ?instance.description,
+      'options': ?instance.options,
+      'default': ?instance.defaultValue,
+      'required': instance.required,
+    };
+
+const _$InputTypeEnumMap = {
+  InputType.string: 'string',
+  InputType.boolean: 'boolean',
+  InputType.choice: 'choice',
+  InputType.json: 'json',
+  InputType.release: 'release',
+};
+
 Workflow _$WorkflowFromJson(Map<String, dynamic> json) => Workflow(
   id: json['id'] as String,
   projectId: json['projectId'] as String,
@@ -33,6 +63,11 @@ Workflow _$WorkflowFromJson(Map<String, dynamic> json) => Workflow(
       .map((e) => WorkflowVersionInfo.fromJson(e as Map<String, dynamic>))
       .toList(),
   yaml: json['yaml'] as String,
+  inputs:
+      (json['inputs'] as List<dynamic>?)
+          ?.map((e) => WorkflowInput.fromJson(e as Map<String, dynamic>))
+          .toList() ??
+      const [],
 );
 
 Map<String, dynamic> _$WorkflowToJson(Workflow instance) => <String, dynamic>{
@@ -43,6 +78,7 @@ Map<String, dynamic> _$WorkflowToJson(Workflow instance) => <String, dynamic>{
   'version': instance.version.toJson(),
   'versions': instance.versions.map((e) => e.toJson()).toList(),
   'yaml': instance.yaml,
+  'inputs': instance.inputs.map((e) => e.toJson()).toList(),
 };
 
 WorkflowSummary _$WorkflowSummaryFromJson(Map<String, dynamic> json) =>

@@ -1,4 +1,5 @@
 import 'package:test/test.dart';
+import 'package:xp_api/xp_api.dart';
 import 'package:xp_engine/xp_engine.dart';
 
 const _catalog = MapStepCatalog({
@@ -250,6 +251,11 @@ stages:
     String document(String inputs) =>
         'schema: 1\ninputs:\n$inputs\nstages: []\n';
 
+    /// [inputs] in a workflow that is valid otherwise.
+    String typed(String inputs) =>
+        'schema: 1\ninputs:\n$inputs\nstages:\n  - name: s\n    jobs:\n'
+        '      j:\n        steps:\n          - kind: version.bump\n';
+
     test('are a mapping', () {
       expect(issues(document('  - a')).first, startsWith('3:3 "inputs" is a'));
     });
@@ -273,8 +279,83 @@ stages:
       expect(
         issues(document('  a: {color: red}')).first,
         '3:7 Unknown key "color" in input "a". Allowed: default, '
-        'description, required.',
+        'description, options, required, type.',
       );
+    });
+
+    test('have a type and, for a choice, options (UX-04)', () {
+      final inputs = parser
+          .parse(
+            typed(
+              '  track: {type: choice, options: [internal, beta], '
+              'default: beta}\n'
+              '  release: {type: release}\n'
+              '  flag: {type: boolean, default: false}\n'
+              '  ids: {type: json, default: {dev: 1}}\n'
+              '  notes: {type: string, default: ""}\n'
+              '  bare:',
+            ),
+          )
+          .definition!
+          .inputs;
+
+      expect(inputs.map((input) => input.type), [
+        InputType.choice,
+        InputType.release,
+        InputType.boolean,
+        InputType.json,
+        InputType.string,
+        null,
+      ]);
+      expect(inputs.first.options, ['internal', 'beta']);
+      expect(inputs.first.toWire().options, ['internal', 'beta']);
+      expect(inputs.last.toWire(), const WorkflowInput(name: 'bare'));
+    });
+
+    test('name a type the engine knows, and options that fit it', () {
+      expect(
+        issues(typed('  a: {type: number}')).first,
+        '3:13 "type" is one of string, boolean, choice, json, release.',
+      );
+      expect(
+        issues(typed('  a: {type: [string]}')).first,
+        startsWith('3:13 "type" is one of'),
+      );
+      expect(
+        issues(typed('  a: {type: choice}')).first,
+        '3:6 A choice input needs "options".',
+      );
+      expect(
+        issues(typed('  a: {type: choice, options: []}')).first,
+        '3:30 "options" is a list of strings.',
+      );
+      expect(
+        issues(typed('  a: {type: choice, options: [1]}')).first,
+        '3:30 "options" is a list of strings.',
+      );
+      expect(
+        issues(typed('  a: {type: string, options: [x]}')).first,
+        '3:30 "options" go with "type: choice".',
+      );
+    });
+
+    test('have a default of their type', () {
+      for (final (input, message) in [
+        ('{type: boolean, default: yes}', 'must be true or false'),
+        ('{type: string, default: 3}', 'must be text'),
+        ('{type: choice, options: [a], default: b}', 'must be one of a'),
+        ('{type: release, default: 1.2.3}', 'must be a release, x.y.z+build'),
+        ('{type: release, default: latest}', 'must be a release'),
+        ('{type: release, default: 3}', 'must be a release'),
+      ]) {
+        expect(
+          issues(typed('  a: $input')).single,
+          contains('The default of "a" $message'),
+          reason: input,
+        );
+      }
+      expect(issues(typed('  a: {type: release, default: 1.2.3+4}')), isEmpty);
+      expect(issues(typed('  a: {type: json, default: [1]}')), isEmpty);
     });
 
     test('are required with true or false, and without a default', () {

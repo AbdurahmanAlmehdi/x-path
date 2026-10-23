@@ -182,6 +182,24 @@ void main() {
       );
     });
 
+    test('GET one carries its typed inputs (UX-04)', () async {
+      final id = await client.builtin('shorebird-patch');
+      final path = '${client.base}/$id';
+
+      final response = await client.send('GET', path);
+
+      expectContract(response, path: path, status: 200);
+      final inputs = response.json['inputs']! as List<Object?>;
+      expect(inputs.first, {
+        'name': 'releaseVersion',
+        'type': 'release',
+        'description':
+            'The release the patch applies to, for example 5.4.1+3283. The '
+            "dispatch's releaseVersion when it gives none.",
+        'required': false,
+      });
+    });
+
     test('PUT 200, 404, 409 and 422', () async {
       final id = await client.create('mine', echoWorkflow);
       final builtin = await client.builtin('test');

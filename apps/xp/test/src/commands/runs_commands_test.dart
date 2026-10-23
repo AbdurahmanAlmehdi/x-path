@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:mocktail/mocktail.dart';
 import 'package:test/test.dart';
@@ -23,6 +24,8 @@ void main() {
 
   group('dispatch', () {
     setUp(() {
+      when(() => env.client.getWorkflow('prj_1', 'wf_1'))
+          .thenAnswer((_) async => sample.workflow);
       when(() => env.client.dispatchWorkflow('prj_1', 'wf_1', any()))
           .thenAnswer(
             (_) async =>
@@ -94,6 +97,153 @@ void main() {
           },
         ),
       );
+    });
+
+    group('with typed inputs (UX-04)', () {
+      setUp(() {
+        when(() => env.client.getWorkflow('prj_1', 'wf_1')).thenAnswer(
+          (_) async => Workflow(
+            id: 'wf_1',
+            projectId: 'prj_1',
+            name: 'dev-build',
+            builtin: false,
+            version: sample.workflowVersion,
+            versions: [sample.workflowVersion],
+            yaml: 'name: dev-build\n',
+            inputs: const [
+              WorkflowInput(name: 'notes', type: InputType.string),
+              WorkflowInput(name: 'ids', type: InputType.json),
+              WorkflowInput(name: 'flag', type: InputType.boolean),
+              WorkflowInput(
+                name: 'track',
+                type: InputType.choice,
+                options: ['internal', 'beta'],
+              ),
+              WorkflowInput(
+                name: 'release',
+                type: InputType.release,
+                description: 'The release.',
+                required: true,
+              ),
+            ],
+          ),
+        );
+      });
+
+      test('reads each input as its type', () async {
+        await env.runOk([
+          'dispatch',
+          'prj_1',
+          'wf_1',
+          '--input',
+          'notes=true',
+          '--input',
+          'ids={"dev": 1}',
+          '--input',
+          'flag=TRUE',
+          '--input',
+          'track=beta',
+          '--input',
+          'release=1.2.0+3',
+        ]);
+
+        expect(sent().inputs, {
+          'notes': 'true',
+          'ids': {'dev': 1},
+          'flag': true,
+          'track': 'beta',
+          'release': '1.2.0+3',
+        });
+      });
+
+      test('refuses a value that is not its type', () async {
+        expect(
+          await env.run(['dispatch', 'prj_1', 'wf_1', '--input', 'flag=yes']),
+          64,
+        );
+        expect(
+          env.logger.errors.first,
+          'The input "flag" is true or false, not "yes".',
+        );
+        expect(
+          await env.run(['dispatch', 'prj_1', 'wf_1', '--input', 'ids={']),
+          64,
+        );
+        verifyNever(() => env.client.dispatchWorkflow(any(), any(), any()));
+      });
+
+      test('asks for a required input on a terminal', () async {
+        env.prompt
+          ..interactive = true
+          ..answers.add('1.2.0+3');
+
+        await env.runOk(['dispatch', 'prj_1', 'wf_1']);
+
+        expect(env.prompt.questions, ['release — The release.']);
+        expect(sent().inputs, {'release': '1.2.0+3'});
+      });
+
+      test('reads an input file, under what --input gives', () async {
+        final file = File('${env.directory.path}/inputs.yaml')
+          ..writeAsStringSync(
+            'notes: From the file\nids:\n  dev: [1, 2]\nrelease: 1.2.0+3\n',
+          );
+
+        await env.runOk([
+          'dispatch',
+          'prj_1',
+          'wf_1',
+          '--input-file',
+          file.path,
+          '--input',
+          'notes=From the flag',
+        ]);
+
+        expect(sent().inputs, {
+          'notes': 'From the flag',
+          'ids': {
+            'dev': [1, 2],
+          },
+          'release': '1.2.0+3',
+        });
+      });
+
+      test('says what is wrong with an input file', () async {
+        final directory = env.directory.path;
+        File('$directory/list.json').writeAsStringSync('[1]');
+        File('$directory/broken.yaml').writeAsStringSync('a: [');
+
+        expect(
+          await env.run([
+            'dispatch',
+            'prj_1',
+            'wf_1',
+            '--input-file',
+            '$directory/none.yaml',
+          ]),
+          66,
+        );
+        expect(
+          await env.run([
+            'dispatch',
+            'prj_1',
+            'wf_1',
+            '--input-file',
+            '$directory/list.json',
+          ]),
+          64,
+        );
+        expect(
+          await env.run([
+            'dispatch',
+            'prj_1',
+            'wf_1',
+            '--input-file',
+            '$directory/broken.yaml',
+          ]),
+          64,
+        );
+      });
     });
 
     test('refuses an input without a key', () async {

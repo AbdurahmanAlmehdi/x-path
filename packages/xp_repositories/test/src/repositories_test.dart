@@ -640,6 +640,17 @@ void main() {
 
     setUp(() => repository = WorkflowsRepository(harness.session));
 
+    test('remembers the last inputs of a workflow in the cache', () async {
+      expect(await repository.lastInputs('prj_1', 'wf_1'), isEmpty);
+
+      await repository.rememberInputs('prj_1', 'wf_1', {'notes': 'Hi'});
+
+      expect(await repository.lastInputs('prj_1', 'wf_1'), {'notes': 'Hi'});
+      expect(await repository.lastInputs('prj_1', 'wf_2'), isEmpty);
+      await harness.cache.write('dispatch-inputs.prj_1.wf_3', 'not a map');
+      expect(await repository.lastInputs('prj_1', 'wf_3'), isEmpty);
+    });
+
     test('lists and reads workflows', () async {
       final client = harness.client;
       final summary = WorkflowSummary(

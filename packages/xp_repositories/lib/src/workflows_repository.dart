@@ -85,6 +85,27 @@ class WorkflowsRepository {
     ),
   );
 
+  /// The inputs the last dispatch of [workflowId] in [projectId] from this
+  /// app gave, kept with the engine's offline cache; empty before the first.
+  Future<Map<String, Object?>> lastInputs(
+    String projectId,
+    String workflowId,
+  ) async =>
+      switch (await _session.cache.read(_inputsKey(projectId, workflowId))) {
+        final Map<String, Object?> inputs => inputs,
+        _ => const {},
+      };
+
+  /// Keeps [inputs] as the last inputs of [workflowId] in [projectId].
+  Future<void> rememberInputs(
+    String projectId,
+    String workflowId,
+    Map<String, Object?> inputs,
+  ) => _session.cache.write(_inputsKey(projectId, workflowId), inputs);
+
+  static String _inputsKey(String projectId, String workflowId) =>
+      'dispatch-inputs.$projectId.$workflowId';
+
   /// Dispatches [workflowId] of [projectId] with [request].
   Future<Run> dispatch(
     String projectId,

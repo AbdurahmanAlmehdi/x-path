@@ -3139,6 +3139,40 @@ components:
         yaml:
           type: string
           description: The workflow document of `version`.
+        inputs:
+          type: array
+          description: |
+            The inputs `yaml` declares, as the engine reads them; empty when
+            it declares none or no longer reads as a workflow.
+          items:
+            $ref: "#/components/schemas/WorkflowInput"
+    InputType:
+      type: string
+      description: |
+        What an input takes (UX-04): text, true or false, one of `options`,
+        any JSON value, or a release `x.y.z+build` of the project (the
+        dispatch's `releaseVersion` when it gives none).
+      enum: [string, boolean, choice, json, release]
+    WorkflowInput:
+      type: object
+      required: [name, required]
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+        type:
+          $ref: "#/components/schemas/InputType"
+        description:
+          type: string
+        options:
+          type: array
+          description: The values a `choice` input may take.
+          items:
+            type: string
+        default:
+          description: The value when a dispatch gives none.
+        required:
+          type: boolean
     WorkflowSummary:
       type: object
       required: [id, projectId, name, builtin, version]

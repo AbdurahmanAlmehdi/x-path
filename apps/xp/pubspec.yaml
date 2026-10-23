@@ -24,6 +24,7 @@ dependencies:
   xp_client: any
   xp_engine: any
   xp_secrets: any
+  yaml: ^3.1.4
 
 dev_dependencies:
   mocktail: ^1.0.5

@@ -5,6 +5,7 @@ import 'package:mocktail/mocktail.dart';
 import 'package:xp_api/xp_api.dart';
 import 'package:xp_client/xp_client.dart';
 import 'package:xp_desktop/dispatch/dispatch.dart';
+import 'package:xp_desktop/widgets/widgets.dart';
 import 'package:xp_repositories/xp_repositories.dart';
 
 import '../helpers/fakes.dart';
@@ -191,6 +192,229 @@ void main() {
       await tester.tap(find.text('Dispatch 4 jobs'));
       await commandReturn(tester);
       verifyNever(() => harness.workflows.dispatch(any(), any(), any()));
+    });
+  });
+
+  group('inputs (UX-04)', () {
+    Workflow typed(List<WorkflowInput> inputs) => Workflow(
+      id: 'wf_prod',
+      projectId: 'prj_1',
+      name: 'shorebird-patch',
+      builtin: true,
+      version: prodWorkflow.version,
+      versions: prodWorkflow.versions,
+      yaml: 'stages: []',
+      inputs: inputs,
+    );
+
+    Release release(String version, int build, int day) => Release(
+      id: 'rel_$build',
+      projectId: 'prj_1',
+      app: '.',
+      flavor: 'prod',
+      version: version,
+      build: build,
+      state: ReleaseState.live,
+      stores: const [],
+      builds: const [],
+      mergeEnabled: false,
+      createdAt: DateTime.utc(2026, 10, day),
+      updatedAt: DateTime.utc(2026, 10, day),
+    );
+
+    MockReleasesRepository releasesOf(List<Release> releases) {
+      final repository = MockReleasesRepository();
+      when(() => repository.watchReleases(projectId: any(named: 'projectId')))
+          .thenAnswer((_) => Stream.value(Snapshot(releases)));
+      return repository;
+    }
+
+    Finder text(String input) => find.descendant(
+      of: find.byKey(Key('dispatch.input.$input')),
+      matching: find.byType(TextField),
+    );
+
+    testWidgets('a patch dispatches after picking a release', (tester) async {
+      final harness = DispatchHarness();
+      when(() => harness.workflows.getWorkflow(any(), any())).thenAnswer(
+        (_) async => typed(const [
+          WorkflowInput(
+            name: 'releaseVersion',
+            type: InputType.release,
+            description: 'The release the patch applies to.',
+          ),
+          WorkflowInput(
+            name: 'allowNativeDiffs',
+            type: InputType.boolean,
+            defaultValue: false,
+          ),
+          WorkflowInput(
+            name: 'track',
+            type: InputType.choice,
+            options: ['internal', 'beta'],
+            required: true,
+          ),
+        ]),
+      );
+      when(() => harness.workflows.dispatch('prj_1', 'wf_prod', any()))
+          .thenAnswer((_) async => runningRun().run);
+      await harness.open(
+        tester,
+        releases: releasesOf([
+          release('5.4.0', 3200, 1),
+          release('5.4.1', 3283, 9),
+        ]),
+      );
+
+      expect(find.text('INPUTS'), findsOneWidget);
+      expect(find.text('The release the patch applies to.'), findsOneWidget);
+      expect(find.text('5.4.1 (3283) · prod'), findsOneWidget);
+      await tester.tap(find.text('5.4.1 (3283) · prod'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('5.4.0 (3200) · prod').last);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Yes'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('internal'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('beta').last);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Dispatch 4 jobs'));
+      await tester.pumpAndSettle();
+
+      final request =
+          verify(
+                () => harness.workflows.dispatch(
+                  'prj_1',
+                  'wf_prod',
+                  captureAny(),
+                ),
+              ).captured.single
+              as DispatchRequest;
+      expect(request.releaseVersion, '5.4.0+3200');
+      expect(request.inputs, {
+        'releaseVersion': '5.4.0+3200',
+        'allowNativeDiffs': true,
+        'track': 'beta',
+      });
+    });
+
+    testWidgets('a release input waits for a release', (tester) async {
+      final harness = DispatchHarness();
+      when(() => harness.workflows.getWorkflow(any(), any())).thenAnswer(
+        (_) async => typed(const [
+          WorkflowInput(name: 'releaseVersion', type: InputType.release),
+        ]),
+      );
+      await harness.open(tester, releases: releasesOf(const []));
+
+      expect(
+        find.text(
+          'No releases yet: this workflow needs a release that reached a '
+          'store.',
+        ),
+        findsOneWidget,
+      );
+      final button = tester.widget<XpButton>(
+        find.widgetWithText(XpButton, 'Dispatch 4 jobs'),
+      );
+      expect(button.onPressed, isNull);
+    });
+
+    testWidgets('a dev build uploads to a Firebase app id typed in the sheet', (
+      tester,
+    ) async {
+      final harness = DispatchHarness();
+      when(() => harness.workflows.getWorkflow(any(), any())).thenAnswer(
+        (_) async => typed(const [
+          WorkflowInput(name: 'firebaseAppIds', type: InputType.json),
+          WorkflowInput(
+            name: 'notes',
+            type: InputType.string,
+            defaultValue: 'Default notes',
+          ),
+          WorkflowInput(name: 'loose'),
+        ]),
+      );
+      when(() => harness.workflows.dispatch('prj_1', 'wf_prod', any()))
+          .thenAnswer((_) async => runningRun().run);
+      await harness.open(tester);
+
+      expect(
+        tester.widget<TextField>(text('notes')).controller!.text,
+        'Default notes',
+      );
+      await tester.enterText(text('firebaseAppIds'), '{"dev": ');
+      await tester.pumpAndSettle();
+      expect(find.text('Not valid JSON.'), findsOneWidget);
+      expect(
+        tester
+            .widget<XpButton>(find.widgetWithText(XpButton, 'Dispatch 4 jobs'))
+            .onPressed,
+        isNull,
+      );
+      await tester.enterText(
+        text('firebaseAppIds'),
+        '{"dev": {"android": "1:1:android:a"}}',
+      );
+      await tester.enterText(text('loose'), 'true');
+      await tester.enterText(text('notes'), '');
+      await tester.pumpAndSettle();
+      expect(find.text('Not valid JSON.'), findsNothing);
+      await tester.enterText(text('firebaseAppIds'), ' ');
+      await tester.enterText(
+        text('firebaseAppIds'),
+        '{"dev": {"android": "1:1:android:a"}}',
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Dispatch 4 jobs'));
+      await tester.pumpAndSettle();
+
+      final request =
+          verify(
+                () => harness.workflows.dispatch(
+                  'prj_1',
+                  'wf_prod',
+                  captureAny(),
+                ),
+              ).captured.single
+              as DispatchRequest;
+      expect(request.inputs, {
+        'firebaseAppIds': {
+          'dev': {'android': '1:1:android:a'},
+        },
+        'loose': 'true',
+      });
+    });
+
+    testWidgets('types a version instead of a bump', (tester) async {
+      final harness = DispatchHarness();
+      when(() => harness.workflows.dispatch('prj_1', 'wf_prod', any()))
+          .thenAnswer((_) async => runningRun().run);
+      await harness.open(tester);
+
+      await tester.enterText(
+        find.descendant(
+          of: find.byKey(const Key('dispatch.version')),
+          matching: find.byType(TextField),
+        ),
+        '6.0.0',
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Dispatch 4 jobs'));
+      await tester.pumpAndSettle();
+
+      final request =
+          verify(
+                () => harness.workflows.dispatch(
+                  'prj_1',
+                  'wf_prod',
+                  captureAny(),
+                ),
+              ).captured.single
+              as DispatchRequest;
+      expect(request.version, '6.0.0');
+      expect(request.bump, isNull);
     });
   });
 }

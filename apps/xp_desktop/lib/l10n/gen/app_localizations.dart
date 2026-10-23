@@ -2236,6 +2236,48 @@ abstract class AppLocalizations {
   /// **'from {version} in the pubspec at the last scan'**
   String dispatchFromPubspec(String version);
 
+  /// Placeholder of the explicit version field next to the bump.
+  ///
+  /// In en, this message translates to:
+  /// **'or x.y.z'**
+  String get dispatchVersionHint;
+
+  /// Section of the dispatch sheet: the inputs the workflow declares.
+  ///
+  /// In en, this message translates to:
+  /// **'Inputs'**
+  String get dispatchInputs;
+
+  /// A boolean input set to true.
+  ///
+  /// In en, this message translates to:
+  /// **'Yes'**
+  String get dispatchYes;
+
+  /// A boolean input set to false.
+  ///
+  /// In en, this message translates to:
+  /// **'No'**
+  String get dispatchNo;
+
+  /// Under a JSON input whose text does not parse.
+  ///
+  /// In en, this message translates to:
+  /// **'Not valid JSON.'**
+  String get dispatchJsonInvalid;
+
+  /// A release input when the project has no release to pick; Dispatch waits.
+  ///
+  /// In en, this message translates to:
+  /// **'No releases yet: this workflow needs a release that reached a store.'**
+  String get dispatchNoReleases;
+
+  /// A release in the release picker.
+  ///
+  /// In en, this message translates to:
+  /// **'{version} · {flavor}'**
+  String dispatchRelease(String version, String flavor);
+
   /// Label over the preview.
   ///
   /// In en, this message translates to:

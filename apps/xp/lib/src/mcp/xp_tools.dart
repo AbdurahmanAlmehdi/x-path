@@ -259,7 +259,12 @@ List<McpTool> buildXpTools(
         'releaseVersion': text('The release x.y.z+build a patch applies to.'),
         'inputs': {
           'type': 'object',
-          'description': 'The inputs the workflow declares.',
+          'description':
+              'The inputs the workflow declares, by name. get_workflow lists '
+              'them with their type: string (text), boolean (true or false), '
+              'choice (one of its options), json (any JSON value) or release '
+              '(x.y.z+build; the releaseVersion when it gives none). An input '
+              'without a type takes any value.',
         },
       },
       (args) async {

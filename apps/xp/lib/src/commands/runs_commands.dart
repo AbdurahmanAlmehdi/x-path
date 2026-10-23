@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:xp/src/commands/xp_command.dart';
 import 'package:xp/src/context.dart';
@@ -9,6 +10,7 @@ import 'package:xp/src/resolve.dart';
 import 'package:xp/src/run_approvals.dart';
 import 'package:xp_api/xp_api.dart';
 import 'package:xp_client/xp_client.dart';
+import 'package:yaml/yaml.dart';
 
 /// `xp dispatch <project> <workflow>`: runs a workflow.
 class DispatchCommand extends XpCommand {
@@ -36,10 +38,18 @@ class DispatchCommand extends XpCommand {
       ..addMultiOption(
         'input',
         help:
-            'An input of the workflow, key=value. The value is JSON if it '
-            'parses as JSON, else text. Repeatable.',
+            'An input of the workflow, key=value, read as its declared type '
+            '(text, true or false, JSON, ...); an input without a type is '
+            'JSON if it parses as JSON, else text. Repeatable.',
         valueHelp: 'key=value',
         splitCommas: false,
+      )
+      ..addOption(
+        'input-file',
+        help:
+            'A YAML or JSON file of inputs, name: value. --input wins over '
+            'it.',
+        valueHelp: 'file',
       );
   }
 
@@ -59,13 +69,45 @@ class DispatchCommand extends XpCommand {
       'workflow',
     ]);
     final results = argResults!;
-    final inputs = <String, dynamic>{};
+    final given = <String, String>{};
     for (final input in results.multiOption('input')) {
       final split = input.indexOf('=');
       if (split < 1) usageException('--input must be key=value, not "$input".');
-      inputs[input.substring(0, split)] = _parseInput(
-        input.substring(split + 1),
-      );
+      given[input.substring(0, split)] = input.substring(split + 1);
+    }
+    final file = results.option('input-file');
+    final fromFile = file == null
+        ? const <String, Object?>{}
+        : _readInputs(file);
+    final projectId = await resolveProject(client, projectReference);
+    final workflowId = await resolveWorkflow(
+      client,
+      projectId,
+      workflowReference,
+    );
+    final declared = {
+      for (final input in (await client.getWorkflow(
+        projectId,
+        workflowId,
+      )).inputs)
+        input.name: input,
+    };
+    final inputs = <String, dynamic>{
+      ...fromFile,
+      for (final MapEntry(key: name, value: text) in given.entries)
+        name: _coerce(name, declared[name], text),
+    };
+    final prompt = context.secretPrompt;
+    for (final input in declared.values) {
+      if (input.required &&
+          !inputs.containsKey(input.name) &&
+          prompt.interactive) {
+        final answer = prompt.ask(
+          [input.name, ?input.description].join(' — '),
+          secret: false,
+        );
+        inputs[input.name] = _coerce(input.name, input, answer);
+      }
     }
     final bump = results.option('bump');
     final flavors = results.multiOption('flavor');
@@ -82,24 +124,78 @@ class DispatchCommand extends XpCommand {
       releaseVersion: results.option('release-version'),
       inputs: inputs,
     );
-    final projectId = await resolveProject(client, projectReference);
-    final run = await client.dispatchWorkflow(
-      projectId,
-      await resolveWorkflow(client, projectId, workflowReference),
-      request,
-    );
+    final run = await client.dispatchWorkflow(projectId, workflowId, request);
     emit(run.toJson(), () => 'Dispatched ${run.id}.\n\n${describeRun(run)}');
     return XpExit.ok;
   }
-}
 
-dynamic _parseInput(String text) {
-  try {
-    return jsonDecode(text);
-  } on FormatException {
-    return text;
+  /// The value [text] gives the input [name], read as its declared [input]
+  /// type (UX-04): text stays text, a boolean is true or false, JSON is
+  /// decoded. An input without a type, or one the workflow does not declare
+  /// (the engine refuses it), is JSON if it parses as JSON, else text.
+  Object? _coerce(String name, WorkflowInput? input, String text) {
+    switch (input?.type) {
+      case InputType.string || InputType.choice || InputType.release:
+        return text;
+      case InputType.boolean:
+        return switch (text.toLowerCase()) {
+          'true' => true,
+          'false' => false,
+          _ => usageException(
+            'The input "$name" is true or false, not "$text".',
+          ),
+        };
+      case InputType.json:
+        try {
+          return jsonDecode(text);
+        } on FormatException {
+          usageException('The input "$name" must be JSON: $text');
+        }
+      case null:
+        try {
+          return jsonDecode(text);
+        } on FormatException {
+          return text;
+        }
+    }
+  }
+
+  /// The inputs of an `--input-file`: a YAML (or JSON, which is YAML) mapping
+  /// from a name to its value.
+  Map<String, Object?> _readInputs(String path) {
+    final String text;
+    try {
+      text = File(path).readAsStringSync();
+    } on FileSystemException catch (error) {
+      throw ReferenceException(
+        'Cannot read "$path": ${error.osError?.message ?? error.message}.',
+        notFound: true,
+      );
+    }
+    final Object? document;
+    try {
+      document = loadYaml(text);
+    } on YamlException catch (error) {
+      usageException('$path is not YAML or JSON: ${error.message}');
+    }
+    if (document is! Map) {
+      usageException('$path must be a mapping of input names to values.');
+    }
+    return {
+      for (final MapEntry(:key, :value) in document.entries)
+        '$key': _plain(value),
+    };
   }
 }
+
+/// [value] of a YAML document as plain lists, maps and scalars.
+Object? _plain(Object? value) => switch (value) {
+  final Map<Object?, Object?> map => {
+    for (final MapEntry(:key, :value) in map.entries) '$key': _plain(value),
+  },
+  final List<Object?> list => [for (final item in list) _plain(item)],
+  _ => value,
+};
 
 /// The lines `xp runs show` prints.
 String describeRun(Run run, {List<Approval> approvals = const []}) {

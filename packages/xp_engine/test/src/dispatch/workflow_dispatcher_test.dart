@@ -805,6 +805,44 @@ stages:
       );
     });
 
+    test('takes the release from its release input (UX-04)', () async {
+      final run = await harness.dispatchBuiltin(
+        'shorebird-patch',
+        const DispatchRequest(
+          platforms: ['android'],
+          inputs: {'releaseVersion': '1.2.0+30'},
+        ),
+      );
+
+      final jobs = await harness.jobsOf(run);
+      expect(
+        (await harness.input(jobs[1], 'shorebird.patch'))['version'],
+        '1.2.0+30',
+      );
+    });
+
+    test('refuses an input of the wrong type', () async {
+      await expectLater(
+        harness.dispatchBuiltin(
+          'shorebird-patch',
+          const DispatchRequest(
+            releaseVersion: '1.2.0+30',
+            inputs: {'allowNativeDiffs': 'true'},
+          ),
+        ),
+        _dispatchError('The input "allowNativeDiffs" must be true or false.'),
+      );
+      await expectLater(
+        harness.dispatchBuiltin(
+          'shorebird-patch',
+          const DispatchRequest(inputs: {'releaseVersion': '1.2.0'}),
+        ),
+        _dispatchError(
+          'The input "releaseVersion" must be a release, x.y.z+build.',
+        ),
+      );
+    });
+
     test('has nothing to run when no flavor has Shorebird', () async {
       final app = AppProfile(
         name: 'demo',

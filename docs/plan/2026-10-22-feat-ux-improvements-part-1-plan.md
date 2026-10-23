@@ -213,7 +213,7 @@ Details:
 
 ### Phase U2b: Typed inputs and the dispatch form
 
-- **Status:** Not started
+- **Status:** Done
 - **Scope:** Workflow inputs have types, and the dispatch sheet, CLI and MCP collect them.
 - **Files touched:** `packages/xp_engine/lib/src/workflows/**`,
   `packages/xp_api/lib/src/workflow.dart`, `packages/xp_api/openapi.yaml`,

@@ -15,7 +15,7 @@ server tells the agent so when it connects.
 | `list_projects` | none | Every project with its apps, flavors and the findings of the last scan. |
 | `get_project` | **`project`** | One project with its profile and findings. |
 | `list_workflows` | **`project`** | The built-in workflows and the project's own. |
-| `get_workflow` | **`project`**, **`workflow`**, `version` (integer; newest by default) | The workflow with its YAML and versions. |
+| `get_workflow` | **`project`**, **`workflow`**, `version` (integer; newest by default) | The workflow with its YAML, versions and `inputs`: each with its `type` (`string`, `boolean`, `choice` with `options`, `json`, `release`, or none for any value), `default` and `required`. |
 | `get_run` | **`run`** (`run_...`) | `{run, pendingApprovals, note?}`: the run with its jobs, and the approvals it waits for. |
 | `get_job` | **`job`** (`job_...`) | The job with its steps and their results. |
 | `get_job_log_tail` | **`job`**, `lines` (100 by default) | `{lines, jobEnded, jobState?}`: the last lines, masked. |

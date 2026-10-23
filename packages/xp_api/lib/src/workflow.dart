@@ -33,6 +33,82 @@ class WorkflowVersionInfo extends Equatable {
   List<Object?> get props => [id, version, createdAt];
 }
 
+/// What kind of value an input of a workflow takes (UX-04).
+@JsonEnum(valueField: 'wire')
+enum InputType {
+  /// Text, sent as it is typed.
+  string('string'),
+
+  /// `true` or `false`.
+  boolean('boolean'),
+
+  /// One of the input's `options`.
+  choice('choice'),
+
+  /// Any JSON value: a list, a map, a number.
+  json('json'),
+
+  /// A release of the project, `x.y.z+build`; the dispatch's
+  /// `releaseVersion` when it gives none.
+  release('release');
+
+  new(this.wire);
+
+  /// The name in a workflow document and on the wire.
+  final String wire;
+}
+
+/// An input a workflow declares: what a dispatch can set as `inputs.<name>`.
+@JsonSerializable(includeIfNull: false)
+class WorkflowInput extends Equatable {
+  /// Creates the description.
+  const new({
+    required this.name,
+    this.type,
+    this.description,
+    this.options,
+    this.defaultValue,
+    this.required = false,
+  });
+
+  /// Reads an input from its JSON form.
+  factory WorkflowInput.fromJson(Map<String, dynamic> json) =>
+      _$WorkflowInputFromJson(json);
+
+  /// The name under `inputs`.
+  final String name;
+
+  /// What it takes; `null` for an input without a type, which takes any
+  /// value (a client sends text, or JSON when the text parses as JSON).
+  final InputType? type;
+
+  /// What it is for.
+  final String? description;
+
+  /// The values a [InputType.choice] input may take.
+  final List<String>? options;
+
+  /// The value when a dispatch gives none.
+  @JsonKey(name: 'default')
+  final Object? defaultValue;
+
+  /// Whether a dispatch without it is refused.
+  final bool required;
+
+  /// The JSON form.
+  Map<String, dynamic> toJson() => _$WorkflowInputToJson(this);
+
+  @override
+  List<Object?> get props => [
+    name,
+    type,
+    description,
+    options,
+    defaultValue,
+    required,
+  ];
+}
+
 /// A workflow of a project, with the YAML of one of its versions.
 @JsonSerializable(explicitToJson: true, includeIfNull: false)
 class Workflow extends Equatable {
@@ -45,6 +121,7 @@ class Workflow extends Equatable {
     required this.version,
     required this.versions,
     required this.yaml,
+    this.inputs = const [],
   });
 
   /// Reads a workflow from its JSON form.
@@ -73,6 +150,10 @@ class Workflow extends Equatable {
   /// The YAML document of [version].
   final String yaml;
 
+  /// The inputs [yaml] declares, as the engine reads them; empty when it
+  /// declares none or no longer reads as a workflow.
+  final List<WorkflowInput> inputs;
+
   /// The JSON form.
   Map<String, dynamic> toJson() => _$WorkflowToJson(this);
 
@@ -85,6 +166,7 @@ class Workflow extends Equatable {
     version,
     versions,
     yaml,
+    inputs,
   ];
 }
 

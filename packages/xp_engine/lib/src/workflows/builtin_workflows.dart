@@ -29,25 +29,31 @@ description: >-
   Distribution, iOS to TestFlight.
 inputs:
   firebaseAppIds:
+    type: json
     description: >-
       Firebase app ids by flavor and platform, for example
       {dev: {android: "1:123456789012:android:abcdef"}}. A flavor without one
       uses the id of its profile; a build with neither is not uploaded.
   testerGroups:
+    type: json
     description: Firebase tester group aliases.
     default: []
   notes:
+    type: string
     description: Release notes for the testers.
     default: ""
   appleAppIds:
+    type: json
     description: >-
       App Store Connect app ids by flavor, for example {dev: "1234567890"}. A
       flavor without one uses the id of its profile; an iOS build with neither
       is not uploaded.
   exportOptionsPlist:
+    type: string
     description: The export options of iOS builds, relative to the app.
     default: ios/ExportOptions.plist
   dartDefineFile:
+    type: string
     description: The --dart-define-from-file file, relative to the app.
 stages:
   - name: check
@@ -139,27 +145,34 @@ description: >-
 lock: project
 inputs:
   firebaseAppIds:
+    type: json
     description: >-
       Firebase app ids by flavor and platform; a flavor without one uses the
       id of its profile. A Shorebird flavor with one is also uploaded to
       Firebase App Distribution as an APK.
   testerGroups:
+    type: json
     description: Firebase tester group aliases.
     default: []
   notes:
+    type: string
     description: Release notes.
     default: ""
   appleAppIds:
+    type: json
     description: >-
       App Store Connect app ids by flavor; a flavor without one uses the id of
       its profile. An iOS build with neither is not uploaded.
   playTrack:
+    type: string
     description: The Google Play track an Android build goes to.
     default: internal
   exportOptionsPlist:
+    type: string
     description: The export options of iOS builds, relative to the app.
     default: ios/ExportOptions.plist
   dartDefineFile:
+    type: string
     description: The --dart-define-from-file file, relative to the app.
 stages:
   - name: prepare
@@ -335,12 +348,20 @@ description: >-
   a time per project, and only with the owner's approval.
 lock: project
 inputs:
+  releaseVersion:
+    type: release
+    description: >-
+      The release the patch applies to, for example 5.4.1+3283. The dispatch's
+      releaseVersion when it gives none.
   exportOptionsPlist:
+    type: string
     description: The export options of iOS builds, relative to the app.
     default: ios/ExportOptions.plist
   dartDefineFile:
+    type: string
     description: The --dart-define-from-file file, relative to the app.
   allowNativeDiffs:
+    type: boolean
     description: >-
       Publish the patch although Shorebird reports native changes. Only for
       differences you have checked are not real native changes.
@@ -399,9 +420,11 @@ name: Test
 description: Runs the tests of the app against the baseline, then the analyzer.
 inputs:
   paths:
+    type: json
     description: Test files or folders, relative to the app. All by default.
     default: []
   tags:
+    type: json
     description: Run only the tests with all of these tags.
     default: []
 stages:

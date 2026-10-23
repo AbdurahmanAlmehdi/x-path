@@ -75,7 +75,7 @@ class FakeSecretPrompt implements SecretPrompt {
   final questions = <String>[];
 
   @override
-  String ask(String question) {
+  String ask(String question, {bool secret = true}) {
     questions.add(question);
     return answers.removeAt(0);
   }

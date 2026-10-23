@@ -1,5 +1,7 @@
 import 'package:equatable/equatable.dart';
+import 'package:xp_api/xp_api.dart';
 import 'package:xp_engine/src/scheduler/capability.dart';
+import 'package:xp_engine/src/versioning/app_version.dart';
 import 'package:xp_engine/src/workflows/expression.dart';
 import 'package:xp_engine/src/workflows/gate_action.dart';
 
@@ -58,6 +60,8 @@ class InputDefinition extends Equatable {
   const new({
     required this.name,
     required this.position,
+    this.type,
+    this.options,
     this.description,
     this.defaultValue,
     this.required = false,
@@ -65,6 +69,13 @@ class InputDefinition extends Equatable {
 
   /// The name under `inputs`.
   final String name;
+
+  /// What it takes (UX-04); `null` for an input without a type, which
+  /// takes any value.
+  final InputType? type;
+
+  /// The values a [InputType.choice] input may take.
+  final List<String>? options;
 
   /// What it is for.
   final String? description;
@@ -79,9 +90,47 @@ class InputDefinition extends Equatable {
   /// Where it is declared.
   final SourcePosition position;
 
+  /// Why [value] is not a value of this input, as the end of a sentence
+  /// about it ("must be true or false"), or `null` when it is one. `null`
+  /// is a value of every input: the one it has without a default.
+  String? problemOf(Object? value) {
+    if (value == null) return null;
+    return switch (type) {
+      null || InputType.json => null,
+      InputType.string when value is! String => 'must be text',
+      InputType.boolean when value is! bool => 'must be true or false',
+      InputType.choice when !(options ?? const []).contains(value) =>
+        'must be one of ${(options ?? const []).join(', ')}',
+      InputType.release when !_isRelease(value) =>
+        'must be a release, x.y.z+build',
+      _ => null,
+    };
+  }
+
+  static bool _isRelease(Object value) {
+    if (value is! String) return false;
+    try {
+      return AppVersion.parse(value).build != null;
+    } on FormatException {
+      return false;
+    }
+  }
+
+  /// The input as clients see it.
+  WorkflowInput toWire() => WorkflowInput(
+    name: name,
+    type: type,
+    description: description,
+    options: options,
+    defaultValue: defaultValue,
+    required: required,
+  );
+
   @override
   List<Object?> get props => [
     name,
+    type,
+    options,
     description,
     defaultValue,
     required,

@@ -109,6 +109,10 @@ class DispatchHarness {
         request: any(named: 'request'),
       ),
     ).thenAnswer((_) async => releasePreview);
+    when(() => workflows.lastInputs(any(), any()))
+        .thenAnswer((_) async => const {});
+    when(() => workflows.rememberInputs(any(), any(), any()))
+        .thenAnswer((_) async {});
   }
 
   final workflows = MockWorkflowsRepository();
@@ -119,6 +123,7 @@ class DispatchHarness {
     WidgetTester tester, {
     Project? project,
     EngineConnectionBloc? connection,
+    ReleasesRepository? releases,
   }) async {
     await tester.pumpApp(
       Builder(
@@ -137,6 +142,7 @@ class DispatchHarness {
       ),
       connection: connection,
       workflowsRepository: workflows,
+      releasesRepository: releases,
     );
     await tester.tap(find.text('Open'));
     await tester.pumpAndSettle();

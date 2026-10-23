@@ -129,7 +129,7 @@ class WorkflowDispatcher {
     final app = _app(project, request.app);
     final flavors = _flavors(app, request.flavors, definition);
     final platforms = _platforms(app, request.platforms);
-    final inputs = _inputs(definition, request.inputs);
+    final inputs = _inputs(definition, request);
     final steps = definition.jobs.expand((job) => job.steps).toList();
     final kinds = {for (final step in steps) step.kind};
 
@@ -148,7 +148,7 @@ class WorkflowDispatcher {
     final model = await _models.get(projectId);
     final scope = TagScope(app: app.name);
 
-    final releaseVersion = _releaseVersion(request, kinds);
+    final releaseVersion = _releaseVersion(request, kinds, definition, inputs);
     final current = kinds.difference(_unversionedKinds).isEmpty
         ? null
         : await _currentVersion(mirror, sha, app, runId);
@@ -396,10 +396,19 @@ class WorkflowDispatcher {
     return asked.toSet().toList();
   }
 
+  /// The values of the inputs of [definition]: what [request] gives, the
+  /// dispatch's `releaseVersion` for a release input it leaves out, else
+  /// the default. Each must be a value its input takes (UX-04).
   Map<String, Object?> _inputs(
     WorkflowDefinition definition,
-    Map<String, dynamic> given,
+    DispatchRequest request,
   ) {
+    final given = {
+      for (final input in definition.inputs)
+        if (input.type == InputType.release)
+          input.name: ?request.releaseVersion,
+      ...request.inputs,
+    };
     final declared = {for (final input in definition.inputs) input.name: input};
     for (final name in given.keys) {
       if (!declared.containsKey(name)) {
@@ -409,7 +418,7 @@ class WorkflowDispatcher {
         throw DispatchException('The workflow has no input "$name"$has');
       }
     }
-    return {
+    final values = {
       for (final input in declared.values)
         input.name: given.containsKey(input.name)
             ? given[input.name]
@@ -417,10 +426,29 @@ class WorkflowDispatcher {
             ? throw DispatchException('The input "${input.name}" is needed.')
             : input.defaultValue,
     };
+    for (final input in declared.values) {
+      if (input.problemOf(values[input.name]) case final problem?) {
+        throw DispatchException('The input "${input.name}" $problem.');
+      }
+    }
+    return values;
   }
 
-  AppVersion? _releaseVersion(DispatchRequest request, Set<String> kinds) {
-    final text = request.releaseVersion;
+  /// The release a patch applies to: the dispatch's `releaseVersion`, else
+  /// the value of the workflow's release input.
+  AppVersion? _releaseVersion(
+    DispatchRequest request,
+    Set<String> kinds,
+    WorkflowDefinition definition,
+    Map<String, Object?> inputs,
+  ) {
+    final text =
+        request.releaseVersion ??
+        definition.inputs
+            .where((input) => input.type == InputType.release)
+            .map((input) => inputs[input.name])
+            .whereType<String>()
+            .firstOrNull;
     if (text == null) {
       if (kinds.contains('shorebird.patch')) {
         throw const DispatchException(

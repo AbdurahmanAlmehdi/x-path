@@ -156,6 +156,32 @@ void main() {
       expect(newest.builtin, isFalse);
     });
 
+    test('reads the inputs its version declares, typed', () async {
+      await service.list('prj_1');
+      final patch = (await service.list('prj_1'))
+          .firstWhere((workflow) => workflow.name == 'shorebird-patch');
+
+      final inputs = (await service.get('prj_1', patch.id)).inputs;
+
+      expect(inputs.first, isA<WorkflowInput>());
+      expect({
+        for (final input in inputs) input.name: input.type,
+      }, containsPair('releaseVersion', InputType.release));
+      expect({
+        for (final input in inputs) input.name: input.type,
+      }, containsPair('allowNativeDiffs', InputType.boolean));
+      final plain = await service.create('prj_1', name: 'plain', yaml: _simple);
+      expect((await service.get('prj_1', plain.id)).inputs, isEmpty);
+      // A version saved before this engine's rules reads without inputs.
+      await repository.addVersion(
+        workflowId: plain.id,
+        versionId: 'wfv_old',
+        yaml: 'schema: 1\ninputs:\n  a: {type: nope}\n',
+        createdAt: DateTime.utc(2026),
+      );
+      expect((await service.get('prj_1', plain.id)).inputs, isEmpty);
+    });
+
     test('says when there is no such version or workflow', () async {
       final created = await service.create(
         'prj_1',

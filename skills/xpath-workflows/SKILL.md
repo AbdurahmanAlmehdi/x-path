@@ -18,8 +18,9 @@ name: Dev build                # optional
 description: ...               # optional
 lock: project                  # optional: one run of this workflow at a time per project
 inputs:                        # optional: variables a dispatch can set
-  notes: {description: Release notes, default: ""}
+  notes: {type: string, description: Release notes, default: ""}
   appId: {description: The app id, required: true}
+  track: {type: choice, options: [internal, beta], default: internal}
   extra:                       # empty: no default, not required
 stages:                        # required; run in order
   - name: build
@@ -43,11 +44,16 @@ Allowed keys, and nothing else (an unknown key is an issue that lists the allowe
 | Where | Keys |
 |---|---|
 | the workflow | `schema`, `name`, `description`, `lock`, `inputs`, `stages` |
-| an input | `description`, `default`, `required` (an input with a default cannot be required) |
+| an input | `type`, `description`, `options`, `default`, `required` (an input with a default cannot be required) |
 | a stage | `name`, `jobs` |
 | a job | `name`, `matrix`, `if`, `capabilities`, `steps` |
 | a step | `kind`, `with`, `if`, `gate` |
 
+- Input types (optional): `string` (text), `boolean` (`true`/`false`), `choice` (one of its
+  `options`, which only a choice has and a choice must have), `json` (any value: a list, a map, a
+  number) and `release` (`x.y.z+build` of the project; a dispatch's `releaseVersion` fills it,
+  and it fills `releaseVersion`). A default must be of the input's type. An input without a type
+  takes any value; the CLI sends it as JSON when it parses, else as text, and the app as text.
 - Input names: letters, digits and `_`, not starting with a digit. Job ids: a letter, then
   letters, digits, `-` and `_`.
 - `lock` can only be `project`. A locked run holds the project from its first job until it

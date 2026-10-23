@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:material_ui/material_ui.dart';
@@ -16,13 +18,16 @@ import 'package:xp_repositories/xp_repositories.dart';
 /// the run dispatched, or `null` when the sheet was closed.
 Future<Run?> showDispatchSheet(BuildContext context, Project project) {
   final workflows = context.read<WorkflowsRepository>();
+  final releases = context.read<ReleasesRepository>();
   return showDialog<Run>(
     context: context,
     barrierColor: context.xpColors.scrimDefault,
     builder: (_) => BlocProvider(
-      create: (_) =>
-          DispatchBloc(workflows: workflows, project: project)
-            ..add(const DispatchStarted()),
+      create: (_) => DispatchBloc(
+        workflows: workflows,
+        releases: releases,
+        project: project,
+      )..add(const DispatchStarted()),
       child: const DispatchSheet(),
     ),
   );
@@ -349,6 +354,16 @@ class _Form extends StatelessWidget {
                   },
                   onChanged: (bump) => bloc.add(DispatchBumpChanged(bump)),
                 ),
+                const SizedBox(width: 8),
+                SizedBox(
+                  width: 110,
+                  child: _TextInput(
+                    key: const Key('dispatch.version'),
+                    initial: state.version,
+                    hint: l10n.dispatchVersionHint,
+                    onChanged: (text) => bloc.add(DispatchVersionChanged(text)),
+                  ),
+                ),
                 const SizedBox(width: 12),
                 if (state.preview?.version case final version?) ...[
                   Text(
@@ -373,6 +388,24 @@ class _Form extends StatelessWidget {
             ),
           ),
         ],
+        if (workflow != null && workflow.inputs.isNotEmpty) ...[
+          const SizedBox(height: 16),
+          _Field(
+            label: l10n.dispatchInputs,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                for (final input in workflow.inputs)
+                  _InputField(
+                    key: ValueKey((workflow.id, input.name)),
+                    input: input,
+                    value: state.inputs[input.name],
+                    releases: state.releases,
+                  ),
+              ],
+            ),
+          ),
+        ],
         const SizedBox(height: 20),
         if (state.preview case final preview?) _WillRun(preview),
       ],
@@ -390,6 +423,213 @@ class _Field extends StatelessWidget {
   Widget build(BuildContext context) => Column(
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [XpSectionLabel(label), const SizedBox(height: 6), child],
+  );
+}
+
+/// One input of the workflow, by its type (UX-04): a switch, a menu, a
+/// release picker, JSON checked as it is typed, or text.
+class _InputField extends StatelessWidget {
+  const new({
+    required this.input,
+    required this.value,
+    required this.releases,
+    super.key,
+  });
+
+  final WorkflowInput input;
+
+  /// What the owner or the last dispatch set; `null` for the default.
+  final Object? value;
+  final List<Release>? releases;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    final colors = context.xpColors;
+    final bloc = context.read<DispatchBloc>();
+    void set(Object? value, {bool valid = true}) =>
+        bloc.add(DispatchInputChanged(input.name, value, valid: valid));
+    final shown = value ?? input.defaultValue;
+    final field = switch (input.type) {
+      InputType.boolean => Align(
+        alignment: Alignment.centerLeft,
+        child: XpSegmented<bool>(
+          value: shown == true,
+          values: const [false, true],
+          labelOf: (on) => on ? l10n.dispatchYes : l10n.dispatchNo,
+          onChanged: set,
+        ),
+      ),
+      InputType.choice => Align(
+        alignment: Alignment.centerLeft,
+        child: XpSelect<String>(
+          value: shown is String && input.options!.contains(shown)
+              ? shown
+              : input.options!.first,
+          values: input.options!,
+          labelOf: (option) => option,
+          code: true,
+          onChanged: set,
+        ),
+      ),
+      InputType.release => _releasePicker(context, set),
+      InputType.json => _JsonInput(input: input, value: shown, onChanged: set),
+      InputType.string || null => _TextInput(
+        initial: shown == null ? '' : '$shown',
+        onChanged: (text) => set(text.isEmpty ? null : text),
+      ),
+    };
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              XpCode(input.name, color: colors.textPrimary),
+              if (input.required) ...[
+                const SizedBox(width: 4),
+                Text('*', style: TextStyle(color: colors.negativeDefault)),
+              ],
+            ],
+          ),
+          if (input.description case final description?) ...[
+            const SizedBox(height: 2),
+            Text(
+              description,
+              style: context.xpType.caption.copyWith(
+                color: colors.textSecondary,
+              ),
+            ),
+          ],
+          const SizedBox(height: 4),
+          KeyedSubtree(key: Key('dispatch.input.${input.name}'), child: field),
+        ],
+      ),
+    );
+  }
+
+  Widget _releasePicker(BuildContext context, void Function(Object?) set) {
+    final l10n = context.l10n;
+    final releases = this.releases;
+    if (releases == null) return const SizedBox(height: 28);
+    if (releases.isEmpty) {
+      return XpMessage(XpStatus.scanInfo, l10n.dispatchNoReleases);
+    }
+    final values = <String>[];
+    for (final release in releases) {
+      final value = releaseValue(release);
+      if (!values.contains(value)) values.add(value);
+    }
+    String labelOf(String value) {
+      final release = releases.firstWhere((r) => releaseValue(r) == value);
+      return l10n.dispatchRelease(
+        versionLabel(release.version, release.build),
+        release.flavor,
+      );
+    }
+
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: XpSelect<String>(
+        value: values.contains(value) ? value! as String : values.first,
+        values: values,
+        labelOf: labelOf,
+        code: true,
+        onChanged: set,
+      ),
+    );
+  }
+}
+
+/// A JSON input: the value as JSON text, sent once it parses.
+class _JsonInput extends StatefulWidget {
+  const new({
+    required this.input,
+    required this.value,
+    required this.onChanged,
+  });
+
+  final WorkflowInput input;
+  final Object? value;
+  final void Function(Object? value, {bool valid}) onChanged;
+
+  @override
+  State<_JsonInput> createState() => _JsonInputState();
+}
+
+class _JsonInputState extends State<_JsonInput> {
+  var _valid = true;
+
+  void _changed(String text) {
+    if (text.trim().isEmpty) {
+      setState(() => _valid = true);
+      widget.onChanged(null);
+      return;
+    }
+    try {
+      final value = jsonDecode(text);
+      setState(() => _valid = true);
+      widget.onChanged(value);
+    } on FormatException {
+      setState(() => _valid = false);
+      widget.onChanged(null, valid: false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      _TextInput(
+        initial: widget.value == null ? '' : jsonEncode(widget.value),
+        onChanged: _changed,
+      ),
+      if (!_valid) ...[
+        const SizedBox(height: 2),
+        Text(
+          context.l10n.dispatchJsonInvalid,
+          style: context.xpType.caption.copyWith(
+            color: context.xpColors.negativeDefault,
+          ),
+        ),
+      ],
+    ],
+  );
+}
+
+/// A one-line text field of the sheet that keeps what is typed.
+class _TextInput extends StatefulWidget {
+  const new({
+    required this.initial,
+    required this.onChanged,
+    this.hint,
+    super.key,
+  });
+
+  final String initial;
+  final String? hint;
+  final ValueChanged<String> onChanged;
+
+  @override
+  State<_TextInput> createState() => _TextInputState();
+}
+
+class _TextInputState extends State<_TextInput> {
+  late final _controller = TextEditingController(text: widget.initial);
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => XpTextField(
+    controller: _controller,
+    hint: widget.hint,
+    code: true,
+    onChanged: widget.onChanged,
   );
 }
 
