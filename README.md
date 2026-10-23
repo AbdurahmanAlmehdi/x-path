@@ -350,11 +350,20 @@ files only. Each option has an environment variable (`XPATH_VERSION`, `XPATH_PRE
 `tool/release/linux/install_test.sh` tests it with no network against the archive of the machine in
 `build/release/assets`, in a throwaway `HOME` and prefix: an install, an update from the unpacked folder, a download
 from `file://` URLs with and without a version, a wrong SHA-256, a wrong version and the runner mode; on Linux also
-the service step against a fake `systemctl` and `loginctl` (the unit written, `enable --now`, the restart on update).
+the service step against a fake `systemctl` and `loginctl` (the unit written, `enable --now`, the restart on update)
+and `--with-android` against a fake `apt-get`, `sudo`, `dpkg-query` and `sdkmanager`.
+
+**Which versions work together** (runners follow their engine; the app and the CLI need the same API version):
+[docs/guide/install.md](docs/guide/install.md#which-versions-work-together).
+
+**A Linux runner, with Android.** `install.sh --runner --with-android` (Debian or Ubuntu) also installs a JDK 17, git,
+ssh, curl, unzip, xz, zip and perl with `apt-get`, the Android command-line tools (pinned by version and SHA-256),
+the licences, one platform and one build-tools, into `--android-sdk <dir>` (default `~/Android/Sdk`, where Flutter
+looks). It ends with the next steps: `xp runner doctor`, the pairing command, `xp runner install-service`.
 
 **Docker.** The `Dockerfile` copies the Linux bundles of `build/release/bundles` (run `bundles.sh` first; `buildx`
-picks the bundle of each platform) into a `debian:trixie-slim` image with `git`, `ssh` and `curl` but no Flutter
-(builds go to runners). It runs `xpd serve --host 0.0.0.0 --port 7480` as the user `xpath` (uid 10001), keeps its
+picks the bundle of each platform) into a `debian:trixie-slim` image with `git`, `ssh` and `curl`, but not `unzip`,
+which the Flutter SDK download needs, so the engine's own runner offers no `flutter` and builds go to runners. It runs `xpd serve --host 0.0.0.0 --port 7480` as the user `xpath` (uid 10001), keeps its
 data (database, `master.key`) in the volume `/data` (`XPATH_DATA_DIR`) and checks `/health` every 30 s.
 
 ```sh
@@ -362,6 +371,11 @@ tool/release/bundles.sh && docker build -t xpath .
 docker run -d --name xpath -p 127.0.0.1:7480:7480 -v xpath-data:/data xpath
 docker exec xpath xpd token create --name laptop --kind cli
 ```
+
+**The runner image.** `Dockerfile.runner` makes `ghcr.io/abdurahmanalmehdi/xpath-runner`, a runner that offers
+`android` and `flutter` out of the box (amd64 only): it is built by `install.sh --runner --with-android` from the
+release archive, and the release workflow checks `xp runner doctor` in it before it pushes it. How to run it:
+[docs/guide/runners.md](docs/guide/runners.md#the-runner-image).
 
 **The Mac app (local install, Phase 18b).** `tool/release/build_mac.sh` builds `dist/XPath.app` (gitignored) for
 this Mac: it runs `bundles.sh` for the Mac's target and the Linux runner targets (`--reuse-bundles` takes the ones in
@@ -1286,8 +1300,13 @@ side: the protocol, the leases, the probe and the endpoints. The runner agent, `
 
 ### Pairing
 
+Setting up a runner step by step: [docs/guide/runners.md](docs/guide/runners.md). How a runner on
+another machine reaches the engine (Tailscale, Cloudflare Tunnel, an SSH tunnel):
+[Reaching the engine](docs/guide/runners.md#reaching-the-engine).
+
 ```sh
-xp runners pair mac-mini        # on any machine with a cli token: prints a pairing token, once
+xp runners url https://mac.tailnet.ts.net   # the address runners reach the engine at; pairing commands carry it
+xp runners pair mac-mini        # on any machine with a cli token: prints the pairing command, once
 # on the runner machine: xp runner pair --engine <url> --token <pairing token> exchanges it for the credential
 xp runners revoke mac-mini      # kills the credential, the connection and the leases
 ```
@@ -1412,7 +1431,9 @@ answered with `cancel`. The sweep (`LeaseSweeper`, every 10 s) ends the leases t
 
 ### The runner agent
 
-`xp runner` is the other end of everything above (`apps/xp/lib/src/runner`).
+`xp runner` is the other end of everything above (`apps/xp/lib/src/runner`). What a runner does
+while the engine is away for hours, and what happens to its jobs:
+[docs/guide/runners.md](docs/guide/runners.md#when-the-engine-is-away).
 
 ```sh
 xp runner pair --engine https://xpath.example.com --token xpp_...   # once; xp runners pair <name> made the token
@@ -1807,7 +1828,7 @@ The tools (all of them answer with JSON text, or with `isError` and a message):
 
 | Kind | Tools |
 |---|---|
-| Read | `list_projects`, `get_project`, `list_workflows`, `get_workflow`, `get_run`, `get_job`, `get_job_log_tail`, `list_artifacts`, `get_job_tests`, `get_test_baselines`, `list_releases`, `get_release`, `get_release_notes`, `list_approvals`, `get_approval`, `get_gates`, `get_storage_report`, `list_credentials` (names, kinds, accounts, checks and the flavors that use each; never a secret; no tool adds, assigns or removes one) |
+| Read | `list_projects`, `get_project`, `list_workflows`, `get_workflow`, `get_run`, `get_job`, `get_job_log_tail`, `list_artifacts`, `get_job_tests`, `get_test_baselines`, `list_releases`, `get_release`, `get_release_notes`, `list_approvals`, `get_approval`, `get_gates`, `get_storage_report`, `list_runners`, `list_credentials` (names, kinds, accounts, checks and the flavors that use each; never a secret; no tool adds, assigns or removes one) |
 | Create and edit | `add_project`, `scan_project`, `update_project`, `validate_workflow`, `create_workflow`, `update_workflow` (a document is validated first; with issues nothing is saved and they come back with `line` and `column`) |
 | Run | `dispatch_workflow` |
 

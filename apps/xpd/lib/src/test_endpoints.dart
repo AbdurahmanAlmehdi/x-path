@@ -10,6 +10,7 @@ class TestEndpoints {
     this.ascUrl,
     this.playUrl,
     this.fileSecrets = false,
+    this.leaseSeconds,
   });
 
   /// Reads the settings from [environment].
@@ -25,6 +26,7 @@ class TestEndpoints {
       ascUrl: url(ascVariable),
       playUrl: url(playVariable),
       fileSecrets: environment[fileSecretsVariable] == '1',
+      leaseSeconds: int.tryParse(environment[leaseSecondsVariable] ?? ''),
     );
   }
 
@@ -46,6 +48,10 @@ class TestEndpoints {
   /// on Linux, instead of the Keychain of the Mac.
   static const fileSecretsVariable = 'XPD_TEST_FILE_SECRETS';
 
+  /// How long a runner's lease lasts, in seconds, instead of 90: the runner
+  /// offline end-to-end test waits out a few leases in seconds.
+  static const leaseSecondsVariable = 'XPD_TEST_LEASE_SECONDS';
+
   /// Where GitHub is, when it is not GitHub.
   final Uri? githubApiUrl;
 
@@ -62,13 +68,17 @@ class TestEndpoints {
   /// Whether secrets go to the encrypted file even on macOS.
   final bool fileSecrets;
 
+  /// How long a runner's lease lasts, when it is not the usual 90 seconds.
+  final int? leaseSeconds;
+
   /// Whether anything differs from a real engine.
   bool get isActive =>
       githubApiUrl != null ||
       firebaseUrl != null ||
       ascUrl != null ||
       playUrl != null ||
-      fileSecrets;
+      fileSecrets ||
+      leaseSeconds != null;
 
   /// The operating system the secret store is chosen for.
   String secretStoreSystem(String operatingSystem) =>

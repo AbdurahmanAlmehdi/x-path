@@ -53,11 +53,15 @@ void main() {
   late CommandRunner<int> commands;
   String? launchctlPrint;
 
-  RunnerHost hostOn(String operatingSystem, {String? executable}) => RunnerHost(
+  RunnerHost hostOn(
+    String operatingSystem, {
+    String? executable,
+    Map<String, String> environment = const {},
+  }) => RunnerHost(
     operatingSystem: operatingSystem,
     cores: 8,
     pid: 1,
-    environment: {'HOME': home, 'USER': 'me'},
+    environment: {'HOME': home, 'USER': 'me', ...environment},
     runner: _Machine(services),
     openCredentials: (_) => credentials,
     executable: executable ?? p.join(bundle.path, 'bin', 'xp'),
@@ -337,6 +341,38 @@ void main() {
         contains('systemctl --user enable --now xp-runner.service'),
       );
     });
+
+    test(
+      'writes where the Android SDK and the JDK are when they are set',
+      () async {
+        use(
+          hostOn(
+            'linux',
+            environment: {
+              'ANDROID_HOME': '/opt/android-sdk',
+              'JAVA_HOME': '/usr/lib/jvm/java-17-openjdk-amd64',
+              'ANDROID_SDK_ROOT': '',
+            },
+          ),
+        );
+        await pair();
+
+        expect(
+          await run(['install-service', '--data-dir', paths.root]),
+          XpExit.ok,
+        );
+
+        final text = File(unit()).readAsStringSync();
+        expect(text, contains('Environment=ANDROID_HOME=/opt/android-sdk\n'));
+        expect(
+          text,
+          contains(
+            'Environment=JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64\n',
+          ),
+        );
+        expect(text, isNot(contains('ANDROID_SDK_ROOT')));
+      },
+    );
 
     test('hands the key of the credential file to the runner', () async {
       await pair();

@@ -94,11 +94,12 @@ class RunnerRecord extends Equatable {
         : revokedAt as DateTime?,
   );
 
-  /// The API form, for a runner that is [status] and holds the leases of
-  /// [jobIds].
+  /// The API form, for a runner that is [status], holds the leases of
+  /// [jobIds] and lacks [missing].
   Runner toRunner({
     required RunnerStatus status,
     List<String> jobIds = const [],
+    List<MissingCapability>? missing,
   }) => Runner(
     id: id,
     name: name,
@@ -113,6 +114,7 @@ class RunnerRecord extends Equatable {
     lastHeartbeat: lastHeartbeat,
     createdAt: createdAt,
     revokedAt: revokedAt,
+    missing: missing,
   );
 
   /// The wire names of [capabilities], sorted.

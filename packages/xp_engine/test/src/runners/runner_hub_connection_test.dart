@@ -30,6 +30,18 @@ void main() {
       expect(h.hub.statusOf(runner.id), RunnerStatus.offline);
     });
 
+    test('the welcome carries the lease length and a heartbeat three times '
+        'per lease', () async {
+      final short = await RunnerHarness.create(
+        leaseLength: const Duration(seconds: 6),
+      );
+      final runner = await short.pair();
+
+      final welcome = runner.link.sentOf<WelcomeFrame>().single;
+      expect(welcome.leaseSeconds, 6);
+      expect(welcome.heartbeatSeconds, 2);
+    });
+
     test('a second connection of the runner replaces the first', () async {
       final first = await h.online();
 
@@ -43,6 +55,8 @@ void main() {
       // one is probed before it gets jobs. Nobody was told it left.
       expect(schedulerRunners(), ['local']);
       expect(await h.eventsOf<RunnerDisconnected>(), isEmpty);
+      const replaced = 'replaced by a new connection of the same runner (4001)';
+      expect(h.refused, ['${first.record.name}: $replaced']);
     });
 
     test('a runner that is gone is announced once', () async {
@@ -54,8 +68,29 @@ void main() {
       expect(h.hub.isConnected(runner.id), isFalse);
       expect(schedulerRunners(), ['local']);
       expect(await h.eventsOf<RunnerDisconnected>(), [
-        RunnerDisconnected(runnerId: runner.id, name: 'mac'),
+        RunnerDisconnected(
+          runnerId: runner.id,
+          name: 'mac',
+          reason: 'the connection dropped',
+        ),
       ]);
+    });
+
+    test('a disconnect says why, from the close code', () async {
+      final normal = await h.online(name: 'normal');
+      final odd = await h.online(name: 'odd');
+      final revoked = await h.online(name: 'revoked');
+
+      await normal.connection.closed(1000);
+      await odd.connection.closed(4500);
+      await h.service.revoke(revoked.id, by: h.owner);
+
+      expect((await h.eventsOf<RunnerDisconnected>()).map((e) => e.reason), [
+        'the runner closed the connection',
+        'the runner closed the connection with code 4500',
+        'revoked',
+      ]);
+      expect(h.refused, isEmpty);
     });
 
     test('a runner that never got probed leaves without a word', () async {
@@ -65,6 +100,7 @@ void main() {
 
       expect(h.hub.isConnected(runner.id), isFalse);
       expect(await h.eventsOf<RunnerDisconnected>(), isEmpty);
+      expect(h.refused, isEmpty);
     });
 
     test('a broken connection does not stop the engine', () async {
@@ -85,6 +121,9 @@ void main() {
 
       expect(runner.faults.single.code, 'unexpected_frame');
       expect(runner.link.closeCode, runnerProtocolCloseCode);
+      expect(h.refused, [
+        '${runner.record.name}: the first frame is hello (4400)',
+      ]);
       // Nothing more is read from a closed connection.
       await runner.hello();
       expect(runner.link.sentOf<ProbeFrame>(), isEmpty);
@@ -212,6 +251,46 @@ void main() {
       expect((await h.runners.get(mac.id))!.capabilities, found(mac));
     });
 
+    test('the runner hears what it offers and why not, after the '
+        'probe', () async {
+      final runner = await h.pair();
+      await runner.hello();
+      expect(runner.link.sentOf<ProbedFrame>(), isEmpty);
+
+      await runner.answerProbe(macProbe());
+
+      final probed = runner.link.sentOf<ProbedFrame>().single;
+      expect(probed.capabilities, ['flutter', 'ios-sign']);
+      expect(probed.missing.map((m) => m.capability), ['android']);
+      expect(h.hub.missingOf(runner.id), probed.missing);
+    });
+
+    test('lists the paired runners that are not revoked, and which are '
+        'connected', () async {
+      final online = await h.online(name: 'online');
+      final away = await h.pair('away');
+      await away.connection.closed();
+      final gone = await h.pair('gone');
+      await h.service.revoke(gone.id, by: h.owner);
+
+      final paired = await h.hub.pairedRunners();
+
+      expect(paired.map((r) => (r.name, r.connected)), [
+        ('online', true),
+        ('away', false),
+      ]);
+      expect(paired.first.capabilities, contains(Capability.flutter));
+      expect(paired.first.id, online.id);
+    });
+
+    test('nothing is missing for a runner that is not connected', () async {
+      final runner = await h.pair();
+      await runner.hello();
+
+      expect(h.hub.missingOf(runner.id), isNull);
+      expect(h.hub.missingOf('rnr_nobody'), isNull);
+    });
+
     test('an answer to another probe is ignored', () async {
       final runner = await h.pair();
       await runner.hello();
@@ -296,6 +375,7 @@ void main() {
       await h.hub.sweep();
       expect(runner.link.closeCode, runnerTimeoutCloseCode);
       expect(h.hub.isConnected(runner.id), isFalse);
+      expect(h.refused, ['${runner.record.name}: the probe timed out (4008)']);
     });
 
     test('drops a runner that was quiet for a whole lease', () async {
@@ -309,7 +389,10 @@ void main() {
       await h.hub.sweep();
       expect(runner.link.closeCode, runnerTimeoutCloseCode);
       expect(schedulerRunners(), ['local']);
-      expect(await h.eventsOf<RunnerDisconnected>(), hasLength(1));
+      expect(
+        (await h.eventsOf<RunnerDisconnected>()).single.reason,
+        'no frame for 90 s',
+      );
     });
 
     test('a heartbeat keeps a runner that has nothing to do', () async {

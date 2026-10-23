@@ -70,6 +70,48 @@ void main() {
       );
     });
 
+    test('GET and PUT settings/runner-url 200, 400 and 403', () async {
+      const path = '/settings/runner-url';
+      expectContract(
+        await client.send('PUT', path, body: {'url': 'http://a.example'}),
+        method: 'PUT',
+        path: path,
+        status: 200,
+      );
+      expectContract(
+        await client.send('GET', path, kind: DeviceTokenKind.mcp),
+        path: path,
+        status: 200,
+      );
+      expectContract(
+        await client.send('PUT', path, body: {'url': 'nope'}),
+        method: 'PUT',
+        path: path,
+        status: 400,
+      );
+      expectContract(
+        await client.send(
+          'PUT',
+          path,
+          kind: DeviceTokenKind.mcp,
+          body: {'url': null},
+        ),
+        method: 'PUT',
+        path: path,
+        status: 403,
+      );
+      expectContract(
+        await client.send(
+          'POST',
+          '/runners/pairing-tokens',
+          body: {'name': 'with-url'},
+        ),
+        method: 'POST',
+        path: '/runners/pairing-tokens',
+        status: 201,
+      );
+    });
+
     test('POST pairing-tokens 201, 400, 401, 403 and 409', () async {
       expectContract(
         await client.send(
@@ -347,6 +389,8 @@ void main() {
       stream.send(
         ProbeResultFrame(probeId: probe.probeId, results: macProbeResults),
       );
+      final probed = await take<ProbedFrame>();
+      expect(probed.missing.map((m) => m.capability), ['android']);
       await client.waitOnline();
       final job = await client.engine.jobs.create(
         workflowVersionId: 'wfv_1',

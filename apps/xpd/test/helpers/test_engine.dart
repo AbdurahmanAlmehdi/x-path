@@ -299,6 +299,7 @@ class TestEngine {
       pairing: InMemoryPairingTokenRepository(),
       tokens: tokens,
       presence: runnerHub,
+      settings: InMemoryEngineSettingRepository(),
       events: events,
       clock: clock,
     );

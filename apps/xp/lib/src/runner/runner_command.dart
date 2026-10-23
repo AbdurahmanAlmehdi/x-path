@@ -7,6 +7,7 @@ import 'package:xp/src/config/xp_config.dart';
 import 'package:xp/src/context.dart';
 import 'package:xp/src/exit_codes.dart';
 import 'package:xp/src/runner/runner_agent.dart';
+import 'package:xp/src/runner/runner_doctor.dart';
 import 'package:xp/src/runner/runner_identity.dart';
 import 'package:xp/src/runner/runner_options.dart';
 import 'package:xp/src/runner/runner_runtime.dart';
@@ -34,6 +35,7 @@ XpGroup runnerCommand(
   return XpGroup(context, 'runner', 'Run jobs for an engine on this machine.', [
     RunnerPairCommand(context, machine),
     RunnerStartCommand(context, machine, build, signals, restart),
+    RunnerDoctorCommand(context, machine),
     RunnerInstallServiceCommand(context, machine),
     RunnerUninstallServiceCommand(context, machine),
     RunnerServiceStatusCommand(context, machine),

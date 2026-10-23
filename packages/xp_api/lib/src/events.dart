@@ -188,6 +188,7 @@ sealed class EngineEvent extends Equatable {
     RunnerDisconnected.eventType => RunnerDisconnected(
       runnerId: payload['runnerId'] as String,
       name: payload['name'] as String,
+      reason: payload['reason'] as String?,
     ),
     RunnerRevoked.eventType => RunnerRevoked(
       runnerId: payload['runnerId'] as String,
@@ -1389,7 +1390,7 @@ final class RunnerConnected extends EngineEvent {
 /// its last heartbeat unless it comes back.
 final class RunnerDisconnected extends EngineEvent {
   /// Creates the event.
-  const new({required this.runnerId, required this.name});
+  const new({required this.runnerId, required this.name, this.reason});
 
   /// The wire name of this event.
   static const eventType = 'runner.disconnected';
@@ -1400,14 +1401,22 @@ final class RunnerDisconnected extends EngineEvent {
   /// Its name.
   final String name;
 
+  /// Why, for example `no frame for 90 s` or `the runner closed the
+  /// connection`.
+  final String? reason;
+
   @override
   String get type => eventType;
 
   @override
-  Map<String, dynamic> get payload => {'runnerId': runnerId, 'name': name};
+  Map<String, dynamic> get payload => {
+    'runnerId': runnerId,
+    'name': name,
+    'reason': ?reason,
+  };
 
   @override
-  List<Object?> get props => [runnerId, name];
+  List<Object?> get props => [runnerId, name, reason];
 }
 
 /// A runner was revoked. Its credential stops working and its leases end.

@@ -1,0 +1,62 @@
+# What makes a fresh Linux box a runner, checked on the pull requests that
+# change it: install.sh with its tests (including --with-android against fake
+# package managers), and the xpath-runner image, built by that installer with
+# the real Android SDK, whose `xp runner doctor` must find `android` and
+# `flutter`. The release workflow runs the same checks on every push to main
+# (and pushes the image); this one catches them before the merge. It builds
+# the linux-x64 bundles only.
+name: runner setup
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/runner_setup.yaml"
+      - "tool/release/**"
+      - "Dockerfile.runner"
+      - ".dockerignore"
+      - "apps/xp/lib/src/runner/**"
+      - "apps/xp/lib/src/command_runner.dart"
+      - "packages/xp_engine/lib/src/probe/**"
+      - "packages/xp_api/lib/src/runner_protocol.dart"
+
+permissions:
+  contents: read
+
+jobs:
+  install:
+    name: install.sh
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Git Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2.23.0
+        with:
+          flutter-version: "3.47.6"
+          cache: true
+
+      - name: Install Dependencies
+        run: dart pub get
+
+      - name: Build the linux-x64 Bundles
+        run: tool/release/bundles.sh --targets linux-x64
+
+      - name: Test install.sh
+        run: tool/release/linux/install_test.sh
+
+      - name: Test the Runner Image's Entrypoint
+        run: tool/release/linux/xpath-runner_test.sh
+
+      - name: Build the Runner Image
+        run: docker build -f Dockerfile.runner -t xpath-runner:test .
+
+      - name: Test the Runner Image
+        run: |
+          docker run --rm xpath-runner:test --json runner doctor | tee doctor.json
+          jq -e '[.checks[] | select(.state == "ok") | .name] | index("android") and index("flutter")' doctor.json

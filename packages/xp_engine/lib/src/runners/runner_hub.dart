@@ -9,6 +9,7 @@ import 'package:xp_engine/src/jobs/job_logs.dart';
 import 'package:xp_engine/src/jobs/job_record.dart';
 import 'package:xp_engine/src/jobs/job_repository.dart';
 import 'package:xp_engine/src/jobs/job_runner.dart';
+import 'package:xp_engine/src/probe/runner_probe.dart';
 import 'package:xp_engine/src/process/output_line.dart';
 import 'package:xp_engine/src/process/output_masker.dart';
 import 'package:xp_engine/src/projects/github_remote.dart';
@@ -17,11 +18,11 @@ import 'package:xp_engine/src/repositories/event_log.dart';
 import 'package:xp_engine/src/runners/remote_runner.dart';
 import 'package:xp_engine/src/runners/remote_step_policy.dart';
 import 'package:xp_engine/src/runners/runner_link.dart';
-import 'package:xp_engine/src/runners/runner_probe.dart';
 import 'package:xp_engine/src/runners/runner_record.dart';
 import 'package:xp_engine/src/runners/runner_repository.dart';
 import 'package:xp_engine/src/runners/runner_secret_grants.dart';
 import 'package:xp_engine/src/runners/serial_queues.dart';
+import 'package:xp_engine/src/scheduler/paired_runners.dart';
 import 'package:xp_engine/src/scheduler/scheduler.dart';
 import 'package:xp_engine/src/scheduler/scheduler_runner.dart';
 import 'package:xp_engine/src/secrets/secret_store.dart';
@@ -36,11 +37,13 @@ abstract interface class RunnerPresence {
   /// The jobs the runner [runnerId] holds a lease for.
   List<String> jobsOf(String runnerId);
 
+  /// What the runner [runnerId] cannot do and why, from its last probe;
+  /// `null` while it is not connected.
+  List<MissingCapability>? missingOf(String runnerId);
+
   /// The runner was revoked: closes its connection and ends its leases.
   Future<void> revoked(RunnerRecord runner);
 }
-
-const _leaseLength = Duration(seconds: runnerLeaseSeconds);
 
 /// A lease: one job held by one runner until its heartbeats stop.
 class _Lease {
@@ -86,6 +89,7 @@ class _Session {
   DateTime? probeDeadline;
   DateTime? cooldownUntil;
   RemoteRunner? remote;
+  List<MissingCapability> missing = const [];
 }
 
 /// The runners that are connected, the leases they hold and the rules that
@@ -118,7 +122,8 @@ class _Session {
 ///
 /// Every state change of a job is done under a per-job lock, so heartbeats,
 /// reports, cancels and the sweep never interleave.
-class RunnerHub implements RemoteLeases, RemoteJobs, RunnerPresence {
+class RunnerHub
+    implements RemoteLeases, RemoteJobs, RunnerPresence, PairedRunners {
   /// Creates the hub.
   ///
   /// [probeTimeout] is how long a runner has to answer the probe;
@@ -137,12 +142,23 @@ class RunnerHub implements RemoteLeases, RemoteJobs, RunnerPresence {
     required this._masker,
     required this._grants,
     required this._engineVersion,
+    this.leaseLength = const Duration(seconds: runnerLeaseSeconds),
     this.probeTimeout = const Duration(seconds: 60),
     this.rejectCooldown = const Duration(seconds: 15),
     this.onError,
+    this.onRefused,
     this._probe = const RunnerProbe(),
     Random? random,
   }) : _random = random ?? Random.secure();
+
+  /// How long a lease lasts after the heartbeat that renewed it (D-08).
+  /// Shorter only in tests.
+  final Duration leaseLength;
+
+  /// How often a runner sends a heartbeat: three times per lease, at least
+  /// every second.
+  Duration get heartbeatInterval =>
+      Duration(seconds: max(1, leaseLength.inSeconds ~/ 3));
 
   /// How long a runner has to answer the probe.
   final Duration probeTimeout;
@@ -152,6 +168,11 @@ class RunnerHub implements RemoteLeases, RemoteJobs, RunnerPresence {
 
   /// Hears about failures of the engine's own bookkeeping.
   final void Function(Object error, StackTrace stackTrace)? onError;
+
+  /// Hears about a connection of the runner called `name` that the hub
+  /// closed before the runner took part in scheduling (a protocol error, a
+  /// probe that timed out), or that a newer connection replaced, and why.
+  final void Function(String name, String why)? onRefused;
 
   final RunnerRepository _runners;
   final ProjectRepository _projects;
@@ -186,6 +207,11 @@ class RunnerHub implements RemoteLeases, RemoteJobs, RunnerPresence {
     _sessions[runner.id] = session;
     if (previous != null) {
       _drop(previous, announce: false);
+      onRefused?.call(
+        runner.name,
+        'replaced by a new connection of the same runner '
+        '($runnerReplacedCloseCode)',
+      );
       unawaited(
         previous.link
             .close(runnerReplacedCloseCode, 'replaced by a new connection')
@@ -197,6 +223,8 @@ class RunnerHub implements RemoteLeases, RemoteJobs, RunnerPresence {
         runnerId: runner.id,
         engineVersion: _engineVersion,
         apiVersion: apiVersion,
+        heartbeatSeconds: heartbeatInterval.inSeconds,
+        leaseSeconds: leaseLength.inSeconds,
       ),
     );
     return RunnerConnection._(this, session);
@@ -204,6 +232,19 @@ class RunnerHub implements RemoteLeases, RemoteJobs, RunnerPresence {
 
   /// Whether the runner [runnerId] has a connection open.
   bool isConnected(String runnerId) => _sessions.containsKey(runnerId);
+
+  @override
+  Future<List<PairedRunner>> pairedRunners() async => [
+    for (final runner in await _runners.list())
+      if (!runner.isRevoked)
+        PairedRunner(
+          id: runner.id,
+          name: runner.name,
+          capabilities: runner.capabilities,
+          connected: isConnected(runner.id),
+          lastSeen: runner.lastHeartbeat,
+        ),
+  ];
 
   @override
   RunnerStatus statusOf(String runnerId) {
@@ -217,6 +258,13 @@ class RunnerHub implements RemoteLeases, RemoteJobs, RunnerPresence {
     for (final lease in _leases.values)
       if (lease.runnerId == runnerId) lease.jobId,
   ]..sort();
+
+  @override
+  List<MissingCapability>? missingOf(String runnerId) {
+    final session = _sessions[runnerId];
+    if (session == null || !session.probed) return null;
+    return session.missing;
+  }
 
   @override
   int slotsOf(String runnerId) {
@@ -237,7 +285,7 @@ class RunnerHub implements RemoteLeases, RemoteJobs, RunnerPresence {
   Future<void> revoked(RunnerRecord runner) async {
     final session = _sessions.remove(runner.id);
     if (session != null) {
-      _drop(session, announce: true);
+      _drop(session, announce: true, reason: 'revoked');
       unawaited(
         session.link
             .close(runnerRevokedCloseCode, 'revoked')
@@ -278,7 +326,7 @@ class RunnerHub implements RemoteLeases, RemoteJobs, RunnerPresence {
         );
       }
       final now = _clock.now();
-      final until = now.add(_leaseLength);
+      final until = now.add(leaseLength);
       final lease = _Lease(
         id: 'lse_${_hex(8)}',
         jobId: jobId,
@@ -435,10 +483,18 @@ class RunnerHub implements RemoteLeases, RemoteJobs, RunnerPresence {
     }
     for (final session in _sessions.values.toList()) {
       final deadline = session.probeDeadline;
-      final silent = now.difference(session.lastSeen) >= _leaseLength;
+      final silent = now.difference(session.lastSeen) >= leaseLength;
       if (silent || (deadline != null && !now.isBefore(deadline))) {
         _sessions.remove(session.record.id);
-        _drop(session, announce: true);
+        final why = silent
+            ? 'no frame for ${leaseLength.inSeconds} s'
+            : 'the probe timed out';
+        _drop(
+          session,
+          announce: true,
+          reason: why,
+          code: runnerTimeoutCloseCode,
+        );
         unawaited(
           session.link
               .close(
@@ -637,18 +693,26 @@ class RunnerHub implements RemoteLeases, RemoteJobs, RunnerPresence {
     }
   }
 
-  Future<void> _onClosed(_Session session) async {
+  Future<void> _onClosed(_Session session, int? code) async {
     session.closed = true;
     if (!identical(_sessions[session.record.id], session)) return;
     _sessions.remove(session.record.id);
-    _drop(session, announce: true);
+    _drop(
+      session,
+      announce: true,
+      reason: switch (code) {
+        1000 || 1001 => 'the runner closed the connection',
+        null || 1005 || 1006 => 'the connection dropped',
+        final code => 'the runner closed the connection with code $code',
+      },
+    );
   }
 
   Future<void> _closeSession(_Session session, int code, String reason) async {
     if (identical(_sessions[session.record.id], session)) {
       _sessions.remove(session.record.id);
     }
-    _drop(session, announce: true);
+    _drop(session, announce: true, reason: reason, code: code);
     try {
       await session.link.close(code, reason);
     } on Object {
@@ -658,12 +722,23 @@ class RunnerHub implements RemoteLeases, RemoteJobs, RunnerPresence {
 
   /// Takes the session out of the scheduler. Only a session that took part
   /// in scheduling was announced as connected, so only such a session is
-  /// announced as disconnected, and not when another connection of the same
-  /// runner replaced it ([announce] false).
-  void _drop(_Session session, {required bool announce}) {
+  /// announced as disconnected, with the [reason], and not when another
+  /// connection of the same runner replaced it ([announce] false). A session
+  /// the hub closes with [code] before that is reported as refused.
+  void _drop(
+    _Session session, {
+    required bool announce,
+    String? reason,
+    int? code,
+  }) {
     session.closed = true;
     final remote = session.remote;
-    if (remote == null) return;
+    if (remote == null) {
+      if (code != null && announce) {
+        onRefused?.call(session.record.name, '$reason ($code)');
+      }
+      return;
+    }
     session.remote = null;
     _scheduler.removeRunner(session.record.id);
     if (announce) {
@@ -671,6 +746,7 @@ class RunnerHub implements RemoteLeases, RemoteJobs, RunnerPresence {
         RunnerDisconnected(
           runnerId: session.record.id,
           name: session.record.name,
+          reason: reason,
         ),
       );
     }
@@ -707,9 +783,18 @@ class RunnerHub implements RemoteLeases, RemoteJobs, RunnerPresence {
       ..probeId = null
       ..probeDeadline = null;
     final before = session.record.capabilities;
-    final found = _probe.evaluate(frame.results).capabilities;
+    final findings = _probe.evaluate(frame.results);
+    final found = findings.capabilities;
     await _save(session, (stored) => stored.copyWith(capabilities: found));
     final record = session.record;
+    session.missing = findings.missing;
+    _send(
+      session,
+      ProbedFrame(
+        capabilities: RunnerRecord.wireNames(found),
+        missing: findings.missing,
+      ),
+    );
     if (!(before.length == found.length && before.containsAll(found))) {
       _events.append(
         RunnerCapabilitiesChanged(
@@ -846,7 +931,7 @@ class RunnerHub implements RemoteLeases, RemoteJobs, RunnerPresence {
       await _loseLocked(lease.jobId, 'lapsed', tell: false);
       return null;
     }
-    final renewed = now.add(_leaseLength);
+    final renewed = now.add(leaseLength);
     final held = await _jobs.renewLease(
       lease.jobId,
       runnerId: lease.runnerId,
@@ -1218,8 +1303,9 @@ class RunnerConnection {
   Future<void> receive(RunnerFrame frame) =>
       _enqueue(() => _hub._onFrame(_session, frame));
 
-  /// The socket ended.
-  Future<void> closed() => _enqueue(() => _hub._onClosed(_session));
+  /// The socket ended, with the close [code] the runner sent, if any.
+  Future<void> closed([int? code]) =>
+      _enqueue(() => _hub._onClosed(_session, code));
 
   Future<void> _enqueue(Future<void> Function() handle) {
     final next = _tail.then((_) async {

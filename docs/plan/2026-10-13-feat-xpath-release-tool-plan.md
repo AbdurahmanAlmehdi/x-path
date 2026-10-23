@@ -67,7 +67,7 @@ Accepted by the owner on 2026-10-13 (grilling rounds 1 to 4, plus the post-resea
 | D-21 | Tests: `flutter test --machine` results per test, `flutter analyze`, baseline = last green run on the base branch. Device integration tests out of scope. |
 | D-22 | Extras in 1.0: artifact retention + "free up space", Firebase App Distribution, R8 / dSYM / Shorebird symbol storage, release notes (Slack and WhatsApp text), macOS + Slack notifications, preflight checks (closed train, build-number reuse, Play target SDK), `min_version_*` reminder. |
 | D-23 | Distribution: Developer ID signed, notarized DMG on GitHub Releases, Sparkle 2 embedded directly, Homebrew cask in `AbdurahmanAlmehdi/homebrew-tap`. Linux: bundle tarball, install script, Docker image. Developer ID cert from team AFBD5TBR5U. |
-| D-24 | Defaults: no telemetry; logs kept 90 days; light and dark themes; app accepts an engine one minor version behind; engine updates only when idle and backs up the DB before migrating; runners update between jobs. |
+| D-24 | Defaults: no telemetry; logs kept 90 days; light and dark themes; the app, the CLI and `xp mcp` accept an engine of the same API version (every 1.x release is API 1), so they need not be upgraded with it; engine updates only when idle and backs up the DB before migrating; a runner always runs its engine's version, updating itself between jobs, and does not check for releases itself. |
 
 ## Technical Approach
 

@@ -175,10 +175,17 @@ void main() {
         }
       });
 
-      test('pairs and revokes runners', () {
+      test('lists, pairs and revokes runners', () {
         expect(
           env.runner.commands['runners']!.subcommands.keys,
-          unorderedEquals(['pair', 'revoke']),
+          unorderedEquals(['list', 'pair', 'revoke', 'url']),
+        );
+      });
+
+      test('checks a runner machine with doctor', () {
+        expect(
+          env.runner.commands['runner']!.subcommands.keys,
+          contains('doctor'),
         );
       });
 
@@ -215,6 +222,16 @@ void main() {
         when(() => env.client.listProjects()).thenAnswer((_) async => []);
 
         await env.runOk(['--json', 'projects', 'list']);
+
+        expect(env.update.calls, 0);
+        expect(env.logger.warnings, isEmpty);
+      });
+
+      test('does not look for an update for a runner: it follows its '
+          'engine', () async {
+        env.update.newer = '9.9.9';
+
+        await env.run(['runner', 'doctor', '--help']);
 
         expect(env.update.calls, 0);
         expect(env.logger.warnings, isEmpty);

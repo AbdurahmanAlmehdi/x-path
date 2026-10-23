@@ -11,6 +11,16 @@ import 'package:xp/src/runner/update/runner_versions.dart';
 import 'package:xp/src/version.dart';
 import 'package:xp_adapters/xp_adapters.dart';
 
+/// The manager of the runner service on [host], in [scope].
+ServiceManager runnerServiceManager(RunnerHost host, ServiceScope scope) =>
+    ServiceManager.forPlatform(
+      operatingSystem: host.operatingSystem,
+      runner: host.runner,
+      home: host.home,
+      user: host.environment['USER'] ?? host.environment['LOGNAME'] ?? '',
+      scope: scope,
+    );
+
 /// The base of the commands that manage the service of a runner.
 abstract class _ServiceCommand extends Command<int> {
   new(this._context, this._host) {
@@ -33,13 +43,7 @@ abstract class _ServiceCommand extends Command<int> {
   ServiceScope get _scope =>
       argResults!.flag('system') ? ServiceScope.system : ServiceScope.user;
 
-  ServiceManager get _manager => ServiceManager.forPlatform(
-    operatingSystem: _host.operatingSystem,
-    runner: _host.runner,
-    home: _host.home,
-    user: _host.environment['USER'] ?? _host.environment['LOGNAME'] ?? '',
-    scope: _scope,
-  );
+  ServiceManager get _manager => runnerServiceManager(_host, _scope);
 
   Future<int> _guarded(Future<int> Function() body) async {
     try {
@@ -205,6 +209,17 @@ class RunnerInstallServiceCommand extends _ServiceCommand {
           ),
       slots: slots,
       logsToFiles: isMacOS,
+      // Set at install time, for example by `install.sh --with-android` with
+      // an SDK outside the places Flutter looks in.
+      tools: {
+        for (final name in const [
+          'ANDROID_HOME',
+          'ANDROID_SDK_ROOT',
+          'JAVA_HOME',
+        ])
+          if (_host.environment[name] case final value? when value.isNotEmpty)
+            name: value,
+      },
       credential: switch ((encrypted, plain)) {
         (final file?, _) => ServiceCredential(
           name: runnerMasterKeyCredentialName,

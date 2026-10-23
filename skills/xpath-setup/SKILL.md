@@ -184,8 +184,10 @@ A runner is another machine that runs build jobs: a Mac for `ios-sign`, a Linux 
 `android`, `flutter` and `swift-linux`.
 
 ```sh
-xp runners pair mac-mini           # on a machine with a cli token: prints a pairing token once
-xp runner pair --engine https://xpath.example.com --token xpp_...   # on the runner machine
+xp runners url https://mac.tailnet.ts.net   # once: the address runners reach the engine at
+xp runners pair mac-mini           # on a machine with a cli token: prints the pairing command once
+xp runner pair --engine https://mac.tailnet.ts.net --token xpp_...   # on the runner machine
+xp runner doctor                   # on the runner: will it get jobs, and why not
 xp runner start [--slots 4]        # or keep it running:
 xp runner install-service [--slots 4]
 xp runner service-status
@@ -195,9 +197,22 @@ xp runners revoke mac-mini
 The user runs the pairing commands: the pairing token (`xpp_...`) is single use, valid for 15
 minutes and bound to the runner's name. The runner keeps its credential in the machine's secret
 store and dials out to the engine. It fetches the source with its own SSH key, so add the
-runner's key as a deploy key on the repository and run `ssh -T git@github.com` once. A runner on
-another machine should reach the engine through TLS (a reverse proxy or a tunnel): the socket
-carries signing material. The engine prints the capabilities it found for itself at start.
+runner's key as a deploy key on the repository and run `ssh -T git@github.com` once. The engine
+prints the capabilities it found for itself at start, and the runner prints what it offers and,
+for each capability it lacks, why and the fix.
+
+Reaching the engine from another machine (the engine listens on loopback only; the socket carries
+signing material, so never `--host 0.0.0.0` over plain http):
+
+1. **Tailscale (recommended).** Tailscale on both machines, MagicDNS and HTTPS Certificates on in
+   the admin console, then on the engine's Mac `tailscale serve --bg http://127.0.0.1:7480` and
+   `xp runners url https://<mac>.<tailnet>.ts.net` (`tailscale serve status` prints the name).
+2. **Cloudflare Tunnel.** `cloudflared tunnel run --url http://127.0.0.1:7480 <tunnel>` with a DNS
+   route; Cloudflare Access in front is not supported yet.
+3. **SSH reverse tunnel.** `autossh -M 0 -N -R 127.0.0.1:7480:127.0.0.1:7480 user@runner` from the
+   Mac; the runner then pairs with `http://127.0.0.1:7480`.
+
+The full recipes: `docs/guide/runners.md#reaching-the-engine` in the XPath repository.
 
 ## Health, data and logs
 

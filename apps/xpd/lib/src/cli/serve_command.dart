@@ -3,9 +3,11 @@ import 'dart:io';
 
 import 'package:path/path.dart' as p;
 import 'package:xp_adapters/xp_adapters.dart';
+import 'package:xp_api/xp_api.dart' show runnerLeaseSeconds;
 import 'package:xp_engine/xp_engine.dart';
 import 'package:xp_secrets/xp_secrets.dart';
 import 'package:xpd/src/cli/gh_executable.dart';
+import 'package:xpd/src/cli/runner_log.dart';
 import 'package:xpd/src/cli/xpd_command.dart';
 import 'package:xpd/src/cli/xpd_context.dart';
 import 'package:xpd/src/credentials/credential_checks.dart';
@@ -416,22 +418,22 @@ class ServeCommand extends XpdCommand {
         events: events,
         clock: const SystemClock(),
       );
-      final capabilities = await LocalCapabilities(
+      final findings = await LocalCapabilities(
         runner: runner,
-        prober: ToolProber(runner: runner, isMacOS: isMacOS),
-        android: DirectoryAndroidSdk(
-          environment: context.environment,
-          home: context.environment['HOME'],
-        ),
-        isMacOS: isMacOS,
+        operatingSystem: isMacOS ? 'macos' : 'linux',
       ).probe();
+      final capabilities = findings.capabilities;
       final can = capabilities.isEmpty
           ? 'no capability'
           : capabilities.map((capability) => capability.wire).join(', ');
       context.out.writeln(
         'xpd runs jobs here with $slots slot${slots == 1 ? '' : 's'} and $can',
       );
+      for (final missing in findings.missing) {
+        context.out.writeln('no ${missing.capability}: ${missing.explanation}');
+      }
       final runRepository = SqliteRunRepository(database);
+      final runnerRepository = SqliteRunnerRepository(database);
       scheduler = Scheduler(
         runner: jobs,
         records: jobRepository,
@@ -546,8 +548,17 @@ class ServeCommand extends XpdCommand {
         tokens: SqliteDeviceTokenRepository(database),
         clock: const SystemClock(),
       );
-      final runnerRepository = SqliteRunnerRepository(database);
+      // The runners' comings and goings go to the engine log.
+      final runnerLog = RunnerLog(
+        context.out,
+        onError: (error) =>
+            context.err.writeln('warning: runner log line failed: $error'),
+      );
+      final leaseLength = Duration(
+        seconds: testing.leaseSeconds ?? runnerLeaseSeconds,
+      );
       final runnerHub = RunnerHub(
+        leaseLength: leaseLength,
         runners: runnerRepository,
         projects: projectRepository,
         jobs: jobRepository,
@@ -562,16 +573,21 @@ class ServeCommand extends XpdCommand {
         engineVersion: packageVersion,
         onError: (error, stackTrace) =>
             context.err.writeln('error: runner hub: $error\n$stackTrace'),
+        onRefused: (name, why) => runnerLog.refused('"$name"', why),
       );
-      scheduler.remoteJobs = runnerHub;
+      scheduler
+        ..remoteJobs = runnerHub
+        ..pairedRunners = runnerHub;
       final runnerService = RunnerService(
         runners: runnerRepository,
         pairing: SqlitePairingTokenRepository(database),
         tokens: tokenService,
         presence: runnerHub,
+        settings: SqliteEngineSettingRepository(database),
         events: events,
         clock: const SystemClock(),
       );
+      final runnerEvents = runnerLog.follow(events, runnerService);
       final server = await XpdServer.start(
         tokens: tokenService,
         events: events,
@@ -631,6 +647,7 @@ class ServeCommand extends XpdCommand {
         port: port,
         onError: (error, stackTrace) =>
             context.err.writeln('error: $error\n$stackTrace'),
+        onRunnerRefused: runnerLog.refused,
       );
       context.out.writeln('xpd listening on ${server.uri}');
       // The owner hears about what matters, in the app and in Slack (D-22).
@@ -684,6 +701,11 @@ class ServeCommand extends XpdCommand {
       // (D-08).
       final leaseSweeper = LeaseSweeper(
         hub: runnerHub,
+        // Every 10 s, or as often as heartbeats when a test shortened the
+        // lease.
+        interval: runnerHub.heartbeatInterval < const Duration(seconds: 10)
+            ? runnerHub.heartbeatInterval
+            : const Duration(seconds: 10),
         onError: (error, stackTrace) =>
             context.err.writeln('warning: lease sweep failed: $error'),
       );
@@ -701,6 +723,7 @@ class ServeCommand extends XpdCommand {
       await releaseWatcher.stop();
       housekeepingSchedule.stop();
       await notifier.stop();
+      await runnerEvents.cancel();
       slackWebhook.close();
       credentialChecks.close();
       github.close();
