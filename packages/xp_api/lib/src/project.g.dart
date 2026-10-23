@@ -59,9 +59,14 @@ AddProjectRequest _$AddProjectRequestFromJson(Map<String, dynamic> json) =>
       final val = AddProjectRequest(
         path: $checkedConvert('path', (v) => v as String?),
         remote: $checkedConvert('remote', (v) => v as String?),
+        sshUrl: $checkedConvert('sshUrl', (v) => v as String?),
       );
       return val;
     });
 
 Map<String, dynamic> _$AddProjectRequestToJson(AddProjectRequest instance) =>
-    <String, dynamic>{'path': ?instance.path, 'remote': ?instance.remote};
+    <String, dynamic>{
+      'path': ?instance.path,
+      'remote': ?instance.remote,
+      'sshUrl': ?instance.sshUrl,
+    };

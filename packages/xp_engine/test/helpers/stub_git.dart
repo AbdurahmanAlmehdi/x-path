@@ -99,6 +99,9 @@ class StubGit implements GitService {
   }
 
   @override
+  Future<String> lsRemote(String url) => throw UnimplementedError();
+
+  @override
   Future<GitMirror> ensureMirror({
     required String key,
     required String remoteUrl,

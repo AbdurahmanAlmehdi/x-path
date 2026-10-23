@@ -10,6 +10,7 @@ import 'package:xp_engine/src/git/git_models.dart';
 import 'package:xp_engine/src/git/git_service.dart';
 import 'package:xp_engine/src/jobs/job_repository.dart';
 import 'package:xp_engine/src/jobs/job_runner.dart';
+import 'package:xp_engine/src/projects/git_remote.dart';
 import 'package:xp_engine/src/projects/project_record.dart';
 import 'package:xp_engine/src/projects/project_repository.dart';
 import 'package:xp_engine/src/releases/release_exceptions.dart';
@@ -112,7 +113,8 @@ class WorkflowDispatcher {
   /// Throws a `ProjectNotFoundException`, a [WorkflowNotFoundException], a
   /// [WorkflowInvalidException] when the document no longer is valid, a
   /// [DispatchException] when the request asks for something the project
-  /// cannot do, and a `GitException` or `GitHub` failure when the mirror
+  /// cannot do (a GitHub step on a project that is not on GitHub, ADR 0015),
+  /// and a `GitException` or `GitHub` failure when the mirror
   /// cannot be fetched.
   Future<Run> dispatch(
     String projectId,
@@ -132,6 +134,7 @@ class WorkflowDispatcher {
     final inputs = _inputs(definition, request.inputs);
     final steps = definition.jobs.expand((job) => job.steps).toList();
     final kinds = {for (final step in steps) step.kind};
+    _refuseGitHubSteps(project, stored.workflow.name, kinds);
 
     final mirror = await _git.ensureMirror(
       key: project.sourceKey,
@@ -251,6 +254,31 @@ class WorkflowDispatcher {
   }
 
   // -------------------------------------------------------------- releases
+
+  /// Refuses a workflow with a step that needs GitHub on a [project] that is
+  /// not on GitHub (Q3 of the runner plan, ADR 0015): `github.*` steps call
+  /// the GitHub API, and `git.push` pushes with the GitHub token only.
+  static void _refuseGitHubSteps(
+    ProjectRecord project,
+    String workflow,
+    Set<String> kinds,
+  ) {
+    if (project.isOnGitHub) return;
+    final step = kinds
+        .where((kind) => kind.startsWith('github.') || kind == 'git.push')
+        .firstOrNull;
+    if (step == null) return;
+    final where = project.host == GitRemote.localHost
+        ? 'a local repository'
+        : 'on ${project.host}';
+    throw DispatchException(
+      '${project.fullName} is $where, not on GitHub, so "$workflow" cannot '
+      'run: its "$step" step works only on GitHub, where XPath pushes and '
+      'opens pull requests with its GitHub token. Run a workflow without '
+      'GitHub steps, such as dev-build or test, or keep a private mirror of '
+      'the repository on GitHub and add that as the project.',
+    );
+  }
 
   /// The release of each job, by job id: the releases a workflow that cuts a
   /// release branch makes (one per flavor), or the release the request names.

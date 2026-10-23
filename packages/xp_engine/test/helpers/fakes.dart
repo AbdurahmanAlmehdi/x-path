@@ -93,6 +93,20 @@ class FakeGitService implements GitService {
   /// If set, [ensureMirror] waits for it.
   Future<void>? gate;
 
+  /// The default branch [lsRemote] reads.
+  String defaultBranch = 'main';
+
+  /// Set to make [lsRemote] fail with it.
+  Exception? lsRemoteFailure;
+
+  @override
+  Future<String> lsRemote(String url) async {
+    calls.add('lsRemote $url');
+    final failure = lsRemoteFailure;
+    if (failure != null) throw failure;
+    return defaultBranch;
+  }
+
   @override
   Future<GitMirror> ensureMirror({
     required String key,

@@ -24,6 +24,15 @@ abstract interface class GitService {
     required String remoteUrl,
   });
 
+  /// The default branch of the repository at [url], read over the network
+  /// without a mirror (`git ls-remote --symref <url> HEAD`). It proves that
+  /// the engine can read the repository (ADR 0015).
+  ///
+  /// Throws an `ArgumentError` for a [url] that looks like an option, and a
+  /// `GitException` with git's message when the repository cannot be read or
+  /// has no branch yet.
+  Future<String> lsRemote(String url);
+
   /// Brings [mirror] up to date with `origin`: branches under
   /// `refs/remotes/origin/*` and all tags, pruning what the remote no longer
   /// has.

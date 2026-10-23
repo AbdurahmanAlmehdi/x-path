@@ -120,14 +120,15 @@ class ProjectsResponse extends Equatable {
   List<Object?> get props => [projects];
 }
 
-/// The body of `POST /projects`: exactly one of [path] and [remote].
+/// The body of `POST /projects`: exactly one of [path] and [remote], and
+/// with [path] maybe the [sshUrl] the owner confirmed.
 ///
 /// Reading a request from JSON fails with a `CheckedFromJsonException` for a
 /// field of the wrong type.
 @JsonSerializable(includeIfNull: false, checked: true)
 class AddProjectRequest extends Equatable {
   /// Creates a request.
-  const new({this.path, this.remote});
+  const new({this.path, this.remote, this.sshUrl});
 
   /// Reads a request from its JSON form.
   factory AddProjectRequest.fromJson(Map<String, dynamic> json) =>
@@ -137,12 +138,20 @@ class AddProjectRequest extends Equatable {
   /// `origin` identifies the repository and its files seed the scan.
   final String? path;
 
-  /// A GitHub repository: `owner/name`, or an HTTPS or SSH URL.
+  /// A GitHub repository (`owner/name`, or an HTTPS or SSH URL), or a
+  /// repository on any other host by its SSH URL (scp-like or `ssh://`) or
+  /// `file://` URL (ADR 0015).
   final String? remote;
+
+  /// With [path]: the SSH URL to fetch from when the folder's `origin` is an
+  /// HTTPS URL on a host other than GitHub. It is the URL the engine offered
+  /// with `ssh_url_required`, which the owner confirmed; it must name the
+  /// same repository. The folder's clone is not changed.
+  final String? sshUrl;
 
   /// The JSON form.
   Map<String, dynamic> toJson() => _$AddProjectRequestToJson(this);
 
   @override
-  List<Object?> get props => [path, remote];
+  List<Object?> get props => [path, remote, sshUrl];
 }

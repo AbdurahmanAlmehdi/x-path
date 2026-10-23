@@ -354,7 +354,7 @@ void main() {
     test('names a local repository by its folder', () async {
       printed = ['err:fatal: Could not read from remote repository.'];
       final denied = await failureOn('file:///srv/git/app.git');
-      expect(denied, contains('cannot read srv/git/app over SSH'));
+      expect(denied, contains('cannot read srv/git/app. Fix'));
       expect(denied, contains('let the user of this runner read'));
 
       printed = ['err:fatal: remote error: upload-pack: not our ref $_sha'];

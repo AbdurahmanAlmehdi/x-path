@@ -435,13 +435,24 @@ cannot name the home folder). The jobs, the tool probes and every program the en
 
 ## Projects and scans
 
-A project is a GitHub repository, keyed by its GitHub repository id (D-05). The folder you pick only
-identifies the repository and seeds the first scan; builds run from the engine's own bare mirror.
+A project is a repository, keyed by its source key (D-05, ADR 0015): the GitHub repository id for a GitHub
+project, `h` and 16 hex digits of the SHA-256 of the normalised remote for any other host. The folder you pick
+only identifies the repository and seeds the first scan; builds run from the engine's own bare mirror.
+
+**Other git hosts** (Bitbucket, GitLab, any SSH server, a `file://` repository) are added by an SSH URL
+(`git@host:path` or `ssh://`) or a `file://` URL. The engine reads them with its own SSH key
+(`~/.ssh/id_ed25519.pub` of the user it runs as, with no passphrase: the LaunchAgent has no terminal) and
+`GIT_SSH_COMMAND='ssh -o BatchMode=yes -o ConnectTimeout=30 -o StrictHostKeyChecking=accept-new'`, so the first
+connection records the host key and a changed one fails. Adding proves access with `git ls-remote` and, when it
+fails, says where to add the key (an access key on Bitbucket). An HTTPS origin on another host answers `422
+ssh_url_required` with the SSH URL of the same repository; add it again with that URL (`sshUrl` with a folder).
+Only workflows without a `github.*` or `git.push` step run on such a project (`dev-build`, `test`, or custom ones
+like them); the others are refused at dispatch with the reason. Pull requests on other hosts are later work.
 All routes need a device token.
 
 | Route | What it does |
 |---|---|
-| `POST /projects` | Adds a project from `{"path": "/abs/clone"}` (reads its `origin`) or `{"remote": "owner/name"}` (or a GitHub URL), asks GitHub for the repository, sets up the mirror and scans. `409` if it is a project already. |
+| `POST /projects` | Adds a project from `{"path": "/abs/clone"}` (reads its `origin`) or `{"remote": "owner/name"}` (or a GitHub URL, or the SSH or `file://` URL of another host), asks GitHub for a GitHub repository or runs `git ls-remote` for another one, sets up the mirror and scans. `409` if it is a project already; `422 ssh_url_required` (with `sshUrl`) for an HTTPS origin on another host. |
 | `GET /projects`, `GET /projects/{id}` | The projects, each with its profile and the findings of the last scan. |
 | `POST /projects/{id}/scan` | Scans again: the folder it was added from if it still exists, else a fresh worktree of the mirror. Follows a GitHub rename or a new default branch. |
 | `PATCH /projects/{id}` | Edits the profile (production flavor, store country, base branch, Shorebird, ids, version files). Edits are kept apart from the scan and applied on top of every scan, so a rescan never undoes them. |
@@ -1291,6 +1302,11 @@ Android SDK or Xcode and takes about four minutes, most of it the production lea
 can. The build job of `dev-build` goes to the runner (its own checkout, a real APK), the check and the upload (to a
 local fake Firebase) stay on the engine, and the APK in the engine store is the one the runner built.
 
+`tool/e2e/runner_any_host_e2e.sh` (ADR 0015) runs it with `--mode runner-any-host`: the same build for a project whose
+origin is a `file://` bare repository, on an engine with no GitHub token. The engine adds it without GitHub, the
+runner fetches the commit from the URL of the lease into a cache named by the source key, and `prod-release` is
+refused at dispatch with the host and its `git.push` step.
+
 ## Runners
 
 A runner is a machine that runs jobs for the engine (D-08, D-19): another Mac for `ios-sign`, a Linux box for
@@ -1723,7 +1739,7 @@ escaped) and WhatsApp text (`*bold*`, the link as plain text). `409` while the r
 xpd token create --name "My Mac" --kind cli                     # on the engine machine; printed once
 xpd token create --name "Claude" --kind mcp                     # a second token, for `xp mcp`
 xp connect http://127.0.0.1:7480 --token <cli token> --mcp-token <mcp token>
-xp projects add acme/app            # or a folder on the engine machine
+xp projects add acme/app            # or a folder on the engine machine, or git@bitbucket.org:ws/app.git
 xp workflows list acme/app
 xp dispatch acme/app dev-build --flavor dev --platform android
 xp logs -f <job id>

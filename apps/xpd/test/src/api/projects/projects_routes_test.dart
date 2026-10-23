@@ -147,7 +147,7 @@ void main() {
     });
 
     test(
-      'rejects a folder that is not there and a remote that is not GitHub',
+      'rejects a folder that is not there and a remote it cannot reach',
       () async {
         final missing = await send(
           'POST',
@@ -157,13 +157,41 @@ void main() {
         final other = await send(
           'POST',
           '/projects',
-          json: {'remote': 'https://example.com/x/y'},
+          json: {'remote': 'svn://example.com/x/y'},
         );
 
         expect(missing.statusCode, 400);
         expect(other.statusCode, 400);
       },
     );
+
+    test('adds a repository on another host by its SSH URL', () async {
+      engine.github.failure = Exception('GitHub must not be asked');
+
+      final project = await add({'remote': 'git@bitbucket.org:ws/app.git'});
+
+      expect(project.host, 'bitbucket.org');
+      expect(project.sourceKey, matches(RegExp(r'^h[0-9a-f]{16}$')));
+      expect(project.githubRepoId, isNull);
+      expect(project.fullName, 'ws/app');
+    });
+
+    test('offers the SSH URL of an HTTPS remote on another host', () async {
+      final response = await send(
+        'POST',
+        '/projects',
+        json: {'remote': 'https://bitbucket.org/ws/app.git'},
+      );
+
+      expect(response.statusCode, 422);
+      expect(errorCode(response), 'ssh_url_required');
+      expect(
+        errorMessage(response),
+        'XPath has no credentials for bitbucket.org over HTTPS; use the SSH '
+        'URL git@bitbucket.org:ws/app.git.',
+      );
+      expect(response.json['sshUrl'], 'git@bitbucket.org:ws/app.git');
+    });
 
     test('answers 409 for a repository that is a project already', () async {
       final first = await add();

@@ -114,21 +114,27 @@ paths:
           $ref: "#/components/responses/InternalError"
     post:
       operationId: addProject
-      summary: Add a GitHub repository as a project, and scan it.
+      summary: Add a repository as a project, and scan it.
       description: |
         Give exactly one of `path` and `remote`.
 
         With `path` (an absolute folder on the engine's machine), the engine
-        reads the `origin` of the clone to find the repository, asks GitHub
-        for it, sets up its own mirror and scans the folder. The folder only
-        identifies the repository and seeds the scan (D-05); nothing is
-        written to it (D-04).
+        reads the `origin` of the clone to find the repository, sets up its
+        own mirror and scans the folder. The folder only identifies the
+        repository and seeds the scan (D-05); nothing is written to it (D-04).
 
-        With `remote` (`owner/name` or a GitHub URL), the engine fetches the
-        repository into its mirror and scans the default branch there.
+        With `remote`, the engine fetches the repository into its mirror and
+        scans the default branch there.
 
-        Projects are keyed by the GitHub repository id: a repository that is a
-        project already answers `409 conflict`.
+        A repository on GitHub (`owner/name` or a GitHub URL) is read with the
+        engine's GitHub token. Any other host is read over SSH with the
+        engine's own key, from an SSH URL (scp-like or `ssh://`) or a
+        `file://` URL (ADR 0015); `git ls-remote` proves access first. An
+        HTTPS origin on another host answers `422 ssh_url_required` with the
+        SSH URL of the same repository; add the project again with it.
+
+        Projects are keyed by their source key: a repository that is a project
+        already answers `409 conflict`.
       requestBody:
         required: true
         content:
@@ -154,6 +160,8 @@ paths:
           $ref: "#/components/responses/NotFound"
         "409":
           $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/SshUrlRequired"
         "502":
           $ref: "#/components/responses/UpstreamError"
         "503":
@@ -2416,6 +2424,15 @@ components:
       schema:
         $ref: "#/components/schemas/CredentialKind"
   responses:
+    SshUrlRequired:
+      description: |
+        The origin is an HTTPS URL on a host other than GitHub, which XPath
+        has no credentials for; `sshUrl` is the SSH URL of the same
+        repository (ADR 0015).
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/SshUrlRequiredResponse"
     CredentialInUse:
       description: |
         The credential is used by flavors, so it was not deleted; `usedBy`
@@ -2533,6 +2550,7 @@ components:
         - resync_required
         - credential_rejected
         - workflow_invalid
+        - ssh_url_required
         - upgrade_required
         - internal
         - upstream_error
@@ -2567,6 +2585,26 @@ components:
               type: string
         approval:
           $ref: "#/components/schemas/Approval"
+    SshUrlRequiredResponse:
+      type: object
+      required: [error, sshUrl]
+      additionalProperties: false
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          additionalProperties: false
+          properties:
+            code:
+              $ref: "#/components/schemas/ErrorCode"
+            message:
+              type: string
+        sshUrl:
+          type: string
+          description: |
+            The SSH URL of the repository the HTTPS origin names, for example
+            `git@bitbucket.org:ws/app.git`. Send it back as `sshUrl` (with
+            `path`) or as `remote` to use it.
     CredentialInUseResponse:
       type: object
       required: [error, usedBy]
@@ -2913,16 +2951,25 @@ components:
             $ref: "#/components/schemas/Project"
     AddProjectRequest:
       type: object
-      description: Exactly one of `path` and `remote`.
+      description: |
+        Exactly one of `path` and `remote`; `sshUrl` only with `path`.
       additionalProperties: false
       properties:
         path:
           type: string
         remote:
           type: string
+        sshUrl:
+          type: string
+          description: |
+            The SSH URL the owner confirmed for a folder whose `origin` is an
+            HTTPS URL on a host other than GitHub: the one a
+            `422 ssh_url_required` answer offered (ADR 0015).
       oneOf:
         - required: [path]
         - required: [remote]
+          not:
+            required: [sshUrl]
     FlavorEdit:
       type: object
       required: [name]

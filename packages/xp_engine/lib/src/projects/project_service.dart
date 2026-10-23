@@ -3,12 +3,15 @@ import 'dart:math';
 
 import 'package:xp_api/xp_api.dart';
 import 'package:xp_engine/src/clock/clock.dart';
+import 'package:xp_engine/src/git/git_access.dart';
+import 'package:xp_engine/src/git/git_exceptions.dart';
 import 'package:xp_engine/src/git/git_models.dart';
 import 'package:xp_engine/src/git/git_service.dart';
 import 'package:xp_engine/src/git/github_client.dart';
 import 'package:xp_engine/src/git/github_exceptions.dart';
 import 'package:xp_engine/src/process/process_runner.dart';
 import 'package:xp_engine/src/projects/apply_edits.dart';
+import 'package:xp_engine/src/projects/git_remote.dart';
 import 'package:xp_engine/src/projects/github_remote.dart';
 import 'package:xp_engine/src/projects/project_exceptions.dart';
 import 'package:xp_engine/src/projects/project_record.dart';
@@ -24,11 +27,16 @@ typedef ScanSourceFactory = ScanSource Function(String directory);
 
 /// Adds, scans, edits and removes projects (D-04, D-05).
 ///
-/// A project is a GitHub repository, keyed by its id. Adding by path reads the
-/// `origin` of the folder, asks GitHub for the repository, sets up the
-/// engine's own mirror and scans the folder: the folder only identifies the
-/// repository and seeds the scan. Adding by remote scans a fresh worktree of
-/// the mirror instead. Nothing is ever written to the folder.
+/// A project is a repository keyed by its source key (ADR 0015). Adding by
+/// path reads the `origin` of the folder, sets up the engine's own mirror and
+/// scans the folder: the folder only identifies the repository and seeds the
+/// scan. Adding by remote scans a fresh worktree of the mirror instead.
+/// Nothing is ever written to the folder.
+///
+/// A GitHub repository is asked of GitHub and keyed by its id. Any other one
+/// is reached over SSH or `file://` with the engine's own access: `git
+/// ls-remote` proves it and reads the default branch, and no GitHub call is
+/// made.
 ///
 /// Operations that change projects run one at a time.
 class ProjectService {
@@ -75,9 +83,12 @@ class ProjectService {
   /// Adds the repository that [request] names and scans it.
   ///
   /// Throws a [ProjectInvalidException] unless exactly one of path and remote
-  /// is given and it names a GitHub repository, a [ProjectExistsException] if
-  /// the repository is a project already, a `GitHubException` if GitHub
-  /// refuses and a `GitException` if the mirror cannot be filled.
+  /// is given and it names a repository XPath can reach, a
+  /// [ProjectSshUrlRequiredException] for an HTTPS origin on a host other
+  /// than GitHub without the confirmed SSH URL, a [ProjectExistsException]
+  /// if the repository is a project already, a `GitHubException` if GitHub
+  /// refuses and a `GitException` if the repository cannot be read (with
+  /// what to do on its host) or the mirror cannot be filled.
   Future<Project> add(AddProjectRequest request) => _exclusive(() async {
     final path = request.path;
     final remote = request.remote;
@@ -86,12 +97,13 @@ class ProjectService {
         'Give exactly one of "path" and "remote".',
       );
     }
-    if (path != null) return await _addFolder(path);
-    final parsed = GitHubRemote.parse(remote!);
-    if (parsed == null) {
-      throw ProjectInvalidException('"$remote" is not a GitHub repository.');
+    if (path == null && request.sshUrl != null) {
+      throw const ProjectInvalidException(
+        '"sshUrl" goes with "path"; give the SSH URL as "remote" instead.',
+      );
     }
-    return await _register(parsed, localPath: null);
+    if (path != null) return await _addFolder(path, request.sshUrl);
+    return await _addRemote(remote!, localPath: null, sshUrl: null);
   });
 
   /// Scans the project [id] again and keeps the owner's edits.
@@ -165,19 +177,62 @@ class ProjectService {
     return result;
   }
 
-  Future<Project> _addFolder(String path) async {
+  Future<Project> _addFolder(String path, String? sshUrl) async {
     if (!path.startsWith('/')) {
       throw ProjectInvalidException('"$path" is not an absolute path.');
     }
     if (!await _sources(path).exists('')) {
       throw ProjectInvalidException('"$path" is not a folder.');
     }
-    final url = await _originOf(path);
-    final remote = GitHubRemote.parse(url);
-    if (remote == null) {
-      throw ProjectInvalidException('The origin of $path is not on GitHub.');
+    final origin = await _originOf(path);
+    // A clone of a local repository names it by its folder.
+    final url = origin.startsWith('/') ? Uri.file(origin).toString() : origin;
+    return await _addRemote(url, localPath: path, sshUrl: sshUrl);
+  }
+
+  /// Adds the repository at [url]: a GitHub one through GitHub, any other
+  /// over SSH or `file://`. An HTTPS [url] on another host is read at
+  /// [sshUrl], the SSH URL the owner confirmed.
+  Future<Project> _addRemote(
+    String url, {
+    required String? localPath,
+    required String? sshUrl,
+  }) async {
+    if (GitHubRemote.parse(url) case final github?) {
+      if (sshUrl != null) {
+        throw const ProjectInvalidException(
+          'The repository is on GitHub, which XPath reaches with its GitHub '
+          'token: leave out "sshUrl".',
+        );
+      }
+      return await _register(github, localPath: localPath);
     }
-    return await _register(remote, localPath: path);
+    if (GitRemote.parse(url) case final remote?) {
+      if (sshUrl != null) {
+        throw const ProjectInvalidException(
+          '"sshUrl" is only for an HTTPS origin: leave it out.',
+        );
+      }
+      return await _registerOther(remote, url.trim(), localPath: localPath);
+    }
+    final derived = GitRemote.sshUrlFor(url);
+    if (derived == null) {
+      throw ProjectInvalidException(
+        '"$url" is not a repository XPath can reach. Give a GitHub '
+        'repository, an SSH URL (git@host:path or ssh://) or a file:// URL.',
+      );
+    }
+    final offered = GitRemote.parse(derived)!;
+    if (sshUrl == null) {
+      throw ProjectSshUrlRequiredException(host: offered.host, sshUrl: derived);
+    }
+    final confirmed = GitRemote.parse(sshUrl);
+    if (confirmed == null || confirmed.sourceKey != offered.sourceKey) {
+      throw ProjectInvalidException(
+        '"$sshUrl" is not the SSH URL of $url. Use $derived.',
+      );
+    }
+    return await _registerOther(confirmed, sshUrl.trim(), localPath: localPath);
   }
 
   /// The URL of `origin` in the clone at [path]. Only reads its config.
@@ -234,6 +289,54 @@ class ProjectService {
     );
     await _repository.add(record);
     _events.append(ProjectAdded(projectId: id, fullName: repo.fullName));
+    _scanned(record);
+    return record.toProject();
+  }
+
+  /// Registers the repository [remote] on a host other than GitHub, fetched
+  /// from [url] with the engine's own SSH access (ADR 0015).
+  Future<Project> _registerOther(
+    GitRemote remote,
+    String url, {
+    required String? localPath,
+  }) async {
+    final key = remote.sourceKey;
+    final existing = await _repository.findBySourceKey(key);
+    if (existing != null) {
+      throw ProjectExistsException(existing.id, existing.fullName);
+    }
+    final String branch;
+    try {
+      branch = await _git.lsRemote(url);
+    } on GitException catch (error) {
+      throw GitException(
+        explainGitAccess(
+              error.message,
+              url: url,
+              reader: GitAccessReader.engine,
+            ) ??
+            'XPath cannot read $url: ${error.message}',
+      );
+    }
+    final id = 'prj_${_hex(8)}';
+    final mirror = await _git.ensureMirror(key: key, remoteUrl: url);
+    final result = localPath != null
+        ? await _scanner.scan(_sources(localPath))
+        : await _scanMirror(mirror, branch, id);
+    final record = ProjectRecord(
+      id: id,
+      host: remote.host,
+      sourceKey: key,
+      fullName: remote.fullName,
+      remote: url,
+      githubDefaultBranch: branch,
+      localPath: localPath,
+      scan: _withDefaultBranch(result.profile, branch),
+      findings: result.findings,
+      scannedAt: _clock.now(),
+    );
+    await _repository.add(record);
+    _events.append(ProjectAdded(projectId: id, fullName: remote.fullName));
     _scanned(record);
     return record.toProject();
   }

@@ -120,6 +120,31 @@ class CliGitService implements GitService {
     return mirror;
   }
 
+  @override
+  Future<String> lsRemote(String url) async {
+    if (url.isEmpty || url.startsWith('-')) {
+      throw ArgumentError.value(url, 'url', 'is not a URL');
+    }
+    final output = await _git([
+      'ls-remote',
+      '--symref',
+      url,
+      'HEAD',
+    ], network: true);
+    if (output.exitCode != 0) throw _failure('ls-remote', output);
+    final head = _symbolicHead.firstMatch(output.stdout);
+    if (head == null) {
+      throw GitException('$url has no branch yet: push one, then try again.');
+    }
+    return head.group(1)!;
+  }
+
+  // `ref: refs/heads/main<TAB>HEAD`, the first line of `ls-remote --symref`.
+  static final _symbolicHead = RegExp(
+    r'^ref: refs/heads/(\S+)\tHEAD$',
+    multiLine: true,
+  );
+
   /// Fetches `refs/heads/*` into `refs/remotes/origin/*` and `refs/tags/*` into
   /// itself, both forced and pruned, so the mirror shows what the remote has.
   ///

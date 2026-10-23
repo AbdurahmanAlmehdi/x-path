@@ -46,6 +46,9 @@ class ScriptedGit implements GitService {
   }
 
   @override
+  Future<String> lsRemote(String url) => throw UnimplementedError();
+
+  @override
   Future<void> fetch(GitMirror mirror) async {
     calls.add('fetch');
     final failure = fetchFailure;

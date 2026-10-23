@@ -225,66 +225,18 @@ class RemoteCheckoutStep extends Step<GitCheckoutInput, GitCheckoutResult> {
   /// The message for a fetch that failed: what is wrong and what to do,
   /// for the host of [url].
   String _explain(_GitRun run, String url, String sha) {
-    final text = run.lines.join('\n').toLowerCase();
-    final github = GitHubRemote.parse(url);
-    final remote = GitRemote.parse(url);
-    final host = github != null ? 'github.com' : remote?.host;
-    // The SSH host, if there is one: not for a local repository.
-    final sshHost = host == GitRemote.localHost ? null : host;
-    final server = switch (host) {
-      'github.com' => 'GitHub',
-      null || GitRemote.localHost => 'The repository',
-      final host => host,
-    };
-    final repo = github?.fullName ?? remote?.fullName ?? url;
-    if (text.contains('host key verification failed') ||
-        text.contains('remote host identification has changed')) {
-      // SSH records a host key it has not seen (accept-new), so this is a
-      // key that differs from the one recorded.
-      if (sshHost == null) {
-        return 'The host key of the repository server is not the one SSH '
-            'on this machine recorded for it. If the server changed its key, '
-            'remove the old one with ssh-keygen -R as the user of this '
-            'runner, then run the job again.';
-      }
-      return 'The host key of $sshHost is not the one SSH on this machine '
-          'recorded for it. If $sshHost changed its key, remove the old one '
-          '(ssh-keygen -R $sshHost) as the user of this runner and run '
-          '"ssh -T git@$sshHost" once to check the new one, then run the job '
-          'again.';
-    }
-    if (text.contains('not our ref') ||
-        text.contains("couldn't find remote ref") ||
-        text.contains('unadvertised object') ||
-        text.contains('no such remote ref')) {
-      return '$server has no commit ${sha.substring(0, 12)} to give '
-          '($repo). It was not pushed or is not reachable from a branch. '
-          'Push it, then run the job again.';
-    }
-    if (text.contains('permission denied') ||
-        text.contains('could not read from remote repository') ||
-        text.contains('repository not found') ||
-        text.contains('access denied') ||
-        text.contains('authentication failed')) {
-      final fix = switch (host) {
-        'github.com' =>
-          "add this runner's SSH key as a deploy key on $repo "
-              '(GitHub: Settings, Deploy keys), or use the key of a user who '
-              'can read it',
-        'bitbucket.org' =>
-          "add this runner's SSH key as an access key of $repo "
-              '(Bitbucket: Repository settings, Access keys)',
-        null || GitRemote.localHost =>
-          'let the user of this runner read the repository',
-        final host =>
-          "add this runner's SSH key to $host with read access to $repo",
-      };
-      return 'This runner cannot read $repo over SSH. Fix: $fix, then run '
-          'the job again.';
-    }
+    final explained = explainGitAccess(
+      run.lines.join('\n'),
+      url: url,
+      reader: GitAccessReader.runner,
+      sha: sha,
+    );
+    if (explained != null) return explained;
+    final repo =
+        GitHubRemote.parse(url)?.fullName ?? GitRemote.parse(url)?.fullName;
     return 'git fetch failed (exit code ${run.exit.exitCode})'
         '${run.lines.isEmpty ? '' : ': ${run.lines.last}'}. Check that this '
-        'runner can reach $repo over SSH.';
+        'runner can reach ${repo ?? url} over SSH.';
   }
 }
 

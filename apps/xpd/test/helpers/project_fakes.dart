@@ -69,6 +69,9 @@ class FakeGit implements GitService {
   }) async => GitMirror(key: key, path: '/mirrors/$key.git');
 
   @override
+  Future<String> lsRemote(String url) async => 'main';
+
+  @override
   Future<void> fetch(GitMirror mirror) async {
     final failure = fetchFailure;
     if (failure != null) throw failure;

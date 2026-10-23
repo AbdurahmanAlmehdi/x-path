@@ -183,7 +183,7 @@ Details:
 
 ### Phase R10c: Adding, scanning and dispatching
 
-- **Status:** Not started
+- **Status:** Done
 - **Scope:** Projects whose origin is not GitHub can be added and scanned, and workflows that
   need GitHub are refused at dispatch with the reason.
 - **Files touched:** `packages/xp_engine/lib/src/projects/project_service.dart`,

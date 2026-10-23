@@ -32,6 +32,7 @@ export 'src/dispatch/plan_context.dart';
 export 'src/dispatch/step_planners.dart';
 export 'src/dispatch/workflow_dispatcher.dart';
 export 'src/engine_summary.dart';
+export 'src/git/git_access.dart';
 export 'src/git/git_exceptions.dart';
 export 'src/git/git_models.dart';
 export 'src/git/git_service.dart';

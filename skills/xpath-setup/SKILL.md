@@ -169,7 +169,7 @@ credential: the engine has one (**Settings** ▸ **GitHub**).
 ## Projects
 
 ```sh
-xp projects add acme/app           # or an absolute folder on the engine machine, or a GitHub URL
+xp projects add acme/app           # or an absolute folder on the engine machine, a GitHub URL, or git@bitbucket.org:ws/app.git
 xp projects show acme/app          # apps, flavors, ids and the findings of the scan
 xp projects scan acme/app
 ```
