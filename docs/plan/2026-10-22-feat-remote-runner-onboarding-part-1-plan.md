@@ -192,7 +192,7 @@ xp runner doctor [--data-dir <dir>] [--git-host github.com]...
 
 ### Phase R3: `xp runners list`, `list_runners`, engine log lines
 
-- **Status:** Not started
+- **Status:** Done
 - **Scope:** See every runner from the CLI and MCP, and see connects, disconnects and refusals
   in the engine log.
 - **Files touched:** `apps/xp/lib/src/commands/runners_commands.dart`,

@@ -124,6 +124,40 @@ class Runner extends Equatable {
   ];
 }
 
+/// What a runner is doing, as the app and the CLI show it.
+enum RunnerActivity {
+  /// Online and running no job.
+  idle,
+
+  /// Online and running jobs.
+  busy,
+
+  /// Finishing its jobs and taking no new one, before an update.
+  updating,
+
+  /// Offline while it still holds the leases of jobs: lost mid-job.
+  lost,
+
+  /// Offline.
+  offline,
+
+  /// Revoked by the owner.
+  revoked,
+}
+
+/// What [Runner.status] and its jobs mean for the owner.
+extension RunnerActivityOf on Runner {
+  /// What the runner is doing.
+  RunnerActivity get activity => switch (status) {
+    RunnerStatus.online when jobIds.isEmpty => RunnerActivity.idle,
+    RunnerStatus.online => RunnerActivity.busy,
+    RunnerStatus.draining => RunnerActivity.updating,
+    RunnerStatus.offline when jobIds.isNotEmpty => RunnerActivity.lost,
+    RunnerStatus.offline => RunnerActivity.offline,
+    RunnerStatus.revoked => RunnerActivity.revoked,
+  };
+}
+
 /// The body of `GET /runners`.
 @JsonSerializable(explicitToJson: true)
 class RunnersResponse extends Equatable {

@@ -175,10 +175,10 @@ void main() {
         }
       });
 
-      test('pairs and revokes runners', () {
+      test('lists, pairs and revokes runners', () {
         expect(
           env.runner.commands['runners']!.subcommands.keys,
-          unorderedEquals(['pair', 'revoke']),
+          unorderedEquals(['list', 'pair', 'revoke']),
         );
       });
 

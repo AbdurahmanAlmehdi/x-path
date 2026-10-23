@@ -15,6 +15,34 @@ void main() {
     });
   });
 
+  group('RunnerActivity', () {
+    Runner runner(RunnerStatus status, {List<String> jobs = const []}) =>
+        Runner(
+          id: 'rnr_1',
+          name: 'aws',
+          status: status,
+          capabilities: const [],
+          slots: 2,
+          jobIds: jobs,
+          createdAt: created,
+        );
+
+    test('reads the status and the jobs as the owner sees them', () {
+      expect(runner(RunnerStatus.online).activity, RunnerActivity.idle);
+      expect(
+        runner(RunnerStatus.online, jobs: ['job_1']).activity,
+        RunnerActivity.busy,
+      );
+      expect(runner(RunnerStatus.draining).activity, RunnerActivity.updating);
+      expect(
+        runner(RunnerStatus.offline, jobs: ['job_1']).activity,
+        RunnerActivity.lost,
+      );
+      expect(runner(RunnerStatus.offline).activity, RunnerActivity.offline);
+      expect(runner(RunnerStatus.revoked).activity, RunnerActivity.revoked);
+    });
+  });
+
   group('Runner', () {
     final minimal = Runner(
       id: 'rnr_1',

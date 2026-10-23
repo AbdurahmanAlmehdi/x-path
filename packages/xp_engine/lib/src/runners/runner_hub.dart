@@ -145,6 +145,7 @@ class RunnerHub implements RemoteLeases, RemoteJobs, RunnerPresence {
     this.probeTimeout = const Duration(seconds: 60),
     this.rejectCooldown = const Duration(seconds: 15),
     this.onError,
+    this.onRefused,
     this._probe = const RunnerProbe(),
     Random? random,
   }) : _random = random ?? Random.secure();
@@ -157,6 +158,11 @@ class RunnerHub implements RemoteLeases, RemoteJobs, RunnerPresence {
 
   /// Hears about failures of the engine's own bookkeeping.
   final void Function(Object error, StackTrace stackTrace)? onError;
+
+  /// Hears about a connection of the runner called `name` that the hub
+  /// closed before the runner took part in scheduling (a protocol error, a
+  /// probe that timed out), or that a newer connection replaced, and why.
+  final void Function(String name, String why)? onRefused;
 
   final RunnerRepository _runners;
   final ProjectRepository _projects;
@@ -191,6 +197,11 @@ class RunnerHub implements RemoteLeases, RemoteJobs, RunnerPresence {
     _sessions[runner.id] = session;
     if (previous != null) {
       _drop(previous, announce: false);
+      onRefused?.call(
+        runner.name,
+        'replaced by a new connection of the same runner '
+        '($runnerReplacedCloseCode)',
+      );
       unawaited(
         previous.link
             .close(runnerReplacedCloseCode, 'replaced by a new connection')
@@ -249,7 +260,7 @@ class RunnerHub implements RemoteLeases, RemoteJobs, RunnerPresence {
   Future<void> revoked(RunnerRecord runner) async {
     final session = _sessions.remove(runner.id);
     if (session != null) {
-      _drop(session, announce: true);
+      _drop(session, announce: true, reason: 'revoked');
       unawaited(
         session.link
             .close(runnerRevokedCloseCode, 'revoked')
@@ -450,7 +461,15 @@ class RunnerHub implements RemoteLeases, RemoteJobs, RunnerPresence {
       final silent = now.difference(session.lastSeen) >= _leaseLength;
       if (silent || (deadline != null && !now.isBefore(deadline))) {
         _sessions.remove(session.record.id);
-        _drop(session, announce: true);
+        final why = silent
+            ? 'no frame for ${_leaseLength.inSeconds} s'
+            : 'the probe timed out';
+        _drop(
+          session,
+          announce: true,
+          reason: why,
+          code: runnerTimeoutCloseCode,
+        );
         unawaited(
           session.link
               .close(
@@ -649,18 +668,26 @@ class RunnerHub implements RemoteLeases, RemoteJobs, RunnerPresence {
     }
   }
 
-  Future<void> _onClosed(_Session session) async {
+  Future<void> _onClosed(_Session session, int? code) async {
     session.closed = true;
     if (!identical(_sessions[session.record.id], session)) return;
     _sessions.remove(session.record.id);
-    _drop(session, announce: true);
+    _drop(
+      session,
+      announce: true,
+      reason: switch (code) {
+        1000 || 1001 => 'the runner closed the connection',
+        null || 1005 || 1006 => 'the connection dropped',
+        final code => 'the runner closed the connection with code $code',
+      },
+    );
   }
 
   Future<void> _closeSession(_Session session, int code, String reason) async {
     if (identical(_sessions[session.record.id], session)) {
       _sessions.remove(session.record.id);
     }
-    _drop(session, announce: true);
+    _drop(session, announce: true, reason: reason, code: code);
     try {
       await session.link.close(code, reason);
     } on Object {
@@ -670,12 +697,23 @@ class RunnerHub implements RemoteLeases, RemoteJobs, RunnerPresence {
 
   /// Takes the session out of the scheduler. Only a session that took part
   /// in scheduling was announced as connected, so only such a session is
-  /// announced as disconnected, and not when another connection of the same
-  /// runner replaced it ([announce] false).
-  void _drop(_Session session, {required bool announce}) {
+  /// announced as disconnected, with the [reason], and not when another
+  /// connection of the same runner replaced it ([announce] false). A session
+  /// the hub closes with [code] before that is reported as refused.
+  void _drop(
+    _Session session, {
+    required bool announce,
+    String? reason,
+    int? code,
+  }) {
     session.closed = true;
     final remote = session.remote;
-    if (remote == null) return;
+    if (remote == null) {
+      if (code != null && announce) {
+        onRefused?.call(session.record.name, '$reason ($code)');
+      }
+      return;
+    }
     session.remote = null;
     _scheduler.removeRunner(session.record.id);
     if (announce) {
@@ -683,6 +721,7 @@ class RunnerHub implements RemoteLeases, RemoteJobs, RunnerPresence {
         RunnerDisconnected(
           runnerId: session.record.id,
           name: session.record.name,
+          reason: reason,
         ),
       );
     }
@@ -1239,8 +1278,9 @@ class RunnerConnection {
   Future<void> receive(RunnerFrame frame) =>
       _enqueue(() => _hub._onFrame(_session, frame));
 
-  /// The socket ended.
-  Future<void> closed() => _enqueue(() => _hub._onClosed(_session));
+  /// The socket ended, with the close [code] the runner sent, if any.
+  Future<void> closed([int? code]) =>
+      _enqueue(() => _hub._onClosed(_session, code));
 
   Future<void> _enqueue(Future<void> Function() handle) {
     final next = _tail.then((_) async {

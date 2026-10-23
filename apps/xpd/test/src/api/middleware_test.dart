@@ -10,6 +10,39 @@ Request _request(String path, {Map<String, String>? headers}) =>
     Request('GET', Uri.parse('http://localhost$path'), headers: headers);
 
 void main() {
+  group('runnerRefusalMiddleware', () {
+    Future<List<String>> refusals(
+      int status, {
+      String path = '/runners/connect',
+    }) async {
+      final seen = <String>[];
+      final handler = const Pipeline()
+          .addMiddleware(
+            runnerRefusalMiddleware((who, why) => seen.add('$who: $why')),
+          )
+          .addHandler((_) => Response(status));
+      await handler(_request(path));
+      return seen;
+    }
+
+    test('names why a runner connection was turned away', () async {
+      expect(await refusals(401), [
+        'an unknown address: an unknown or revoked credential (401)',
+      ]);
+      expect(await refusals(403), [
+        'an unknown address: not a runner token (403)',
+      ]);
+      expect(await refusals(426), [
+        'an unknown address: not a WebSocket upgrade (426)',
+      ]);
+    });
+
+    test('says nothing about other answers and other routes', () async {
+      expect(await refusals(200), isEmpty);
+      expect(await refusals(401, path: '/projects'), isEmpty);
+    });
+  });
+
   group('errorMiddleware', () {
     test('lets a response through', () async {
       final handler = const Pipeline()

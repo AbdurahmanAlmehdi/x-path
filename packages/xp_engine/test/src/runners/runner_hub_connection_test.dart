@@ -43,6 +43,8 @@ void main() {
       // one is probed before it gets jobs. Nobody was told it left.
       expect(schedulerRunners(), ['local']);
       expect(await h.eventsOf<RunnerDisconnected>(), isEmpty);
+      const replaced = 'replaced by a new connection of the same runner (4001)';
+      expect(h.refused, ['${first.record.name}: $replaced']);
     });
 
     test('a runner that is gone is announced once', () async {
@@ -54,8 +56,29 @@ void main() {
       expect(h.hub.isConnected(runner.id), isFalse);
       expect(schedulerRunners(), ['local']);
       expect(await h.eventsOf<RunnerDisconnected>(), [
-        RunnerDisconnected(runnerId: runner.id, name: 'mac'),
+        RunnerDisconnected(
+          runnerId: runner.id,
+          name: 'mac',
+          reason: 'the connection dropped',
+        ),
       ]);
+    });
+
+    test('a disconnect says why, from the close code', () async {
+      final normal = await h.online(name: 'normal');
+      final odd = await h.online(name: 'odd');
+      final revoked = await h.online(name: 'revoked');
+
+      await normal.connection.closed(1000);
+      await odd.connection.closed(4500);
+      await h.service.revoke(revoked.id, by: h.owner);
+
+      expect((await h.eventsOf<RunnerDisconnected>()).map((e) => e.reason), [
+        'the runner closed the connection',
+        'the runner closed the connection with code 4500',
+        'revoked',
+      ]);
+      expect(h.refused, isEmpty);
     });
 
     test('a runner that never got probed leaves without a word', () async {
@@ -65,6 +88,7 @@ void main() {
 
       expect(h.hub.isConnected(runner.id), isFalse);
       expect(await h.eventsOf<RunnerDisconnected>(), isEmpty);
+      expect(h.refused, isEmpty);
     });
 
     test('a broken connection does not stop the engine', () async {
@@ -85,6 +109,9 @@ void main() {
 
       expect(runner.faults.single.code, 'unexpected_frame');
       expect(runner.link.closeCode, runnerProtocolCloseCode);
+      expect(h.refused, [
+        '${runner.record.name}: the first frame is hello (4400)',
+      ]);
       // Nothing more is read from a closed connection.
       await runner.hello();
       expect(runner.link.sentOf<ProbeFrame>(), isEmpty);
@@ -318,6 +345,7 @@ void main() {
       await h.hub.sweep();
       expect(runner.link.closeCode, runnerTimeoutCloseCode);
       expect(h.hub.isConnected(runner.id), isFalse);
+      expect(h.refused, ['${runner.record.name}: the probe timed out (4008)']);
     });
 
     test('drops a runner that was quiet for a whole lease', () async {
@@ -331,7 +359,10 @@ void main() {
       await h.hub.sweep();
       expect(runner.link.closeCode, runnerTimeoutCloseCode);
       expect(schedulerRunners(), ['local']);
-      expect(await h.eventsOf<RunnerDisconnected>(), hasLength(1));
+      expect(
+        (await h.eventsOf<RunnerDisconnected>()).single.reason,
+        'no frame for 90 s',
+      );
     });
 
     test('a heartbeat keeps a runner that has nothing to do', () async {

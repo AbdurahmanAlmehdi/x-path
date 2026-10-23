@@ -6,6 +6,7 @@ import 'package:xp_adapters/xp_adapters.dart';
 import 'package:xp_engine/xp_engine.dart';
 import 'package:xp_secrets/xp_secrets.dart';
 import 'package:xpd/src/cli/gh_executable.dart';
+import 'package:xpd/src/cli/runner_log.dart';
 import 'package:xpd/src/cli/xpd_command.dart';
 import 'package:xpd/src/cli/xpd_context.dart';
 import 'package:xpd/src/credentials/credential_checks.dart';
@@ -547,6 +548,8 @@ class ServeCommand extends XpdCommand {
         tokens: SqliteDeviceTokenRepository(database),
         clock: const SystemClock(),
       );
+      // The runners' comings and goings go to the engine log.
+      late final RunnerLog runnerLog;
       final runnerHub = RunnerHub(
         runners: runnerRepository,
         projects: projectRepository,
@@ -562,6 +565,7 @@ class ServeCommand extends XpdCommand {
         engineVersion: packageVersion,
         onError: (error, stackTrace) =>
             context.err.writeln('error: runner hub: $error\n$stackTrace'),
+        onRefused: (name, why) => runnerLog.refused('"$name"', why),
       );
       scheduler.remoteJobs = runnerHub;
       final runnerService = RunnerService(
@@ -572,6 +576,8 @@ class ServeCommand extends XpdCommand {
         events: events,
         clock: const SystemClock(),
       );
+      runnerLog = RunnerLog(context.out, runnerService);
+      final runnerEvents = runnerLog.follow(events);
       final server = await XpdServer.start(
         tokens: tokenService,
         events: events,
@@ -631,6 +637,7 @@ class ServeCommand extends XpdCommand {
         port: port,
         onError: (error, stackTrace) =>
             context.err.writeln('error: $error\n$stackTrace'),
+        onRunnerRefused: runnerLog.refused,
       );
       context.out.writeln('xpd listening on ${server.uri}');
       // The owner hears about what matters, in the app and in Slack (D-22).
@@ -701,6 +708,7 @@ class ServeCommand extends XpdCommand {
       await releaseWatcher.stop();
       housekeepingSchedule.stop();
       await notifier.stop();
+      await runnerEvents.cancel();
       slackWebhook.close();
       credentialChecks.close();
       github.close();

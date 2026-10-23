@@ -20,6 +20,7 @@ export 'src/api/system_routes.dart';
 export 'src/api/tests/tests_routes.dart';
 export 'src/api/workflows/workflows_routes.dart';
 export 'src/cli/gh_executable.dart';
+export 'src/cli/runner_log.dart';
 export 'src/cli/secrets_command.dart';
 export 'src/cli/serve_command.dart';
 export 'src/cli/token_command.dart';

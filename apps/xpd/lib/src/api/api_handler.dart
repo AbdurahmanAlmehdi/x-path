@@ -53,6 +53,7 @@ Handler buildApiHandler({
   required RunnerBundles runnerBundles,
   required String engineVersion,
   void Function(Object error, StackTrace stackTrace)? onError,
+  void Function(String address, String why)? onRunnerRefused,
 }) {
   final router =
       Router(
@@ -80,6 +81,7 @@ Handler buildApiHandler({
   RunnersRoutes(runners, runnerArtifacts, runnerBundles).addTo(router);
   return const Pipeline()
       .addMiddleware(errorMiddleware(onError: onError))
+      .addMiddleware(runnerRefusalMiddleware(onRunnerRefused ?? (_, _) {}))
       .addMiddleware(authMiddleware(tokens, publicPaths: publicPaths))
       .addMiddleware(runnerScopeMiddleware())
       .addHandler(router.call);

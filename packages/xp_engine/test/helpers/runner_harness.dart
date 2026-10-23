@@ -265,6 +265,7 @@ class RunnerHarness {
     required this.service,
     required this.owner,
     required this.errors,
+    required this.refused,
     required this.localGate,
   });
 
@@ -276,6 +277,7 @@ class RunnerHarness {
     RunnerRepository Function(RunnerRepository inner)? wrapRunners,
   }) async {
     final errors = <Object>[];
+    final refused = <String>[];
     final localGate = Completer<void>();
     final jobs = JobHarness.create(
       repository: jobRepository,
@@ -332,6 +334,7 @@ class RunnerHarness {
       grants: RunnerSecretGrants(credentials),
       engineVersion: '9.9.9',
       onError: (error, _) => errors.add(error),
+      onRefused: (name, why) => refused.add('$name: $why'),
     );
     scheduler.remoteJobs = hub;
     final pairing = InMemoryPairingTokenRepository();
@@ -362,6 +365,7 @@ class RunnerHarness {
       service: service,
       owner: owner,
       errors: errors,
+      refused: refused,
       localGate: localGate,
     );
   }
@@ -382,6 +386,9 @@ class RunnerHarness {
 
   /// Failures reported to `onError`; a test that expects none checks it.
   final List<Object> errors;
+
+  /// What the hub reported as refused connections, as `name: why`.
+  final List<String> refused;
 
   /// Local steps made with `block: true` wait for this.
   final Completer<void> localGate;

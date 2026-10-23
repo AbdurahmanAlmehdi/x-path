@@ -3,6 +3,7 @@ import 'package:xp/src/context.dart';
 import 'package:xp/src/exit_codes.dart';
 import 'package:xp/src/output/format.dart';
 import 'package:xp/src/resolve.dart';
+import 'package:xp_api/xp_api.dart';
 import 'package:xp_client/xp_client.dart';
 
 /// `xp runners`: the machines that run jobs for the engine (D-08).
@@ -12,9 +13,88 @@ import 'package:xp_client/xp_client.dart';
 XpGroup runnersCommand(XpContext context) => XpGroup(
   context,
   'runners',
-  'Pair a runner with the engine, or revoke one.',
-  [RunnersPairCommand(context), RunnersRevokeCommand(context)],
+  'List, pair or revoke the runners of the engine.',
+  [
+    RunnersListCommand(context),
+    RunnersPairCommand(context),
+    RunnersRevokeCommand(context),
+  ],
 );
+
+/// `xp runners list [--all]`.
+class RunnersListCommand extends XpCommand {
+  /// Creates the command.
+  new(super.context) {
+    argParser.addFlag(
+      'all',
+      negatable: false,
+      help: 'Also list the revoked runners.',
+    );
+  }
+
+  @override
+  String get name => 'list';
+
+  @override
+  String get description =>
+      'List the runners: where they are, what they offer and what they run.';
+
+  @override
+  String get invocation => 'xp runners list [--all]';
+
+  @override
+  Future<int> execute(XpClient client) async {
+    positionals([]);
+    final all = argResults!.flag('all');
+    final runners = [
+      for (final runner in await client.listRunners())
+        if (all || runner.status != RunnerStatus.revoked) runner,
+    ];
+    emit([for (final runner in runners) runner.toJson()], () {
+      if (runners.isEmpty) {
+        return 'No runners. Pair one: xp runners pair <name>';
+      }
+      final table = renderTable(
+        [
+          'NAME',
+          'ID',
+          'STATUS',
+          'LAST SEEN',
+          'CAPABILITIES',
+          'SLOTS',
+          'JOBS',
+          'MACHINE',
+        ],
+        [
+          for (final runner in runners)
+            [
+              runner.name,
+              runner.id,
+              runner.activity.name,
+              formatTime(runner.lastHeartbeat),
+              _listed(runner.capabilities),
+              '${runner.jobIds.length}/${runner.slots}',
+              _listed(runner.jobIds),
+              [
+                ?runner.os,
+                ?runner.arch,
+                if (runner.version case final version?) 'xp $version',
+              ].join(' '),
+            ],
+        ],
+      );
+      final missing = [
+        for (final runner in runners)
+          for (final item in runner.missing ?? const <MissingCapability>[])
+            '${runner.name}: no ${item.capability}: ${item.explanation}',
+      ];
+      return [table, if (missing.isNotEmpty) '', ...missing].join('\n');
+    });
+    return XpExit.ok;
+  }
+}
+
+String _listed(List<String> items) => items.isEmpty ? '-' : items.join(',');
 
 /// `xp runners pair <name>`.
 class RunnersPairCommand extends XpCommand {

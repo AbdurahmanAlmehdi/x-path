@@ -74,7 +74,7 @@ class RunnerConnectRoute {
         }
       },
       onError: (Object _) {},
-      onDone: () => unawaited(connection.closed()),
+      onDone: () => unawaited(connection.closed(channel.closeCode)),
     );
   }
 }

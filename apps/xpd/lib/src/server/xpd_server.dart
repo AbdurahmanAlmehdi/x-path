@@ -43,6 +43,7 @@ class XpdServer {
     String host = '127.0.0.1',
     int port = 0,
     void Function(Object error, StackTrace stackTrace)? onError,
+    void Function(String address, String why)? onRunnerRefused,
   }) async {
     final route = EventsRoute(events: events, clock: clock);
     final logRoute = JobLogsRoute(jobs: jobs, logs: logs);
@@ -70,6 +71,7 @@ class XpdServer {
       runnerBundles: runnerBundles,
       engineVersion: engineVersion,
       onError: onError,
+      onRunnerRefused: onRunnerRefused,
     );
     final http = await shelf_io.serve(handler, host, port);
     events.append(

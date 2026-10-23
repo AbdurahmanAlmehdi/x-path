@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:shelf/shelf.dart';
 import 'package:xp_api/xp_api.dart';
 import 'package:xp_engine/xp_engine.dart';
@@ -23,6 +25,33 @@ Middleware errorMiddleware({
         );
       }
     };
+
+/// Tells [onRefused] about a runner connection (`GET /runners/connect`)
+/// that was turned away before the WebSocket opened: who asked and why.
+///
+/// Add it before [authMiddleware]: it sees the `401` that one answers.
+Middleware runnerRefusalMiddleware(
+  void Function(String address, String why) onRefused,
+) =>
+    (inner) => (request) async {
+      final response = await inner(request);
+      if (request.requestedUri.path != '/runners/connect') return response;
+      final why = switch (response.statusCode) {
+        401 => 'an unknown or revoked credential (401)',
+        403 => 'not a runner token (403)',
+        426 => 'not a WebSocket upgrade (426)',
+        _ => null,
+      };
+      if (why != null) onRefused(_addressOf(request), why);
+      return response;
+    };
+
+String _addressOf(Request request) {
+  final info = request.context['shelf.io.connection_info'];
+  return info is HttpConnectionInfo
+      ? info.remoteAddress.address
+      : 'an unknown address';
+}
 
 final _bearer = RegExp(r'^Bearer\s+(\S+)$', caseSensitive: false);
 
