@@ -93,9 +93,11 @@ void main() {
       await engine.close();
 
       expect(await stream.closeCode(), 1000);
+      // Refused, or reset when the freed port was already taken by another
+      // test file's server running in parallel: either way nothing serves.
       await expectLater(
         engine.request('/health'),
-        throwsA(isA<SocketException>()),
+        throwsA(anyOf(isA<SocketException>(), isA<HttpException>())),
       );
     });
   });
