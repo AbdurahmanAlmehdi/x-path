@@ -49,6 +49,16 @@ void main() {
       expect((json.single as Map)['fullName'], 'acme/app');
     });
 
+    test('takes --json after the command too', () async {
+      when(() => env.client.listProjects())
+          .thenAnswer((_) async => [sample.project]);
+
+      await env.runOk(['projects', 'list', '--json']);
+
+      final json = jsonDecode(env.logger.infos.single) as List<dynamic>;
+      expect((json.single as Map)['fullName'], 'acme/app');
+    });
+
     test('closes the client', () async {
       when(() => env.client.listProjects()).thenAnswer((_) async => []);
 
@@ -160,6 +170,37 @@ void main() {
               as AddProjectRequest;
       expect(request.remote, 'acme/app');
       expect(request.path, isNull);
+    });
+
+    test('says a folder that does not exist is not there', () async {
+      for (final path in ['./typo', '/no/such/folder', '~/typo', '..']) {
+        if (Directory(path).existsSync()) continue;
+        env.logger.errors.clear();
+        expect(await env.run(['projects', 'add', path]), 64);
+        expect(env.logger.errors.first, 'No folder at $path.');
+      }
+      verifyNever(() => env.client.addProject(any()));
+    });
+
+    test('takes the remote forms of any host for a remote', () async {
+      when(() => env.client.addProject(any()))
+          .thenAnswer((_) async => sample.project);
+      const remotes = [
+        'git@gitlab.example.com:acme/app.git',
+        'ssh://git@host/acme/app.git',
+        'file:///srv/git/app.git',
+        'https://gitea.example.com/acme/app',
+        'http://host/acme/app',
+      ];
+
+      for (final remote in remotes) {
+        await env.runOk(['projects', 'add', remote]);
+      }
+
+      final requests = verify(() => env.client.addProject(captureAny()))
+          .captured
+          .cast<AddProjectRequest>();
+      expect([for (final request in requests) request.remote], remotes);
     });
 
     test('says when the project exists already', () async {

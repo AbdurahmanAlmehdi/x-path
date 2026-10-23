@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:mocktail/mocktail.dart';
 import 'package:test/test.dart';
+import 'package:xp/src/commands/runs_commands.dart';
 import 'package:xp_api/xp_api.dart';
 import 'package:xp_client/xp_client.dart';
 
@@ -235,6 +236,73 @@ void main() {
       expect(env.logger.out, contains('guard'));
     });
 
+    test('show says why each step failed and what the guards say to fix', () {
+      final job = Job(
+        id: 'job_1',
+        projectId: 'prj_1',
+        workflowVersionId: 'wfv_1',
+        state: JobState.failed,
+        createdAt: sample.at,
+        steps: const [
+          JobStep(
+            ordinal: 0,
+            kind: 'guard',
+            state: StepState.succeeded,
+            sideEffect: false,
+            attempts: 1,
+            result: {
+              'results': [
+                {'name': 'credentials', 'status': 'passed', 'message': 'ok'},
+                {
+                  'name': 'versionSync',
+                  'status': 'warning',
+                  'message': 'The iOS version differs.',
+                  'fix': 'Run flutter pub get.',
+                },
+              ],
+            },
+          ),
+          JobStep(
+            ordinal: 1,
+            kind: 'build.ios',
+            state: StepState.failed,
+            sideEffect: false,
+            attempts: 1,
+            message: 'xcodebuild exited with 65.\nSee the log.',
+          ),
+          JobStep(
+            ordinal: 2,
+            kind: 'gate',
+            state: StepState.waitingForApproval,
+            sideEffect: false,
+            attempts: 1,
+          ),
+          JobStep(
+            ordinal: 3,
+            kind: 'guard',
+            state: StepState.pending,
+            sideEffect: false,
+            attempts: 0,
+            result: {'results': 'none'},
+          ),
+        ],
+      );
+
+      final text = describeJob(job);
+
+      expect(
+        text,
+        contains(
+          'step 1 (build.ios) failed:\n'
+          '  xcodebuild exited with 65.\n'
+          '  See the log.',
+        ),
+      );
+      expect(text, contains('fix (guard versionSync): Run flutter pub get.'));
+      expect(text, isNot(contains('fix (guard credentials)')));
+      expect(text, contains('waiting_for_approval'));
+    });
+
     test('show copes with a job that has no name', () async {
       when(() => env.client.getJob('job_1'))
           .thenAnswer((_) async => sample.job(name: null));
@@ -280,6 +348,11 @@ void main() {
   });
 
   group('logs', () {
+    setUp(() {
+      when(() => env.client.getJob('job_1'))
+          .thenAnswer((_) async => sample.job());
+    });
+
     LogLineFrame line(int seq) => LogLineFrame(
       seq: seq,
       step: 0,
@@ -317,6 +390,25 @@ void main() {
       expect(await run(['logs', 'job_1']), 0);
 
       expect(env.logger.infos, ['line 1']);
+    });
+
+    test('without -f reads the whole log of a job that ended', () async {
+      when(() => env.client.getJob('job_1'))
+          .thenAnswer((_) async => sample.job(state: JobState.succeeded));
+      final controller = StreamController<LogFrame>();
+      final run = logs(controller.stream);
+      controller.add(line(1));
+      // Slower than logIdle: a job that ended is read to its end.
+      Timer(const Duration(milliseconds: 120), () {
+        controller
+          ..add(line(2))
+          ..add(const LogEndFrame(state: JobState.succeeded));
+        unawaited(controller.close());
+      });
+
+      expect(await run(['logs', 'job_1']), 0);
+
+      expect(env.logger.infos, ['line 1', 'line 2', '-- job succeeded']);
     });
 
     test('with -f waits for the end and fails with a failed job', () async {

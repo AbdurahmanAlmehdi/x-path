@@ -37,6 +37,10 @@ void main() {
 
   Object? decoded(McpToolResult result) => jsonDecode(result.text);
 
+  /// The message of an error result, which is `{"code", "message", "hint"}`.
+  String message(McpToolResult result) =>
+      (decoded(result)! as Map<String, Object?>)['message']! as String;
+
   group('the tool list', () {
     test('has no way to approve, deny, loosen a gate, merge or delete', () {
       for (final name in tools.keys) {
@@ -237,7 +241,8 @@ void main() {
 
       expect(missing.text, contains('"edits" is required'));
       expect(broken.isError, isTrue);
-      expect(broken.text, startsWith('Invalid arguments'));
+      expect(message(broken), startsWith('Invalid arguments'));
+      expect((decoded(broken)! as Map)['code'], 'invalid_request');
     });
   });
 
@@ -429,7 +434,7 @@ void main() {
       });
 
       expect(result.isError, isTrue);
-      expect(result.text, '"flavors" must be a list of strings.');
+      expect(message(result), '"flavors" must be a list of strings.');
       verifyNever(() => client.dispatchWorkflow(any(), any(), any()));
     });
 
@@ -602,7 +607,11 @@ void main() {
 
       final result = await call('get_job_tests', {'job': 'job_1'});
 
-      expect(result.text, 'No tests.');
+      expect(decoded(result), {
+        'code': 'not_found',
+        'message': 'No tests.',
+        'hint': '',
+      });
     });
 
     test('get_job_tests refuses a status it does not know', () async {
@@ -611,7 +620,7 @@ void main() {
         'statuses': ['great'],
       });
 
-      expect(result.text, 'Unknown status "great".');
+      expect(message(result), 'Unknown status "great".');
     });
 
     test('get_test_baselines lists them', () async {
@@ -863,7 +872,9 @@ void main() {
         ),
       );
 
-      expect((await call('list_projects')).text, 'Busy.');
+      final result = await call('list_projects');
+      expect(message(result), 'Busy.');
+      expect((decoded(result)! as Map)['code'], 'secrets_locked');
     });
 
     test('an engine that cannot be reached', () async {
@@ -873,7 +884,11 @@ void main() {
       final result = await call('list_projects');
 
       expect(result.isError, isTrue);
-      expect(result.text, 'Cannot reach the engine.');
+      expect(decoded(result), {
+        'code': 'unreachable',
+        'message': 'Cannot reach the engine.',
+        'hint': '',
+      });
     });
 
     test('a project that does not exist', () async {
@@ -882,7 +897,41 @@ void main() {
       final result = await call('get_project', {'project': 'ghost'});
 
       expect(result.isError, isTrue);
-      expect(result.text, contains('ghost'));
+      expect(decoded(result), {
+        'code': 'not_found',
+        'message': 'No project "ghost".',
+        'hint': 'See: list_projects',
+      });
+    });
+
+    test('a name that is more than one project names no tool', () async {
+      when(() => client.listProjects())
+          .thenAnswer((_) async => [sample.project, sample.project]);
+
+      final result = await call('get_project', {'project': 'app'});
+
+      expect((decoded(result)! as Map)['code'], 'ambiguous');
+      expect((decoded(result)! as Map)['hint'], '');
+    });
+
+    test('an error that is not about the arguments says what it was', () async {
+      when(() => client.listProjects()).thenThrow(const _Broken());
+
+      final result = await call('list_projects');
+
+      expect(decoded(result), {
+        'code': 'internal',
+        'message': 'Broken.',
+        'hint': '',
+      });
+    });
+
+    test('a value that does not parse is an argument error', () async {
+      when(() => client.listProjects()).thenThrow(const FormatException('x'));
+
+      final result = await call('list_projects');
+
+      expect(message(result), 'Invalid arguments: x');
     });
 
     test('an argument error reads as its message', () {
@@ -890,19 +939,26 @@ void main() {
     });
 
     test('a missing or mistyped argument', () async {
-      expect((await call('get_job')).text, '"job" is required.');
+      expect(message(await call('get_job')), '"job" is required.');
       expect(
-        (await call('get_job', {'job': 3})).text,
+        message(await call('get_job', {'job': 3})),
         '"job" must be a string.',
       );
       expect(
-        (await call('get_job_log_tail', {'job': 'j', 'lines': 'x'})).text,
+        message(await call('get_job_log_tail', {'job': 'j', 'lines': 'x'})),
         '"lines" must be an integer.',
       );
       expect(
-        (await call('update_project', {'project': 'p', 'edits': 'x'})).text,
+        message(await call('update_project', {'project': 'p', 'edits': 'x'})),
         '"edits" must be an object.',
       );
     });
   });
+}
+
+class _Broken implements Exception {
+  const new();
+
+  @override
+  String toString() => 'Broken.';
 }

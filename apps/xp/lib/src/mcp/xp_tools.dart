@@ -1,6 +1,8 @@
 import 'dart:async';
 
+import 'package:json_annotation/json_annotation.dart';
 import 'package:xp/src/mcp/mcp_tool.dart';
+import 'package:xp/src/output/error_json.dart';
 import 'package:xp/src/resolve.dart';
 import 'package:xp/src/run_approvals.dart';
 import 'package:xp_api/xp_api.dart';
@@ -581,28 +583,45 @@ Future<Map<String, Object?>> _tail(
   return {'lines': kept, 'jobEnded': ended != null, 'jobState': ?ended?.wire};
 }
 
+/// Runs a tool and turns its failure into an error result: [errorJson],
+/// with the engine's code and a hint that names MCP tools, not commands.
 Future<McpToolResult> _guard(Future<McpToolResult> Function() body) async {
+  McpToolResult fail(String code, String message, [String? hint]) =>
+      McpToolResult.json(errorJson(code, message, hint), isError: true);
   try {
     return await body();
   } on ApiException catch (error) {
-    return McpToolResult.error(
-      error.isForbidden
-          ? 'The engine refused: ${error.message} This MCP token reads, '
-                'creates and edits projects and workflows and dispatches; it '
-                'can never approve or loosen a gate.'
-          : error.isUnauthorized
-          ? 'The engine rejected the MCP token. Create one with `xpd token '
-                'create --kind mcp` and save it with `xp connect --mcp-token '
-                '<token>`.'
-          : error.message,
-    );
+    return error.isForbidden
+        ? fail(
+            apiCodeOf(error),
+            'The engine refused: ${error.message} This MCP token reads, '
+            'creates and edits projects and workflows and dispatches; it can '
+            'never approve or loosen a gate.',
+          )
+        : error.isUnauthorized
+        ? fail(
+            apiCodeOf(error),
+            'The engine rejected the MCP token.',
+            'Ask the owner to create one with `xpd token create --kind mcp` '
+                'and save it with `xp connect --mcp-token <token>`.',
+          )
+        : fail(apiCodeOf(error), error.message);
   } on ConnectionException catch (error) {
-    return McpToolResult.error(error.message);
+    return fail('unreachable', error.message);
   } on ReferenceException catch (error) {
-    return McpToolResult.error(error.message);
+    return fail(
+      error.notFound ? 'not_found' : 'ambiguous',
+      error.message,
+      error.mcpHint,
+    );
   } on McpArgumentError catch (error) {
-    return McpToolResult.error(error.message);
+    return fail('invalid_request', error.message);
+  } on CheckedFromJsonException catch (error) {
+    // A malformed object argument (`edits`) fails as it is read.
+    return fail('invalid_request', 'Invalid arguments: ${error.message}');
+  } on FormatException catch (error) {
+    return fail('invalid_request', 'Invalid arguments: ${error.message}');
   } on Exception catch (error) {
-    return McpToolResult.error('Invalid arguments: $error');
+    return fail('internal', '$error');
   }
 }

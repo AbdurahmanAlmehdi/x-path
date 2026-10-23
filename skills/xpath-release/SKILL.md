@@ -76,7 +76,8 @@ xp workflows show acme/app dev-build
 ```
 
 MCP: `list_projects`, `get_project`, `list_workflows`, `get_workflow`. Every CLI command takes
-`--json` before the command (`xp --json runs show run_...`) to print what the API answered.
+`--json`, before or after the command (`xp runs show run_... --json`), to print what the API
+answered; an error is then `{"code", "message", "hint"}` on standard error.
 
 Every project has the built-ins `dev-build`, `prod-release`, `release-merge`, `shorebird-patch`
 and `test`. Read a workflow's `inputs` before dispatching it.
@@ -236,8 +237,9 @@ engine never repeats it on its own. On resume, the step first asks whether its w
 
 ## When something fails
 
-Read the failing step first: `get_job` (or `xp --json jobs show <job>`) has each step's result,
-and a `guard` step lists every check with its `status`, `message` and `fix`. Then
+Read the failing step first: `get_job` (or `xp jobs show <job>`, which prints each failed step's
+message and every guard check's fix) has each step's result, and a `guard` step lists every check
+with its `status`, `message` and `fix`. Then
 `get_job_log_tail`. The common failures, the CLI exit codes and what each means are in
 [references/failures.md](references/failures.md).
 

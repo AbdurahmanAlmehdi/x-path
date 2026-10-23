@@ -42,6 +42,13 @@ String formatBytes(int bytes) {
   return unit == 0 ? '$bytes B' : '${value.toStringAsFixed(1)} ${units[unit]}';
 }
 
+/// A name as the wire spells job states: `waitingForApproval` reads
+/// `waiting_for_approval`.
+String snakeCase(String name) => name.replaceAllMapped(
+  RegExp('[A-Z]'),
+  (match) => '_${match[0]!.toLowerCase()}',
+);
+
 /// [value] as indented JSON, the form of `--json`.
 String prettyJson(Object? value) =>
     const JsonEncoder.withIndent('  ').convert(value);

@@ -368,7 +368,7 @@ class WorkflowDispatcher {
       throw DispatchException(
         definition.locksProject
             ? 'No flavor of the app is a production flavor; give "flavors" or '
-                  'mark one with PATCH /projects/{id}.'
+                  "mark one as production in the project's profile."
             : 'Every flavor of the app is a production flavor; give '
                   '"flavors".',
       );

@@ -377,8 +377,8 @@ class StepPlanners implements StepCatalog {
         final appleId = p.job.credential(CredentialKind.appleId);
         if (key == null && appleId == null) {
           p.fail(
-            'The flavor has no App Store Connect key or Apple ID assigned '
-            '(xp credentials assign).',
+            'The flavor has no App Store Connect key or Apple ID assigned. '
+            'Assign one to the flavor first.',
           );
         }
         return {
@@ -565,7 +565,7 @@ class StepPlanners implements StepCatalog {
       _secretOf(p, kind) ??
       p.fail(
         'The flavor "${p.job.flavor?.name ?? 'default'}" has no '
-        '${kind.wire} credential assigned (xp credentials assign).',
+        '${kind.wire} credential assigned. Assign one to the flavor first.',
       );
 
   static String? _blankToNull(String? text) =>

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:args/command_runner.dart';
 import 'package:cli_completion/cli_completion.dart';
@@ -6,9 +7,13 @@ import 'package:mason_logger/mason_logger.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:test/test.dart';
 import 'package:xp/src/command_runner.dart';
+import 'package:xp/src/commands/xp_command.dart';
+import 'package:xp/src/config/xp_config.dart';
 import 'package:xp/src/context.dart';
 import 'package:xp/src/update/update_check.dart';
 import 'package:xp/src/version.dart';
+import 'package:xp_api/xp_api.dart';
+import 'package:xp_client/xp_client.dart';
 
 import '../helpers/test_env.dart';
 
@@ -61,7 +66,9 @@ void main() {
       });
       final result = await commandRunner.run(['--version']);
       expect(result, equals(ExitCode.usage.code));
+      // The message, and no Dart stack trace.
       verify(() => logger.err(exception.message)).called(1);
+      verifyNever(() => logger.err(any(that: contains('#0'))));
       verify(() => logger.info(commandRunner.usage)).called(1);
     });
 
@@ -267,6 +274,160 @@ void main() {
         expect(env.logger.warnings, isEmpty);
         stuck.complete();
       });
+    });
+  });
+
+  group('--json', () {
+    late TestEnv env;
+
+    setUpAll(registerFallbacks);
+    setUp(() => env = TestEnv());
+    tearDown(() => env.dispose());
+
+    test('moves to the front, wherever it is given', () {
+      expect(jsonFirst(['runs', 'show', 'r', '--json']), [
+        '--json',
+        'runs',
+        'show',
+        'r',
+      ]);
+      expect(jsonFirst(['runs', 'show']), ['runs', 'show']);
+      expect(jsonFirst(['x', '--', '--json']), ['x', '--', '--json']);
+      expect(jsonFirst(['--json', 'x', '--json', '--', 'y']), [
+        '--json',
+        'x',
+        '--',
+        'y',
+      ]);
+    });
+
+    test('prints an error of the engine as JSON on standard error', () async {
+      when(() => env.client.getRun('bad_id')).thenThrow(
+        const ApiException(
+          'No run bad_id.',
+          statusCode: 404,
+          code: ApiErrorCode.notFound,
+        ),
+      );
+
+      expect(await env.run(['--json', 'runs', 'show', 'bad_id']), 66);
+
+      expect(jsonDecode(env.logger.errors.single), {
+        'code': 'not_found',
+        'message': 'No run bad_id.',
+        'hint': '',
+      });
+      expect(env.logger.infos, isEmpty);
+    });
+
+    test('says what the CLI adds, and the other failures, as JSON', () async {
+      Future<Map<String, Object?>> failure(Object error) async {
+        when(() => env.client.listProjects()).thenThrow(error);
+        env.logger.errors.clear();
+        await env.run(['projects', 'list', '--json']);
+        return jsonDecode(env.logger.errors.single) as Map<String, Object?>;
+      }
+
+      expect(
+        await failure(
+          const ApiException(
+            'Bad token.',
+            statusCode: 401,
+            code: ApiErrorCode.unauthorized,
+          ),
+        ),
+        {
+          'code': 'unauthorized',
+          'message': 'Bad token.',
+          'hint': 'Run: xp connect <url> --token <token>',
+        },
+      );
+      expect(
+        (await failure(const ApiException('Down.', statusCode: 502)))['code'],
+        'unknown',
+      );
+      expect(
+        (await failure(const ConnectionException('Away.')))['code'],
+        'unreachable',
+      );
+      expect(
+        (await failure(const DownloadException('Torn.')))['code'],
+        'download_failed',
+      );
+
+      when(() => env.client.listProjects()).thenAnswer((_) async => []);
+      env.logger.errors.clear();
+      await env.run(['projects', 'show', 'ghost', '--json']);
+      expect(jsonDecode(env.logger.errors.single), {
+        'code': 'not_found',
+        'message': 'No project "ghost".',
+        'hint': 'See: xp projects list',
+      });
+    });
+
+    test('says a usage error as JSON, without the usage', () async {
+      expect(await env.run(['runs', 'show', '--json']), 64);
+
+      expect(jsonDecode(env.logger.errors.single), {
+        'code': 'usage',
+        'message': 'Missing <run>.',
+        'hint': '',
+      });
+      expect(env.logger.infos, isEmpty);
+    });
+
+    test('says a parse error as JSON', () async {
+      expect(await env.run(['--json', 'logs', 'j', '--nope']), 64);
+
+      expect((jsonDecode(env.logger.errors.single) as Map)['code'], 'usage');
+    });
+
+    test('says when there is no connection as JSON', () async {
+      final bare = TestEnv(environment: {engineUrlVariable: ''});
+      addTearDown(bare.dispose);
+      bare.environment.remove(engineUrlVariable);
+
+      await bare.run(['projects', 'list', '--json']);
+
+      expect(
+        (jsonDecode(bare.logger.errors.single) as Map)['code'],
+        'not_connected',
+      );
+    });
+  });
+
+  group('cliHint', () {
+    ApiException invalid(String message) => ApiException(
+      message,
+      statusCode: 422,
+      code: ApiErrorCode.workflowInvalid,
+    );
+
+    test('names the command that fixes what the engine said', () {
+      expect(
+        cliHint(
+          invalid(
+            'The flavor "dev" has no firebase_sa credential assigned. '
+            'Assign one to the flavor first.',
+          ),
+        ),
+        'Assign one with: xp credentials assign',
+      );
+      expect(
+        cliHint(invalid('No flavor of the app is a production flavor; ...')),
+        'Name the flavors with --flavor.',
+      );
+      expect(cliHint(invalid('Something else.')), isNull);
+      expect(
+        describeApiError(
+          const ApiException(
+            'No.',
+            statusCode: 403,
+            code: ApiErrorCode.forbidden,
+          ),
+        ),
+        'Not allowed with this token: No.',
+      );
     });
   });
 }

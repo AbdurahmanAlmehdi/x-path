@@ -1,7 +1,7 @@
 # `xp mcp` tools
 
 The tools of `xp mcp`, from `apps/xp/lib/src/mcp/xp_tools.dart`. Every tool answers with JSON
-text, or with `isError` and a message. `project` is an id (`prj_...`), `owner/name` or `name`;
+text, or with `isError` and the error as JSON: `{"code", "message", "hint"}`. `project` is an id (`prj_...`), `owner/name` or `name`;
 `workflow` is an id (`wf_...`) or a name.
 
 There is no tool to approve, deny, merge, abandon, delete, change a gate, cancel or resume, nor to
@@ -51,14 +51,20 @@ server tells the agent so when it connects.
 
 ## Errors the tools return
 
-- `403`: "The engine refused: ... This MCP token reads, creates and edits projects and workflows
-  and dispatches; it can never approve or loosen a gate."
-- `401`: "The engine rejected the MCP token." The owner makes a new one with
+An error is `{"code", "message", "hint"}`. `code` is the engine's (`not_found`,
+`workflow_invalid`, ...; see [failures.md](failures.md)), or one of `unreachable`, `ambiguous`,
+`invalid_request` and `internal` when the engine never answered. `hint` names the tool to call
+next, or is empty.
+
+- `forbidden`: "The engine refused: ... This MCP token reads, creates and edits projects and
+  workflows and dispatches; it can never approve or loosen a gate."
+- `unauthorized`: "The engine rejected the MCP token." The owner makes a new one with
   `xpd token create --name <name> --kind mcp` and saves it with `xp connect --mcp-token <token>`.
-- A connection error: the engine is not reachable at the saved URL (or `XP_ENGINE_URL`).
-- A name that matches no project or workflow, or a bare `name` that is more than one project
-  (use `owner/name` or the id).
-- Any other API error comes back with the engine's message; see [failures.md](failures.md).
+- `unreachable`: the engine is not reachable at the saved URL (or `XP_ENGINE_URL`).
+- `not_found` with the hint `See: list_projects` (or `list_workflows`): a name that matches no
+  project or workflow. `ambiguous`: a bare `name` that is more than one project (use
+  `owner/name` or the id).
+- Any other API error comes back with the engine's code and message.
 
 ## A typical session
 

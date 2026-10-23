@@ -116,6 +116,13 @@ String _describeFlavor(FlavorProfile flavor) {
       '${ios == null ? '' : '  ios $ios'}';
 }
 
+/// A remote, whatever host: `git@host:path`, or a `ssh://`, `file://`,
+/// `http://` or `https://` URL. These are never taken for a folder.
+final _remote = RegExp(r'^([\w.-]+@[\w.-]+:|(ssh|file|https?)://)');
+
+/// A folder, not `owner/name`: it starts with `/`, `.` or `~`.
+final _pathLike = RegExp('^[/.~]');
+
 /// `xp projects add <folder or owner/name>`.
 class ProjectsAddCommand extends XpCommand {
   /// Creates the command.
@@ -134,10 +141,16 @@ class ProjectsAddCommand extends XpCommand {
   @override
   Future<int> execute(XpClient client) async {
     final [source] = positionals(['folder or repository']);
-    final directory = Directory(source);
-    final request = directory.existsSync()
-        ? AddProjectRequest(path: p.canonicalize(directory.path))
-        : AddProjectRequest(remote: source);
+    final request = switch (source) {
+      _ when _remote.hasMatch(source) => AddProjectRequest(remote: source),
+      _ when Directory(source).existsSync() => AddProjectRequest(
+        path: p.canonicalize(source),
+      ),
+      _ when _pathLike.hasMatch(source) => usageException(
+        'No folder at $source.',
+      ),
+      _ => AddProjectRequest(remote: source),
+    };
     final project = await client.addProject(request);
     emit(
       project.toJson(),

@@ -5,16 +5,26 @@ import 'package:xp_client/xp_client.dart';
 /// one.
 class ReferenceException implements Exception {
   /// Creates the exception.
-  const new(this.message, {required this.notFound});
+  const new(this.message, {required this.notFound, this.listing});
 
-  /// What is wrong and what to try.
+  /// What is wrong, in words every client can show.
   final String message;
 
   /// Whether nothing matched (as opposed to several things).
   final bool notFound;
 
+  /// What lists the names that would match (`projects`, `workflows`,
+  /// `credentials`); each client names its own way to list them.
+  final String? listing;
+
+  /// What the CLI suggests: the command that lists the names.
+  String? get cliHint => listing == null ? null : 'See: xp $listing list';
+
+  /// What MCP suggests: the tool that lists the names.
+  String? get mcpHint => listing == null ? null : 'See: list_$listing';
+
   @override
-  String toString() => message;
+  String toString() => [message, ?cliHint].join(' ');
 }
 
 /// The id of the project called [reference]: an id (`prj_...`), `owner/name`,
@@ -31,8 +41,9 @@ Future<String> resolveProject(XpClient client, String reference) async {
   if (matches.length == 1) return matches.single.id;
   if (matches.isEmpty) {
     throw ReferenceException(
-      'No project "$reference". See: xp projects list',
+      'No project "$reference".',
       notFound: true,
+      listing: 'projects',
     );
   }
   throw ReferenceException(
@@ -54,8 +65,9 @@ Future<String> resolveWorkflow(
     if (workflow.name == reference) return workflow.id;
   }
   throw ReferenceException(
-    'No workflow "$reference" in this project. See: xp workflows list',
+    'No workflow "$reference" in this project.',
     notFound: true,
+    listing: 'workflows',
   );
 }
 
@@ -88,7 +100,8 @@ Future<NamedCredential> resolveCredential(
     if (credential.name.toLowerCase() == wanted) return credential;
   }
   throw ReferenceException(
-    'No credential "$reference". See: xp credentials list',
+    'No credential "$reference".',
     notFound: true,
+    listing: 'credentials',
   );
 }

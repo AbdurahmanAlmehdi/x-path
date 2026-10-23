@@ -145,7 +145,7 @@ Details:
 
 ### Phase U1b: Quick fixes: CLI, MCP and engine wording
 
-- **Status:** Not started
+- **Status:** Done
 - **Scope:** The CLI prints what the engine knows about a failure, `--json` works everywhere,
   and engine messages carry no client jargon.
 - **Files touched:** `apps/xp/lib/**`, `apps/xp/test/**`,

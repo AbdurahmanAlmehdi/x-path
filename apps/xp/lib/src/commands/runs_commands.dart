@@ -197,7 +197,8 @@ XpGroup jobsCommand(XpContext context) =>
       JobsResumeCommand(context),
     ]);
 
-/// The lines `xp jobs show` prints.
+/// The lines `xp jobs show` prints: the job, its steps, why each failed step
+/// failed, and what each guard check says to fix.
 String describeJob(Job job) {
   final name = job.name;
   final times =
@@ -212,11 +213,39 @@ String describeJob(Job job) {
       ['STEP', 'KIND', 'STATE', 'TRIES'],
       [
         for (final step in job.steps)
-          ['${step.ordinal}', step.kind, step.state.name, '${step.attempts}'],
+          [
+            '${step.ordinal}',
+            step.kind,
+            snakeCase(step.state.name),
+            '${step.attempts}',
+          ],
       ],
     ),
+    for (final step in job.steps)
+      if (step.state == StepState.failed && step.message != null)
+        _failure(step),
+    for (final step in job.steps) ..._guardFixes(step),
   ];
   return lines.join('\n');
+}
+
+String _failure(JobStep step) =>
+    '\nstep ${step.ordinal} (${step.kind}) failed:\n${_indent(step.message!)}';
+
+String _indent(String text) =>
+    text.split('\n').map((line) => '  $line').join('\n');
+
+/// What the checks of a guard step that ran say to fix (a failed one says
+/// it in its message).
+Iterable<String> _guardFixes(JobStep step) sync* {
+  if (step.kind != 'guard') return;
+  final results = step.result?['results'];
+  if (results is! List) return;
+  for (final result in results) {
+    if (result case {'name': final String check, 'fix': final String fix}) {
+      yield '\nfix (${step.kind} $check): $fix';
+    }
+  }
 }
 
 /// `xp jobs show <job>`.
@@ -301,8 +330,9 @@ class JobsResumeCommand extends XpCommand {
 
 /// `xp logs <job> [-f]`: the log of a job.
 class LogsCommand extends XpCommand {
-  /// Creates the command. Without `-f` the log so far is printed once the
-  /// engine has been quiet for `XpContext.logIdle`.
+  /// Creates the command. Without `-f` the log of a job that ended is
+  /// printed to its end; that of a job that runs, until the engine has been
+  /// quiet for `XpContext.logIdle`.
   new(super.context) {
     argParser
       ..addFlag(
@@ -336,11 +366,14 @@ class LogsCommand extends XpCommand {
       usageException('--after must be a non-negative number.');
     }
     final follow = argResults!.flag('follow');
+    // A job that ended has its whole log: read it to its end, however long
+    // the engine takes. One that runs prints what it has so far.
+    final whole = follow || (await client.getJob(id)).state.isFinished;
     final lines = StreamIterator(client.followJobLogs(id, after: after));
     LogEndFrame? end;
     try {
       while (true) {
-        final more = follow
+        final more = whole
             ? await lines.moveNext()
             : await lines.moveNext().timeout(
                 context.logIdle,
