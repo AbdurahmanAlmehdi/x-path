@@ -20,6 +20,7 @@ const engineMigrations = <Migration>[
   Migration(version: 13, sql: _v13),
   Migration(version: 14, sql: _v14, notes: _v14Notes),
   Migration(version: 15, sql: _v15),
+  Migration(version: 16, sql: _v16),
 ];
 
 // Timestamps are integer microseconds since the Unix epoch (UTC), so that
@@ -515,4 +516,14 @@ CREATE TABLE engine_setting (
   key TEXT PRIMARY KEY,
   value TEXT NOT NULL
 ) STRICT;
+''';
+
+// UX U2a: the store ids of a flavor (UX-03), from its profile like its bundle
+// and application ids: the Firebase app id of each platform and the App Store
+// Connect app id. The built-in workflows upload to them when no input gives
+// one.
+const _v16 = '''
+ALTER TABLE flavor ADD COLUMN firebase_app_id_android TEXT;
+ALTER TABLE flavor ADD COLUMN firebase_app_id_ios TEXT;
+ALTER TABLE flavor ADD COLUMN apple_app_id TEXT;
 ''';

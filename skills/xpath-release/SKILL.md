@@ -102,9 +102,12 @@ MCP `dispatch_workflow` takes the same as `project`, `workflow`, `ref`, `app`, `
 
 ### Dev build
 
-Without upload inputs, `dev-build` builds and keeps the artifacts. Android goes to Firebase App
-Distribution when `firebaseAppIds` names the flavor's Firebase app; iOS goes to TestFlight when
-`appleAppIds` names the App Store Connect app.
+Android goes to Firebase App Distribution when `firebaseAppIds` or the flavor's profile names its
+Firebase app; iOS goes to TestFlight when `appleAppIds` or the profile names the App Store
+Connect app. Without either, `dev-build` builds and keeps the artifacts. The owner sets the
+profile's ids once, in the app (Credentials, the flavor's store ids) or with
+`xp projects set acme/app --flavor dev --firebase-app-id android=1:... --apple-app-id 1234567890`;
+an input still wins over them.
 
 ```sh
 xp dispatch acme/app dev-build --flavor dev --platform android \

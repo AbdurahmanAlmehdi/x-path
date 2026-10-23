@@ -183,7 +183,7 @@ Details:
 
 ### Phase U2a: Flavor store identifiers
 
-- **Status:** Not started
+- **Status:** Done
 - **Scope:** Store ids live on the flavor, so built-ins upload without forking.
 - **Files touched:** `packages/xp_api/lib/src/{project_profile,profile_edits}.dart`,
   `packages/xp_api/openapi.yaml`, `packages/xp_adapters/lib/src/sqlite/migrations.dart` and a

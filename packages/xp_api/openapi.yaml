@@ -2619,7 +2619,8 @@ components:
           type: string
           description: |
             `engine.started`, `stream.opened`, `project.added`,
-            `project.scanned`, `project.removed`, `job.state_changed`,
+            `project.scanned`, `project.edited`, `project.removed`,
+            `job.state_changed`,
             `job.step_changed`, `test_run.completed`, `credential.saved`,
             `credential.verified`, `credential.expired`, `credential.removed`,
             `credential.renamed`, `credential.assigned`,
@@ -2752,6 +2753,23 @@ components:
           items:
             type: string
             enum: [gradle, flavorizr, xcscheme, entrypoint]
+        firebaseAppId:
+          type: object
+          description: |
+            The Firebase app id of the flavor by platform: what the Firebase
+            files of the app name, or the owner's edit. The built-in
+            workflows upload to it when no input gives one.
+          additionalProperties: false
+          properties:
+            android:
+              type: string
+            ios:
+              type: string
+        appleAppId:
+          type: string
+          description: |
+            The App Store Connect app id of the flavor. The built-in
+            workflows upload iOS builds to it when no input gives one.
     IosPackageManager:
       type: string
       enum: [cocoapods, spm, both, none]
@@ -2928,6 +2946,23 @@ components:
           type: array
           items:
             type: string
+        firebaseAppId:
+          type: object
+          description: |
+            The Firebase app id by platform, for example
+            `1:123456789012:android:abcdef`. An empty id removes it.
+          additionalProperties: false
+          properties:
+            android:
+              type: string
+              pattern: "^$|^[0-9]+:[0-9]+:android:[0-9a-f]+$"
+            ios:
+              type: string
+              pattern: "^$|^[0-9]+:[0-9]+:ios:[0-9a-f]+$"
+        appleAppId:
+          type: string
+          description: The App Store Connect app id. Empty removes it.
+          pattern: "^[0-9]*$"
     AppEdit:
       type: object
       required: [path]

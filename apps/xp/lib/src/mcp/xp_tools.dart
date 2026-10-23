@@ -119,7 +119,10 @@ List<McpTool> buildXpTools(
       'update_project',
       "Edit the project's profile: the base branch, and per app the store "
           'country and per flavor prod, shorebird, entrypoint, iosBundleId, '
-          'androidAppId and versionFiles. Edits survive rescans.',
+          'androidAppId, versionFiles, firebaseAppId ({"android": "1:..."}; '
+          'an empty id removes it) and appleAppId, which the built-in '
+          'workflows upload to when no input gives one. Edits survive '
+          'rescans.',
       {
         'project': project,
         'edits': {

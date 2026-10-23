@@ -183,7 +183,7 @@ class JobContext {
 }
 
 /// The flavor as a workflow reads it (`flavor.name`, `flavor.prod`,
-/// `flavor.credentials.play_sa`, ...).
+/// `flavor.firebaseAppId.android`, `flavor.credentials.play_sa`, ...).
 Map<String, Object?> flavorScope(
   FlavorProfile flavor,
   Iterable<AssignedCredential> credentials,
@@ -196,6 +196,8 @@ Map<String, Object?> flavorScope(
   'iosBundleId': flavor.iosBundleId,
   'androidAppId': flavor.androidAppId,
   'shorebirdAppId': flavor.shorebirdAppId,
+  'firebaseAppId': {...?flavor.firebaseAppId},
+  'appleAppId': flavor.appleAppId,
   'credentials': {
     for (final credential in credentials) credential.kind.wire: true,
   },

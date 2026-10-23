@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:test/test.dart';
 import 'package:xp_api/xp_api.dart';
 import 'package:xp_engine/xp_engine.dart';
@@ -882,4 +884,145 @@ flavors:
       }
     });
   });
+
+  group('Firebase app ids', () {
+    String googleServices(Map<String, String> ids) => jsonEncode({
+      'project_info': {'project_number': '111'},
+      'client': [
+        for (final MapEntry(key: package, value: id) in ids.entries)
+          {
+            'client_info': {
+              'mobilesdk_app_id': id,
+              'android_client_info': {'package_name': package},
+            },
+          },
+        {'client_info': 'not a client'},
+      ],
+    });
+
+    String googleServiceInfo(String bundle, String id) =>
+        '<plist version="1.0"><dict>\n'
+        '  <key>BUNDLE_ID</key>\n'
+        '  <string>$bundle</string>\n'
+        '  <key>GOOGLE_APP_ID</key>\n'
+        '  <string>$id</string>\n'
+        '</dict></plist>';
+
+    String options(Map<String, String> ids) => [
+      'class DefaultFirebaseOptions {',
+      for (final MapEntry(key: platform, value: body) in ids.entries)
+        _option(platform, body),
+      '}',
+    ].join('\n');
+
+    test(
+      'come from google-services.json and GoogleService-Info.plist',
+      () async {
+        final result = await scanApp1(
+          flavored(
+            more: {
+              'android/app/src/dev/google-services.json': googleServices({
+                'com.example.dev': '1:111:android:dev',
+              }),
+              'android/app/src/prod/google-services.json': googleServices({
+                'com.example': '1:111:android:prod',
+              }),
+              'ios/config/dev/GoogleService-Info.plist': googleServiceInfo(
+                'com.example.dev',
+                '1:111:ios:dev',
+              ),
+              'ios/Pods/Some/GoogleService-Info.plist': googleServiceInfo(
+                'com.example',
+                '1:999:ios:pods',
+              ),
+            },
+          ),
+        );
+
+        final [dev, prod] = only(result).flavors;
+        expect(dev.firebaseAppId, {
+          'android': '1:111:android:dev',
+          'ios': '1:111:ios:dev',
+        });
+        expect(prod.firebaseAppId, {'android': '1:111:android:prod'});
+        final missing = finding(result, 'firebase_app_id_missing');
+        expect(missing.severity, FindingSeverity.info);
+        expect(missing.flavor, 'prod');
+        expect(missing.message, contains('no ios app for flavor prod'));
+        expect(missing.message, contains('(com.example)'));
+      },
+    );
+
+    test(
+      'come from firebase_options.dart for an app without flavors',
+      () async {
+        final result = await scanApp1({
+          'lib/firebase_options.dart': options({
+            'android': "    apiKey: 'key',\n    appId: '1:111:android:aaa',",
+            'ios':
+                '    appId: "1:111:ios:bbb",\n'
+                "    iosBundleId: 'com.example.demo',",
+            'web': "    appId: '1:111:web:ccc',",
+            'macos': "    apiKey: 'key',",
+          }),
+        });
+
+        expect(only(result).flavors.single.firebaseAppId, {
+          'android': '1:111:android:aaa',
+          'ios': '1:111:ios:bbb',
+        });
+        expect(codes(result), isNot(contains('firebase_app_id_missing')));
+      },
+    );
+
+    test('of a flavored app come from the options of each flavor', () async {
+      final result = await scanApp1(
+        flavored(
+          more: {
+            'lib/firebase_options_dev.dart': options({
+              'android': "    appId: '1:111:android:dev',",
+            }),
+            'lib/firebase_options.dart': options({
+              'android': "    appId: '1:111:android:all',",
+            }),
+          },
+        ),
+      );
+
+      final [dev, prod] = only(result).flavors;
+      expect(dev.firebaseAppId, {'android': '1:111:android:dev'});
+      expect(prod.firebaseAppId, isNull);
+      expect(
+        result.findings
+            .where((f) => f.code == 'firebase_app_id_missing')
+            .map((f) => f.flavor),
+        ['prod'],
+      );
+    });
+
+    test('are left out without Firebase files, or with broken ones', () async {
+      final result = await scanApp1({
+        'android/app/google-services.json': '{not json',
+      });
+
+      expect(only(result).flavors.single.firebaseAppId, isNull);
+      expect(codes(result), isNot(contains('firebase_app_id_missing')));
+    });
+
+    test('a missing one of an app without flavors names the app', () async {
+      final result = await scanApp1({
+        'android/app/google-services.json': googleServices({
+          'com.other': '1:111:android:x',
+        }),
+      });
+
+      final missing = finding(result, 'firebase_app_id_missing');
+      expect(missing.flavor, isNull);
+      expect(missing.message, contains('no android app for the app'));
+    });
+  });
 }
+
+String _option(String platform, String body) =>
+    '  static const FirebaseOptions $platform = '
+    'FirebaseOptions(\n$body\n  );';

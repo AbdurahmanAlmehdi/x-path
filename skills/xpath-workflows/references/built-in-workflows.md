@@ -17,7 +17,7 @@ No lock: as many run at once as the slots allow. Builds the dev flavors and send
 |---|---|---|---|
 | `check` | `check` (engine) | platform x flavor | `git.checkout`; `guard` with `[source, credentials]` |
 | `build` | `build` (runner-eligible) | platform x flavor | `git.checkout`; `version.bump`; `build.android` (`artifact: apk`) if android; `build.ios` if ios; `record.manifest` |
-| `upload` | `upload` (engine) | platform x flavor, only cells with an app id | `upload.firebase` for android with `inputs.firebaseAppIds[flavor.name].android`; `upload.appStore` for ios with `inputs.appleAppIds[flavor.name]`; both `artifactsFrom: build` |
+| `upload` | `upload` (engine) | platform x flavor, only cells with an app id | `upload.firebase` for android with `inputs.firebaseAppIds[flavor.name].android`, else `flavor.firebaseAppId.android`; `upload.appStore` for ios with `inputs.appleAppIds[flavor.name]`, else `flavor.appleAppId`; both `artifactsFrom: build` |
 
 Inputs: `firebaseAppIds` (by flavor and platform, `{dev: {android: "1:..."}}`), `testerGroups`
 (default `[]`), `notes` (default `""`), `appleAppIds` (by flavor, `{dev: "1234567890"}`),

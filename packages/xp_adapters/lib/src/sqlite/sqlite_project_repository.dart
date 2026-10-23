@@ -182,13 +182,17 @@ class SqliteProjectRepository implements ProjectRepository {
     for (final flavor in app.flavors) {
       _db.execute(
         'INSERT INTO flavor (id, app_id, name, entrypoint, ios_bundle_id, '
-        'android_app_id, shorebird, prod, version_files) '
-        'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) '
+        'android_app_id, shorebird, prod, version_files, '
+        'firebase_app_id_android, firebase_app_id_ios, apple_app_id) '
+        'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) '
         'ON CONFLICT (id) DO UPDATE SET entrypoint = excluded.entrypoint, '
         'ios_bundle_id = excluded.ios_bundle_id, '
         'android_app_id = excluded.android_app_id, '
         'shorebird = excluded.shorebird, prod = excluded.prod, '
-        'version_files = excluded.version_files',
+        'version_files = excluded.version_files, '
+        'firebase_app_id_android = excluded.firebase_app_id_android, '
+        'firebase_app_id_ios = excluded.firebase_app_id_ios, '
+        'apple_app_id = excluded.apple_app_id',
         [
           existing[flavor.name] ?? _newId('flv'),
           appId,
@@ -199,6 +203,9 @@ class SqliteProjectRepository implements ProjectRepository {
           if (flavor.shorebird) 1 else 0,
           if (flavor.prod) 1 else 0,
           jsonEncode(flavor.versionFiles),
+          flavor.firebaseAppId?['android'],
+          flavor.firebaseAppId?['ios'],
+          flavor.appleAppId,
         ],
       );
     }

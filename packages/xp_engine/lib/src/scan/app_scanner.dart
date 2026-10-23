@@ -1,4 +1,5 @@
 import 'package:xp_api/xp_api.dart';
+import 'package:xp_engine/src/scan/firebase_files.dart';
 import 'package:xp_engine/src/scan/gradle_parser.dart';
 import 'package:xp_engine/src/scan/ios_files.dart';
 import 'package:xp_engine/src/scan/scan_context.dart';
@@ -152,6 +153,12 @@ class _AppScan {
         if (plist.literal) plist.path,
     };
     _checkShorebird(shorebird, names, implicit: implicit);
+    final firebase = await readFirebaseFiles(_source, _dir);
+    final firebaseIds = {
+      for (final flavor in flavors)
+        flavor.name: firebase.idsOf(flavor, one: flavors.length == 1),
+    };
+    _checkFirebase(firebase, flavors, firebaseIds, implicit: implicit);
     if (!implicit && !flavors.any((flavor) => flavor.prod)) {
       _add(
         FindingSeverity.info,
@@ -204,12 +211,47 @@ class _AppScan {
                   literal.contains(flavor.infoPlist))
                 flavor.infoPlist!,
             ],
+            firebaseAppId: switch (firebaseIds[flavor.name]!) {
+              final ids when ids.isEmpty => null,
+              final ids => () => ids,
+            },
           ),
       ],
       plists: _plists.values.toList(),
       keystore: await _keystore(),
       shorebird: shorebird,
     );
+  }
+
+  /// Says which flavor the Firebase files of a platform leave out: its
+  /// builds then need an id to be uploaded to Firebase.
+  void _checkFirebase(
+    FirebaseFiles firebase,
+    List<FlavorProfile> flavors,
+    Map<String, Map<String, String>> ids, {
+    required bool implicit,
+  }) {
+    for (final flavor in flavors) {
+      for (final platform in [if (hasAndroid) 'android', if (hasIos) 'ios']) {
+        if (!firebase.covers(platform)) continue;
+        if (ids[flavor.name]!.containsKey(platform)) continue;
+        final appId = platform == 'android'
+            ? flavor.androidAppId
+            : flavor.iosBundleId;
+        final subject = implicit ? 'the app' : 'flavor ${flavor.name}';
+        _add(
+          FindingSeverity.info,
+          'firebase_app_id_missing',
+          'The Firebase files name no $platform app for $subject'
+              '${appId == null ? '' : ' ($appId)'}, so its builds are not '
+              'uploaded to Firebase until it has an id.',
+          'Set the Firebase app id of $subject in XPath, or add '
+              '${appId ?? 'the app'} to the Firebase project and download '
+              'its config file again.',
+          flavor: implicit ? null : flavor.name,
+        );
+      }
+    }
   }
 
   // ------------------------------------------------------- build systems

@@ -236,11 +236,12 @@ void main() {
         events: const [
           ProjectAdded(projectId: 'prj_2', fullName: 'a/b'),
           ProjectScanned(projectId: 'prj_1', errors: 0, warnings: 1),
+          ProjectEdited(projectId: 'prj_1'),
           ProjectRemoved(projectId: 'prj_2'),
           RunnerPaired(runnerId: 'r', name: 'r'),
         ],
       );
-      expect(loads, 4);
+      expect(loads, 5);
       final cached = await repository.watchProjects().first;
       expect(cached, const Snapshot([project], cached: true));
     });
@@ -275,6 +276,9 @@ void main() {
           .thenAnswer((_) async => project);
       when(() => client.scanProject('prj_1')).thenAnswer((_) async => project);
       when(() => client.removeProject('prj_1')).thenAnswer((_) async {});
+      const edits = ProfileEdits(defaultBaseBranch: 'dev');
+      when(() => client.updateProject('prj_1', edits))
+          .thenAnswer((_) async => project);
       when(
         () => client.assignCredential(
           'prj_1',
@@ -299,6 +303,7 @@ void main() {
       expect(await repository.getProject('prj_1'), project);
       expect(await repository.addProject('/src/app'), project);
       expect(await repository.scanProject('prj_1'), project);
+      expect(await repository.editProject('prj_1', edits), project);
       await repository.removeProject('prj_1');
       expect(
         await repository.assignCredential(

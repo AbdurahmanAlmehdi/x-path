@@ -162,8 +162,20 @@ void main() {
         'iosBundleId': 'ly.demo',
         'androidAppId': 'ly.demo',
         'shorebirdAppId': 'sb-prod',
+        'firebaseAppId': <String, String>{},
+        'appleAppId': null,
         'credentials': {'play_sa': true},
       });
+      expect(
+        flavorScope(
+          prod.copyWith(
+            firebaseAppId: () => {'android': '1:1:android:a'},
+            appleAppId: () => '9',
+          ),
+          const [],
+        ),
+        containsPair('firebaseAppId', {'android': '1:1:android:a'}),
+      );
     });
   });
 

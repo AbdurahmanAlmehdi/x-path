@@ -810,6 +810,40 @@ class AppLocalizationsEn extends AppLocalizations {
       'The credential this flavor uses for each kind, with what the last checks found: does it work, and can it reach this flavor\'s app.';
 
   @override
+  String get flavorStoreIds => 'Store ids';
+
+  @override
+  String get flavorStoreIdsHelp =>
+      'The built-in workflows upload this flavor\'s builds to these apps when a dispatch names none. The scan fills in the Firebase ids its files name.';
+
+  @override
+  String get flavorFirebaseAndroid => 'Firebase app id · Android';
+
+  @override
+  String get flavorFirebaseIos => 'Firebase app id · iOS';
+
+  @override
+  String flavorFirebaseHint(String platform) {
+    return '1:123456789012:$platform:abc123';
+  }
+
+  @override
+  String get flavorAppleAppId => 'App Store Connect app id';
+
+  @override
+  String get flavorAppleAppIdHint => '1234567890';
+
+  @override
+  String get flavorStoreIdsSave => 'Save ids';
+
+  @override
+  String get flavorStoreIdsSaved =>
+      'Saved. The next dispatch uploads to these apps.';
+
+  @override
+  String get scanSetStoreId => 'Set the id…';
+
+  @override
   String get flavorCredentialsNotAssigned => 'Not assigned';
 
   @override

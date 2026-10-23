@@ -309,4 +309,148 @@ void main() {
       expect(await listWith(const DownloadException('Broke.')), 1);
     });
   });
+
+  group('projects set', () {
+    ProfileEdits sent() =>
+        verify(() => env.client.updateProject('prj_1', captureAny()))
+                .captured
+                .single
+            as ProfileEdits;
+
+    setUp(() {
+      when(() => env.client.updateProject('prj_1', any())).thenAnswer(
+        (_) async => const Project(
+          id: 'prj_1',
+          githubRepoId: 7,
+          fullName: 'acme/app',
+          remote: 'r',
+          defaultBaseBranch: 'main',
+          profile: ProjectProfile(
+            apps: [
+              AppProfile(
+                name: 'app',
+                path: '.',
+                flavors: [
+                  FlavorProfile(
+                    name: 'dev',
+                    entrypoint: 'lib/main_dev.dart',
+                    firebaseAppId: {'android': '1:1:android:a'},
+                    appleAppId: '123',
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      );
+      when(() => env.client.getProject('prj_1'))
+          .thenAnswer((_) async => sample.project);
+    });
+
+    test('sets the store ids of a flavor of the only app', () async {
+      await env.runOk([
+        'projects',
+        'set',
+        'prj_1',
+        '--flavor',
+        'dev',
+        '--firebase-app-id',
+        'android=1:1:android:a',
+        '--firebase-app-id',
+        'ios=',
+        '--apple-app-id',
+        '123',
+      ]);
+
+      final app = sent().apps.single;
+      expect(app.path, '.');
+      expect(
+        app.flavors.single,
+        const FlavorEdit(
+          name: 'dev',
+          firebaseAppId: {'android': '1:1:android:a', 'ios': ''},
+          appleAppId: '123',
+        ),
+      );
+      expect(env.logger.out, contains('firebase android: 1:1:android:a'));
+      expect(env.logger.out, contains('app store: 123'));
+    });
+
+    test('takes the app it is given', () async {
+      await env.runOk([
+        'projects',
+        'set',
+        'prj_1',
+        '--app',
+        'apps/x',
+        '--flavor',
+        'dev',
+        '--apple-app-id',
+        '',
+      ]);
+
+      expect(sent().apps.single.path, 'apps/x');
+      expect(sent().apps.single.flavors.single.firebaseAppId, isNull);
+      verifyNever(() => env.client.getProject(any()));
+    });
+
+    test(
+      'refuses a value that is not platform=id, or nothing to set',
+      () async {
+        expect(
+          await env.run([
+            'projects',
+            'set',
+            'prj_1',
+            '--flavor',
+            'dev',
+            '--firebase-app-id',
+            'nope',
+          ]),
+          64,
+        );
+        expect(
+          await env.run(['projects', 'set', 'prj_1', '--flavor', 'dev']),
+          64,
+        );
+        expect(
+          await env.run(['projects', 'set', 'prj_1', '--apple-app-id', '1']),
+          64,
+        );
+        verifyNever(() => env.client.updateProject(any(), any()));
+      },
+    );
+
+    test('asks for --app when the project has more than one', () async {
+      when(() => env.client.getProject('prj_1')).thenAnswer(
+        (_) async => const Project(
+          id: 'prj_1',
+          githubRepoId: 7,
+          fullName: 'acme/app',
+          remote: 'r',
+          defaultBaseBranch: 'main',
+          profile: ProjectProfile(
+            apps: [
+              AppProfile(name: 'a', path: 'apps/a'),
+              AppProfile(name: 'b', path: 'apps/b'),
+            ],
+          ),
+        ),
+      );
+
+      expect(
+        await env.run([
+          'projects',
+          'set',
+          'prj_1',
+          '--flavor',
+          'dev',
+          '--apple-app-id',
+          '1',
+        ]),
+        64,
+      );
+      expect(env.logger.errors.first, contains('apps/a, apps/b'));
+    });
+  });
 }

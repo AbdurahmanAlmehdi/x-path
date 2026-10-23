@@ -1408,6 +1408,66 @@ abstract class AppLocalizations {
   /// **'The credential this flavor uses for each kind, with what the last checks found: does it work, and can it reach this flavor\'s app.'**
   String get flavorCredentialsHelp;
 
+  /// Section of the flavor sheet: the Firebase and App Store Connect app ids.
+  ///
+  /// In en, this message translates to:
+  /// **'Store ids'**
+  String get flavorStoreIds;
+
+  /// Flavor sheet, store ids.
+  ///
+  /// In en, this message translates to:
+  /// **'The built-in workflows upload this flavor\'s builds to these apps when a dispatch names none. The scan fills in the Firebase ids its files name.'**
+  String get flavorStoreIdsHelp;
+
+  /// Field label.
+  ///
+  /// In en, this message translates to:
+  /// **'Firebase app id · Android'**
+  String get flavorFirebaseAndroid;
+
+  /// Field label.
+  ///
+  /// In en, this message translates to:
+  /// **'Firebase app id · iOS'**
+  String get flavorFirebaseIos;
+
+  /// Placeholder of a Firebase app id field.
+  ///
+  /// In en, this message translates to:
+  /// **'1:123456789012:{platform}:abc123'**
+  String flavorFirebaseHint(String platform);
+
+  /// Field label.
+  ///
+  /// In en, this message translates to:
+  /// **'App Store Connect app id'**
+  String get flavorAppleAppId;
+
+  /// Placeholder of the App Store Connect app id field.
+  ///
+  /// In en, this message translates to:
+  /// **'1234567890'**
+  String get flavorAppleAppIdHint;
+
+  /// Saves the store ids of the flavor.
+  ///
+  /// In en, this message translates to:
+  /// **'Save ids'**
+  String get flavorStoreIdsSave;
+
+  /// The store ids were saved.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved. The next dispatch uploads to these apps.'**
+  String get flavorStoreIdsSaved;
+
+  /// On a finding of a missing Firebase app id: opens the flavor's store ids.
+  ///
+  /// In en, this message translates to:
+  /// **'Set the id…'**
+  String get scanSetStoreId;
+
   /// The flavor has no credential of a kind.
   ///
   /// In en, this message translates to:

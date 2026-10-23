@@ -160,6 +160,11 @@ void main() {
                     'iosBundleId': 'com.example',
                     'androidAppId': 'com.example',
                     'versionFiles': ['pubspec.yaml'],
+                    'firebaseAppId': {
+                      'android': '1:123456789012:android:abcdef',
+                      'ios': '',
+                    },
+                    'appleAppId': '1234567890',
                   },
                 ],
               },
@@ -319,6 +324,57 @@ void main() {
 
       expect(response.statusCode, 200);
       expect(response.json['defaultBaseBranch'], 'dev');
+      expectContract(response, path: '/projects/$id', method: 'PATCH');
+    });
+
+    test('PATCH /projects/{id} sets the store ids of a flavor', () async {
+      final id = await addProject();
+
+      final response = await send('PATCH', '/projects/$id', {
+        'apps': [
+          {
+            'path': '.',
+            'flavors': [
+              {
+                'name': 'default',
+                'firebaseAppId': {'android': '1:123456789012:android:abcdef'},
+                'appleAppId': '1234567890',
+              },
+            ],
+          },
+        ],
+      });
+
+      expect(response.statusCode, 200);
+      final flavor =
+          (((response.json['profile'] as Map)['apps'] as List).single
+                  as Map)['flavors']
+              as List;
+      expect((flavor.single as Map)['firebaseAppId'], {
+        'android': '1:123456789012:android:abcdef',
+      });
+      expect((flavor.single as Map)['appleAppId'], '1234567890');
+      expectContract(response, path: '/projects/$id', method: 'PATCH');
+    });
+
+    test('PATCH /projects/{id} 400 for a store id of the wrong form', () async {
+      final id = await addProject();
+
+      final response = await send('PATCH', '/projects/$id', {
+        'apps': [
+          {
+            'path': '.',
+            'flavors': [
+              {
+                'name': 'default',
+                'firebaseAppId': {'android': '1:1:ios:a'},
+              },
+            ],
+          },
+        ],
+      });
+
+      expect(response.statusCode, 400);
       expectContract(response, path: '/projects/$id', method: 'PATCH');
     });
 

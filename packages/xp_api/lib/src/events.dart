@@ -34,6 +34,9 @@ sealed class EngineEvent extends Equatable {
       errors: payload['errors'] as int,
       warnings: payload['warnings'] as int,
     ),
+    ProjectEdited.eventType => ProjectEdited(
+      projectId: payload['projectId'] as String,
+    ),
     ProjectRemoved.eventType => ProjectRemoved(
       projectId: payload['projectId'] as String,
     ),
@@ -349,6 +352,27 @@ final class ProjectScanned extends EngineEvent {
 
   @override
   List<Object?> get props => [projectId, errors, warnings];
+}
+
+/// The owner edited the profile of a project (`PATCH /projects/{id}`).
+final class ProjectEdited extends EngineEvent {
+  /// Creates the event.
+  const new({required this.projectId});
+
+  /// The wire name of this event.
+  static const eventType = 'project.edited';
+
+  /// The project's id.
+  final String projectId;
+
+  @override
+  String get type => eventType;
+
+  @override
+  Map<String, dynamic> get payload => {'projectId': projectId};
+
+  @override
+  List<Object?> get props => [projectId];
 }
 
 /// A project was removed.

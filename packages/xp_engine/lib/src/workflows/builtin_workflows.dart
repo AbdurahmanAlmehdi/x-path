@@ -31,8 +31,8 @@ inputs:
   firebaseAppIds:
     description: >-
       Firebase app ids by flavor and platform, for example
-      {dev: {android: "1:123456789012:android:abcdef"}}. A build without one
-      is not uploaded.
+      {dev: {android: "1:123456789012:android:abcdef"}}. A flavor without one
+      uses the id of its profile; a build with neither is not uploaded.
   testerGroups:
     description: Firebase tester group aliases.
     default: []
@@ -41,8 +41,9 @@ inputs:
     default: ""
   appleAppIds:
     description: >-
-      App Store Connect app ids by flavor, for example {dev: "1234567890"}. An
-      iOS build without one is not uploaded.
+      App Store Connect app ids by flavor, for example {dev: "1234567890"}. A
+      flavor without one uses the id of its profile; an iOS build with neither
+      is not uploaded.
   exportOptionsPlist:
     description: The export options of iOS builds, relative to the app.
     default: ios/ExportOptions.plist
@@ -92,21 +93,21 @@ stages:
           platform: ${{ platforms }}
           flavor: ${{ flavors }}
         if: >-
-          (platform == 'android' && inputs.firebaseAppIds[flavor.name].android)
-          || (platform == 'ios' && inputs.appleAppIds[flavor.name])
+          (platform == 'android' && (inputs.firebaseAppIds[flavor.name].android || flavor.firebaseAppId.android))
+          || (platform == 'ios' && (inputs.appleAppIds[flavor.name] || flavor.appleAppId))
         steps:
           - kind: upload.firebase
-            if: platform == 'android' && inputs.firebaseAppIds[flavor.name].android
+            if: platform == 'android' && (inputs.firebaseAppIds[flavor.name].android || flavor.firebaseAppId.android)
             with:
               artifactsFrom: build
-              appId: ${{ inputs.firebaseAppIds[flavor.name].android }}
+              appId: ${{ inputs.firebaseAppIds[flavor.name].android || flavor.firebaseAppId.android }}
               groupAliases: ${{ inputs.testerGroups }}
               releaseNotes: ${{ inputs.notes }}
           - kind: upload.appStore
-            if: platform == 'ios' && inputs.appleAppIds[flavor.name]
+            if: platform == 'ios' && (inputs.appleAppIds[flavor.name] || flavor.appleAppId)
             with:
               artifactsFrom: build
-              appleAppId: ${{ inputs.appleAppIds[flavor.name] }}
+              appleAppId: ${{ inputs.appleAppIds[flavor.name] || flavor.appleAppId }}
 ''';
 
 // A production release is ship.sh `release prod` plus the release model: the
@@ -139,8 +140,9 @@ lock: project
 inputs:
   firebaseAppIds:
     description: >-
-      Firebase app ids by flavor and platform. A Shorebird flavor with one is
-      also uploaded to Firebase App Distribution as an APK.
+      Firebase app ids by flavor and platform; a flavor without one uses the
+      id of its profile. A Shorebird flavor with one is also uploaded to
+      Firebase App Distribution as an APK.
   testerGroups:
     description: Firebase tester group aliases.
     default: []
@@ -149,8 +151,8 @@ inputs:
     default: ""
   appleAppIds:
     description: >-
-      App Store Connect app ids by flavor. An iOS build without one is not
-      uploaded.
+      App Store Connect app ids by flavor; a flavor without one uses the id of
+      its profile. An iOS build with neither is not uploaded.
   playTrack:
     description: The Google Play track an Android build goes to.
     default: internal
@@ -253,8 +255,8 @@ stages:
           flavor: ${{ flavors }}
         if: >-
           (platform == 'android' && (flavor.credentials.play_sa
-          || (flavor.shorebird && inputs.firebaseAppIds[flavor.name].android)))
-          || (platform == 'ios' && inputs.appleAppIds[flavor.name])
+          || (flavor.shorebird && (inputs.firebaseAppIds[flavor.name].android || flavor.firebaseAppId.android))))
+          || (platform == 'ios' && (inputs.appleAppIds[flavor.name] || flavor.appleAppId))
         steps:
           - kind: upload.play
             if: platform == 'android' && flavor.credentials.play_sa
@@ -264,17 +266,17 @@ stages:
               releaseNotes:
                 en-US: ${{ inputs.notes }}
           - kind: upload.firebase
-            if: platform == 'android' && flavor.shorebird && inputs.firebaseAppIds[flavor.name].android
+            if: platform == 'android' && flavor.shorebird && (inputs.firebaseAppIds[flavor.name].android || flavor.firebaseAppId.android)
             with:
               artifactsFrom: build
-              appId: ${{ inputs.firebaseAppIds[flavor.name].android }}
+              appId: ${{ inputs.firebaseAppIds[flavor.name].android || flavor.firebaseAppId.android }}
               groupAliases: ${{ inputs.testerGroups }}
               releaseNotes: ${{ inputs.notes }}
           - kind: upload.appStore
-            if: platform == 'ios' && inputs.appleAppIds[flavor.name]
+            if: platform == 'ios' && (inputs.appleAppIds[flavor.name] || flavor.appleAppId)
             with:
               artifactsFrom: build
-              appleAppId: ${{ inputs.appleAppIds[flavor.name] }}
+              appleAppId: ${{ inputs.appleAppIds[flavor.name] || flavor.appleAppId }}
   - name: finalize
     jobs:
       tag:

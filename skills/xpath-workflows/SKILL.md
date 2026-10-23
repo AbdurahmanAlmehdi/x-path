@@ -80,7 +80,8 @@ Variables from the dispatch: `app` (`name`, `path`, `hasIos`, `hasAndroid`, `ver
 `project` (`id`, `fullName`, `baseBranch`), `ref`, `sha`, `version` (`x.y.z`), `build`, `bump`,
 `releaseVersion`, `patch`, `release`, `platforms`, `flavors` and `inputs` (the document's
 defaults, then what the dispatch gave). A matrix adds `platform` and `flavor` (`name`, `prod`,
-`shorebird`, `implicit`, `entrypoint`, `iosBundleId`, `androidAppId`, `shorebirdAppId`, and
+`shorebird`, `implicit`, `entrypoint`, `iosBundleId`, `androidAppId`, `shorebirdAppId`,
+`firebaseAppId` (by platform, `flavor.firebaseAppId.android`), `appleAppId`, and
 `credentials.<kind>` for each credential the flavor has, such as `flavor.credentials.play_sa`).
 
 ## Steps
@@ -160,8 +161,9 @@ credential, a value a step refuses. Validate, then dispatch once with the smalle
 
 ## Worked example: dev build to Firebase with app ids as defaults
 
-The built-in `dev-build` uploads Android only when `firebaseAppIds` is given at dispatch. This
-copy carries the ids as input defaults, builds Android only and sends the APK to a tester group.
+The built-in `dev-build` uploads Android when `firebaseAppIds` is given at dispatch or the flavor
+has a Firebase app id in its profile (`flavor.firebaseAppId`). This copy carries the ids as input
+defaults, builds Android only and sends the APK to a tester group.
 
 ```yaml
 schema: 1

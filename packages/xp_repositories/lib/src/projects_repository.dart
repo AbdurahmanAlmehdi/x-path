@@ -22,6 +22,7 @@ class ProjectsRepository {
     refreshOn: (event) =>
         event is ProjectAdded ||
         event is ProjectScanned ||
+        event is ProjectEdited ||
         event is ProjectRemoved,
   );
 
@@ -37,6 +38,11 @@ class ProjectsRepository {
   /// Scans [id] again.
   Future<Project> scanProject(String id) =>
       _session.call((client) => client.scanProject(id));
+
+  /// Applies the owner's [edits] to the profile of [id]; they survive
+  /// rescans.
+  Future<Project> editProject(String id, ProfileEdits edits) =>
+      _session.call((client) => client.updateProject(id, edits));
 
   /// Removes [id] from the engine. Nothing in the repository changes.
   Future<void> removeProject(String id) =>

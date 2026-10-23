@@ -145,6 +145,69 @@ void main() {
       },
     );
 
+    group('with store ids on the dev flavor', () {
+      final withIds = AppProfile(
+        name: demoApp.name,
+        path: demoApp.path,
+        version: demoApp.version,
+        flutterVersion: demoApp.flutterVersion,
+        hasAndroid: true,
+        hasIos: true,
+        flavors: [
+          demoApp.flavors.first.copyWith(
+            firebaseAppId: () => {'android': '1:111:android:aaa'},
+            appleAppId: () => '1234567890',
+          ),
+          demoApp.flavors.last,
+        ],
+      );
+
+      setUp(() async {
+        harness = await DispatchHarness.create(apps: [withIds]);
+        await harness.saveCredential('dev', CredentialKind.firebaseSa);
+        await harness.saveCredential('dev', CredentialKind.ascKey);
+      });
+
+      test('uploads with them and no inputs (UX-03)', () async {
+        final run = await harness.dispatchBuiltin('dev-build');
+
+        expect(
+          run.jobs.map((job) => job.name),
+          containsAll(['Upload dev for android', 'Upload dev for ios']),
+        );
+        final android = await harness.input(
+          await jobNamed(run, 'Upload dev for android'),
+          'upload.firebase',
+        );
+        expect(android['appId'], '1:111:android:aaa');
+        final ios = await harness.input(
+          await jobNamed(run, 'Upload dev for ios'),
+          'upload.appStore',
+        );
+        expect(ios['appleAppId'], '1234567890');
+      });
+
+      test('an input still wins over them', () async {
+        final run = await harness.dispatchBuiltin(
+          'dev-build',
+          const DispatchRequest(
+            platforms: ['android'],
+            inputs: {
+              'firebaseAppIds': {
+                'dev': {'android': '1:222:android:bbb'},
+              },
+            },
+          ),
+        );
+
+        final upload = await harness.input(
+          await jobNamed(run, 'Upload dev for android'),
+          'upload.firebase',
+        );
+        expect(upload['appId'], '1:222:android:bbb');
+      });
+    });
+
     test('leaves blank release notes out', () async {
       await harness.saveCredential('dev', CredentialKind.firebaseSa);
 

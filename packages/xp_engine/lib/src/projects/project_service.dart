@@ -142,6 +142,7 @@ class ProjectService {
     final valid = validateEdits(record.profile, patch);
     final updated = record.copyWith(edits: record.edits.merge(valid));
     await _repository.update(updated);
+    _events.append(ProjectEdited(projectId: id));
     return updated.toProject();
   });
 

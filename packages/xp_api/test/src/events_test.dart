@@ -37,6 +37,7 @@ void main() {
         const StreamOpened(),
         const ProjectAdded(projectId: 'prj_1', fullName: 'o/r'),
         const ProjectScanned(projectId: 'prj_1', errors: 1, warnings: 2),
+        const ProjectEdited(projectId: 'prj_1'),
         const ProjectRemoved(projectId: 'prj_1'),
         const JobStateChanged(
           jobId: 'job_1',
@@ -278,6 +279,7 @@ void main() {
         StreamOpened() => 'opened',
         ProjectAdded() => 'added',
         ProjectScanned() => 'scanned',
+        ProjectEdited() => 'edited',
         ProjectRemoved() => 'removed',
         JobStateChanged() => 'job',
         JobStepChanged() => 'step',

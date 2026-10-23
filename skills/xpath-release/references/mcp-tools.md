@@ -38,7 +38,7 @@ server tells the agent so when it connects.
 |---|---|---|
 | `add_project` | exactly one of `path` (an absolute folder with a clone, on the engine's machine) or `remote` (`owner/name`, or an https or ssh URL) | Adds the GitHub repository and scans it. Needs the engine's GitHub token. |
 | `scan_project` | **`project`** | Scans again. Read-only: the repository is never changed. |
-| `update_project` | **`project`**, **`edits`** | `edits` is a `ProfileEdits` object, for example `{"defaultBaseBranch": "main", "apps": [{"path": ".", "storeCountry": "us", "flavors": [{"name": "prod", "prod": true}]}]}`. Per flavor: `prod`, `shorebird`, `entrypoint`, `iosBundleId`, `androidAppId`, `versionFiles`. Edits survive rescans. |
+| `update_project` | **`project`**, **`edits`** | `edits` is a `ProfileEdits` object, for example `{"defaultBaseBranch": "main", "apps": [{"path": ".", "storeCountry": "us", "flavors": [{"name": "prod", "prod": true}]}]}`. Per flavor: `prod`, `shorebird`, `entrypoint`, `iosBundleId`, `androidAppId`, `versionFiles`, `firebaseAppId` (by platform; an empty id removes it), `appleAppId`. The built-ins upload to the store ids when no input gives one. Edits survive rescans. |
 | `validate_workflow` | **`project`**, **`yaml`** | `{valid, saved: false, issues: [{line, column, message}]}`. Saves nothing. |
 | `create_workflow` | **`project`**, **`name`** (letters, digits, `.`, `_`, `-`), **`yaml`** | Validates first; with issues nothing is saved and the issues come back (`isError`). |
 | `update_workflow` | **`project`**, **`workflow`**, **`yaml`** | A new version of a workflow of the project's own; built-ins cannot be edited. Validates first. |

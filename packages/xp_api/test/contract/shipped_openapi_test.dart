@@ -1405,6 +1405,7 @@ void main() {
         const StreamOpened(),
         const ProjectAdded(projectId: 'prj_1', fullName: 'o/r'),
         const ProjectScanned(projectId: 'prj_1', errors: 0, warnings: 1),
+        const ProjectEdited(projectId: 'prj_1'),
         const ProjectRemoved(projectId: 'prj_1'),
         const JobStateChanged(
           jobId: 'job_1',
