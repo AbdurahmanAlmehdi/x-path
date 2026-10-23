@@ -137,6 +137,16 @@ jobs:
     name: runner-offline
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    # The e2e commits the fixture app and at once clones it bare. Background
+    # auto-maintenance after the commit can pack and delete the loose objects
+    # while the clone copies them ("failed to copy file ... No such file or
+    # directory"), so it is off for every git the e2e runs.
+    env:
+      GIT_CONFIG_COUNT: "2"
+      GIT_CONFIG_KEY_0: maintenance.auto
+      GIT_CONFIG_VALUE_0: "false"
+      GIT_CONFIG_KEY_1: gc.auto
+      GIT_CONFIG_VALUE_1: "0"
     steps:
       - *checkout
       - *setup-flutter
