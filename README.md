@@ -2007,8 +2007,9 @@ below its threshold. The thresholds are the three `test:coverage:*` scripts in t
 `pubspec.yaml`: a package not named in `test:coverage:strict` gets the 90% floor.
 
 The `gate` workflow enforces the same thresholds on Linux, where the `macos` and `golden` tests
-are skipped. The `macos` workflow runs the whole suite on macOS while the repository is public;
-on a private repository, run `melos run test:coverage` on a Mac before merging to `main`.
+are skipped, with one job per package. The `macos` workflow runs the packages with macOS-only tests
+(and those whose code depends on the host OS) on macOS while the repository is public; on a private
+repository, run `melos run test:coverage` on a Mac before merging to `main`.
 Coverage counts the files that tests import, so keep each package's barrel (`lib/<name>.dart`)
 exporting everything.
 
@@ -2041,16 +2042,27 @@ more pixels than that. After a deliberate change, write them again with
 
 The workflows in `.github/workflows`:
 
-- `gate.yaml`: one job, `gate`, on every pull request and every push to `main`, with no path filters, so it always
-  reports and branch protection can require it. On Ubuntu it runs the full gate of CONTRIBUTING.md: `dart pub get`,
-  `dart analyze --fatal-infos`, `dart format --set-exit-if-changed .`, the layer check, `melos run test:coverage`
-  (every package with its threshold), `melos run test:contract` and `tool/e2e/smoke_bundle.sh`, which builds the
-  `xpd` AOT bundle, starts it and checks `/health`, the SQLite build hook, token authentication and a clean
-  shutdown. It replaced the per-package workflows, each of which ran a part of it.
-- `macos.yaml`: one job, `macos`, on every pull request and every push to `main`, on a GitHub-hosted macOS runner,
-  only while the repository is public (macOS minutes are free for public repositories only; on a private one the
-  job is skipped, which a required check counts as passed). It runs `melos run test:coverage` on macOS, so the
-  `macos` and `golden` tests run too, and `flutter build macos --debug` of the desktop app.
+- `gate.yaml`: on every pull request and every push to `main`, with no path filters, so it always reports and
+  branch protection can require it. On Ubuntu it runs the full gate of CONTRIBUTING.md in jobs that run in
+  parallel: `analyze` (`dart analyze --fatal-infos`, `dart format --set-exit-if-changed .`, the layer check and
+  the CI matrix check), `coverage` (one job per package, each running the `test:coverage:*` script that
+  `melos run test:coverage` runs it with, so it keeps its threshold), `contract` (`melos run test:contract`),
+  `smoke` (`tool/e2e/smoke_bundle.sh`, which builds the `xpd` AOT bundle, starts it and checks `/health`, the
+  SQLite build hook, token authentication and a clean shutdown) and `runner-offline`
+  (`tool/e2e/runner_offline_e2e.sh`). The last job, `gate`, waits for all of them and fails unless every one
+  passed; it is the check branch protection requires. A pull request takes about as long as the slowest package.
+- `macos.yaml`: on every pull request and every push to `main`, on GitHub-hosted macOS runners, only while the
+  repository is public (macOS minutes are free for public repositories only; on a private one the jobs are
+  skipped, which a required check counts as passed). One `coverage` job per package with tests only macOS runs
+  (`macos` and `golden` tags, the Flutter packages) or code that depends on the host OS, with the same script as
+  in `gate`, and `build-desktop`, `flutter build macos --debug` of the desktop app. The last job, `macos`, waits
+  for them and fails unless every one passed.
+
+The package lists of both `coverage` matrices are written in the workflows. `dart run tool/check_ci_matrix.dart`
+(in the `analyze` job) fails when a workspace package with tests is missing from the `gate` matrix, when one with
+macOS-only tests is missing from the `macos` matrix, or when an entry names the wrong script: a scoped
+`melos run` of a script whose filters exclude the package finds nothing and exits 0. A new package goes into the
+matrix with the script its threshold comes from (`strict`, `floor` or `flutter`).
 - `release.yml`: a release of XPath on every push to `main` that changes more than `site/` (see Releases and
   installation).
 - `site.yaml`: on a pull request that touches `site/`, checks the website (see Website). It never deploys.
