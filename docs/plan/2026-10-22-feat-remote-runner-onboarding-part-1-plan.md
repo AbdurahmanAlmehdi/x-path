@@ -146,7 +146,7 @@ Details:
 
 ### Phase R2: `xp runner doctor`
 
-- **Status:** Not started
+- **Status:** Done
 - **Scope:** Answer "will this machine get jobs?" without connecting, and with no engine at
   all.
 - **Files touched:** `apps/xp/lib/src/runner/runner_command.dart` (new `doctor` subcommand),

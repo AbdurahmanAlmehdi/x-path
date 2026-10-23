@@ -182,6 +182,13 @@ void main() {
         );
       });
 
+      test('checks a runner machine with doctor', () {
+        expect(
+          env.runner.commands['runner']!.subcommands.keys,
+          contains('doctor'),
+        );
+      });
+
       test('prints the usage of a group', () async {
         expect(await env.run(['projects']), 64);
 
