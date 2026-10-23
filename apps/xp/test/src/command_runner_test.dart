@@ -227,6 +227,16 @@ void main() {
         expect(env.logger.warnings, isEmpty);
       });
 
+      test('does not look for an update for a runner: it follows its '
+          'engine', () async {
+        env.update.newer = '9.9.9';
+
+        await env.run(['runner', 'doctor', '--help']);
+
+        expect(env.update.calls, 0);
+        expect(env.logger.warnings, isEmpty);
+      });
+
       test('does not look for an update without a command', () async {
         await env.runOk(['--version']);
 

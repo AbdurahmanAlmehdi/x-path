@@ -894,7 +894,8 @@ void main() {
       expect(
         log,
         contains(
-          'The engine runs version 2.0.0, this runner 1.2.3: no new jobs; the '
+          'The engine runs 2.0.0; this runner (1.2.3) updates to it between '
+          'jobs: no new jobs; the '
           'runner updates now.',
         ),
       );
@@ -923,7 +924,8 @@ void main() {
       expect(
         log,
         contains(
-          'The engine runs version 2.0.0, this runner 1.2.3: no new jobs; the '
+          'The engine runs 2.0.0; this runner (1.2.3) updates to it between '
+          'jobs: no new jobs; the '
           'running job finishes, then the runner updates.',
         ),
       );
@@ -959,7 +961,8 @@ void main() {
       expect(
         log,
         contains(
-          'The engine runs version 2.0.0, this runner 1.2.3: no new jobs; the '
+          'The engine runs 2.0.0; this runner (1.2.3) updates to it between '
+          'jobs: no new jobs; the '
           '2 running jobs finish, then the runner updates.',
         ),
       );

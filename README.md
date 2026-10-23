@@ -353,6 +353,9 @@ from `file://` URLs with and without a version, a wrong SHA-256, a wrong version
 the service step against a fake `systemctl` and `loginctl` (the unit written, `enable --now`, the restart on update)
 and `--with-android` against a fake `apt-get`, `sudo`, `dpkg-query` and `sdkmanager`.
 
+**Which versions work together** (runners follow their engine; the app and the CLI need the same API version):
+[docs/guide/install.md](docs/guide/install.md#which-versions-work-together).
+
 **A Linux runner, with Android.** `install.sh --runner --with-android` (Debian or Ubuntu) also installs a JDK 17, git,
 ssh, curl, unzip, xz, zip and perl with `apt-get`, the Android command-line tools (pinned by version and SHA-256),
 the licences, one platform and one build-tools, into `--android-sdk <dir>` (default `~/Android/Sdk`, where Flutter

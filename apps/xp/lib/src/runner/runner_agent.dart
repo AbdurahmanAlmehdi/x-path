@@ -513,8 +513,8 @@ class RunnerAgent {
         _ => 'the $running running jobs finish, then the runner updates',
       };
       _log(
-        'The engine runs version $engineVersion, this runner $version: no '
-        'new jobs; $then.',
+        'The engine runs $engineVersion; this runner ($version) updates to '
+        'it between jobs: no new jobs; $then.',
       );
     }
   }

@@ -484,7 +484,7 @@ Details:
 
 ### Phase R9: Versions: what must match
 
-- **Status:** Not started
+- **Status:** Done
 - **Scope:** Write down which versions must match, make the 1.0 plan agree with the code, and
   stop the misleading update nag on runners.
 - **Files touched:** `docs/guide/install.md` (new), `README.md` (link),
