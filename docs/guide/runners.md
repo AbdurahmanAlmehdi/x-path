@@ -65,4 +65,106 @@ is your call.
 ## Reaching the engine
 
 The engine listens on `127.0.0.1:7480`, so only its own machine reaches it. A runner on another
-machine needs an address that leads there.
+machine needs an address that leads there. Pick one of these three; Tailscale is the one we
+recommend. The commands follow the Tailscale Serve syntax of Tailscale 1.52 and later, checked
+against Tailscale's docs in October 2026.
+
+### Tailscale (recommended)
+
+Tailscale puts the engine's Mac and the runner on one private network (a tailnet). `tailscale
+serve` then publishes the engine at `https://<mac>.<tailnet>.ts.net` with a real certificate.
+The engine keeps listening on loopback, nothing is public, and the runner's traffic is encrypted
+twice (TLS inside WireGuard). WebSockets, which runners use, pass through.
+
+1. Install Tailscale on the engine's Mac and on the runner, and sign both in to the same tailnet.
+   On a Linux runner:
+
+   ```sh
+   curl -fsSL https://tailscale.com/install.sh | sh
+   sudo tailscale up
+   ```
+
+2. In the Tailscale admin console, under DNS, turn on MagicDNS and HTTPS Certificates. Serve
+   needs them; if they are off, `tailscale serve` offers to turn them on.
+
+3. On the engine's Mac, publish the engine. `--bg` keeps it published after the terminal closes
+   and across restarts:
+
+   ```sh
+   tailscale serve --bg http://127.0.0.1:7480
+   tailscale serve status        # prints https://<mac>.<tailnet>.ts.net
+   ```
+
+4. Tell the engine that address, so pairing commands carry it:
+
+   ```sh
+   xp runners url https://<mac>.<tailnet>.ts.net
+   ```
+
+5. Pair the runner as in [Pair a runner](#pair-a-runner). To stop publishing the engine later:
+   `tailscale serve --https=443 http://127.0.0.1:7480 off`.
+
+### Cloudflare Tunnel
+
+`cloudflared` on the engine's machine maps a hostname of a domain you have on Cloudflare to the
+engine. The engine becomes reachable from the internet, protected by its bearer tokens (every
+route but `/health` and `/version` needs one).
+
+```sh
+cloudflared tunnel login
+cloudflared tunnel create xpath
+cloudflared tunnel route dns xpath xpath.example.com
+cloudflared tunnel run --url http://127.0.0.1:7480 xpath
+xp runners url https://xpath.example.com
+```
+
+Cloudflare Access in front of the tunnel is **not** supported yet: the runner cannot send Access
+service-token headers, so Access would turn it away.
+
+### SSH reverse tunnel
+
+When the engine's Mac can reach the runner over SSH, a reverse tunnel gives the runner the engine
+on its own loopback. SSH encrypts the traffic. It takes one tunnel per runner, kept up by
+`autossh`:
+
+```sh
+autossh -M 0 -N -o ServerAliveInterval=30 -o ExitOnForwardFailure=yes -R 127.0.0.1:7480:127.0.0.1:7480 user@runner
+```
+
+On the runner the engine is then `http://127.0.0.1:7480`, so pair it with that address (`xp runners
+url http://127.0.0.1:7480`, or the pairing command as printed). To keep the tunnel up on the Mac,
+save this LaunchAgent as `~/Library/LaunchAgents/ly.abdurahman.xpath.tunnel.plist`, with your
+user, runner and the path of `autossh` (`which autossh`), then `launchctl load` it. XPath does not
+ship or install it.
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>ly.abdurahman.xpath.tunnel</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/opt/homebrew/bin/autossh</string>
+    <string>-M</string><string>0</string>
+    <string>-N</string>
+    <string>-o</string><string>ServerAliveInterval=30</string>
+    <string>-o</string><string>ExitOnForwardFailure=yes</string>
+    <string>-R</string><string>127.0.0.1:7480:127.0.0.1:7480</string>
+    <string>USER@RUNNER</string>
+  </array>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+</dict>
+</plist>
+```
+
+### What not to do
+
+Do not start the engine with `--host 0.0.0.0` and send runners to it over plain `http`. The runner
+connection carries signing material (keystores, certificates, API keys) for the jobs it runs, and
+anyone on the path could read it. `xp runners url` warns when a plain `http` address leaves the
+machine and the tailnet.

@@ -351,7 +351,7 @@ Details:
 
 ### Phase R6: Docs: reaching the engine from another machine
 
-- **Status:** Not started
+- **Status:** Done
 - **Scope:** A section "Reaching the engine" in `docs/guide/runners.md` (anchor
   `#reaching-the-engine`, which R4's output links to), a README link to it, and a short version
   in `skills/xpath-setup/SKILL.md`. It names one setup and two alternatives (Q4).

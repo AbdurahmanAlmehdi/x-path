@@ -1286,8 +1286,9 @@ side: the protocol, the leases, the probe and the endpoints. The runner agent, `
 
 ### Pairing
 
-Setting up a runner step by step, and how a runner on another machine reaches the engine:
-[docs/guide/runners.md](docs/guide/runners.md).
+Setting up a runner step by step: [docs/guide/runners.md](docs/guide/runners.md). How a runner on
+another machine reaches the engine (Tailscale, Cloudflare Tunnel, an SSH tunnel):
+[Reaching the engine](docs/guide/runners.md#reaching-the-engine).
 
 ```sh
 xp runners url https://mac.tailnet.ts.net   # the address runners reach the engine at; pairing commands carry it
