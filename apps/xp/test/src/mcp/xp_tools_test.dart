@@ -77,6 +77,7 @@ void main() {
           'get_approval',
           'get_job_tests',
           'get_storage_report',
+          'list_runners',
         ]),
       );
     });
@@ -97,10 +98,44 @@ void main() {
 
     test('marks the tools that only read', () {
       expect(tools['list_projects']!.readOnly, isTrue);
+      expect(tools['list_runners']!.readOnly, isTrue);
       expect(tools['get_approval']!.readOnly, isTrue);
       expect(tools['dispatch_workflow']!.readOnly, isFalse);
       expect(tools['create_workflow']!.readOnly, isFalse);
       expect(tools['add_project']!.readOnly, isFalse);
+    });
+  });
+
+  group('runners', () {
+    test('list_runners lists them with what they lack', () async {
+      final runner = Runner(
+        id: 'rnr_1',
+        name: 'aws',
+        status: RunnerStatus.online,
+        capabilities: const ['flutter'],
+        slots: 2,
+        jobIds: const [],
+        createdAt: DateTime.utc(2026, 10, 22),
+        missing: const [
+          MissingCapability(
+            capability: 'android',
+            reason: 'no JDK: java not found',
+            fix: 'install JDK 17 or set JAVA_HOME',
+          ),
+        ],
+      );
+      when(() => client.listRunners()).thenAnswer((_) async => [runner]);
+
+      final result = await call('list_runners');
+
+      expect(result.isError, isFalse);
+      final listed = (decoded(result)! as List).single as Map;
+      expect(listed['name'], 'aws');
+      expect((listed['missing'] as List).single, {
+        'capability': 'android',
+        'reason': 'no JDK: java not found',
+        'fix': 'install JDK 17 or set JAVA_HOME',
+      });
     });
   });
 

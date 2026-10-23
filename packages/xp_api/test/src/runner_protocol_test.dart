@@ -217,6 +217,17 @@ void main() {
           ),
         ],
       ),
+      const ProbedFrame(capabilities: ['flutter']),
+      const ProbedFrame(
+        capabilities: [],
+        missing: [
+          MissingCapability(
+            capability: 'android',
+            reason: 'no JDK: java not found',
+            fix: 'install JDK 17 or set JAVA_HOME',
+          ),
+        ],
+      ),
       LeaseOfferFrame(
         leaseId: 'lse_1',
         jobId: 'job_1',
@@ -291,8 +302,29 @@ void main() {
       }
     });
 
+    test('a missing capability explains itself in two sentences', () {
+      const missing = MissingCapability(
+        capability: 'android',
+        reason: 'no JDK: java not found',
+        fix: 'install JDK 17 or set JAVA_HOME',
+      );
+
+      expect(
+        missing.explanation,
+        'no JDK: java not found. Install JDK 17 or set JAVA_HOME.',
+      );
+      expect(
+        const MissingCapability(
+          capability: 'android',
+          reason: 'no JDK',
+          fix: '',
+        ).explanation,
+        'no JDK.',
+      );
+    });
+
     test('leaves out what a frame lacks', () {
-      expect(frames[3].toJson().keys, {
+      expect(frames[5].toJson().keys, {
         'type',
         'leaseId',
         'jobId',
@@ -303,7 +335,7 @@ void main() {
         'steps',
         'secrets',
       });
-      expect(frames[8].toJson().keys, {'type', 'jobId', 'reason'});
+      expect(frames[10].toJson().keys, {'type', 'jobId', 'reason'});
     });
 
     test('the welcome frame carries the 30 s and 90 s rules', () {

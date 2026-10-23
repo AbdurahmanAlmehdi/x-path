@@ -49,10 +49,12 @@ void main() {
     EngineStatus status = EngineStatus.connected,
     LocalEngineBloc? localEngine,
     List<EngineProfile>? engineList,
+    RunnersRepository? runners,
   }) async {
     await tester.pumpApp(
       SettingsPage(github: github),
       settingsRepository: settings,
+      runnersRepository: runners,
       connection: connectionIn(
         connectedTo(status: status, engines: engineList),
       ),
@@ -70,6 +72,66 @@ void main() {
     tester.view.physicalSize = const Size(1440, 1400);
     await tester.pumpAndSettle();
   }
+
+  group('RunnerUrlSection', () {
+    testWidgets('shows the URL with its warning, saves and clears it', (
+      tester,
+    ) async {
+      final runners = quietRunners();
+      const plain = RunnerUrl(
+        url: 'http://a.example',
+        warning: 'Plain http carries signing material.',
+      );
+      when(runners.runnerUrl).thenAnswer((_) async => plain);
+      when(() => runners.setRunnerUrl('https://mac.tailnet.ts.net')).thenAnswer(
+        (_) async => const RunnerUrl(url: 'https://mac.tailnet.ts.net'),
+      );
+      when(() => runners.setRunnerUrl(null))
+          .thenAnswer((_) async => const RunnerUrl());
+      await pump(tester, runners: runners);
+
+      expect(
+        find.text('Runners reach the engine at http://a.example.'),
+        findsOne,
+      );
+      expect(find.text('Plain http carries signing material.'), findsOne);
+
+      await tester.enterText(
+        find.byKey(const Key('settings.runnerUrl')),
+        'https://mac.tailnet.ts.net',
+      );
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('settings.runnerUrlSave')));
+      await tester.pumpAndSettle();
+      expect(
+        find.text('Runners reach the engine at https://mac.tailnet.ts.net.'),
+        findsOne,
+      );
+      expect(find.text('Plain http carries signing material.'), findsNothing);
+
+      await tester.tap(find.byKey(const Key('settings.runnerUrlClear')));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('No runner URL is set'), findsOne);
+    });
+
+    testWidgets('says what the engine refused', (tester) async {
+      final runners = quietRunners();
+      when(() => runners.setRunnerUrl('ftp://a')).thenThrow(
+        const ApiException('"ftp://a" is not a runner URL.', statusCode: 400),
+      );
+      await pump(tester, runners: runners);
+
+      await tester.enterText(
+        find.byKey(const Key('settings.runnerUrl')),
+        'ftp://a',
+      );
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('settings.runnerUrlSave')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('"ftp://a" is not a runner URL.'), findsOne);
+    });
+  });
 
   group('SettingsPage', () {
     testWidgets('shows the versions, the engine and its login item', (

@@ -9,10 +9,12 @@ import 'package:xp_desktop/local_engine/local_engine.dart';
 import 'package:xp_desktop/settings/bloc/command_line_tool_bloc.dart';
 import 'package:xp_desktop/settings/bloc/github_token_bloc.dart';
 import 'package:xp_desktop/settings/bloc/remove_xpath_bloc.dart';
+import 'package:xp_desktop/settings/bloc/runner_url_bloc.dart';
 import 'package:xp_desktop/settings/bloc/settings_bloc.dart';
 import 'package:xp_desktop/settings/widgets/command_line_tool_section.dart';
 import 'package:xp_desktop/settings/widgets/github_token_section.dart';
 import 'package:xp_desktop/settings/widgets/remove_xpath_sheet.dart';
+import 'package:xp_desktop/settings/widgets/runner_url_section.dart';
 import 'package:xp_desktop/shell/widgets/engine_status_text.dart';
 import 'package:xp_desktop/shell/widgets/shell_page.dart';
 import 'package:xp_desktop/theme/theme.dart';
@@ -21,8 +23,8 @@ import 'package:xp_macos_services/xp_macos_services.dart';
 import 'package:xp_repositories/xp_repositories.dart';
 
 /// The settings (XPath ▸ Settings…, ⌘,): the versions and the engine's
-/// login item, the `xp` link, the engine's GitHub token, and "Remove
-/// XPath". [github]
+/// login item, the `xp` link, the engine's GitHub token, the runner URL,
+/// and "Remove XPath". [github]
 /// puts the cursor in the GitHub token field.
 class SettingsPage extends StatelessWidget {
   const new({this.github = false, super.key});
@@ -51,6 +53,11 @@ class SettingsPage extends StatelessWidget {
           create: (_) =>
               GitHubTokenBloc(settings: settings)
                 ..add(const GitHubTokenRequested()),
+        ),
+        BlocProvider(
+          create: (_) =>
+              RunnerUrlBloc(runners: context.read<RunnersRepository>())
+                ..add(const RunnerUrlRequested()),
         ),
         BlocProvider(
           create: (_) => RemoveXPathBloc(
@@ -98,6 +105,10 @@ class SettingsView extends StatelessWidget {
             padding: const EdgeInsets.all(16),
             child: GitHubTokenSection(autofocus: github),
           ),
+          const SizedBox(height: 20),
+          XpSectionLabel(l10n.settingsRunners),
+          const SizedBox(height: 8),
+          const XpPanel(padding: EdgeInsets.all(16), child: RunnerUrlSection()),
           const SizedBox(height: 20),
           XpSectionLabel(l10n.settingsRemove),
           const SizedBox(height: 8),

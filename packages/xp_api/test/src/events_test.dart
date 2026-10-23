@@ -223,6 +223,11 @@ void main() {
           slots: 2,
         ),
         const RunnerDisconnected(runnerId: 'rnr_1', name: 'mac-mini'),
+        const RunnerDisconnected(
+          runnerId: 'rnr_1',
+          name: 'mac-mini',
+          reason: 'no frame for 90 s',
+        ),
         const RunnerRevoked(runnerId: 'rnr_1', name: 'mac-mini'),
         const RunnerCapabilitiesChanged(
           runnerId: 'rnr_1',

@@ -19,6 +19,7 @@ const engineMigrations = <Migration>[
   Migration(version: 12, sql: _v12),
   Migration(version: 13, sql: _v13),
   Migration(version: 14, sql: _v14, notes: _v14Notes),
+  Migration(version: 15, sql: _v15),
 ];
 
 // Timestamps are integer microseconds since the Unix epoch (UTC), so that
@@ -503,4 +504,15 @@ FROM credential_ref WHERE kind != 'github' ORDER BY rowid;
 DROP INDEX idx_credential_ref_flavor_kind;
 DROP INDEX idx_credential_ref_flavor;
 DROP TABLE credential_ref;
+''';
+
+// Runner onboarding R4: settings of the engine itself, one text value per
+// key. The first is `runner_url`, the address runners reach the engine at,
+// which pairing tokens carry. `housekeeping_setting` has the same shape but
+// its JSON values belong to housekeeping.
+const _v15 = '''
+CREATE TABLE engine_setting (
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL
+) STRICT;
 ''';

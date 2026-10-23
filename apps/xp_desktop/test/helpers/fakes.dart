@@ -94,6 +94,7 @@ MockReleasesRepository quietReleases() {
 MockRunnersRepository quietRunners() {
   final repository = MockRunnersRepository();
   when(repository.watchRunners).thenAnswer((_) => const Stream.empty());
+  when(repository.runnerUrl).thenAnswer((_) async => const RunnerUrl());
   return repository;
 }
 

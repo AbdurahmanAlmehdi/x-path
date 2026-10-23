@@ -22,6 +22,12 @@ const macProbeResults = [
   ),
   ProbeResult(id: 'android_sdk', status: ProbeStatus.exited, exitCode: 1),
   ProbeResult(
+    id: 'java',
+    status: ProbeStatus.exited,
+    exitCode: 0,
+    stderr: 'openjdk version "17.0.12" 2024-07-16\n',
+  ),
+  ProbeResult(
     id: 'xcode_select',
     status: ProbeStatus.exited,
     exitCode: 0,

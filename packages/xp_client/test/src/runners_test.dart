@@ -80,6 +80,36 @@ void main() {
     });
   });
 
+  group('the runner URL', () {
+    test('is read', () async {
+      engine.json('GET', '/settings/runner-url', {
+        'url': 'https://mac.tailnet.ts.net',
+      });
+
+      expect(
+        await client.runnerUrl(),
+        const RunnerUrl(url: 'https://mac.tailnet.ts.net'),
+      );
+    });
+
+    test('is set and cleared', () async {
+      engine.json('PUT', '/settings/runner-url', {
+        'url': 'http://a.example',
+        'warning': 'Plain http.',
+      });
+
+      expect(
+        await client.setRunnerUrl('http://a.example'),
+        const RunnerUrl(url: 'http://a.example', warning: 'Plain http.'),
+      );
+      expect(engine.last.json, {'url': 'http://a.example'});
+
+      engine.json('PUT', '/settings/runner-url', <String, dynamic>{});
+      expect(await client.setRunnerUrl(null), const RunnerUrl());
+      expect(engine.last.json, {'url': null});
+    });
+  });
+
   group('createPairingToken', () {
     test('asks for a token for the runner called so', () async {
       final token = PairingToken(

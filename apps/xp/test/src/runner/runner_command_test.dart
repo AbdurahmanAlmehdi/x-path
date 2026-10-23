@@ -138,6 +138,7 @@ void main() {
     expect(env.runner.commands['runner']!.subcommands.keys, [
       'pair',
       'start',
+      'doctor',
       'install-service',
       'uninstall-service',
       'service-status',

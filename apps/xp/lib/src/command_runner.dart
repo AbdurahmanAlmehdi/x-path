@@ -168,8 +168,13 @@ class XpCommandRunner extends CompletionCommandRunner<int> {
   bool _wantsUpdateCheck(ArgResults results) {
     final command = results.command?.name;
     // `xp mcp` talks MCP on standard output and is started by agents; JSON
-    // output is read by scripts. Neither wants a notice.
-    return command != null && command != 'mcp' && results['json'] != true;
+    // output is read by scripts. Neither wants a notice. A runner (`xp
+    // runner`) runs its engine's version and updates itself to it between
+    // jobs (D-24): a newer release on GitHub is nothing it should act on.
+    return command != null &&
+        command != 'mcp' &&
+        command != 'runner' &&
+        results['json'] != true;
   }
 }
 

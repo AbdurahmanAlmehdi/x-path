@@ -10,8 +10,11 @@
 # without a version, a refused download whose SHA-256 does not match, a
 # refused version mismatch and the runner mode. On Linux it also checks the
 # service step against a fake `systemctl` and `loginctl` on PATH: the user
-# unit `xpd install-service` writes, `enable --now`, and a restart on update.
-# No test talks to the real service manager.
+# unit `xpd install-service` writes, `enable --now`, and a restart on update,
+# and `--with-android` against a fake `apt-get`, `sudo`, `dpkg-query` and
+# `sdkmanager` (in a local command-line tools zip): the packages, the SDK, a
+# wrong SHA-256, a system that is not Debian, and a run that finds everything
+# installed. No test talks to the real service manager or package manager.
 set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
@@ -129,8 +132,17 @@ grep -q "asked for 99.0.0" "$work/out.log" || fail "no version message"
 echo "6. Runner mode..."
 run_install -- --archive "$archive" --prefix "$prefix" --runner || fail "runner install failed"
 expect_installed
+grep -q "xp runner doctor" "$work/out.log" || fail "no doctor step"
 grep -q "xp runner pair --engine" "$work/out.log" || fail "no pairing hint"
 grep -q "xp runner install-service" "$work/out.log" || fail "no runner service hint"
+
+if [[ "$os" != linux ]]; then
+  echo "6b. --with-android is for Linux..."
+  if run_install -- --archive "$archive" --prefix "$prefix" --runner --with-android; then
+    fail "--with-android ran on $os"
+  fi
+  grep -q "is for Debian and Ubuntu" "$work/out.log" || fail "no Debian message"
+fi
 
 if [[ "$os" == linux ]]; then
   echo "7. Service step (fake systemctl and loginctl)..."
@@ -155,6 +167,88 @@ EOF
   grep -q "restart" "$work/calls.log" && fail "restarted a service that was not there before"
   run_install -- --archive "$archive" --prefix "$prefix" || fail "update with the service failed"
   grep -q "systemctl --user restart xpd.service" "$work/calls.log" || fail "the update did not restart the service"
+
+  echo "8. --with-android (fake apt-get, sudo, dpkg-query and sdkmanager)..."
+  android="$work/android"
+  mkdir -p "$android/fakes" "$android/zip/cmdline-tools/bin"
+  # dpkg-query says a package is installed once the fake apt-get installed it.
+  cat >"$android/fakes/dpkg-query" <<FAKE
+#!/bin/sh
+for last; do :; done
+grep -qx "\$last" "$android/installed" 2>/dev/null && echo "install ok installed"
+exit 0
+FAKE
+  cat >"$android/fakes/apt-get" <<FAKE
+#!/bin/sh
+echo "apt-get \$*" >>"$android/calls.log"
+[ "\$1" = install ] || exit 0
+for word; do case "\$word" in -*|install) ;; *) echo "\$word" >>"$android/installed" ;; esac; done
+FAKE
+  cat >"$android/fakes/sudo" <<FAKE
+#!/bin/sh
+echo "sudo \$*" >>"$android/calls.log"
+exec "\$@"
+FAKE
+  cat >"$android/zip/cmdline-tools/bin/sdkmanager" <<FAKE
+#!/bin/sh
+echo "sdkmanager \$*" >>"$android/calls.log"
+root=""
+for word; do case "\$word" in --sdk_root=*) root="\${word#--sdk_root=}" ;; esac; done
+for word; do
+  case "\$word" in
+    # One answer, as the real one reads one per licence: \`yes\` never ends.
+    --licenses) read -r _ || :; mkdir -p "\$root/licenses" ;;
+    --*) ;;
+    *) mkdir -p "\$root/\$(printf '%s' "\$word" | tr ';' /)" ;;
+  esac
+done
+FAKE
+  chmod +x "$android/fakes/"* "$android/zip/cmdline-tools/bin/sdkmanager"
+  (cd "$android/zip" && zip -qr "$android/tools.zip" cmdline-tools)
+  tools_sha="$( (sha256sum "$android/tools.zip" 2>/dev/null || shasum -a 256 "$android/tools.zip") | cut -d' ' -f1)"
+  printf 'ID=ubuntu\nID_LIKE=debian\n' >"$android/ubuntu"
+  printf 'ID=fedora\n' >"$android/fedora"
+  sdk="$work/sdk"
+  base_path="$android/fakes:$base_path"
+  android_env=(
+    XPATH_ANDROID_TOOLS_URL="file://$android/tools.zip"
+    XPATH_ANDROID_TOOLS_SHA256="$tools_sha"
+    XPATH_OS_RELEASE="$android/ubuntu"
+  )
+
+  if run_install "${android_env[@]}" XPATH_OS_RELEASE="$android/fedora" -- --archive "$archive" \
+    --prefix "$prefix" --runner --with-android --android-sdk "$sdk"; then
+    fail "--with-android ran on Fedora"
+  fi
+  grep -q "on Debian or Ubuntu only, not 'fedora'" "$work/out.log" || fail "no message for a system that is not Debian"
+
+  if run_install "${android_env[@]}" XPATH_ANDROID_TOOLS_SHA256=0000 -- --archive "$archive" --prefix "$prefix" \
+    --runner --with-android --android-sdk "$sdk"; then
+    fail "installed command-line tools whose SHA-256 does not match"
+  fi
+  grep -q "SHA-256 of the Android command-line tools does not match" "$work/out.log" || fail "no SHA-256 message"
+  [[ ! -e "$sdk/cmdline-tools/latest" ]] || fail "a refused download left command-line tools behind"
+  rm -f "$android/installed" "$android/calls.log"
+
+  run_install "${android_env[@]}" -- --archive "$archive" --prefix "$prefix" --runner --with-android \
+    --android-sdk "$sdk" || fail "--with-android failed"
+  grep -q "sudo apt-get install -y -q --no-install-recommends openjdk-17-jdk-headless git openssh-client curl unzip xz-utils zip perl" \
+    "$android/calls.log" || fail "the packages were not installed through sudo: $(cat "$android/calls.log")"
+  [[ -x "$sdk/cmdline-tools/latest/bin/sdkmanager" ]] || fail "no sdkmanager in $sdk"
+  grep -q -- "--licenses" "$android/calls.log" || fail "the licences were not accepted"
+  for dir in platform-tools platforms/android-36 build-tools/36.0.0; do
+    [[ -d "$sdk/$dir" ]] || fail "no $dir in $sdk"
+  done
+  grep -q "export ANDROID_HOME=$sdk" "$work/out.log" || fail "no ANDROID_HOME line for an SDK Flutter does not look in"
+  grep -q "xp runner doctor" "$work/out.log" || fail "no doctor step after --with-android"
+
+  echo "9. --with-android again skips what is there..."
+  rm -f "$android/calls.log"
+  run_install "${android_env[@]}" XPATH_ANDROID_TOOLS_URL="file://$android/missing.zip" -- --archive "$archive" \
+    --prefix "$prefix" --runner --with-android --android-sdk "$sdk" || fail "--with-android again failed"
+  grep -q "apt-get" "$android/calls.log" && fail "installed packages that are installed"
+  grep -q "Downloading the Android command-line tools" "$work/out.log" && fail "downloaded the command-line tools again"
+  grep -q "sdkmanager --sdk_root=$sdk platform" "$android/calls.log" && fail "installed SDK packages again"
 else
   echo "7. Service step on macOS: hint only..."
   run_install -- --archive "$archive" --prefix "$prefix" || fail "install failed"
@@ -162,4 +256,4 @@ else
   [[ ! -e "$home/Library/LaunchAgents" ]] || fail "install.sh touched LaunchAgents"
 fi
 
-echo "OK: install.sh installs, updates, verifies downloads and sets up the service."
+echo "OK: install.sh installs, updates, verifies downloads, sets up the service and, with --with-android, the Android SDK."

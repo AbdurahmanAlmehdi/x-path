@@ -1,100 +1,81 @@
-import 'dart:async';
-
 import 'package:test/test.dart';
 import 'package:xp_engine/xp_engine.dart';
 
-ProcessOutput _ok([String stdout = '']) =>
-    ProcessOutput(exitCode: 0, stdout: stdout);
+ProcessOutput _ok([String stdout = '', String stderr = '']) =>
+    ProcessOutput(exitCode: 0, stdout: stdout, stderr: stderr);
 
-LocalCapabilities _probe(
-  ProcessOutput Function(FakeProcessCall call) answer, {
-  bool isMacOS = false,
-  String? sdk,
-}) {
-  final runner = FakeProcessRunner(answer);
-  return LocalCapabilities(
-    runner: runner,
-    prober: ToolProber(runner: runner, isMacOS: isMacOS),
-    android: FakeAndroidSdkLocator(sdk),
-    isMacOS: isMacOS,
-  );
-}
+/// Answers the probe commands like a machine that has [has], by command id.
+ProcessOutput Function(FakeProcessCall call) _machine(
+  String uname,
+  Set<String> has,
+) => (call) {
+  final script = call.arguments.length == 2 ? call.arguments[1] : '';
+  final id = switch (call.executable) {
+    'uname' => 'os',
+    'sh' when script == RunnerProbe.androidSdkScript => 'android_sdk',
+    'sh' when script == RunnerProbe.javaScript => 'java',
+    'sh' => 'flutter_tools',
+    final executable => executable,
+  };
+  if (id == 'os') return _ok('$uname\n');
+  if (!has.contains(id)) {
+    return const ProcessOutput(exitCode: 127, stderr: 'not found');
+  }
+  return switch (id) {
+    'java' => _ok('', 'openjdk version "21.0.4" 2024-07-16\n'),
+    'xcodebuild' => _ok('Xcode 27.1\nBuild version 27A9275\n'),
+    _ => _ok('version 1\n'),
+  };
+};
 
 void main() {
-  test(
-    'a Mac with Xcode, git and the Android SDK can do three things',
-    () async {
-      final capabilities = _probe(
-        (call) => switch (call.executable) {
-          'xcode-select' => _ok('/Xcode/Developer\n'),
-          'xcodebuild' => _ok('Xcode 27.1\nBuild version 27A9275\n'),
-          _ => _ok('git version 2.50.1'),
-        },
-        isMacOS: true,
-        sdk: '/sdk',
-      );
-
-      expect(await capabilities.probe(), {
-        Capability.flutter,
-        Capability.android,
-        Capability.iosSign,
-      });
-    },
-  );
-
-  test('a Mac never asks for swift', () async {
+  test('runs the commands of the runner probe, in order', () async {
     final asked = <String>[];
-    final capabilities = _probe((call) {
+    final runner = FakeProcessRunner((call) {
       asked.add(call.executable);
-      return _ok('Xcode 27.1\n');
-    }, isMacOS: true);
+      return _machine('Darwin', const {})(call);
+    });
 
-    await capabilities.probe();
+    await LocalCapabilities(runner: runner, operatingSystem: 'macos').probe();
 
-    expect(asked, isNot(contains('swift')));
+    expect(asked, ['uname', 'git', 'sh', 'sh', 'xcode-select']);
   });
 
-  test('Linux has no ios-sign, and swift-linux when swift runs', () async {
-    final capabilities = _probe((call) => _ok('version 1'), sdk: '/sdk');
+  test('a Mac with Xcode, git, a JDK and the Android SDK can do three '
+      'things', () async {
+    final findings = await LocalCapabilities(
+      runner: FakeProcessRunner(
+        _machine('Darwin', const {
+          'git',
+          'android_sdk',
+          'java',
+          'xcode-select',
+          'xcodebuild',
+        }),
+      ),
+      operatingSystem: 'macos',
+    ).probe();
 
-    expect(await capabilities.probe(), {
+    expect(findings.capabilities, {
       Capability.flutter,
       Capability.android,
-      Capability.swiftLinux,
+      Capability.iosSign,
     });
+    expect(findings.missing, isEmpty);
   });
 
-  test('a machine without the tools can do nothing', () async {
-    final capabilities = _probe(
-      (call) => throw ProcessStartException(call.executable, 'not found'),
-    );
+  test('a Linux box without a JDK says why it has no android', () async {
+    final findings = await LocalCapabilities(
+      runner: FakeProcessRunner(
+        _machine('Linux', const {'git', 'flutter_tools', 'android_sdk'}),
+      ),
+      operatingSystem: 'linux',
+    ).probe();
 
-    expect(await capabilities.probe(), isEmpty);
-  });
-
-  test('a tool that fails or is too slow does not count', () async {
-    final failing = _probe(
-      (call) => const ProcessOutput(exitCode: 1, stderr: 'broken'),
-    );
-    final slow = _probe((call) => throw TimeoutException('slow'));
-
-    expect(await failing.probe(), isEmpty);
-    expect(await slow.probe(), isEmpty);
-  });
-
-  test('a machine without an Xcode selected cannot sign', () async {
-    final capabilities = _probe(
-      (call) => call.executable == 'xcode-select'
-          ? const ProcessOutput(exitCode: 2, stderr: 'no developer tools')
-          : _ok('git version 2'),
-      isMacOS: true,
-    );
-
-    expect(await capabilities.probe(), {Capability.flutter});
-  });
-
-  test('the fake locator finds what it was given', () async {
-    expect(await const FakeAndroidSdkLocator('/sdk').locate(), '/sdk');
-    expect(await const FakeAndroidSdkLocator().locate(), isNull);
+    expect(findings.capabilities, {Capability.flutter});
+    expect(findings.missing.map((m) => '${m.capability}: ${m.reason}'), [
+      'android: no JDK: java not found',
+      'swift-linux: no Swift: swift not found',
+    ]);
   });
 }

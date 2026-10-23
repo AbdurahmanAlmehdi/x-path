@@ -1,5 +1,9 @@
-# The image needs the Linux bundles from tool/release/bundles.sh and the
-# licence only.
+# The engine image needs the Linux bundles from tool/release/bundles.sh and the
+# licence; the runner image (Dockerfile.runner) needs the linux-x64 release
+# archive, the installer and its entrypoint.
 *
 !LICENSE
 !build/release/bundles/linux-*/
+!build/release/assets/xpath-linux-x64.tar.gz
+!tool/release/linux/install.sh
+!tool/release/linux/xpath-runner

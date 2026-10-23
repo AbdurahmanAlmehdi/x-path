@@ -97,9 +97,14 @@ class RunnersTable extends StatelessWidget {
         ),
       ),
       _Cell(
-        runner.capabilities.isEmpty
-            ? Text(l10n.runnerNotProbed, style: secondary)
-            : Wrap(
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          spacing: 4,
+          children: [
+            if (runner.capabilities.isEmpty && runner.missing == null)
+              Text(l10n.runnerNotProbed, style: secondary)
+            else if (runner.capabilities.isNotEmpty)
+              Wrap(
                 spacing: 4,
                 runSpacing: 4,
                 children: [
@@ -107,6 +112,17 @@ class RunnersTable extends StatelessWidget {
                     _Capability(capability),
                 ],
               ),
+            // Inline, not in a tooltip: the reason is what the owner acts on.
+            for (final missing in runner.missing ?? const <MissingCapability>[])
+              Text(
+                l10n.runnerMissingCapability(
+                  missing.capability,
+                  missing.explanation,
+                ),
+                style: secondary,
+              ),
+          ],
+        ),
       ),
       _Cell(Text('${runner.jobIds.length}/${runner.slots}', style: code)),
       _Cell(

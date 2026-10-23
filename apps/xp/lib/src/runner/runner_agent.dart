@@ -4,11 +4,11 @@ import 'dart:convert';
 import 'package:xp/src/runner/backoff.dart';
 import 'package:xp/src/runner/job/lease_outbox.dart';
 import 'package:xp/src/runner/job/leased_job.dart';
-import 'package:xp/src/runner/probe_executor.dart';
 import 'package:xp/src/runner/runner_socket.dart';
 import 'package:xp/src/runner/secrets/lease_secret_store.dart';
 import 'package:xp_api/xp_api.dart';
 import 'package:xp_client/xp_client.dart';
+import 'package:xp_engine/xp_engine.dart' show ProbeExecutor;
 
 /// Why [RunnerAgent.run] ended.
 enum AgentExit {
@@ -49,11 +49,14 @@ typedef LeaseStarter = LeaseWork Function(
 );
 
 class _Lease {
-  const new(this.offer, this.outbox, this.work);
+  new(this.offer, this.outbox, this.work, this.renewedAt);
 
   final LeaseOfferFrame offer;
   final LeaseOutbox outbox;
   final LeaseWork work;
+
+  /// When the engine last renewed the lease, on the agent's monotonic clock.
+  Duration renewedAt;
 
   LeaseRef get ref => LeaseRef(jobId: offer.jobId, leaseId: offer.leaseId);
   bool get needsIosSign => offer.capabilities.contains('ios-sign');
@@ -67,7 +70,9 @@ class _Lease {
 /// - **Says hello** (version, system, cores, the most jobs it will run, the
 ///   leases it still holds), **runs the probe** the engine sends, and gets
 ///   jobs only after that. It never claims capabilities; the engine derives
-///   them from the probe.
+///   them from the probe and says what it found (`probed`), which the runner
+///   prints the first time and whenever it changes: what it offers and, for
+///   each capability it lacks, why and what gives it.
 /// - **Takes leases** within its slots (an `ios-sign` job never runs beside
 ///   another), refuses the others with a reason, and refuses all of them
 ///   while draining. **Heartbeats** every `heartbeatSeconds` of the welcome,
@@ -76,6 +81,15 @@ class _Lease {
 ///   engine has not acknowledged and sends it again after a reconnect.
 /// - **Obeys `cancel`**: the job's process groups end, its secrets and files
 ///   are wiped, nothing more is reported.
+/// - **Fences a lost lease** (D-08): a lease the engine has not renewed for
+///   its whole length plus 15 seconds (one sweep and some clock skew) is one
+///   the engine has given up, so the runner stops the job as a `cancel` would
+///   and drops what its outbox still held. It measures with a monotonic clock
+///   from the last acknowledgement, so the clocks of the engine and the
+///   runner need not agree.
+/// - **Stays quiet while the engine is away**: one line when the connection
+///   is lost, one for the first failed attempt, then at most one every
+///   [nagInterval], and one when it is back.
 /// - **Drains** (finish the jobs, take none, exit) and, with `oneShot`, takes
 ///   one job and exits after it.
 /// - **Updates between jobs** (D-24): when the version in the engine's
@@ -104,10 +118,17 @@ class RunnerAgent {
     Duration Function(int seconds)? heartbeatUnit,
     this.wantsUpdateTo,
     this.onWelcomed,
+    this.fenceInterval = const Duration(seconds: 5),
+    Timer Function(Duration, void Function(Timer))? timers,
+    this.fenceGrace = const Duration(seconds: 15),
+    this.nagInterval = const Duration(minutes: 10),
+    Duration Function()? elapsed,
   }) : _backoff = backoff ?? Backoff(),
        _delay = delay ?? Future<void>.delayed,
        _heartbeatUnit =
-           heartbeatUnit ?? ((seconds) => Duration(seconds: seconds));
+           heartbeatUnit ?? ((seconds) => Duration(seconds: seconds)),
+       _elapsed = elapsed ?? _monotonic(),
+       _timers = timers ?? Timer.periodic;
 
   final RunnerConnector _connect;
   final LeaseStarter _start;
@@ -117,6 +138,13 @@ class RunnerAgent {
   final Backoff _backoff;
   final Future<void> Function(Duration) _delay;
   final Duration Function(int seconds) _heartbeatUnit;
+
+  /// A monotonic clock: the time since the agent was made.
+  final Duration Function() _elapsed;
+
+  /// Starts the periodic timer of the lease fence; [Timer.periodic] unless a
+  /// test drives it.
+  final Timer Function(Duration, void Function(Timer)) _timers;
 
   /// The `xp` version sent in the hello.
   final String version;
@@ -152,6 +180,15 @@ class RunnerAgent {
   /// runner, which is what proves a new version works.
   final void Function(String engineVersion)? onWelcomed;
 
+  /// How often the leases are checked against their length.
+  final Duration fenceInterval;
+
+  /// How long past its length a lease is kept before it counts as lost.
+  final Duration fenceGrace;
+
+  /// The least time between two lines that say the engine is still away.
+  final Duration nagInterval;
+
   final _active = <String, _Lease>{};
   final _secrets = <String, Completer<List<int>?>>{};
   final _askedSecrets = <String, SecretRequestFrame>{};
@@ -160,6 +197,13 @@ class RunnerAgent {
   AgentExit? _exit;
   var _draining = false;
   String? _updateTo;
+  String? _engineVersion;
+  ProbedFrame? _offers;
+  var _leaseLength = const Duration(seconds: runnerLeaseSeconds);
+  Timer? _fence;
+  // Since when the engine is away, and when the runner last said so.
+  Duration? _awaySince;
+  Duration? _saidAwayAt;
   var _tookJob = false;
   Completer<void>? _wake;
 
@@ -178,6 +222,7 @@ class RunnerAgent {
 
   /// Connects, serves and reconnects until the runner has to end.
   Future<AgentExit> run() async {
+    _fence = _timers(fenceInterval, (_) => unawaited(_fenceLost()));
     while (_exit == null) {
       final RunnerSocket socket;
       try {
@@ -191,15 +236,15 @@ class RunnerAgent {
           _exit = AgentExit.credentialRejected;
           break;
         }
-        _log('Cannot connect: ${error.message}');
+        _cannotConnect(error.message);
         await _backOff();
         continue;
       } on Object catch (error) {
-        _log('Cannot connect: ${_describe(error)}');
+        _cannotConnect(_describe(error));
         await _backOff();
         continue;
       }
-      await _serve(socket);
+      final broke = await _serve(socket);
       if (_exit != null) break;
       switch (socket.closeCode) {
         case runnerRevokedCloseCode:
@@ -212,12 +257,66 @@ class RunnerAgent {
           );
           _exit = AgentExit.replaced;
         default:
-          _log('The connection to the engine ended; connecting again.');
+          _log(
+            broke == null
+                ? 'The connection to the engine ended; connecting again.'
+                : 'The connection to the engine broke ($broke); connecting '
+                      'again.',
+          );
+          _awaySince ??= _elapsed();
           await _backOff();
       }
     }
     await _stopWork();
     return _exit!;
+  }
+
+  /// Says that an attempt failed: the first one, then at most once every
+  /// [nagInterval].
+  void _cannotConnect(String why) {
+    final now = _elapsed();
+    final since = _awaySince ??= now;
+    final said = _saidAwayAt;
+    if (said == null) {
+      _saidAwayAt = now;
+      _log('Cannot connect: $why');
+      return;
+    }
+    if (now - said < nagInterval) return;
+    _saidAwayAt = now;
+    _log(
+      'The engine has been unreachable for ${_span(now - since)}; still '
+      'trying every ${_backoff.max.inSeconds} s. Last: $why',
+    );
+  }
+
+  /// Stops the jobs whose lease the engine must have given up: not renewed
+  /// for its whole length and [fenceGrace].
+  Future<void> _fenceLost() async {
+    final now = _elapsed();
+    for (final lease in _active.values.toList()) {
+      if (now - lease.renewedAt <= _leaseLength + fenceGrace) continue;
+      await _end(
+        lease,
+        'Lost the lease of job ${lease.offer.jobId} while the engine was '
+        'unreachable; stopped it.',
+      );
+    }
+  }
+
+  static Duration Function() _monotonic() {
+    final watch = Stopwatch()..start();
+    return () => watch.elapsed;
+  }
+
+  static String _span(Duration duration) {
+    if (duration < const Duration(minutes: 1)) {
+      return '${duration.inSeconds} s';
+    }
+    final hours = duration.inHours;
+    final minutes = duration.inMinutes % 60;
+    if (hours == 0) return '$minutes min';
+    return minutes == 0 ? '$hours h' : '$hours h $minutes min';
   }
 
   Future<void> _backOff() {
@@ -278,6 +377,7 @@ class RunnerAgent {
   }
 
   Future<void> _stopWork() async {
+    _fence?.cancel();
     _heartbeat?.cancel();
     final leases = _active.values.toList();
     _active.clear();
@@ -291,14 +391,15 @@ class RunnerAgent {
 
   // ------------------------------------------------------------ one connection
 
-  Future<void> _serve(RunnerSocket socket) async {
+  /// Serves [socket] until it closes; returns why it broke, if it did.
+  Future<String?> _serve(RunnerSocket socket) async {
     _socket = socket;
     try {
       // The runner was told to end while it was connecting: there is no need
       // to wait for a frame of the engine to notice.
       if (_exit != null) {
         unawaited(_closeSocket());
-        return;
+        return null;
       }
       await for (final text in socket.frames) {
         try {
@@ -309,12 +410,13 @@ class RunnerAgent {
         if (_exit != null) break;
       }
     } on Object catch (error) {
-      _log('The connection broke: ${_describe(error)}');
+      return _describe(error);
     } finally {
       _heartbeat?.cancel();
       _heartbeat = null;
       _socket = null;
     }
+    return null;
   }
 
   Future<void> _onText(String text) async {
@@ -338,10 +440,12 @@ class RunnerAgent {
         _welcome(frame);
       case ProbeFrame():
         await _probed(frame);
+      case ProbedFrame():
+        _found(frame);
       case LeaseOfferFrame():
         _offered(frame);
       case HeartbeatAckFrame():
-        break;
+        _acknowledged(frame);
       case ChunkAckFrame():
         _active[frame.jobId]?.outbox.chunkAcknowledged(frame);
       case DoneAckFrame():
@@ -364,6 +468,13 @@ class RunnerAgent {
 
   void _welcome(WelcomeFrame frame) {
     _backoff.reset();
+    _engineVersion = frame.engineVersion;
+    _leaseLength = Duration(seconds: frame.leaseSeconds);
+    if (_awaySince case final since?) {
+      _log('Connected again after ${_span(_elapsed() - since)}.');
+      _awaySince = null;
+      _saidAwayAt = null;
+    }
     _decideUpdate(frame.engineVersion);
     _heartbeat?.cancel();
     _heartbeat = Timer.periodic(
@@ -404,9 +515,18 @@ class RunnerAgent {
         _ => 'the $running running jobs finish, then the runner updates',
       };
       _log(
-        'The engine runs version $engineVersion, this runner $version: no '
-        'new jobs; $then.',
+        'The engine runs $engineVersion; this runner ($version) updates to '
+        'it between jobs: no new jobs; $then.',
       );
+    }
+  }
+
+  /// The engine renewed the leases it lists until a lease length from now.
+  void _acknowledged(HeartbeatAckFrame frame) {
+    final now = _elapsed();
+    for (final grant in frame.leases) {
+      final lease = _active[grant.jobId];
+      if (lease?.offer.leaseId == grant.leaseId) lease!.renewedAt = now;
     }
   }
 
@@ -417,6 +537,24 @@ class RunnerAgent {
   Future<void> _probed(ProbeFrame frame) async {
     final results = await _probe.run(frame.commands);
     _sendFrame(ProbeResultFrame(probeId: frame.probeId, results: results));
+  }
+
+  /// Says what the engine found this runner offers: after the first probe,
+  /// then only when it changes.
+  void _found(ProbedFrame frame) {
+    final first = _offers == null;
+    if (frame == _offers) return;
+    _offers = frame;
+    final offers = frame.capabilities.isEmpty
+        ? 'This runner offers nothing yet, so it will get no jobs. Run: xp '
+              'runner doctor'
+        : 'The engine runs $_engineVersion; this runner offers '
+              '${frame.capabilities.join(', ')}, $slots '
+              'slot${slots == 1 ? '' : 's'}.';
+    _log(first ? 'Connected. $offers' : offers);
+    for (final missing in frame.missing) {
+      _log('No ${missing.capability}: ${missing.explanation}');
+    }
   }
 
   // ----------------------------------------------------------------- leases
@@ -460,7 +598,8 @@ class RunnerAgent {
       send: _sendFrame,
     );
     final work = _start(offer, outbox, (key) => _requestSecret(offer, key));
-    _active[offer.jobId] = _Lease(offer, outbox, work);
+    // The offer leased the job for a lease length; the accept is its start.
+    _active[offer.jobId] = _Lease(offer, outbox, work, _elapsed());
     _tookJob = true;
     if (oneShot && !_draining) {
       // The engine offers nothing more once the runner says so.
@@ -497,10 +636,21 @@ class RunnerAgent {
     if (lease == null) return;
     final leaseId = frame.leaseId;
     if (leaseId != null && leaseId != lease.offer.leaseId) return;
-    _log('Job ${frame.jobId} was cancelled by the engine: ${frame.reason}');
-    _active.remove(frame.jobId);
+    await _end(
+      lease,
+      'Job ${frame.jobId} was cancelled by the engine: ${frame.reason}',
+    );
+  }
+
+  /// Stops the job of [lease] and forgets it, with what its outbox held: its
+  /// process groups end, its secrets are wiped, nothing more is reported.
+  Future<void> _end(_Lease lease, String message) async {
+    final jobId = lease.offer.jobId;
+    if (!identical(_active[jobId], lease)) return;
+    _log(message);
+    _active.remove(jobId);
     for (final key in _askedSecrets.keys.toList()) {
-      if (key.startsWith('${frame.jobId}/')) {
+      if (key.startsWith('$jobId/')) {
         _askedSecrets.remove(key);
         _secrets.remove(key)?.complete(null);
       }

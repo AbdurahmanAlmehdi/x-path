@@ -349,6 +349,112 @@ void main() {
       expect(await exit, 0);
     });
 
+    test('logs runners that connect, leave and are refused', () async {
+      final exit = run(['serve', '--port', '0', '--data-dir', dataDir]);
+      final uri = await startServing(exit);
+      final secret = await withDatabase(
+        (database) async => (await TokenService(
+          tokens: SqliteDeviceTokenRepository(database),
+          clock: const SystemClock(),
+        ).issue(name: 'owner', kind: DeviceTokenKind.app)).secret,
+      );
+      final client = HttpClient();
+      addTearDown(() => client.close(force: true));
+      Future<Map<String, dynamic>> post(
+        String path,
+        Object body, {
+        String? token,
+      }) async {
+        final request = await client.postUrl(uri.resolve(path));
+        if (token != null) {
+          request.headers.set('authorization', 'Bearer $token');
+        }
+        request.write(jsonEncode(body));
+        final response = await request.close();
+        return jsonDecode(await utf8.decodeStream(response))
+            as Map<String, dynamic>;
+      }
+
+      final pairing = await post('/runners/pairing-tokens', {
+        'name': 'aws',
+      }, token: secret);
+      final paired = await post('/runners/pair', {
+        'pairingToken': pairing['token'],
+      });
+      final connect = 'ws://127.0.0.1:${uri.port}/runners/connect';
+
+      await expectLater(
+        WebSocket.connect(
+          connect,
+          headers: {'authorization': 'Bearer xpr_unknown'},
+        ),
+        throwsA(isA<WebSocketException>()),
+      );
+      await out.until('refused a runner connection');
+      expect(
+        out.toString(),
+        contains(
+          'refused a runner connection from 127.0.0.1: an unknown or revoked '
+          'credential (401)\n',
+        ),
+      );
+
+      final socket = await WebSocket.connect(
+        connect,
+        headers: {'authorization': 'Bearer ${paired['token']}'},
+      );
+      final frames = socket
+          .map((text) => jsonDecode(text as String) as Map<String, dynamic>)
+          .asBroadcastStream();
+      Future<Map<String, dynamic>> next(String type) =>
+          frames.firstWhere((frame) => frame['type'] == type);
+      await next('welcome');
+      final probe = next('probe');
+      socket.add(
+        jsonEncode(
+          const HelloFrame(
+            version: '1.0.0',
+            os: 'macos',
+            arch: 'arm64',
+            cores: 8,
+          ).toJson(),
+        ),
+      );
+      final probeId = (await probe)['probeId'] as String;
+      socket.add(
+        jsonEncode(
+          ProbeResultFrame(
+            probeId: probeId,
+            results: const [
+              ProbeResult(
+                id: 'os',
+                status: ProbeStatus.exited,
+                exitCode: 0,
+                stdout: 'Darwin\n',
+              ),
+              ProbeResult(id: 'git', status: ProbeStatus.exited, exitCode: 0),
+            ],
+          ).toJson(),
+        ),
+      );
+      await out.until('runner "aws" connected');
+      expect(
+        out.toString(),
+        contains('runner "aws" connected: xp 1.0.0, macos arm64, 2 slots, '),
+      );
+
+      await socket.close(1000);
+      await out.until('disconnected');
+      expect(
+        out.toString(),
+        contains(
+          'runner "aws" disconnected (the runner closed the connection)',
+        ),
+      );
+      shutdown.add(null);
+      expect(await exit, 0);
+    });
+
     test('keeps the event log across a restart', () async {
       Directory(dataDir).createSync();
       final secret = await withDatabase(
@@ -423,6 +529,29 @@ void main() {
       await startServing(exit);
 
       expect(out.toString(), contains('xpd runs jobs here with 3 slots and '));
+
+      shutdown.add(null);
+      await exit;
+    });
+
+    test('says what it cannot do and why', () async {
+      // Only perl, which the engine needs to start: no git, no sh.
+      final bin = Directory('${root.path}/bin')..createSync();
+      Link(
+        '${bin.path}/perl',
+      ).createSync(Process.runSync('which', ['perl']).stdout.toString().trim());
+      final exit = run(
+        ['serve', '--port', '0', '--data-dir', dataDir],
+        environment: {'PATH': bin.path},
+      );
+      await startServing(exit);
+
+      expect(out.toString(), contains('and no capability\n'));
+      expect(
+        out.toString(),
+        contains('no flutter: no git: git not found. Install git.\n'),
+      );
+      expect(out.toString(), contains('no android: no JDK: java not found.'));
 
       shutdown.add(null);
       await exit;

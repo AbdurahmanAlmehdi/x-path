@@ -29,6 +29,7 @@ server tells the agent so when it connects.
 | `get_approval` | **`approval`** (`apr_...`) | One approval. Poll it while it is `pending`. |
 | `get_gates` | **`project`** | Which actions of the project wait for an approval. Read-only. |
 | `get_storage_report` | none | What the engine keeps on disk and what could be freed. |
+| `list_runners` | none | Every runner: `name`, `id`, `status`, `lastHeartbeat`, `capabilities`, `missing` (each with `capability`, `reason` and `fix`, while the runner is connected), `slots`, `jobIds`. A job that waits with "No runner can do ..." needs a runner that offers it. Read-only. |
 | `list_credentials` | `project` (only the credentials it uses, and only its flavors) | The named credentials, never a secret: `id`, `name`, `kind`, `account`, `status` (`unverified`, `verified`, `rejected`, `unreachable`), `message`, `fix`, and `usedBy` (`projectId`, `project`, `app`, `flavor`, and the `status`, `message` and `fix` of that assignment). Read-only. |
 
 ## Create and edit

@@ -8,6 +8,7 @@ import 'package:xp_engine/src/jobs/job_repository.dart';
 import 'package:xp_engine/src/jobs/job_runner.dart';
 import 'package:xp_engine/src/repositories/event_log.dart';
 import 'package:xp_engine/src/scheduler/capability.dart';
+import 'package:xp_engine/src/scheduler/paired_runners.dart';
 import 'package:xp_engine/src/scheduler/run_record.dart';
 import 'package:xp_engine/src/scheduler/scheduler_runner.dart';
 
@@ -42,7 +43,9 @@ import 'package:xp_engine/src/scheduler/scheduler_runner.dart';
 ///   hold up the jobs behind it that can. Nothing depends on the clock or on
 ///   chance, so the same state always gives the same pass.
 ///
-/// A queued job that waits says why in its `message`. A job that reaches a
+/// A queued job that waits says why in its `message`; when no connected
+/// runner can do it, the message names the paired runners that could and are
+/// offline. A job that reaches a
 /// gate stops in `waiting_for_approval` and holds no slot; whoever decides the
 /// gate calls [resumeWaiting] and the job takes its turn again.
 class Scheduler implements JobControl {
@@ -83,6 +86,10 @@ class Scheduler implements JobControl {
   /// there is one. Set once, after the runners hub exists: the hub needs the
   /// scheduler, so the scheduler cannot take it in its constructor.
   RemoteJobs? remoteJobs;
+
+  /// The paired runners, to name the offline ones that could take a job no
+  /// connected runner can do. Set once, like [remoteJobs].
+  PairedRunners? pairedRunners;
 
   /// Stops starting jobs: the engine is shutting down.
   void stop() => _stopped = true;
@@ -223,6 +230,10 @@ class Scheduler implements JobControl {
         if (snapshot.run.lockHeld) snapshot.run.projectId: snapshot.run.id,
     };
     final waitingOn = <String, String>{};
+    // Read once per pass, and only when a job waits for a capability.
+    Future<List<PairedRunner>>? paired;
+    Future<List<PairedRunner>> readPaired() => paired ??=
+        pairedRunners?.pairedRunners() ?? Future.value(const <PairedRunner>[]);
 
     for (final snapshot in runs) {
       final queued = snapshot.nextJobs;
@@ -252,7 +263,10 @@ class Scheduler implements JobControl {
         ];
         final runner = _place(job, kinds, used, signing);
         if (runner == null) {
-          await _note(job, _whyNoRunner(job, kinds, used, signing));
+          await _note(
+            job,
+            await _whyNoRunner(job, kinds, used, signing, readPaired),
+          );
           continue;
         }
         if (await _launch(runner, job)) {
@@ -313,18 +327,26 @@ class Scheduler implements JobControl {
     return best;
   }
 
-  String _whyNoRunner(
+  Future<String> _whyNoRunner(
     JobRecord job,
     List<String> kinds,
     Map<String, int> used,
     Set<String> signing,
-  ) {
+    Future<List<PairedRunner>> Function() paired,
+  ) async {
     final needs = _needs(job);
     final capable = _targets
         .where((runner) => runner.capabilities.containsAll(needs))
         .toList();
     if (capable.isEmpty) {
-      return 'No runner can do ${needs.map((c) => c.wire).join(', ')}.';
+      final wires = needs.map((c) => c.wire).join(', ');
+      final offline = [
+        for (final runner in await paired())
+          if (!runner.connected && runner.capabilities.containsAll(needs))
+            _offline(runner, wires),
+      ];
+      if (offline.isEmpty) return 'No runner can do $wires.';
+      return 'No connected runner can do $wires. ${offline.join(' ')}';
     }
     final accepting = capable.where((runner) => runner.accepts(kinds)).toList();
     if (accepting.isEmpty) {
@@ -341,6 +363,20 @@ class Scheduler implements JobControl {
     }
     return 'Waiting for a free slot on '
         '${accepting.map((runner) => runner.id).join(', ')}.';
+  }
+
+  static String _offline(PairedRunner runner, String wires) {
+    final since = runner.lastSeen;
+    return '${runner.name} offers $wires; offline'
+        '${since == null ? '' : ' since ${_at(since)}'}.';
+  }
+
+  /// [time] in UTC to the minute, for example `2026-10-22 14:02 UTC`.
+  static String _at(DateTime time) {
+    final utc = time.toUtc();
+    String two(int n) => n.toString().padLeft(2, '0');
+    return '${utc.year}-${two(utc.month)}-${two(utc.day)} '
+        '${two(utc.hour)}:${two(utc.minute)} UTC';
   }
 
   Set<Capability> _needs(JobRecord job) => {

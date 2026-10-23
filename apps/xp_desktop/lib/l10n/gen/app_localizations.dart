@@ -3682,6 +3682,12 @@ abstract class AppLocalizations {
   /// **'Not probed yet'**
   String get runnerNotProbed;
 
+  /// A capability the engine did not find on a runner; explanation is the engine's reason and fix.
+  ///
+  /// In en, this message translates to:
+  /// **'No {capability}: {explanation}'**
+  String runnerMissingCapability(String capability, String explanation);
+
   /// A runner that never sent a heartbeat.
   ///
   /// In en, this message translates to:
@@ -3799,8 +3805,20 @@ abstract class AppLocalizations {
   /// A pairing token past its 15 minutes.
   ///
   /// In en, this message translates to:
-  /// **'Expired. Close this and create another.'**
+  /// **'Expired before it was used.'**
   String get pairRunnerExpired;
+
+  /// Makes another pairing token for the same name once the first expired.
+  ///
+  /// In en, this message translates to:
+  /// **'New token'**
+  String get pairRunnerNewToken;
+
+  /// The engine URL of the pairing command is loopback and no runner URL is set.
+  ///
+  /// In en, this message translates to:
+  /// **'This address only works on this Mac. Set the address runners reach the engine at; pairing commands carry it.'**
+  String get pairRunnerLoopback;
 
   /// Title of the storage view.
   ///
@@ -4539,6 +4557,54 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Unknown'**
   String get settingsUnknown;
+
+  /// Section label.
+  ///
+  /// In en, this message translates to:
+  /// **'Runners'**
+  String get settingsRunners;
+
+  /// Field label.
+  ///
+  /// In en, this message translates to:
+  /// **'Runner URL'**
+  String get settingsRunnerUrl;
+
+  /// Lead of the runner URL section.
+  ///
+  /// In en, this message translates to:
+  /// **'The address runners on other machines reach this engine at, for example a Tailscale name. Every pairing command carries it.'**
+  String get settingsRunnerUrlBody;
+
+  /// No runner URL.
+  ///
+  /// In en, this message translates to:
+  /// **'No runner URL is set: pairing commands use the address this app reaches the engine at.'**
+  String get settingsRunnerUrlUnset;
+
+  /// No description provided for @settingsRunnerUrlSet.
+  ///
+  /// In en, this message translates to:
+  /// **'Runners reach the engine at {url}.'**
+  String settingsRunnerUrlSet(String url);
+
+  /// Under the runner URL field.
+  ///
+  /// In en, this message translates to:
+  /// **'Runners paired already keep their address; pair them again to move them. See docs/guide/runners.md, Reaching the engine.'**
+  String get settingsRunnerUrlNote;
+
+  /// Button.
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get settingsRunnerUrlSave;
+
+  /// Button.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear'**
+  String get settingsRunnerUrlClear;
 
   /// Section label.
   ///

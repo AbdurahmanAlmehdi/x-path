@@ -29,6 +29,7 @@ List<ProbeResult> macProbe({
     status: ProbeStatus.exited,
     exitCode: android ? 0 : 1,
   ),
+  javaProbe(),
   ProbeResult(
     id: 'xcode_select',
     status: xcode ? ProbeStatus.exited : ProbeStatus.notStarted,
@@ -44,6 +45,14 @@ List<ProbeResult> macProbe({
   const ProbeResult(id: 'swift', status: ProbeStatus.skipped),
 ];
 
+/// The result of the `java` probe command of a machine with JDK [version].
+ProbeResult javaProbe([int version = 17]) => ProbeResult(
+  id: 'java',
+  status: ProbeStatus.exited,
+  exitCode: 0,
+  stderr: 'openjdk version "$version.0.12" 2024-07-16\n',
+);
+
 /// The results of the probe of a Linux machine.
 List<ProbeResult> linuxProbe({bool android = true, bool swift = false}) => [
   const ProbeResult(
@@ -58,11 +67,17 @@ List<ProbeResult> linuxProbe({bool android = true, bool swift = false}) => [
     exitCode: 0,
     stdout: 'git version 2.43.0\n',
   ),
+  const ProbeResult(
+    id: 'flutter_tools',
+    status: ProbeStatus.exited,
+    exitCode: 0,
+  ),
   ProbeResult(
     id: 'android_sdk',
     status: ProbeStatus.exited,
     exitCode: android ? 0 : 1,
   ),
+  javaProbe(),
   const ProbeResult(id: 'xcode_select', status: ProbeStatus.skipped),
   const ProbeResult(id: 'xcodebuild', status: ProbeStatus.skipped),
   ProbeResult(
@@ -250,6 +265,7 @@ class RunnerHarness {
     required this.service,
     required this.owner,
     required this.errors,
+    required this.refused,
     required this.localGate,
   });
 
@@ -259,8 +275,10 @@ class RunnerHarness {
     JobRepository? jobRepository,
     JobLogs Function(JobLogStore store)? hubLogs,
     RunnerRepository Function(RunnerRepository inner)? wrapRunners,
+    Duration leaseLength = const Duration(seconds: runnerLeaseSeconds),
   }) async {
     final errors = <Object>[];
+    final refused = <String>[];
     final localGate = Completer<void>();
     final jobs = JobHarness.create(
       repository: jobRepository,
@@ -304,6 +322,7 @@ class RunnerHarness {
       ),
     );
     final hub = RunnerHub(
+      leaseLength: leaseLength,
       runners: storedRunners,
       projects: projects,
       jobs: jobs.jobs,
@@ -317,6 +336,7 @@ class RunnerHarness {
       grants: RunnerSecretGrants(credentials),
       engineVersion: '9.9.9',
       onError: (error, _) => errors.add(error),
+      onRefused: (name, why) => refused.add('$name: $why'),
     );
     scheduler.remoteJobs = hub;
     final pairing = InMemoryPairingTokenRepository();
@@ -325,6 +345,7 @@ class RunnerHarness {
       pairing: pairing,
       tokens: tokens,
       presence: hub,
+      settings: InMemoryEngineSettingRepository(),
       events: jobs.events,
       clock: jobs.clock,
     );
@@ -347,6 +368,7 @@ class RunnerHarness {
       service: service,
       owner: owner,
       errors: errors,
+      refused: refused,
       localGate: localGate,
     );
   }
@@ -367,6 +389,9 @@ class RunnerHarness {
 
   /// Failures reported to `onError`; a test that expects none checks it.
   final List<Object> errors;
+
+  /// What the hub reported as refused connections, as `name: why`.
+  final List<String> refused;
 
   /// Local steps made with `block: true` wait for this.
   final Completer<void> localGate;

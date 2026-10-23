@@ -340,6 +340,66 @@ void main() {
       );
     });
 
+    test('a paired runner compares by value', () {
+      PairedRunner runner({bool connected = false}) => PairedRunner(
+        id: 'rnr_1',
+        name: 'aws',
+        capabilities: const {Capability.android},
+        connected: connected,
+        lastSeen: DateTime.utc(2026, 10, 22),
+      );
+
+      expect(runner(), runner());
+      expect(runner(), isNot(runner(connected: true)));
+    });
+
+    test(
+      'name the paired runners that could do a job and are offline',
+      () async {
+        final paired = _PairedRunners([
+          PairedRunner(
+            id: 'rnr_aws',
+            name: 'AWS Instance',
+            capabilities: const {Capability.flutter, Capability.iosSign},
+            connected: false,
+            lastSeen: DateTime.utc(2026, 10, 22, 14, 2, 30),
+          ),
+          const PairedRunner(
+            id: 'rnr_new',
+            name: 'never seen',
+            capabilities: {Capability.iosSign},
+            connected: false,
+          ),
+          // Connected but not probed yet: not offline.
+          const PairedRunner(
+            id: 'rnr_now',
+            name: 'connecting',
+            capabilities: {Capability.iosSign},
+            connected: true,
+          ),
+        ]);
+        f.build([f.local()]);
+        f.scheduler.pairedRunners = paired;
+        final ids = await f.run([
+          const _Spec('ios', needs: ['ios-sign']),
+          const _Spec('mac', needs: ['ios-sign']),
+          const _Spec('linux', needs: ['swift-linux']),
+        ]);
+
+        await f.scheduler.pump();
+
+        expect(
+          await f.message(ids['ios']!),
+          'No connected runner can do ios-sign. AWS Instance offers ios-sign; '
+          'offline since 2026-10-22 14:02 UTC. never seen offers ios-sign; '
+          'offline.',
+        );
+        expect(await f.message(ids['mac']!), await f.message(ids['ios']!));
+        expect(await f.message(ids['linux']!), 'No runner can do swift-linux.');
+        expect(paired.reads, 1, reason: 'read once per pass');
+      },
+    );
+
     test('say it once, not on every pass', () async {
       f.build([f.local()]);
       final ids = await f.run([
@@ -1138,5 +1198,18 @@ class _Remote implements RemoteJobs {
   Future<bool> cancel(String id) async {
     asked.add(id);
     return handled.contains(id);
+  }
+}
+
+class _PairedRunners implements PairedRunners {
+  new(this.runners);
+
+  final List<PairedRunner> runners;
+  int reads = 0;
+
+  @override
+  Future<List<PairedRunner>> pairedRunners() async {
+    reads++;
+    return runners;
   }
 }

@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:xp_api/xp_api.dart';
-import 'package:xp_engine/xp_engine.dart';
+import 'package:xp_engine/src/process/process_runner.dart';
 
 /// How much of the output of a probe command is kept: 64 KiB, as the protocol
 /// says.

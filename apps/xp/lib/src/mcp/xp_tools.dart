@@ -8,7 +8,7 @@ import 'package:xp_client/xp_client.dart';
 
 /// What `xp mcp` tells the agent about itself when it connects.
 const mcpInstructions = '''
-XPath releases Flutter apps. These tools read projects, workflows, runs, jobs, logs, releases, approvals, test runs, storage and credentials (never a secret); create and edit projects and workflows (a workflow is checked first and its errors come back with their lines); and dispatch workflows.
+XPath releases Flutter apps. These tools read projects, workflows, runs, jobs, logs, releases, approvals, test runs, storage, credentials (never a secret) and runners; create and edit projects and workflows (a workflow is checked first and its errors come back with their lines); and dispatch workflows.
 
 Gated actions (a production release, a production OTA patch, a store submission, a push, a merge, a delete) wait for the owner's approval. This server can never approve or deny: when a dispatched run reaches a gate, get_run shows it as waiting_for_approval with the pending approval ids; tell the owner, who approves in the XPath app or with `xp approvals approve <id>`, and poll get_approval until its state is no longer pending. Expired counts as denied.
 
@@ -466,6 +466,20 @@ List<McpTool> buildXpTools(
       {'project': project},
       (args) async => (await client.getGates(await projectId(args))).toJson(),
       required: ['project'],
+      readOnly: true,
+    ),
+    tool(
+      'list_runners',
+      'List the runners: name, id, status (online, draining, offline, '
+          'revoked), when the engine last heard from each, what it can do '
+          '(capabilities), what it cannot and why (missing, while it is '
+          'connected), its slots and the jobs it runs. A job that waits with '
+          '"No runner can do ..." needs a runner that offers that capability. '
+          'Read-only: the owner pairs and revokes runners.',
+      {},
+      (args) async => [
+        for (final runner in await client.listRunners()) runner.toJson(),
+      ],
       readOnly: true,
     ),
     tool(

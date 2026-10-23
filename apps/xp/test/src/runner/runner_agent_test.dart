@@ -5,7 +5,6 @@ import 'dart:math';
 import 'package:test/test.dart';
 import 'package:xp/src/runner/backoff.dart';
 import 'package:xp/src/runner/job/lease_outbox.dart';
-import 'package:xp/src/runner/probe_executor.dart';
 import 'package:xp/src/runner/runner_agent.dart';
 import 'package:xp/src/runner/runner_socket.dart';
 import 'package:xp/src/runner/secrets/lease_secret_store.dart';
@@ -30,6 +29,13 @@ void main() {
   late List<Duration> waited;
   late List<_Started> started;
   late FakeProcessRunner processes;
+  // The lease fence's periodic callback; a test calls it when time passed.
+  void Function(Timer timer)? fenceTick;
+
+  Future<void> checkLeases() async {
+    fenceTick!(_QuietTimer());
+    await pumpEventQueue();
+  }
 
   FakeRunnerSocket socket() {
     final fake = FakeRunnerSocket();
@@ -48,6 +54,7 @@ void main() {
     bool Function(String engineVersion)? wantsUpdateTo,
     void Function(String engineVersion)? onWelcomed,
     Future<void> Function()? beforeConnect,
+    Duration Function()? elapsed,
   }) => RunnerAgent(
     connect: () async {
       await beforeConnect?.call();
@@ -80,6 +87,11 @@ void main() {
     heartbeatUnit: heartbeatUnit ?? ((seconds) => Duration(seconds: seconds)),
     wantsUpdateTo: wantsUpdateTo,
     onWelcomed: onWelcomed,
+    elapsed: elapsed,
+    timers: (interval, tick) {
+      fenceTick = tick;
+      return _QuietTimer();
+    },
   );
 
   setUp(() {
@@ -199,6 +211,187 @@ void main() {
         await running;
       },
     );
+  });
+
+  group('what the engine found', () {
+    const noJdk = MissingCapability(
+      capability: 'android',
+      reason: 'no JDK: java not found',
+      fix:
+          'install JDK 17 (apt-get install openjdk-17-jdk-headless) or set '
+          'JAVA_HOME',
+    );
+
+    test('is printed after the connection, with the reason for each missing '
+        'capability', () async {
+      final fake = socket();
+      final running = agent().run();
+      await pumpEventQueue();
+      await welcome(fake, engineVersion: '1.1.2');
+
+      fake.engine(
+        const ProbedFrame(capabilities: ['flutter'], missing: [noJdk]),
+      );
+      await pumpEventQueue();
+
+      expect(noJdk.explanation, startsWith('no JDK: java not found. Install'));
+      const connected = 'Connected. The engine runs 1.1.2;';
+      expect(log, [
+        '$connected this runner offers flutter, 2 slots.',
+        'No android: ${noJdk.explanation}',
+      ]);
+      await fake.engineCloses(runnerRevokedCloseCode);
+      await running;
+    });
+
+    test('is printed again only when it changes', () async {
+      final first = socket();
+      final second = socket();
+      final third = socket();
+      final running = agent(slots: 1).run();
+      await pumpEventQueue();
+      await welcome(first, engineVersion: '1.1.2');
+      first.engine(const ProbedFrame(capabilities: ['flutter']));
+      await pumpEventQueue();
+      await first.engineCloses(1006);
+      await pumpEventQueue();
+      await welcome(second, engineVersion: '1.1.2');
+      second.engine(const ProbedFrame(capabilities: ['flutter']));
+      await pumpEventQueue();
+      await second.engineCloses(1006);
+      await pumpEventQueue();
+      await welcome(third, engineVersion: '1.1.2');
+      third.engine(const ProbedFrame(capabilities: ['android', 'flutter']));
+      await pumpEventQueue();
+
+      expect(log.where((line) => line.contains('offers')), [
+        'Connected. The engine runs 1.1.2; this runner offers flutter, 1 slot.',
+        'The engine runs 1.1.2; this runner offers android, flutter, 1 slot.',
+      ]);
+      await third.engineCloses(runnerRevokedCloseCode);
+      await running;
+    });
+
+    test('says plainly when the runner offers nothing', () async {
+      final fake = socket();
+      final running = agent().run();
+      await pumpEventQueue();
+      await welcome(fake);
+
+      fake.engine(const ProbedFrame(capabilities: [], missing: [noJdk]));
+      await pumpEventQueue();
+
+      expect(
+        log.first,
+        'Connected. This runner offers nothing yet, so it will get no jobs. '
+        'Run: xp runner doctor',
+      );
+      await fake.engineCloses(runnerRevokedCloseCode);
+      await running;
+    });
+  });
+
+  group('the lease fence', () {
+    late Duration now;
+
+    Future<FakeRunnerSocket> holding(Future<AgentExit> Function() start) async {
+      final fake = socket();
+      unawaited(start());
+      await pumpEventQueue();
+      await welcome(fake);
+      await offer(fake, 'job_1');
+      return fake;
+    }
+
+    setUp(() => now = Duration.zero);
+
+    test(
+      'stops a job whose lease the engine gave up while it was away',
+      () async {
+        final running = agent(elapsed: () => now);
+        final fake = await holding(running.run);
+        expect(started.single.work.cancelled, isFalse);
+
+        now = const Duration(seconds: 90 + 15);
+        await checkLeases();
+        expect(started.single.work.cancelled, isFalse, reason: 'not yet over');
+
+        now = const Duration(seconds: 90 + 16);
+        await checkLeases();
+
+        expect(started.single.work.cancelled, isTrue);
+        expect(
+          log,
+          contains(
+            'Lost the lease of job job_1 while the engine was unreachable; '
+            'stopped it.',
+          ),
+        );
+        expect(running.activeJobs, 0);
+        await fake.engineCloses(runnerRevokedCloseCode);
+      },
+    );
+
+    test('keeps a job whose lease the engine renews', () async {
+      final running = agent(elapsed: () => now);
+      final fake = await holding(running.run);
+
+      now = const Duration(seconds: 80);
+      fake.engine(
+        HeartbeatAckFrame(
+          leases: [
+            LeaseGrant(
+              jobId: 'job_1',
+              leaseId: 'lse_1',
+              until: DateTime.utc(2026),
+            ),
+            // A lease of another job, or an older lease of this one, renews
+            // nothing.
+            LeaseGrant(
+              jobId: 'job_1',
+              leaseId: 'lse_old',
+              until: DateTime.utc(2026),
+            ),
+            LeaseGrant(
+              jobId: 'job_9',
+              leaseId: 'lse_9',
+              until: DateTime.utc(2026),
+            ),
+          ],
+        ),
+      );
+      await pumpEventQueue();
+      now = const Duration(seconds: 80 + 100);
+      await checkLeases();
+
+      expect(started.single.work.cancelled, isFalse);
+      expect(running.activeJobs, 1);
+      await fake.engineCloses(runnerRevokedCloseCode);
+    });
+
+    test('follows the lease length of the welcome', () async {
+      final running = agent(elapsed: () => now);
+      final fake = socket();
+      unawaited(running.run());
+      await pumpEventQueue();
+      fake.engine(
+        WelcomeFrame(
+          runnerId: 'rnr_1',
+          engineVersion: '9.9.9',
+          apiVersion: apiVersion,
+          heartbeatSeconds: 2,
+          leaseSeconds: 6,
+        ),
+      );
+      await pumpEventQueue();
+      await offer(fake, 'job_1');
+
+      now = const Duration(seconds: 6 + 15 + 1);
+      await checkLeases();
+
+      expect(started.single.work.cancelled, isTrue);
+      await fake.engineCloses(runnerRevokedCloseCode);
+    });
   });
 
   group('the heartbeat', () {
@@ -701,7 +894,8 @@ void main() {
       expect(
         log,
         contains(
-          'The engine runs version 2.0.0, this runner 1.2.3: no new jobs; the '
+          'The engine runs 2.0.0; this runner (1.2.3) updates to it between '
+          'jobs: no new jobs; the '
           'runner updates now.',
         ),
       );
@@ -730,7 +924,8 @@ void main() {
       expect(
         log,
         contains(
-          'The engine runs version 2.0.0, this runner 1.2.3: no new jobs; the '
+          'The engine runs 2.0.0; this runner (1.2.3) updates to it between '
+          'jobs: no new jobs; the '
           'running job finishes, then the runner updates.',
         ),
       );
@@ -766,7 +961,8 @@ void main() {
       expect(
         log,
         contains(
-          'The engine runs version 2.0.0, this runner 1.2.3: no new jobs; the '
+          'The engine runs 2.0.0; this runner (1.2.3) updates to it between '
+          'jobs: no new jobs; the '
           '2 running jobs finish, then the runner updates.',
         ),
       );
@@ -885,16 +1081,18 @@ void main() {
         ..add(Exception('socket'))
         ..add(const ApiException('Busy.', statusCode: 503));
       final fake = socket();
-      final running = agent().run();
+      final running = agent(elapsed: () => Duration.zero).run();
       await pumpEventQueue();
       await welcome(fake);
       await fake.engineCloses(runnerRevokedCloseCode);
       await running;
 
       expect(waited, hasLength(3));
-      expect(log.first, 'Cannot connect: refused');
-      expect(log[1], contains('Exception: socket'));
-      expect(log[2], 'Cannot connect: Busy.');
+      // The first failure is said; the next ones are not, until much later.
+      expect(log.take(2), [
+        'Cannot connect: refused',
+        'Connected again after 0 s.',
+      ]);
     });
 
     test('keeps going after a connection that breaks', () async {
@@ -909,7 +1107,87 @@ void main() {
       await second.engineCloses(runnerRevokedCloseCode);
       await running;
 
-      expect(log.any((m) => m.contains('The connection broke')), isTrue);
+      expect(
+        log.any((m) => m.startsWith('The connection to the engine broke (')),
+        isTrue,
+      );
+    });
+
+    test('says once in a while that the engine is still away, and when it '
+        'is back', () async {
+      var now = Duration.zero;
+      for (var i = 0; i < 40; i++) {
+        connections.add(const ConnectionException('refused'));
+      }
+      final fake = socket();
+      final running = agent(
+        elapsed: () => now,
+        delay: (duration) async {
+          waited.add(duration);
+          // Every attempt is a minute after the one before.
+          now += const Duration(minutes: 1);
+        },
+      ).run();
+      await pumpEventQueue(times: 200);
+      await welcome(fake);
+      await fake.engineCloses(runnerRevokedCloseCode);
+      await running;
+
+      expect(waited, hasLength(40));
+      String away(int minutes) =>
+          'The engine has been unreachable for $minutes min; still trying '
+          'every 60 s. Last: refused';
+      expect(log, [
+        'Cannot connect: refused',
+        away(10),
+        away(20),
+        away(30),
+        'Connected again after 40 min.',
+        'The engine revoked this runner. It does not connect again.',
+      ]);
+    });
+
+    test(
+      'says the first failed attempt after a connection that was lost',
+      () async {
+        final first = socket();
+        connections
+          ..add(const ConnectionException('refused'))
+          ..add(const ConnectionException('refused'));
+        final second = socket();
+        final running = agent(elapsed: () => Duration.zero).run();
+        await pumpEventQueue();
+        await welcome(first);
+        await first.engineCloses(1006);
+        await pumpEventQueue(times: 50);
+        await welcome(second);
+        await second.engineCloses(runnerRevokedCloseCode);
+        await running;
+
+        expect(log.take(3), [
+          'The connection to the engine ended; connecting again.',
+          'Cannot connect: refused',
+          'Connected again after 0 s.',
+        ]);
+      },
+    );
+
+    test('says how long it was away in hours', () async {
+      var now = Duration.zero;
+      connections.add(const ConnectionException('refused'));
+      final fake = socket();
+      final running = agent(
+        elapsed: () => now,
+        delay: (duration) async {
+          now += const Duration(hours: 3, minutes: 12);
+        },
+      ).run();
+      await pumpEventQueue();
+      await welcome(fake);
+      await fake.engineCloses(runnerRevokedCloseCode);
+      await running;
+
+      expect(log, contains('Connected again after 3 h 12 min.'));
     });
 
     test('is not made again when the credential is refused', () async {
@@ -1243,4 +1521,15 @@ class _FixedRandom implements Random {
 
   @override
   int nextInt(int max) => 0;
+}
+
+class _QuietTimer implements Timer {
+  @override
+  void cancel() {}
+
+  @override
+  bool get isActive => true;
+
+  @override
+  int get tick => 0;
 }

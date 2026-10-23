@@ -33,6 +33,14 @@ class RunnersRepository {
   Future<PairingToken> createPairingToken(String name) =>
       _session.call((client) => client.createPairingToken(name));
 
+  /// The address runners reach the engine at.
+  Future<RunnerUrl> runnerUrl() =>
+      _session.call((client) => client.runnerUrl());
+
+  /// Sets the runner URL to [url], or clears it for `null`.
+  Future<RunnerUrl> setRunnerUrl(String? url) =>
+      _session.call((client) => client.setRunnerUrl(url));
+
   /// Revokes [id].
   Future<Runner> revoke(String id) =>
       _session.call((client) => client.revokeRunner(id));

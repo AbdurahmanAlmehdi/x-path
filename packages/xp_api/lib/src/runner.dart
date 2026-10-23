@@ -3,6 +3,7 @@
 
 import 'package:equatable/equatable.dart';
 import 'package:json_annotation/json_annotation.dart';
+import 'package:xp_api/src/runner_protocol.dart';
 
 part 'runner.g.dart';
 
@@ -29,7 +30,7 @@ enum RunnerStatus {
 }
 
 /// A machine that runs jobs for the engine (D-08, D-19).
-@JsonSerializable(includeIfNull: false)
+@JsonSerializable(includeIfNull: false, explicitToJson: true)
 class Runner extends Equatable {
   /// Creates a runner.
   const new({
@@ -46,6 +47,7 @@ class Runner extends Equatable {
     this.cores,
     this.lastHeartbeat,
     this.revokedAt,
+    this.missing,
   });
 
   /// Reads a runner from its JSON form.
@@ -65,6 +67,10 @@ class Runner extends Equatable {
   /// connection, never from what the runner says about itself (D-19). Empty
   /// until the first probe.
   final List<String> capabilities;
+
+  /// What it cannot do, why, and what gives it, from the same probe as
+  /// [capabilities]. Kept in memory only: present while it is connected.
+  final List<MissingCapability>? missing;
 
   /// How many jobs it runs at once. `ios-sign` jobs run one at a time
   /// whatever this is.
@@ -114,7 +120,42 @@ class Runner extends Equatable {
     lastHeartbeat,
     createdAt,
     revokedAt,
+    missing,
   ];
+}
+
+/// What a runner is doing, as the app and the CLI show it.
+enum RunnerActivity {
+  /// Online and running no job.
+  idle,
+
+  /// Online and running jobs.
+  busy,
+
+  /// Finishing its jobs and taking no new one, before an update.
+  updating,
+
+  /// Offline while it still holds the leases of jobs: lost mid-job.
+  lost,
+
+  /// Offline.
+  offline,
+
+  /// Revoked by the owner.
+  revoked,
+}
+
+/// What [Runner.status] and its jobs mean for the owner.
+extension RunnerActivityOf on Runner {
+  /// What the runner is doing.
+  RunnerActivity get activity => switch (status) {
+    RunnerStatus.online when jobIds.isEmpty => RunnerActivity.idle,
+    RunnerStatus.online => RunnerActivity.busy,
+    RunnerStatus.draining => RunnerActivity.updating,
+    RunnerStatus.offline when jobIds.isNotEmpty => RunnerActivity.lost,
+    RunnerStatus.offline => RunnerActivity.offline,
+    RunnerStatus.revoked => RunnerActivity.revoked,
+  };
 }
 
 /// The body of `GET /runners`.
@@ -160,10 +201,15 @@ class CreatePairingTokenRequest extends Equatable {
 
 /// A pairing token (D-08): single use, valid for 15 minutes. It is shown
 /// once and only its hash is kept.
-@JsonSerializable()
+@JsonSerializable(includeIfNull: false)
 class PairingToken extends Equatable {
   /// Creates a pairing token.
-  const new({required this.token, required this.name, required this.expiresAt});
+  const new({
+    required this.token,
+    required this.name,
+    required this.expiresAt,
+    this.engineUrl,
+  });
 
   /// Reads a pairing token from its JSON form.
   factory PairingToken.fromJson(Map<String, dynamic> json) =>
@@ -178,11 +224,111 @@ class PairingToken extends Equatable {
   /// When it stops working, in UTC.
   final DateTime expiresAt;
 
+  /// The address runners reach the engine at (the runner URL the owner set),
+  /// for the `xp runner pair --engine` command; `null` when none is set.
+  final String? engineUrl;
+
   /// The JSON form.
   Map<String, dynamic> toJson() => _$PairingTokenToJson(this);
 
   @override
-  List<Object?> get props => [token, name, expiresAt];
+  List<Object?> get props => [token, name, expiresAt, engineUrl];
+}
+
+/// Whether [host], the host of a URI (without brackets), is this machine:
+/// `localhost`, `127.0.0.0/8` or `::1`.
+bool isLoopbackHost(String host) {
+  final name = host.toLowerCase();
+  return name == 'localhost' || name == '::1' || name.startsWith('127.');
+}
+
+/// The `xp runner pair` command a [PairingToken] goes with.
+class PairingCommand extends Equatable {
+  /// The command for [token]: the runner URL it carries, else [runnerUrl]
+  /// (one the owner set since), else [fallback], the address the asking
+  /// client reaches the engine at.
+  factory of(PairingToken token, {required Uri fallback, String? runnerUrl}) {
+    final engine =
+        token.engineUrl ??
+        runnerUrl ??
+        fallback.toString().replaceFirst(RegExp(r'/+$'), '');
+    return PairingCommand._(
+      engine: engine,
+      token: token.token,
+      onlyHere:
+          token.engineUrl == null &&
+          runnerUrl == null &&
+          isLoopbackHost(fallback.host),
+    );
+  }
+
+  const new _({
+    required this.engine,
+    required this.token,
+    required this.onlyHere,
+  });
+
+  /// The address the runner pairs with.
+  final String engine;
+
+  /// The pairing token.
+  final String token;
+
+  /// Whether [engine] only works on the engine's machine: no runner URL is
+  /// set and the client reaches the engine on loopback.
+  final bool onlyHere;
+
+  /// The command line.
+  String get text => 'xp runner pair --engine $engine --token $token';
+
+  @override
+  List<Object?> get props => [engine, token, onlyHere];
+}
+
+/// The address runners reach the engine at: the body of `GET` and `PUT
+/// /settings/runner-url`.
+@JsonSerializable(includeIfNull: false)
+class RunnerUrl extends Equatable {
+  /// Creates the setting.
+  const new({this.url, this.warning});
+
+  /// Reads the setting from its JSON form.
+  factory RunnerUrl.fromJson(Map<String, dynamic> json) =>
+      _$RunnerUrlFromJson(json);
+
+  /// The absolute `http` or `https` URL, or `null` when none is set.
+  final String? url;
+
+  /// Why the URL may be a bad idea though it was accepted, for example a
+  /// plain `http` URL that leaves this network; one sentence.
+  final String? warning;
+
+  /// The JSON form.
+  Map<String, dynamic> toJson() => _$RunnerUrlToJson(this);
+
+  @override
+  List<Object?> get props => [url, warning];
+}
+
+/// The body of `PUT /settings/runner-url`.
+@JsonSerializable(checked: true)
+class SetRunnerUrlRequest extends Equatable {
+  /// Creates a request; a `null` [url] clears the setting.
+  const new({required this.url});
+
+  /// Reads a request from its JSON form.
+  factory SetRunnerUrlRequest.fromJson(Map<String, dynamic> json) =>
+      _$SetRunnerUrlRequestFromJson(json);
+
+  /// The runner URL, or `null` to clear it. The key must be there.
+  @JsonKey(required: true)
+  final String? url;
+
+  /// The JSON form.
+  Map<String, dynamic> toJson() => _$SetRunnerUrlRequestToJson(this);
+
+  @override
+  List<Object?> get props => [url];
 }
 
 /// The body of `POST /runners/pair`.

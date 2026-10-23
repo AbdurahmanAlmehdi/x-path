@@ -26,6 +26,9 @@ Runner _$RunnerFromJson(Map<String, dynamic> json) => Runner(
   revokedAt: json['revokedAt'] == null
       ? null
       : DateTime.parse(json['revokedAt'] as String),
+  missing: (json['missing'] as List<dynamic>?)
+      ?.map((e) => MissingCapability.fromJson(e as Map<String, dynamic>))
+      .toList(),
 );
 
 Map<String, dynamic> _$RunnerToJson(Runner instance) => <String, dynamic>{
@@ -33,6 +36,7 @@ Map<String, dynamic> _$RunnerToJson(Runner instance) => <String, dynamic>{
   'name': instance.name,
   'status': _$RunnerStatusEnumMap[instance.status]!,
   'capabilities': instance.capabilities,
+  'missing': ?instance.missing?.map((e) => e.toJson()).toList(),
   'slots': instance.slots,
   'jobIds': instance.jobIds,
   'os': ?instance.os,
@@ -80,6 +84,7 @@ PairingToken _$PairingTokenFromJson(Map<String, dynamic> json) => PairingToken(
   token: json['token'] as String,
   name: json['name'] as String,
   expiresAt: DateTime.parse(json['expiresAt'] as String),
+  engineUrl: json['engineUrl'] as String?,
 );
 
 Map<String, dynamic> _$PairingTokenToJson(PairingToken instance) =>
@@ -87,7 +92,29 @@ Map<String, dynamic> _$PairingTokenToJson(PairingToken instance) =>
       'token': instance.token,
       'name': instance.name,
       'expiresAt': instance.expiresAt.toIso8601String(),
+      'engineUrl': ?instance.engineUrl,
     };
+
+RunnerUrl _$RunnerUrlFromJson(Map<String, dynamic> json) =>
+    RunnerUrl(url: json['url'] as String?, warning: json['warning'] as String?);
+
+Map<String, dynamic> _$RunnerUrlToJson(RunnerUrl instance) => <String, dynamic>{
+  'url': ?instance.url,
+  'warning': ?instance.warning,
+};
+
+SetRunnerUrlRequest _$SetRunnerUrlRequestFromJson(Map<String, dynamic> json) =>
+    $checkedCreate('SetRunnerUrlRequest', json, ($checkedConvert) {
+      $checkKeys(json, requiredKeys: const ['url']);
+      final val = SetRunnerUrlRequest(
+        url: $checkedConvert('url', (v) => v as String?),
+      );
+      return val;
+    });
+
+Map<String, dynamic> _$SetRunnerUrlRequestToJson(
+  SetRunnerUrlRequest instance,
+) => <String, dynamic>{'url': instance.url};
 
 PairRunnerRequest _$PairRunnerRequestFromJson(Map<String, dynamic> json) =>
     $checkedCreate('PairRunnerRequest', json, ($checkedConvert) {

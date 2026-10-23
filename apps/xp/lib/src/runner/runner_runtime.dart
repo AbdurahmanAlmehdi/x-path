@@ -9,7 +9,6 @@ import 'package:xp/src/runner/job/leased_job.dart';
 import 'package:xp/src/runner/job/pgid_journal.dart';
 import 'package:xp/src/runner/job/uploading_artifacts.dart';
 import 'package:xp/src/runner/no_secrets.dart';
-import 'package:xp/src/runner/probe_executor.dart';
 import 'package:xp/src/runner/runner_agent.dart';
 import 'package:xp/src/runner/runner_identity.dart';
 import 'package:xp/src/runner/runner_paths.dart';
