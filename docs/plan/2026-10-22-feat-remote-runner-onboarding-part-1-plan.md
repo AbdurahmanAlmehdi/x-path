@@ -391,7 +391,7 @@ The section also says what not to do: `--host 0.0.0.0` without TLS in front.
 
 ### Phase R7: `install.sh --with-android` and the next steps
 
-- **Status:** Not started
+- **Status:** Done
 - **Scope:** One installer flag gives a Debian or Ubuntu box everything `android` and `flutter`
   need, and `--runner` ends with the three next steps.
 - **Files touched:** `tool/release/linux/install.sh`, `tool/release/linux/install_test.sh`,

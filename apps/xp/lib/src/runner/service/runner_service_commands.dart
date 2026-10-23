@@ -209,6 +209,17 @@ class RunnerInstallServiceCommand extends _ServiceCommand {
           ),
       slots: slots,
       logsToFiles: isMacOS,
+      // Set at install time, for example by `install.sh --with-android` with
+      // an SDK outside the places Flutter looks in.
+      tools: {
+        for (final name in const [
+          'ANDROID_HOME',
+          'ANDROID_SDK_ROOT',
+          'JAVA_HOME',
+        ])
+          if (_host.environment[name] case final value? when value.isNotEmpty)
+            name: value,
+      },
       credential: switch ((encrypted, plain)) {
         (final file?, _) => ServiceCredential(
           name: runnerMasterKeyCredentialName,
