@@ -360,6 +360,143 @@ void main() {
       });
     });
 
+    group('ios-linux', () {
+      const dir = '/home/me/omarchy-apple-dev';
+      const pin = RunnerProbe.iosLinuxPin;
+      const setup = 'run install-toolchain.sh in $dir';
+
+      ProbeFindings evaluate(List<ProbeResult> extra, {bool swift = true}) =>
+          probe.evaluate([
+            ...linuxProbe(swift: swift),
+            ...extra,
+          ], iosLinuxDirectory: dir);
+
+      List<(String, String)> missing(ProbeFindings findings) => [
+        for (final m in findings.missing)
+          if (m.capability == 'ios-linux') (m.reason, m.fix),
+      ];
+
+      test('has three commands for the folder, Linux only', () {
+        final commands = probe.iosLinuxCommands(dir);
+
+        expect(commands.map((c) => c.id), [
+          'ios_linux_commit',
+          'ios_linux_sdk',
+          'ios_linux_tools',
+        ]);
+        expect(commands.first.executable, 'git');
+        expect(commands.first.arguments, ['-C', dir, 'rev-parse', 'HEAD']);
+        expect(commands.map((c) => c.onlyOn).toSet(), {'linux'});
+        for (final command in commands.skip(1)) {
+          expect(command.arguments.last, isNot(contains(dir)));
+        }
+      });
+
+      test('is offered by a configured Linux runner with everything', () {
+        final findings = evaluate(iosLinuxProbe());
+
+        expect(findings.capabilities, contains(Capability.iosLinux));
+        expect(missing(findings), isEmpty);
+      });
+
+      test('is neither offered nor missing unconfigured or off Linux', () {
+        final unconfigured = probe.evaluate([
+          ...linuxProbe(swift: true),
+          ...iosLinuxProbe(),
+        ]);
+        final mac = probe.evaluate([
+          ...macProbe(),
+          ...iosLinuxProbe(),
+        ], iosLinuxDirectory: dir);
+
+        for (final findings in [unconfigured, mac]) {
+          expect(findings.capabilities, isNot(contains(Capability.iosLinux)));
+          expect(missing(findings), isEmpty);
+        }
+      });
+
+      test('a checkout at another commit says how to move it', () {
+        final findings = evaluate(
+          iosLinuxProbe(commit: '0123456789abcdef0123456789abcdef01234567'),
+        );
+
+        expect(findings.capabilities, isNot(contains(Capability.iosLinux)));
+        expect(missing(findings), [
+          (
+            'omarchy-apple-dev is at 0123456789ab; this XPath needs '
+                '955127bf7d27',
+            'git -C $dir fetch && git -C $dir checkout $pin',
+          ),
+        ]);
+      });
+
+      test('a folder that is no checkout says how to make one', () {
+        final findings = evaluate([
+          const ProbeResult(
+            id: 'ios_linux_commit',
+            status: ProbeStatus.exited,
+            exitCode: 128,
+            stderr: 'fatal: not a git repository\n',
+          ),
+          ...iosLinuxProbe().skip(1),
+        ]);
+
+        expect(missing(findings), [
+          (
+            '$dir is not an omarchy-apple-dev checkout: fatal: not a git '
+                'repository',
+            'git clone https://github.com/joshuaswarren/omarchy-apple-dev '
+                '$dir && git -C $dir checkout $pin',
+          ),
+        ]);
+      });
+
+      test('lists every missing piece with its fix', () {
+        final findings = evaluate([
+          const ProbeResult(
+            id: 'ios_linux_commit',
+            status: ProbeStatus.exited,
+            exitCode: 0,
+          ),
+          ...iosLinuxProbe(
+            sdk: false,
+            missingTools: 'rcodesign llvm-lipo pymobile3 other',
+          ).skip(1),
+        ], swift: false);
+
+        expect(missing(findings), [
+          (
+            'omarchy-apple-dev is at nothing; this XPath needs 955127bf7d27',
+            'git -C $dir fetch && git -C $dir checkout $pin',
+          ),
+          ('no Swift: swift not found', setup),
+          (
+            'no darwin SDK bundle (swift-sdks/darwin.artifactbundle under '
+                r'$XDG_CONFIG_HOME/swiftpm or ~/.swiftpm)',
+            'download Xcode.xip in a browser and $setup, as the user the '
+                'runner runs as',
+          ),
+          (
+            'no rcodesign, llvm-lipo, ~/pymobile3-venv/bin/python: '
+                'omarchy-apple-dev needs them',
+            setup,
+          ),
+        ]);
+      });
+
+      test('one missing tool is it, and tools not checked say so', () {
+        expect(missing(evaluate(iosLinuxProbe(missingTools: 'llvm-ar'))), [
+          ('no llvm-ar: omarchy-apple-dev needs it', setup),
+        ]);
+        expect(missing(evaluate(iosLinuxProbe().take(2).toList())), [
+          (
+            'the Linux iOS tools could not be checked (sh was not checked)',
+            setup,
+          ),
+        ]);
+      });
+    });
+
     test('findings compare by value', () {
       final capabilities = {Capability.flutter};
 

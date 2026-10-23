@@ -3,6 +3,12 @@ import 'package:xp_api/xp_api.dart';
 import 'package:xp_engine/src/scheduler/capability.dart';
 import 'package:xp_engine/src/toolchain/version_parsers.dart';
 
+/// The variable that names the omarchy-apple-dev checkout of a runner that
+/// builds iOS apps on Linux (ADR 0014). `xp runner start` and `xp runner
+/// doctor` read it, and `xp runner install-service` writes it into the
+/// service when it is set.
+const iosLinuxDirectoryVariable = 'XP_IOS_LINUX_DIR';
+
 /// What the engine concluded from the results of a probe.
 class ProbeFindings extends Equatable {
   /// Creates the findings.
@@ -20,8 +26,9 @@ class ProbeFindings extends Equatable {
 
   /// What it cannot do, why, and what gives it. A capability that cannot
   /// exist on its operating system (`ios-sign` on Linux, `swift-linux` on
-  /// macOS) is not listed. One capability can be listed more than once, once
-  /// for each thing it lacks.
+  /// macOS), or that the machine was not configured for (`ios-linux`), is not
+  /// listed. One capability can be listed more than once, once for each thing
+  /// it lacks.
   final List<MissingCapability> missing;
 
   @override
@@ -47,6 +54,12 @@ class ProbeFindings extends Equatable {
 ///   certificates and profiles are the runner owner's to keep in order, and
 ///   a job fails with a clear message when a signing identity is missing.
 /// - `swift-linux`: Linux with `swift` installed.
+/// - `ios-linux` (opt-in, ADR 0014): Linux, on a runner configured with an
+///   omarchy-apple-dev checkout ([iosLinuxDirectoryVariable]) at
+///   [iosLinuxPin], whose toolchain is installed: `swift`, the darwin SDK
+///   bundle, `rcodesign`, the pymobile3 python and LLVM's binutils. The
+///   runner adds [iosLinuxCommands] to the engine's commands, since only it
+///   knows the folder, and sends the folder with the results.
 ///
 /// Each capability it does not find comes with the reason, taken from the
 /// command that failed, and the fix (`ProbeFindings.missing`).
@@ -56,6 +69,47 @@ class RunnerProbe {
 
   /// The oldest JDK the Android Gradle plugin accepts.
   static const minimumJdk = 17;
+
+  /// The omarchy-apple-dev commit this release of XPath builds iOS apps on
+  /// Linux with. A checkout at another commit does not count.
+  static const iosLinuxPin = '955127bf7d27fffa65abbef22e4c750e6c2f7055';
+
+  /// Where omarchy-apple-dev is.
+  static const iosLinuxRepository =
+      'https://github.com/joshuaswarren/omarchy-apple-dev';
+
+  /// The shell script of the `ios_linux_sdk` command: exits 0 if the darwin
+  /// Swift SDK bundle that omarchy-apple-dev's `install-toolchain.sh` makes
+  /// from `Xcode.xip` is where SwiftPM looks for it.
+  static const darwinSdkScript = r'''
+d="${XDG_CONFIG_HOME:+$XDG_CONFIG_HOME/swiftpm}"
+[ -d "${d:-$HOME/.swiftpm}/swift-sdks/darwin.artifactbundle" ]
+''';
+
+  /// The shell script of the `ios_linux_tools` command: exits 1 and prints
+  /// the names of the tools omarchy-apple-dev's Flutter scripts need that are
+  /// not installed (`pymobile3` for `~/pymobile3-venv/bin/python`).
+  static const iosLinuxToolsScript = r'''
+missing=
+for tool in rcodesign llvm-strip llvm-lipo llvm-otool llvm-install-name-tool llvm-ar; do
+  command -v "$tool" >/dev/null 2>&1 || missing="$missing $tool"
+done
+[ -x "$HOME/pymobile3-venv/bin/python" ] || missing="$missing pymobile3"
+[ -z "$missing" ] && exit 0
+echo $missing
+exit 1
+''';
+
+  /// The tools of [iosLinuxToolsScript], as a reason names them.
+  static const _iosLinuxTools = {
+    'rcodesign': 'rcodesign',
+    'llvm-strip': 'llvm-strip',
+    'llvm-lipo': 'llvm-lipo',
+    'llvm-otool': 'llvm-otool',
+    'llvm-install-name-tool': 'llvm-install-name-tool',
+    'llvm-ar': 'llvm-ar',
+    'pymobile3': '~/pymobile3-venv/bin/python',
+  };
 
   /// The shell script of the `android_sdk` command: exits 0 if a folder that
   /// has `platform-tools`, `cmdline-tools` or `build-tools` is one of the
@@ -139,8 +193,38 @@ exit 1
     ),
   ];
 
-  /// What the machine can do, from its [results].
-  ProbeFindings evaluate(List<ProbeResult> results) {
+  /// The commands a runner configured for Linux iOS builds runs after the
+  /// engine's, for the omarchy-apple-dev checkout [directory]. The folder is
+  /// an argument, never part of a script.
+  List<ProbeCommand> iosLinuxCommands(String directory) => [
+    ProbeCommand(
+      id: 'ios_linux_commit',
+      executable: 'git',
+      arguments: ['-C', directory, 'rev-parse', 'HEAD'],
+      onlyOn: 'linux',
+    ),
+    const ProbeCommand(
+      id: 'ios_linux_sdk',
+      executable: 'sh',
+      arguments: ['-c', darwinSdkScript],
+      onlyOn: 'linux',
+    ),
+    const ProbeCommand(
+      id: 'ios_linux_tools',
+      executable: 'sh',
+      arguments: ['-c', iosLinuxToolsScript],
+      onlyOn: 'linux',
+    ),
+  ];
+
+  /// What the machine can do, from its [results]. [iosLinuxDirectory] is the
+  /// omarchy-apple-dev checkout of a runner configured for Linux iOS builds,
+  /// whose [iosLinuxCommands] are among the results; without it `ios-linux`
+  /// is neither offered nor missing.
+  ProbeFindings evaluate(
+    List<ProbeResult> results, {
+    String? iosLinuxDirectory,
+  }) {
     final byId = {for (final result in results) result.id: result};
     final uname = byId['os']?.succeeded ?? false
         ? byId['os']!.stdout.trim()
@@ -233,6 +317,13 @@ exit 1
       );
     }
 
+    final iosLinux = linux && iosLinuxDirectory != null
+        ? _iosLinuxProblems(byId, iosLinuxDirectory, swift)
+        : null;
+    for (final (reason, fix) in iosLinux ?? const <(String, String)>[]) {
+      lacks(Capability.iosLinux, reason, fix);
+    }
+
     return ProbeFindings(
       operatingSystem: os,
       capabilities: {
@@ -240,10 +331,69 @@ exit 1
         if (sdk && jdk == null) Capability.android,
         if (os == 'macos' && xcode == null) Capability.iosSign,
         if (linux && swift == null) Capability.swiftLinux,
+        if (iosLinux != null && iosLinux.isEmpty) Capability.iosLinux,
       },
       missing: missing,
     );
   }
+
+  /// What the omarchy-apple-dev checkout [directory] and its toolchain lack,
+  /// as reasons and fixes; empty when nothing.
+  static List<(String, String)> _iosLinuxProblems(
+    Map<String, ProbeResult> byId,
+    String directory,
+    String? swift,
+  ) {
+    final setup = 'run install-toolchain.sh in $directory';
+    final commit = byId['ios_linux_commit'];
+    final checkout = _problem(commit, 'git');
+    final at = commit?.stdout.trim() ?? '';
+    final tools = _iosLinuxToolsProblem(byId['ios_linux_tools']);
+    return [
+      if (checkout != null)
+        (
+          '$directory is not an omarchy-apple-dev checkout: $checkout',
+          'git clone $iosLinuxRepository $directory && git -C $directory '
+              'checkout $iosLinuxPin',
+        )
+      else if (at != iosLinuxPin)
+        (
+          'omarchy-apple-dev is at ${_short(at)}; this XPath needs '
+              '${_short(iosLinuxPin)}',
+          'git -C $directory fetch && git -C $directory checkout '
+              '$iosLinuxPin',
+        ),
+      if (swift != null) ('no Swift: $swift', setup),
+      if (!(byId['ios_linux_sdk']?.succeeded ?? false))
+        (
+          'no darwin SDK bundle (swift-sdks/darwin.artifactbundle under '
+              r'$XDG_CONFIG_HOME/swiftpm or ~/.swiftpm)',
+          'download Xcode.xip in a browser and $setup, as the user the '
+              'runner runs as',
+        ),
+      if (tools != null) (tools, setup),
+    ];
+  }
+
+  /// Why the tools of omarchy-apple-dev's Flutter scripts do not count, or
+  /// `null` when they count.
+  static String? _iosLinuxToolsProblem(ProbeResult? result) {
+    if (result?.succeeded ?? false) return null;
+    final names = result?.status == ProbeStatus.exited && result!.exitCode == 1
+        ? result.stdout.split(RegExp(r'\s+')).where(_iosLinuxTools.containsKey)
+        : const <String>[];
+    if (names.isEmpty) {
+      return 'the Linux iOS tools could not be checked '
+          '(${_problem(result, 'sh')})';
+    }
+    return 'no ${names.map((name) => _iosLinuxTools[name]).join(', ')}: '
+        'omarchy-apple-dev needs ${names.length == 1 ? 'it' : 'them'}';
+  }
+
+  /// The first 12 characters of a commit, or `nothing`.
+  static String _short(String commit) => commit.isEmpty
+      ? 'nothing'
+      : commit.substring(0, commit.length < 12 ? commit.length : 12);
 
   /// Why the command [what] did not succeed, or `null` when it did.
   static String? _problem(ProbeResult? result, String what) => switch (result) {

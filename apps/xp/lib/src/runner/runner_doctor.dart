@@ -111,22 +111,30 @@ class RunnerDoctor {
   final List<String> gitHosts;
 
   /// About how many GB of disk [capability] needs: a Flutter SDK, then
-  /// Gradle caches and builds, Xcode's derived data, a Swift build.
+  /// Gradle caches and builds, Xcode's derived data, a Swift build, the
+  /// Flutter install omarchy-apple-dev's `flutter/setup.sh` makes for each
+  /// Flutter version.
   static int _gigabytesFor(Capability capability) => switch (capability) {
     Capability.flutter => 3,
     Capability.android => 5,
     Capability.iosSign => 10,
     Capability.swiftLinux => 2,
+    Capability.iosLinux => 7,
   };
 
   /// Runs every check.
   Future<DoctorReport> examine() async {
     const probe = RunnerProbe();
-    final results = await ProbeExecutor(
-      runner: _host.runner,
-      operatingSystem: _host.operatingSystem,
-    ).run(probe.commands);
-    final findings = probe.evaluate(results);
+    final iosLinux = _host.iosLinuxDirectory;
+    final results =
+        await ProbeExecutor(
+          runner: _host.runner,
+          operatingSystem: _host.operatingSystem,
+        ).run([
+          ...probe.commands,
+          if (iosLinux != null) ...probe.iosLinuxCommands(iosLinux),
+        ]);
+    final findings = probe.evaluate(results, iosLinuxDirectory: iosLinux);
     final paired = await _paired();
     return DoctorReport([
       ..._capabilities(findings),

@@ -10,6 +10,7 @@ import 'package:xp/src/runner/service/runner_service.dart';
 import 'package:xp/src/runner/update/runner_versions.dart';
 import 'package:xp/src/version.dart';
 import 'package:xp_adapters/xp_adapters.dart';
+import 'package:xp_engine/xp_engine.dart' show iosLinuxDirectoryVariable;
 
 /// The manager of the runner service on [host], in [scope].
 ServiceManager runnerServiceManager(RunnerHost host, ServiceScope scope) =>
@@ -210,12 +211,14 @@ class RunnerInstallServiceCommand extends _ServiceCommand {
       slots: slots,
       logsToFiles: isMacOS,
       // Set at install time, for example by `install.sh --with-android` with
-      // an SDK outside the places Flutter looks in.
+      // an SDK outside the places Flutter looks in, or for Linux iOS builds
+      // (ADR 0014).
       tools: {
         for (final name in const [
           'ANDROID_HOME',
           'ANDROID_SDK_ROOT',
           'JAVA_HOME',
+          iosLinuxDirectoryVariable,
         ])
           if (_host.environment[name] case final value? when value.isNotEmpty)
             name: value,

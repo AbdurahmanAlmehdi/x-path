@@ -121,7 +121,7 @@ once and opens one pull request.
 
 ### Phase 2: Report the `ios-linux` capability
 
-- **Status:** Not started
+- **Status:** Done
 - **Scope:** A configured runner reports `ios-linux` with reasons when it is missing. No step
   accepts it yet. Amends D-19.
 - **Files touched:** `packages/xp_engine/lib/src/scheduler/capability.dart`,

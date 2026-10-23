@@ -90,6 +90,14 @@ class RunnerHost {
   /// The home directory.
   String get home => environment['HOME'] ?? '';
 
+  /// The omarchy-apple-dev checkout of a runner configured to build iOS apps
+  /// on Linux ([iosLinuxDirectoryVariable]), or `null` (ADR 0014).
+  String? get iosLinuxDirectory =>
+      switch (environment[iosLinuxDirectoryVariable]) {
+        final directory? when directory.isNotEmpty => directory,
+        _ => null,
+      };
+
   /// Where the credential of a runner with the data directory [paths] is
   /// kept: the Keychain on macOS, an encrypted file in the data directory
   /// otherwise (`XP_TEST_FILE_SECRETS=1` forces the file, for tests).
@@ -252,6 +260,7 @@ Future<RunnerProcess> buildRunner(RunnerSetup setup) async {
       runner: host.runner,
       operatingSystem: host.operatingSystem,
     ),
+    iosLinuxDirectory: host.iosLinuxDirectory,
     stepKinds: RunnerSteps.kinds,
     log: setup.log,
     version: setup.version,

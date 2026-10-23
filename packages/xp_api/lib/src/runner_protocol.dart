@@ -598,12 +598,13 @@ final class HelloFrame extends RunnerFrame {
 /// The answer to a [ProbeFrame].
 final class ProbeResultFrame extends RunnerFrame {
   /// Creates the frame.
-  const new({required this.probeId, required this.results});
+  const new({required this.probeId, required this.results, this.iosLinuxDir});
 
   /// Reads the frame from its JSON form.
   factory fromJson(Map<String, dynamic> json) => ProbeResultFrame(
     probeId: _required<String>(json, 'probeId'),
     results: _objects(json, 'results', ProbeResult.fromJson),
+    iosLinuxDir: _optional<String>(json, 'iosLinuxDir'),
   );
 
   /// The wire name of this frame.
@@ -612,8 +613,14 @@ final class ProbeResultFrame extends RunnerFrame {
   /// The id of the probe.
   final String probeId;
 
-  /// One result per command, in the order of the commands.
+  /// One result per command, in the order of the commands, then one per
+  /// command of the omarchy-apple-dev checkout when [iosLinuxDir] is set.
   final List<ProbeResult> results;
+
+  /// The omarchy-apple-dev checkout of a runner configured to build iOS apps
+  /// on Linux (`XP_IOS_LINUX_DIR`, ADR 0014), whose probe commands the runner
+  /// ran after the engine's; `null` for a runner that is not.
+  final String? iosLinuxDir;
 
   @override
   String get type => frameType;
@@ -623,10 +630,11 @@ final class ProbeResultFrame extends RunnerFrame {
     'type': frameType,
     'probeId': probeId,
     'results': [for (final result in results) result.toJson()],
+    'iosLinuxDir': ?iosLinuxDir,
   };
 
   @override
-  List<Object?> get props => [probeId, results];
+  List<Object?> get props => [probeId, results, iosLinuxDir];
 }
 
 /// The runner takes the job offered.

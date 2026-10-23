@@ -496,6 +496,19 @@ void main() {
       expect(RunnerHost.system(const {}).home, isEmpty);
       expect(real.isMacOS, Platform.isMacOS);
     });
+
+    test('reads the omarchy-apple-dev checkout from XP_IOS_LINUX_DIR', () {
+      expect(
+        RunnerHost.system({iosLinuxDirectoryVariable: '/srv/omarchy'})
+            .iosLinuxDirectory,
+        '/srv/omarchy',
+      );
+      expect(
+        RunnerHost.system({iosLinuxDirectoryVariable: ''}).iosLinuxDirectory,
+        isNull,
+      );
+      expect(RunnerHost.system(const {}).iosLinuxDirectory, isNull);
+    });
   });
 }
 

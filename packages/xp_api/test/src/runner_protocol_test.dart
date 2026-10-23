@@ -37,6 +37,11 @@ void main() {
           ProbeResult(id: 'slow', status: ProbeStatus.timedOut, stderr: 'x'),
         ],
       ),
+      const ProbeResultFrame(
+        probeId: 'prb_2',
+        results: [],
+        iosLinuxDir: '/home/me/omarchy-apple-dev',
+      ),
       const LeaseAcceptFrame(jobId: 'job_1', leaseId: 'lse_1'),
       const LeaseRejectFrame(jobId: 'job_1', leaseId: 'lse_1', reason: 'busy'),
       const HeartbeatFrame(),

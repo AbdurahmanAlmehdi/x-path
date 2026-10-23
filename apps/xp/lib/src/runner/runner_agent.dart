@@ -8,7 +8,7 @@ import 'package:xp/src/runner/runner_socket.dart';
 import 'package:xp/src/runner/secrets/lease_secret_store.dart';
 import 'package:xp_api/xp_api.dart';
 import 'package:xp_client/xp_client.dart';
-import 'package:xp_engine/xp_engine.dart' show ProbeExecutor;
+import 'package:xp_engine/xp_engine.dart' show ProbeExecutor, RunnerProbe;
 
 /// Why [RunnerAgent.run] ended.
 enum AgentExit {
@@ -111,6 +111,7 @@ class RunnerAgent {
     required this.cores,
     required this.slots,
     this.requestedSlots,
+    this._iosLinuxDirectory,
     this.oneShot = false,
     this.secretTimeout = const Duration(seconds: 60),
     Backoff? backoff,
@@ -133,6 +134,7 @@ class RunnerAgent {
   final RunnerConnector _connect;
   final LeaseStarter _start;
   final ProbeExecutor _probe;
+  final String? _iosLinuxDirectory;
   final Set<String> _stepKinds;
   final void Function(String message) _log;
   final Backoff _backoff;
@@ -534,9 +536,22 @@ class RunnerAgent {
     HeartbeatFrame(leases: [for (final lease in _active.values) lease.ref]),
   );
 
+  /// Runs the engine's probe, and the commands of the omarchy-apple-dev
+  /// checkout after it when this runner is configured for Linux iOS builds:
+  /// only the runner knows the folder, so it sends it with the results.
   Future<void> _probed(ProbeFrame frame) async {
-    final results = await _probe.run(frame.commands);
-    _sendFrame(ProbeResultFrame(probeId: frame.probeId, results: results));
+    final directory = _iosLinuxDirectory;
+    final results = await _probe.run([
+      ...frame.commands,
+      if (directory != null) ...const RunnerProbe().iosLinuxCommands(directory),
+    ]);
+    _sendFrame(
+      ProbeResultFrame(
+        probeId: frame.probeId,
+        results: results,
+        iosLinuxDir: directory,
+      ),
+    );
   }
 
   /// Says what the engine found this runner offers: after the first probe,

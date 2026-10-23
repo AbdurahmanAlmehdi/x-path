@@ -251,6 +251,57 @@ void main() {
       expect((await h.runners.get(mac.id))!.capabilities, found(mac));
     });
 
+    test('a runner configured for Linux iOS offers ios-linux and gets no '
+        'iOS job', () async {
+      const dir = '/home/me/omarchy-apple-dev';
+      final runner = await h.pair();
+      await runner.hello();
+
+      await runner.send(
+        ProbeResultFrame(
+          probeId: runner.link.sentOf<ProbeFrame>().last.probeId,
+          results: [...linuxProbe(swift: true), ...iosLinuxProbe()],
+          iosLinuxDir: dir,
+        ),
+      );
+      final jobId = await h.job(needs: ['flutter', 'ios-sign']);
+      await h.scheduler.pump();
+
+      final probed = runner.link.sentOf<ProbedFrame>().single;
+      expect(probed.capabilities, contains('ios-linux'));
+      expect(
+        probed.missing.map((m) => m.capability),
+        isNot(contains('ios-linux')),
+      );
+      expect(runner.offers, isEmpty);
+      expect(await h.state(jobId), JobState.queued);
+    });
+
+    test('a configured runner whose checkout moved loses ios-linux, with the '
+        'fix', () async {
+      final runner = await h.pair();
+      await runner.hello();
+
+      await runner.send(
+        ProbeResultFrame(
+          probeId: runner.link.sentOf<ProbeFrame>().last.probeId,
+          results: [
+            ...linuxProbe(swift: true),
+            ...iosLinuxProbe(commit: 'f' * 40),
+          ],
+          iosLinuxDir: '/srv/omarchy',
+        ),
+      );
+
+      final probed = runner.link.sentOf<ProbedFrame>().single;
+      expect(probed.capabilities, isNot(contains('ios-linux')));
+      final missing = probed.missing.singleWhere(
+        (m) => m.capability == 'ios-linux',
+      );
+      expect(missing.reason, contains('omarchy-apple-dev is at ffffffffffff'));
+      expect(missing.fix, contains('git -C /srv/omarchy checkout'));
+    });
+
     test('the runner hears what it offers and why not, after the '
         'probe', () async {
       final runner = await h.pair();

@@ -14,7 +14,12 @@ enum Capability {
   flutter('flutter'),
 
   /// Builds Swift for Linux.
-  swiftLinux('swift-linux');
+  swiftLinux('swift-linux'),
+
+  /// Builds and signs iOS apps on Linux with omarchy-apple-dev (ADR 0014):
+  /// opt-in and experimental, offered only by a runner configured for it. No
+  /// step accepts it yet.
+  iosLinux('ios-linux');
 
   new(this.wire);
 

@@ -55,6 +55,8 @@ void main() {
     void Function(String engineVersion)? onWelcomed,
     Future<void> Function()? beforeConnect,
     Duration Function()? elapsed,
+    String operatingSystem = 'macos',
+    String? iosLinuxDirectory,
   }) => RunnerAgent(
     connect: () async {
       await beforeConnect?.call();
@@ -67,7 +69,8 @@ void main() {
       started.add(_Started(work, requestSecret));
       return work;
     },
-    probe: ProbeExecutor(runner: processes, operatingSystem: 'macos'),
+    probe: ProbeExecutor(runner: processes, operatingSystem: operatingSystem),
+    iosLinuxDirectory: iosLinuxDirectory,
     stepKinds: kinds,
     log: log.add,
     version: '1.2.3',
@@ -207,10 +210,51 @@ void main() {
           [for (final r in result.results) (r.id, r.status)],
           [('git', ProbeStatus.exited), ('swift', ProbeStatus.skipped)],
         );
+        expect(result.iosLinuxDir, isNull);
         await fake.engineCloses(runnerRevokedCloseCode);
         await running;
       },
     );
+
+    test('adds the commands of the omarchy-apple-dev checkout and names '
+        'it', () async {
+      final fake = socket();
+      final running = agent(
+        operatingSystem: 'linux',
+        iosLinuxDirectory: '/srv/omarchy',
+      ).run();
+      await pumpEventQueue();
+      await welcome(fake);
+
+      fake.engine(
+        const ProbeFrame(
+          probeId: 'prb_1',
+          commands: [
+            ProbeCommand(
+              id: 'git',
+              executable: 'git',
+              arguments: ['--version'],
+            ),
+          ],
+        ),
+      );
+      await pumpEventQueue();
+
+      final result = fake.sentOf<ProbeResultFrame>().single;
+      expect(result.iosLinuxDir, '/srv/omarchy');
+      expect(result.results.map((r) => r.id), [
+        'git',
+        'ios_linux_commit',
+        'ios_linux_sdk',
+        'ios_linux_tools',
+      ]);
+      expect(
+        processes.calls.map((call) => call.arguments.take(4).join(' ')),
+        contains('-C /srv/omarchy rev-parse HEAD'),
+      );
+      await fake.engineCloses(runnerRevokedCloseCode);
+      await running;
+    });
   });
 
   group('what the engine found', () {
