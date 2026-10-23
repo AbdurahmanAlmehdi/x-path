@@ -44,8 +44,6 @@ abstract interface class RunnerPresence {
   Future<void> revoked(RunnerRecord runner);
 }
 
-const _leaseLength = Duration(seconds: runnerLeaseSeconds);
-
 /// A lease: one job held by one runner until its heartbeats stop.
 class _Lease {
   new({
@@ -142,6 +140,7 @@ class RunnerHub implements RemoteLeases, RemoteJobs, RunnerPresence {
     required this._masker,
     required this._grants,
     required this._engineVersion,
+    this.leaseLength = const Duration(seconds: runnerLeaseSeconds),
     this.probeTimeout = const Duration(seconds: 60),
     this.rejectCooldown = const Duration(seconds: 15),
     this.onError,
@@ -149,6 +148,10 @@ class RunnerHub implements RemoteLeases, RemoteJobs, RunnerPresence {
     this._probe = const RunnerProbe(),
     Random? random,
   }) : _random = random ?? Random.secure();
+
+  /// How long a lease lasts after the heartbeat that renewed it (D-08). A
+  /// runner sends a heartbeat three times per lease. Shorter only in tests.
+  final Duration leaseLength;
 
   /// How long a runner has to answer the probe.
   final Duration probeTimeout;
@@ -213,6 +216,8 @@ class RunnerHub implements RemoteLeases, RemoteJobs, RunnerPresence {
         runnerId: runner.id,
         engineVersion: _engineVersion,
         apiVersion: apiVersion,
+        heartbeatSeconds: max(1, leaseLength.inSeconds ~/ 3),
+        leaseSeconds: leaseLength.inSeconds,
       ),
     );
     return RunnerConnection._(this, session);
@@ -301,7 +306,7 @@ class RunnerHub implements RemoteLeases, RemoteJobs, RunnerPresence {
         );
       }
       final now = _clock.now();
-      final until = now.add(_leaseLength);
+      final until = now.add(leaseLength);
       final lease = _Lease(
         id: 'lse_${_hex(8)}',
         jobId: jobId,
@@ -458,11 +463,11 @@ class RunnerHub implements RemoteLeases, RemoteJobs, RunnerPresence {
     }
     for (final session in _sessions.values.toList()) {
       final deadline = session.probeDeadline;
-      final silent = now.difference(session.lastSeen) >= _leaseLength;
+      final silent = now.difference(session.lastSeen) >= leaseLength;
       if (silent || (deadline != null && !now.isBefore(deadline))) {
         _sessions.remove(session.record.id);
         final why = silent
-            ? 'no frame for ${_leaseLength.inSeconds} s'
+            ? 'no frame for ${leaseLength.inSeconds} s'
             : 'the probe timed out';
         _drop(
           session,
@@ -906,7 +911,7 @@ class RunnerHub implements RemoteLeases, RemoteJobs, RunnerPresence {
       await _loseLocked(lease.jobId, 'lapsed', tell: false);
       return null;
     }
-    final renewed = now.add(_leaseLength);
+    final renewed = now.add(leaseLength);
     final held = await _jobs.renewLease(
       lease.jobId,
       runnerId: lease.runnerId,

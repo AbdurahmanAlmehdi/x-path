@@ -65,3 +65,6 @@ jobs:
 
       - name: Smoke Test the xpd Bundle
         run: tool/e2e/smoke_bundle.sh
+
+      - name: Runner Offline E2E
+        run: tool/e2e/runner_offline_e2e.sh

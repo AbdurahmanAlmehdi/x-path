@@ -47,6 +47,8 @@ void main() {
     bool Function(String engineVersion)? wantsUpdateTo,
     void Function(String engineVersion)? onWelcomed,
     Future<void> Function()? beforeConnect,
+    Duration Function()? elapsed,
+    Duration fenceInterval = const Duration(seconds: 5),
   }) => RunnerAgent(
     connect: () async {
       await beforeConnect?.call();
@@ -79,6 +81,8 @@ void main() {
     heartbeatUnit: heartbeatUnit ?? ((seconds) => Duration(seconds: seconds)),
     wantsUpdateTo: wantsUpdateTo,
     onWelcomed: onWelcomed,
+    elapsed: elapsed,
+    fenceInterval: fenceInterval,
   );
 
   setUp(() {
@@ -275,6 +279,118 @@ void main() {
       );
       await fake.engineCloses(runnerRevokedCloseCode);
       await running;
+    });
+  });
+
+  group('the lease fence', () {
+    late Duration now;
+
+    Future<FakeRunnerSocket> holding(Future<AgentExit> Function() start) async {
+      final fake = socket();
+      unawaited(start());
+      await pumpEventQueue();
+      await welcome(fake);
+      await offer(fake, 'job_1');
+      return fake;
+    }
+
+    setUp(() => now = Duration.zero);
+
+    test(
+      'stops a job whose lease the engine gave up while it was away',
+      () async {
+        final running = agent(
+          elapsed: () => now,
+          fenceInterval: const Duration(milliseconds: 5),
+        );
+        final fake = await holding(running.run);
+        expect(started.single.work.cancelled, isFalse);
+
+        now = const Duration(seconds: 90 + 15);
+        await Future<void>.delayed(const Duration(milliseconds: 30));
+        expect(started.single.work.cancelled, isFalse, reason: 'not yet over');
+
+        now = const Duration(seconds: 90 + 16);
+        await Future<void>.delayed(const Duration(milliseconds: 30));
+
+        expect(started.single.work.cancelled, isTrue);
+        expect(
+          log,
+          contains(
+            'Lost the lease of job job_1 while the engine was unreachable; '
+            'stopped it.',
+          ),
+        );
+        expect(running.activeJobs, 0);
+        await fake.engineCloses(runnerRevokedCloseCode);
+      },
+    );
+
+    test('keeps a job whose lease the engine renews', () async {
+      final running = agent(
+        elapsed: () => now,
+        fenceInterval: const Duration(milliseconds: 5),
+      );
+      final fake = await holding(running.run);
+
+      now = const Duration(seconds: 80);
+      fake.engine(
+        HeartbeatAckFrame(
+          leases: [
+            LeaseGrant(
+              jobId: 'job_1',
+              leaseId: 'lse_1',
+              until: DateTime.utc(2026),
+            ),
+            // A lease of another job, or an older lease of this one, renews
+            // nothing.
+            LeaseGrant(
+              jobId: 'job_1',
+              leaseId: 'lse_old',
+              until: DateTime.utc(2026),
+            ),
+            LeaseGrant(
+              jobId: 'job_9',
+              leaseId: 'lse_9',
+              until: DateTime.utc(2026),
+            ),
+          ],
+        ),
+      );
+      await pumpEventQueue();
+      now = const Duration(seconds: 80 + 100);
+      await Future<void>.delayed(const Duration(milliseconds: 30));
+
+      expect(started.single.work.cancelled, isFalse);
+      expect(running.activeJobs, 1);
+      await fake.engineCloses(runnerRevokedCloseCode);
+    });
+
+    test('follows the lease length of the welcome', () async {
+      final running = agent(
+        elapsed: () => now,
+        fenceInterval: const Duration(milliseconds: 5),
+      );
+      final fake = socket();
+      unawaited(running.run());
+      await pumpEventQueue();
+      fake.engine(
+        WelcomeFrame(
+          runnerId: 'rnr_1',
+          engineVersion: '9.9.9',
+          apiVersion: apiVersion,
+          heartbeatSeconds: 2,
+          leaseSeconds: 6,
+        ),
+      );
+      await pumpEventQueue();
+      await offer(fake, 'job_1');
+
+      now = const Duration(seconds: 6 + 15 + 1);
+      await Future<void>.delayed(const Duration(milliseconds: 30));
+
+      expect(started.single.work.cancelled, isTrue);
+      await fake.engineCloses(runnerRevokedCloseCode);
     });
   });
 
@@ -969,9 +1085,11 @@ void main() {
       await running;
 
       expect(waited, hasLength(3));
-      expect(log.first, 'Cannot connect: refused');
-      expect(log[1], contains('Exception: socket'));
-      expect(log[2], 'Cannot connect: Busy.');
+      // The first failure is said; the next ones are not, until much later.
+      expect(log.take(2), [
+        'Cannot connect: refused',
+        'Connected again after 0 s.',
+      ]);
     });
 
     test('keeps going after a connection that breaks', () async {
@@ -986,7 +1104,62 @@ void main() {
       await second.engineCloses(runnerRevokedCloseCode);
       await running;
 
-      expect(log.any((m) => m.contains('The connection broke')), isTrue);
+      expect(
+        log.any((m) => m.startsWith('The connection to the engine broke (')),
+        isTrue,
+      );
+    });
+
+    test('says once in a while that the engine is still away, and when it '
+        'is back', () async {
+      var now = Duration.zero;
+      for (var i = 0; i < 40; i++) {
+        connections.add(const ConnectionException('refused'));
+      }
+      final fake = socket();
+      final running = agent(
+        elapsed: () => now,
+        delay: (duration) async {
+          waited.add(duration);
+          // Every attempt is a minute after the one before.
+          now += const Duration(minutes: 1);
+        },
+      ).run();
+      await pumpEventQueue(times: 200);
+      await welcome(fake);
+      await fake.engineCloses(runnerRevokedCloseCode);
+      await running;
+
+      expect(waited, hasLength(40));
+      String away(int minutes) =>
+          'The engine has been unreachable for $minutes min; still trying '
+          'every 60 s. Last: refused';
+      expect(log, [
+        'Cannot connect: refused',
+        away(10),
+        away(20),
+        away(30),
+        'Connected again after 40 min.',
+        'The engine revoked this runner. It does not connect again.',
+      ]);
+    });
+
+    test('says how long it was away in hours', () async {
+      var now = Duration.zero;
+      connections.add(const ConnectionException('refused'));
+      final fake = socket();
+      final running = agent(
+        elapsed: () => now,
+        delay: (duration) async {
+          now += const Duration(hours: 3, minutes: 12);
+        },
+      ).run();
+      await pumpEventQueue();
+      await welcome(fake);
+      await fake.engineCloses(runnerRevokedCloseCode);
+      await running;
+
+      expect(log, contains('Connected again after 3 h 12 min.'));
     });
 
     test('is not made again when the credential is refused', () async {

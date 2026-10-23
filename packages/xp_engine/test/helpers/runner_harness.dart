@@ -275,6 +275,7 @@ class RunnerHarness {
     JobRepository? jobRepository,
     JobLogs Function(JobLogStore store)? hubLogs,
     RunnerRepository Function(RunnerRepository inner)? wrapRunners,
+    Duration leaseLength = const Duration(seconds: runnerLeaseSeconds),
   }) async {
     final errors = <Object>[];
     final refused = <String>[];
@@ -321,6 +322,7 @@ class RunnerHarness {
       ),
     );
     final hub = RunnerHub(
+      leaseLength: leaseLength,
       runners: storedRunners,
       projects: projects,
       jobs: jobs.jobs,

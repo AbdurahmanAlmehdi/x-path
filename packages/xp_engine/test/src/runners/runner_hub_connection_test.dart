@@ -30,6 +30,18 @@ void main() {
       expect(h.hub.statusOf(runner.id), RunnerStatus.offline);
     });
 
+    test('the welcome carries the lease length and a heartbeat three times '
+        'per lease', () async {
+      final short = await RunnerHarness.create(
+        leaseLength: const Duration(seconds: 6),
+      );
+      final runner = await short.pair();
+
+      final welcome = runner.link.sentOf<WelcomeFrame>().single;
+      expect(welcome.leaseSeconds, 6);
+      expect(welcome.heartbeatSeconds, 2);
+    });
+
     test('a second connection of the runner replaces the first', () async {
       final first = await h.online();
 

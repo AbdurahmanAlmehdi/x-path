@@ -43,7 +43,14 @@
 // the commit, bumps the version, builds the APK and uploads it; the check and
 // the upload to Firebase run on the engine: see `_runnerBuild`.
 //
-// Usage: dart run tool/release_e2e.dart --mode dev|prod|mcp|runner-loss|runner-build
+// `--mode runner-offline` (runner onboarding R5, tool/e2e/runner_offline_e2e.sh)
+// runs the engine with a lease of a few seconds, gives a real `xp runner` a
+// job, then stops the engine (SIGSTOP, then SIGKILL) for longer than a lease:
+// the runner fences the job it can no longer hold, and when the engine comes
+// back on the same address the runner reconnects by itself and the job
+// follows the loss rule: see `_runnerOffline`.
+//
+// Usage: dart run tool/release_e2e.dart --mode dev|prod|mcp|runner-loss|runner-build|runner-offline
 //          --xpd <executable> --fixture <dir> --work <dir>
 //          [--flutter-sdk <dir>] [--xp <executable>]
 //
@@ -67,11 +74,18 @@ Future<void> main(List<String> arguments) async {
   final parser = ArgParser()
     ..addOption(
       'mode',
-      allowed: ['dev', 'prod', 'mcp', 'runner-loss', 'runner-build'],
+      allowed: [
+        'dev',
+        'prod',
+        'mcp',
+        'runner-loss',
+        'runner-build',
+        'runner-offline',
+      ],
       defaultsTo: 'dev',
     )
     ..addOption('xpd', mandatory: true, help: 'The xpd executable.')
-    ..addOption('xp', help: 'The xp executable (modes mcp and runner-loss).')
+    ..addOption('xp', help: 'The xp executable (mcp and the runner modes).')
     ..addOption('fixture', mandatory: true, help: 'The fixture app folder.')
     ..addOption('work', mandatory: true, help: 'An empty scratch folder.')
     ..addOption(
@@ -196,6 +210,10 @@ class _E2e {
     }
     if (mode == 'runner-build') {
       await _runnerBuild(projectId);
+      return;
+    }
+    if (mode == 'runner-offline') {
+      await _runnerOffline(projectId);
       return;
     }
     if (mode == 'prod') {
@@ -737,6 +755,161 @@ class _E2e {
     'XP_RUNNER_TEST_SOURCE_URL': p.join(work, 'origin.git'),
     'PATH': ?path,
   };
+
+  /// Runner onboarding R5: a runner outlives an engine that is away for
+  /// longer than a lease.
+  ///
+  ///   1. pairs and starts a real `xp runner` and gives it a job with a side
+  ///      effect (the engine's only slot is taken),
+  ///   2. stops the engine with SIGSTOP for longer than the lease of 6 s plus
+  ///      the runner's 15 s of grace: the runner fences the job (stops its
+  ///      process and says so) although it never heard from the engine,
+  ///   3. kills the engine with SIGKILL and starts it again on the same
+  ///      address and data directory,
+  ///   4. checks that the same runner process reconnects by itself within
+  ///      60 s, and that the job follows the loss rule: a step with a side
+  ///      effect makes it wait for a resume, never repeated by itself.
+  Future<void> _runnerOffline(String projectId) async {
+    final xp = this.xp;
+    if (xp == null) {
+      throw const _Failure('--xp is required for --mode runner-offline');
+    }
+    final runnerData = p.join(work, 'runner-data');
+    final environment = _runnerEnvironment();
+    await _pairRunner(xp, runnerData, environment);
+    await _startRunner(xp, runnerData, environment);
+    final runner = _runnerProcess!;
+    var runnerExited = false;
+    unawaited(runner.exitCode.then((_) => runnerExited = true));
+    _log('the runner is online');
+
+    Future<String> workflow(String name, String steps) async {
+      final created = await _post('/projects/$projectId/workflows', {
+        'name': name,
+        'yaml':
+            'schema: 1\nname: $name\nstages:\n  - name: only\n    jobs:\n'
+            '      $name:\n        name: $name\n        steps:\n$steps',
+      }, expect: 201);
+      return created['id']! as String;
+    }
+
+    String sleep(String seconds, {required bool sideEffect}) =>
+        '''
+          - kind: git.checkout
+          - kind: command
+            with:
+              executable: sleep
+              arguments: ['$seconds']
+              sideEffect: $sideEffect
+''';
+    Future<String> dispatch(String workflowId) async => _jobOf(
+      await _post('/projects/$projectId/workflows/$workflowId/dispatch', {
+        'platforms': ['android'],
+        'flavors': ['dev'],
+      }, expect: 202),
+      0,
+    );
+    final occupier = await dispatch(
+      await workflow('occupy', sleep('3600', sideEffect: false)),
+    );
+    await _waitForJob(occupier, const Duration(minutes: 2), {'running'});
+    final held = await dispatch(
+      await workflow('hold', sleep('3573', sideEffect: true)),
+    );
+    _lastJob = held;
+    final running = await _waitForJob(held, const Duration(minutes: 3), {
+      'running',
+      'failed',
+    });
+    _expect(
+      running['state'] == 'running' && running['runnerId'] != null,
+      'the job runs on the runner, not ${running['state']}: '
+      '${running['message']}',
+    );
+    await _waitFor('the job to sleep on the runner', () {
+      return _alive('sleep 3573') ? true : null;
+    });
+    _log('the job runs on the runner');
+
+    // --- the engine goes quiet: no answer, the socket stays open
+    final engine = _engine!;
+    final port = _url.port;
+    engine.kill(ProcessSignal.sigstop);
+    final stoppedAt = DateTime.now();
+    _log('stopped the engine with SIGSTOP');
+    await _waitFor('the runner to fence the job it can no longer hold', () {
+      return _runnerLog.toString().contains(
+            'Lost the lease of job $held while the engine was unreachable',
+          )
+          ? true
+          : null;
+    });
+    final fencedAfter = DateTime.now().difference(stoppedAt);
+    _expect(
+      fencedAfter >= const Duration(seconds: 6),
+      'the runner kept the job for its lease at least '
+      '(fenced after ${fencedAfter.inSeconds} s)',
+    );
+    await _waitFor('the process of the fenced job to end', () {
+      return _alive('sleep 3573') ? null : true;
+    });
+    _log('the runner fenced the job after ${fencedAfter.inSeconds} s');
+
+    // --- the engine dies and comes back on the same address
+    engine.kill(ProcessSignal.sigkill);
+    await engine.exitCode;
+    await Future<void>.delayed(const Duration(seconds: 2));
+    await _launchEngine(port: port);
+    final backAt = DateTime.now();
+    _expect(_url.port == port, 'the engine is back on port $port');
+    await _waitFor('the runner to reconnect by itself', () {
+      return _runnerLog.toString().contains('Connected again after')
+          ? true
+          : null;
+    });
+    final reconnected = await _waitForRunnerOnline(const Duration(seconds: 60));
+    _expect(
+      reconnected && !runnerExited,
+      'the same runner process came back online within 60 s of the engine '
+      '(after ${DateTime.now().difference(backAt).inSeconds} s)',
+    );
+    _log('the runner reconnected without a restart');
+
+    // --- the loss rule
+    final lost = await _waitForJob(held, const Duration(minutes: 1), {
+      'waiting_for_resume',
+      'queued',
+      'failed',
+      'cancelled',
+    });
+    // The engine that comes back finds the job running on a runner it holds
+    // no lease for (JobRecovery): a step with a side effect makes it wait.
+    _expect(
+      lost['state'] == 'waiting_for_resume' &&
+          lost['runnerId'] == null &&
+          '${lost['message']}'.isNotEmpty,
+      'the job with a side effect waits for a resume and says why: '
+      '${lost['state']} ${lost['message']}',
+    );
+    await Future<void>.delayed(const Duration(seconds: 10));
+    _expect(
+      (await _get('/jobs/$held'))['state'] == 'waiting_for_resume' &&
+          !_alive('sleep 3573'),
+      'the job was not run again by itself',
+    );
+    _log('the job waits for a resume, as the loss rule says');
+  }
+
+  /// Whether a runner is online within [timeout].
+  Future<bool> _waitForRunnerOnline(Duration timeout) async {
+    final deadline = DateTime.now().add(timeout);
+    while (DateTime.now().isBefore(deadline)) {
+      final runners = (await _get('/runners'))['runners'] as List;
+      if (runners.any((r) => (r as Map)['status'] == 'online')) return true;
+      await Future<void>.delayed(const Duration(seconds: 1));
+    }
+    return false;
+  }
 
   /// Makes a pairing token, exchanges it with `xp runner pair` for the
   /// credential of a runner called `e2e-runner`, and checks that what the
@@ -1425,6 +1598,9 @@ class _E2e {
       TestEndpoints.githubApiVariable: _github!.url.toString(),
       TestEndpoints.firebaseVariable: _firebase!.baseUrl.toString(),
       TestEndpoints.fileSecretsVariable: '1',
+      // A lease of 6 seconds: the runner fences its job 21 seconds after the
+      // engine went quiet, not 105.
+      if (mode == 'runner-offline') TestEndpoints.leaseSecondsVariable: '6',
       if (mode == 'runner-loss')
         // `keytool` accepts the made-up keystore the script saves.
         'PATH': '${_keytoolShim()}:${Platform.environment['PATH']}',
@@ -1479,21 +1655,26 @@ class _E2e {
       throw _Failure('xpd token create failed: ${created.stderr}');
     }
     _token = (created.stdout as String).trim();
+    await _launchEngine();
+  }
 
+  /// Starts `xpd serve` on [port] (any free one for 0) and waits until it
+  /// listens.
+  Future<void> _launchEngine({int port = 0}) async {
     final engine = _engine = await Process.start(
       xpd,
       [
         'serve',
         '--port',
-        '0',
+        '$port',
         '--data-dir',
         data,
         '--slots',
-        // One slot for the runner test: a long job on the engine keeps the next
-        // ones for the runner.
-        if (mode == 'runner-loss') '1' else '2',
+        // One slot for the runner tests: a long job on the engine keeps the
+        // next ones for the runner.
+        if (mode == 'runner-loss' || mode == 'runner-offline') '1' else '2',
       ],
-      environment: environment,
+      environment: _engineEnvironment,
       includeParentEnvironment: mode != 'runner-build',
     );
     final listening = Completer<Uri>();

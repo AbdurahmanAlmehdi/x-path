@@ -1,8 +1,10 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:math';
 
 import 'package:path/path.dart' as p;
 import 'package:xp_adapters/xp_adapters.dart';
+import 'package:xp_api/xp_api.dart' show runnerLeaseSeconds;
 import 'package:xp_engine/xp_engine.dart';
 import 'package:xp_secrets/xp_secrets.dart';
 import 'package:xpd/src/cli/gh_executable.dart';
@@ -550,7 +552,11 @@ class ServeCommand extends XpdCommand {
       );
       // The runners' comings and goings go to the engine log.
       late final RunnerLog runnerLog;
+      final leaseLength = Duration(
+        seconds: testing.leaseSeconds ?? runnerLeaseSeconds,
+      );
       final runnerHub = RunnerHub(
+        leaseLength: leaseLength,
         runners: runnerRepository,
         projects: projectRepository,
         jobs: jobRepository,
@@ -692,6 +698,10 @@ class ServeCommand extends XpdCommand {
       // (D-08).
       final leaseSweeper = LeaseSweeper(
         hub: runnerHub,
+        // Every 10 s, or three times per lease when a test shortened it.
+        interval: Duration(
+          seconds: min(10, max(1, leaseLength.inSeconds ~/ 3)),
+        ),
         onError: (error, stackTrace) =>
             context.err.writeln('warning: lease sweep failed: $error'),
       );

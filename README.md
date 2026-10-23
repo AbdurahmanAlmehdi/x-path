@@ -1416,7 +1416,9 @@ answered with `cancel`. The sweep (`LeaseSweeper`, every 10 s) ends the leases t
 
 ### The runner agent
 
-`xp runner` is the other end of everything above (`apps/xp/lib/src/runner`).
+`xp runner` is the other end of everything above (`apps/xp/lib/src/runner`). What a runner does
+while the engine is away for hours, and what happens to its jobs:
+[docs/guide/runners.md](docs/guide/runners.md#when-the-engine-is-away).
 
 ```sh
 xp runner pair --engine https://xpath.example.com --token xpp_...   # once; xp runners pair <name> made the token

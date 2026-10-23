@@ -299,7 +299,7 @@ Details:
 
 ### Phase R5: Offline for hours: lease fence and quiet reconnects
 
-- **Status:** Not started
+- **Status:** Done
 - **Scope:** A runner may be offline for hours (the Mac asleep, the tunnel down). It comes back
   within about a minute of the engine, and it never keeps working on a job the engine has
   already given up.

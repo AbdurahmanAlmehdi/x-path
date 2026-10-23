@@ -10,6 +10,7 @@ void main() {
     expect(endpoints.ascUrl, isNull);
     expect(endpoints.playUrl, isNull);
     expect(endpoints.fileSecrets, isFalse);
+    expect(endpoints.leaseSeconds, isNull);
     expect(endpoints.isActive, isFalse);
     expect(endpoints.secretStoreSystem('macos'), 'macos');
   });
@@ -39,15 +40,25 @@ void main() {
       {TestEndpoints.ascVariable: 'http://x'},
       {TestEndpoints.playVariable: 'http://x'},
       {TestEndpoints.fileSecretsVariable: '1'},
+      {TestEndpoints.leaseSecondsVariable: '6'},
     ]) {
       expect(TestEndpoints.fromEnvironment(environment).isActive, isTrue);
     }
+  });
+
+  test('reads a shorter lease', () {
+    expect(
+      TestEndpoints.fromEnvironment({TestEndpoints.leaseSecondsVariable: '6'})
+          .leaseSeconds,
+      6,
+    );
   });
 
   test('an empty address or another value is none', () {
     final endpoints = TestEndpoints.fromEnvironment({
       TestEndpoints.githubApiVariable: '',
       TestEndpoints.fileSecretsVariable: 'yes',
+      TestEndpoints.leaseSecondsVariable: 'soon',
     });
 
     expect(endpoints.isActive, isFalse);
