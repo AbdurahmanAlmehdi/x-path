@@ -1052,7 +1052,7 @@ void main() {
       when(() => client.createPairingToken('a')).thenAnswer((_) async => token);
       when(() => client.revokeRunner('rnr_1')).thenAnswer((_) async => _runner);
       const url = RunnerUrl(url: 'https://mac.tailnet.ts.net');
-      when(() => client.runnerUrl()).thenAnswer((_) async => url);
+      when(client.runnerUrl).thenAnswer((_) async => url);
       when(() => client.setRunnerUrl('https://mac.tailnet.ts.net'))
           .thenAnswer((_) async => url);
 

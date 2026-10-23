@@ -80,7 +80,6 @@ void main() {
       );
       expectContract(
         await client.send('GET', path, kind: DeviceTokenKind.mcp),
-        method: 'GET',
         path: path,
         status: 200,
       );
