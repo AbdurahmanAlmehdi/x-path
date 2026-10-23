@@ -340,6 +340,19 @@ void main() {
       );
     });
 
+    test('a paired runner compares by value', () {
+      PairedRunner runner({bool connected = false}) => PairedRunner(
+        id: 'rnr_1',
+        name: 'aws',
+        capabilities: const {Capability.android},
+        connected: connected,
+        lastSeen: DateTime.utc(2026, 10, 22),
+      );
+
+      expect(runner(), runner());
+      expect(runner(), isNot(runner(connected: true)));
+    });
+
     test(
       'name the paired runners that could do a job and are offline',
       () async {
