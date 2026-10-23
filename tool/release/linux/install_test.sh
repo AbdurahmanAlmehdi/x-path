@@ -196,7 +196,8 @@ root=""
 for word; do case "\$word" in --sdk_root=*) root="\${word#--sdk_root=}" ;; esac; done
 for word; do
   case "\$word" in
-    --licenses) cat >/dev/null; mkdir -p "\$root/licenses" ;;
+    # One answer, as the real one reads one per licence: \`yes\` never ends.
+    --licenses) read -r _ || :; mkdir -p "\$root/licenses" ;;
     --*) ;;
     *) mkdir -p "\$root/\$(printf '%s' "\$word" | tr ';' /)" ;;
   esac
