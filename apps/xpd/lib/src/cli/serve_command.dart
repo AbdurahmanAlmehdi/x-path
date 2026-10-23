@@ -549,7 +549,11 @@ class ServeCommand extends XpdCommand {
         clock: const SystemClock(),
       );
       // The runners' comings and goings go to the engine log.
-      late final RunnerLog runnerLog;
+      final runnerLog = RunnerLog(
+        context.out,
+        onError: (error) =>
+            context.err.writeln('warning: runner log line failed: $error'),
+      );
       final leaseLength = Duration(
         seconds: testing.leaseSeconds ?? runnerLeaseSeconds,
       );
@@ -583,8 +587,7 @@ class ServeCommand extends XpdCommand {
         events: events,
         clock: const SystemClock(),
       );
-      runnerLog = RunnerLog(context.out, runnerService);
-      final runnerEvents = runnerLog.follow(events);
+      final runnerEvents = runnerLog.follow(events, runnerService);
       final server = await XpdServer.start(
         tokens: tokenService,
         events: events,

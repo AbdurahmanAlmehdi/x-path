@@ -15,7 +15,9 @@ set -u
 data="${XP_RUNNER_DATA_DIR:-/data}"
 mkdir -p "${HOME:-$data/home}" 2>/dev/null || true
 
-xp=/usr/local/bin/xp
+# The xp of the image; XPATH_RUNNER_XP points elsewhere for the test
+# (xpath-runner_test.sh).
+xp="${XPATH_RUNNER_XP:-/usr/local/bin/xp}"
 [ -x "$data/current/bin/xp" ] && xp="$data/current/bin/xp"
 
 [ $# -gt 0 ] || set -- runner start

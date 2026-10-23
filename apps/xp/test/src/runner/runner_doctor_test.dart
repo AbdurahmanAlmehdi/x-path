@@ -42,8 +42,12 @@ class _Machine {
   );
   final calls = <String>[];
 
+  /// What an executable answers instead, or throws.
+  final answers = <String, ProcessOutput Function()>{};
+
   ProcessOutput answer(FakeProcessCall call) {
     calls.add(call.executable);
+    if (answers[call.executable] case final answer?) return answer();
     final script = call.arguments.length == 2 ? call.arguments[1] : '';
     switch (call.executable) {
       case 'uname':
@@ -185,44 +189,11 @@ void main() {
     });
 
     test('that fails or hangs is missing', () async {
-      final failing = RunnerDoctor(
-        host: RunnerHost(
-          operatingSystem: 'linux',
-          cores: 1,
-          pid: 1,
-          environment: {'HOME': directory.path},
-          runner: FakeProcessRunner(
-            (call) => call.executable == 'perl'
-                ? const ProcessOutput(exitCode: 2)
-                : machine.answer(call),
-          ),
-        ),
-        paths: paths,
-        clientFactory: env.context.clientFactory,
-        serviceStatus: () => throw StateError('none'),
-      );
-      expect((await check('perl', failing)).detail, 'perl exited with 2');
+      machine.answers['perl'] = () => const ProcessOutput(exitCode: 2);
+      expect((await check('perl')).detail, 'perl exited with 2');
 
-      final hanging = RunnerDoctor(
-        host: RunnerHost(
-          operatingSystem: 'linux',
-          cores: 1,
-          pid: 1,
-          environment: {'HOME': directory.path},
-          runner: FakeProcessRunner(
-            (call) => call.executable == 'perl'
-                ? throw TimeoutException('slow')
-                : machine.answer(call),
-          ),
-        ),
-        paths: paths,
-        clientFactory: env.context.clientFactory,
-        serviceStatus: () => throw StateError('none'),
-      );
-      expect(
-        (await check('perl', hanging)).detail,
-        'perl did not answer in time',
-      );
+      machine.answers['perl'] = () => throw TimeoutException('slow');
+      expect((await check('perl')).detail, 'perl did not answer in time');
     });
   });
 
@@ -445,24 +416,9 @@ void main() {
         contains('apt-get install openssh-client'),
       );
 
-      final slow = RunnerDoctor(
-        host: RunnerHost(
-          operatingSystem: 'linux',
-          cores: 1,
-          pid: 1,
-          environment: {'HOME': directory.path},
-          runner: FakeProcessRunner(
-            (call) => call.executable == 'ssh'
-                ? throw TimeoutException('slow')
-                : machine.answer(call),
-          ),
-        ),
-        paths: paths,
-        clientFactory: env.context.clientFactory,
-        serviceStatus: () => throw StateError('none'),
-      );
+      machine.answers['ssh'] = () => throw TimeoutException('slow');
       expect(
-        (await check('ssh github.com', slow)).detail,
+        (await check('ssh github.com')).detail,
         'github.com did not answer in time',
       );
     });
@@ -493,23 +449,9 @@ void main() {
       machine.df = const ProcessOutput(exitCode: 1, stderr: 'df: no');
       expect((await check('disk')).state, DoctorState.skipped);
 
-      final broken = RunnerDoctor(
-        host: RunnerHost(
-          operatingSystem: 'linux',
-          cores: 1,
-          pid: 1,
-          environment: {'HOME': directory.path},
-          runner: FakeProcessRunner(
-            (call) => call.executable == 'df'
-                ? throw const ProcessStartException('df', 'not found')
-                : machine.answer(call),
-          ),
-        ),
-        paths: paths,
-        clientFactory: env.context.clientFactory,
-        serviceStatus: () => throw StateError('none'),
-      );
-      expect((await check('disk', broken)).state, DoctorState.skipped);
+      machine.answers['df'] = () =>
+          throw const ProcessStartException('df', 'not found');
+      expect((await check('disk')).state, DoctorState.skipped);
     });
   });
 

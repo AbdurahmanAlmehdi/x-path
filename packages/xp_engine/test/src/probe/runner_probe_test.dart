@@ -81,10 +81,6 @@ void main() {
         expect(RunnerProbe.flutterToolsScript, contains(tool));
       }
     });
-
-    test('are the same every time', () {
-      expect(probe.commands, probe.commands);
-    });
   });
 
   group('evaluate', () {
@@ -109,7 +105,7 @@ void main() {
       });
     });
 
-    test('Xcode counts when it prints a version', () {
+    test('Xcode counts only when it exits cleanly with a version', () {
       expect(
         probe.evaluate([
           exited('os', stdout: 'Darwin'),

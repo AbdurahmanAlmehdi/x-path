@@ -845,9 +845,11 @@ class _E2e {
           : null;
     });
     final fencedAfter = DateTime.now().difference(stoppedAt);
+    // The lease of 6 s plus 15 s of grace, counted from the last renewal
+    // (a heartbeat every 2 s), so no sooner than about 19 s after the stop.
     _expect(
-      fencedAfter >= const Duration(seconds: 6),
-      'the runner kept the job for its lease at least '
+      fencedAfter >= const Duration(seconds: 15),
+      'the runner kept the job for its lease and the grace '
       '(fenced after ${fencedAfter.inSeconds} s)',
     );
     await _waitFor('the process of the fenced job to end', () {

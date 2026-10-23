@@ -238,8 +238,8 @@ install_android() {
       || die "the Android command-line tools archive has no cmdline-tools folder"
   fi
   say "Accepting the Android SDK licences"
-  yes | "$sdkmanager" --sdk_root="$android_sdk" --licenses >/dev/null 2>&1 \
-    || die "sdkmanager --licenses failed"
+  yes | "$sdkmanager" --sdk_root="$android_sdk" --licenses >"$work/sdkmanager.log" 2>&1 \
+    || die "sdkmanager --licenses failed: $(tail -n 5 "$work/sdkmanager.log")"
   wanted=""
   for package in $android_packages; do
     [ -d "$android_sdk/$(printf '%s' "$package" | tr ';' '/')" ] || wanted="$wanted $package"
@@ -247,7 +247,8 @@ install_android() {
   if [ -n "$wanted" ]; then
     say "Installing$wanted in $android_sdk"
     # shellcheck disable=SC2086 # one word per package
-    "$sdkmanager" --sdk_root="$android_sdk" $wanted >/dev/null || die "sdkmanager could not install$wanted"
+    "$sdkmanager" --sdk_root="$android_sdk" $wanted >"$work/sdkmanager.log" 2>&1 \
+      || die "sdkmanager could not install$wanted: $(tail -n 5 "$work/sdkmanager.log")"
   fi
   say "The Android SDK is in $android_sdk."
   case "$android_sdk" in

@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:args/command_runner.dart';
 import 'package:path/path.dart' as p;
+import 'package:xp/src/commands/runners_commands.dart' show reachingTheEngine;
 import 'package:xp/src/config/xp_config.dart';
 import 'package:xp/src/context.dart';
 import 'package:xp/src/exit_codes.dart';
@@ -95,8 +96,11 @@ class RunnerDoctor {
     required this._paths,
     required this._clientFactory,
     required this._serviceStatus,
-    this.gitHosts = const ['github.com'],
+    this.gitHosts = defaultGitHosts,
   });
+
+  /// The git hosts checked when none is given.
+  static const defaultGitHosts = ['github.com'];
 
   final RunnerHost _host;
   final RunnerPaths _paths;
@@ -106,13 +110,13 @@ class RunnerDoctor {
   /// The hosts whose SSH access is checked.
   final List<String> gitHosts;
 
-  /// About how much disk each capability needs: a Flutter SDK, then Gradle
-  /// caches and builds, Xcode's derived data, a Swift build.
-  static const Map<Capability, int> _gigabytesFor = {
-    Capability.flutter: 3,
-    Capability.android: 5,
-    Capability.iosSign: 10,
-    Capability.swiftLinux: 2,
+  /// About how many GB of disk [capability] needs: a Flutter SDK, then
+  /// Gradle caches and builds, Xcode's derived data, a Swift build.
+  static int _gigabytesFor(Capability capability) => switch (capability) {
+    Capability.flutter => 3,
+    Capability.android => 5,
+    Capability.iosSign => 10,
+    Capability.swiftLinux => 2,
   };
 
   /// Runs every check.
@@ -150,37 +154,29 @@ class RunnerDoctor {
   ];
 
   Future<DoctorCheck> _perl() async {
-    const fix =
-        'install perl (apt-get install perl): the runner stops the '
-        'processes of a job with it';
+    String detail;
     try {
       final output = await _host.runner.run('perl', const [
         '-e',
         '1',
       ], timeout: const Duration(seconds: 10));
-      return output.exitCode == 0
-          ? const DoctorCheck(name: 'perl', state: .ok)
-          : DoctorCheck(
-              name: 'perl',
-              state: .missing,
-              detail: 'perl exited with ${output.exitCode}',
-              fix: fix,
-            );
+      if (output.exitCode == 0) {
+        return const DoctorCheck(name: 'perl', state: .ok);
+      }
+      detail = 'perl exited with ${output.exitCode}';
     } on ProcessStartException {
-      return const DoctorCheck(
-        name: 'perl',
-        state: .missing,
-        detail: 'perl not found',
-        fix: fix,
-      );
+      detail = 'perl not found';
     } on TimeoutException {
-      return const DoctorCheck(
-        name: 'perl',
-        state: .missing,
-        detail: 'perl did not answer in time',
-        fix: fix,
-      );
+      detail = 'perl did not answer in time';
     }
+    return DoctorCheck(
+      name: 'perl',
+      state: .missing,
+      detail: detail,
+      fix:
+          'install perl (apt-get install perl): the runner stops the '
+          'processes of a job with it',
+    );
   }
 
   Future<({DoctorCheck check, RunnerEnrollment? enrollment})> _paired() async {
@@ -269,7 +265,7 @@ class RunnerDoctor {
         detail: 'the engine at $url does not answer: ${_describe(error)}',
         fix:
             'check that the engine runs and that this machine reaches it; '
-            'see docs/guide/runners.md#reaching-the-engine',
+            'see $reachingTheEngine',
       );
     } finally {
       client.close();
@@ -381,9 +377,9 @@ class RunnerDoctor {
     }
     final needs = offered.fold(
       0,
-      (sum, capability) => sum + _gigabytesFor[capability]!,
+      (sum, capability) => sum + _gigabytesFor(capability),
     );
-    final int? free;
+    int? free;
     try {
       final output = await _host.runner.run('df', [
         '-Pk',
@@ -399,11 +395,7 @@ class RunnerDoctor {
           ? int.tryParse(fields[3])
           : null;
     } on Object {
-      return const DoctorCheck(
-        name: 'disk',
-        state: .skipped,
-        detail: 'df did not say how much space is free',
-      );
+      free = null;
     }
     if (free == null) {
       return const DoctorCheck(
@@ -449,7 +441,7 @@ class RunnerDoctorCommand extends Command<int> {
         'git-host',
         help: 'A git host whose SSH access to check.',
         valueHelp: 'host',
-        defaultsTo: const ['github.com'],
+        defaultsTo: RunnerDoctor.defaultGitHosts,
       )
       ..addFlag(
         'system',

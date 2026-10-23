@@ -9,27 +9,31 @@ import 'package:xp_engine/xp_engine.dart';
 /// `xp_engine` stays free of logging: the hub records events and reports
 /// refusals, and this turns them into lines.
 class RunnerLog {
-  /// Creates the log, which writes to [_out] and reads what a runner reported
-  /// about itself from [_runners].
-  const new(this._out, this._runners);
+  /// Creates the log, which writes to [_out]; [onError] hears about a line
+  /// that could not be written.
+  const new(this._out, {this.onError});
 
   final StringSink _out;
-  final RunnerService _runners;
 
-  /// Follows the runner events logged in [events] from now on.
-  StreamSubscription<void> follow(EventLog events) => events
-      .subscribe(after: events.head)
-      .asyncMap((logged) => _write(logged.event))
-      .listen(null, onError: (Object _) {});
+  /// Hears about a runner event that could not be turned into a line.
+  final void Function(Object error)? onError;
+
+  /// Follows the runner events logged in [events] from now on, and reads
+  /// what a runner reported about itself from [runners].
+  StreamSubscription<void> follow(EventLog events, RunnerService runners) =>
+      events
+          .subscribe(after: events.head)
+          .asyncMap((logged) => _write(logged.event, runners))
+          .listen(null, onError: (Object error) => onError?.call(error));
 
   /// Writes that the connection of [who] was turned away, and [why].
   void refused(String who, String why) =>
       _out.writeln('refused a runner connection from $who: $why');
 
-  Future<void> _write(EngineEvent event) async {
+  Future<void> _write(EngineEvent event, RunnerService runners) async {
     switch (event) {
       case RunnerConnected():
-        _out.writeln(await _connected(event));
+        _out.writeln(await _connected(event, runners));
       case RunnerDisconnected(:final name, :final reason):
         _out.writeln(
           'runner "$name" disconnected${reason == null ? '' : ' ($reason)'}',
@@ -43,10 +47,13 @@ class RunnerLog {
     }
   }
 
-  Future<String> _connected(RunnerConnected event) async {
+  Future<String> _connected(
+    RunnerConnected event,
+    RunnerService runners,
+  ) async {
     final Runner runner;
     try {
-      runner = await _runners.get(event.runnerId);
+      runner = await runners.get(event.runnerId);
     } on RunnerNotFoundException {
       return 'runner "${event.name}" connected';
     }

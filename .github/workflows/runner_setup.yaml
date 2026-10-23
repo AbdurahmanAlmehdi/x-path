@@ -19,6 +19,9 @@ on:
       - "Dockerfile.runner"
       - ".dockerignore"
       - "apps/xp/lib/src/runner/**"
+      - "apps/xp/lib/src/command_runner.dart"
+      - "packages/xp_engine/lib/src/probe/**"
+      - "packages/xp_api/lib/src/runner_protocol.dart"
 
 permissions:
   contents: read
@@ -46,6 +49,9 @@ jobs:
 
       - name: Test install.sh
         run: tool/release/linux/install_test.sh
+
+      - name: Test the Runner Image's Entrypoint
+        run: tool/release/linux/xpath-runner_test.sh
 
       - name: Build the Runner Image
         run: docker build -f Dockerfile.runner -t xpath-runner:test .

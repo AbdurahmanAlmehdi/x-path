@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:test/test.dart';
 import 'package:xp_api/xp_api.dart';
+import 'package:xp_engine/xp_engine.dart';
 import 'package:xpd/xpd.dart';
 
 import '../../helpers/runner_helpers.dart';
@@ -11,12 +12,14 @@ void main() {
   late StringBuffer out;
   late RunnerLog log;
   late StreamSubscription<void> following;
+  late List<Object> errors;
 
   setUp(() async {
+    errors = [];
     client = await RunnerClient.start();
     out = StringBuffer();
-    log = RunnerLog(out, client.engine.runnerService);
-    following = log.follow(client.engine.events);
+    log = RunnerLog(out, onError: errors.add);
+    following = log.follow(client.engine.events, client.engine.runnerService);
   });
 
   tearDown(() async {
@@ -66,6 +69,31 @@ void main() {
     expect(lines, ['runner "ghost" connected', 'runner "ghost" disconnected']);
   });
 
+  test('passes on what it could not write', () async {
+    final failing = StreamController<SequencedEvent>();
+    final seen = <Object>[];
+    final events = _FailingLog(failing.stream);
+    final sub = RunnerLog(
+      out,
+      onError: seen.add,
+    ).follow(events, client.engine.runnerService);
+    failing.addError(StateError('gone'));
+    await pumpEventQueue();
+
+    expect(seen.single, isA<StateError>());
+    await sub.cancel();
+    await failing.close();
+    // Without a listener an error is dropped quietly.
+    final quiet = StreamController<SequencedEvent>();
+    final silent = RunnerLog(out)
+        .follow(_FailingLog(quiet.stream), client.engine.runnerService);
+    quiet.addError(StateError('gone'));
+    await pumpEventQueue();
+    await silent.cancel();
+    await quiet.close();
+    expect(errors, isEmpty);
+  });
+
   test('writes refused connections', () {
     log.refused('10.0.0.7', 'an unknown or revoked credential (401)');
 
@@ -75,4 +103,19 @@ void main() {
       'credential (401)\n',
     );
   });
+}
+
+class _FailingLog implements EventLog {
+  new(this._stream);
+
+  final Stream<SequencedEvent> _stream;
+
+  @override
+  int get head => 0;
+
+  @override
+  Stream<SequencedEvent> subscribe({int? after}) => _stream;
+
+  @override
+  Object? noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
