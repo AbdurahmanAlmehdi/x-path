@@ -633,7 +633,7 @@ SUCCESS CRITERIA:
 
 NON-GOALS:
 - Hosted cloud version, relay service, multi-user accounts and roles
-- GitLab or Bitbucket
+- Pull requests, merges or tags on GitLab or Bitbucket (other hosts can be built since ADR 0015)
 - Device or emulator integration tests
 - Native iOS/Android project types beyond command steps
 - ASC build upload API and ASC webhooks
