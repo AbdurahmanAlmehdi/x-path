@@ -119,6 +119,11 @@ class _WorkflowFields extends StatelessWidget {
                 : null,
           ),
         ),
+        const SizedBox(height: 4),
+        Text(
+          l10n.workflowsLockHint,
+          style: context.xpType.caption.copyWith(color: colors.textTertiary),
+        ),
         const SizedBox(height: 16),
         XpSectionLabel(l10n.workflowsInputs),
         const SizedBox(height: 6),

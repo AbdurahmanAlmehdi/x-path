@@ -1035,7 +1035,7 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get jobRerunAll => 'Re-run all';
+  String get jobRestart => 'Restart job';
 
   @override
   String jobResumeFrom(String step) {
@@ -1108,6 +1108,11 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String jobWaitingForResumeBody(String step) {
     return 'The engine stopped during $step, which changes something outside the engine, so it never runs again by itself. Check, then resume.';
+  }
+
+  @override
+  String jobWaitReason(String reason) {
+    return 'Waiting: $reason';
   }
 
   @override
@@ -2619,6 +2624,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get workflowsLock => 'One run at a time per project';
 
   @override
+  String get workflowsLockHint =>
+      'It also makes the production flavors the default when a dispatch names none.';
+
+  @override
   String get workflowsInputs => 'Inputs';
 
   @override
@@ -2717,6 +2726,15 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get workflowsNameBody =>
       'Letters, digits, dots, dashes and underscores; unique in the project.';
+
+  @override
+  String get workflowsNameInvalid =>
+      'Start with a letter or digit; then letters, digits, dots, dashes and underscores, 64 at most.';
+
+  @override
+  String workflowsNameTaken(String name) {
+    return 'The project already has a workflow called $name.';
+  }
 
   @override
   String get workflowsCancel => 'Cancel';

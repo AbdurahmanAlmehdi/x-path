@@ -42,7 +42,7 @@ void main() {
         findsOneWidget,
       );
       expect(find.text('2 lines'), findsOneWidget);
-      expect(find.text('Re-run all'), findsNothing);
+      expect(find.text('Restart job'), findsNothing);
     });
 
     testWidgets('says what the engine answered without a run', (tester) async {
@@ -143,7 +143,7 @@ void main() {
       expect(find.text('First 2 steps'), findsOneWidget);
       expect(find.text('Build iOS and after'), findsOneWidget);
 
-      await tester.tap(find.text('Re-run all'));
+      await tester.tap(find.text('Restart job'));
       await tester.pump();
       verify(() => harness.jobs.resumeJob('job_ios', fromStep: 0)).called(1);
 
@@ -181,7 +181,7 @@ void main() {
       when(() => harness.jobs.resumeJob('job_ios', fromStep: 0))
           .thenThrow(const ApiException('Not resumable.', statusCode: 409));
       await harness.pump(tester);
-      await tester.tap(find.text('Re-run all'));
+      await tester.tap(find.text('Restart job'));
       await tester.pump();
       expect(find.text('Not resumable.'), findsOneWidget);
     });
@@ -268,13 +268,106 @@ void main() {
       );
     });
 
+    testWidgets('says why a failed job failed without hovering', (
+      tester,
+    ) async {
+      final run = failedRun();
+      Job withMessages(Job job) => Job(
+        id: job.id,
+        projectId: job.projectId,
+        workflowVersionId: job.workflowVersionId,
+        runId: job.runId,
+        name: job.name,
+        stage: job.stage,
+        state: job.state,
+        startedAt: job.startedAt,
+        finishedAt: job.finishedAt,
+        createdAt: job.createdAt,
+        message: 'Build iOS failed.',
+        steps: [
+          for (final step in job.steps)
+            JobStep(
+              ordinal: step.ordinal,
+              kind: step.kind,
+              state: step.state,
+              sideEffect: step.sideEffect,
+              attempts: step.attempts,
+              startedAt: step.startedAt,
+              finishedAt: step.finishedAt,
+              message: step.state == StepState.failed
+                  ? 'xcodebuild exited with 65.'
+                  : null,
+            ),
+        ],
+      );
+      final failed = RunJobs(
+        run: run.run,
+        jobs: [
+          for (final job in run.jobs)
+            if (job.id == 'job_ios') withMessages(job) else job,
+        ],
+      );
+      await JobHarness(run: failed, log: failedLog).pump(tester);
+      expect(
+        find.text('xcodebuild exited with 65. Build iOS failed.'),
+        findsOneWidget,
+      );
+      expect(find.text('Failed'), findsWidgets);
+
+      expect(failureOf(run.jobs[1]), isNull);
+      expect(
+        failureOf(
+          job(
+            'j',
+            'j',
+            0,
+            JobState.failed,
+            message: 'Same.',
+            steps: const [
+              JobStep(
+                ordinal: 0,
+                kind: 'command',
+                state: StepState.failed,
+                sideEffect: false,
+                attempts: 1,
+                message: 'Same.',
+              ),
+            ],
+          ),
+        ),
+        'Same.',
+      );
+    });
+
+    testWidgets('says why a queued job waits', (tester) async {
+      final run = runningRun();
+      final waiting = RunJobs(
+        run: run.run,
+        jobs: [
+          for (final candidate in run.jobs)
+            if (candidate.id == 'job_upload')
+              job(
+                'job_upload',
+                'Upload prod for ios',
+                2,
+                JobState.queued,
+                message: 'No runner can do ios-sign.',
+              )
+            else
+              candidate,
+        ],
+      );
+      await JobHarness(run: waiting).pump(tester, jobId: 'job_upload');
+      expect(find.text('Waiting: No runner can do ios-sign.'), findsOneWidget);
+    });
+
     testWidgets('is read-only while the engine is away', (tester) async {
       final harness = JobHarness(run: interruptedRun());
       await harness.pump(
         tester,
         connection: connectionIn(connectedTo(status: EngineStatus.unreachable)),
       );
-      await tester.tap(find.text('Re-run all'));
+      await tester.tap(find.text('Restart job'));
       await tester.tap(find.text('Cancel'));
       await tester.pumpAndSettle();
       for (final key in [LogicalKeyboardKey.keyR, LogicalKeyboardKey.period]) {

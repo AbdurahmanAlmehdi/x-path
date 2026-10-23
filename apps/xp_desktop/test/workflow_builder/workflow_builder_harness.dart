@@ -4,6 +4,7 @@ import 'package:mocktail/mocktail.dart';
 import 'package:xp_api/xp_api.dart';
 import 'package:xp_desktop/app/app_services.dart';
 import 'package:xp_desktop/projects/bloc/projects_bloc.dart';
+import 'package:xp_desktop/shell/cubit/shell_cubit.dart';
 import 'package:xp_desktop/workflow_builder/workflow_builder.dart';
 
 import '../helpers/fakes.dart';
@@ -128,9 +129,11 @@ Future<void> pumpBuilder(
   Brightness brightness = Brightness.light,
   FilePicker? pickFile,
   FileSaver? saveFile,
+  ShellCubit? shell,
 }) async {
   await tester.pumpApp(
     WorkflowBuilderPage(projectId: 'prj_1', workflowId: workflowId),
+    shell: shell,
     workflowsRepository: repository ?? workflowsRepository(),
     services: testServices(pickFile: pickFile, saveFile: saveFile),
     brightness: brightness,

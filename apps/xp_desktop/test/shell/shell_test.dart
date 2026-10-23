@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/widgets.dart';
@@ -148,6 +150,71 @@ void main() {
       'prj_1',
       'wf_1',
     ]);
+  });
+
+  group('ShellCubit', () {
+    blocTest<ShellCubit, ShellDestination>(
+      'shows a destination at once without a guard',
+      build: ShellCubit.new,
+      act: (shell) => shell.show(const RunnersDestination()),
+      expect: () => [const RunnersDestination()],
+    );
+
+    blocTest<ShellCubit, ShellDestination>(
+      'stays when the guard keeps the destination',
+      build: ShellCubit.new,
+      act: (shell) async {
+        shell
+          ..guard(() async => false)
+          ..show(const RunnersDestination());
+        await Future<void>.delayed(Duration.zero);
+      },
+      expect: () => const <ShellDestination>[],
+    );
+
+    blocTest<ShellCubit, ShellDestination>(
+      'leaves once the guard lets go, and asks nothing for the shown one',
+      build: ShellCubit.new,
+      act: (shell) async {
+        var asked = 0;
+        shell
+          ..guard(() async {
+            asked++;
+            return true;
+          })
+          ..show(const HomeDestination())
+          ..show(const RunnersDestination());
+        await Future<void>.delayed(Duration.zero);
+        expect(asked, 1);
+      },
+      expect: () => [const RunnersDestination()],
+    );
+
+    blocTest<ShellCubit, ShellDestination>(
+      'asks nothing once the guard is released, and keeps a newer guard',
+      build: ShellCubit.new,
+      act: (shell) async {
+        final release = shell.guard(() async => false);
+        shell.guard(() async => false);
+        release();
+        shell.show(const RunnersDestination());
+        await Future<void>.delayed(Duration.zero);
+        shell.guard(() async => true)();
+        shell.show(const StorageDestination());
+      },
+      expect: () => [const StorageDestination()],
+    );
+
+    test('does not leave once closed', () async {
+      final answer = Completer<bool>();
+      final shell = ShellCubit()
+        ..guard(() => answer.future)
+        ..show(const RunnersDestination());
+      await shell.close();
+      answer.complete(true);
+      await Future<void>.delayed(Duration.zero);
+      expect(shell.state, const HomeDestination());
+    });
   });
 
   group('Sidebar', () {

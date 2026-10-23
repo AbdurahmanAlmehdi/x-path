@@ -8,6 +8,7 @@ import 'package:xp_api/xp_api.dart';
 import 'package:xp_client/xp_client.dart';
 import 'package:xp_desktop/app/app_services.dart';
 import 'package:xp_desktop/projects/bloc/projects_bloc.dart';
+import 'package:xp_desktop/shell/cubit/shell_cubit.dart';
 import 'package:xp_desktop/widgets/widgets.dart';
 import 'package:xp_desktop/workflow_builder/workflow_builder.dart';
 import 'package:xp_repositories/xp_repositories.dart';
@@ -66,6 +67,13 @@ void main() {
       'Store release',
     );
     expect(find.text('inputs.notes'), findsOneWidget);
+    expect(
+      find.text(
+        'It also makes the production flavors the default when a dispatch '
+        'names none.',
+      ),
+      findsOneWidget,
+    );
     final save = tester.widget<XpButton>(find.widgetWithText(XpButton, 'Save'));
     expect(save.onPressed, isNull);
   });
@@ -424,6 +432,108 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('Save as…'), findsOneWidget);
+  });
+
+  testWidgets('asks before the shell leaves with unsaved changes', (
+    tester,
+  ) async {
+    final shell = ShellCubit(const WorkflowsDestination('prj_1'));
+    await pumpBuilder(tester, repository: repository, shell: shell);
+
+    // Nothing to lose: the shell leaves at once.
+    shell.show(const ReleasesDestination('prj_1'));
+    await tester.pumpAndSettle();
+    expect(find.text('Discard unsaved changes?'), findsNothing);
+    expect(shell.state, const ReleasesDestination('prj_1'));
+
+    await type(tester, field('Name'), 'Changed');
+    shell.show(const TestsDestination('prj_1'));
+    await tester.pumpAndSettle();
+    expect(find.text('Discard unsaved changes?'), findsOneWidget);
+    await tester.tap(find.text('Keep editing'));
+    await tester.pumpAndSettle();
+    expect(shell.state, const ReleasesDestination('prj_1'));
+    expect(tester.widget<TextField>(field('Name')).controller!.text, 'Changed');
+
+    shell.show(const TestsDestination('prj_1'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Discard'));
+    await tester.pumpAndSettle();
+    expect(shell.state, const TestsDestination('prj_1'));
+  });
+
+  testWidgets('saves a copy of a built-in under a free name at once', (
+    tester,
+  ) async {
+    when(
+      () => repository.createWorkflow(
+        'prj_1',
+        name: 'dev-build-copy',
+        yaml: any(named: 'yaml'),
+      ),
+    ).thenAnswer(
+      (invocation) async => Workflow(
+        id: 'wf_copy',
+        projectId: 'prj_1',
+        name: 'dev-build-copy',
+        builtin: false,
+        version: versionInfo(1),
+        versions: [versionInfo(1)],
+        yaml: invocation.namedArguments[#yaml] as String,
+      ),
+    );
+    await pumpBuilder(tester, repository: repository, workflowId: 'wf_dev');
+
+    await tester.tap(find.text('Save as…'));
+    await tester.pumpAndSettle();
+    final name = find.descendant(
+      of: find.byType(WorkflowNameDialog),
+      matching: find.byType(TextField),
+    );
+    expect(tester.widget<TextField>(name).controller!.text, 'dev-build-copy');
+
+    await tester.enterText(name, 'store-release');
+    await tester.pump();
+    expect(
+      find.text('The project already has a workflow called store-release.'),
+      findsOneWidget,
+    );
+    await tester.enterText(name, 'my build');
+    await tester.pump();
+    expect(
+      find.text(
+        'Start with a letter or digit; then letters, digits, dots, dashes '
+        'and underscores, 64 at most.',
+      ),
+      findsOneWidget,
+    );
+    await tester.tap(
+      find.descendant(
+        of: find.byType(WorkflowNameDialog),
+        matching: find.text('Save'),
+      ),
+    );
+    await tester.pump();
+    expect(find.byType(WorkflowNameDialog), findsOneWidget);
+
+    await tester.enterText(name, 'dev-build-copy');
+    await tester.pump();
+    await press(
+      tester,
+      find.descendant(
+        of: find.byType(WorkflowNameDialog),
+        matching: find.text('Save'),
+      ),
+    );
+    expect(find.text('Saved dev-build-copy, version 1.'), findsOneWidget);
+  });
+
+  test('copyName offers the first free copy name', () {
+    expect(copyName('dev-build', const {}), 'dev-build-copy');
+    expect(
+      copyName('dev-build', const {'dev-build-copy', 'dev-build-copy-2'}),
+      'dev-build-copy-3',
+    );
   });
 
   testWidgets('imports and exports YAML files', (tester) async {

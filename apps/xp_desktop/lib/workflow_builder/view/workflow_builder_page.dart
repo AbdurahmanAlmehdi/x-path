@@ -6,6 +6,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:xp_desktop/app/app_services.dart';
 import 'package:xp_desktop/l10n/l10n.dart';
 import 'package:xp_desktop/projects/bloc/projects_bloc.dart';
+import 'package:xp_desktop/shell/cubit/shell_cubit.dart';
 import 'package:xp_desktop/shell/widgets/shell_page.dart';
 import 'package:xp_desktop/theme/theme.dart';
 import 'package:xp_desktop/widgets/widgets.dart';
@@ -47,9 +48,48 @@ class WorkflowBuilderPage extends StatelessWidget {
         pickFile: services.pickFile,
         saveFile: services.saveFile,
       )..add(WorkflowBuilderStarted(workflowId: workflowId)),
-      child: const WorkflowBuilderView(),
+      child: const _LeaveGuard(child: WorkflowBuilderView()),
     );
   }
+}
+
+/// Asks before the shell leaves the builder with unsaved changes (the
+/// sidebar, ⇧⌘A); Keep editing stays.
+class _LeaveGuard extends StatefulWidget {
+  const new({required this.child});
+
+  final Widget child;
+
+  @override
+  State<_LeaveGuard> createState() => _LeaveGuardState();
+}
+
+class _LeaveGuardState extends State<_LeaveGuard> {
+  late final void Function() _release;
+
+  @override
+  void initState() {
+    super.initState();
+    _release = context.read<ShellCubit>().guard(_canLeave);
+  }
+
+  Future<bool> _canLeave() async {
+    final state = context.read<WorkflowBuilderBloc>().state;
+    if (!state.dirty) return true;
+    return await confirmDiscard(
+      context,
+      state.name ?? context.l10n.workflowsTitle,
+    );
+  }
+
+  @override
+  void dispose() {
+    _release();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
 }
 
 class WorkflowBuilderView extends StatelessWidget {
@@ -86,9 +126,13 @@ class WorkflowBuilderView extends StatelessWidget {
         bloc.add(const WorkflowSaveRequested());
         return;
       }
+      final taken = {for (final summary in state.workflows) summary.name};
       final name = await askWorkflowName(
         context,
-        initial: state.draftName ?? workflow?.name,
+        initial:
+            state.draftName ??
+            (workflow == null ? null : copyName(workflow.name, taken)),
+        taken: taken,
       );
       if (name != null) bloc.add(WorkflowSaveRequested(name: name));
     }

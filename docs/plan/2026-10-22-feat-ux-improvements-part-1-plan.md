@@ -76,7 +76,7 @@ once and opens one pull request.
 
 ### Phase U1a-1: Quick fixes: failures and drafts
 
-- **Status:** Not started
+- **Status:** Done
 - **Scope:** Show failures and waits without hovering, and stop losing builder drafts.
 - **Files touched:** `apps/xp_desktop/lib/{job,workflow_builder,shell}/**`,
   `apps/xp_desktop/lib/l10n/arb/app_en.arb`, the matching tests

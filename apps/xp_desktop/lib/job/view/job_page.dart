@@ -81,6 +81,13 @@ class JobView extends StatelessWidget {
                 (job.state == JobState.interrupted ||
                     job.state == JobState.waitingForResume))
               _InterruptedBanner(job),
+            if (job != null && job.state == JobState.failed)
+              if (failureOf(job) case final failure?)
+                _Banner(
+                  status: XpStatus.jobFailed,
+                  label: l10n.statusFailed,
+                  text: failure,
+                ),
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
               child: Column(
@@ -91,6 +98,16 @@ class JobView extends StatelessWidget {
                     const SizedBox(height: 10),
                   ],
                   _Hero(state),
+                  if (job != null && job.state == JobState.queued)
+                    if (job.message case final reason?) ...[
+                      const SizedBox(height: 6),
+                      Text(
+                        l10n.jobWaitReason(reason),
+                        style: context.xpType.body.copyWith(
+                          color: context.xpColors.textSecondary,
+                        ),
+                      ),
+                    ],
                   const SizedBox(height: 16),
                   PipelineGraph(
                     stages: pipelineStages(
@@ -152,7 +169,7 @@ class JobView extends StatelessWidget {
         XpStatusLabel(XpStatus.jobRunning, l10n.jobRunningCount(running)),
       if (resumable) ...[
         XpButton(
-          label: l10n.jobRerunAll,
+          label: l10n.jobRestart,
           icon: PhosphorIconsRegular.arrowClockwise,
           hint: '⌘R',
           busy: state.command == JobViewCommand.resuming,
@@ -379,6 +396,17 @@ String _failedAt(List<Job> jobs, AppLocalizations l10n) {
   return l10n.statusFailed;
 }
 
+/// Why [job] failed: the message of its failed step, then the job's own,
+/// once each; `null` when the engine said neither.
+String? failureOf(Job job) {
+  final messages = {
+    for (final step in job.steps)
+      if (step.state == StepState.failed) ?step.message,
+    ?job.message,
+  };
+  return messages.isEmpty ? null : messages.join(' ');
+}
+
 class _InterruptedBanner extends StatelessWidget {
   const new(this.job);
 
@@ -387,7 +415,6 @@ class _InterruptedBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
-    final colors = context.xpColors;
     final step = job.steps
         .where(
           (step) =>
@@ -407,30 +434,49 @@ class _InterruptedBanner extends StatelessWidget {
       if (!sideEffects) l10n.jobNothingChanged,
       ?job.message,
     ].join(' ');
+    return _Banner(
+      status: XpStatus.jobInterrupted,
+      label: l10n.statusInterrupted,
+      text: text,
+    );
+  }
+}
+
+/// A band over the job view that says what happened to the selected job
+/// without hovering: its [status], a [label] and the engine's [text].
+class _Banner extends StatelessWidget {
+  const new({required this.status, required this.label, required this.text});
+
+  final XpStatus status;
+  final String label;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.xpColors;
+    final (container, onContainer) = status == XpStatus.jobFailed
+        ? (colors.statusNegativeContainer, colors.statusNegativeOnContainer)
+        : (colors.statusCautionContainer, colors.statusCautionOnContainer);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
       decoration: BoxDecoration(
-        color: colors.statusCautionContainer,
+        color: container,
         border: Border(bottom: BorderSide(color: colors.borderDefault)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const XpStatusIcon(XpStatus.jobInterrupted),
+          XpStatusIcon(status),
           const SizedBox(width: 6),
           Text(
-            l10n.statusInterrupted,
-            style: context.xpType.bodyStrong.copyWith(
-              color: colors.statusCautionOnContainer,
-            ),
+            label,
+            style: context.xpType.bodyStrong.copyWith(color: onContainer),
           ),
           const SizedBox(width: 12),
           Expanded(
             child: Text(
               text,
-              style: context.xpType.body.copyWith(
-                color: colors.statusCautionOnContainer,
-              ),
+              style: context.xpType.body.copyWith(color: onContainer),
             ),
           ),
         ],

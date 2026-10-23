@@ -1834,11 +1834,11 @@ abstract class AppLocalizations {
   /// **'{count} running'**
   String jobRunningCount(int count);
 
-  /// Runs the job again from its first step.
+  /// Runs the selected job again from its first step.
   ///
   /// In en, this message translates to:
-  /// **'Re-run all'**
-  String get jobRerunAll;
+  /// **'Restart job'**
+  String get jobRestart;
 
   /// Resumes the job at a step.
   ///
@@ -1923,6 +1923,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'The engine stopped during {step}, which changes something outside the engine, so it never runs again by itself. Check, then resume.'**
   String jobWaitingForResumeBody(String step);
+
+  /// Under the hero of a queued job: why it has not started.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting: {reason}'**
+  String jobWaitReason(String reason);
 
   /// Interrupted banner: no side-effect step succeeded.
   ///
@@ -4240,6 +4246,12 @@ abstract class AppLocalizations {
   /// **'One run at a time per project'**
   String get workflowsLock;
 
+  /// Under the lock chip: what lock: project changes besides one run at a time.
+  ///
+  /// In en, this message translates to:
+  /// **'It also makes the production flavors the default when a dispatch names none.'**
+  String get workflowsLockHint;
+
   /// Label of the workflow's inputs.
   ///
   /// In en, this message translates to:
@@ -4431,6 +4443,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Letters, digits, dots, dashes and underscores; unique in the project.'**
   String get workflowsNameBody;
+
+  /// Name dialog: the name is not one the engine takes.
+  ///
+  /// In en, this message translates to:
+  /// **'Start with a letter or digit; then letters, digits, dots, dashes and underscores, 64 at most.'**
+  String get workflowsNameInvalid;
+
+  /// Name dialog: the name is taken.
+  ///
+  /// In en, this message translates to:
+  /// **'The project already has a workflow called {name}.'**
+  String workflowsNameTaken(String name);
 
   /// Closes a dialog.
   ///
