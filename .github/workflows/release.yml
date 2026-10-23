@@ -14,6 +14,10 @@
 #             install.sh test.
 #   arm64     runs the arm64 bundles on an arm64 machine.
 #   docker    builds, tests and pushes the image (linux/amd64, linux/arm64).
+#   docker-runner
+#             builds the xpath-runner image (Dockerfile.runner, linux/amd64:
+#             install.sh --runner --with-android), checks that `xp runner
+#             doctor` in it finds android and flutter, and pushes it.
 #   release   tags the commit vX.Y.Z and creates the GitHub Release with
 #             generated notes and the assets (a pre-release before 1.0 or
 #             with a "-"); on a run again it replaces the assets.
@@ -59,6 +63,7 @@ permissions:
 
 env:
   IMAGE: ghcr.io/abdurahmanalmehdi/xpath
+  RUNNER_IMAGE: ghcr.io/abdurahmanalmehdi/xpath-runner
 
 jobs:
   version:
@@ -251,8 +256,60 @@ jobs:
             org.opencontainers.image.version=${{ needs.version.outputs.version }}
             org.opencontainers.image.licenses=Apache-2.0
 
+  docker-runner:
+    needs: [version, bundles]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+    steps:
+      - name: Git Checkout
+        uses: actions/checkout@v7
+
+      - name: Download the Build
+        uses: actions/download-artifact@v4
+        with:
+          name: release
+
+      - name: Unpack the Build
+        run: tar -xf release.tar
+
+      - name: Build the Runner Image
+        run: docker build -f Dockerfile.runner -t xpath-runner:test .
+
+      # The image is built by install.sh --with-android: a runner made from it
+      # must offer android and flutter.
+      - name: Test the Runner Image
+        run: |
+          test "$(docker run --rm xpath-runner:test --version)" = "${VERSION}"
+          docker run --rm xpath-runner:test --json runner doctor | tee doctor.json
+          jq -e '[.checks[] | select(.state == "ok") | .name] | index("android") and index("flutter")' doctor.json
+
+      - name: Log In to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # amd64 only: Google ships no Android build tools for Linux arm64. A
+      # pre-release does not move `latest`.
+      - name: Push the Runner Image
+        env:
+          PRERELEASE: ${{ needs.version.outputs.prerelease }}
+        run: |
+          docker tag xpath-runner:test "${RUNNER_IMAGE}:${VERSION}"
+          docker push "${RUNNER_IMAGE}:${VERSION}"
+          if [ "${PRERELEASE}" != true ]; then
+            docker tag xpath-runner:test "${RUNNER_IMAGE}:latest"
+            docker push "${RUNNER_IMAGE}:latest"
+          fi
+
   release:
-    needs: [version, bundles, arm64, docker]
+    needs: [version, bundles, arm64, docker, docker-runner]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:

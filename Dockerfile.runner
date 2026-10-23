@@ -1,0 +1,56 @@
+# An XPath runner (`xp runner start`) that builds Android and Flutter apps out
+# of the box.
+#
+#   tool/release/bundles.sh --targets linux-x64
+#   docker build -f Dockerfile.runner -t xpath-runner .
+#   docker volume create xpath-runner
+#   docker run --rm -it -v xpath-runner:/data xpath-runner \
+#     runner pair --engine https://mac.tailnet.ts.net --token xpp_...
+#   docker run --rm -v xpath-runner:/data xpath-runner runner doctor
+#   docker run -d --name xpath-runner --restart on-failure -v xpath-runner:/data xpath-runner
+#
+# The image is built by the installer it ships: install.sh --runner
+# --with-android, from the release archive tool/release/bundles.sh made
+# (build/release/assets/xpath-linux-x64.tar.gz), so building it tests the
+# installer. It has a JDK 17, git, ssh, curl, unzip, xz, zip, perl and the
+# Android SDK in /opt/android-sdk, but no Flutter: the runner clones the
+# pinned Flutter SDK into the volume (/data/toolchains/flutter/<version>) as
+# it does anywhere, so one image serves every Flutter version and the volume
+# caches them. amd64 only: Google ships no Android build tools (aapt2) for
+# Linux arm64.
+#
+# It runs as `xpath` (uid 10001) with everything in the volume /data: the
+# runner's files, and HOME=/data/home, so ~/.ssh and ~/.gradle persist. The
+# entrypoint (tool/release/linux/xpath-runner) runs the xp the runner updated
+# itself to, if any, and tells Docker not to restart a runner that must not
+# run (revoked, replaced or not paired).
+
+FROM ubuntu:24.04
+
+# The runner owns the Android SDK: the Android Gradle plugin downloads the
+# platforms a project asks for into it.
+COPY tool/release/linux/install.sh /tmp/xpath/install.sh
+COPY build/release/assets/xpath-linux-x64.tar.gz /tmp/xpath/xpath-linux-x64.tar.gz
+RUN set -eu; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends ca-certificates curl; \
+    sh /tmp/xpath/install.sh --archive /tmp/xpath/xpath-linux-x64.tar.gz \
+      --prefix /usr/local --runner --with-android --android-sdk /opt/android-sdk --no-service; \
+    rm -rf /tmp/xpath /var/lib/apt/lists/*; \
+    groupadd --system --gid 10001 xpath; \
+    useradd --system --uid 10001 --gid xpath --home-dir /data/home --no-create-home \
+      --shell /usr/sbin/nologin xpath; \
+    chown -R xpath:xpath /opt/android-sdk; \
+    mkdir -p /data/home; \
+    chown -R xpath:xpath /data
+COPY tool/release/linux/xpath-runner /usr/local/bin/xpath-runner
+
+ENV XP_RUNNER_DATA_DIR=/data \
+    HOME=/data/home \
+    ANDROID_HOME=/opt/android-sdk \
+    XP_RUNNER_MANAGED=1
+USER xpath
+WORKDIR /data/home
+VOLUME /data
+ENTRYPOINT ["xpath-runner"]
+CMD ["runner", "start"]

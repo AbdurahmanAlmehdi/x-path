@@ -10,8 +10,10 @@
 # build --platform linux/amd64,linux/arm64` picks the bundle of each platform.
 # The engine runs as the unprivileged user `xpath` and keeps everything,
 # master.key included (D-07: a 0600 key file without a systemd credential), in
-# the volume /data. The image has git and ssh for the mirrors but no Flutter:
-# build jobs go to runners (`xp runner`).
+# the volume /data. The image has git and ssh for the mirrors, but not unzip,
+# which the Flutter SDK download needs, so the engine's own runner offers no
+# `flutter` (`xpd serve` prints the reason) and build jobs go to runners: `xp
+# runner` anywhere, or the xpath-runner image of Dockerfile.runner.
 
 FROM debian:trixie-slim AS bundles
 ARG TARGETARCH

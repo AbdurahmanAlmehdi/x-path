@@ -350,11 +350,17 @@ files only. Each option has an environment variable (`XPATH_VERSION`, `XPATH_PRE
 `tool/release/linux/install_test.sh` tests it with no network against the archive of the machine in
 `build/release/assets`, in a throwaway `HOME` and prefix: an install, an update from the unpacked folder, a download
 from `file://` URLs with and without a version, a wrong SHA-256, a wrong version and the runner mode; on Linux also
-the service step against a fake `systemctl` and `loginctl` (the unit written, `enable --now`, the restart on update).
+the service step against a fake `systemctl` and `loginctl` (the unit written, `enable --now`, the restart on update)
+and `--with-android` against a fake `apt-get`, `sudo`, `dpkg-query` and `sdkmanager`.
+
+**A Linux runner, with Android.** `install.sh --runner --with-android` (Debian or Ubuntu) also installs a JDK 17, git,
+ssh, curl, unzip, xz, zip and perl with `apt-get`, the Android command-line tools (pinned by version and SHA-256),
+the licences, one platform and one build-tools, into `--android-sdk <dir>` (default `~/Android/Sdk`, where Flutter
+looks). It ends with the next steps: `xp runner doctor`, the pairing command, `xp runner install-service`.
 
 **Docker.** The `Dockerfile` copies the Linux bundles of `build/release/bundles` (run `bundles.sh` first; `buildx`
-picks the bundle of each platform) into a `debian:trixie-slim` image with `git`, `ssh` and `curl` but no Flutter
-(builds go to runners). It runs `xpd serve --host 0.0.0.0 --port 7480` as the user `xpath` (uid 10001), keeps its
+picks the bundle of each platform) into a `debian:trixie-slim` image with `git`, `ssh` and `curl`, but not `unzip`,
+which the Flutter SDK download needs, so the engine's own runner offers no `flutter` and builds go to runners. It runs `xpd serve --host 0.0.0.0 --port 7480` as the user `xpath` (uid 10001), keeps its
 data (database, `master.key`) in the volume `/data` (`XPATH_DATA_DIR`) and checks `/health` every 30 s.
 
 ```sh
@@ -362,6 +368,11 @@ tool/release/bundles.sh && docker build -t xpath .
 docker run -d --name xpath -p 127.0.0.1:7480:7480 -v xpath-data:/data xpath
 docker exec xpath xpd token create --name laptop --kind cli
 ```
+
+**The runner image.** `Dockerfile.runner` makes `ghcr.io/abdurahmanalmehdi/xpath-runner`, a runner that offers
+`android` and `flutter` out of the box (amd64 only): it is built by `install.sh --runner --with-android` from the
+release archive, and the release workflow checks `xp runner doctor` in it before it pushes it. How to run it:
+[docs/guide/runners.md](docs/guide/runners.md#the-runner-image).
 
 **The Mac app (local install, Phase 18b).** `tool/release/build_mac.sh` builds `dist/XPath.app` (gitignored) for
 this Mac: it runs `bundles.sh` for the Mac's target and the Linux runner targets (`--reuse-bundles` takes the ones in

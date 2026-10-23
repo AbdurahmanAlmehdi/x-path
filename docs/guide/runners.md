@@ -39,6 +39,43 @@ you change the runner URL, for example when you move from an SSH tunnel to Tails
 runner again: `xp runners pair <name>` on the engine, then the printed `xp runner pair` on the
 runner, which replaces its old credential.
 
+## Set up a Linux runner
+
+On Debian or Ubuntu, one command installs `xp` and everything `android` and `flutter` jobs need: a
+JDK 17, git, ssh, curl, unzip, xz, zip, perl and the Android SDK.
+
+```sh
+curl -fsSL https://xpath.abdurahman.ly/install | sh -s -- --runner --with-android
+```
+
+It ends with the three next steps: `xp runner doctor` (what this runner offers, and why not the
+rest), the pairing command, and `xp runner install-service`.
+
+## The runner image
+
+`ghcr.io/abdurahmanalmehdi/xpath-runner` is a runner that builds Android and Flutter apps out of the
+box (amd64 only: Google ships no Android build tools for Linux arm64). Flutter is not in the image:
+the runner fetches the version each project pins into its volume, so one image serves every
+Flutter version and the volume caches them.
+
+```sh
+docker volume create xpath-runner
+docker run --rm -it -v xpath-runner:/data ghcr.io/abdurahmanalmehdi/xpath-runner \
+  runner pair --engine https://mac.tailnet.ts.net --token xpp_...
+docker run --rm -v xpath-runner:/data ghcr.io/abdurahmanalmehdi/xpath-runner runner doctor
+docker run -d --name xpath-runner --restart on-failure -v xpath-runner:/data \
+  ghcr.io/abdurahmanalmehdi/xpath-runner
+```
+
+- Everything the runner keeps is in the volume, its home folder (`/data/home`) included, so its
+  SSH key and its Gradle caches survive a new container.
+- The runner fetches the source with its own SSH key. Make one in the volume and add the public
+  key (`doctor` prints its path) as a deploy key of the repository:
+  `docker exec xpath-runner ssh-keygen -t ed25519`. Or mount a key read-only.
+- When the runner updates itself to its engine's version, the update survives a restart of the
+  container. A runner the engine revoked, that another connection replaced, or that is not paired
+  exits with 0 and says why, so `--restart on-failure` does not start it again.
+
 ## When the engine is away
 
 A runner may be cut off from the engine for hours: the engine's Mac sleeps, the tunnel drops, the

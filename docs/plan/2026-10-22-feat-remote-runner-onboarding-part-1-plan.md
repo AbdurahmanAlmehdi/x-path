@@ -432,7 +432,7 @@ Details:
 
 ### Phase R8: The `xpath-runner` image
 
-- **Status:** Not started
+- **Status:** Done
 - **Scope:** A Docker image that is a working Android and Flutter runner out of the box, built
   by the R7 installer.
 - **Files touched:** `Dockerfile.runner` (new), `tool/release/linux/xpath-runner` (entrypoint,

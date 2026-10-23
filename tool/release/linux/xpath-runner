@@ -1,0 +1,38 @@
+#!/bin/sh
+# The entrypoint of the xpath-runner image (Dockerfile.runner): runs `xp` with
+# the arguments given (`runner start` by default).
+#
+# - It runs <data dir>/current/bin/xp when the runner updated itself to its
+#   engine's version (D-24), else the xp of the image, so the update survives
+#   a restart of the container.
+# - For `runner start` it passes exit 75 (the runner switched version) on, so
+#   `--restart on-failure` starts it again, and turns 77 (revoked or refused),
+#   73 (replaced) and 78 (not paired) into 0 with the reason, so Docker does
+#   not restart a runner that must not run. The systemd unit does the same
+#   with RestartPreventExitStatus.
+set -u
+
+data="${XP_RUNNER_DATA_DIR:-/data}"
+mkdir -p "${HOME:-$data/home}" 2>/dev/null || true
+
+xp=/usr/local/bin/xp
+[ -x "$data/current/bin/xp" ] && xp="$data/current/bin/xp"
+
+[ $# -gt 0 ] || set -- runner start
+"$xp" "$@"
+code=$?
+
+if [ "${1:-}" = runner ] && [ "${2:-}" = start ]; then
+  case "$code" in
+    77)
+      echo "xpath-runner: the engine revoked this runner or refused its credential. Pair it again; not restarting." >&2
+      exit 0 ;;
+    73)
+      echo "xpath-runner: another connection of this runner took over: is it running twice? Not restarting." >&2
+      exit 0 ;;
+    78)
+      echo "xpath-runner: this runner is not paired. Pair it: docker run --rm -it -v <volume>:/data <image> runner pair --engine <url> --token <pairing token>. Not restarting." >&2
+      exit 0 ;;
+  esac
+fi
+exit "$code"
