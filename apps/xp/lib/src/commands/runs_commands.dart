@@ -50,6 +50,13 @@ class DispatchCommand extends XpCommand {
             'A YAML or JSON file of inputs, name: value. --input wins over '
             'it.',
         valueHelp: 'file',
+      )
+      ..addFlag(
+        'dry-run',
+        negatable: false,
+        help:
+            'Print what would run, where, what is left out and why, and the '
+            'build number it would take; start nothing.',
       );
   }
 
@@ -124,6 +131,11 @@ class DispatchCommand extends XpCommand {
       releaseVersion: results.option('release-version'),
       inputs: inputs,
     );
+    if (results.flag('dry-run')) {
+      final plan = await client.planDispatch(projectId, workflowId, request);
+      emit(plan.toJson(), () => describePlan(plan));
+      return plan.blocked ? XpExit.invalid : XpExit.ok;
+    }
     final run = await client.dispatchWorkflow(projectId, workflowId, request);
     emit(run.toJson(), () => 'Dispatched ${run.id}.\n\n${describeRun(run)}');
     return XpExit.ok;
@@ -195,6 +207,46 @@ Object? _plain(Object? value) => switch (value) {
   },
   final List<Object?> list => [for (final item in list) _plain(item)],
   _ => value,
+};
+
+/// The lines `xp dispatch --dry-run` prints: what the engine would start,
+/// where, what it leaves out and why (UX-01).
+String describePlan(DispatchPlan plan) {
+  final version = plan.version;
+  final lines = [
+    [
+      'flavors: ${plan.flavors.join(', ')}',
+      'platforms: ${plan.platforms.join(', ')}',
+      if (version != null)
+        'version: $version${plan.build == null ? '' : '+${plan.build}'}',
+      if (plan.releaseVersion case final release?) 'patches: $release',
+    ].join('  '),
+    '',
+    renderTable(
+      ['STAGE', 'JOB', 'WHERE'],
+      [
+        for (final stage in plan.stages)
+          for (final job in stage.jobs) [stage.name, job.name, _where(job)],
+      ],
+    ),
+    for (final stage in plan.stages)
+      if (stage.gates.isNotEmpty)
+        '${stage.name} waits for approval: ${stage.gates.join(', ')}',
+    if (plan.skipped.isNotEmpty) ...[
+      '',
+      for (final job in plan.skipped)
+        '${job.blocks ? 'cannot run' : 'skipped'}  ${job.name}: ${job.reason}',
+    ],
+  ];
+  return lines.join('\n');
+}
+
+String _where(PlannedJob job) => switch (job) {
+  PlannedJob(:final waitReason?) => 'waits: $waitReason',
+  PlannedJob(engineOnly: true) => 'engine',
+  PlannedJob(:final runner?, local: true) => 'engine, else $runner',
+  PlannedJob(:final runner?) => runner,
+  _ => 'engine',
 };
 
 /// The lines `xp runs show` prints.

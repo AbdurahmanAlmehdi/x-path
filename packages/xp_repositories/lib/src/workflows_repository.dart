@@ -1,7 +1,5 @@
 import 'package:xp_api/xp_api.dart';
 import 'package:xp_repositories/src/session/engine_session.dart';
-import 'package:xp_repositories/src/workflows/dispatch_preview.dart';
-import 'package:xp_repositories/src/workflows/workflow_outline.dart';
 
 /// The workflows of the engine of an [EngineSession], and dispatching them.
 class WorkflowsRepository {
@@ -68,21 +66,14 @@ class WorkflowsRepository {
     );
   }
 
-  /// What dispatching [workflow] in [project] with [request] would start,
-  /// read from the runners, gates and credentials the engine has now.
-  Future<DispatchPreview> preview({
-    required Project project,
-    required Workflow workflow,
-    required DispatchRequest request,
-  }) async => DispatchPreview.plan(
-    project: project,
-    workflow: WorkflowOutline.parse(workflow.yaml),
-    request: request,
-    runners: await _session.call((client) => client.listRunners()),
-    gates: await _session.call((client) => client.getGates(project.id)),
-    credentials: await _session.call(
-      (client) => client.listCredentials(project.id),
-    ),
+  /// What dispatching [workflowId] of [projectId] with [request] would
+  /// start, planned by the engine without starting it (UX-01).
+  Future<DispatchPlan> plan(
+    String projectId,
+    String workflowId,
+    DispatchRequest request,
+  ) => _session.call(
+    (client) => client.planDispatch(projectId, workflowId, request),
   );
 
   /// The inputs the last dispatch of [workflowId] in [projectId] from this
@@ -96,12 +87,24 @@ class WorkflowsRepository {
         _ => const {},
       };
 
-  /// Keeps [inputs] as the last inputs of [workflowId] in [projectId].
-  Future<void> rememberInputs(
+  /// The workflow the last dispatch in [projectId] from this app ran, if
+  /// any: what the Dispatch sheet offers first.
+  Future<String?> lastWorkflow(String projectId) async =>
+      switch (await _session.cache.read('dispatch-workflow.$projectId')) {
+        final String id => id,
+        _ => null,
+      };
+
+  /// Keeps [workflowId] as the last workflow dispatched in [projectId] and
+  /// [inputs] as its last inputs.
+  Future<void> rememberDispatch(
     String projectId,
     String workflowId,
     Map<String, Object?> inputs,
-  ) => _session.cache.write(_inputsKey(projectId, workflowId), inputs);
+  ) async {
+    await _session.cache.write('dispatch-workflow.$projectId', workflowId);
+    await _session.cache.write(_inputsKey(projectId, workflowId), inputs);
+  }
 
   static String _inputsKey(String projectId, String workflowId) =>
       'dispatch-inputs.$projectId.$workflowId';

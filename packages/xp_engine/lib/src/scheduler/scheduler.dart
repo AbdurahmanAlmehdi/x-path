@@ -12,6 +12,11 @@ import 'package:xp_engine/src/scheduler/paired_runners.dart';
 import 'package:xp_engine/src/scheduler/run_record.dart';
 import 'package:xp_engine/src/scheduler/scheduler_runner.dart';
 
+/// Where a dry run of a dispatch places a job: whether the engine can run
+/// it, the connected runner it can go to, and why it would wait when
+/// neither can.
+typedef JobPlacement = ({bool local, String? runner, String? waitReason});
+
 /// Decides which queued job starts, where, and when (D-11, D-19).
 ///
 /// The jobs of dispatched runs wait in the database in state `queued`. Each
@@ -327,14 +332,50 @@ class Scheduler implements JobControl {
     return best;
   }
 
-  Future<String> _whyNoRunner(
-    JobRecord job,
+  /// Where a job that needs [capabilities] and is made of steps of [kinds]
+  /// could start, without queueing it (a dry run, UX-01): whether the engine
+  /// can run it, the connected runner it can go to (by name), and why it
+  /// would wait when neither can. Free slots are not counted: they change
+  /// before the job's stage starts.
+  Future<JobPlacement> placement(
+    List<String> capabilities,
     List<String> kinds,
-    Map<String, int> used,
-    Set<String> signing,
+  ) async {
+    final needs = {for (final wire in capabilities) ?Capability.fromWire(wire)};
+    final able = [
+      for (final runner in _targets)
+        if (runner.capabilities.containsAll(needs) && runner.accepts(kinds))
+          runner,
+    ];
+    final paired =
+        await (pairedRunners?.pairedRunners() ??
+            Future.value(const <PairedRunner>[]));
+    final local = able.any((runner) => runner.id == localRunnerId);
+    final remote = able.where((runner) => runner.id != localRunnerId);
+    if (local || remote.isNotEmpty) {
+      final id = remote.firstOrNull?.id;
+      return (
+        local: local,
+        runner: id == null
+            ? null
+            : paired.where((runner) => runner.id == id).firstOrNull?.name ?? id,
+        waitReason: null,
+      );
+    }
+    return (
+      local: false,
+      runner: null,
+      waitReason: await _cannotRun(needs, kinds, () async => paired),
+    );
+  }
+
+  /// Why no connected runner can ever take a job that needs [needs] and is
+  /// made of steps of [kinds]; `null` when one can.
+  Future<String?> _cannotRun(
+    Set<Capability> needs,
+    List<String> kinds,
     Future<List<PairedRunner>> Function() paired,
   ) async {
-    final needs = _needs(job);
     final capable = _targets
         .where((runner) => runner.capabilities.containsAll(needs))
         .toList();
@@ -348,8 +389,7 @@ class Scheduler implements JobControl {
       if (offline.isEmpty) return 'No runner can do $wires.';
       return 'No connected runner can do $wires. ${offline.join(' ')}';
     }
-    final accepting = capable.where((runner) => runner.accepts(kinds)).toList();
-    if (accepting.isEmpty) {
+    if (!capable.any((runner) => runner.accepts(kinds))) {
       final engineOnly = {
         for (final kind in kinds)
           if (!capable.any((runner) => runner.accepts([kind]))) kind,
@@ -357,6 +397,26 @@ class Scheduler implements JobControl {
       return 'Only the engine runs ${engineOnly.join(', ')}, and the engine '
           'cannot do ${needs.map((c) => c.wire).join(', ')}.';
     }
+    return null;
+  }
+
+  Future<String> _whyNoRunner(
+    JobRecord job,
+    List<String> kinds,
+    Map<String, int> used,
+    Set<String> signing,
+    Future<List<PairedRunner>> Function() paired,
+  ) async {
+    final needs = _needs(job);
+    if (await _cannotRun(needs, kinds, paired) case final reason?) {
+      return reason;
+    }
+    final accepting = _targets
+        .where(
+          (runner) =>
+              runner.capabilities.containsAll(needs) && runner.accepts(kinds),
+        )
+        .toList();
     if (needs.contains(Capability.iosSign) &&
         accepting.every((runner) => signing.contains(runner.id))) {
       return 'Waiting for the ios-sign job that runs now: one at a time.';

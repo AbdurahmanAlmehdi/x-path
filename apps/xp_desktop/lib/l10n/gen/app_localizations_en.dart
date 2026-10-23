@@ -1370,8 +1370,23 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String dispatchOnRunner(String engine, String runner, int slot, int slots) {
-    return '$engine first, else $runner · slot $slot of $slots';
+  String dispatchOnRunner(String engine, String runner) {
+    return '$engine first, else $runner';
+  }
+
+  @override
+  String dispatchSkipped(String reason) {
+    return 'skipped, $reason';
+  }
+
+  @override
+  String dispatchBlocked(String reason) {
+    return 'cannot run: $reason';
+  }
+
+  @override
+  String dispatchBuildNumber(int build) {
+    return 'build $build';
   }
 
   @override
@@ -2659,6 +2674,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get workflowsImport => 'Import…';
+
+  @override
+  String get workflowsRun => 'Run…';
 
   @override
   String get workflowsExport => 'Export…';

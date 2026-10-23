@@ -19,8 +19,5 @@ export 'src/settings_repository.dart';
 export 'src/snapshot.dart';
 export 'src/storage_repository.dart';
 export 'src/tests_repository.dart';
-export 'src/workflows/dispatch_preview.dart';
 export 'src/workflows/workflow_document.dart';
-export 'src/workflows/workflow_expression.dart';
-export 'src/workflows/workflow_outline.dart';
 export 'src/workflows_repository.dart';

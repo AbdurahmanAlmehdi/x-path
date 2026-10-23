@@ -264,13 +264,18 @@ class WorkflowService {
   WorkflowSummary _summary(
     WorkflowRecord workflow,
     WorkflowVersionRecord newest,
-  ) => WorkflowSummary(
-    id: workflow.id,
-    projectId: workflow.projectId,
-    name: workflow.name,
-    builtin: workflow.builtin,
-    version: _info(newest),
-  );
+  ) {
+    final definition = _parser.parse(newest.yaml).definition;
+    return WorkflowSummary(
+      id: workflow.id,
+      projectId: workflow.projectId,
+      name: workflow.name,
+      builtin: workflow.builtin,
+      version: _info(newest),
+      title: definition?.name,
+      description: definition?.description,
+    );
+  }
 
   Workflow _detail(
     WorkflowRecord workflow,

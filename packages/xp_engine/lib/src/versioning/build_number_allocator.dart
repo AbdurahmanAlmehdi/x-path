@@ -37,7 +37,38 @@ class BuildNumberAllocator {
     TagScope scope = const TagScope(),
     String? iosBundleId,
     String? androidAppId,
-  }) async {
+  }) async => await _counters.allocate(
+    projectId: projectId,
+    appPath: appPath,
+    seed: await _seed(mirror, model, scope, iosBundleId, androidAppId),
+  );
+
+  /// The number [allocate] would hand out now, without handing it out: what
+  /// a dry run of a dispatch shows (UX-01).
+  ///
+  /// Throws an `UnknownAppException` if the project has no such app.
+  Future<int> peek({
+    required String projectId,
+    required String appPath,
+    required GitMirror mirror,
+    ReleaseModel model = const ReleaseModel(),
+    TagScope scope = const TagScope(),
+    String? iosBundleId,
+    String? androidAppId,
+  }) async => await _counters.peek(
+    projectId: projectId,
+    appPath: appPath,
+    seed: await _seed(mirror, model, scope, iosBundleId, androidAppId),
+  );
+
+  /// The largest build number the stores and the tags know.
+  Future<int> _seed(
+    GitMirror mirror,
+    ReleaseModel model,
+    TagScope scope,
+    String? iosBundleId,
+    String? androidAppId,
+  ) async {
     final store = await _stores.lookup(
       iosBundleId: iosBundleId,
       androidAppId: androidAppId,
@@ -47,10 +78,6 @@ class BuildNumberAllocator {
       final build = model.parseTag(tag.name, scope: scope)?.build ?? 0;
       if (build > seed) seed = build;
     }
-    return await _counters.allocate(
-      projectId: projectId,
-      appPath: appPath,
-      seed: seed,
-    );
+    return seed;
   }
 }

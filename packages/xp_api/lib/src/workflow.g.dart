@@ -90,6 +90,8 @@ WorkflowSummary _$WorkflowSummaryFromJson(Map<String, dynamic> json) =>
       version: WorkflowVersionInfo.fromJson(
         json['version'] as Map<String, dynamic>,
       ),
+      title: json['title'] as String?,
+      description: json['description'] as String?,
     );
 
 Map<String, dynamic> _$WorkflowSummaryToJson(WorkflowSummary instance) =>
@@ -99,6 +101,8 @@ Map<String, dynamic> _$WorkflowSummaryToJson(WorkflowSummary instance) =>
       'name': instance.name,
       'builtin': instance.builtin,
       'version': instance.version.toJson(),
+      'title': ?instance.title,
+      'description': ?instance.description,
     };
 
 WorkflowsResponse _$WorkflowsResponseFromJson(Map<String, dynamic> json) =>

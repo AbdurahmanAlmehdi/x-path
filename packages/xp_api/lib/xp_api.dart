@@ -8,6 +8,7 @@ export 'src/approval.dart';
 export 'src/artifact.dart';
 export 'src/credential.dart';
 export 'src/device_token_kind.dart';
+export 'src/dispatch_plan.dart';
 export 'src/events.dart';
 export 'src/finding.dart';
 export 'src/github_token.dart';

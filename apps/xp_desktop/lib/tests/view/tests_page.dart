@@ -171,7 +171,7 @@ class _NoRuns extends StatelessWidget {
             hint: '⌘N',
             tooltip: context.canCommand ? null : l10n.readOnlyHint,
             onPressed: context.canCommand
-                ? () => dispatchFor(context, project)
+                ? () => dispatchFor(context, project, workflowId: 'test')
                 : null,
           ),
         ],

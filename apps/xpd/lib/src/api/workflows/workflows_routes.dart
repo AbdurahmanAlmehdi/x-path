@@ -98,6 +98,14 @@ class WorkflowsRoutes {
                 request.change(body: body),
                 DispatchRequest.fromJson,
               );
+        final dryRun = request.url.queryParameters['dryRun'];
+        if (dryRun != null && dryRun != 'true' && dryRun != 'false') {
+          throw const BadRequestException('dryRun must be true or false.');
+        }
+        if (dryRun == 'true') {
+          final plan = await _dispatcher.plan(id, workflowId, dispatch);
+          return jsonResponse(plan.toJson());
+        }
         final run = await _dispatcher.dispatch(id, workflowId, dispatch);
         return jsonResponse(
           run.toJson(),

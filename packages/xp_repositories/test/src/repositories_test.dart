@@ -640,11 +640,13 @@ void main() {
 
     setUp(() => repository = WorkflowsRepository(harness.session));
 
-    test('remembers the last inputs of a workflow in the cache', () async {
+    test('remembers the last workflow and its inputs in the cache', () async {
       expect(await repository.lastInputs('prj_1', 'wf_1'), isEmpty);
+      expect(await repository.lastWorkflow('prj_1'), isNull);
 
-      await repository.rememberInputs('prj_1', 'wf_1', {'notes': 'Hi'});
+      await repository.rememberDispatch('prj_1', 'wf_1', {'notes': 'Hi'});
 
+      expect(await repository.lastWorkflow('prj_1'), 'wf_1');
       expect(await repository.lastInputs('prj_1', 'wf_1'), {'notes': 'Hi'});
       expect(await repository.lastInputs('prj_1', 'wf_2'), isEmpty);
       await harness.cache.write('dispatch-inputs.prj_1.wf_3', 'not a map');
@@ -731,25 +733,16 @@ void main() {
       expect(await repository.workflowOf(runOf('wfv_9')), workflow(version2));
     });
 
-    test('previews and dispatches a run', () async {
+    test('plans and dispatches a run', () async {
       final client = harness.client;
       const request = DispatchRequest(flavors: ['dev']);
-      when(client.listRunners).thenAnswer((_) async => [_runner]);
-      when(() => client.getGates('prj_1'))
-          .thenAnswer((_) async => const ProjectGates({}));
-      when(() => client.listCredentials('prj_1'))
-          .thenAnswer((_) async => [_credential]);
+      const plan = DispatchPlan(flavors: ['dev'], platforms: ['android']);
+      when(() => client.planDispatch('prj_1', 'wf_1', request))
+          .thenAnswer((_) async => plan);
       when(() => client.dispatchWorkflow('prj_1', 'wf_1', request))
           .thenAnswer((_) async => _run);
-      final preview = await repository.preview(
-        project: project,
-        workflow: workflow(version2),
-        request: request,
-      );
-      expect(
-        preview,
-        const DispatchPreview(flavors: [], platforms: [], stages: []),
-      );
+
+      expect(await repository.plan('prj_1', 'wf_1', request), plan);
       expect(await repository.dispatch('prj_1', 'wf_1', request), _run);
     });
   });

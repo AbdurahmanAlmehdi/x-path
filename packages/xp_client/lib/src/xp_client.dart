@@ -211,6 +211,24 @@ class XpClient {
     ),
   );
 
+  /// `POST /projects/{id}/workflows/{workflowId}/dispatch?dryRun=true`:
+  /// what dispatching would start, planned by the engine; nothing starts and
+  /// no build number is taken (UX-01).
+  Future<DispatchPlan> planDispatch(
+    String projectId,
+    String workflowId,
+    DispatchRequest request,
+  ) async => DispatchPlan.fromJson(
+    await _json(
+      await _send(
+        'POST',
+        ['projects', projectId, 'workflows', workflowId, 'dispatch'],
+        query: {'dryRun': 'true'},
+        body: request.toJson(),
+      ),
+    ),
+  );
+
   // ------------------------------------------------------------- runs, jobs
 
   /// `GET /runs/{id}`.

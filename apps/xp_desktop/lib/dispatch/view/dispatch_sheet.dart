@@ -14,9 +14,14 @@ import 'package:xp_desktop/theme/theme.dart';
 import 'package:xp_desktop/widgets/widgets.dart';
 import 'package:xp_repositories/xp_repositories.dart';
 
-/// Opens the Dispatch sheet (`Dispatch-Sheet.dc.html`) for [project]. Gives
-/// the run dispatched, or `null` when the sheet was closed.
-Future<Run?> showDispatchSheet(BuildContext context, Project project) {
+/// Opens the Dispatch sheet (`Dispatch-Sheet.dc.html`) for [project], on
+/// [workflowId] if given (else the workflow dispatched last). Gives the run
+/// dispatched, or `null` when the sheet was closed.
+Future<Run?> showDispatchSheet(
+  BuildContext context,
+  Project project, {
+  String? workflowId,
+}) {
   final workflows = context.read<WorkflowsRepository>();
   final releases = context.read<ReleasesRepository>();
   return showDialog<Run>(
@@ -27,18 +32,23 @@ Future<Run?> showDispatchSheet(BuildContext context, Project project) {
         workflows: workflows,
         releases: releases,
         project: project,
-      )..add(const DispatchStarted()),
+      )..add(DispatchStarted(workflowId: workflowId)),
       child: const DispatchSheet(),
     ),
   );
 }
 
-/// Dispatches for [project] (⌘N, the Dispatch… buttons): opens the sheet
-/// while the engine takes commands, then the job view of the run.
-Future<void> dispatchFor(BuildContext context, Project project) async {
+/// Dispatches for [project] (⌘N, the Dispatch… buttons), on [workflowId] if
+/// given: opens the sheet while the engine takes commands, then the job view
+/// of the run.
+Future<void> dispatchFor(
+  BuildContext context,
+  Project project, {
+  String? workflowId,
+}) async {
   if (!context.read<EngineConnectionBloc>().state.status.canCommand) return;
   final shell = context.read<ShellCubit>();
-  final run = await showDispatchSheet(context, project);
+  final run = await showDispatchSheet(context, project, workflowId: workflowId);
   if (run != null) shell.show(JobDestination(run.id, projectId: project.id));
 }
 
@@ -224,8 +234,12 @@ class _Form extends StatelessWidget {
                       child: XpSelect<String>(
                         value: workflow?.id ?? workflows.first.id,
                         values: [for (final item in workflows) item.id],
-                        labelOf: (id) =>
-                            workflows.firstWhere((item) => item.id == id).name,
+                        labelOf: (id) {
+                          final item = workflows.firstWhere(
+                            (item) => item.id == id,
+                          );
+                          return item.title ?? item.name;
+                        },
                         onChanged: (id) =>
                             bloc.add(DispatchWorkflowChanged(id)),
                       ),
@@ -244,6 +258,19 @@ class _Form extends StatelessWidget {
                   ],
                 ),
         ),
+        if (workflows
+                .where((item) => item.id == workflow?.id)
+                .firstOrNull
+                ?.description
+            case final description?) ...[
+          const SizedBox(height: 4),
+          Text(
+            description,
+            style: context.xpType.caption.copyWith(
+              color: context.xpColors.textSecondary,
+            ),
+          ),
+        ],
         if (apps.length > 1) ...[
           const SizedBox(height: 16),
           _Field(
@@ -367,7 +394,7 @@ class _Form extends StatelessWidget {
                 const SizedBox(width: 12),
                 if (state.preview?.version case final version?) ...[
                   Text(
-                    version,
+                    versionLabel(version, state.preview?.build),
                     style: context.xpType.code.copyWith(
                       color: context.xpColors.textPrimary,
                     ),
@@ -694,7 +721,7 @@ class _RefFieldState extends State<_RefField> {
 class _WillRun extends StatelessWidget {
   const new(this.preview);
 
-  final DispatchPreview preview;
+  final DispatchPlan preview;
 
   @override
   Widget build(BuildContext context) {
@@ -715,18 +742,19 @@ class _WillRun extends StatelessWidget {
         for (final job in stage.jobs) {
           rows.add(
             _Row(
-              status: job.runner == null
+              status: job.waitReason != null
+                  ? XpStatus.jobWaitingRunner
+                  : job.runner == null
                   ? XpStatus.jobQueued
                   : XpStatus.runnerBusy,
               title: job.name,
-              meta: job.engineOnly || job.runner == null
-                  ? engine
-                  : l10n.dispatchOnRunner(
-                      engine,
-                      job.runner!.name,
-                      job.slot!,
-                      job.runner!.slots,
-                    ),
+              meta: switch (job) {
+                PlannedJob(:final waitReason?) => waitReason,
+                PlannedJob(:final runner?, local: true, engineOnly: false) =>
+                  l10n.dispatchOnRunner(engine, runner),
+                PlannedJob(:final runner?, engineOnly: false) => runner,
+                _ => engine,
+              },
             ),
           );
         }
@@ -742,6 +770,17 @@ class _WillRun extends StatelessWidget {
           ),
         );
       }
+    }
+    for (final job in preview.skipped) {
+      rows.add(
+        _Row(
+          status: job.blocks ? XpStatus.jobFailed : XpStatus.jobSkipped,
+          title: job.name,
+          meta: job.blocks
+              ? l10n.dispatchBlocked(job.reason)
+              : l10n.dispatchSkipped(job.reason),
+        ),
+      );
     }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,

@@ -234,7 +234,8 @@ class _NoRelease extends StatelessWidget {
             hint: '⌘N',
             tooltip: context.canCommand ? null : l10n.readOnlyHint,
             onPressed: context.canCommand
-                ? () => dispatchFor(context, project)
+                ? () =>
+                      dispatchFor(context, project, workflowId: 'prod-release')
                 : null,
           ),
         ],

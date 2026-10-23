@@ -180,6 +180,8 @@ class WorkflowSummary extends Equatable {
     required this.name,
     required this.builtin,
     required this.version,
+    this.title,
+    this.description,
   });
 
   /// Reads a summary from its JSON form.
@@ -201,11 +203,26 @@ class WorkflowSummary extends Equatable {
   /// The newest version.
   final WorkflowVersionInfo version;
 
+  /// What the newest version calls the workflow (its `name`), for example
+  /// "Dev build".
+  final String? title;
+
+  /// What the newest version says the workflow is for.
+  final String? description;
+
   /// The JSON form.
   Map<String, dynamic> toJson() => _$WorkflowSummaryToJson(this);
 
   @override
-  List<Object?> get props => [id, projectId, name, builtin, version];
+  List<Object?> get props => [
+    id,
+    projectId,
+    name,
+    builtin,
+    version,
+    title,
+    description,
+  ];
 }
 
 /// The body of `GET /projects/{id}/workflows`.

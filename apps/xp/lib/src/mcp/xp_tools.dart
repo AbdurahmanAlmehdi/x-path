@@ -68,6 +68,44 @@ List<McpTool> buildXpTools(
 
   Future<String> projectId(McpArgs args) =>
       resolveProject(client, args.string('project'));
+  final dispatchArgs = <String, Object?>{
+    'project': project,
+    'workflow': workflow,
+    'ref': text('Branch, tag or commit; the base branch by default.'),
+    'app': text('The app by path ("." for the root).'),
+    'flavors': strings('The flavors to run for.'),
+    'platforms': strings('"android" and/or "ios".'),
+    'bump': text(
+      'How to bump the version.',
+      values: [for (final bump in VersionBump.values) bump.wire],
+    ),
+    'version': text('The version x.y.z to release, instead of bump.'),
+    'releaseVersion': text('The release x.y.z+build a patch applies to.'),
+    'inputs': {
+      'type': 'object',
+      'description':
+          'The inputs the workflow declares, by name. get_workflow lists '
+          'them with their type: string (text), boolean (true or false), '
+          'choice (one of its options), json (any JSON value) or release '
+          '(x.y.z+build; the releaseVersion when it gives none). An input '
+          'without a type takes any value.',
+    },
+  };
+  DispatchRequest dispatchRequestOf(McpArgs args) {
+    final bump = args.optionalString('bump');
+    return DispatchRequest(
+      ref: args.optionalString('ref'),
+      app: args.optionalString('app'),
+      flavors: args.optionalStrings('flavors'),
+      platforms: args.optionalStrings('platforms'),
+      bump: bump == null
+          ? null
+          : VersionBump.values.firstWhere((value) => value.wire == bump),
+      version: args.optionalString('version'),
+      releaseVersion: args.optionalString('releaseVersion'),
+      inputs: args.optionalObject('inputs') ?? const {},
+    );
+  }
 
   return [
     tool(
@@ -244,51 +282,37 @@ List<McpTool> buildXpTools(
           'becomes waiting_for_approval and an approval is pending. Poll '
           'get_run for the approval ids, then get_approval; only the owner '
           'can approve.',
-      {
-        'project': project,
-        'workflow': workflow,
-        'ref': text('Branch, tag or commit; the base branch by default.'),
-        'app': text('The app by path ("." for the root).'),
-        'flavors': strings('The flavors to run for.'),
-        'platforms': strings('"android" and/or "ios".'),
-        'bump': text(
-          'How to bump the version.',
-          values: [for (final bump in VersionBump.values) bump.wire],
-        ),
-        'version': text('The version x.y.z to release, instead of bump.'),
-        'releaseVersion': text('The release x.y.z+build a patch applies to.'),
-        'inputs': {
-          'type': 'object',
-          'description':
-              'The inputs the workflow declares, by name. get_workflow lists '
-              'them with their type: string (text), boolean (true or false), '
-              'choice (one of its options), json (any JSON value) or release '
-              '(x.y.z+build; the releaseVersion when it gives none). An input '
-              'without a type takes any value.',
-        },
-      },
+      dispatchArgs,
       (args) async {
         final id = await projectId(args);
-        final bump = args.optionalString('bump');
         final run = await client.dispatchWorkflow(
           id,
           await resolveWorkflow(client, id, args.string('workflow')),
-          DispatchRequest(
-            ref: args.optionalString('ref'),
-            app: args.optionalString('app'),
-            flavors: args.optionalStrings('flavors'),
-            platforms: args.optionalStrings('platforms'),
-            bump: bump == null
-                ? null
-                : VersionBump.values.firstWhere((value) => value.wire == bump),
-            version: args.optionalString('version'),
-            releaseVersion: args.optionalString('releaseVersion'),
-            inputs: args.optionalObject('inputs') ?? const {},
-          ),
+          dispatchRequestOf(args),
         );
         return await _runWithApprovals(client, run);
       },
       required: ['project', 'workflow'],
+    ),
+    tool(
+      'plan_dispatch',
+      'What dispatch_workflow would start, planned by the engine; nothing '
+          'starts and no build number is taken. Lists the jobs of each stage '
+          'and where each would run (or why it would wait), the jobs it '
+          'leaves out and why (skipped), the gates, and the version and '
+          'build number. A skipped job that blocks means dispatch_workflow '
+          'would be refused; fix what its reason says first.',
+      dispatchArgs,
+      (args) async {
+        final id = await projectId(args);
+        return (await client.planDispatch(
+          id,
+          await resolveWorkflow(client, id, args.string('workflow')),
+          dispatchRequestOf(args),
+        )).toJson();
+      },
+      required: ['project', 'workflow'],
+      readOnly: true,
     ),
     tool(
       'get_run',

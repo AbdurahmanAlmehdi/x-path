@@ -1,9 +1,11 @@
 import 'dart:math';
 
 import 'package:xp_api/xp_api.dart';
+import 'package:xp_engine/src/approvals/gate_config.dart';
 import 'package:xp_engine/src/clock/clock.dart';
 import 'package:xp_engine/src/credentials/credential_repository.dart';
 import 'package:xp_engine/src/dispatch/plan_context.dart';
+import 'package:xp_engine/src/dispatch/skip_reason.dart';
 import 'package:xp_engine/src/dispatch/step_planners.dart';
 import 'package:xp_engine/src/git/git_exceptions.dart';
 import 'package:xp_engine/src/git/git_models.dart';
@@ -15,6 +17,7 @@ import 'package:xp_engine/src/projects/project_repository.dart';
 import 'package:xp_engine/src/releases/release_exceptions.dart';
 import 'package:xp_engine/src/releases/release_opener.dart';
 import 'package:xp_engine/src/repositories/event_log.dart';
+import 'package:xp_engine/src/runners/remote_step_policy.dart';
 import 'package:xp_engine/src/scan/scan_source.dart';
 import 'package:xp_engine/src/scheduler/run_record.dart';
 import 'package:xp_engine/src/scheduler/scheduler.dart';
@@ -28,6 +31,7 @@ import 'package:xp_engine/src/versioning/version_files.dart';
 import 'package:xp_engine/src/versioning/versioning_exceptions.dart';
 import 'package:xp_engine/src/versioning/workspace.dart';
 import 'package:xp_engine/src/workflows/expression.dart';
+import 'package:xp_engine/src/workflows/gate_action.dart';
 import 'package:xp_engine/src/workflows/workflow_definition.dart';
 import 'package:xp_engine/src/workflows/workflow_exceptions.dart';
 import 'package:xp_engine/src/workflows/workflow_matrix.dart';
@@ -63,8 +67,10 @@ const _unversionedKinds = {
 ///
 /// The plan is complete before anything is stored, so a dispatch that cannot
 /// work (an unknown flavor, a credential that is missing) leaves nothing
-/// behind but the build number it allocated. A job gets no worktree here: its
-/// first step, `git.checkout`, makes it when the job runs.
+/// behind but the build number it allocated. [plan] makes the same plan and
+/// stores nothing, not even the build number (a dry run, UX-01). A job gets
+/// no worktree here: its first step, `git.checkout`, makes it when the job
+/// runs.
 class WorkflowDispatcher {
   /// Creates the dispatcher.
   ///
@@ -86,6 +92,7 @@ class WorkflowDispatcher {
     required this._workspaces,
     required this._worktreeAt,
     this._releases,
+    this._gates,
     Random? random,
   }) : _random = random ?? Random.secure();
 
@@ -105,6 +112,10 @@ class WorkflowDispatcher {
   final WorkspaceOpener _workspaces;
   final WorktreeLocator _worktreeAt;
   final ReleaseOpener? _releases;
+
+  /// The gates of the projects, for the gates a [plan] names; every gate is
+  /// on without it.
+  final GateConfigRepository? _gates;
   final Random _random;
 
   /// Dispatches the workflow [workflowId] of the project [projectId].
@@ -119,77 +130,19 @@ class WorkflowDispatcher {
     String workflowId,
     DispatchRequest request,
   ) async {
-    final stored = await _workflows.latest(projectId, workflowId);
-    final parsed = WorkflowParser(_planners).parse(stored.version.yaml);
-    final definition = parsed.definition;
-    if (definition == null) throw WorkflowInvalidException(parsed.issues);
-    final project = (await _projects.get(projectId))!;
-    final runId = _id('run');
-
-    final app = _app(project, request.app);
-    final flavors = _flavors(app, request.flavors, definition);
-    final platforms = _platforms(app, request.platforms);
-    final inputs = _inputs(definition, request);
-    final steps = definition.jobs.expand((job) => job.steps).toList();
-    final kinds = {for (final step in steps) step.kind};
-
-    final mirror = await _git.ensureMirror(
-      githubRepoId: project.githubRepoId,
-      remoteUrl: project.remote,
+    final (:stored, :definition, :context, :kinds) = await _prepare(
+      projectId,
+      workflowId,
+      request,
+      dryRun: false,
     );
-    await _git.fetch(mirror);
-    final ref = request.ref ?? project.defaultBaseBranch;
-    final String sha;
-    try {
-      sha = await _git.resolveRef(mirror, ref);
-    } on GitRefNotFoundException catch (error) {
-      throw DispatchException(error.message);
-    }
-    final model = await _models.get(projectId);
-    final scope = TagScope(app: app.name);
-
-    final releaseVersion = _releaseVersion(request, kinds, definition, inputs);
-    final current = kinds.difference(_unversionedKinds).isEmpty
-        ? null
-        : await _currentVersion(mirror, sha, app, runId);
-    VersionName? name;
-    int? build;
-    if (kinds.contains('version.bump')) {
-      name = _versionName(request, current);
-      build = await _allocator.allocate(
-        projectId: projectId,
-        appPath: app.path,
-        mirror: mirror,
-        model: model,
-        scope: scope,
-        iosBundleId: flavors.firstOrNull?.iosBundleId,
-        androidAppId: flavors.firstOrNull?.androidAppId,
-      );
-    }
-    final patch = releaseVersion != null && kinds.contains('git.tag')
-        ? await _nextPatch(mirror, model, scope, releaseVersion)
-        : null;
-
-    final context = RunContext(
-      runId: runId,
-      project: project,
-      app: app,
-      flavors: flavors,
-      platforms: platforms,
-      ref: ref,
-      sha: sha,
-      mirror: mirror,
-      model: model,
-      worktreeAt: _worktreeAt,
-      inputs: inputs,
-      bump: (request.bump ?? VersionBump.keep).wire,
-      version: name == null ? null : AppVersion(name, build),
-      build: build,
-      current: current,
-      releaseVersion: releaseVersion,
-      patch: patch,
-      release: request.release,
-    );
+    final runId = context.runId;
+    final sha = context.sha;
+    final ref = context.ref;
+    final name = context.version?.name;
+    final build = context.build;
+    final flavors = context.flavors;
+    final platforms = context.platforms;
     final jobs = await _planJobs(definition, context);
     if (jobs.isEmpty) {
       throw DispatchException(
@@ -248,6 +201,184 @@ class WorkflowDispatcher {
     );
     await _scheduler.pump();
     return run.toRun(await _records.forRun(runId));
+  }
+
+  /// Plans dispatching the workflow [workflowId] of [projectId] with
+  /// [request] and starts nothing (a dry run, UX-01): the jobs it would
+  /// make and where each would run, the jobs it leaves out and why (a job
+  /// it cannot plan is left out too, and [DispatchPlan.blocked] says that a
+  /// dispatch would be refused), the gates, and the version and build number
+  /// it would take. No build number is taken, no release is opened.
+  ///
+  /// Throws what [dispatch] throws for a request it cannot plan at all.
+  Future<DispatchPlan> plan(
+    String projectId,
+    String workflowId,
+    DispatchRequest request,
+  ) async {
+    final (:stored, :definition, :context, :kinds) = await _prepare(
+      projectId,
+      workflowId,
+      request,
+      dryRun: true,
+    );
+    final skipped = <SkippedJob>[];
+    final jobs = await _planJobs(definition, context, skipped: skipped);
+    final gates = await _gates?.get(projectId) ?? const GateConfig();
+    return DispatchPlan(
+      flavors: [for (final flavor in context.flavors) flavor.name],
+      platforms: context.platforms,
+      currentVersion: context.current?.toString(),
+      version: context.version?.name.toString(),
+      build: context.build,
+      releaseVersion: context.releaseVersion?.toString(),
+      stages: [
+        for (final (index, stage) in definition.stages.indexed)
+          if (jobs.where((job) => job.stage == index).toList()
+              case final planned when planned.isNotEmpty)
+            PlannedStage(
+              name: stage.name,
+              jobs: [for (final job in planned) await _plannedJob(job)],
+              gates: {
+                for (final job in planned)
+                  for (final step in job.steps)
+                    if (step.kind == 'gate')
+                      if (GateAction.fromWire('${step.input['action']}')
+                          case final action? when gates.isGated(action))
+                        action.wire,
+              }.toList(),
+            ),
+      ],
+      skipped: skipped,
+    );
+  }
+
+  Future<PlannedJob> _plannedJob(_PlannedJob job) async {
+    final kinds = [for (final step in job.steps) step.kind];
+    final placement = await _scheduler.placement(job.capabilities, kinds);
+    return PlannedJob(
+      name: job.name,
+      flavor: job.cell['flavor'],
+      platform: job.cell['platform'],
+      capabilities: job.capabilities,
+      engineOnly: !RemoteStepPolicy.canRunRemotely(kinds),
+      local: placement.local,
+      runner: placement.runner,
+      waitReason: placement.waitReason,
+    );
+  }
+
+  /// What [dispatch] and [plan] work out before planning the jobs: the
+  /// workflow, the request read against the project, the commit, the
+  /// version and (outside a [dryRun]) the build number it allocates.
+  Future<
+    ({
+      StoredWorkflow stored,
+      WorkflowDefinition definition,
+      RunContext context,
+      Set<String> kinds,
+    })
+  >
+  _prepare(
+    String projectId,
+    String workflowId,
+    DispatchRequest request, {
+    required bool dryRun,
+  }) async {
+    final stored = await _workflows.latest(projectId, workflowId);
+    final parsed = WorkflowParser(_planners).parse(stored.version.yaml);
+    final definition = parsed.definition;
+    if (definition == null) throw WorkflowInvalidException(parsed.issues);
+    final project = (await _projects.get(projectId))!;
+    final runId = _id('run');
+
+    final app = _app(project, request.app);
+    final flavors = _flavors(app, request.flavors, definition);
+    final platforms = _platforms(app, request.platforms);
+    final inputs = _inputs(definition, request);
+    final steps = definition.jobs.expand((job) => job.steps).toList();
+    final kinds = {for (final step in steps) step.kind};
+
+    final mirror = await _git.ensureMirror(
+      githubRepoId: project.githubRepoId,
+      remoteUrl: project.remote,
+    );
+    final ref = request.ref ?? project.defaultBaseBranch;
+    final sha = await _commitOf(mirror, ref, dryRun: dryRun);
+    final model = await _models.get(projectId);
+    final scope = TagScope(app: app.name);
+
+    final releaseVersion = _releaseVersion(request, kinds, definition, inputs);
+    final current = kinds.difference(_unversionedKinds).isEmpty
+        ? null
+        : await _currentVersion(mirror, sha, app, runId);
+    VersionName? name;
+    int? build;
+    if (kinds.contains('version.bump')) {
+      name = _versionName(request, current);
+      final allocate = dryRun ? _allocator.peek : _allocator.allocate;
+      build = await allocate(
+        projectId: projectId,
+        appPath: app.path,
+        mirror: mirror,
+        model: model,
+        scope: scope,
+        iosBundleId: flavors.firstOrNull?.iosBundleId,
+        androidAppId: flavors.firstOrNull?.androidAppId,
+      );
+    }
+    final patch = releaseVersion != null && kinds.contains('git.tag')
+        ? await _nextPatch(mirror, model, scope, releaseVersion)
+        : null;
+
+    final context = RunContext(
+      runId: runId,
+      project: project,
+      app: app,
+      flavors: flavors,
+      platforms: platforms,
+      ref: ref,
+      sha: sha,
+      mirror: mirror,
+      model: model,
+      worktreeAt: _worktreeAt,
+      inputs: inputs,
+      bump: (request.bump ?? VersionBump.keep).wire,
+      version: name == null ? null : AppVersion(name, build),
+      build: build,
+      current: current,
+      releaseVersion: releaseVersion,
+      patch: patch,
+      release: request.release,
+    );
+    return (
+      stored: stored,
+      definition: definition,
+      context: context,
+      kinds: kinds,
+    );
+  }
+
+  /// The commit [ref] names in [mirror], fetched first; a [dryRun] fetches
+  /// only when the mirror does not know [ref] yet.
+  Future<String> _commitOf(
+    GitMirror mirror,
+    String ref, {
+    required bool dryRun,
+  }) async {
+    if (dryRun) {
+      try {
+        return await _git.resolveRef(mirror, ref);
+      } on GitRefNotFoundException {
+        // Fetched below.
+      }
+    }
+    await _git.fetch(mirror);
+    try {
+      return await _git.resolveRef(mirror, ref);
+    } on GitRefNotFoundException catch (error) {
+      throw DispatchException(error.message);
+    }
   }
 
   // -------------------------------------------------------------- releases
@@ -539,20 +670,47 @@ class WorkflowDispatcher {
 
   // -------------------------------------------------------------- planning
 
+  /// The jobs of [definition] in [run]: every cell of every matrix whose
+  /// `if` holds. With [skipped] (a dry run) the cells left out are added to
+  /// it with the reason, and so is a job that cannot be planned, which
+  /// otherwise fails the dispatch.
   Future<List<_PlannedJob>> _planJobs(
     WorkflowDefinition definition,
-    RunContext run,
-  ) async {
+    RunContext run, {
+    List<SkippedJob>? skipped,
+  }) async {
     final planned = <_PlannedJob>[];
     for (final (stage, stageDefinition) in definition.stages.indexed) {
       for (final job in stageDefinition.jobs) {
         for (final cell in expandMatrix(job, run.scope)) {
           final context = await _jobContext(job, cell, run, planned);
-          if (job.condition != null &&
-              !Expression.isTruthy(job.condition!.evaluate(context.scope))) {
+          SkippedJob skip(String reason, {bool blocks = false}) => SkippedJob(
+            name: _jobName(job, cell, context.scope),
+            stage: stageDefinition.name,
+            flavor: cell['flavor'],
+            platform: cell['platform'],
+            reason: reason,
+            blocks: blocks,
+          );
+          final condition = job.condition;
+          if (condition != null &&
+              !Expression.isTruthy(condition.evaluate(context.scope))) {
+            skipped?.add(
+              skip(
+                skipReason(condition, context.scope, flavor: cell['flavor']),
+              ),
+            );
             continue;
           }
-          planned.add(await _planJob(job, cell, stage, context));
+          if (skipped == null) {
+            planned.add(await _planJob(job, cell, stage, context));
+            continue;
+          }
+          try {
+            planned.add(await _planJob(job, cell, stage, context));
+          } on DispatchException catch (error) {
+            skipped.add(skip(error.message, blocks: true));
+          }
         }
       }
     }
@@ -675,19 +833,28 @@ class WorkflowDispatcher {
       steps.add(await _planners.plan(planning));
       capabilities.addAll(_planners.capabilitiesOf(planning));
     }
-    final fallback =
-        '${definition.id}'
-        '${cell.isEmpty ? '' : ' (${cell.values.join(', ')})'}';
-    final name = definition.name?.evaluate(scope);
     return _PlannedJob(
       id: context.jobId,
       definitionId: definition.id,
       cell: cell,
       stage: stage,
-      name: name is String && name.isNotEmpty ? name : fallback,
+      name: _jobName(definition, cell, scope),
       capabilities: (capabilities.map((c) => c.wire).toList()..sort()),
       steps: steps,
     );
+  }
+
+  /// What the job of [definition] in [cell] is called: its `name`, else its
+  /// id and the cell.
+  String _jobName(
+    JobDefinition definition,
+    Map<String, String> cell,
+    Map<String, Object?> scope,
+  ) {
+    final name = definition.name?.evaluate(scope);
+    if (name is String && name.isNotEmpty) return name;
+    return '${definition.id}'
+        '${cell.isEmpty ? '' : ' (${cell.values.join(', ')})'}';
   }
 
   /// What a gate binds an approval to besides the project, action and

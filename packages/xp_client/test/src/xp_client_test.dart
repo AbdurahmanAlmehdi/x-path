@@ -221,6 +221,28 @@ void main() {
       ).toJson(),
     ),
     _Endpoint(
+      'planDispatch',
+      method: 'POST',
+      path: '/projects/prj_1/workflows/wf_1/dispatch',
+      query: {'dryRun': 'true'},
+      response: const DispatchPlan(
+        flavors: ['prod'],
+        platforms: ['ios'],
+        build: 46,
+      ).toJson(),
+      call: (client) => client.planDispatch(
+        'prj_1',
+        'wf_1',
+        const DispatchRequest(flavors: ['prod']),
+      ),
+      expected: const DispatchPlan(
+        flavors: ['prod'],
+        platforms: ['ios'],
+        build: 46,
+      ),
+      body: const DispatchRequest(flavors: ['prod']).toJson(),
+    ),
+    _Endpoint(
       'getRun',
       method: 'GET',
       path: '/runs/run_1',

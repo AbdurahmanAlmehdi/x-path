@@ -2299,8 +2299,26 @@ abstract class AppLocalizations {
   /// Where a job that can run anywhere lands.
   ///
   /// In en, this message translates to:
-  /// **'{engine} first, else {runner} · slot {slot} of {slots}'**
-  String dispatchOnRunner(String engine, String runner, int slot, int slots);
+  /// **'{engine} first, else {runner}'**
+  String dispatchOnRunner(String engine, String runner);
+
+  /// A job the run leaves out, and why (the engine's words).
+  ///
+  /// In en, this message translates to:
+  /// **'skipped, {reason}'**
+  String dispatchSkipped(String reason);
+
+  /// A job the engine cannot plan, so the dispatch would be refused.
+  ///
+  /// In en, this message translates to:
+  /// **'cannot run: {reason}'**
+  String dispatchBlocked(String reason);
+
+  /// The build number a dispatch would take.
+  ///
+  /// In en, this message translates to:
+  /// **'build {build}'**
+  String dispatchBuildNumber(int build);
 
   /// Row of a stage's gates.
   ///
@@ -4323,6 +4341,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Import…'**
   String get workflowsImport;
+
+  /// Opens the dispatch sheet on the open workflow.
+  ///
+  /// In en, this message translates to:
+  /// **'Run…'**
+  String get workflowsRun;
 
   /// Saves the YAML to a file.
   ///

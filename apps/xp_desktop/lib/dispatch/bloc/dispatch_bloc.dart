@@ -11,9 +11,16 @@ sealed class DispatchEvent extends Equatable {
   List<Object?> get props => [];
 }
 
-/// Loads the workflows of the project and previews the first.
+/// Loads the workflows of the project and previews [workflowId] (an id, or
+/// the name of a workflow such as `prod-release`), else the one dispatched
+/// last, else the first.
 final class DispatchStarted extends DispatchEvent {
-  const new();
+  const new({this.workflowId});
+
+  final String? workflowId;
+
+  @override
+  List<Object?> get props => [workflowId];
 }
 
 final class DispatchWorkflowChanged extends DispatchEvent {
@@ -126,7 +133,6 @@ class DispatchState extends Equatable {
     this.status = DispatchStatus.loading,
     this.workflows = const [],
     this.workflow,
-    this.outline,
     this.flavors,
     this.platforms,
     this.refKind = RefKind.branch,
@@ -152,7 +158,6 @@ class DispatchState extends Equatable {
 
   /// The workflow chosen, as the engine has it now.
   final Workflow? workflow;
-  final WorkflowOutline? outline;
 
   /// The flavors picked, or `null` for the ones the engine takes by default.
   final List<String>? flavors;
@@ -177,8 +182,8 @@ class DispatchState extends Equatable {
   /// arrive or when the workflow has none.
   final List<Release>? releases;
 
-  /// What the dispatch would start.
-  final DispatchPreview? preview;
+  /// What the dispatch would start, as the engine plans it (UX-01).
+  final DispatchPlan? preview;
 
   /// Whether the preview is being worked out again.
   final bool previewing;
@@ -189,14 +194,9 @@ class DispatchState extends Equatable {
   /// What went wrong last.
   final String? error;
 
-  /// Whether the workflow writes a version, so the bump matters.
-  bool get bumps =>
-      outline?.stages.any(
-        (stage) => stage.jobs.any(
-          (job) => job.steps.any((step) => step.kind == 'version.bump'),
-        ),
-      ) ??
-      false;
+  /// Whether the workflow writes a version, so the bump matters: the
+  /// engine's plan says which version it would release.
+  bool get bumps => preview?.version != null;
 
   /// The flavors the run is for: the ones picked, else the default.
   List<String> get chosenFlavors => flavors ?? preview?.flavors ?? const [];
@@ -249,6 +249,7 @@ class DispatchState extends Equatable {
       workflow != null &&
       invalidInputs.isEmpty &&
       !noReleases &&
+      !(preview?.blocked ?? false) &&
       (preview?.jobCount ?? 0) > 0;
 
   DispatchState copyWith({
@@ -256,7 +257,6 @@ class DispatchState extends Equatable {
     DispatchStatus? status,
     List<WorkflowSummary>? workflows,
     Workflow? workflow,
-    WorkflowOutline? outline,
     List<String>? Function()? flavors,
     List<String>? Function()? platforms,
     String? ref,
@@ -266,7 +266,7 @@ class DispatchState extends Equatable {
     Map<String, Object?>? inputs,
     Set<String>? invalidInputs,
     List<Release>? Function()? releases,
-    DispatchPreview? preview,
+    DispatchPlan? preview,
     bool? previewing,
     Run? run,
     String? Function()? error,
@@ -276,7 +276,6 @@ class DispatchState extends Equatable {
     status: status ?? this.status,
     workflows: workflows ?? this.workflows,
     workflow: workflow ?? this.workflow,
-    outline: outline ?? this.outline,
     flavors: flavors == null ? this.flavors : flavors(),
     platforms: platforms == null ? this.platforms : platforms(),
     ref: ref ?? this.ref,
@@ -299,7 +298,6 @@ class DispatchState extends Equatable {
     status,
     workflows,
     workflow,
-    outline,
     flavors,
     platforms,
     ref,
@@ -325,6 +323,11 @@ const _reachedAStore = <ReleaseState>{
   ReleaseState.live,
   ReleaseState.merged,
 };
+
+/// Whether the sheet leaves [workflow] out: the merge of a release pull
+/// request, which starts from the release.
+bool _hidden(WorkflowSummary workflow) =>
+    workflow.builtin && workflow.name == 'release-merge';
 
 /// [release] as a release input takes it: `x.y.z+build`.
 String releaseValue(Release release) => '${release.version}+${release.build}';
@@ -417,13 +420,24 @@ class DispatchBloc extends Bloc<DispatchEvent, DispatchState> {
     Emitter<DispatchState> emit,
   ) async {
     try {
-      final workflows = await _workflows.listWorkflows(state.project.id);
+      final workflows = [
+        for (final workflow in await _workflows.listWorkflows(state.project.id))
+          if (!_hidden(workflow)) workflow,
+      ];
       emit(state.copyWith(workflows: workflows));
       if (workflows.isEmpty) {
         emit(state.copyWith(status: DispatchStatus.ready));
         return;
       }
-      add(DispatchWorkflowChanged(workflows.first.id));
+      final wanted =
+          event.workflowId ?? await _workflows.lastWorkflow(state.project.id);
+      final first =
+          workflows
+              .where((workflow) => wanted == workflow.id)
+              .followedBy(workflows.where((w) => wanted == w.name))
+              .firstOrNull ??
+          workflows.first;
+      add(DispatchWorkflowChanged(first.id));
     } on Exception catch (error) {
       emit(
         state.copyWith(
@@ -444,12 +458,6 @@ class DispatchBloc extends Bloc<DispatchEvent, DispatchState> {
         state.project.id,
         event.workflowId,
       );
-      WorkflowOutline? outline;
-      try {
-        outline = WorkflowOutline.parse(workflow.yaml);
-      } on FormatException {
-        outline = const WorkflowOutline();
-      }
       final remembered = await _workflows.lastInputs(
         state.project.id,
         workflow.id,
@@ -457,7 +465,6 @@ class DispatchBloc extends Bloc<DispatchEvent, DispatchState> {
       emit(
         state.copyWith(
           workflow: workflow,
-          outline: outline,
           flavors: () => null,
           platforms: () => null,
           inputs: remembered,
@@ -506,10 +513,10 @@ class DispatchBloc extends Bloc<DispatchEvent, DispatchState> {
     final workflow = state.workflow;
     if (workflow == null) return;
     try {
-      final preview = await _workflows.preview(
-        project: state.project,
-        workflow: workflow,
-        request: state.request,
+      final preview = await _workflows.plan(
+        state.project.id,
+        workflow.id,
+        state.request,
       );
       emit(
         state.copyWith(
@@ -543,7 +550,7 @@ class DispatchBloc extends Bloc<DispatchEvent, DispatchState> {
         state.workflow!.id,
         request,
       );
-      await _workflows.rememberInputs(
+      await _workflows.rememberDispatch(
         state.project.id,
         state.workflow!.id,
         request.inputs,

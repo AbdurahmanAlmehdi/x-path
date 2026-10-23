@@ -1248,6 +1248,17 @@ paths:
         `422 workflow_invalid` when the document no longer is valid or the
         request asks for something the project cannot do (an unknown flavor,
         a step without a credential it needs); the message says what.
+
+        With `dryRun=true` the engine plans the dispatch and starts nothing
+        (UX-01): `200` with the plan, which lists the jobs it would start and
+        where, the jobs it leaves out and why, the gates, and the version and
+        build number it would take (no number is taken).
+      parameters:
+        - name: dryRun
+          in: query
+          required: false
+          schema:
+            type: boolean
       requestBody:
         required: false
         content:
@@ -1255,6 +1266,12 @@ paths:
             schema:
               $ref: "#/components/schemas/DispatchRequest"
       responses:
+        "200":
+          description: The plan of a dry run.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DispatchPlan"
         "202":
           description: The run, with its jobs.
           headers:
@@ -3146,6 +3163,99 @@ components:
             it declares none or no longer reads as a workflow.
           items:
             $ref: "#/components/schemas/WorkflowInput"
+    DispatchPlan:
+      type: object
+      required: [flavors, platforms, stages, skipped]
+      additionalProperties: false
+      properties:
+        flavors:
+          type: array
+          items:
+            type: string
+        platforms:
+          type: array
+          items:
+            type: string
+        stages:
+          type: array
+          items:
+            $ref: "#/components/schemas/PlannedStage"
+        skipped:
+          type: array
+          description: |
+            The jobs the run leaves out (their `if` is false) and the ones the
+            engine cannot plan (`blocks`), which it would refuse to dispatch.
+          items:
+            $ref: "#/components/schemas/SkippedJob"
+        currentVersion:
+          type: string
+          description: The pubspec version at the commit, `x.y.z+build`.
+        version:
+          type: string
+          description: The version the run would release.
+        build:
+          type: integer
+          description: The build number the run would take; not taken yet.
+        releaseVersion:
+          type: string
+    PlannedStage:
+      type: object
+      required: [name, jobs, gates]
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+        jobs:
+          type: array
+          items:
+            $ref: "#/components/schemas/PlannedJob"
+        gates:
+          type: array
+          items:
+            type: string
+    PlannedJob:
+      type: object
+      required: [name, capabilities, engineOnly, local]
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+        flavor:
+          type: string
+        platform:
+          type: string
+        capabilities:
+          type: array
+          items:
+            type: string
+        engineOnly:
+          type: boolean
+        local:
+          type: boolean
+          description: Whether the engine itself can run it.
+        runner:
+          type: string
+          description: The connected runner it would go to otherwise.
+        waitReason:
+          type: string
+          description: Why it would wait to start.
+    SkippedJob:
+      type: object
+      required: [name, stage, reason, blocks]
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+        stage:
+          type: string
+        flavor:
+          type: string
+        platform:
+          type: string
+        reason:
+          type: string
+        blocks:
+          type: boolean
     InputType:
       type: string
       description: |
@@ -3188,6 +3298,12 @@ components:
           type: boolean
         version:
           $ref: "#/components/schemas/WorkflowVersionInfo"
+        title:
+          type: string
+          description: The `name` the newest version gives the workflow.
+        description:
+          type: string
+          description: What the newest version says it is for.
     WorkflowsResponse:
       type: object
       required: [workflows]

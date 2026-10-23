@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:xp_desktop/app/app_services.dart';
+import 'package:xp_desktop/dispatch/view/dispatch_sheet.dart';
 import 'package:xp_desktop/l10n/l10n.dart';
 import 'package:xp_desktop/projects/bloc/projects_bloc.dart';
 import 'package:xp_desktop/shell/cubit/shell_cubit.dart';
@@ -191,6 +192,20 @@ class WorkflowBuilderView extends StatelessWidget {
             onPressed: busy
                 ? null
                 : () => leave(() => bloc.add(const WorkflowImportRequested())),
+          ),
+          XpButton(
+            label: l10n.workflowsRun,
+            icon: PhosphorIconsRegular.play,
+            tooltip: canCommand ? null : l10n.readOnlyHint,
+            onPressed: canCommand && workflow != null && !state.dirty
+                ? () => dispatchFor(
+                    context,
+                    context.read<ProjectsBloc>().state.byId(
+                      workflow.projectId,
+                    )!,
+                    workflowId: workflow.id,
+                  )
+                : null,
           ),
           XpButton(
             label: l10n.workflowsExport,

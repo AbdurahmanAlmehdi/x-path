@@ -51,6 +51,22 @@ sealed class Expression {
   /// The variables the expression reads: the first name of each reference.
   Set<String> get variables;
 
+  /// The expression as it reads, for example `flavor.credentials.play_sa`
+  /// or `platform == 'ios'`.
+  String get source;
+
+  /// The parts that make the expression false in [scope]: the false
+  /// operands of `&&` and `||` (both of a false `||`), down to a reference,
+  /// a comparison or a `!`. Empty when it is true.
+  List<Expression> falseParts(Map<String, Object?> scope) =>
+      Expression.isTruthy(evaluate(scope)) ? const [] : _whyFalse(scope);
+
+  /// [falseParts] of an expression that is false.
+  List<Expression> _whyFalse(Map<String, Object?> scope) => [this];
+
+  @override
+  String toString() => source;
+
   /// Whether [value] counts as true.
   static bool isTruthy(Object? value) =>
       value != null && value != false && value != 0 && value != '';
@@ -66,6 +82,11 @@ final class _Literal extends Expression {
 
   @override
   Set<String> get variables => const {};
+
+  @override
+  String get source => value is String
+      ? "'${(value! as String).replaceAll("'", "''")}'"
+      : '$value';
 }
 
 final class _Reference extends Expression {
@@ -78,6 +99,9 @@ final class _Reference extends Expression {
 
   @override
   Set<String> get variables => {name};
+
+  @override
+  String get source => name;
 }
 
 final class _Member extends Expression {
@@ -99,6 +123,18 @@ final class _Member extends Expression {
 
   @override
   Set<String> get variables => {...target.variables, ...key.variables};
+
+  @override
+  String get source => switch (key) {
+    _Literal(:final String value) when _isName(value) =>
+      '${target.source}.$value',
+    _ => '${target.source}[${key.source}]',
+  };
+
+  static bool _isName(String text) =>
+      text.isNotEmpty &&
+      _nameStart.hasMatch(text[0]) &&
+      text.split('').every(_namePart.hasMatch);
 }
 
 final class _Not extends Expression {
@@ -112,6 +148,9 @@ final class _Not extends Expression {
 
   @override
   Set<String> get variables => operand.variables;
+
+  @override
+  String get source => '!${operand.source}';
 }
 
 final class _Equals extends Expression {
@@ -132,6 +171,10 @@ final class _Equals extends Expression {
 
   @override
   Set<String> get variables => {...left.variables, ...right.variables};
+
+  @override
+  String get source =>
+      '${left.source} ${negated ? '!=' : '=='} ${right.source}';
 }
 
 final class _Logical extends Expression {
@@ -148,7 +191,18 @@ final class _Logical extends Expression {
   }
 
   @override
+  List<Expression> _whyFalse(Map<String, Object?> scope) {
+    final leftFalse = left.falseParts(scope);
+    if (isAnd) return leftFalse.isNotEmpty ? leftFalse : right._whyFalse(scope);
+    return [...leftFalse, ...right.falseParts(scope)];
+  }
+
+  @override
   Set<String> get variables => {...left.variables, ...right.variables};
+
+  @override
+  String get source =>
+      '(${left.source} ${isAnd ? '&&' : '||'} ${right.source})';
 }
 
 enum _Kind {

@@ -97,7 +97,7 @@ class JobViewState extends Equatable {
   final bool cached;
 
   /// The workflow the run runs, for the names of its stages.
-  final WorkflowOutline? outline;
+  final WorkflowDocument? outline;
 
   /// What the workflow is called.
   final String? workflowName;
@@ -137,7 +137,7 @@ class JobViewState extends Equatable {
     bool? loaded,
     RunJobs? runJobs,
     bool? cached,
-    WorkflowOutline? outline,
+    WorkflowDocument? outline,
     String? workflowName,
     String? selectedJobId,
     int? Function()? selectedStep,
@@ -264,10 +264,10 @@ class JobViewBloc extends Bloc<JobViewEvent, JobViewState> {
       // The stages keep their numbers; the connection banner tells why.
       return;
     }
-    WorkflowOutline? outline;
+    WorkflowDocument? outline;
     try {
-      outline = WorkflowOutline.parse(workflow.yaml);
-    } on FormatException {
+      outline = WorkflowDocument.parse(workflow.yaml);
+    } on WorkflowDocumentException {
       outline = null;
     }
     emit(state.copyWith(outline: outline, workflowName: workflow.name));
