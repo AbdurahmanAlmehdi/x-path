@@ -163,25 +163,31 @@ class UploadAppStoreResult extends Equatable {
     this.deliveryId,
     this.buildId,
     this.processingState,
+    this.warnings = const [],
   });
 
   /// Whether App Store Connect had the build before this run, so nothing was
   /// uploaded.
   final bool alreadyUploaded;
 
-  /// Whether altool said the upload went through (a success line in its
-  /// output).
+  /// Whether App Store Connect accepted the upload, or altool said it went
+  /// through (a success line in its output).
   final bool confirmed;
 
   /// altool's delivery UUID, for `altool --build-status`.
   final String? deliveryId;
 
-  /// The id of the build in the REST API, when an API key found it.
+  /// The id of the build in the REST API, when an API key found or uploaded
+  /// it.
   final String? buildId;
 
   /// The processing state (`PROCESSING`, `VALID`, ...) when an API key found
   /// the build.
   final String? processingState;
+
+  /// What App Store Connect warned about when it accepted an upload through
+  /// the API, as `code: description`.
+  final List<String> warnings;
 
   /// The stored form.
   Map<String, dynamic> toJson() => {
@@ -190,6 +196,7 @@ class UploadAppStoreResult extends Equatable {
     'deliveryId': ?deliveryId,
     'buildId': ?buildId,
     'processingState': ?processingState,
+    if (warnings.isNotEmpty) 'warnings': warnings,
   };
 
   @override
@@ -199,5 +206,6 @@ class UploadAppStoreResult extends Equatable {
     deliveryId,
     buildId,
     processingState,
+    warnings,
   ];
 }

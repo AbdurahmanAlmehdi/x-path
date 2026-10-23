@@ -63,19 +63,23 @@ class AppleStores {
   List<GuardCheck> get guardChecks => [AppStoreTrainCheck(trains)];
 
   /// The `upload.appStore` step, uploading from the artifact [store].
+  ///
+  /// [processingTimeout] replaces the 30 minutes a build upload may take, and
+  /// the upload is then polled every second (end-to-end tests).
   UploadAppStoreStep uploadStep({
     required ArtifactRepository repository,
     required LocalArtifactStore store,
     required SecretStore secrets,
-    required SecretFileStore secretFiles,
     required bool isMacOS,
+    Duration? processingTimeout,
   }) => UploadAppStoreStep(
     repository: repository,
     store: store,
     secrets: secrets,
-    secretFiles: secretFiles,
     connect: connect,
     isMacOS: isMacOS,
+    pollInterval: Duration(seconds: processingTimeout == null ? 15 : 1),
+    processingTimeout: processingTimeout ?? const Duration(minutes: 30),
   );
 
   /// Releases the HTTP clients.

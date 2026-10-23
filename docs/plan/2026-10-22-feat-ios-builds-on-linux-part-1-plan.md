@@ -93,7 +93,7 @@ once and opens one pull request.
 
 ### Phase 1: App Store upload through the App Store Connect API (no Linux needed)
 
-- **Status:** Not started
+- **Status:** Done
 - **Scope:** `upload.appStore` uploads through the build-upload API when the credential is an
   `asc_key`, on any engine, and no longer needs `ios-sign`. Amends D-14.
 - **Files touched:**

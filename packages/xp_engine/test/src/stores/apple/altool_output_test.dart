@@ -152,6 +152,36 @@ void main() {
     });
   });
 
+  group('the errors of a build upload', () {
+    test('are lines of code and description with the codes found', () {
+      final output = AltoolOutput.ofUploadIssues(const [
+        AscUploadIssue(code: '90189', description: 'Redundant binary.'),
+        AscUploadIssue(code: 'STATE_ERROR', description: 'ITMS-90186: Closed.'),
+        AscUploadIssue(code: 'ENTITY_ERROR', description: 'Higher (90062).'),
+        AscUploadIssue(code: 'ITMS-90189', description: 'Again.'),
+      ]);
+
+      expect(output.errors, [
+        '90189: Redundant binary.',
+        'STATE_ERROR: ITMS-90186: Closed.',
+        'ENTITY_ERROR: Higher (90062).',
+        'ITMS-90189: Again.',
+      ]);
+      expect(output.codes, ['90189', '90186', '90062']);
+      expect(output.rejected, isTrue);
+      expect(output.hint, contains('Bump the version'));
+    });
+
+    test('without a code have no cure', () {
+      final output = AltoolOutput.ofUploadIssues(const [
+        AscUploadIssue(code: 'UNKNOWN', description: 'Odd.'),
+      ]);
+
+      expect(output.codes, isEmpty);
+      expect(output.hint, isNull);
+    });
+  });
+
   test('a clean output equals another clean output', () {
     expect(AltoolOutput.parse(const []), const AltoolOutput());
   });

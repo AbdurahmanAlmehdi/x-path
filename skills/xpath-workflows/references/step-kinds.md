@@ -50,7 +50,7 @@ explicit resume, which asks the step whether its work exists first (`alreadyDone
 |---|---|---|
 | `upload.firebase` | `appId` (required), `artifactName`, `artifactsFrom`, `testerEmails`, `groupAliases`, `releaseNotes` | Firebase App Distribution with the flavor's `firebase_sa` credential. `appId` is the Firebase app id (`1:123456789012:android:...`). Takes the APK by default. |
 | `upload.play` | `artifactName`, `artifactsFrom`, `packageName`, `track`, `status`, `userFraction`, `releaseName`, `releaseNotes` | Google Play with the flavor's `play_sa` credential. `packageName` defaults to the flavor's Android application id; `track` to `internal`; `status` is `completed` (default), `inProgress` (with a `userFraction` between 0 and 1) or `draft`. `releaseNotes` maps a language tag to text. Takes the AAB by default. Never cancels a review in progress. |
-| `upload.appStore` | `appleAppId` (required), `artifactName`, `artifactsFrom`, `bundleId` | `xcrun altool --upload-package` with the flavor's `asc_key` or `apple_id` credential. `bundleId` defaults to the flavor's iOS bundle id. Needs `ios-sign`. |
+| `upload.appStore` | `appleAppId` (required), `artifactName`, `artifactsFrom`, `bundleId` | With the flavor's `asc_key`, uploads through the App Store Connect build-upload API on any engine; with an `apple_id`, runs `xcrun altool --upload-package` and needs `ios-sign`. `bundleId` defaults to the flavor's iOS bundle id. |
 
 `artifactsFrom: <job id>` takes the file from the job of the same matrix cell in an earlier
 stage (the build job), which is how an upload runs on the engine while the build ran on a runner.

@@ -96,6 +96,39 @@ void main() {
     });
   });
 
+  group('AscBuildUploadState', () {
+    test('reads the values of the API and knows the final ones', () {
+      expect(
+        AscBuildUploadState.fromWire('AWAITING_UPLOAD'),
+        AscBuildUploadState.awaitingUpload,
+      );
+      expect(
+        AscBuildUploadState.fromWire('COMPLETE'),
+        AscBuildUploadState.complete,
+      );
+      expect(
+        [
+          for (final state in AscBuildUploadState.values)
+            if (state.isFinal) state,
+        ],
+        [AscBuildUploadState.complete, AscBuildUploadState.failed],
+      );
+    });
+
+    test('maps anything else to unknown', () {
+      expect(AscBuildUploadState.fromWire('NEW'), AscBuildUploadState.unknown);
+      expect(AscBuildUploadState.fromWire(null), AscBuildUploadState.unknown);
+      expect(AscBuildUploadState.fromWire(''), AscBuildUploadState.unknown);
+    });
+  });
+
+  test('an upload issue reads as code: description', () {
+    expect(
+      '${AscUploadIssue(code: '90189', description: 'Used.')}',
+      '90189: Used.',
+    );
+  });
+
   group('AscRateLimit.parse', () {
     test('reads the quota of the hour', () {
       expect(
@@ -115,6 +148,20 @@ void main() {
     expect(
       AscApp(id: '1', bundleId: 'a', name: 'A'),
       AscApp(id: '1', bundleId: 'a', name: 'A'),
+    );
+    expect(
+      AscBuildUpload(
+        id: 'u',
+        state: AscBuildUploadState.failed,
+        errors: const [AscUploadIssue(code: '1', description: 'd')],
+        buildId: 'b',
+      ),
+      AscBuildUpload(
+        id: 'u',
+        state: AscBuildUploadState.failed,
+        errors: const [AscUploadIssue(code: '1', description: 'd')],
+        buildId: 'b',
+      ),
     );
     expect(
       AscBuild(

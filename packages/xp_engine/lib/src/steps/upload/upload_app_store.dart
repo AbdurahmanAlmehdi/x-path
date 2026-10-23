@@ -1,7 +1,7 @@
 import 'package:xp_api/xp_api.dart';
+import 'package:xp_engine/src/artifacts/artifact_record.dart';
 import 'package:xp_engine/src/artifacts/artifact_repository.dart';
 import 'package:xp_engine/src/artifacts/artifact_store.dart';
-import 'package:xp_engine/src/jobs/secret_file_store.dart';
 import 'package:xp_engine/src/process/process_runner.dart';
 import 'package:xp_engine/src/process/process_supervisor.dart';
 import 'package:xp_engine/src/secrets/secret_store.dart';
@@ -19,16 +19,19 @@ import 'package:xp_engine/src/stores/apple/asc_models.dart';
 /// (`-p @env:XPATH_ASC_APP_PASSWORD`), so that it is never in `ps`.
 const ascAppPasswordVariable = 'XPATH_ASC_APP_PASSWORD';
 
-/// The variable altool reads the folder of its `.p8` key from.
-const _privateKeysDirectoryVariable = 'API_PRIVATE_KEYS_DIR';
-
 /// Uploads the IPA of the job to App Store Connect (`upload.appStore`,
-/// C:752-785, K:559-581; D-14, D-09).
+/// C:752-785, K:559-581; D-14 as amended by ADR 0014, D-09).
 ///
-/// Runs `xcrun altool --upload-package` with either the API key (`--apiKey`,
-/// `--apiIssuer`, the `.p8` written for this job only) or the Apple ID and an
-/// app-specific password. altool can exit 0 after Apple rejected the build, so
-/// its output decides, not its exit code.
+/// With an API key the IPA goes through the build-upload API, on any engine:
+/// the parts App Store Connect asks for are sent, then the upload is polled
+/// every [pollInterval] until App Store Connect accepts or refuses it, for at
+/// most [processingTimeout]. Its errors are reported the way altool's are
+/// (`AltoolOutput`), its warnings are kept in the result.
+///
+/// With an Apple ID and an app-specific password it runs `xcrun altool
+/// --upload-package` on macOS: the REST API takes API keys only. altool can
+/// exit 0 after Apple rejected the build, so its output decides, not its exit
+/// code.
 ///
 /// The step has a side effect. `alreadyDone` asks App Store Connect whether it
 /// has the build: the REST API for an API key, `altool --build-status` for an
@@ -36,28 +39,29 @@ const _privateKeysDirectoryVariable = 'API_PRIVATE_KEYS_DIR';
 class UploadAppStoreStep
     extends Step<UploadAppStoreInput, UploadAppStoreResult> {
   /// Creates the step. [isMacOS] tells whether this machine runs macOS, where
-  /// altool is. [connect] makes the REST client for an API key.
+  /// altool is. [connect] makes the REST client for an API key. [sleep] waits
+  /// between two polls (`Future.delayed` by default; tests replace it).
   const new({
     required this.repository,
     required this.store,
     required this.secrets,
-    required this.secretFiles,
     required this.connect,
     required this.isMacOS,
     this.executable = 'xcrun',
+    this.pollInterval = const Duration(seconds: 15),
+    this.processingTimeout = const Duration(minutes: 30),
+    this.sleep = Future.delayed,
   });
 
   /// The records of the stored artifacts.
   final ArtifactRepository repository;
 
-  /// The artifact store, whose IPA altool reads from disk.
+  /// The artifact store, whose IPA is sent to App Store Connect, or read from
+  /// disk by altool.
   final LocalArtifactStore store;
 
-  /// Where the API key is read from.
+  /// Where the API key and the app-specific password are read from.
   final SecretStore secrets;
-
-  /// Where the `.p8` is written for the job: private, deleted at job end.
-  final SecretFileStore secretFiles;
 
   /// Makes the App Store Connect client of an API key.
   final AppStoreConnectFactory connect;
@@ -67,6 +71,16 @@ class UploadAppStoreStep
 
   /// The program that runs altool.
   final String executable;
+
+  /// How long to wait between two polls of a build upload.
+  final Duration pollInterval;
+
+  /// How long App Store Connect may take to accept or refuse a build upload
+  /// before the step gives up on it.
+  final Duration processingTimeout;
+
+  /// Waits for a [Duration].
+  final Future<void> Function(Duration) sleep;
 
   @override
   String get kind => 'upload.appStore';
@@ -168,11 +182,12 @@ class UploadAppStoreStep
     UploadAppStoreInput input,
     StepContext context,
   ) async {
-    if (!isMacOS) {
+    if (input.auth is AppleIdUploadAuth && !isMacOS) {
       return const StepFailed(
-        'upload.appStore needs macOS (xcrun altool): this machine cannot '
-        'upload to App Store Connect. Run the upload on the Mac that runs the '
-        'engine.',
+        'upload.appStore with an Apple ID needs macOS (xcrun altool): this '
+        'machine cannot upload with it. Assign an App Store Connect API key '
+        'to the flavor, which uploads from any engine, or run the upload on '
+        'the Mac that runs the engine.',
       );
     }
     final ipa = await intactArtifact(
@@ -189,22 +204,101 @@ class UploadAppStoreStep
         'iOS app first; a changed or missing file is not uploaded.',
       );
     }
-    final path = store.localPath(ipa.path);
+    return await switch (input.auth) {
+      ApiKeyUploadAuth(:final keySecret) => _uploadThroughApi(
+        input,
+        ipa,
+        keySecret,
+        context,
+      ),
+      AppleIdUploadAuth() => _uploadWithAltool(
+        input,
+        store.localPath(ipa.path),
+        context,
+      ),
+    };
+  }
 
-    final ProcessCommand command;
-    switch (input.auth) {
-      case ApiKeyUploadAuth(:final keySecret):
-        final (:key, :problem) = await _usableKey(keySecret);
-        if (key == null) return StepFailed(problem!);
-        command = await _apiKeyCommand(input, path, key, context);
-      case AppleIdUploadAuth():
-        command = _appleIdCommand(input, _uploadArguments(input, path));
+  Future<StepOutcome<UploadAppStoreResult>> _uploadThroughApi(
+    UploadAppStoreInput input,
+    ArtifactRecord ipa,
+    String keySecret,
+    StepContext context,
+  ) async {
+    final (:key, :problem) = await _usableKey(keySecret);
+    if (key == null) return StepFailed(problem!);
+    final client = connect(key);
+    final kept =
+        'The IPA is still ${input.artifactName} in the artifact store.';
+    try {
+      var upload = await client.uploadBuild(
+        input.appleAppId,
+        version: '${input.version.name}',
+        buildNumber: input.build,
+        fileName: input.artifactName,
+        length: ipa.size,
+        content: () => store.read(ipa.path),
+      );
+      final maxPolls =
+          processingTimeout.inMilliseconds ~/ pollInterval.inMilliseconds;
+      for (var polls = 0; !upload.state.isFinal; polls++) {
+        if (context.isStopping) {
+          return const StepFailed(
+            'The upload to App Store Connect was cancelled.',
+          );
+        }
+        if (polls >= maxPolls) {
+          return StepFailed(
+            'App Store Connect did not accept or refuse the upload '
+            '(${upload.id}) of build ${input.build} in '
+            '${_span(processingTimeout)}. Resume the step later: '
+            'it finds the build if App Store Connect made it. $kept',
+          );
+        }
+        await sleep(pollInterval);
+        upload = await client.buildUpload(upload.id);
+      }
+      if (upload.state == AscBuildUploadState.failed) {
+        final output = AltoolOutput.ofUploadIssues(upload.errors);
+        final what = output.rejected ? ': ${output.describe()}' : '.';
+        final hint = output.hint;
+        return StepFailed(
+          'App Store Connect rejected the build$what'
+          '${hint == null ? '' : ' $hint'} $kept',
+        );
+      }
+      return StepSucceeded(
+        UploadAppStoreResult(
+          confirmed: true,
+          buildId: upload.buildId,
+          warnings: [for (final warning in upload.warnings) '$warning'],
+        ),
+      );
+    } on AppStoreConnectException catch (error) {
+      final hint =
+          AltoolOutput.ofUploadIssues([
+            AscUploadIssue(code: error.code ?? '', description: error.message),
+          ]).hint ??
+          error.fix;
+      return StepFailed(
+        'App Store Connect refused the upload: ${error.message}'
+        '${hint == null ? '' : ' $hint'} $kept',
+      );
     }
+  }
 
+  Future<StepOutcome<UploadAppStoreResult>> _uploadWithAltool(
+    UploadAppStoreInput input,
+    String path,
+    StepContext context,
+  ) async {
     final lines = <String>[];
     final ProcessExit exit;
     try {
-      exit = await context.run(command, onLine: (line) => lines.add(line.text));
+      exit = await context.run(
+        _appleIdCommand(input, _uploadArguments(input, path)),
+        onLine: (line) => lines.add(line.text),
+      );
     } on ProcessStartException catch (error) {
       return StepFailed(
         '${error.executable} could not be started: ${error.message}. '
@@ -233,6 +327,10 @@ class UploadAppStoreStep
       ),
     );
   }
+
+  static String _span(Duration duration) => duration.inMinutes > 0
+      ? '${duration.inMinutes} minutes'
+      : '${duration.inSeconds} seconds';
 
   List<String> _uploadArguments(UploadAppStoreInput input, String path) => [
     '--upload-package',
@@ -268,39 +366,6 @@ class UploadAppStoreStep
       ],
       passThroughEnvironment: const ['DEVELOPER_DIR'],
       secretEnvironment: {ascAppPasswordVariable: auth.passwordSecret},
-    );
-  }
-
-  /// The command for an API key. altool reads the `.p8` by its name from the
-  /// folder in `API_PRIVATE_KEYS_DIR`: the folder of this job's secret files.
-  Future<ProcessCommand> _apiKeyCommand(
-    UploadAppStoreInput input,
-    String ipaPath,
-    AscKey key,
-    StepContext context,
-  ) async {
-    final keyPath = await secretFiles.write(
-      context.jobId,
-      key.fileName,
-      key.privateKey,
-    );
-    return ProcessCommand(
-      executable,
-      arguments: [
-        'altool',
-        ..._uploadArguments(input, ipaPath),
-        '--apiKey',
-        key.keyId,
-        '--apiIssuer',
-        key.issuerId,
-      ],
-      environment: {
-        _privateKeysDirectoryVariable: keyPath.substring(
-          0,
-          keyPath.lastIndexOf('/'),
-        ),
-      },
-      passThroughEnvironment: const ['DEVELOPER_DIR'],
     );
   }
 

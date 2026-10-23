@@ -401,7 +401,11 @@ class StepPlanners implements StepCatalog {
           'artifactJob': ?_artifactJob(p),
         };
       },
-      capabilities: (_) => const {Capability.iosSign},
+      // An API key uploads through the REST API on any engine; altool, for an
+      // Apple ID, needs a Mac (ADR 0014).
+      capabilities: (p) => p.job.credential(CredentialKind.ascKey) != null
+          ? const {}
+          : const {Capability.iosSign},
     ),
     StepPlanSpec('git.releaseBranch', const {}, (p) async {
       final version = p.job.run.version;

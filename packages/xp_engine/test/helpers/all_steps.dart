@@ -111,7 +111,6 @@ StepRegistry allSteps({
       repository: harness.artifacts,
       store: store,
       secrets: secrets,
-      secretFiles: InMemorySecretFileStore(),
       connect: connect,
       isMacOS: true,
     ),

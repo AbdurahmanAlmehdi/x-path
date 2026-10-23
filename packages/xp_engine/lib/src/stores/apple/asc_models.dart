@@ -91,6 +91,86 @@ class AscBuild extends Equatable {
   ];
 }
 
+/// Where App Store Connect is with a build upload (`buildUploads`).
+enum AscBuildUploadState {
+  /// The file was not sent yet.
+  awaitingUpload('AWAITING_UPLOAD'),
+
+  /// The file arrived; App Store Connect is checking it.
+  processing('PROCESSING'),
+
+  /// App Store Connect accepted the file and made a build of it.
+  complete('COMPLETE'),
+
+  /// App Store Connect refused the file; the errors say why.
+  failed('FAILED'),
+
+  /// A state this version of XPath does not know.
+  unknown('');
+
+  new(this.wire);
+
+  /// The value the API uses.
+  final String wire;
+
+  /// Whether App Store Connect is done with the upload, either way.
+  bool get isFinal => this == complete || this == failed;
+
+  /// The state called [wire]; [unknown] for any other.
+  static AscBuildUploadState fromWire(String? wire) => values.firstWhere(
+    (state) => state.wire == wire && state != unknown,
+    orElse: () => unknown,
+  );
+}
+
+/// An error or warning App Store Connect reports about a build upload.
+class AscUploadIssue extends Equatable {
+  /// Creates an issue.
+  const new({required this.code, required this.description});
+
+  /// The code, such as `90189` or `STATE_ERROR.VALIDATION_ERROR`.
+  final String code;
+
+  /// What App Store Connect says about it.
+  final String description;
+
+  @override
+  String toString() => '$code: $description';
+
+  @override
+  List<Object?> get props => [code, description];
+}
+
+/// A build upload: an IPA sent through the API instead of altool.
+class AscBuildUpload extends Equatable {
+  /// Creates an upload.
+  const new({
+    required this.id,
+    required this.state,
+    this.errors = const [],
+    this.warnings = const [],
+    this.buildId,
+  });
+
+  /// The id of the build upload resource.
+  final String id;
+
+  /// Where App Store Connect is with it.
+  final AscBuildUploadState state;
+
+  /// Why App Store Connect refused it, when it did.
+  final List<AscUploadIssue> errors;
+
+  /// What App Store Connect warns about; the upload goes through.
+  final List<AscUploadIssue> warnings;
+
+  /// The build it became, once App Store Connect made one.
+  final String? buildId;
+
+  @override
+  List<Object?> get props => [id, state, errors, warnings, buildId];
+}
+
 /// The state of an App Store version (`appVersionState`).
 ///
 /// `appStoreState` is deprecated since version 3.7 of the API; XPath reads

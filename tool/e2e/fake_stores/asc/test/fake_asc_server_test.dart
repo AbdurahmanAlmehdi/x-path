@@ -467,6 +467,302 @@ void main() {
     });
   });
 
+  group('build uploads', () {
+    late FakeAscApp app;
+    final ipa = utf8.encode('twelve bytes');
+    // MD5 of "twelve bytes".
+    const md5 = 'c91fa94e14cf2fa5474beceff788c0dc';
+
+    setUp(() {
+      app = server.addApp('ly.example.app');
+      server.uploadPartSize = 5;
+    });
+
+    Map<String, Object?> link(String type, String id) => {
+      'data': {'type': type, 'id': id},
+    };
+
+    Future<http.Response> createUpload({String buildNumber = '42'}) => call(
+      'POST',
+      '/v1/buildUploads',
+      body: {
+        'data': {
+          'type': 'buildUploads',
+          'attributes': {
+            'cfBundleShortVersionString': '1.0.0',
+            'cfBundleVersion': buildNumber,
+            'platform': 'IOS',
+          },
+          'relationships': {'app': link('apps', app.id)},
+        },
+      },
+    );
+
+    Future<http.Response> createFile(String uploadId) => call(
+      'POST',
+      '/v1/buildUploadFiles',
+      body: {
+        'data': {
+          'type': 'buildUploadFiles',
+          'attributes': {
+            'assetType': 'ASSET',
+            'fileName': 'app.ipa',
+            'fileSize': ipa.length,
+            'uti': 'com.apple.ipa',
+          },
+          'relationships': {'buildUpload': link('buildUploads', uploadId)},
+        },
+      },
+    );
+
+    Future<http.Response> put(Uri url, List<int> bytes) async {
+      final request = http.Request('PUT', url)..bodyBytes = bytes;
+      return await http.Response.fromStream(await client.send(request));
+    }
+
+    Future<http.Response> commit(String fileId, {String hash = md5}) => call(
+      'PATCH',
+      '/v1/buildUploadFiles/$fileId',
+      body: {
+        'data': {
+          'type': 'buildUploadFiles',
+          'id': fileId,
+          'attributes': {
+            'uploaded': true,
+            'sourceFileChecksums': {
+              'file': {'hash': hash, 'algorithm': 'MD5'},
+            },
+          },
+        },
+      },
+    );
+
+    Map<String, dynamic> attributes(http.Response response) =>
+        (json(response)['data'] as Map<String, dynamic>)['attributes']
+            as Map<String, dynamic>;
+
+    Future<Map<String, dynamic>> state(String uploadId) async =>
+        attributes(await call('GET', '/v1/buildUploads/$uploadId'))['state']
+            as Map<String, dynamic>;
+
+    /// Creates an upload, sends its parts and marks it uploaded.
+    Future<String> send() async {
+      final upload =
+          (json(await createUpload())['data'] as Map)['id'] as String;
+      final file = await createFile(upload);
+      for (final operation
+          in attributes(file)['uploadOperations'] as List<dynamic>) {
+        final part = operation as Map<String, dynamic>;
+        final offset = part['offset'] as int;
+        await put(
+          Uri.parse(part['url'] as String),
+          ipa.sublist(offset, offset + (part['length'] as int)),
+        );
+      }
+      await commit((json(file)['data'] as Map)['id'] as String);
+      return upload;
+    }
+
+    test('go from parts to a build', () async {
+      final created = await createUpload();
+      expect(created.statusCode, 201);
+      final upload = (json(created)['data'] as Map)['id'] as String;
+      expect((await state(upload))['state'], 'AWAITING_UPLOAD');
+
+      final file = await createFile(upload);
+      expect(file.statusCode, 201);
+      final operations = [
+        for (final operation
+            in attributes(file)['uploadOperations'] as List<dynamic>)
+          operation as Map<String, dynamic>,
+      ];
+      expect(operations.map((o) => (o['offset'], o['length'])), [
+        (0, 5),
+        (5, 5),
+        (10, 2),
+      ]);
+      expect(operations.first['requestHeaders'], [
+        {'name': 'Content-Type', 'value': 'application/octet-stream'},
+      ]);
+      for (final operation in operations) {
+        final offset = operation['offset'] as int;
+        final response = await put(
+          Uri.parse(operation['url'] as String),
+          ipa.sublist(offset, offset + (operation['length'] as int)),
+        );
+        expect(response.statusCode, 200);
+      }
+      final fileId = (json(file)['data'] as Map)['id'] as String;
+      final committed = await commit(fileId);
+      expect(committed.statusCode, 200);
+      expect(attributes(committed)['assetDeliveryState'], {
+        'state': 'COMPLETE',
+      });
+
+      expect((await state(upload))['state'], 'PROCESSING');
+      final done = await call('GET', '/v1/buildUploads/$upload');
+      expect(attributes(done)['state'], {
+        'state': 'COMPLETE',
+        'errors': <Object?>[],
+        'warnings': <Object?>[],
+        'infos': <Object?>[],
+      });
+      final build = server.builds.single;
+      expect(((json(done)['data'] as Map)['relationships'] as Map)['build'], {
+        'data': {'type': 'builds', 'id': build.id},
+      });
+      expect(build.buildNumber, '42');
+      expect(build.shortVersion, '1.0.0');
+      expect(build.processingState, 'PROCESSING');
+      expect(server.uploadFiles[fileId]!.bytes, ipa);
+      expect(
+        server.requests
+            .where((r) => r.uri.path.startsWith('/upload/'))
+            .map((r) => r.authorization)
+            .toSet(),
+        {null},
+      );
+    });
+
+    test('end the way the outcomes say', () async {
+      server.uploadOutcomes.addAll(const [
+        FakeAscUploadOutcome.rejected([FakeAscIssue('90189', 'Used.')]),
+        FakeAscUploadOutcome.stalled(),
+        FakeAscUploadOutcome.complete(warnings: [FakeAscIssue('1', 'Hm.')]),
+      ]);
+
+      final rejected = await send();
+      final stalled = await send();
+      final warned = await send();
+      for (final upload in [rejected, stalled, warned]) {
+        await state(upload);
+      }
+
+      expect(await state(rejected), {
+        'state': 'FAILED',
+        'errors': [
+          {'code': '90189', 'description': 'Used.'},
+        ],
+        'warnings': <Object?>[],
+        'infos': <Object?>[],
+      });
+      expect((await state(stalled))['state'], 'PROCESSING');
+      expect((await state(warned))['warnings'], [
+        {'code': '1', 'description': 'Hm.'},
+      ]);
+      expect(server.builds, hasLength(1));
+    });
+
+    test('refuse a build number App Store Connect has', () async {
+      server.addBuild(app.id, buildNumber: '42', version: '1.0.0');
+
+      final response = await createUpload();
+
+      expect(response.statusCode, 409);
+      expect(
+        (json(response)['errors'] as List<dynamic>).single,
+        containsPair('code', 'ENTITY_ERROR.ATTRIBUTE.INVALID.DUPLICATE'),
+      );
+    });
+
+    test('refuse what is missing or wrong', () async {
+      final noVersion = await call(
+        'POST',
+        '/v1/buildUploads',
+        body: {
+          'data': {
+            'type': 'buildUploads',
+            'relationships': {'app': link('apps', app.id)},
+          },
+        },
+      );
+      final upload =
+          (json(await createUpload())['data'] as Map)['id'] as String;
+      final badFile = await call(
+        'POST',
+        '/v1/buildUploadFiles',
+        body: {
+          'data': {
+            'type': 'buildUploadFiles',
+            'attributes': {'fileName': 'app.ipa', 'fileSize': 12},
+            'relationships': {'buildUpload': link('buildUploads', upload)},
+          },
+        },
+      );
+      final file = await createFile(upload);
+      final secondFile = await createFile(upload);
+      final fileId = (json(file)['data'] as Map)['id'] as String;
+      final operations = attributes(file)['uploadOperations'] as List<dynamic>;
+      final firstUrl = Uri.parse(
+        (operations.first as Map<String, dynamic>)['url'] as String,
+      );
+      final wrongSize = await put(firstUrl, ipa);
+      final early = await commit(fileId);
+      for (final operation in operations) {
+        final part = operation as Map<String, dynamic>;
+        final offset = part['offset'] as int;
+        await put(
+          Uri.parse(part['url'] as String),
+          ipa.sublist(offset, offset + (part['length'] as int)),
+        );
+      }
+      final wrongHash = await commit(fileId, hash: '0' * 32);
+
+      expect(noVersion.statusCode, 409);
+      expect(badFile.statusCode, 409);
+      expect(secondFile.statusCode, 409);
+      expect(wrongSize.statusCode, 400);
+      expect(early.statusCode, 409);
+      expect(wrongHash.statusCode, 409);
+      expect((await commit(fileId)).statusCode, 200);
+    });
+
+    test('answer 404 for what does not exist', () async {
+      final upload =
+          (json(await createUpload())['data'] as Map)['id'] as String;
+      final file =
+          (json(await createFile(upload))['data'] as Map)['id'] as String;
+
+      expect((await call('GET', '/v1/buildUploads/nope')).statusCode, 404);
+      expect((await createFile('nope')).statusCode, 404);
+      expect((await commit('nope')).statusCode, 404);
+      for (final path in [
+        '/upload/nope/0',
+        '/upload/$file/9',
+        '/upload/$file/-1',
+        '/upload/$file/x',
+        '/upload/$file',
+      ]) {
+        expect(
+          (await put(server.baseUrl.replace(path: path), [1])).statusCode,
+          404,
+          reason: path,
+        );
+      }
+      final get = await http.Response.fromStream(
+        await client.send(
+          http.Request('GET', server.baseUrl.replace(path: '/upload/$file/0')),
+        ),
+      );
+      expect(get.statusCode, 404);
+    });
+
+    test('a file of no bytes is sent in one empty part', () {
+      final file = FakeAscUploadFile(
+        id: 'f',
+        uploadId: 'u',
+        fileName: 'empty.ipa',
+        fileSize: 0,
+        partSize: 5,
+      );
+
+      expect(file.partCount, 1);
+      expect(file.bytes, isNull);
+      file.parts[0] = const [];
+      expect(file.bytes, isEmpty);
+    });
+  });
+
   group('misbehaviour', () {
     test('answers 429 with Retry-After for the requests asked for', () async {
       server.rateLimitNext(2, retryAfterSeconds: 7);

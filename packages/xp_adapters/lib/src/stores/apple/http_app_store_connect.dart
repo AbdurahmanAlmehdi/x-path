@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:typed_data';
 
+import 'package:crypto/crypto.dart';
 import 'package:http/http.dart' as http;
 import 'package:xp_adapters/src/stores/apple/asc_token_provider.dart';
 import 'package:xp_engine/xp_engine.dart';
@@ -17,6 +19,9 @@ import 'package:xp_engine/xp_engine.dart';
 /// [AscRateLimitedException] with the time to wait, because a job must not
 /// sleep for an hour. A `5xx` on a read is retried the same way. The quota that
 /// is left comes from the `X-Rate-Limit` header of each answer ([rateLimit]).
+///
+/// Build uploads send the parts of the IPA to the addresses the API names,
+/// without the token, each with [uploadTimeout] to be answered.
 class HttpAppStoreConnect implements AppStoreConnect {
   /// Creates a client for the API key [key].
   ///
@@ -30,6 +35,7 @@ class HttpAppStoreConnect implements AppStoreConnect {
     this.maxAttempts = 3,
     this.maxWait = const Duration(seconds: 30),
     this.timeout = const Duration(seconds: 60),
+    this.uploadTimeout = const Duration(minutes: 10),
     Future<void> Function(Duration)? sleep,
   }) : _tokens = AscTokenProvider(key: key, clock: clock),
        _client = client ?? http.Client(),
@@ -46,6 +52,9 @@ class HttpAppStoreConnect implements AppStoreConnect {
 
   /// How long one request has to be answered.
   final Duration timeout;
+
+  /// How long one part of a build upload has to be answered.
+  final Duration uploadTimeout;
 
   final AscTokenProvider _tokens;
   final http.Client _client;
@@ -206,6 +215,79 @@ class HttpAppStoreConnect implements AppStoreConnect {
   );
 
   @override
+  Future<AscBuildUpload> uploadBuild(
+    String appId, {
+    required String version,
+    required String buildNumber,
+    required String fileName,
+    required int length,
+    required Stream<List<int>> Function() content,
+  }) async {
+    final upload = _one(
+      await _send(
+        'POST',
+        _url('/v1/buildUploads'),
+        body: {
+          'data': {
+            'type': 'buildUploads',
+            'attributes': {
+              'cfBundleShortVersionString': version,
+              'cfBundleVersion': buildNumber,
+              'platform': 'IOS',
+            },
+            'relationships': {'app': _link('apps', appId)},
+          },
+        },
+      ),
+    );
+    final uploadId = _string(upload, 'id');
+    final file = _one(
+      await _send(
+        'POST',
+        _url('/v1/buildUploadFiles'),
+        body: {
+          'data': {
+            'type': 'buildUploadFiles',
+            'attributes': {
+              'assetType': 'ASSET',
+              'fileName': fileName,
+              'fileSize': length,
+              'uti': 'com.apple.ipa',
+            },
+            'relationships': {'buildUpload': _link('buildUploads', uploadId)},
+          },
+        },
+      ),
+    );
+    final fileId = _string(file, 'id');
+    final checksum = await _sendParts(
+      _operations(_attributes(file)['uploadOperations'], length),
+      content(),
+    );
+    await _send(
+      'PATCH',
+      _url('/v1/buildUploadFiles/$fileId'),
+      body: {
+        'data': {
+          'type': 'buildUploadFiles',
+          'id': fileId,
+          'attributes': {
+            'uploaded': true,
+            'sourceFileChecksums': {
+              'file': {'hash': checksum, 'algorithm': 'MD5'},
+            },
+          },
+        },
+      },
+    );
+    return await buildUpload(uploadId);
+  }
+
+  @override
+  Future<AscBuildUpload> buildUpload(String id) async =>
+      _buildUpload(_one(await _send('GET', _url('/v1/buildUploads/$id'))));
+
+  @override
   Future<void> verifyAccess() async {
     await _send('GET', _url('/v1/apps', {'limit': '1'}));
   }
@@ -260,22 +342,7 @@ class HttpAppStoreConnect implements AppStoreConnect {
           if (body != null) 'Content-Type': 'application/json',
         });
       if (body != null) request.body = jsonEncode(body);
-      final http.Response response;
-      try {
-        response = await http.Response.fromStream(
-          await _client.send(request).timeout(timeout),
-        );
-      } on TimeoutException {
-        throw const AscServerException(
-          0,
-          'App Store Connect did not answer in time.',
-        );
-      } on http.ClientException catch (error) {
-        throw AscServerException(
-          0,
-          'App Store Connect is not reachable: $error',
-        );
-      }
+      final response = await _transmit(request, timeout);
       rateLimit =
           AscRateLimit.parse(response.headers['x-rate-limit']) ?? rateLimit;
       final status = response.statusCode;
@@ -289,6 +356,106 @@ class HttpAppStoreConnect implements AppStoreConnect {
         continue;
       }
       throw _error(response, retryAfter);
+    }
+  }
+
+  /// Sends [request] and reads the whole answer within [limit].
+  Future<http.Response> _transmit(
+    http.BaseRequest request,
+    Duration limit,
+  ) async {
+    try {
+      return await http.Response.fromStream(
+        await _client.send(request).timeout(limit),
+      );
+    } on TimeoutException {
+      throw const AscServerException(
+        0,
+        'App Store Connect did not answer in time.',
+      );
+    } on http.ClientException catch (error) {
+      throw AscServerException(0, 'App Store Connect is not reachable: $error');
+    }
+  }
+
+  /// The upload operations of a build upload file, in the order of their
+  /// offsets. They must cover the [length] bytes of the file exactly.
+  List<_UploadOperation> _operations(Object? value, int length) {
+    final operations = [
+      for (final operation in _resources(value))
+        _UploadOperation(
+          method: _string(operation, 'method'),
+          url: Uri.parse(_string(operation, 'url')),
+          offset: _int(operation, 'offset'),
+          length: _int(operation, 'length'),
+          headers: {
+            for (final header in _resources(operation['requestHeaders']))
+              _string(header, 'name'): _string(header, 'value'),
+          },
+        ),
+    ]..sort((a, b) => a.offset.compareTo(b.offset));
+    var covered = 0;
+    for (final operation in operations) {
+      if (operation.offset != covered) break;
+      covered += operation.length;
+    }
+    if (operations.isEmpty || covered != length) {
+      throw const AscServerException(
+        0,
+        'App Store Connect asked for upload parts that do not cover the IPA.',
+      );
+    }
+    return operations;
+  }
+
+  /// Sends [content] in the parts of [operations] and returns its MD5.
+  Future<String> _sendParts(
+    List<_UploadOperation> operations,
+    Stream<List<int>> content,
+  ) async {
+    final digest = _DigestSink();
+    final hash = md5.startChunkedConversion(digest);
+    final pending = BytesBuilder(copy: false);
+    var next = 0;
+    await for (final chunk in content) {
+      hash.add(chunk);
+      pending.add(chunk);
+      while (next < operations.length &&
+          pending.length >= operations[next].length) {
+        final operation = operations[next++];
+        final bytes = pending.takeBytes();
+        await _sendPart(operation, next, bytes.sublist(0, operation.length));
+        pending.add(bytes.sublist(operation.length));
+      }
+    }
+    hash.close();
+    if (next < operations.length || pending.isNotEmpty) {
+      throw const AscServerException(
+        0,
+        'The IPA is not the size App Store Connect was told; nothing more '
+        'was sent.',
+      );
+    }
+    return '${digest.value}';
+  }
+
+  Future<void> _sendPart(
+    _UploadOperation operation,
+    int part,
+    Uint8List bytes,
+  ) async {
+    final request = http.Request(operation.method, operation.url)
+      ..followRedirects = false
+      ..headers.addAll(operation.headers)
+      ..bodyBytes = bytes;
+    final response = await _transmit(request, uploadTimeout);
+    final status = response.statusCode;
+    if (status < 200 || status >= 300) {
+      throw AscServerException(
+        status,
+        'App Store Connect refused part $part of the upload '
+        '(HTTP $status).',
+      );
     }
   }
 
@@ -393,6 +560,12 @@ class HttpAppStoreConnect implements AppStoreConnect {
     return value is String ? value : null;
   }
 
+  int _int(Map<String, dynamic> map, String field) {
+    final value = map[field];
+    if (value is int) return value;
+    throw AscServerException(0, 'App Store Connect sent no "$field".');
+  }
+
   DateTime? _date(Map<String, dynamic> map, String field) {
     final text = _optional(map, field);
     return text == null ? null : DateTime.tryParse(text)?.toUtc();
@@ -457,6 +630,34 @@ class HttpAppStoreConnect implements AppStoreConnect {
     );
   }
 
+  AscBuildUpload _buildUpload(Map<String, dynamic> resource) {
+    final state = _attributes(resource)['state'];
+    final details = state is Map<String, dynamic>
+        ? state
+        : const <String, dynamic>{};
+    List<AscUploadIssue> issues(String field) => [
+      for (final issue in _resources(details[field]))
+        AscUploadIssue(
+          code: _optional(issue, 'code') ?? '',
+          description: _optional(issue, 'description') ?? '',
+        ),
+    ];
+    final relationships = resource['relationships'];
+    final build = relationships is Map<String, dynamic>
+        ? relationships['build']
+        : null;
+    final buildData = build is Map<String, dynamic> ? build['data'] : null;
+    return AscBuildUpload(
+      id: _string(resource, 'id'),
+      state: AscBuildUploadState.fromWire(_optional(details, 'state')),
+      errors: issues('errors'),
+      warnings: issues('warnings'),
+      buildId: buildData is Map<String, dynamic>
+          ? _optional(buildData, 'id')
+          : null,
+    );
+  }
+
   AscPhasedRelease _phased(Map<String, dynamic> resource) {
     final attributes = _attributes(resource);
     final state = PhasedReleaseState.fromWire(
@@ -475,4 +676,32 @@ class HttpAppStoreConnect implements AppStoreConnect {
       currentDayNumber: day is int ? day : null,
     );
   }
+}
+
+/// A part of a build upload: where to send which bytes of the IPA.
+class _UploadOperation {
+  const new({
+    required this.method,
+    required this.url,
+    required this.offset,
+    required this.length,
+    required this.headers,
+  });
+
+  final String method;
+  final Uri url;
+  final int offset;
+  final int length;
+  final Map<String, String> headers;
+}
+
+/// Keeps the digest a chunked hash ends with.
+class _DigestSink implements Sink<Digest> {
+  Digest? value;
+
+  @override
+  void add(Digest data) => value = data;
+
+  @override
+  void close() {}
 }

@@ -46,20 +46,24 @@ void main() {
   late InMemoryArtifactRepository repository;
   late LocalInMemoryArtifactStore store;
   late MemorySecretStore secrets;
-  late InMemorySecretFileStore secretFiles;
   late FakeAppStoreConnect connect;
   late AscKey? keyConnectedWith;
+  late List<Duration> sleeps;
 
-  UploadAppStoreStep step({bool isMacOS = true}) => UploadAppStoreStep(
+  UploadAppStoreStep step({
+    bool isMacOS = true,
+    Duration processingTimeout = const Duration(minutes: 2),
+  }) => UploadAppStoreStep(
     repository: repository,
     store: store,
     secrets: secrets,
-    secretFiles: secretFiles,
     connect: (key) {
       keyConnectedWith = key;
       return connect;
     },
     isMacOS: isMacOS,
+    processingTimeout: processingTimeout,
+    sleep: (duration) async => sleeps.add(duration),
   );
 
   Future<void> putIpa({String name = _ipaName, String jobId = 'job_1'}) async {
@@ -82,9 +86,9 @@ void main() {
     secrets = MemorySecretStore()
       ..values['asc.prod'] = _key.toSecret()
       ..values['apple.password'] = _password;
-    secretFiles = InMemorySecretFileStore();
     connect = FakeAppStoreConnect();
     keyConnectedWith = null;
+    sleeps = [];
     await putIpa();
   });
 
@@ -106,91 +110,210 @@ void main() {
   });
 
   group('upload with an API key', () {
-    test(
-      'runs altool with the key from this job and no secret in argv',
-      () async {
-        final context = _context('altool_upload_succeeded.txt');
+    test('sends the IPA through the API, on any machine', () async {
+      final context = StreamingContext.single(const []);
 
-        final outcome = await step().run(_input(), context);
+      final outcome = await step(isMacOS: false).run(_input(), context);
 
-        final command = context.commands.single;
-        expect(command.executable, 'xcrun');
-        expect(command.arguments, [
-          'altool',
-          '--upload-package',
-          '/artifacts/job_1/$_ipaName',
-          '--type',
-          'ios',
-          '--apple-id',
-          '1234567890',
-          '--bundle-id',
-          'com.mataa.app',
-          '--bundle-version',
-          '3283',
-          '--bundle-short-version-string',
-          '5.4.1',
-          '--apiKey',
-          'ABC123DEF4',
-          '--apiIssuer',
-          '57246542-96fe-1a63-e053-0824d011072a',
-        ]);
-        expect(command.environment, {'API_PRIVATE_KEYS_DIR': '/secrets/job_1'});
-        expect(command.passThroughEnvironment, ['DEVELOPER_DIR']);
-        expect(command.secretEnvironment, isEmpty);
-        expect(secretFiles.files, {
-          '/secrets/job_1/AuthKey_ABC123DEF4.p8': _key.privateKey,
-        });
-        expect(command.arguments.join(' '), isNot(contains('PRIVATE KEY')));
-        expect(
-          outcome,
-          isA<StepSucceeded<UploadAppStoreResult>>().having(
-            (o) => o.result,
-            'result',
-            const UploadAppStoreResult(
-              confirmed: true,
-              deliveryId: '3d6a9d4a-8f0e-4a62-9d8b-1c2f5b7e9a10',
-            ),
+      expect(context.commands, isEmpty);
+      expect(keyConnectedWith, _key);
+      expect(connect.calls, [
+        'uploadBuild 1234567890 5.4.1 3283 $_ipaName 9',
+        'buildUpload upload-1',
+      ]);
+      expect(connect.uploads.values.single, utf8.encode('ipa bytes'));
+      expect(
+        outcome,
+        isA<StepSucceeded<UploadAppStoreResult>>().having(
+          (o) => o.result,
+          'result',
+          const UploadAppStoreResult(
+            confirmed: true,
+            buildId: 'build-of-upload-1',
           ),
-        );
-      },
-    );
+        ),
+      );
+    });
 
-    test(
-      'names an individual key ApiKey_ so that altool signs sub: user',
-      () async {
-        secrets.values['asc.prod'] = const AscKey(
-          keyId: 'IND1234567',
-          issuerId: 'issuer',
-          privateKey: 'pem',
-          kind: AscKeyKind.individual,
-        ).toSecret();
+    test('polls until App Store Connect made the build', () async {
+      connect.uploadAnswers.addAll(const [
+        AscBuildUpload(id: 'upload-1', state: AscBuildUploadState.processing),
+        AscBuildUpload(
+          id: 'upload-1',
+          state: AscBuildUploadState.complete,
+          buildId: 'build-9',
+          warnings: [
+            AscUploadIssue(
+              code: '90683',
+              description: 'A purpose string is missing.',
+            ),
+          ],
+        ),
+      ]);
 
-        await step().run(_input(), _context('altool_upload_succeeded.txt'));
-
-        expect(secretFiles.files.keys, ['/secrets/job_1/ApiKey_IND1234567.p8']);
-      },
-    );
-
-    test(
-      'succeeds, unconfirmed, when altool prints nothing wrong or right',
-      () async {
-        final context = StreamingContext.single(['Uploading']);
-
-        final outcome = await step().run(_input(), context);
-
-        expect(
-          (outcome as StepSucceeded<UploadAppStoreResult>).result,
-          const UploadAppStoreResult(),
-        );
-      },
-    );
-  });
-
-  group('a rejection', () {
-    test('that exited 0 fails the step (closed train)', () async {
       final outcome = await step().run(
         _input(),
-        _context('altool_closed_train_exit0.txt'),
+        StreamingContext.single(const []),
+      );
+
+      expect(connect.calls.skip(1), [
+        'buildUpload upload-1',
+        'buildUpload upload-1',
+      ]);
+      expect(sleeps, const [Duration(seconds: 15), Duration(seconds: 15)]);
+      expect(
+        (outcome as StepSucceeded<UploadAppStoreResult>).result,
+        const UploadAppStoreResult(
+          confirmed: true,
+          buildId: 'build-9',
+          warnings: ['90683: A purpose string is missing.'],
+        ),
+      );
+      expect(outcome.result.toJson()['warnings'], [
+        '90683: A purpose string is missing.',
+      ]);
+    });
+
+    test('reports a rejected build the way altool does', () async {
+      connect.uploadAnswers.add(
+        const AscBuildUpload(
+          id: 'upload-1',
+          state: AscBuildUploadState.failed,
+          errors: [
+            AscUploadIssue(
+              code: 'STATE_ERROR.VALIDATION_ERROR',
+              description: 'ITMS-90186: The train is closed.',
+            ),
+          ],
+        ),
+      );
+
+      final outcome = await step().run(
+        _input(),
+        StreamingContext.single(const []),
+      );
+
+      final message = (outcome as StepFailed).message;
+      expect(message, startsWith('App Store Connect rejected the build: '));
+      expect(message, contains('ITMS-90186: The train is closed.'));
+      expect(message, contains('Bump the version'));
+      expect(message, endsWith('$_ipaName in the artifact store.'));
+    });
+
+    test('reports a rejection without errors', () async {
+      connect.uploadAnswers.add(
+        const AscBuildUpload(id: 'upload-1', state: AscBuildUploadState.failed),
+      );
+
+      final outcome = await step().run(
+        _input(),
+        StreamingContext.single(const []),
+      );
+
+      expect(
+        (outcome as StepFailed).message,
+        'App Store Connect rejected the build. The IPA is still $_ipaName in '
+        'the artifact store.',
+      );
+    });
+
+    test('gives up when processing takes too long', () async {
+      connect.uploadAnswers.add(
+        const AscBuildUpload(
+          id: 'upload-1',
+          state: AscBuildUploadState.processing,
+        ),
+      );
+
+      final outcome = await step().run(
+        _input(),
+        StreamingContext.single(const []),
+      );
+
+      final message = (outcome as StepFailed).message;
+      expect(
+        message,
+        startsWith(
+          'App Store Connect did not accept or refuse the upload (upload-1) '
+          'of build 3283 in 2 minutes.',
+        ),
+      );
+      expect(message, contains('Resume the step later'));
+      expect(sleeps, hasLength(8));
+    });
+
+    test('says a short wait in seconds', () async {
+      connect.uploadAnswers.add(
+        const AscBuildUpload(
+          id: 'upload-1',
+          state: AscBuildUploadState.processing,
+        ),
+      );
+
+      final outcome = await step(processingTimeout: const Duration(seconds: 30))
+          .run(_input(), StreamingContext.single(const []));
+
+      expect((outcome as StepFailed).message, contains('in 30 seconds.'));
+      expect(sleeps, hasLength(2));
+    });
+
+    test('stops polling when the job is cancelled', () async {
+      connect.uploadAnswers.add(
+        const AscBuildUpload(
+          id: 'upload-1',
+          state: AscBuildUploadState.processing,
+        ),
+      );
+      final context = StreamingContext.single(const [])..isStopping = true;
+
+      final outcome = await step().run(_input(), context);
+
+      expect((outcome as StepFailed).message, contains('cancelled'));
+      expect(sleeps, isEmpty);
+    });
+
+    test('reports a refusal with its cure', () async {
+      connect.failure = const AscConflictException(
+        'The bundle version must be higher (90189).',
+        code: 'ENTITY_ERROR.ATTRIBUTE.INVALID.DUPLICATE',
+      );
+
+      final outcome = await step().run(
+        _input(),
+        StreamingContext.single(const []),
+      );
+
+      final message = (outcome as StepFailed).message;
+      expect(
+        message,
+        startsWith(
+          'App Store Connect refused the upload: The bundle version must be '
+          'higher (90189).',
+        ),
+      );
+      expect(message, contains('Allocate a new build number'));
+    });
+
+    test('reports a refusal without a known cure with its fix', () async {
+      connect.failure = const AscForbiddenException('No role.');
+
+      final outcome = await step().run(
+        _input(),
+        StreamingContext.single(const []),
+      );
+
+      expect((outcome as StepFailed).message, contains('App Manager'));
+    });
+  });
+
+  group('a rejection by altool', () {
+    StreamingContext altool(String fixture, {int exitCode = 0}) =>
+        _context(fixture, exitCode: exitCode);
+
+    test('that exited 0 fails the step (closed train)', () async {
+      final outcome = await step().run(
+        _input(auth: _appleId),
+        altool('altool_closed_train_exit0.txt'),
       );
 
       expect(outcome, isA<StepFailed>());
@@ -204,8 +327,8 @@ void main() {
 
     test('with a non-zero exit fails the step with the code', () async {
       final outcome = await step().run(
-        _input(),
-        _context('altool_redundant_binary.txt', exitCode: 1),
+        _input(auth: _appleId),
+        altool('altool_redundant_binary.txt', exitCode: 1),
       );
 
       final message = (outcome as StepFailed).message;
@@ -215,7 +338,7 @@ void main() {
 
     test('with a non-zero exit and no error line says so', () async {
       final outcome = await step().run(
-        _input(),
+        _input(auth: _appleId),
         StreamingContext.single([
           'something odd',
         ], exit: const ProcessExit(exitCode: 2)),
@@ -229,7 +352,7 @@ void main() {
 
     test('that was cancelled fails the step', () async {
       final outcome = await step().run(
-        _input(),
+        _input(auth: _appleId),
         _context('altool_upload_succeeded.txt', exitCode: -15, cancelled: true),
       );
 
@@ -241,19 +364,22 @@ void main() {
         (_, _) => throw const ProcessStartException('xcrun', 'not found'),
       );
 
-      final outcome = await step().run(_input(), context);
+      final outcome = await step().run(_input(auth: _appleId), context);
 
       expect((outcome as StepFailed).message, contains('xcode-select'));
     });
   });
 
   group('before the upload', () {
-    test('fails off macOS', () async {
+    test('fails off macOS for an Apple ID', () async {
       final context = StreamingContext.single(const []);
 
-      final outcome = await step(isMacOS: false).run(_input(), context);
+      final outcome = await step(isMacOS: false)
+          .run(_input(auth: _appleId), context);
 
-      expect((outcome as StepFailed).message, contains('needs macOS'));
+      final message = (outcome as StepFailed).message;
+      expect(message, contains('needs macOS'));
+      expect(message, contains('App Store Connect API key'));
       expect(context.commands, isEmpty);
     });
 
@@ -263,7 +389,7 @@ void main() {
       final outcome = await step().run(_input(), context);
 
       expect((outcome as StepFailed).message, contains('no intact IPA'));
-      expect(context.commands, isEmpty);
+      expect(connect.calls, isEmpty);
     });
 
     test('finds the IPA in the build job the input names', () async {
@@ -273,14 +399,17 @@ void main() {
 
       final outcome = await step().run(
         UploadAppStoreInput.fromJson({
-          ..._input().toJson(),
+          ..._input(auth: _appleId).toJson(),
           'artifactJob': 'job_build',
         }),
         context,
       );
 
       expect(outcome, isA<StepSucceeded<UploadAppStoreResult>>());
-      expect(context.commands, isNotEmpty);
+      expect(
+        context.commands.single.arguments,
+        contains('/artifacts/job_build/$_ipaName'),
+      );
     });
 
     test('says which job lacks the IPA when it is another one', () async {
@@ -298,7 +427,7 @@ void main() {
         (outcome as StepFailed).message,
         contains('The build job job_other has no intact IPA'),
       );
-      expect(context.commands, isEmpty);
+      expect(connect.calls, isEmpty);
     });
 
     test('fails when the stored IPA changed', () async {
@@ -308,7 +437,7 @@ void main() {
       final outcome = await step().run(_input(), context);
 
       expect((outcome as StepFailed).message, contains('no intact IPA'));
-      expect(context.commands, isEmpty);
+      expect(connect.calls, isEmpty);
     });
 
     test('fails when the ASC key secret is missing', () async {
@@ -339,7 +468,7 @@ void main() {
           (outcome as StepFailed).message,
           contains('not a usable ASC key'),
         );
-        expect(secretFiles.written, isEmpty);
+        expect(connect.calls, isEmpty);
       },
     );
   });
@@ -375,7 +504,6 @@ void main() {
       });
       expect(command.environment, isEmpty);
       expect(command.arguments.join(' '), isNot(contains(_password)));
-      expect(secretFiles.written, isEmpty);
       expect(outcome, isA<StepSucceeded<UploadAppStoreResult>>());
     });
 
