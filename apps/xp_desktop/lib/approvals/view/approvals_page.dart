@@ -186,8 +186,8 @@ class _Row extends StatelessWidget {
                         ),
                       ),
                     ),
-                    Text(
-                      formatTime(approval.createdAt),
+                    XpTime(
+                      approval.createdAt,
                       style: type.code.copyWith(color: colors.textSecondary),
                     ),
                   ],
@@ -301,7 +301,10 @@ class _Detail extends StatelessWidget {
                 hint: '⇧⌘A',
                 kind: XpButtonKind.primary,
                 size: XpButtonSize.large,
-                onPressed: () => showApprovalReview(context, approval.id),
+                tooltip: canCommand ? null : l10n.readOnlyHint,
+                onPressed: canCommand
+                    ? () => showApprovalReview(context, approval.id)
+                    : null,
               ),
             ],
           ),

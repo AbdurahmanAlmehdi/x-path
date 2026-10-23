@@ -26,6 +26,9 @@ typedef FileSaver = Future<String?> Function(
   String contents,
 );
 
+/// Shows the file at [path] in Finder, selected.
+typedef FileRevealer = Future<void> Function(String path);
+
 /// A file the user picked.
 class PickedFile extends Equatable {
   const new({required this.name, required this.bytes});
@@ -70,6 +73,8 @@ class AppServices {
     required this.pickFolder,
     required this.pickFile,
     required this.saveFile,
+    required this.revealFile,
+    required this.engineLog,
     required this.deviceName,
     required this.alerts,
     required this.runningApp,
@@ -111,6 +116,10 @@ class AppServices {
         await File(location.path).writeAsString(contents);
         return location.path;
       },
+      revealFile: (path) async {
+        await Process.run('/usr/bin/open', ['-R', path]);
+      },
+      engineLog: p.join(engineDataDirectory(home), 'service-logs', 'xpd.log'),
       deviceName: Platform.localHostname.split('.').first,
       alerts: MethodChannelNeedsYouAlerts(),
       runningApp: const MethodChannelRunningApp(),
@@ -131,6 +140,10 @@ class AppServices {
   final FolderPicker pickFolder;
   final FilePicker pickFile;
   final FileSaver saveFile;
+  final FileRevealer revealFile;
+
+  /// The log of the engine on this Mac, as its service writes it.
+  final String engineLog;
 
   /// What this Mac is called, for naming its token.
   final String deviceName;

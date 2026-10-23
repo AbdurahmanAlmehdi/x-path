@@ -6,12 +6,16 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:xp_api/xp_api.dart';
 import 'package:xp_client/xp_client.dart';
+import 'package:xp_desktop/credentials/view/flavor_credentials_sheet.dart';
+import 'package:xp_desktop/dispatch/dispatch.dart';
 import 'package:xp_desktop/l10n/l10n.dart';
 import 'package:xp_desktop/projects/bloc/projects_bloc.dart';
 import 'package:xp_desktop/releases/releases.dart';
 import 'package:xp_desktop/shell/cubit/shell_cubit.dart';
+import 'package:xp_desktop/widgets/widgets.dart';
 import 'package:xp_repositories/xp_repositories.dart';
 
+import '../dispatch/dispatch_harness.dart';
 import '../helpers/approval_fixtures.dart';
 import '../helpers/job_fixtures.dart';
 import '../helpers/pump_app.dart';
@@ -29,6 +33,12 @@ Release _noKey({StoreState apple = StoreState.uploaded}) => reviewRelease(
     ),
     lane(ReleaseStore.play, StoreState.inReview, changedAt: oct12(19, 40)),
   ],
+);
+
+/// The confirming button [label] of the open confirmation.
+Finder confirm(String label) => find.descendant(
+  of: find.byType(XpConfirmDialog),
+  matching: find.text(label),
 );
 
 void main() {
@@ -123,7 +133,16 @@ void main() {
       );
 
       await tester.tap(find.text('Mark approved'));
-      await tester.pump();
+      await tester.pumpAndSettle();
+      expect(find.byType(XpConfirmDialog), findsOneWidget);
+      await tester.tap(find.text('Keep'));
+      await tester.pumpAndSettle();
+      verifyNever(() => repository.setStoreStatus(any(), any(), any()));
+
+      await tester.tap(find.text('Mark approved'));
+      await tester.pumpAndSettle();
+      await tester.tap(confirm('Mark approved'));
+      await tester.pumpAndSettle();
       verify(
         () => repository.setStoreStatus(
           'rel_2',
@@ -132,7 +151,9 @@ void main() {
         ),
       ).called(1);
       await tester.tap(find.text('Mark live'));
-      await tester.pump();
+      await tester.pumpAndSettle();
+      await tester.tap(confirm('Mark live'));
+      await tester.pumpAndSettle();
       verify(
         () => repository.setStoreStatus(
           'rel_2',
@@ -141,7 +162,9 @@ void main() {
         ),
       ).called(1);
       await tester.tap(find.text('Add API key…'));
-      expect(shell.state, const CredentialsDestination('prj_1'));
+      await tester.pumpAndSettle();
+      expect(find.byType(FlavorCredentialsSheet), findsOneWidget);
+      expect(shell.state, const HomeDestination());
     });
 
     testWidgets('marks an approved App Store and Google Play live', (
@@ -163,7 +186,9 @@ void main() {
         findsOneWidget,
       );
       await tester.tap(find.text('Mark live').last);
-      await tester.pump();
+      await tester.pumpAndSettle();
+      await tester.tap(confirm('Mark live'));
+      await tester.pumpAndSettle();
       verify(
         () => repository.setStoreStatus(
           'rel_2',
@@ -280,7 +305,8 @@ void main() {
     });
 
     testWidgets('says when there is no release, or no project', (tester) async {
-      await ReleasesHarness(releases: const []).pump(tester);
+      await ReleasesHarness(releases: const [])
+          .pump(tester, workflows: DispatchHarness().workflows);
       expect(
         find.text(
           'A production release dispatched from the overview shows '
@@ -288,6 +314,11 @@ void main() {
         ),
         findsOneWidget,
       );
+      await tester.tap(find.text('Dispatch Prod release…'));
+      await tester.pumpAndSettle();
+      expect(find.byType(DispatchSheet), findsOneWidget);
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await tester.pumpAndSettle();
       await tester.pumpApp(
         const ReleasesPage(projectId: 'prj_9'),
         projects: projectsIn(const ProjectsState(loaded: true)),

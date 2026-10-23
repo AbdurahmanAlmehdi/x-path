@@ -7,6 +7,9 @@ import 'package:xp_desktop/theme/theme.dart';
 /// One page of the content area: the toolbar (`size.toolbar.height`,
 /// `surface.base`, a hairline under it) with the page's [title], [subtitle]
 /// and [actions], the connection banner, then [child].
+///
+/// The page takes the keyboard focus when it opens (unless a page above it
+/// took it first), so the shell's shortcuts (⌘N, ⌘1–⌘9) work on every page.
 class ShellPage extends StatelessWidget {
   const new({
     required this.title,
@@ -25,7 +28,7 @@ class ShellPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.xpColors;
     final type = context.xpType;
-    return Column(
+    final page = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Container(
@@ -73,6 +76,7 @@ class ShellPage extends StatelessWidget {
         Expanded(child: child),
       ],
     );
+    return Focus(autofocus: true, skipTraversal: true, child: page);
   }
 }
 

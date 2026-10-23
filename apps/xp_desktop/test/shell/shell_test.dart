@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter/gestures.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
@@ -10,6 +11,7 @@ import 'package:xp_desktop/add_project/view/add_project_page.dart';
 import 'package:xp_desktop/app/app.dart';
 import 'package:xp_desktop/approvals/approvals.dart';
 import 'package:xp_desktop/credentials/view/credentials_page.dart';
+import 'package:xp_desktop/dispatch/dispatch.dart';
 import 'package:xp_desktop/engines/view/engines_page.dart';
 import 'package:xp_desktop/job/view/job_page.dart';
 import 'package:xp_desktop/local_engine/local_engine.dart';
@@ -28,6 +30,7 @@ import 'package:xp_desktop/workflow_builder/workflow_builder.dart';
 import 'package:xp_macos_services/testing.dart';
 import 'package:xp_repositories/xp_repositories.dart';
 
+import '../dispatch/dispatch_harness.dart';
 import '../helpers/approval_fixtures.dart';
 import '../helpers/engine_fixtures.dart';
 import '../helpers/fakes.dart';
@@ -83,6 +86,67 @@ void main() {
       expect(shell.state, const SettingsDestination());
       await tester.pumpWidget(const SizedBox());
       menu.chooseSettings();
+    });
+
+    testWidgets('⌘N dispatches for the shown project from any of its pages', (
+      tester,
+    ) async {
+      await tester.pumpApp(
+        const AppShell(),
+        shell: ShellCubit(const ReleasesDestination('prj_1')),
+        projects: projectsIn(
+          const ProjectsState(loaded: true, projects: [mataa, captain]),
+        ),
+        projectsRepository: repository,
+        workflowsRepository: DispatchHarness().workflows,
+      );
+      await tester.pump();
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.metaLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyN);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.metaLeft);
+      await tester.pumpAndSettle();
+      expect(find.byType(DispatchSheet), findsOneWidget);
+    });
+
+    testWidgets('⌘N does nothing without a project', (tester) async {
+      await tester.pumpApp(
+        const AppShell(),
+        shell: ShellCubit(const RunnersDestination()),
+        projects: projectsIn(
+          const ProjectsState(loaded: true, projects: [mataa]),
+        ),
+        projectsRepository: repository,
+      );
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.metaLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyN);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.metaLeft);
+      await tester.pumpAndSettle();
+      expect(find.byType(DispatchSheet), findsNothing);
+    });
+
+    testWidgets('⌘1–⌘9 show the projects in sidebar order', (tester) async {
+      final shell = ShellCubit(const RunnersDestination());
+      await tester.pumpApp(
+        const AppShell(),
+        shell: shell,
+        projects: projectsIn(
+          const ProjectsState(loaded: true, projects: [mataa, captain]),
+        ),
+        projectsRepository: repository,
+      );
+      Future<void> press(LogicalKeyboardKey key) async {
+        await tester.sendKeyDownEvent(LogicalKeyboardKey.metaLeft);
+        await tester.sendKeyEvent(key);
+        await tester.sendKeyUpEvent(LogicalKeyboardKey.metaLeft);
+        await tester.pump();
+      }
+
+      await press(LogicalKeyboardKey.digit2);
+      expect(shell.state, ProjectDestination(captain.id));
+      await press(LogicalKeyboardKey.digit9);
+      expect(shell.state, ProjectDestination(captain.id));
+      await press(LogicalKeyboardKey.digit1);
+      expect(shell.state, ProjectDestination(mataa.id));
     });
 
     testWidgets('shows the first project at home', (tester) async {
@@ -402,6 +466,7 @@ void main() {
           shell: shell,
         );
         expect(find.textContaining(text), findsOneWidget);
+        expect(find.text('Set up this Mac again'), findsNothing);
         if (status == EngineStatus.rejected) {
           expect(find.text('Retry'), findsNothing);
         } else {
@@ -412,6 +477,32 @@ void main() {
         expect(shell.state, const EnginesDestination());
       });
     }
+
+    testWidgets('says how to unlock a locked Keychain', (tester) async {
+      await tester.pumpApp(
+        const ConnectionBanner(),
+        connection: connectionIn(
+          connectedTo(status: EngineStatus.secretsLocked, active: macMini),
+        ),
+      );
+      expect(
+        find.textContaining('unlock its login keychain in Keychain Access'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('sets this Mac up again when its engine refuses the token', (
+      tester,
+    ) async {
+      final shell = ShellCubit();
+      await tester.pumpApp(
+        const ConnectionBanner(),
+        connection: connectionIn(connectedTo(status: EngineStatus.rejected)),
+        shell: shell,
+      );
+      await tester.tap(find.text('Set up this Mac again'));
+      expect(shell.state, const OnboardingDestination());
+    });
 
     testWidgets('is hidden while connected or connecting', (tester) async {
       for (final status in [EngineStatus.connected, EngineStatus.connecting]) {
@@ -501,6 +592,30 @@ void main() {
           expect(find.text('Start engine'), findsOneWidget);
         });
       }
+
+      testWidgets('shows the log when the engine did not answer', (
+        tester,
+      ) async {
+        final revealed = <String>[];
+        await tester.pumpApp(
+          const ConnectionBanner(),
+          connection: connectionIn(unreachable),
+          services: testServices(
+            revealFile: (path) async => revealed.add(path),
+          ),
+          localEngine: localEngineIn(
+            const LocalEngineState(
+              running: false,
+              progress: LocalEngineProgress.failed,
+              failure: LocalEngineFailure.timedOut,
+            ),
+          ),
+        );
+        await tester.tap(find.text('Show log in Finder'));
+        expect(revealed, [
+          '/Users/me/Library/Application Support/XPath/service-logs/xpd.log',
+        ]);
+      });
 
       testWidgets('opens Login Items when macOS waits for the owner', (
         tester,

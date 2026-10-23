@@ -41,6 +41,23 @@ Future<bool> confirmDiscard(BuildContext context, String name) async =>
     ) ??
     false;
 
+/// Asks before removing a stage, job or step from the document (UX-08):
+/// [title] names it and [detail] says what goes with it.
+Future<bool> confirmRemove(
+  BuildContext context, {
+  required String title,
+  String? detail,
+}) {
+  final l10n = context.l10n;
+  return confirmAction(
+    context,
+    title: title,
+    points: [?detail, l10n.workflowsRemoveUnsaved],
+    keep: l10n.confirmKeep,
+    confirm: l10n.confirmRemove,
+  );
+}
+
 class _BuilderDialog extends StatelessWidget {
   const new({required this.title, required this.children});
 

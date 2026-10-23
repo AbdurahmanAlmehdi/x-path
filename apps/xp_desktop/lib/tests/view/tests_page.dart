@@ -1,6 +1,7 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:xp_api/xp_api.dart';
+import 'package:xp_desktop/dispatch/view/dispatch_sheet.dart';
 import 'package:xp_desktop/l10n/l10n.dart';
 import 'package:xp_desktop/projects/bloc/projects_bloc.dart';
 import 'package:xp_desktop/shell/cubit/shell_cubit.dart';
@@ -115,7 +116,7 @@ class TestsView extends StatelessWidget {
             const SizedBox(height: 24),
             TestLists(response: response),
           ] else if (state.loaded && runs.isEmpty)
-            const _NoRuns(),
+            _NoRuns(project: project),
           if (state.baselines.isNotEmpty) ...[
             const SizedBox(height: 24),
             BaselinesPanel(
@@ -131,7 +132,9 @@ class TestsView extends StatelessWidget {
 }
 
 class _NoRuns extends StatelessWidget {
-  const new();
+  const new({required this.project});
+
+  final Project project;
 
   @override
   Widget build(BuildContext context) {
@@ -159,6 +162,17 @@ class _NoRuns extends StatelessWidget {
               textAlign: TextAlign.center,
               style: context.xpType.body.copyWith(color: colors.textSecondary),
             ),
+          ),
+          const SizedBox(height: 16),
+          XpButton(
+            label: l10n.testsRun,
+            icon: PhosphorIconsRegular.testTube,
+            kind: XpButtonKind.primary,
+            hint: '⌘N',
+            tooltip: context.canCommand ? null : l10n.readOnlyHint,
+            onPressed: context.canCommand
+                ? () => dispatchFor(context, project)
+                : null,
           ),
         ],
       ),

@@ -157,7 +157,12 @@ class ApprovalDetails extends StatelessWidget {
         (l10n.approvalVersion, XpCode(pubspecLabel(version))),
       (
         l10n.approvalCommit,
-        Tooltip(message: approval.sha, child: XpCode(shortSha(approval.sha))),
+        XpSha(
+          approval.sha,
+          style: context.xpType.code.copyWith(
+            color: context.xpColors.textPrimary,
+          ),
+        ),
       ),
       if (job != null)
         (

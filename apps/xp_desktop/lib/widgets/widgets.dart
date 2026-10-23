@@ -1,9 +1,12 @@
 export 'xp_button.dart';
 export 'xp_clock.dart';
+export 'xp_confirm_dialog.dart';
 export 'xp_format.dart';
 export 'xp_layout.dart';
 export 'xp_segmented.dart';
 export 'xp_select.dart';
+export 'xp_sha.dart';
 export 'xp_spinner.dart';
 export 'xp_status.dart';
 export 'xp_text_field.dart';
+export 'xp_time.dart';

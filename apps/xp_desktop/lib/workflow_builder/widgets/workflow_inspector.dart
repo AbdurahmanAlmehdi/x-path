@@ -5,6 +5,7 @@ import 'package:xp_desktop/theme/theme.dart';
 import 'package:xp_desktop/widgets/widgets.dart';
 import 'package:xp_desktop/workflow_builder/bloc/workflow_edits.dart';
 import 'package:xp_desktop/workflow_builder/widgets/builder_controls.dart';
+import 'package:xp_desktop/workflow_builder/widgets/workflow_dialogs.dart';
 import 'package:xp_repositories/xp_repositories.dart';
 
 /// Called with the edited document and, when it changes, what to select.
@@ -186,10 +187,19 @@ class _StageFields extends StatelessWidget {
                 document.moveStage(stage, delta),
                 WorkflowSelection(stage: stage + delta),
               ),
-              onRemove: () => onEdit(
-                document.removeStage(stage),
-                WorkflowSelection.workflow,
-              ),
+              onRemove: () async {
+                final removed = document.stages[stage];
+                if (await confirmRemove(
+                  context,
+                  title: l10n.workflowsRemoveStageTitle(removed.name),
+                  detail: l10n.workflowsRemoveStageJobs(removed.jobs.length),
+                )) {
+                  onEdit(
+                    document.removeStage(stage),
+                    WorkflowSelection.workflow,
+                  );
+                }
+              },
             ),
           ],
         ),
@@ -262,10 +272,18 @@ class _JobFields extends StatelessWidget {
                 document.moveJob(stage, job, delta),
                 WorkflowSelection(stage: stage, job: job + delta),
               ),
-              onRemove: () => onEdit(
-                document.removeJob(stage, job),
-                WorkflowSelection(stage: stage),
-              ),
+              onRemove: () async {
+                if (await confirmRemove(
+                  context,
+                  title: l10n.workflowsRemoveJobTitle(current.id),
+                  detail: l10n.workflowsRemoveJobSteps(current.steps.length),
+                )) {
+                  onEdit(
+                    document.removeJob(stage, job),
+                    WorkflowSelection(stage: stage),
+                  );
+                }
+              },
             ),
           ],
         ),
@@ -369,7 +387,14 @@ class _JobFields extends StatelessWidget {
             enabled: enabled,
             onChanged: (value) => _edit((j) => j.editStep(index, (_) => value)),
             onMove: (delta) => _edit((j) => j.moveStep(index, delta)),
-            onRemove: () => _edit((j) => j.removeStep(index)),
+            onRemove: () async {
+              if (await confirmRemove(
+                context,
+                title: l10n.workflowsRemoveStepTitle(step.kind),
+              )) {
+                _edit((j) => j.removeStep(index));
+              }
+            },
           ),
       ],
     );

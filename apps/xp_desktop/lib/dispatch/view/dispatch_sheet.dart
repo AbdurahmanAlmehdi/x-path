@@ -2,9 +2,11 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:xp_api/xp_api.dart';
+import 'package:xp_desktop/app/bloc/engine_connection_bloc.dart';
 import 'package:xp_desktop/dispatch/bloc/dispatch_bloc.dart';
 import 'package:xp_desktop/job/widgets/job_status.dart';
 import 'package:xp_desktop/l10n/l10n.dart';
+import 'package:xp_desktop/shell/cubit/shell_cubit.dart';
 import 'package:xp_desktop/shell/widgets/shell_page.dart';
 import 'package:xp_desktop/theme/theme.dart';
 import 'package:xp_desktop/widgets/widgets.dart';
@@ -24,6 +26,15 @@ Future<Run?> showDispatchSheet(BuildContext context, Project project) {
       child: const DispatchSheet(),
     ),
   );
+}
+
+/// Dispatches for [project] (⌘N, the Dispatch… buttons): opens the sheet
+/// while the engine takes commands, then the job view of the run.
+Future<void> dispatchFor(BuildContext context, Project project) async {
+  if (!context.read<EngineConnectionBloc>().state.status.canCommand) return;
+  final shell = context.read<ShellCubit>();
+  final run = await showDispatchSheet(context, project);
+  if (run != null) shell.show(JobDestination(run.id, projectId: project.id));
 }
 
 /// The sheet: workflow, flavors, platforms, ref and version, what will run

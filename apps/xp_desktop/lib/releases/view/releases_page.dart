@@ -2,6 +2,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:xp_api/xp_api.dart';
 import 'package:xp_desktop/approvals/widgets/needs_you_bar.dart';
+import 'package:xp_desktop/dispatch/view/dispatch_sheet.dart';
 import 'package:xp_desktop/l10n/l10n.dart';
 import 'package:xp_desktop/project_overview/widgets/release_status.dart';
 import 'package:xp_desktop/projects/bloc/projects_bloc.dart';
@@ -130,7 +131,7 @@ class ReleasesView extends StatelessWidget {
                   if (release != null)
                     _Board(release: release, state: state)
                   else if (state.loaded)
-                    const _NoRelease(),
+                    _NoRelease(project: project),
                 ],
               ),
             ),
@@ -198,7 +199,9 @@ class _Board extends StatelessWidget {
 }
 
 class _NoRelease extends StatelessWidget {
-  const new();
+  const new({required this.project});
+
+  final Project project;
 
   @override
   Widget build(BuildContext context) {
@@ -222,6 +225,17 @@ class _NoRelease extends StatelessWidget {
           Text(
             l10n.releasesEmpty,
             style: context.xpType.body.copyWith(color: colors.textSecondary),
+          ),
+          const SizedBox(height: 16),
+          XpButton(
+            label: l10n.releasesDispatchProd,
+            icon: PhosphorIconsRegular.paperPlaneTilt,
+            kind: XpButtonKind.primary,
+            hint: '⌘N',
+            tooltip: context.canCommand ? null : l10n.readOnlyHint,
+            onPressed: context.canCommand
+                ? () => dispatchFor(context, project)
+                : null,
           ),
         ],
       ),

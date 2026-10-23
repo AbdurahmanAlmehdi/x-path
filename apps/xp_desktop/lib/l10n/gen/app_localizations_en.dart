@@ -63,6 +63,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get bannerLocalStarting => 'Starting the engine on this Mac…';
 
   @override
+  String get bannerSecretsLockedSteps =>
+      'Sign in to that Mac, or unlock its login keychain in Keychain Access; jobs start again by themselves.';
+
+  @override
+  String get bannerShowLog => 'Show log in Finder';
+
+  @override
+  String get bannerSetUpAgain => 'Set up this Mac again';
+
+  @override
   String get localEngineStart => 'Start engine';
 
   @override
@@ -177,6 +187,20 @@ class AppLocalizationsEn extends AppLocalizations {
   String get enginesRemove => 'Remove';
 
   @override
+  String enginesRemoveTitle(String name) {
+    return 'Remove $name?';
+  }
+
+  @override
+  String enginesRemoveForget(String name) {
+    return 'This Mac forgets $name and its token.';
+  }
+
+  @override
+  String get enginesRemoveKeeps =>
+      'The engine keeps running, with its projects and releases. Adding it again needs a new token.';
+
+  @override
   String get enginesSetUpLocal => 'Set up this Mac…';
 
   @override
@@ -235,7 +259,10 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get engineNoTokenBody =>
-      'The Keychain of this Mac has no token for this engine, or it could not be read. Remove the engine and add it again.';
+      'The Keychain of this Mac has no token for this engine, or it could not be read. Try again once the Keychain is unlocked, or remove the engine and add it again.';
+
+  @override
+  String get engineNoTokenRetry => 'Try again';
 
   @override
   String get onboardingTitle => 'Set up XPath on this Mac';
@@ -449,6 +476,19 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get addProjectDiscard => 'Remove project';
+
+  @override
+  String addProjectRemoveTitle(String name) {
+    return 'Remove $name?';
+  }
+
+  @override
+  String get addProjectRemoveForget =>
+      'The engine forgets the project and what its scan found.';
+
+  @override
+  String get addProjectRemoveKeeps =>
+      'Nothing in the folder or on GitHub changes.';
 
   @override
   String get scanAgain => 'Scan again';
@@ -705,8 +745,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get fieldChooseFile => 'Choose file…';
 
   @override
-  String fieldFileChosen(String name, int bytes) {
-    return '$name · $bytes bytes';
+  String fieldFileChosen(String name, String size) {
+    return '$name · $size';
   }
 
   @override
@@ -1727,6 +1767,9 @@ class AppLocalizationsEn extends AppLocalizations {
       'A production release dispatched from the overview shows up here.';
 
   @override
+  String get releasesDispatchProd => 'Dispatch Prod release…';
+
+  @override
   String releaseTitle(String version) {
     return 'Release $version';
   }
@@ -1798,6 +1841,19 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get laneMarkLive => 'Mark live';
+
+  @override
+  String laneMarkTitle(String version, String state) {
+    return 'Mark $version $state?';
+  }
+
+  @override
+  String get laneMarkManual =>
+      'The engine cannot read this store, so it records your mark as manual, at this time.';
+
+  @override
+  String get laneMarkFinal =>
+      'The release moves on from it; a mark cannot be taken back.';
 
   @override
   String get laneAddApiKey => 'Add API key…';
@@ -1979,6 +2035,17 @@ class AppLocalizationsEn extends AppLocalizations {
   String get copied => 'Copied';
 
   @override
+  String get confirmKeep => 'Keep';
+
+  @override
+  String get confirmRemove => 'Remove';
+
+  @override
+  String copyHint(String text) {
+    return '$text · click to copy';
+  }
+
+  @override
   String get minVersionTitle => 'Forced update';
 
   @override
@@ -2083,6 +2150,9 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get testsEmptyBody =>
       'Run the Tests workflow. Its runs on the base branch become the baseline that later runs are compared with; a run\'s results also open from its job.';
+
+  @override
+  String get testsRun => 'Run Tests…';
 
   @override
   String testsIsBaseline(String branch) {
@@ -2660,6 +2730,49 @@ class AppLocalizationsEn extends AppLocalizations {
   String get workflowsRemoveStep => 'Remove step';
 
   @override
+  String workflowsRemoveStageTitle(String name) {
+    return 'Remove stage $name?';
+  }
+
+  @override
+  String workflowsRemoveStageJobs(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Its $count jobs go with it.',
+      one: 'Its job goes with it.',
+      zero: 'It has no jobs.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String workflowsRemoveJobTitle(String id) {
+    return 'Remove job $id?';
+  }
+
+  @override
+  String workflowsRemoveJobSteps(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Its $count steps go with it.',
+      one: 'Its step goes with it.',
+      zero: 'It has no steps.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String workflowsRemoveStepTitle(String name) {
+    return 'Remove step $name?';
+  }
+
+  @override
+  String get workflowsRemoveUnsaved =>
+      'Nothing changes on the engine until you save.';
+
+  @override
   String get workflowsJob => 'Job';
 
   @override
@@ -2885,6 +2998,17 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsGitHubRemove => 'Remove token';
 
   @override
+  String get settingsGitHubRemoveTitle => 'Remove the GitHub token?';
+
+  @override
+  String get settingsGitHubRemoveStops =>
+      'The engine can no longer clone, tag or open pull requests, so jobs that need GitHub fail.';
+
+  @override
+  String get settingsGitHubRemoveKeeps =>
+      'The token stays valid on GitHub; revoke it there if it leaked.';
+
+  @override
   String settingsGitHubFailed(String message) {
     return 'Not saved: $message';
   }
@@ -2993,12 +3117,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get addProjectNoGitHub =>
-      'The engine has no GitHub token, so it cannot add a project. Connect GitHub in Settings first.';
+      'The engine has no GitHub token, so it cannot add a project. Connect GitHub below first.';
 
   @override
   String get addProjectGitHubRejected =>
-      'GitHub refuses the engine\'s token, so it cannot add a project. Save a new one in Settings.';
-
-  @override
-  String get addProjectOpenGitHub => 'Connect GitHub…';
+      'GitHub refuses the engine\'s token, so it cannot add a project. Save a new one below.';
 }

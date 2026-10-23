@@ -1,10 +1,13 @@
+import 'package:flutter/material.dart' show TextField;
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:xp_api/xp_api.dart';
 import 'package:xp_client/xp_client.dart';
 import 'package:xp_desktop/add_project/add_project.dart';
+import 'package:xp_desktop/settings/settings.dart';
 import 'package:xp_desktop/shell/cubit/shell_cubit.dart';
+import 'package:xp_desktop/widgets/widgets.dart';
 import 'package:xp_repositories/xp_repositories.dart';
 
 import '../helpers/fakes.dart';
@@ -42,7 +45,7 @@ void main() {
   final folder = find.byKey(const Key('addProject.folder'));
 
   group('AddProjectPage without a GitHub token', () {
-    testWidgets('says so and opens the GitHub section of the settings', (
+    testWidgets('says so and connects GitHub in place, keeping the folder', (
       tester,
     ) async {
       final settings = quietSettings(
@@ -55,8 +58,25 @@ void main() {
         find.textContaining('The engine has no GitHub token'),
         findsOneWidget,
       );
-      await tester.tap(find.byKey(const Key('addProject.github')));
-      expect(shell.state, const SettingsDestination(github: true));
+      await tester.enterText(folder, '/src/app');
+      await tester.pump();
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('addProject.github')),
+          matching: find.byType(GitHubTokenSection),
+        ),
+        findsOneWidget,
+      );
+      expect(shell.state, const AddProjectDestination());
+      expect(
+        tester
+            .widget<TextField>(
+              find.descendant(of: folder, matching: find.byType(TextField)),
+            )
+            .controller!
+            .text,
+        '/src/app',
+      );
     });
 
     testWidgets('says when GitHub refuses the token', (tester) async {
@@ -141,6 +161,21 @@ void main() {
       await tester.tap(find.text('Add and scan'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Remove project'));
+      await tester.pumpAndSettle();
+      expect(find.text('Remove acme/mataa_new_app?'), findsOneWidget);
+      await tester.tap(find.text('Keep'));
+      await tester.pumpAndSettle();
+      verifyNever(() => projects.removeProject(any()));
+      expect(shell.state, const AddProjectDestination());
+
+      await tester.tap(find.text('Remove project'));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.descendant(
+          of: find.byType(XpConfirmDialog),
+          matching: find.text('Remove project'),
+        ),
+      );
       await tester.pumpAndSettle();
       expect(shell.state, const HomeDestination());
     });

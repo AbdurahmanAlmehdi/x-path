@@ -171,10 +171,15 @@ void main() {
     expect(find.text('Nope.'), findsOneWidget);
   });
 
-  testWidgets('Deny… is read-only while the engine is away', (tester) async {
+  testWidgets('Approve… and Deny… are read-only while the engine is away', (
+    tester,
+  ) async {
     await pump(tester, status: EngineStatus.unreachable);
     await tester.tap(find.text('Deny…'));
     await tester.pumpAndSettle();
     expect(find.text('REASON (OPTIONAL)'), findsNothing);
+    await tester.tap(find.text('Approve…'));
+    await tester.pumpAndSettle();
+    expect(find.text('Return never approves. ⌘↩ approves.'), findsNothing);
   });
 }

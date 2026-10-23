@@ -6,6 +6,7 @@ import 'package:xp_client/xp_client.dart';
 import 'package:xp_desktop/app/app.dart';
 import 'package:xp_desktop/projects/bloc/projects_bloc.dart';
 import 'package:xp_desktop/shell/shell.dart';
+import 'package:xp_desktop/widgets/widgets.dart';
 import 'package:xp_macos_services/testing.dart';
 import 'package:xp_macos_services/xp_macos_services.dart';
 import 'package:xp_repositories/xp_repositories.dart';
@@ -136,11 +137,31 @@ void main() {
       expect(find.text('mataa_captain'), findsNWidgets(2));
     });
 
+    testWidgets('reads the token again on Try again', (tester) async {
+      when(() => engines.token(any())).thenAnswer((_) async => null);
+      await pumpApp(tester);
+      await tester.pumpAndSettle();
+      clearInteractions(engines);
+
+      await tester.tap(find.text('Try again'));
+      await tester.pumpAndSettle();
+      verify(() => engines.token(localEngineId)).called(1);
+      expect(find.text('No token for This Mac'), findsOneWidget);
+    });
+
     testWidgets('removes an engine whose token is missing', (tester) async {
       when(() => engines.token(any())).thenAnswer((_) async => null);
       await pumpApp(tester);
       await tester.pumpAndSettle();
       await tester.tap(find.text('Remove'));
+      await tester.pumpAndSettle();
+      verifyNever(() => engines.remove(any()));
+      await tester.tap(
+        find.descendant(
+          of: find.byType(XpConfirmDialog),
+          matching: find.text('Remove'),
+        ),
+      );
       await tester.pumpAndSettle();
       verify(() => engines.remove(localEngineId)).called(1);
       expect(find.text('No token for mac-mini'), findsOneWidget);

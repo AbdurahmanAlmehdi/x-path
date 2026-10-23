@@ -104,7 +104,7 @@ Details:
 
 ### Phase U1a-2: Quick fixes: confirmations, setup detours and polish
 
-- **Status:** Not started
+- **Status:** Done
 - **Scope:** Confirm destructive actions, keep the Add project folder, and fix small empty
   state, shortcut, formatting and banner gaps.
 - **Files touched:** `apps/xp_desktop/lib/{engines,app,settings,add_project,releases,tests,credentials,approvals,project_overview,shell,widgets}/**`,

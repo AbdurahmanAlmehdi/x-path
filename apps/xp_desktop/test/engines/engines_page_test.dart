@@ -4,6 +4,7 @@ import 'package:mocktail/mocktail.dart';
 import 'package:xp_desktop/app/app.dart';
 import 'package:xp_desktop/engines/engines.dart';
 import 'package:xp_desktop/shell/cubit/shell_cubit.dart';
+import 'package:xp_desktop/widgets/widgets.dart';
 import 'package:xp_repositories/xp_repositories.dart';
 
 import '../helpers/fakes.dart';
@@ -23,6 +24,25 @@ void main() {
       await tester.tap(find.text('Show'));
       verify(() => connection.add(EngineSelected(macMini.id))).called(1);
       await tester.tap(find.text('Remove').first);
+      await tester.pumpAndSettle();
+      expect(find.text('Remove This Mac?'), findsOneWidget);
+      expect(
+        find.text('•  This Mac forgets This Mac and its token.'),
+        findsOneWidget,
+      );
+      await tester.tap(find.text('Keep'));
+      await tester.pumpAndSettle();
+      verifyNever(() => connection.add(const EngineRemoved(localEngineId)));
+
+      await tester.tap(find.text('Remove').first);
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.descendant(
+          of: find.byType(XpConfirmDialog),
+          matching: find.text('Remove'),
+        ),
+      );
+      await tester.pumpAndSettle();
       verify(() => connection.add(const EngineRemoved(localEngineId)))
           .called(1);
     });

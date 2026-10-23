@@ -4,6 +4,7 @@ import 'package:xp_desktop/app/app_services.dart';
 import 'package:xp_desktop/app/bloc/engine_connection_bloc.dart';
 import 'package:xp_desktop/approvals/bloc/pending_approvals_bloc.dart';
 import 'package:xp_desktop/approvals/widgets/needs_you_alerts_listener.dart';
+import 'package:xp_desktop/engines/view/engines_page.dart';
 import 'package:xp_desktop/l10n/l10n.dart';
 import 'package:xp_desktop/local_engine/local_engine.dart';
 import 'package:xp_desktop/onboarding/view/onboarding_page.dart';
@@ -197,9 +198,13 @@ class EngineMissingTokenPage extends StatelessWidget {
                 alignment: WrapAlignment.center,
                 children: [
                   XpButton(
-                    label: l10n.enginesRemove,
+                    label: l10n.engineNoTokenRetry,
                     kind: XpButtonKind.primary,
-                    onPressed: () => bloc.add(EngineRemoved(active.id)),
+                    onPressed: () => bloc.add(const EnginesChanged()),
+                  ),
+                  XpButton(
+                    label: l10n.enginesRemove,
+                    onPressed: () => removeEngine(context, active),
                   ),
                   for (final engine in state.engines)
                     if (engine.id != active.id)

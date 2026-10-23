@@ -161,6 +161,7 @@ class _CredentialsViewState extends State<CredentialsView> {
                   _CredentialTable(
                     state: state,
                     canCommand: canCommand,
+                    onAdd: form == null ? _open : null,
                     onRename: _rename,
                     onReplace: _open,
                     onDelete: (credential) =>
@@ -182,6 +183,7 @@ class _CredentialTable extends StatelessWidget {
   const new({
     required this.state,
     required this.canCommand,
+    required this.onAdd,
     required this.onRename,
     required this.onReplace,
     required this.onDelete,
@@ -189,6 +191,9 @@ class _CredentialTable extends StatelessWidget {
 
   final CredentialsState state;
   final bool canCommand;
+
+  /// Opens the form of a new credential; `null` while a form is open.
+  final VoidCallback? onAdd;
   final ValueChanged<NamedCredential> onRename;
   final ValueChanged<NamedCredential> onReplace;
   final ValueChanged<NamedCredential> onDelete;
@@ -201,9 +206,22 @@ class _CredentialTable extends StatelessWidget {
     if (state.loaded && state.credentials.isEmpty) {
       return XpPanel(
         padding: const EdgeInsets.all(16),
-        child: Text(
-          l10n.credentialsEmpty,
-          style: type.body.copyWith(color: colors.textSecondary),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                l10n.credentialsEmpty,
+                style: type.body.copyWith(color: colors.textSecondary),
+              ),
+            ),
+            const SizedBox(width: 12),
+            XpButton(
+              label: l10n.credentialsAdd,
+              icon: PhosphorIconsRegular.plus,
+              tooltip: canCommand ? null : l10n.readOnlyHint,
+              onPressed: canCommand ? onAdd : null,
+            ),
+          ],
         ),
       );
     }

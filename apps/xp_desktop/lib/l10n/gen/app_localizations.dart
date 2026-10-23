@@ -184,6 +184,24 @@ abstract class AppLocalizations {
   /// **'Starting the engine on this Mac…'**
   String get bannerLocalStarting;
 
+  /// Banner while the engine's Keychain is locked: how to unlock it.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in to that Mac, or unlock its login keychain in Keychain Access; jobs start again by themselves.'**
+  String get bannerSecretsLockedSteps;
+
+  /// Banner: reveals the log of the engine on this Mac.
+  ///
+  /// In en, this message translates to:
+  /// **'Show log in Finder'**
+  String get bannerShowLog;
+
+  /// Banner: the engine on this Mac refused the app's token; runs the setup again.
+  ///
+  /// In en, this message translates to:
+  /// **'Set up this Mac again'**
+  String get bannerSetUpAgain;
+
   /// Starts the engine on this Mac again (banner, Settings).
   ///
   /// In en, this message translates to:
@@ -346,6 +364,24 @@ abstract class AppLocalizations {
   /// **'Remove'**
   String get enginesRemove;
 
+  /// No description provided for @enginesRemoveTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove {name}?'**
+  String enginesRemoveTitle(String name);
+
+  /// No description provided for @enginesRemoveForget.
+  ///
+  /// In en, this message translates to:
+  /// **'This Mac forgets {name} and its token.'**
+  String enginesRemoveForget(String name);
+
+  /// Remove engine confirmation.
+  ///
+  /// In en, this message translates to:
+  /// **'The engine keeps running, with its projects and releases. Adding it again needs a new token.'**
+  String get enginesRemoveKeeps;
+
   /// Opens onboarding to run the engine on this Mac.
   ///
   /// In en, this message translates to:
@@ -445,8 +481,14 @@ abstract class AppLocalizations {
   /// Shown when the token of the active engine is missing.
   ///
   /// In en, this message translates to:
-  /// **'The Keychain of this Mac has no token for this engine, or it could not be read. Remove the engine and add it again.'**
+  /// **'The Keychain of this Mac has no token for this engine, or it could not be read. Try again once the Keychain is unlocked, or remove the engine and add it again.'**
   String get engineNoTokenBody;
+
+  /// Reads the engine's token from the Keychain again.
+  ///
+  /// In en, this message translates to:
+  /// **'Try again'**
+  String get engineNoTokenRetry;
 
   /// Onboarding headline.
   ///
@@ -801,6 +843,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Remove project'**
   String get addProjectDiscard;
+
+  /// No description provided for @addProjectRemoveTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove {name}?'**
+  String addProjectRemoveTitle(String name);
+
+  /// Remove project confirmation.
+  ///
+  /// In en, this message translates to:
+  /// **'The engine forgets the project and what its scan found.'**
+  String get addProjectRemoveForget;
+
+  /// Remove project confirmation.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing in the folder or on GitHub changes.'**
+  String get addProjectRemoveKeeps;
 
   /// Scans the project again.
   ///
@@ -1261,8 +1321,8 @@ abstract class AppLocalizations {
   /// No description provided for @fieldFileChosen.
   ///
   /// In en, this message translates to:
-  /// **'{name} · {bytes} bytes'**
-  String fieldFileChosen(String name, int bytes);
+  /// **'{name} · {size}'**
+  String fieldFileChosen(String name, String size);
 
   /// Saves the credential.
   ///
@@ -2842,6 +2902,12 @@ abstract class AppLocalizations {
   /// **'A production release dispatched from the overview shows up here.'**
   String get releasesEmpty;
 
+  /// Empty releases: opens the dispatch sheet on the prod release.
+  ///
+  /// In en, this message translates to:
+  /// **'Dispatch Prod release…'**
+  String get releasesDispatchProd;
+
   /// Toolbar title of a release.
   ///
   /// In en, this message translates to:
@@ -2961,6 +3027,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Mark live'**
   String get laneMarkLive;
+
+  /// No description provided for @laneMarkTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Mark {version} {state}?'**
+  String laneMarkTitle(String version, String state);
+
+  /// Mark approved / live confirmation.
+  ///
+  /// In en, this message translates to:
+  /// **'The engine cannot read this store, so it records your mark as manual, at this time.'**
+  String get laneMarkManual;
+
+  /// Mark approved / live confirmation.
+  ///
+  /// In en, this message translates to:
+  /// **'The release moves on from it; a mark cannot be taken back.'**
+  String get laneMarkFinal;
 
   /// Opens the credentials.
   ///
@@ -3220,6 +3304,24 @@ abstract class AppLocalizations {
   /// **'Copied'**
   String get copied;
 
+  /// Cancel of a confirmation of a destructive action: keeps the object.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep'**
+  String get confirmKeep;
+
+  /// Confirms removing something.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove'**
+  String get confirmRemove;
+
+  /// Tooltip of something that copies itself when clicked.
+  ///
+  /// In en, this message translates to:
+  /// **'{text} · click to copy'**
+  String copyHint(String text);
+
   /// Label of the min_version panel.
   ///
   /// In en, this message translates to:
@@ -3387,6 +3489,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Run the Tests workflow. Its runs on the base branch become the baseline that later runs are compared with; a run\'s results also open from its job.'**
   String get testsEmptyBody;
+
+  /// Empty tests: opens the dispatch sheet on the Tests workflow.
+  ///
+  /// In en, this message translates to:
+  /// **'Run Tests…'**
+  String get testsRun;
 
   /// No description provided for @testsIsBaseline.
   ///
@@ -4312,6 +4420,42 @@ abstract class AppLocalizations {
   /// **'Remove step'**
   String get workflowsRemoveStep;
 
+  /// No description provided for @workflowsRemoveStageTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove stage {name}?'**
+  String workflowsRemoveStageTitle(String name);
+
+  /// No description provided for @workflowsRemoveStageJobs.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{It has no jobs.} =1{Its job goes with it.} other{Its {count} jobs go with it.}}'**
+  String workflowsRemoveStageJobs(int count);
+
+  /// No description provided for @workflowsRemoveJobTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove job {id}?'**
+  String workflowsRemoveJobTitle(String id);
+
+  /// No description provided for @workflowsRemoveJobSteps.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{It has no steps.} =1{Its step goes with it.} other{Its {count} steps go with it.}}'**
+  String workflowsRemoveJobSteps(int count);
+
+  /// No description provided for @workflowsRemoveStepTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove step {name}?'**
+  String workflowsRemoveStepTitle(String name);
+
+  /// Remove stage, job or step confirmation.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing changes on the engine until you save.'**
+  String get workflowsRemoveUnsaved;
+
   /// Inspector label of a job.
   ///
   /// In en, this message translates to:
@@ -4714,6 +4858,24 @@ abstract class AppLocalizations {
   /// **'Remove token'**
   String get settingsGitHubRemove;
 
+  /// Remove GitHub token confirmation.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove the GitHub token?'**
+  String get settingsGitHubRemoveTitle;
+
+  /// Remove GitHub token confirmation.
+  ///
+  /// In en, this message translates to:
+  /// **'The engine can no longer clone, tag or open pull requests, so jobs that need GitHub fail.'**
+  String get settingsGitHubRemoveStops;
+
+  /// Remove GitHub token confirmation.
+  ///
+  /// In en, this message translates to:
+  /// **'The token stays valid on GitHub; revoke it there if it leaked.'**
+  String get settingsGitHubRemoveKeeps;
+
   /// A failed request.
   ///
   /// In en, this message translates to:
@@ -4879,20 +5041,14 @@ abstract class AppLocalizations {
   /// Add project without a GitHub token.
   ///
   /// In en, this message translates to:
-  /// **'The engine has no GitHub token, so it cannot add a project. Connect GitHub in Settings first.'**
+  /// **'The engine has no GitHub token, so it cannot add a project. Connect GitHub below first.'**
   String get addProjectNoGitHub;
 
   /// Add project with a refused token.
   ///
   /// In en, this message translates to:
-  /// **'GitHub refuses the engine\'s token, so it cannot add a project. Save a new one in Settings.'**
+  /// **'GitHub refuses the engine\'s token, so it cannot add a project. Save a new one below.'**
   String get addProjectGitHubRejected;
-
-  /// Opens the GitHub section of Settings.
-  ///
-  /// In en, this message translates to:
-  /// **'Connect GitHub…'**
-  String get addProjectOpenGitHub;
 }
 
 class _AppLocalizationsDelegate

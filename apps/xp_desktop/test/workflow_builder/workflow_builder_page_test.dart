@@ -46,6 +46,17 @@ Future<void> type(WidgetTester tester, Finder finder, String text) async {
   await settle(tester);
 }
 
+/// Presses Remove in the open confirmation and lets the check run.
+Future<void> acceptRemoval(WidgetTester tester) async {
+  await tester.tap(
+    find.descendant(
+      of: find.byType(XpConfirmDialog),
+      matching: find.text('Remove'),
+    ),
+  );
+  await settle(tester);
+}
+
 void main() {
   late MockWorkflowsRepository repository;
 
@@ -140,6 +151,16 @@ void main() {
       ['check-2', 'check'],
     );
     await press(tester, find.byTooltip('Remove job'));
+    expect(find.text('Remove job check-2?'), findsOneWidget);
+    expect(
+      find.text('•  Nothing changes on the engine until you save.'),
+      findsOneWidget,
+    );
+    await tester.tap(find.text('Keep'));
+    await settle(tester);
+    expect(find.text('check-2'), findsWidgets);
+    await press(tester, find.byTooltip('Remove job'));
+    await acceptRemoval(tester);
     expect(find.text('check-2'), findsNothing);
 
     await press(tester, find.text('CHECK'));
@@ -152,6 +173,9 @@ void main() {
       'stage-3',
     ]);
     await press(tester, find.byTooltip('Remove stage'));
+    expect(find.text('Remove stage verify?'), findsOneWidget);
+    expect(find.text('•  Its job goes with it.'), findsOneWidget);
+    await acceptRemoval(tester);
     expect(WorkflowDocument.parse(yamlOf(tester)).stages.map((s) => s.name), [
       'build',
       'stage-3',
@@ -262,6 +286,8 @@ void main() {
     await press(tester, find.byTooltip('Move earlier').last);
     await press(tester, find.byTooltip('Move later').at(1));
     await press(tester, find.byTooltip('Remove step').first);
+    expect(find.byType(XpConfirmDialog), findsOneWidget);
+    await acceptRemoval(tester);
     steps = WorkflowDocument.parse(yamlOf(tester)).stages[1].jobs.single.steps;
     expect(steps.map((s) => s.kind), ['git.checkout', 'guard', 'upload.play']);
   });
