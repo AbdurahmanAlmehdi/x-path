@@ -73,6 +73,7 @@ export 'src/process/process_environment.dart';
 export 'src/process/process_runner.dart';
 export 'src/process/process_supervisor.dart';
 export 'src/projects/apply_edits.dart';
+export 'src/projects/git_remote.dart';
 export 'src/projects/github_remote.dart';
 export 'src/projects/project_exceptions.dart';
 export 'src/projects/project_record.dart';

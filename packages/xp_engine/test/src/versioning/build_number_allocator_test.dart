@@ -4,7 +4,7 @@ import 'package:xp_engine/xp_engine.dart';
 import '../../helpers/stub_git.dart';
 
 void main() {
-  const mirror = GitMirror(githubRepoId: 1, path: '/m.git');
+  const mirror = GitMirror(key: '1', path: '/m.git');
   late StubGit git;
   late FakeStoreBuildNumbers store;
   late InMemoryBuildCounterRepository counters;

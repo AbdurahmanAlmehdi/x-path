@@ -128,7 +128,7 @@ void main() {
       await service.add(byPath);
 
       expect(git.calls, ['ensureMirror 42']);
-      expect(git.remotes[42], 'https://github.com/octo/app.git');
+      expect(git.remotes['42'], 'https://github.com/octo/app.git');
     });
 
     test('announces the project and the scan', () async {
@@ -150,7 +150,7 @@ void main() {
 
       expect(project.fullName, 'octo/app');
       expect(project.remote, 'https://github.com/octo/app.git');
-      expect(git.remotes[42], 'https://github.com/octo/app.git');
+      expect(git.remotes['42'], 'https://github.com/octo/app.git');
     });
 
     test('refuses a relative path and a missing folder', () async {
@@ -344,7 +344,7 @@ void main() {
       expect(scanned.remote, 'https://github.com/octo/renamed.git');
       expect(scanned.defaultBaseBranch, 'develop');
       expect(scanned.profile.branches.defaultBranch, 'develop');
-      expect(git.remotes[42], 'https://github.com/octo/renamed.git');
+      expect(git.remotes['42'], 'https://github.com/octo/renamed.git');
     });
 
     test(

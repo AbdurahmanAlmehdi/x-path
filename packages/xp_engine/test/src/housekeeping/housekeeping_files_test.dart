@@ -10,7 +10,7 @@ void main() {
 
   WorktreeDirectory worktree(String job, {int repo = 42, int bytes = 1000}) =>
       WorktreeDirectory(
-        githubRepoId: repo,
+        key: '$repo',
         name: job,
         path: '/data/worktrees/$repo/$job',
         bytes: bytes,
@@ -126,7 +126,7 @@ void main() {
 
   group('mirrors', () {
     MirrorDirectory mirror(int repo, {int bytes = 5000}) => MirrorDirectory(
-      githubRepoId: repo,
+      key: '$repo',
       path: '/data/mirrors/$repo.git',
       bytes: bytes,
     );
@@ -136,7 +136,7 @@ void main() {
 
       final result = await free(StorageCategory.mirrors);
 
-      expect(h.files.mirrorList.map((m) => m.githubRepoId), [42]);
+      expect(h.files.mirrorList.map((m) => m.key), ['42']);
       expect(result.categories.single.bytes, 800);
       expect(result.categories.single.items, 1);
     });

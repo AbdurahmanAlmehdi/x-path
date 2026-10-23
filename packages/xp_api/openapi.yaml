@@ -4951,15 +4951,20 @@ components:
       type: object
       description: >-
         Where a runner gets the commit of a leased job: the repository's SSH
-        URL and GitHub id. Never a credential; the runner reaches GitHub with
-        its own SSH key (ADR 0009).
-      required: [githubRepoId, sshUrl]
+        URL and the key of its cache. Never a credential; the runner reaches
+        the git host with its own SSH key (ADR 0009, ADR 0015).
+      required: [cacheKey, sshUrl]
       additionalProperties: false
       properties:
-        githubRepoId:
-          type: integer
+        cacheKey:
+          type: string
+          pattern: "^([0-9]+|h[0-9a-f]{16})$"
+          description: The project's source key; it keys the runner's cache.
         sshUrl:
           type: string
+        githubRepoId:
+          type: integer
+          description: For a project on GitHub only.
     LeaseOfferFrame:
       type: object
       required:

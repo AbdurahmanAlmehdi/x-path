@@ -75,6 +75,7 @@ void main() {
     sha: 'a' * 40,
     name: 'Job',
     repository: const LeaseRepository(
+      cacheKey: '42',
       githubRepoId: 42,
       sshUrl: 'git@x:y/z.git',
     ),

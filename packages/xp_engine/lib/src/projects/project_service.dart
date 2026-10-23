@@ -117,7 +117,7 @@ class ProjectService {
       }
     }
     final mirror = await _git.ensureMirror(
-      githubRepoId: record.githubRepoId!,
+      key: record.sourceKey,
       remoteUrl: record.remote,
     );
     final localPath = record.localPath;
@@ -213,7 +213,7 @@ class ProjectService {
     }
     final id = 'prj_${_hex(8)}';
     final mirror = await _git.ensureMirror(
-      githubRepoId: repo.id,
+      key: '${repo.id}',
       remoteUrl: repo.cloneUrl,
     );
     final result = localPath != null

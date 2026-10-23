@@ -8,8 +8,9 @@ import 'package:xp_engine/xp_engine.dart';
 
 /// A [GitService] over the `git` command line.
 ///
-/// Layout under the data directory: the mirror of GitHub repository `N` is
-/// `mirrors/N.git`, the worktree `W` of that mirror is `worktrees/N/W`.
+/// Layout under the data directory: the mirror of the project with source key
+/// `K` (a GitHub repository id, or `h` and 16 hex digits, ADR 0015) is
+/// `mirrors/K.git`, the worktree `W` of that mirror is `worktrees/K/W`.
 ///
 /// Every command runs with the system and global git configuration switched
 /// off, so nothing in the owner's `~/.gitconfig` (signing, hooks, URL
@@ -19,7 +20,10 @@ import 'package:xp_engine/xp_engine.dart';
 /// The GitHub token (`github.token` in the [SecretStore]) reaches git only for
 /// `https://github.com` and only through the environment: the credential
 /// helper is a shell snippet that reads `XPATH_GIT_TOKEN`, so the token is in
-/// no argument, no URL and no config file.
+/// no argument, no URL and no config file. Any other host is reached over SSH
+/// with the engine user's own key: commands that use the network run with
+/// [sshCommand], so SSH never prompts and accepts a host key it has not seen
+/// yet, but not a changed one (ADR 0015).
 class CliGitService implements GitService {
   /// Creates the service.
   ///
@@ -48,6 +52,14 @@ class CliGitService implements GitService {
 
   static const _tokenVariable = 'XPATH_GIT_TOKEN';
 
+  /// The `GIT_SSH_COMMAND` of every git command that uses the network: no
+  /// prompt for a password or passphrase, a bounded connect, and a host key
+  /// that is recorded the first time and must not change after (Q6 of the
+  /// runner plan). The runner's checkout uses the same command.
+  static const sshCommand =
+      'ssh -o BatchMode=yes -o ConnectTimeout=30 '
+      '-o StrictHostKeyChecking=accept-new';
+
   // Answers git's `get` request for credentials with the token in the
   // environment; ignores `store` and `erase`.
   static const _credentialHelper =
@@ -55,9 +67,9 @@ class CliGitService implements GitService {
       r'echo username=x-access-token; echo "password=$XPATH_GIT_TOKEN"; }; f';
 
   /// Where the worktree [name] of [mirror] is under the data directory
-  /// [dataDir]: `worktrees/<repository id>/<name>`.
+  /// [dataDir]: `worktrees/<mirror key>/<name>`.
   static String worktreePath(String dataDir, GitMirror mirror, String name) =>
-      p.join(dataDir, 'worktrees', '${mirror.githubRepoId}', name);
+      p.join(dataDir, 'worktrees', mirror.key, name);
 
   static final _fullSha = RegExp(r'^[0-9a-f]{40}$');
   static final _abbreviatedSha = RegExp(r'^[0-9a-fA-F]{4,40}$');
@@ -72,14 +84,17 @@ class CliGitService implements GitService {
 
   @override
   Future<GitMirror> ensureMirror({
-    required int githubRepoId,
+    required String key,
     required String remoteUrl,
   }) async {
+    if (!GitMirror.keyPattern.hasMatch(key)) {
+      throw ArgumentError.value(key, 'key', 'is not a source key');
+    }
     if (remoteUrl.isEmpty || remoteUrl.startsWith('-')) {
       throw ArgumentError.value(remoteUrl, 'remoteUrl', 'is not a URL');
     }
-    final path = p.join(_mirrorsDir, '$githubRepoId.git');
-    final mirror = GitMirror(githubRepoId: githubRepoId, path: path);
+    final path = p.join(_mirrorsDir, '$key.git');
+    final mirror = GitMirror(key: key, path: path);
     if (!File(p.join(path, 'HEAD')).existsSync()) {
       Directory(_mirrorsDir).createSync(recursive: true);
       await _ok('init', [
@@ -515,6 +530,7 @@ class CliGitService implements GitService {
       'user.email=${identity.email}',
     ];
     if (network) {
+      environment['GIT_SSH_COMMAND'] = sshCommand;
       final token = await _secrets.read(githubTokenSecretKey);
       if (token != null) {
         environment[_tokenVariable] = token;

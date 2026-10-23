@@ -406,22 +406,27 @@ class RunnerHub
   }
 
   /// Where the runner fetches the source of [projectId] from: the SSH URL of
-  /// the repository and its GitHub id. Never a credential (ADR 0009). A
-  /// remote that is not on GitHub (the end-to-end tests use a local one) is
-  /// sent as it is, without the user information of a URL.
+  /// the repository and the key of its cache. Never a credential (ADR 0009).
+  /// A remote that is not on GitHub (an SSH or `file://` one, ADR 0015) is
+  /// sent as it is, without a password in the URL. The user of an `ssh://`
+  /// URL stays: hosts such as Bitbucket only answer to `git`.
   Future<LeaseRepository?> _repositoryOf(String projectId) async {
     final project = await _projects.get(projectId);
     if (project == null) return null;
-    final github = GitHubRemote.parse(project.remote);
+    final github = project.isOnGitHub
+        ? GitHubRemote.parse(project.remote)
+        : null;
     return LeaseRepository(
-      githubRepoId: project.githubRepoId!,
+      cacheKey: project.sourceKey,
       sshUrl: github?.sshUrl ?? _withoutUserInfo(project.remote),
+      githubRepoId: project.githubRepoId,
     );
   }
 
   static String _withoutUserInfo(String remote) {
     final uri = Uri.tryParse(remote);
     if (uri == null || !uri.hasScheme || uri.userInfo.isEmpty) return remote;
+    if (uri.isScheme('ssh') && !uri.userInfo.contains(':')) return remote;
     return uri.replace(userInfo: '').toString();
   }
 

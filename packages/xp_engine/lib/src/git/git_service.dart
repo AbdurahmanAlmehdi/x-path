@@ -11,14 +11,16 @@ import 'package:xp_engine/src/git/git_models.dart';
 /// `xp_adapters` has the `git` CLI implementation. Every method throws a
 /// `GitException` (or a subclass) when git fails.
 abstract interface class GitService {
-  /// The bare mirror for the GitHub repository [githubRepoId], created empty
-  /// if it does not exist yet, with `origin` set to [remoteUrl].
+  /// The bare mirror for the project whose source key is [key] (see
+  /// [GitMirror.keyPattern]), created empty if it does not exist yet, with
+  /// `origin` set to [remoteUrl].
   ///
   /// Does no network I/O; call [fetch] to fill it. Passing a different
   /// [remoteUrl] for an existing mirror updates `origin`: that is how a GitHub
-  /// rename is followed (D-05).
+  /// rename is followed (D-05). Throws an `ArgumentError` for a [key] that
+  /// does not match [GitMirror.keyPattern].
   Future<GitMirror> ensureMirror({
-    required int githubRepoId,
+    required String key,
     required String remoteUrl,
   });
 

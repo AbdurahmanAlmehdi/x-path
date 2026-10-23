@@ -2,17 +2,23 @@ import 'package:test/test.dart';
 import 'package:xp_engine/xp_engine.dart';
 
 void main() {
-  const mirror = GitMirror(githubRepoId: 7, path: '/data/mirrors/7.git');
+  const mirror = GitMirror(key: '7', path: '/data/mirrors/7.git');
 
   test('GitMirror compares by value', () {
+    expect(mirror, const GitMirror(key: '7', path: '/data/mirrors/7.git'));
     expect(
       mirror,
-      const GitMirror(githubRepoId: 7, path: '/data/mirrors/7.git'),
+      isNot(const GitMirror(key: '8', path: '/data/mirrors/7.git')),
     );
-    expect(
-      mirror,
-      isNot(const GitMirror(githubRepoId: 8, path: '/data/mirrors/7.git')),
-    );
+  });
+
+  test('a mirror key is a GitHub id or h and 16 hex digits', () {
+    for (final key in ['7', '123456789', 'h0123456789abcdef']) {
+      expect(GitMirror.keyPattern.hasMatch(key), isTrue, reason: key);
+    }
+    for (final key in ['', 'h0123', 'H0123456789ABCDEF', '../7', '7.git']) {
+      expect(GitMirror.keyPattern.hasMatch(key), isFalse, reason: key);
+    }
   });
 
   test('GitWorktree compares by value', () {

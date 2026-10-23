@@ -86,7 +86,7 @@ void main() {
       final root = BuildSettings(
         worktree: const ReleaseWorktree(
           path: '/work/job_1',
-          mirror: GitMirror(githubRepoId: 1, path: '/m'),
+          mirror: GitMirror(key: '1', path: '/m'),
           sha: buildSha,
         ),
         version: version,

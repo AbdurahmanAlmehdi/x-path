@@ -64,10 +64,9 @@ class FakeGit implements GitService {
 
   @override
   Future<GitMirror> ensureMirror({
-    required int githubRepoId,
+    required String key,
     required String remoteUrl,
-  }) async =>
-      GitMirror(githubRepoId: githubRepoId, path: '/mirrors/$githubRepoId.git');
+  }) async => GitMirror(key: key, path: '/mirrors/$key.git');
 
   @override
   Future<void> fetch(GitMirror mirror) async {

@@ -197,7 +197,7 @@ xp runners revoke mac-mini
 The user runs the pairing commands: the pairing token (`xpp_...`) is single use, valid for 15
 minutes and bound to the runner's name. The runner keeps its credential in the machine's secret
 store and dials out to the engine. It fetches the source with its own SSH key, so add the
-runner's key as a deploy key on the repository and run `ssh -T git@github.com` once. The engine
+runner's key as a deploy key on the repository (an access key on Bitbucket). The engine
 prints the capabilities it found for itself at start, and the runner prints what it offers and,
 for each capability it lacks, why and the fix.
 

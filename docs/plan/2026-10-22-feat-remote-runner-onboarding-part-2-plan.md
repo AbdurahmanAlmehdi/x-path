@@ -153,7 +153,7 @@ Details:
 
 ### Phase R10b: Mirrors, runner cache and the lease
 
-- **Status:** Not started
+- **Status:** Done
 - **Scope:** Everything keyed by `githubRepoId` is keyed by `sourceKey`, and runner errors are
   host-aware.
 - **Files touched:** `packages/xp_engine/lib/src/git/**` (`GitService`, `GitMirror`,

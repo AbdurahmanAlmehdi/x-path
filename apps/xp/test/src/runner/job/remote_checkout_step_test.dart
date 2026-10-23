@@ -11,6 +11,7 @@ import '../../../helpers/step_contexts.dart';
 final String _sha = 'a' * 40;
 
 const _repository = LeaseRepository(
+  cacheKey: '42',
   githubRepoId: 42,
   sshUrl: 'git@github.com:owner/app.git',
 );
@@ -19,7 +20,7 @@ GitCheckoutInput _input(String root) => GitCheckoutInput(
   worktree: ReleaseWorktree(
     path: p.join(root, 'source', 'worktrees', '42', 'job_1'),
     mirror: GitMirror(
-      githubRepoId: 42,
+      key: '42',
       path: p.join(root, 'source', 'mirrors', '42.git'),
     ),
     sha: 'f' * 40,
@@ -156,6 +157,12 @@ void main() {
             fetches ? contains('BatchMode=yes') : isNull,
             reason: command.arguments.join(' '),
           );
+          if (fetches) {
+            expect(
+              command.environment['GIT_SSH_COMMAND'],
+              contains('StrictHostKeyChecking=accept-new'),
+            );
+          }
         }
       },
     );
@@ -201,7 +208,7 @@ void main() {
       expect(config.arguments.last, '/tmp/origin.git');
     });
 
-    test('names the repository by its id, whatever its name is now', () async {
+    test('names the cache by its key, whatever its name is now', () async {
       await step().run(_input(root.path), context);
 
       expect(
@@ -258,12 +265,13 @@ void main() {
       expect(await failure(), contains('deploy key on owner/app'));
     });
 
-    test('says what to do about a host key SSH does not trust', () async {
+    test('says what to do about a host key that changed', () async {
       printed = ['err:Host key verification failed.'];
 
       final text = await failure();
 
-      expect(text, contains('does not trust the host key'));
+      expect(text, contains('host key of github.com is not the one'));
+      expect(text, contains('ssh-keygen -R github.com'));
       expect(text, contains('ssh -T git@github.com'));
     });
 
@@ -286,19 +294,80 @@ void main() {
       expect(text, contains('reach owner/app over SSH'));
     });
 
-    test('names a repository that is not on GitHub by its url', () async {
-      printed = ['err:Permission denied'];
+    Future<String> failureOn(String url) async => message(
+      await step(
+        repository: LeaseRepository(cacheKey: 'h0123456789abcdef', sshUrl: url),
+      ).run(_input(root.path), context),
+    );
 
-      final text = message(
-        await step(
-          repository: const LeaseRepository(
-            githubRepoId: 42,
-            sshUrl: 'ssh://git.example.com/team/app.git',
+    test(
+      'names a repository on another SSH host by its host and path',
+      () async {
+        printed = ['err:Permission denied'];
+
+        final text = await failureOn('ssh://git.example.com/team/app.git');
+
+        expect(text, contains('cannot read team/app over SSH'));
+        expect(
+          text,
+          contains(
+            "add this runner's SSH key to git.example.com with read "
+            'access to team/app',
           ),
-        ).run(_input(root.path), context),
+        );
+      },
+    );
+
+    test('says how Bitbucket takes an access key (ADR 0015)', () async {
+      printed = [
+        'err:git@bitbucket.org: Permission denied (publickey).',
+        'err:fatal: Could not read from remote repository.',
+      ];
+
+      final text = await failureOn('git@bitbucket.org:ws/app.git');
+
+      expect(
+        text,
+        contains(
+          "add this runner's SSH key as an access key of ws/app "
+          '(Bitbucket: Repository settings, Access keys)',
+        ),
+      );
+    });
+
+    test('names the host of another server in its other errors', () async {
+      printed = [
+        'err:@@@ WARNING: REMOTE HOST IDENTIFICATION HAS CHANGED! @@@',
+        'err:Host key verification failed.',
+      ];
+      final changed = await failureOn('git@bitbucket.org:ws/app.git');
+      expect(changed, contains('ssh-keygen -R bitbucket.org'));
+      expect(changed, contains('ssh -T git@bitbucket.org'));
+
+      printed = ["err:fatal: couldn't find remote ref $_sha"];
+      expect(
+        await failureOn('git@bitbucket.org:ws/app.git'),
+        contains('bitbucket.org has no commit aaaaaaaaaaaa to give (ws/app)'),
+      );
+    });
+
+    test('names a local repository by its folder', () async {
+      printed = ['err:fatal: Could not read from remote repository.'];
+      final denied = await failureOn('file:///srv/git/app.git');
+      expect(denied, contains('cannot read srv/git/app over SSH'));
+      expect(denied, contains('let the user of this runner read'));
+
+      printed = ['err:fatal: remote error: upload-pack: not our ref $_sha'];
+      expect(
+        await failureOn('file:///srv/git/app.git'),
+        contains('The repository has no commit'),
       );
 
-      expect(text, contains('ssh://git.example.com/team/app.git'));
+      printed = ['err:Host key verification failed.'];
+      expect(
+        await failureOn('file:///srv/git/app.git'),
+        contains('host key of the repository server is not the one'),
+      );
     });
 
     test('says when the cache cannot be made', () async {

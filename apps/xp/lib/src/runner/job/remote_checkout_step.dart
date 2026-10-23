@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:path/path.dart' as p;
+import 'package:xp_adapters/xp_adapters.dart';
 import 'package:xp_api/xp_api.dart';
 import 'package:xp_engine/xp_engine.dart';
 
@@ -23,16 +24,17 @@ class LeaseSource {
   final String? sha;
 }
 
-/// `git.checkout` on a runner (ADR 0009): the source comes from GitHub over
-/// the runner's own SSH access, not from the engine's mirror.
+/// `git.checkout` on a runner (ADR 0009): the source comes from the git host
+/// over the runner's own SSH access, not from the engine's mirror.
 ///
-/// The runner keeps a bare cache per repository, keyed by the GitHub
-/// repository id. The step fetches the exact commit of the offer into it (with
-/// `GIT_SSH_COMMAND` set to `ssh -o BatchMode=yes`, so that git never asks
-/// for a password or a passphrase), cuts a fresh worktree at that commit and
-/// verifies that its `HEAD` is the commit before the job goes on. When the
-/// runner cannot read the repository, the job fails with what to do: add the
-/// runner's SSH key as a deploy key on the repository.
+/// The runner keeps a bare cache per repository, keyed by the project's
+/// source key (ADR 0015). The step fetches the exact commit of the offer into
+/// it (with `GIT_SSH_COMMAND` set to [CliGitService.sshCommand], so that git
+/// never asks for a password or a passphrase and records a host key it has
+/// not seen yet), cuts a fresh worktree at that commit and verifies that its
+/// `HEAD` is the commit before the job goes on. When the runner cannot read
+/// the repository, the job fails with what to do for its host: add the
+/// runner's SSH key as a deploy key on GitHub, an access key on Bitbucket.
 ///
 /// Every git command goes through the job's process runner, so its output is
 /// in the log of the step and a cancel stops it with its process group.
@@ -56,9 +58,6 @@ class RemoteCheckoutStep extends Step<GitCheckoutInput, GitCheckoutResult> {
     'GIT_TERMINAL_PROMPT': '0',
     'LC_ALL': 'C',
   };
-
-  /// `ssh` never prompts (`BatchMode`), whatever the key needs.
-  static const sshCommand = 'ssh -o BatchMode=yes -o ConnectTimeout=30';
 
   @override
   String get kind => 'git.checkout';
@@ -101,7 +100,7 @@ class RemoteCheckoutStep extends Step<GitCheckoutInput, GitCheckoutResult> {
       );
     }
     return await _queues.run(
-      'repository-${repository.githubRepoId}',
+      'repository-${repository.cacheKey}',
       () => _checkout(
         input.worktree,
         _testUrl ?? repository.sshUrl,
@@ -206,7 +205,7 @@ class RemoteCheckoutStep extends Step<GitCheckoutInput, GitCheckoutResult> {
         workingDirectory: directory,
         environment: {
           ..._environment,
-          if (network) 'GIT_SSH_COMMAND': sshCommand,
+          if (network) 'GIT_SSH_COMMAND': CliGitService.sshCommand,
         },
         passThroughEnvironment: const ['SSH_AUTH_SOCK'],
       ),
@@ -223,20 +222,42 @@ class RemoteCheckoutStep extends Step<GitCheckoutInput, GitCheckoutResult> {
     '${run.lines.isEmpty ? '' : ': ${run.lines.last}'}.',
   );
 
-  /// The message for a fetch that failed: what is wrong and what to do.
+  /// The message for a fetch that failed: what is wrong and what to do,
+  /// for the host of [url].
   String _explain(_GitRun run, String url, String sha) {
     final text = run.lines.join('\n').toLowerCase();
-    final repo = GitHubRemote.parse(url)?.fullName ?? url;
-    if (text.contains('host key verification failed')) {
-      return 'SSH on this machine does not trust the host key of the '
-          'repository server. Fix: run "ssh -T git@github.com" once as the '
-          'user of this runner and accept the key, then run the job again.';
+    final github = GitHubRemote.parse(url);
+    final remote = GitRemote.parse(url);
+    final host = github != null ? 'github.com' : remote?.host;
+    // The SSH host, if there is one: not for a local repository.
+    final sshHost = host == GitRemote.localHost ? null : host;
+    final server = switch (host) {
+      'github.com' => 'GitHub',
+      null || GitRemote.localHost => 'The repository',
+      final host => host,
+    };
+    final repo = github?.fullName ?? remote?.fullName ?? url;
+    if (text.contains('host key verification failed') ||
+        text.contains('remote host identification has changed')) {
+      // SSH records a host key it has not seen (accept-new), so this is a
+      // key that differs from the one recorded.
+      if (sshHost == null) {
+        return 'The host key of the repository server is not the one SSH '
+            'on this machine recorded for it. If the server changed its key, '
+            'remove the old one with ssh-keygen -R as the user of this '
+            'runner, then run the job again.';
+      }
+      return 'The host key of $sshHost is not the one SSH on this machine '
+          'recorded for it. If $sshHost changed its key, remove the old one '
+          '(ssh-keygen -R $sshHost) as the user of this runner and run '
+          '"ssh -T git@$sshHost" once to check the new one, then run the job '
+          'again.';
     }
     if (text.contains('not our ref') ||
         text.contains("couldn't find remote ref") ||
         text.contains('unadvertised object') ||
         text.contains('no such remote ref')) {
-      return 'GitHub has no commit ${sha.substring(0, 12)} to give '
+      return '$server has no commit ${sha.substring(0, 12)} to give '
           '($repo). It was not pushed or is not reachable from a branch. '
           'Push it, then run the job again.';
     }
@@ -245,10 +266,21 @@ class RemoteCheckoutStep extends Step<GitCheckoutInput, GitCheckoutResult> {
         text.contains('repository not found') ||
         text.contains('access denied') ||
         text.contains('authentication failed')) {
-      return 'This runner cannot read $repo over SSH. Fix: '
+      final fix = switch (host) {
+        'github.com' =>
           "add this runner's SSH key as a deploy key on $repo "
-          '(GitHub: Settings, Deploy keys), or use the key of a user who can '
-          'read it, then run the job again.';
+              '(GitHub: Settings, Deploy keys), or use the key of a user who '
+              'can read it',
+        'bitbucket.org' =>
+          "add this runner's SSH key as an access key of $repo "
+              '(Bitbucket: Repository settings, Access keys)',
+        null || GitRemote.localHost =>
+          'let the user of this runner read the repository',
+        final host =>
+          "add this runner's SSH key to $host with read access to $repo",
+      };
+      return 'This runner cannot read $repo over SSH. Fix: $fix, then run '
+          'the job again.';
     }
     return 'git fetch failed (exit code ${run.exit.exitCode})'
         '${run.lines.isEmpty ? '' : ': ${run.lines.last}'}. Check that this '

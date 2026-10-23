@@ -33,6 +33,7 @@ void main() {
       expect(
         offer.repository,
         const LeaseRepository(
+          cacheKey: '7',
           githubRepoId: 7,
           sshUrl: 'git@github.com:owner/app.git',
         ),
@@ -66,15 +67,49 @@ void main() {
       expect(offer.repository!.sshUrl, '/srv/git/app.git');
     });
 
-    test('leaves the url of a remote without user information alone', () async {
+    test('keeps the user of an ssh:// URL but never a password', () async {
       final project = (await h.projects.get('prj_1'))!;
       await h.projects.update(
         project.copyWith(remote: 'ssh://git@example.com/r.git'),
       );
+      expect(
+        (await offered()).repository!.sshUrl,
+        'ssh://git@example.com/r.git',
+      );
+
+      await h.projects.update(
+        project.copyWith(remote: 'ssh://git:secret@example.com/r.git'),
+      );
+      expect((await offered()).repository!.sshUrl, 'ssh://example.com/r.git');
+    });
+
+    test('keys the cache of a project on another host by its source key '
+        '(ADR 0015)', () async {
+      final project = (await h.projects.get('prj_1'))!;
+      await h.projects.update(
+        ProjectRecord(
+          id: project.id,
+          host: 'bitbucket.org',
+          sourceKey: 'h0123456789abcdef',
+          fullName: 'ws/app',
+          remote: 'git@bitbucket.org:ws/app.git',
+          githubDefaultBranch: project.githubDefaultBranch,
+          scan: project.scan,
+          findings: project.findings,
+          scannedAt: project.scannedAt,
+        ),
+      );
 
       final offer = await offered();
 
-      expect(offer.repository!.sshUrl, 'ssh://example.com/r.git');
+      expect(
+        offer.repository,
+        const LeaseRepository(
+          cacheKey: 'h0123456789abcdef',
+          sshUrl: 'git@bitbucket.org:ws/app.git',
+        ),
+      );
+      expect(offer.repository!.toJson(), isNot(contains('githubRepoId')));
     });
 
     test('names no repository for a project the engine forgot', () async {

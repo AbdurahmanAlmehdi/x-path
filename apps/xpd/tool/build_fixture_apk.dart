@@ -67,7 +67,7 @@ Future<int> _run({
   try {
     final secrets = _NoSecrets();
     final git = CliGitService(runner: runner, secrets: secrets, dataDir: data);
-    final mirror = await git.ensureMirror(githubRepoId: 1, remoteUrl: origin);
+    final mirror = await git.ensureMirror(key: '1', remoteUrl: origin);
     await git.fetch(mirror);
     final sha = await git.resolveRef(mirror, 'main');
     final worktree = await git.createWorktree(mirror, name: 'e2e', sha: sha);

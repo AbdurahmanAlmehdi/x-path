@@ -66,7 +66,7 @@ void main() {
           checks: const [GuardCheckName.credentials],
           worktree: const ReleaseWorktree(
             path: '/work/job_1',
-            mirror: GitMirror(githubRepoId: 1, path: '/mirrors/1.git'),
+            mirror: GitMirror(key: '1', path: '/mirrors/1.git'),
             sha: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
           ),
           flavorId: 'flv_prod',

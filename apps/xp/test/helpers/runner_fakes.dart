@@ -109,6 +109,7 @@ LeaseOfferFrame offerOf(
   repository:
       repository ??
       const LeaseRepository(
+        cacheKey: '7',
         githubRepoId: 7,
         sshUrl: 'git@github.com:owner/app.git',
       ),

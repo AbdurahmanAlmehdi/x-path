@@ -54,7 +54,7 @@ class ReleaseNotesService {
         await _projects.get(release.projectId) ??
         (throw ProjectNotFoundException(release.projectId));
     final mirror = await _git.ensureMirror(
-      githubRepoId: project.githubRepoId!,
+      key: project.sourceKey,
       remoteUrl: project.remote,
     );
     final to = await _endOf(release.headSha, release.tag, mirror, release.id);

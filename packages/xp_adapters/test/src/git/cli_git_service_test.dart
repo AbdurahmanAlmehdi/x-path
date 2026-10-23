@@ -31,7 +31,7 @@ void main() {
       dataDir: dataDir.path,
     );
     mirror = await service.ensureMirror(
-      githubRepoId: 42,
+      key: '42',
       remoteUrl: fixture.originUrl,
     );
     await service.fetch(mirror);
@@ -46,8 +46,8 @@ void main() {
       fixture.git(arguments, cwd: mirror.path);
 
   group('ensureMirror', () {
-    test('creates a bare repository keyed by the GitHub repo id', () {
-      expect(mirror.githubRepoId, 42);
+    test('creates a bare repository keyed by the source key', () {
+      expect(mirror.key, '42');
       expect(mirror.path, p.join(dataDir.path, 'mirrors', '42.git'));
       expect(inMirror(['rev-parse', '--is-bare-repository']), 'true');
       expect(inMirror(['remote', 'get-url', 'origin']), fixture.originUrl);
@@ -55,7 +55,7 @@ void main() {
 
     test('is idempotent', () async {
       final again = await service.ensureMirror(
-        githubRepoId: 42,
+        key: '42',
         remoteUrl: fixture.originUrl,
       );
 
@@ -65,7 +65,7 @@ void main() {
 
     test('follows a renamed remote by updating origin', () async {
       await service.ensureMirror(
-        githubRepoId: 42,
+        key: '42',
         remoteUrl: 'https://github.com/acme/renamed.git',
       );
 
@@ -76,13 +76,38 @@ void main() {
       expect(inMirror(['rev-parse', 'refs/remotes/origin/main']), second);
     });
 
+    test('keys the mirror of a project on another host by its h key', () async {
+      final key = GitRemote.parse(fixture.originUrl)!.sourceKey;
+
+      final other = await service.ensureMirror(
+        key: key,
+        remoteUrl: fixture.originUrl,
+      );
+      await service.fetch(other);
+
+      expect(key, matches(RegExp(r'^h[0-9a-f]{16}$')));
+      expect(other.path, p.join(dataDir.path, 'mirrors', '$key.git'));
+      expect(await service.resolveRef(other, 'main'), second);
+      expect(mirror.path, p.join(dataDir.path, 'mirrors', '42.git'));
+    });
+
+    test('refuses a key that is not a source key', () {
+      for (final key in ['', '../x', 'h123', 'H0123456789ABCDEF', '-1']) {
+        expect(
+          service.ensureMirror(key: key, remoteUrl: fixture.originUrl),
+          throwsArgumentError,
+          reason: key,
+        );
+      }
+    });
+
     test('refuses a URL that looks like an option', () {
       expect(
-        service.ensureMirror(githubRepoId: 1, remoteUrl: '--upload-pack=x'),
+        service.ensureMirror(key: '1', remoteUrl: '--upload-pack=x'),
         throwsArgumentError,
       );
       expect(
-        service.ensureMirror(githubRepoId: 1, remoteUrl: ''),
+        service.ensureMirror(key: '1', remoteUrl: ''),
         throwsArgumentError,
       );
     });
@@ -111,7 +136,7 @@ void main() {
 
     test("fails with git's message when the remote is gone", () async {
       await service.ensureMirror(
-        githubRepoId: 42,
+        key: '42',
         remoteUrl: Uri.file(p.join(fixture.root.path, 'gone.git')).toString(),
       );
 
@@ -517,7 +542,7 @@ void main() {
     test("fails with git's message when the origin is unreachable", () async {
       await service.upsertBranch(mirror, name: 'b', sha: first);
       await service.ensureMirror(
-        githubRepoId: 42,
+        key: '42',
         remoteUrl: Uri.file(p.join(fixture.root.path, 'gone.git')).toString(),
       );
 

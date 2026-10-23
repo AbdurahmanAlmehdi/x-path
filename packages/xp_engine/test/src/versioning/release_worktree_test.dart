@@ -4,7 +4,7 @@ import 'package:xp_engine/xp_engine.dart';
 void main() {
   const worktree = ReleaseWorktree(
     path: '/work/job_1',
-    mirror: GitMirror(githubRepoId: 7, path: '/m/7.git'),
+    mirror: GitMirror(key: '7', path: '/m/7.git'),
     sha: 'abc',
     appPath: 'apps/m',
     versionFiles: ['apps/m/pubspec.yaml', 'apps/m/ios/Runner/Info.plist'],
@@ -16,10 +16,25 @@ void main() {
     expect(ReleaseWorktree.fromJson(worktree.toJson()), worktree);
   });
 
+  test('stores the mirror by its key', () {
+    expect(worktree.toJson()['mirror'], {'key': '7', 'path': '/m/7.git'});
+  });
+
+  test('reads the GitHub id of a job stored before ADR 0015 as its key', () {
+    final read = ReleaseWorktree.fromJson(const {
+      'path': '/w',
+      'mirror': {'githubRepoId': 12, 'path': '/m/12.git'},
+      'sha': 'abc',
+    });
+
+    expect(read.mirror, const GitMirror(key: '12', path: '/m/12.git'));
+    expect(ReleaseWorktree.mirrorKeyOf(const {'path': '/m'}), isNull);
+  });
+
   test('needs only the path, mirror and commit', () {
     final read = ReleaseWorktree.fromJson(const {
       'path': '/w',
-      'mirror': {'githubRepoId': 1, 'path': '/m.git'},
+      'mirror': {'key': 'h0123456789abcdef', 'path': '/m.git'},
       'sha': 'abc',
     });
 
@@ -33,13 +48,13 @@ void main() {
   test('describes the git worktree and the paths inside the app', () {
     expect(worktree.gitWorktree.path, '/work/job_1');
     expect(worktree.gitWorktree.sha, 'abc');
-    expect(worktree.gitWorktree.mirror.githubRepoId, 7);
+    expect(worktree.gitWorktree.mirror.key, '7');
     expect(worktree.inApp('lib/main.dart'), 'apps/m/lib/main.dart');
     expect(worktree.versionFilePaths, worktree.versionFiles);
     expect(
       const ReleaseWorktree(
         path: '/w',
-        mirror: GitMirror(githubRepoId: 1, path: '/m'),
+        mirror: GitMirror(key: '1', path: '/m'),
         sha: 'a',
         appPath: 'apps/m',
       ).versionFilePaths,
@@ -48,7 +63,7 @@ void main() {
     expect(
       const ReleaseWorktree(
         path: '/w',
-        mirror: GitMirror(githubRepoId: 1, path: '/m'),
+        mirror: GitMirror(key: '1', path: '/m'),
         sha: 'a',
       ).versionFilePaths,
       ['pubspec.yaml'],
@@ -59,7 +74,7 @@ void main() {
     final cases = <String, Map<String, dynamic>>{
       '"path"': {...worktree.toJson(), 'path': ''},
       '"mirror"': {...worktree.toJson(), 'mirror': 'm'},
-      '"mirror.githubRepoId"': {
+      '"mirror.key"': {
         ...worktree.toJson(),
         'mirror': {'githubRepoId': '7', 'path': '/m'},
       },

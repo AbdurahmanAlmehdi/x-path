@@ -150,29 +150,35 @@ final class LeaseGrant extends Equatable {
 /// worktree of its own.
 final class LeaseRepository extends Equatable {
   /// Creates the repository.
-  const new({required this.githubRepoId, required this.sshUrl});
+  const new({required this.cacheKey, required this.sshUrl, this.githubRepoId});
 
   /// Reads the repository from its JSON form.
   factory fromJson(Map<String, dynamic> json) => LeaseRepository(
-    githubRepoId: _required<int>(json, 'githubRepoId'),
+    cacheKey: _required<String>(json, 'cacheKey'),
     sshUrl: _required<String>(json, 'sshUrl'),
+    githubRepoId: _optional<int>(json, 'githubRepoId'),
   );
 
-  /// The id GitHub gave the repository. It survives renames, so it keys the
-  /// runner's cache.
-  final int githubRepoId;
+  /// The project's source key (ADR 0015): it keys the runner's cache. For a
+  /// GitHub project it is the repository id, which survives renames.
+  final String cacheKey;
 
-  /// The SSH URL to fetch from, for example `git@github.com:owner/app.git`.
+  /// The SSH URL to fetch from, for example `git@github.com:owner/app.git`
+  /// or `git@bitbucket.org:ws/app.git`.
   final String sshUrl;
+
+  /// The id GitHub gave the repository, for a project on GitHub only.
+  final int? githubRepoId;
 
   /// The JSON form.
   Map<String, dynamic> toJson() => {
-    'githubRepoId': githubRepoId,
+    'cacheKey': cacheKey,
     'sshUrl': sshUrl,
+    'githubRepoId': ?githubRepoId,
   };
 
   @override
-  List<Object?> get props => [githubRepoId, sshUrl];
+  List<Object?> get props => [cacheKey, sshUrl, githubRepoId];
 }
 
 /// A step of a job the engine leases to a runner.

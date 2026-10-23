@@ -1448,7 +1448,8 @@ xp runner install-service [--slots 4]                                # keeps it 
   (engine, id, name) and no secret. `--name` only warns when the engine named the runner otherwise: the pairing
   token fixes the name. Pairing again in a paired data directory needs `--force`.
 - **Data directory** (`--data-dir`, else `$XP_RUNNER_DATA_DIR`, else `~/.local/share/xpath/runner`):
-  `source/mirrors/<repo id>.git` (the bare cache), `source/worktrees/<repo id>/<job id>` (fresh worktrees),
+  `source/mirrors/<key>.git` (the bare cache), `source/worktrees/<key>/<job id>` (fresh worktrees), where the key is
+  the project's source key (the GitHub repository id, or `h` and 16 hex digits for another host, ADR 0015),
   `jobs/<job id>` (what a job leaves before it is uploaded), `toolchains/flutter`, `secrets/` (where no tmpfs is
   available), `keychains/`, `state/pgids.json`, and for updates and services `versions/<version>/` (the installed
   `xp` bundles), `current` (a symlink to the version that starts), `update.json`, `service-logs/` (see Runner updates
@@ -1472,12 +1473,15 @@ xp runner install-service [--slots 4]                                # keeps it 
   directory below it) are translated to the runner's (`LeasePaths`). Every step of the offer starts again, since
   the work of an earlier lease is not on this machine, but the attempts are kept, so that a step with side effects
   asks first whether its work exists (`alreadyDone`). `step_state` frames report each new state of a step.
-- **Source (ADR 0009).** `git.checkout` is `RemoteCheckoutStep`: it fetches the exact commit of the offer into the
-  runner's own bare cache (`git fetch origin <sha>` with `GIT_SSH_COMMAND='ssh -o BatchMode=yes'`, no global git
-  configuration, no prompt), cuts a fresh worktree and verifies `HEAD == sha` before anything runs. A key that
-  cannot read the repository fails the job with "add this runner's SSH key as a deploy key on `<owner/repo>`", an
-  unknown host key with "run `ssh -T git@github.com` once", a commit that was never pushed with "push it". The
-  machine needs `git`, `ssh` and its own access to GitHub (a deploy key or the key of a user). **Test only:**
+- **Source (ADR 0009, ADR 0015).** `git.checkout` is `RemoteCheckoutStep`: it fetches the exact commit of the offer
+  into the runner's own bare cache (`git fetch origin <sha>` with
+  `GIT_SSH_COMMAND='ssh -o BatchMode=yes -o ConnectTimeout=30 -o StrictHostKeyChecking=accept-new'`, no global git
+  configuration, no prompt), cuts a fresh worktree and verifies `HEAD == sha` before anything runs. SSH records the
+  host key of a server it has not seen; a key that changed still fails. A key that cannot read the repository fails
+  the job with what to do on its host ("add this runner's SSH key as a deploy key on `<owner/repo>`" on GitHub, "as
+  an access key of `<workspace/repo>`" on Bitbucket), a changed host key with "remove the old one (`ssh-keygen -R
+  <host>`)", a commit that was never pushed with "push it". The machine needs `git`, `ssh` and its own access to the
+  git host (a deploy or access key, or the key of a user). **Test only:**
   `XP_RUNNER_TEST_SOURCE_URL` replaces the URL of every lease (the end-to-end test points it at a local bare
   repository); a real runner never sets it.
 - **Logs and reports.** The output of the processes goes to the engine as `log_chunk` frames numbered from 1 per

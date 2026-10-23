@@ -24,7 +24,7 @@ class DirectoryDataFiles implements DataFiles {
   String get _mirrors => p.join(dataDir, 'mirrors');
   String get _flutter => p.join(dataDir, 'toolchains', 'flutter');
 
-  static final _mirrorName = RegExp(r'^(\d+)\.git$');
+  static final _mirrorName = RegExp(r'^(\d+|h[0-9a-f]{16})\.git$');
 
   @override
   Future<Map<String, int>> logSizes() async => {
@@ -39,10 +39,11 @@ class DirectoryDataFiles implements DataFiles {
   @override
   Future<List<WorktreeDirectory>> worktrees() async => [
     for (final repository in _directories(_worktrees))
-      if (int.tryParse(p.basename(repository.path)) case final repoId?)
+      if (p.basename(repository.path) case final key
+          when GitMirror.keyPattern.hasMatch(key))
         for (final directory in _directories(repository.path))
           WorktreeDirectory(
-            githubRepoId: repoId,
+            key: key,
             name: p.basename(directory.path),
             path: directory.path,
             bytes: await _sizeOf(directory),
@@ -53,7 +54,7 @@ class DirectoryDataFiles implements DataFiles {
   Future<void> deleteWorktree(WorktreeDirectory worktree) async {
     await _git.removeWorktree(
       GitWorktree(
-        mirror: _mirrorOf(worktree.githubRepoId),
+        mirror: _mirrorOf(worktree.key),
         path: worktree.path,
         sha: '',
       ),
@@ -68,7 +69,7 @@ class DirectoryDataFiles implements DataFiles {
     for (final directory in _directories(_mirrors))
       if (_mirrorName.firstMatch(p.basename(directory.path)) case final match?)
         MirrorDirectory(
-          githubRepoId: int.parse(match.group(1)!),
+          key: match.group(1)!,
           path: directory.path,
           bytes: await _sizeOf(directory),
         ),
@@ -77,7 +78,7 @@ class DirectoryDataFiles implements DataFiles {
   @override
   Future<void> deleteMirror(MirrorDirectory mirror) async {
     _delete(Directory(mirror.path));
-    _delete(Directory(p.join(_worktrees, '${mirror.githubRepoId}')));
+    _delete(Directory(p.join(_worktrees, mirror.key)));
   }
 
   @override
@@ -96,10 +97,8 @@ class DirectoryDataFiles implements DataFiles {
   Future<void> deleteFlutterVersion(FlutterDirectory sdk) async =>
       _delete(Directory(p.join(_flutter, _plain(sdk.version))));
 
-  GitMirror _mirrorOf(int githubRepoId) => GitMirror(
-    githubRepoId: githubRepoId,
-    path: p.join(_mirrors, '$githubRepoId.git'),
-  );
+  GitMirror _mirrorOf(String key) =>
+      GitMirror(key: key, path: p.join(_mirrors, '$key.git'));
 
   /// The folders directly inside [path], by name.
   List<Directory> _directories(String path) {

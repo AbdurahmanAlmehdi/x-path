@@ -125,8 +125,7 @@ class HousekeepingPlanner {
       mirrors: mirrors,
       orphanMirrors: [
         for (final mirror in mirrors)
-          if (await _projects.findBySourceKey('${mirror.githubRepoId}') == null)
-            mirror,
+          if (await _projects.findBySourceKey(mirror.key) == null) mirror,
       ],
       sdks: sdks,
       unpinnedSdks: [
