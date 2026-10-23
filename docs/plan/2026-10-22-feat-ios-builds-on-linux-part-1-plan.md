@@ -147,7 +147,7 @@ once and opens one pull request.
 
 ### Phase 3a: Any-of placement and narrowing (no behaviour change)
 
-- **Status:** Not started
+- **Status:** Done
 - **Scope:** The scheduler and planner learn any-of requirements and the narrowing rule, while
   `build.ios` still requires only `ios-sign`, so nothing changes for users yet.
 - **Files touched:** `packages/xp_engine/lib/src/scheduler/{scheduler,capability}.dart`,

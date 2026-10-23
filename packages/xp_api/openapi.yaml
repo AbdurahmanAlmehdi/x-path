@@ -2795,6 +2795,13 @@ components:
           type: boolean
         iosPackageManager:
           $ref: "#/components/schemas/IosPackageManager"
+        iosAppExtensions:
+          type: array
+          description: >-
+            The app extension targets of the Xcode project, which Linux iOS
+            builds cannot make yet (ADR 0014).
+          items:
+            type: string
         flavors:
           type: array
           items:
@@ -3041,7 +3048,7 @@ components:
         capabilities:
           type: array
           items:
-            $ref: "#/components/schemas/Capability"
+            $ref: "#/components/schemas/CapabilityNeed"
         message:
           type: string
           description: Why the job failed or was cancelled, or why it still waits.
@@ -3069,6 +3076,13 @@ components:
         - flutter
         - swift-linux
         - ios-linux
+    CapabilityNeed:
+      type: string
+      description: |
+        One thing a job needs of a runner: a capability, or several joined by
+        `|` of which any will do, the first preferred (`ios-sign|ios-linux`,
+        ADR 0014).
+      pattern: "^(ios-sign|android|flutter|swift-linux|ios-linux)(\\|(ios-sign|android|flutter|swift-linux|ios-linux))*$"
     WorkflowVersionInfo:
       type: object
       required: [id, version, createdAt]
@@ -3288,7 +3302,7 @@ components:
         capabilities:
           type: array
           items:
-            $ref: "#/components/schemas/Capability"
+            $ref: "#/components/schemas/CapabilityNeed"
         message:
           type: string
     Run:

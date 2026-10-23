@@ -13,7 +13,13 @@ import 'package:xp_engine/src/workflows/workflow_exceptions.dart';
 /// gets, and what a runner needs to run it.
 class StepPlanSpec {
   /// Creates a spec.
-  const new(this.kind, this.withKeys, this.input, {this.capabilities});
+  const new(
+    this.kind,
+    this.withKeys,
+    this.input, {
+    this.capabilities,
+    this.anyOf,
+  });
 
   /// The step type.
   final String kind;
@@ -26,6 +32,11 @@ class StepPlanSpec {
 
   /// The capabilities the step needs, when it needs any.
   final Set<Capability> Function(StepPlanning planning)? capabilities;
+
+  /// What else the step needs where any of several capabilities will do,
+  /// the first preferred: `[ios-sign, ios-linux]` for an iOS build that a Mac
+  /// or a Linux runner can make (ADR 0014).
+  final List<List<Capability>> Function(StepPlanning planning)? anyOf;
 }
 
 /// The step types a workflow can use and how each is planned when a workflow
@@ -38,7 +49,13 @@ class StepPlanSpec {
 /// of a step of `JobRunner`, checked by the step type itself.
 class StepPlanners implements StepCatalog {
   /// Creates the planners over `registry`, whose steps check the inputs.
-  new(this._registry) {
+  ///
+  /// With [linuxIosBuilds], `build.ios` and `ios.stripAndReexport` need any
+  /// of `ios-sign` and `ios-linux`, and the dispatcher narrows a job Linux
+  /// cannot build to `ios-sign` (ADR 0014). It stays off until the Linux
+  /// backend of those steps exists, so that no runner gets an iOS job it
+  /// cannot build.
+  new(this._registry, {this.linuxIosBuilds = false}) {
     for (final spec in _specs) {
       _bySpec[spec.kind] = spec;
     }
@@ -47,15 +64,26 @@ class StepPlanners implements StepCatalog {
   final StepRegistry _registry;
   final _bySpec = <String, StepPlanSpec>{};
 
+  /// Whether iOS builds may run on a Linux runner.
+  final bool linuxIosBuilds;
+
   @override
   Iterable<String> get kinds => _bySpec.keys.toList()..sort();
 
   @override
   Set<String>? withKeys(String kind) => _bySpec[kind]?.withKeys;
 
-  /// The capabilities the step needs.
-  Set<Capability> capabilitiesOf(StepPlanning planning) =>
-      _bySpec[planning.kind]?.capabilities?.call(planning) ?? const {};
+  /// What the step needs of a runner: one need per capability it needs, then
+  /// its any-of needs.
+  List<CapabilityNeed> needsOf(StepPlanning planning) {
+    final spec = _bySpec[planning.kind];
+    final all = spec?.capabilities?.call(planning) ?? const <Capability>{};
+    final anyOf = spec?.anyOf?.call(planning) ?? const <List<Capability>>[];
+    return [
+      for (final capability in all) CapabilityNeed([capability]),
+      for (final capabilities in anyOf) CapabilityNeed(capabilities),
+    ];
+  }
 
   /// The plan of the step [planning].
   ///
@@ -180,7 +208,10 @@ class StepPlanners implements StepCatalog {
         ..._settings(p),
         'exportOptionsPlist': p.requireText('exportOptionsPlist'),
       },
-      capabilities: (_) => const {Capability.iosSign, Capability.flutter},
+      capabilities: (_) => linuxIosBuilds
+          ? const {Capability.flutter}
+          : const {Capability.iosSign, Capability.flutter},
+      anyOf: (_) => _iosBuild,
     ),
     StepPlanSpec(
       'build.verifyCompiledConfig',
@@ -201,7 +232,9 @@ class StepPlanners implements StepCatalog {
         'exportOptionsPlist': p.requireText('exportOptionsPlist'),
         'frameworks': p.list('frameworks'),
       },
-      capabilities: (_) => const {Capability.iosSign},
+      capabilities: (_) =>
+          linuxIosBuilds ? const {} : const {Capability.iosSign},
+      anyOf: (_) => _iosBuild,
     ),
     StepPlanSpec(
       'shorebird.release',
@@ -538,6 +571,14 @@ class StepPlanners implements StepCatalog {
     }
     return platform!;
   }
+
+  /// Where an iOS build can be made: a Mac, preferred, or a Linux runner,
+  /// once [linuxIosBuilds] allows it.
+  List<List<Capability>> get _iosBuild => linuxIosBuilds
+      ? const [
+          [Capability.iosSign, Capability.iosLinux],
+        ]
+      : const [];
 
   static Set<Capability> _shorebirdCapabilities(String platform) => {
     Capability.flutter,

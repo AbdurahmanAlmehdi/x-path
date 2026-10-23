@@ -528,6 +528,29 @@ void main() {
       await running;
     });
 
+    test('is refused when an iOS job of any kind runs already', () async {
+      final fake = socket();
+      final running = agent(slots: 4).run();
+      await pumpEventQueue();
+      await welcome(fake);
+      await offer(fake, 'job_1', capabilities: ['ios-linux']);
+
+      await offer(
+        fake,
+        'job_2',
+        leaseId: 'lse_2',
+        capabilities: ['flutter', 'ios-sign|ios-linux'],
+      );
+      await offer(fake, 'job_3', leaseId: 'lse_3', capabilities: ['flutter']);
+
+      expect(fake.sentOf<LeaseRejectFrame>().map((r) => (r.jobId, r.reason)), [
+        ('job_2', 'busy'),
+      ]);
+      expect(started.map((s) => s.work.offer.jobId), ['job_1', 'job_3']);
+      await fake.engineCloses(runnerRevokedCloseCode);
+      await running;
+    });
+
     test('is refused when it has a step this runner cannot run', () async {
       final fake = socket();
       final running = agent().run();

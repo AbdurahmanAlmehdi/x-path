@@ -20,6 +20,7 @@ const engineMigrations = <Migration>[
   Migration(version: 13, sql: _v13),
   Migration(version: 14, sql: _v14, notes: _v14Notes),
   Migration(version: 15, sql: _v15),
+  Migration(version: 16, sql: _v16),
 ];
 
 // Timestamps are integer microseconds since the Unix epoch (UTC), so that
@@ -515,4 +516,12 @@ CREATE TABLE engine_setting (
   key TEXT PRIMARY KEY,
   value TEXT NOT NULL
 ) STRICT;
+''';
+
+// iOS on Linux 3a (ADR 0014): why the planner ruled out an iOS build on Linux
+// for a job, so that it needs ios-sign. A JSON list of reasons, which the
+// queue message of the job repeats.
+const _v16 = '''
+ALTER TABLE job ADD COLUMN narrowing TEXT NOT NULL DEFAULT '[]'
+  CHECK (json_valid(narrowing));
 ''';

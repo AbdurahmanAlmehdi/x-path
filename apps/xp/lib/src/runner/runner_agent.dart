@@ -8,7 +8,8 @@ import 'package:xp/src/runner/runner_socket.dart';
 import 'package:xp/src/runner/secrets/lease_secret_store.dart';
 import 'package:xp_api/xp_api.dart';
 import 'package:xp_client/xp_client.dart';
-import 'package:xp_engine/xp_engine.dart' show ProbeExecutor, RunnerProbe;
+import 'package:xp_engine/xp_engine.dart'
+    show CapabilityNeed, ProbeExecutor, RunnerProbe;
 
 /// Why [RunnerAgent.run] ended.
 enum AgentExit {
@@ -59,8 +60,13 @@ class _Lease {
   Duration renewedAt;
 
   LeaseRef get ref => LeaseRef(jobId: offer.jobId, leaseId: offer.leaseId);
-  bool get needsIosSign => offer.capabilities.contains('ios-sign');
+  bool get isIos => _isIos(offer);
 }
+
+/// Whether the job of [offer] takes the one iOS place of the machine: it
+/// needs `ios-sign` or `ios-linux`, alone or as one of several.
+bool _isIos(LeaseOfferFrame offer) =>
+    CapabilityNeed.parseAll(offer.capabilities).any((need) => need.isIos);
 
 /// The runner: dials out to the engine and does what it says (D-08, D-19).
 ///
@@ -73,8 +79,9 @@ class _Lease {
 ///   them from the probe and says what it found (`probed`), which the runner
 ///   prints the first time and whenever it changes: what it offers and, for
 ///   each capability it lacks, why and what gives it.
-/// - **Takes leases** within its slots (an `ios-sign` job never runs beside
-///   another), refuses the others with a reason, and refuses all of them
+/// - **Takes leases** within its slots (an iOS job, `ios-sign` or
+///   `ios-linux`, never runs beside another), refuses the others with a
+///   reason, and refuses all of them
 ///   while draining. **Heartbeats** every `heartbeatSeconds` of the welcome,
 ///   well inside the lease of 90 seconds.
 /// - **Reports** through each lease's [LeaseOutbox], which keeps what the
@@ -588,8 +595,7 @@ class RunnerAgent {
       refusal = 'unsupported: this runner has no step ${unknown.join(', ')}';
     } else if (_active.length >= slots || _active.containsKey(offer.jobId)) {
       refusal = 'busy';
-    } else if (offer.capabilities.contains('ios-sign') &&
-        _active.values.any((lease) => lease.needsIosSign)) {
+    } else if (_isIos(offer) && _active.values.any((lease) => lease.isIos)) {
       refusal = 'busy';
     }
     if (refusal != null) {

@@ -1010,6 +1010,32 @@ void main() {
       expectContract(response, path: '/jobs/${job.id}');
     });
 
+    test(
+      'GET /jobs/{id} for a job that needs any of two capabilities',
+      () async {
+        final job = await engine.jobs.create(
+          workflowVersionId: 'wfv_1',
+          projectId: 'prj_1',
+          capabilities: const ['flutter', 'ios-sign|ios-linux'],
+          steps: [
+            StepPlan.of(
+              const CommandStep(),
+              const CommandInput(ProcessCommand('x')),
+            ),
+          ],
+        );
+
+        final response = await send('GET', '/jobs/${job.id}');
+
+        expect(response.body, contains('"ios-sign|ios-linux"'));
+        expectContract(response, path: '/jobs/${job.id}');
+        expect(
+          contract.validateSchema('CapabilityNeed', 'ios-sign|warp'),
+          isNotEmpty,
+        );
+      },
+    );
+
     test('GET /jobs/{id} 401 and 404', () async {
       final unauthorized = await engine.request('/jobs/job_x', token: '');
       final missing = await send('GET', '/jobs/job_nope');

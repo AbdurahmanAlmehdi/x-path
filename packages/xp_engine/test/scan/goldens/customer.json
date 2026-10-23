@@ -13,6 +13,9 @@
         "hasIos": true,
         "hasAndroid": true,
         "iosPackageManager": "cocoapods",
+        "iosAppExtensions": [
+          "NotificationServiceExtension"
+        ],
         "flavors": [
           {
             "name": "dev",
