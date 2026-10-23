@@ -67,8 +67,45 @@ DispatchPreview previewOf(int jobs, {List<String> flavors = const ['prod']}) =>
       ],
     );
 
+const _pushing = '''
+stages:
+  - name: finalize
+    jobs:
+      tag:
+        steps:
+          - kind: git.tag
+          - kind: git.push
+          - kind: github.createPr
+''';
+
 void main() {
   late MockWorkflowsRepository workflows;
+
+  group('DispatchState.gitHubStep (ADR 0015)', () {
+    DispatchState stateOf(Project project, String yaml) => DispatchState(
+      project: project,
+      app: '.',
+      ref: project.defaultBaseBranch,
+      status: DispatchStatus.ready,
+      workflow: workflowWith('wf', yaml),
+      outline: WorkflowOutline.parse(yaml),
+      preview: previewOf(1),
+    );
+
+    test('names the first GitHub step for a project on another host', () {
+      final state = stateOf(shop, _pushing);
+
+      expect(state.gitHubStep, 'git.push');
+      expect(state.canDispatch, isFalse);
+    });
+
+    test('is null on GitHub, and for a workflow without GitHub steps', () {
+      for (final state in [stateOf(mataa, _pushing), stateOf(shop, bumping)]) {
+        expect(state.gitHubStep, isNull);
+        expect(state.canDispatch, isTrue);
+      }
+    });
+  });
 
   setUpAll(() {
     registerFallbackValue(mataa);

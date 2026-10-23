@@ -90,6 +90,12 @@ void main() {
       expect(state.byId(null), isNull);
       expect(const ProjectScanRequested('a').props, ['a']);
     });
+
+    test('finds a project on another git host with a three-part name', () {
+      const state = ProjectsState(projects: [mataa, shop]);
+      expect(state.byId('prj_3')?.fullName, 'ws/mobile/shop_app');
+      expect(state.byId('prj_3')?.isOnGitHub, isFalse);
+    });
   });
 
   group('ShellCubit', () {

@@ -205,6 +205,29 @@ const captain = Project(
   ],
 );
 
+/// A project on Bitbucket (ADR 0015): no GitHub id, and a path of three
+/// segments.
+const shop = Project(
+  id: 'prj_3',
+  host: 'bitbucket.org',
+  sourceKey: 'h0123456789abcdef',
+  fullName: 'ws/mobile/shop_app',
+  remote: 'git@bitbucket.org:ws/mobile/shop_app.git',
+  defaultBaseBranch: 'develop',
+  profile: ProjectProfile(
+    apps: [
+      AppProfile(
+        name: 'Shop',
+        path: '.',
+        hasAndroid: true,
+        flavors: [
+          FlavorProfile(name: 'prod', entrypoint: 'lib/main.dart', prod: true),
+        ],
+      ),
+    ],
+  ),
+);
+
 /// The credential `prod` of `mataa` uses for its App Store Connect key.
 final ascKey = Credential(
   id: 'crd_1',

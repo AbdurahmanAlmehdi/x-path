@@ -5,6 +5,7 @@ import 'package:xp_api/xp_api.dart';
 import 'package:xp_desktop/dispatch/bloc/dispatch_bloc.dart';
 import 'package:xp_desktop/job/widgets/job_status.dart';
 import 'package:xp_desktop/l10n/l10n.dart';
+import 'package:xp_desktop/projects/widgets/project_host.dart';
 import 'package:xp_desktop/shell/widgets/shell_page.dart';
 import 'package:xp_desktop/theme/theme.dart';
 import 'package:xp_desktop/widgets/widgets.dart';
@@ -228,6 +229,13 @@ class _Form extends StatelessWidget {
                   ],
                 ),
         ),
+        if (state.gitHubStep case final step?) ...[
+          const SizedBox(height: 8),
+          XpMessage(
+            XpStatus.scanInfo,
+            l10n.dispatchNeedsGitHub(step, state.project.hostLabel(l10n)),
+          ),
+        ],
         if (apps.length > 1) ...[
           const SizedBox(height: 16),
           _Field(

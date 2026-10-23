@@ -340,6 +340,16 @@ void main() {
       }
     });
 
+    testWidgets('shows the host of a project on another git host', (
+      tester,
+    ) async {
+      await OverviewHarness().pump(tester, project: mataaOnBitbucket);
+
+      expect(find.text('mataa_new_app'), findsOneWidget);
+      expect(find.text('bitbucket.org · main · 1 app'), findsOneWidget);
+      expect(find.text('main · 1 app'), findsNothing);
+    });
+
     testWidgets('the scan says when it found nothing', (tester) async {
       await tester.pumpApp(
         const ScanDialog(projectId: 'prj_3'),

@@ -157,6 +157,18 @@ class DispatchState extends Equatable {
       ) ??
       false;
 
+  /// The first step of the workflow that needs GitHub (a `github.*` step or
+  /// `git.push`) when the project is not on GitHub, or `null`. The engine
+  /// refuses such a dispatch (ADR 0015), so the sheet does not offer it.
+  String? get gitHubStep => project.isOnGitHub
+      ? null
+      : outline?.stages
+            .expand((stage) => stage.jobs)
+            .expand((job) => job.steps)
+            .map((step) => step.kind)
+            .where((kind) => kind.startsWith('github.') || kind == 'git.push')
+            .firstOrNull;
+
   /// The flavors the run is for: the ones picked, else the default.
   List<String> get chosenFlavors => flavors ?? preview?.flavors ?? const [];
 
@@ -178,6 +190,7 @@ class DispatchState extends Equatable {
       status == DispatchStatus.ready &&
       !previewing &&
       workflow != null &&
+      gitHubStep == null &&
       (preview?.jobCount ?? 0) > 0;
 
   DispatchState copyWith({

@@ -225,7 +225,7 @@ Details:
 
 ### Phase R10d: The app
 
-- **Status:** Not started
+- **Status:** Done
 - **Scope:** The app adds and shows non-GitHub projects correctly.
 - **Files touched:** `apps/xp_desktop/lib/{add_project,projects,project_overview,dispatch}/**`,
   `apps/xp_desktop/lib/l10n/arb/app_en.arb`, tests
