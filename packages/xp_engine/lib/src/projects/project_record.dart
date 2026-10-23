@@ -8,13 +8,15 @@ class ProjectRecord extends Equatable {
   /// Creates a record.
   const new({
     required this.id,
-    required this.githubRepoId,
+    required this.host,
+    required this.sourceKey,
     required this.fullName,
     required this.remote,
     required this.githubDefaultBranch,
     required this.scan,
     required this.findings,
     required this.scannedAt,
+    this.githubRepoId,
     this.localPath,
     this.edits = const ProfileEdits(),
   });
@@ -22,16 +24,25 @@ class ProjectRecord extends Equatable {
   /// The engine's id.
   final String id;
 
-  /// The GitHub repository id (D-05). It keys the project and its mirror.
-  final int githubRepoId;
+  /// Where the repository lives: `github.com`, another SSH host, or `local`
+  /// for a `file://` origin (ADR 0015).
+  final String host;
 
-  /// `owner/name` as GitHub spells it now.
+  /// What keys the project's mirror, the runner cache and its worktrees: the
+  /// GitHub repository id in decimal, or `h` and 16 hex digits of the
+  /// SHA-256 of the normalised remote (ADR 0015).
+  final String sourceKey;
+
+  /// The GitHub repository id (D-05), for a project on GitHub only.
+  final int? githubRepoId;
+
+  /// `owner/name`: as GitHub spells it now, or the path of the remote.
   final String fullName;
 
   /// The URL the mirror fetches from.
   final String remote;
 
-  /// The branch GitHub shows first.
+  /// The branch the origin shows first.
   final String githubDefaultBranch;
 
   /// The folder the project was added from, if it was added by path.
@@ -49,7 +60,10 @@ class ProjectRecord extends Equatable {
   /// The owner's corrections, applied on top of every scan.
   final ProfileEdits edits;
 
-  /// The branch releases are based on: the owner's choice, else GitHub's
+  /// Whether the repository is on GitHub, so GitHub steps can run for it.
+  bool get isOnGitHub => host == Project.githubHost;
+
+  /// The branch releases are based on: the owner's choice, else the origin's
   /// default branch.
   String get defaultBaseBranch =>
       edits.defaultBaseBranch ?? githubDefaultBranch;
@@ -68,6 +82,8 @@ class ProjectRecord extends Equatable {
     ProfileEdits? edits,
   }) => ProjectRecord(
     id: id,
+    host: host,
+    sourceKey: sourceKey,
     githubRepoId: githubRepoId,
     fullName: fullName ?? this.fullName,
     remote: remote ?? this.remote,
@@ -82,6 +98,8 @@ class ProjectRecord extends Equatable {
   /// The API view of the project.
   Project toProject() => Project(
     id: id,
+    host: host,
+    sourceKey: sourceKey,
     githubRepoId: githubRepoId,
     fullName: fullName,
     remote: remote,
@@ -95,6 +113,8 @@ class ProjectRecord extends Equatable {
   @override
   List<Object?> get props => [
     id,
+    host,
+    sourceKey,
     githubRepoId,
     fullName,
     remote,

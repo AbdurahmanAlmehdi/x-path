@@ -640,6 +640,8 @@ void main() {
         await SqliteProjectRepository(database).add(
           ProjectRecord(
             id: 'prj_real',
+            host: 'github.com',
+            sourceKey: '7',
             githubRepoId: 7,
             fullName: 'octo/real',
             remote: 'x',
@@ -749,6 +751,8 @@ void main() {
         await SqliteProjectRepository(database).add(
           ProjectRecord(
             id: 'prj_real',
+            host: 'github.com',
+            sourceKey: '7',
             githubRepoId: 7,
             fullName: 'octo/real',
             remote: 'x',
@@ -854,6 +858,8 @@ void main() {
         await SqliteProjectRepository(database).add(
           ProjectRecord(
             id: 'prj_real',
+            host: 'github.com',
+            sourceKey: '7',
             githubRepoId: 7,
             fullName: 'octo/real',
             remote: 'x',
@@ -981,6 +987,8 @@ void main() {
       final projectId = await withDatabase((database) async {
         final record = ProjectRecord(
           id: 'prj_real',
+          host: 'github.com',
+          sourceKey: '7',
           githubRepoId: 7,
           fullName: 'octo/real',
           remote: '${root.path}/no-such-repository.git',
@@ -1188,8 +1196,9 @@ void main() {
               .isEmpty) {
             connection
               ..execute(
-                'INSERT INTO project (id, github_repo_id, remote, '
-                "default_base_branch) VALUES ('prj_1', 1, 'r', 'main')",
+                'INSERT INTO project (id, host, source_key, github_repo_id, '
+                'remote, default_base_branch) '
+                "VALUES ('prj_1', 'github.com', '1', 1, 'r', 'main')",
               )
               ..execute(
                 'INSERT INTO workflow (id, project_id, name) '

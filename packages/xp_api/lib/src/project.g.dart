@@ -8,10 +8,12 @@ part of 'project.dart';
 
 Project _$ProjectFromJson(Map<String, dynamic> json) => Project(
   id: json['id'] as String,
-  githubRepoId: (json['githubRepoId'] as num).toInt(),
+  host: json['host'] as String? ?? 'github.com',
+  sourceKey: Project._readSourceKey(json, 'sourceKey') as String,
   fullName: json['fullName'] as String,
   remote: json['remote'] as String,
   defaultBaseBranch: json['defaultBaseBranch'] as String,
+  githubRepoId: (json['githubRepoId'] as num?)?.toInt(),
   localPath: json['localPath'] as String?,
   profile: json['profile'] == null
       ? const ProjectProfile()
@@ -28,7 +30,9 @@ Project _$ProjectFromJson(Map<String, dynamic> json) => Project(
 
 Map<String, dynamic> _$ProjectToJson(Project instance) => <String, dynamic>{
   'id': instance.id,
-  'githubRepoId': instance.githubRepoId,
+  'host': instance.host,
+  'sourceKey': instance.sourceKey,
+  'githubRepoId': ?instance.githubRepoId,
   'fullName': instance.fullName,
   'remote': instance.remote,
   'localPath': ?instance.localPath,

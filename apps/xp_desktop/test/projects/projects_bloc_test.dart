@@ -121,6 +121,8 @@ void main() {
 
 const _rescanned = Project(
   id: 'prj_1',
+  host: 'github.com',
+  sourceKey: '1',
   githubRepoId: 1,
   fullName: 'acme/mataa_new_app',
   remote: 'git@github.com:acme/mataa_new_app.git',

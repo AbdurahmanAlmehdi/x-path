@@ -2853,7 +2853,8 @@ components:
       type: object
       required:
         - id
-        - githubRepoId
+        - host
+        - sourceKey
         - fullName
         - remote
         - defaultBaseBranch
@@ -2863,12 +2864,27 @@ components:
       properties:
         id:
           type: string
+        host:
+          type: string
+          description: |
+            Where the repository lives: `github.com`, another SSH host such as
+            `bitbucket.org`, or `local` for a `file://` origin (ADR 0015).
+        sourceKey:
+          type: string
+          pattern: "^([0-9]+|h[0-9a-f]{16})$"
+          description: |
+            Keys the project's mirror and caches: the GitHub repository id in
+            decimal, or `h` and 16 hex digits of the SHA-256 of the normalised
+            remote (ADR 0015).
         githubRepoId:
           type: integer
-          description: Survives renames and transfers; keys the project (D-05).
+          description: |
+            Survives renames and transfers. Only a project on GitHub has one.
         fullName:
           type: string
-          description: "`owner/name` as GitHub spells it."
+          description: |
+            `owner/name` as GitHub spells it, or the path of the remote on
+            another host (more than two segments for a GitLab subgroup).
         remote:
           type: string
         localPath:

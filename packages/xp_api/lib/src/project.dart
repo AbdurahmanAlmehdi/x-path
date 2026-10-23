@@ -8,16 +8,18 @@ import 'package:xp_api/src/project_profile.dart';
 
 part 'project.g.dart';
 
-/// A repository XPath releases, keyed by its GitHub repository id (D-05).
+/// A repository XPath releases, keyed by its source key (D-05, ADR 0015).
 @JsonSerializable(explicitToJson: true, includeIfNull: false)
 class Project extends Equatable {
   /// Creates a project.
   const new({
     required this.id,
-    required this.githubRepoId,
+    required this.host,
+    required this.sourceKey,
     required this.fullName,
     required this.remote,
     required this.defaultBaseBranch,
+    this.githubRepoId,
     this.localPath,
     this.profile = const ProjectProfile(),
     this.findings = const [],
@@ -28,13 +30,30 @@ class Project extends Equatable {
   factory Project.fromJson(Map<String, dynamic> json) =>
       _$ProjectFromJson(json);
 
+  /// The [host] of a project on GitHub.
+  static const githubHost = 'github.com';
+
   /// The engine's id for the project, for example `prj_1a2b3c4d5e6f7a8b`.
   final String id;
 
-  /// The id GitHub gave the repository. It survives renames and transfers.
-  final int githubRepoId;
+  /// Where the repository lives: [githubHost], another SSH host such as
+  /// `bitbucket.org`, or `local` for a `file://` origin. An engine older
+  /// than ADR 0015 sends none; its projects are all on GitHub.
+  @JsonKey(defaultValue: githubHost)
+  final String host;
 
-  /// `owner/name` as GitHub spells it.
+  /// What keys the project's mirror and caches: the GitHub repository id in
+  /// decimal, or `h` and 16 hex digits for another host. An engine older
+  /// than ADR 0015 sends none; the GitHub repository id is the key then.
+  @JsonKey(readValue: _readSourceKey)
+  final String sourceKey;
+
+  /// The id GitHub gave the repository, for a project on GitHub only. It
+  /// survives renames and transfers.
+  final int? githubRepoId;
+
+  /// `owner/name`: as GitHub spells it, or the path of the remote on another
+  /// host (which can have more than two segments).
   final String fullName;
 
   /// The URL the engine's mirror fetches from.
@@ -56,12 +75,20 @@ class Project extends Equatable {
   /// When the last scan ran, in UTC.
   final DateTime? scannedAt;
 
+  /// Whether the repository is on GitHub, so GitHub steps can run for it.
+  bool get isOnGitHub => host == githubHost;
+
   /// The JSON form.
   Map<String, dynamic> toJson() => _$ProjectToJson(this);
+
+  static Object? _readSourceKey(Map<dynamic, dynamic> json, String key) =>
+      json[key] ?? json['githubRepoId']?.toString();
 
   @override
   List<Object?> get props => [
     id,
+    host,
+    sourceKey,
     githubRepoId,
     fullName,
     remote,

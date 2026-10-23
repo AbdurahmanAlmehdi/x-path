@@ -131,6 +131,8 @@ final macMini = EngineProfile(
 
 const mataa = Project(
   id: 'prj_1',
+  host: 'github.com',
+  sourceKey: '1',
   githubRepoId: 1,
   fullName: 'acme/mataa_new_app',
   remote: 'git@github.com:acme/mataa_new_app.git',
@@ -181,6 +183,8 @@ const mataa = Project(
 
 const captain = Project(
   id: 'prj_2',
+  host: 'github.com',
+  sourceKey: '2',
   githubRepoId: 2,
   fullName: 'acme/mataa_captain',
   remote: 'git@github.com:acme/mataa_captain.git',

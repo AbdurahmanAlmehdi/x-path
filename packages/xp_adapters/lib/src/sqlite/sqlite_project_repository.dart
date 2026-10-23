@@ -29,7 +29,8 @@ class SqliteProjectRepository implements ProjectRepository {
   Database get _db => _database.connection;
 
   static const _columns =
-      'id, github_repo_id, full_name, remote, github_default_branch, '
+      'id, host, source_key, github_repo_id, full_name, remote, '
+      'github_default_branch, '
       'local_path, scan, findings, scanned_at, edits';
 
   @override
@@ -45,9 +46,9 @@ class SqliteProjectRepository implements ProjectRepository {
       _one(_db.select('SELECT $_columns FROM project WHERE id = ?', [id]));
 
   @override
-  Future<ProjectRecord?> findByGithubRepoId(int githubRepoId) async => _one(
-    _db.select('SELECT $_columns FROM project WHERE github_repo_id = ?', [
-      githubRepoId,
+  Future<ProjectRecord?> findBySourceKey(String sourceKey) async => _one(
+    _db.select('SELECT $_columns FROM project WHERE source_key = ?', [
+      sourceKey,
     ]),
   );
 
@@ -55,10 +56,10 @@ class SqliteProjectRepository implements ProjectRepository {
   Future<void> add(ProjectRecord record) async {
     _database.transaction(() {
       _db.execute(
-        'INSERT INTO project (id, github_repo_id, remote, '
+        'INSERT INTO project (id, source_key, host, github_repo_id, remote, '
         'default_base_branch, full_name, github_default_branch, local_path, '
         'scan, findings, scanned_at, edits) '
-        'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
         _values(record, includeIdentity: true),
       );
       _writeProfile(record);
@@ -69,7 +70,7 @@ class SqliteProjectRepository implements ProjectRepository {
   Future<void> update(ProjectRecord record) async {
     _database.transaction(() {
       _db.execute(
-        'UPDATE project SET github_repo_id = ?, remote = ?, '
+        'UPDATE project SET host = ?, github_repo_id = ?, remote = ?, '
         'default_base_branch = ?, full_name = ?, github_default_branch = ?, '
         'local_path = ?, scan = ?, findings = ?, scanned_at = ?, edits = ? '
         'WHERE id = ?',
@@ -100,12 +101,14 @@ class SqliteProjectRepository implements ProjectRepository {
   ProjectRecord? _one(ResultSet rows) =>
       rows.isEmpty ? null : _fromRow(rows.single);
 
-  /// The values of the insert (with the id first) or update statements.
+  /// The values of the insert (with the id and source key first) or update
+  /// statements.
   List<Object?> _values(
     ProjectRecord record, {
     required bool includeIdentity,
   }) => [
-    if (includeIdentity) record.id,
+    if (includeIdentity) ...[record.id, record.sourceKey],
+    record.host,
     record.githubRepoId,
     record.remote,
     record.defaultBaseBranch,
@@ -120,7 +123,9 @@ class SqliteProjectRepository implements ProjectRepository {
 
   static ProjectRecord _fromRow(Row row) => ProjectRecord(
     id: row['id'] as String,
-    githubRepoId: row['github_repo_id'] as int,
+    host: row['host'] as String,
+    sourceKey: row['source_key'] as String,
+    githubRepoId: row['github_repo_id'] as int?,
     fullName: row['full_name'] as String,
     remote: row['remote'] as String,
     githubDefaultBranch: row['github_default_branch'] as String,

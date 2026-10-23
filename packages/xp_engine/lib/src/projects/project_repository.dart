@@ -10,8 +10,8 @@ abstract interface class ProjectRepository {
   /// The project with [id], or `null`.
   Future<ProjectRecord?> get(String id);
 
-  /// The project for the GitHub repository [githubRepoId], or `null`.
-  Future<ProjectRecord?> findByGithubRepoId(int githubRepoId);
+  /// The project whose source key is [sourceKey], or `null`.
+  Future<ProjectRecord?> findBySourceKey(String sourceKey);
 
   /// Stores a new project.
   Future<void> add(ProjectRecord record);
@@ -37,15 +37,15 @@ class InMemoryProjectRepository implements ProjectRepository {
   Future<ProjectRecord?> get(String id) async => _records[id];
 
   @override
-  Future<ProjectRecord?> findByGithubRepoId(int githubRepoId) async => _records
+  Future<ProjectRecord?> findBySourceKey(String sourceKey) async => _records
       .values
-      .where((record) => record.githubRepoId == githubRepoId)
+      .where((record) => record.sourceKey == sourceKey)
       .firstOrNull;
 
   @override
   Future<void> add(ProjectRecord record) async {
-    if (await findByGithubRepoId(record.githubRepoId) != null) {
-      throw StateError('Repository ${record.githubRepoId} is a project.');
+    if (await findBySourceKey(record.sourceKey) != null) {
+      throw StateError('Repository ${record.sourceKey} is a project.');
     }
     _records[record.id] = record;
   }

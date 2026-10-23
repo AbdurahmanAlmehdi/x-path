@@ -156,6 +156,8 @@ void main() {
 extension on Project {
   Project copyWithName(String fullName) => Project(
     id: 'prj_3',
+    host: 'github.com',
+    sourceKey: '9',
     githubRepoId: 9,
     fullName: fullName,
     remote: remote,

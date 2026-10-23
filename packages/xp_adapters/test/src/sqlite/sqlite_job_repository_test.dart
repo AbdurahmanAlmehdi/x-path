@@ -43,8 +43,9 @@ void main() {
     // A job refers to a project and a workflow version.
     database.connection
       ..execute(
-        'INSERT INTO project (id, github_repo_id, remote, '
-        "default_base_branch) VALUES ('prj_1', 1, 'r', 'main')",
+        'INSERT INTO project (id, host, source_key, github_repo_id, remote, '
+        'default_base_branch) '
+        "VALUES ('prj_1', 'github.com', '1', 1, 'r', 'main')",
       )
       ..execute(
         'INSERT INTO workflow (id, project_id, name) '

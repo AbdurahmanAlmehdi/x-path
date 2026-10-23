@@ -39,6 +39,8 @@ ProjectRecord _record({
   String? localPath = '/work/app',
 }) => ProjectRecord(
   id: id,
+  host: 'github.com',
+  sourceKey: '$repoId',
   githubRepoId: repoId,
   fullName: 'octo/app',
   remote: 'https://github.com/octo/app.git',
@@ -101,7 +103,7 @@ void main() {
   test('starts empty', () async {
     expect(await repository.list(), isEmpty);
     expect(await repository.get('prj_1'), isNull);
-    expect(await repository.findByGithubRepoId(42), isNull);
+    expect(await repository.findBySourceKey('42'), isNull);
   });
 
   group('add', () {
@@ -116,8 +118,45 @@ void main() {
       await repository.add(record);
 
       expect(await repository.get('prj_1'), record);
-      expect(await repository.findByGithubRepoId(42), record);
+      expect(await repository.findBySourceKey('42'), record);
       expect(await repository.list(), [record]);
+    });
+
+    test('stores a project that is not on GitHub', () async {
+      final record = ProjectRecord(
+        id: 'prj_bb',
+        host: 'bitbucket.org',
+        sourceKey: 'h0123456789abcdef',
+        fullName: 'ws/repo',
+        remote: 'git@bitbucket.org:ws/repo.git',
+        githubDefaultBranch: 'main',
+        scan: const ProjectProfile(),
+        findings: const [],
+        scannedAt: DateTime.utc(2026),
+      );
+
+      await repository.add(record);
+
+      expect(await repository.findBySourceKey('h0123456789abcdef'), record);
+      expect((await repository.get('prj_bb'))!.githubRepoId, isNull);
+      expect(
+        () => repository.add(
+          ProjectRecord(
+            id: 'prj_gh',
+            host: 'bitbucket.org',
+            sourceKey: 'h1123456789abcdef',
+            githubRepoId: 7,
+            fullName: 'ws/repo',
+            remote: 'r',
+            githubDefaultBranch: 'main',
+            scan: const ProjectProfile(),
+            findings: const [],
+            scannedAt: DateTime.utc(2026),
+          ),
+        ),
+        throwsA(isA<SqliteException>()),
+        reason: 'only a project on GitHub has a GitHub repository id',
+      );
     });
 
     test('lists projects in the order they were added', () async {

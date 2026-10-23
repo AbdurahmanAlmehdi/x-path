@@ -6,6 +6,8 @@ void main() {
   ProjectRecord record({ProfileEdits edits = const ProfileEdits()}) =>
       ProjectRecord(
         id: 'prj_1',
+        host: 'github.com',
+        sourceKey: '7',
         githubRepoId: 7,
         fullName: 'octo/app',
         remote: 'https://github.com/octo/app.git',
@@ -60,6 +62,8 @@ void main() {
         .toProject();
 
     expect(project.id, 'prj_1');
+    expect(project.host, 'github.com');
+    expect(project.sourceKey, '7');
     expect(project.githubRepoId, 7);
     expect(project.fullName, 'octo/app');
     expect(project.remote, 'https://github.com/octo/app.git');
@@ -89,7 +93,27 @@ void main() {
     expect(changed.scannedAt, DateTime.utc(2027));
     expect(changed.edits.defaultBaseBranch, 'x');
     expect(changed.id, 'prj_1');
+    expect(changed.host, 'github.com');
+    expect(changed.sourceKey, '7');
     expect(changed.githubRepoId, 7);
     expect(changed.localPath, '/work/app');
+  });
+
+  test('only a project on github.com is on GitHub', () {
+    expect(record().isOnGitHub, isTrue);
+    final local = ProjectRecord(
+      id: 'prj_2',
+      host: 'local',
+      sourceKey: 'h0123456789abcdef',
+      fullName: 'srv/git/app',
+      remote: 'file:///srv/git/app.git',
+      githubDefaultBranch: 'main',
+      scan: const ProjectProfile(),
+      findings: const [],
+      scannedAt: DateTime.utc(2026),
+    );
+    expect(local.isOnGitHub, isFalse);
+    expect(local.toProject().isOnGitHub, isFalse);
+    expect(local.toProject().githubRepoId, isNull);
   });
 }

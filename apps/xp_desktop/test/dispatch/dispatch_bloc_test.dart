@@ -113,6 +113,8 @@ void main() {
     test('a project without an app runs at the root', () {
       const empty = Project(
         id: 'prj_9',
+        host: 'github.com',
+        sourceKey: '9',
         githubRepoId: 9,
         fullName: 'a/b',
         remote: 'r',

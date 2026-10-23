@@ -18,6 +18,8 @@ import '../helpers/release_fixtures.dart';
 /// `mataa` with the pubspec version of `Main.dc.html`.
 final mataaWithVersion = Project(
   id: mataa.id,
+  host: 'github.com',
+  sourceKey: '${mataa.githubRepoId}',
   githubRepoId: mataa.githubRepoId,
   fullName: mataa.fullName,
   remote: mataa.remote,

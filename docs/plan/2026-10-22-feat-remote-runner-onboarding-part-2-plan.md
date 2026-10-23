@@ -120,7 +120,7 @@ once and opens one pull request.
 
 ### Phase R10a: Schema and identity
 
-- **Status:** Not started
+- **Status:** Done
 - **Scope:** The migration runner learns foreign-keys-off migrations, and `project` is rebuilt
   with `host`, `source_key` and a nullable `github_repo_id`.
 - **Files touched:** `docs/adr/0015-projects-on-any-git-host.md` (new),

@@ -102,20 +102,22 @@ class ProjectService {
   /// reached the stored values stay.
   Future<Project> scan(String id) => _exclusive(() async {
     var record = await _require(id);
-    try {
-      final repo = await _github.getRepoById(record.githubRepoId);
-      record = record.copyWith(
-        fullName: repo.fullName,
-        remote: repo.cloneUrl,
-        githubDefaultBranch: repo.defaultBranch,
-      );
-    } on GitHubException {
-      // Offline or unauthorized: scan with what is stored.
-    } on SecretStoreException {
-      // Secrets are locked: same.
+    if (record.githubRepoId case final githubRepoId?) {
+      try {
+        final repo = await _github.getRepoById(githubRepoId);
+        record = record.copyWith(
+          fullName: repo.fullName,
+          remote: repo.cloneUrl,
+          githubDefaultBranch: repo.defaultBranch,
+        );
+      } on GitHubException {
+        // Offline or unauthorized: scan with what is stored.
+      } on SecretStoreException {
+        // Secrets are locked: same.
+      }
     }
     final mirror = await _git.ensureMirror(
-      githubRepoId: record.githubRepoId,
+      githubRepoId: record.githubRepoId!,
       remoteUrl: record.remote,
     );
     final localPath = record.localPath;
@@ -205,7 +207,7 @@ class ProjectService {
     required String? localPath,
   }) async {
     final repo = await _github.getRepo(remote.owner, remote.name);
-    final existing = await _repository.findByGithubRepoId(repo.id);
+    final existing = await _repository.findBySourceKey('${repo.id}');
     if (existing != null) {
       throw ProjectExistsException(existing.id, existing.fullName);
     }
@@ -219,6 +221,8 @@ class ProjectService {
         : await _scanMirror(mirror, repo.defaultBranch, id);
     final record = ProjectRecord(
       id: id,
+      host: Project.githubHost,
+      sourceKey: '${repo.id}',
       githubRepoId: repo.id,
       fullName: repo.fullName,
       remote: repo.cloneUrl,

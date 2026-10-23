@@ -74,6 +74,39 @@ void main() {
       }
     });
 
+    test('documents projects on GitHub and on any other host', () {
+      const projects = ProjectsResponse([
+        Project(
+          id: 'prj_1',
+          host: Project.githubHost,
+          sourceKey: '42',
+          githubRepoId: 42,
+          fullName: 'acme/shop',
+          remote: 'https://github.com/acme/shop.git',
+          defaultBaseBranch: 'main',
+        ),
+        Project(
+          id: 'prj_2',
+          host: 'bitbucket.org',
+          sourceKey: 'h0123456789abcdef',
+          fullName: 'ws/group/app',
+          remote: 'git@bitbucket.org:ws/group/app.git',
+          defaultBaseBranch: 'main',
+        ),
+      ]);
+
+      expect(
+        shipped.validateResponse(
+          method: 'GET',
+          path: '/projects',
+          statusCode: 200,
+          body: jsonEncode(projects.toJson()),
+          contentType: 'application/json',
+        ),
+        isEmpty,
+      );
+    });
+
     test('documents the job endpoints and their error responses', () {
       final unauthorized = jsonEncode(
         ErrorResponse.of(ApiErrorCode.unauthorized, 'm').toJson(),

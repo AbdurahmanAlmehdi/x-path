@@ -134,7 +134,7 @@ class WorkflowDispatcher {
     final kinds = {for (final step in steps) step.kind};
 
     final mirror = await _git.ensureMirror(
-      githubRepoId: project.githubRepoId,
+      githubRepoId: project.githubRepoId!,
       remoteUrl: project.remote,
     );
     await _git.fetch(mirror);

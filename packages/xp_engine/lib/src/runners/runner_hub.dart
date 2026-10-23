@@ -414,7 +414,7 @@ class RunnerHub
     if (project == null) return null;
     final github = GitHubRemote.parse(project.remote);
     return LeaseRepository(
-      githubRepoId: project.githubRepoId,
+      githubRepoId: project.githubRepoId!,
       sshUrl: github?.sshUrl ?? _withoutUserInfo(project.remote),
     );
   }
