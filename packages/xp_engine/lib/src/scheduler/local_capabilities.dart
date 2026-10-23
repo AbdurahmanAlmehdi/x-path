@@ -1,6 +1,6 @@
+import 'package:xp_engine/src/probe/probe_executor.dart';
+import 'package:xp_engine/src/probe/runner_probe.dart';
 import 'package:xp_engine/src/process/process_runner.dart';
-import 'package:xp_engine/src/runners/probe_executor.dart';
-import 'package:xp_engine/src/runners/runner_probe.dart';
 
 /// What this machine can do (D-19): the engine asks the tools instead of
 /// trusting a setting.

@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:math';
 
 import 'package:path/path.dart' as p;
 import 'package:xp_adapters/xp_adapters.dart';
@@ -443,7 +442,6 @@ class ServeCommand extends XpdCommand {
         runners: [
           LocalRunner(jobs: jobs, capabilities: capabilities, slots: slots),
         ],
-        paired: runnerRepository,
         onError: (error, stackTrace) =>
             context.err.writeln('error: scheduler: $error\n$stackTrace'),
       );
@@ -573,7 +571,9 @@ class ServeCommand extends XpdCommand {
             context.err.writeln('error: runner hub: $error\n$stackTrace'),
         onRefused: (name, why) => runnerLog.refused('"$name"', why),
       );
-      scheduler.remoteJobs = runnerHub;
+      scheduler
+        ..remoteJobs = runnerHub
+        ..pairedRunners = runnerHub;
       final runnerService = RunnerService(
         runners: runnerRepository,
         pairing: SqlitePairingTokenRepository(database),
@@ -698,10 +698,11 @@ class ServeCommand extends XpdCommand {
       // (D-08).
       final leaseSweeper = LeaseSweeper(
         hub: runnerHub,
-        // Every 10 s, or three times per lease when a test shortened it.
-        interval: Duration(
-          seconds: min(10, max(1, leaseLength.inSeconds ~/ 3)),
-        ),
+        // Every 10 s, or as often as heartbeats when a test shortened the
+        // lease.
+        interval: runnerHub.heartbeatInterval < const Duration(seconds: 10)
+            ? runnerHub.heartbeatInterval
+            : const Duration(seconds: 10),
         onError: (error, stackTrace) =>
             context.err.writeln('warning: lease sweep failed: $error'),
       );

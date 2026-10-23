@@ -49,11 +49,14 @@ typedef LeaseStarter = LeaseWork Function(
 );
 
 class _Lease {
-  const new(this.offer, this.outbox, this.work);
+  new(this.offer, this.outbox, this.work, this.renewedAt);
 
   final LeaseOfferFrame offer;
   final LeaseOutbox outbox;
   final LeaseWork work;
+
+  /// When the engine last renewed the lease, on the agent's monotonic clock.
+  Duration renewedAt;
 
   LeaseRef get ref => LeaseRef(jobId: offer.jobId, leaseId: offer.leaseId);
   bool get needsIosSign => offer.capabilities.contains('ios-sign');
@@ -116,6 +119,7 @@ class RunnerAgent {
     this.wantsUpdateTo,
     this.onWelcomed,
     this.fenceInterval = const Duration(seconds: 5),
+    Timer Function(Duration, void Function(Timer))? timers,
     this.fenceGrace = const Duration(seconds: 15),
     this.nagInterval = const Duration(minutes: 10),
     Duration Function()? elapsed,
@@ -123,7 +127,8 @@ class RunnerAgent {
        _delay = delay ?? Future<void>.delayed,
        _heartbeatUnit =
            heartbeatUnit ?? ((seconds) => Duration(seconds: seconds)),
-       _elapsed = elapsed ?? _monotonic();
+       _elapsed = elapsed ?? _monotonic(),
+       _timers = timers ?? Timer.periodic;
 
   final RunnerConnector _connect;
   final LeaseStarter _start;
@@ -136,6 +141,10 @@ class RunnerAgent {
 
   /// A monotonic clock: the time since the agent was made.
   final Duration Function() _elapsed;
+
+  /// Starts the periodic timer of the lease fence; [Timer.periodic] unless a
+  /// test drives it.
+  final Timer Function(Duration, void Function(Timer)) _timers;
 
   /// The `xp` version sent in the hello.
   final String version;
@@ -191,8 +200,6 @@ class RunnerAgent {
   String? _engineVersion;
   ProbedFrame? _offers;
   var _leaseLength = const Duration(seconds: runnerLeaseSeconds);
-  // When the engine last renewed each lease, on the monotonic clock.
-  final _renewed = <String, Duration>{};
   Timer? _fence;
   // Since when the engine is away, and when the runner last said so.
   Duration? _awaySince;
@@ -215,7 +222,7 @@ class RunnerAgent {
 
   /// Connects, serves and reconnects until the runner has to end.
   Future<AgentExit> run() async {
-    _fence = Timer.periodic(fenceInterval, (_) => unawaited(_fenceLost()));
+    _fence = _timers(fenceInterval, (_) => unawaited(_fenceLost()));
     while (_exit == null) {
       final RunnerSocket socket;
       try {
@@ -257,7 +264,6 @@ class RunnerAgent {
                       'again.',
           );
           _awaySince ??= _elapsed();
-          _saidAwayAt = _elapsed();
           await _backOff();
       }
     }
@@ -269,15 +275,14 @@ class RunnerAgent {
   /// [nagInterval].
   void _cannotConnect(String why) {
     final now = _elapsed();
-    final since = _awaySince;
-    if (since == null) {
-      _awaySince = now;
+    final since = _awaySince ??= now;
+    final said = _saidAwayAt;
+    if (said == null) {
       _saidAwayAt = now;
       _log('Cannot connect: $why');
       return;
     }
-    final said = _saidAwayAt;
-    if (said != null && now - said < nagInterval) return;
+    if (now - said < nagInterval) return;
     _saidAwayAt = now;
     _log(
       'The engine has been unreachable for ${_span(now - since)}; still '
@@ -290,10 +295,7 @@ class RunnerAgent {
   Future<void> _fenceLost() async {
     final now = _elapsed();
     for (final lease in _active.values.toList()) {
-      final renewed = _renewed[lease.offer.jobId];
-      if (renewed == null || now - renewed <= _leaseLength + fenceGrace) {
-        continue;
-      }
+      if (now - lease.renewedAt <= _leaseLength + fenceGrace) continue;
       await _end(
         lease,
         'Lost the lease of job ${lease.offer.jobId} while the engine was '
@@ -523,9 +525,8 @@ class RunnerAgent {
   void _acknowledged(HeartbeatAckFrame frame) {
     final now = _elapsed();
     for (final grant in frame.leases) {
-      if (_active[grant.jobId]?.offer.leaseId == grant.leaseId) {
-        _renewed[grant.jobId] = now;
-      }
+      final lease = _active[grant.jobId];
+      if (lease?.offer.leaseId == grant.leaseId) lease!.renewedAt = now;
     }
   }
 
@@ -597,9 +598,8 @@ class RunnerAgent {
       send: _sendFrame,
     );
     final work = _start(offer, outbox, (key) => _requestSecret(offer, key));
-    _active[offer.jobId] = _Lease(offer, outbox, work);
     // The offer leased the job for a lease length; the accept is its start.
-    _renewed[offer.jobId] = _elapsed();
+    _active[offer.jobId] = _Lease(offer, outbox, work, _elapsed());
     _tookJob = true;
     if (oneShot && !_draining) {
       // The engine offers nothing more once the runner says so.
@@ -628,7 +628,6 @@ class RunnerAgent {
   void _release(String jobId, LeaseWork work) {
     if (!identical(_active[jobId]?.work, work)) return;
     _active.remove(jobId);
-    _renewed.remove(jobId);
     _checkExit();
   }
 
@@ -650,7 +649,6 @@ class RunnerAgent {
     if (!identical(_active[jobId], lease)) return;
     _log(message);
     _active.remove(jobId);
-    _renewed.remove(jobId);
     for (final key in _askedSecrets.keys.toList()) {
       if (key.startsWith('$jobId/')) {
         _askedSecrets.remove(key);

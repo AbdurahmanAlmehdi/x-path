@@ -331,7 +331,8 @@ void main() {
 
         expect(
           findings.missing.first.explanation,
-          'no curl, unzip or xz: the check for them did not answer in time. '
+          'no curl, unzip or xz: they could not be checked (sh did not answer '
+          'in time). '
           'Install them (apt-get install curl unzip xz-utils).',
         );
         expect(

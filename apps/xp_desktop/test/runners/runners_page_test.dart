@@ -358,6 +358,34 @@ void main() {
       expect(find.textContaining('only works on this Mac'), findsNothing);
     });
 
+    testWidgets('does not warn about a loopback runner URL set on purpose', (
+      tester,
+    ) async {
+      when(() => repository.createPairingToken('aws')).thenAnswer(
+        (_) async => PairingToken(
+          token: 'xpp_secret',
+          name: 'aws',
+          expiresAt: testNow.add(const Duration(minutes: 15)),
+          engineUrl: 'http://127.0.0.1:7480',
+        ),
+      );
+      await pump(tester);
+      await tester.tap(find.text('Pair runner…'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField), 'aws');
+      await tester.pump();
+      await tester.tap(find.text('Create pairing token'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text(
+          'xp runner pair --engine http://127.0.0.1:7480 --token xpp_secret',
+        ),
+        findsOneWidget,
+      );
+      expect(find.textContaining('only works on this Mac'), findsNothing);
+    });
+
     testWidgets('warns about a loopback address and sets the runner URL in '
         'place', (tester) async {
       when(() => repository.createPairingToken('aws')).thenAnswer(

@@ -107,12 +107,13 @@ class _PairRunnerSheetState extends State<PairRunnerSheet> {
               ] else
                 _Token(
                   token: token,
-                  engine:
-                      context.select<RunnerUrlBloc, String?>(
-                        (bloc) => bloc.state.url?.url,
-                      ) ??
-                      token.engineUrl ??
-                      engine?.toString().replaceFirst(RegExp(r'/+$'), ''),
+                  command: PairingCommand.of(
+                    token,
+                    fallback: engine ?? Uri(),
+                    runnerUrl: context.select<RunnerUrlBloc, String?>(
+                      (bloc) => bloc.state.url?.url,
+                    ),
+                  ),
                   onNewToken: () => context.read<PairRunnerBloc>().add(
                     PairingTokenRequested(token.name),
                   ),
@@ -151,14 +152,14 @@ class _PairRunnerSheetState extends State<PairRunnerSheet> {
 class _Token extends StatelessWidget {
   const new({
     required this.token,
-    required this.engine,
+    required this.command,
     required this.onNewToken,
   });
 
   final PairingToken token;
 
-  /// The address the runner pairs with.
-  final String? engine;
+  /// What the runner machine runs.
+  final PairingCommand command;
 
   final VoidCallback onNewToken;
 
@@ -170,15 +171,6 @@ class _Token extends StatelessWidget {
     final now = XpClock.now(context);
     final expiresAt = token.expiresAt;
     final expired = !expiresAt.isAfter(now);
-    final command = [
-      'xp runner pair',
-      if (engine case final engine?) '--engine $engine',
-      '--token ${token.token}',
-    ].join(' ');
-    final host = engine == null ? null : Uri.tryParse(engine!)?.host;
-    final loopback =
-        host != null &&
-        (host == 'localhost' || host == '::1' || host.startsWith('127.'));
     Widget well(String text, String copyLabel) => Container(
       padding: const EdgeInsets.fromLTRB(10, 6, 6, 6),
       decoration: BoxDecoration(
@@ -208,9 +200,9 @@ class _Token extends StatelessWidget {
         const SizedBox(height: 14),
         XpSectionLabel(l10n.pairRunnerCommand),
         const SizedBox(height: 6),
-        well(command, l10n.pairRunnerCopyCommand),
+        well(command.text, l10n.pairRunnerCopyCommand),
         const SizedBox(height: 12),
-        if (loopback) ...[
+        if (command.onlyHere) ...[
           XpMessage(XpStatus.scanWarning, l10n.pairRunnerLoopback),
           const SizedBox(height: 12),
           const RunnerUrlSection(),

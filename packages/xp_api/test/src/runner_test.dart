@@ -120,6 +120,91 @@ void main() {
     });
   });
 
+  group('isLoopbackHost', () {
+    test('is this machine only', () {
+      for (final host in [
+        'localhost',
+        'LOCALHOST',
+        '127.0.0.1',
+        '127.9.9.9',
+        '::1',
+      ]) {
+        expect(isLoopbackHost(host), isTrue, reason: host);
+      }
+      for (final host in ['', 'mac.tailnet.ts.net', '100.64.0.1', '10.0.0.1']) {
+        expect(isLoopbackHost(host), isFalse, reason: host);
+      }
+    });
+  });
+
+  group('PairingCommand', () {
+    PairingToken token({String? engineUrl}) => PairingToken(
+      token: 'xpp_1',
+      name: 'aws',
+      expiresAt: created,
+      engineUrl: engineUrl,
+    );
+
+    test('names the runner URL the token carries', () {
+      final command = PairingCommand.of(
+        token(engineUrl: 'https://mac.tailnet.ts.net'),
+        fallback: Uri.parse('http://127.0.0.1:7480'),
+      );
+
+      expect(
+        command.text,
+        'xp runner pair --engine https://mac.tailnet.ts.net --token xpp_1',
+      );
+      expect(command.onlyHere, isFalse);
+    });
+
+    test('a loopback runner URL the owner set is not called out', () {
+      expect(
+        PairingCommand.of(
+          token(engineUrl: 'http://127.0.0.1:7480'),
+          fallback: Uri.parse('http://127.0.0.1:7480'),
+        ).onlyHere,
+        isFalse,
+      );
+      expect(
+        PairingCommand.of(
+          token(),
+          fallback: Uri.parse('http://127.0.0.1:7480'),
+          runnerUrl: 'http://127.0.0.1:7480',
+        ).onlyHere,
+        isFalse,
+      );
+    });
+
+    test('falls back to the client address, called out when loopback', () {
+      final local = PairingCommand.of(
+        token(),
+        fallback: Uri.parse('http://127.0.0.1:7480/'),
+      );
+      final remote = PairingCommand.of(
+        token(),
+        fallback: Uri.parse('https://xpath.example.com'),
+      );
+      final set = PairingCommand.of(
+        token(),
+        fallback: Uri.parse('http://127.0.0.1:7480'),
+        runnerUrl: 'https://mac.tailnet.ts.net',
+      );
+
+      expect(local.engine, 'http://127.0.0.1:7480');
+      expect(local.onlyHere, isTrue);
+      expect(remote.onlyHere, isFalse);
+      expect(set.engine, 'https://mac.tailnet.ts.net');
+      expect(
+        local,
+        PairingCommand.of(
+          token(),
+          fallback: Uri.parse('http://127.0.0.1:7480'),
+        ),
+      );
+    });
+  });
+
   group('runner URL', () {
     test('round-trips, leaving out what it lacks', () {
       const url = RunnerUrl(url: 'http://a.example', warning: 'Plain http.');

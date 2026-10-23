@@ -103,7 +103,10 @@ class RunnerService {
   /// The runner URL, with the warning its address deserves.
   Future<RunnerUrl> runnerUrl() async {
     final url = await _settings.read(runnerUrlKey);
-    return RunnerUrl(url: url, warning: url == null ? null : _warning(url));
+    return RunnerUrl(
+      url: url,
+      warning: url == null ? null : _warning(Uri.parse(url)),
+    );
   }
 
   /// Sets the runner URL to [url], or clears it for `null`, for the token
@@ -138,12 +141,11 @@ class RunnerService {
     }
     final text = parsed.toString().replaceFirst(RegExp(r'/+$'), '');
     await _settings.write(runnerUrlKey, text);
-    return RunnerUrl(url: text, warning: _warning(text));
+    return RunnerUrl(url: text, warning: _warning(parsed));
   }
 
-  /// Why [url] may be a bad idea, or `null`.
-  static String? _warning(String url) {
-    final uri = Uri.parse(url);
+  /// Why [uri] may be a bad idea, or `null`.
+  static String? _warning(Uri uri) {
     if (uri.scheme != 'http' || _private(uri.host)) return null;
     return 'This plain http address is not on this machine or a tailnet, '
         'and the runner connection carries signing material. Put TLS in '
@@ -154,12 +156,11 @@ class RunnerService {
   /// or a `*.ts.net` name.
   static bool _private(String host) {
     final name = host.toLowerCase();
-    if (name == 'localhost' || name.endsWith('.ts.net')) return true;
-    if (name == '::1' || name == '[::1]') return true;
+    if (isLoopbackHost(name) || name.endsWith('.ts.net')) return true;
     final octets = name.split('.').map(int.tryParse).toList();
     if (octets.length != 4 || octets.contains(null)) return false;
     final [first!, second!, _, _] = octets;
-    return first == 127 || (first == 100 && second >= 64 && second < 128);
+    return first == 100 && second >= 64 && second < 128;
   }
 
   /// Exchanges the pairing token [secret] for a runner and its credential.

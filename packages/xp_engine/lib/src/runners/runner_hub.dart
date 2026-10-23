@@ -9,6 +9,7 @@ import 'package:xp_engine/src/jobs/job_logs.dart';
 import 'package:xp_engine/src/jobs/job_record.dart';
 import 'package:xp_engine/src/jobs/job_repository.dart';
 import 'package:xp_engine/src/jobs/job_runner.dart';
+import 'package:xp_engine/src/probe/runner_probe.dart';
 import 'package:xp_engine/src/process/output_line.dart';
 import 'package:xp_engine/src/process/output_masker.dart';
 import 'package:xp_engine/src/projects/github_remote.dart';
@@ -17,11 +18,11 @@ import 'package:xp_engine/src/repositories/event_log.dart';
 import 'package:xp_engine/src/runners/remote_runner.dart';
 import 'package:xp_engine/src/runners/remote_step_policy.dart';
 import 'package:xp_engine/src/runners/runner_link.dart';
-import 'package:xp_engine/src/runners/runner_probe.dart';
 import 'package:xp_engine/src/runners/runner_record.dart';
 import 'package:xp_engine/src/runners/runner_repository.dart';
 import 'package:xp_engine/src/runners/runner_secret_grants.dart';
 import 'package:xp_engine/src/runners/serial_queues.dart';
+import 'package:xp_engine/src/scheduler/paired_runners.dart';
 import 'package:xp_engine/src/scheduler/scheduler.dart';
 import 'package:xp_engine/src/scheduler/scheduler_runner.dart';
 import 'package:xp_engine/src/secrets/secret_store.dart';
@@ -121,7 +122,8 @@ class _Session {
 ///
 /// Every state change of a job is done under a per-job lock, so heartbeats,
 /// reports, cancels and the sweep never interleave.
-class RunnerHub implements RemoteLeases, RemoteJobs, RunnerPresence {
+class RunnerHub
+    implements RemoteLeases, RemoteJobs, RunnerPresence, PairedRunners {
   /// Creates the hub.
   ///
   /// [probeTimeout] is how long a runner has to answer the probe;
@@ -149,9 +151,14 @@ class RunnerHub implements RemoteLeases, RemoteJobs, RunnerPresence {
     Random? random,
   }) : _random = random ?? Random.secure();
 
-  /// How long a lease lasts after the heartbeat that renewed it (D-08). A
-  /// runner sends a heartbeat three times per lease. Shorter only in tests.
+  /// How long a lease lasts after the heartbeat that renewed it (D-08).
+  /// Shorter only in tests.
   final Duration leaseLength;
+
+  /// How often a runner sends a heartbeat: three times per lease, at least
+  /// every second.
+  Duration get heartbeatInterval =>
+      Duration(seconds: max(1, leaseLength.inSeconds ~/ 3));
 
   /// How long a runner has to answer the probe.
   final Duration probeTimeout;
@@ -216,7 +223,7 @@ class RunnerHub implements RemoteLeases, RemoteJobs, RunnerPresence {
         runnerId: runner.id,
         engineVersion: _engineVersion,
         apiVersion: apiVersion,
-        heartbeatSeconds: max(1, leaseLength.inSeconds ~/ 3),
+        heartbeatSeconds: heartbeatInterval.inSeconds,
         leaseSeconds: leaseLength.inSeconds,
       ),
     );
@@ -225,6 +232,19 @@ class RunnerHub implements RemoteLeases, RemoteJobs, RunnerPresence {
 
   /// Whether the runner [runnerId] has a connection open.
   bool isConnected(String runnerId) => _sessions.containsKey(runnerId);
+
+  @override
+  Future<List<PairedRunner>> pairedRunners() async => [
+    for (final runner in await _runners.list())
+      if (!runner.isRevoked)
+        PairedRunner(
+          id: runner.id,
+          name: runner.name,
+          capabilities: runner.capabilities,
+          connected: isConnected(runner.id),
+          lastSeen: runner.lastHeartbeat,
+        ),
+  ];
 
   @override
   RunnerStatus statusOf(String runnerId) {

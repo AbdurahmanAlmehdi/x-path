@@ -119,10 +119,7 @@ class RunnersPairCommand extends XpCommand {
   Future<int> execute(XpClient client) async {
     final [name] = positionals(['name']);
     final token = await client.createPairingToken(name);
-    final engine =
-        token.engineUrl ??
-        client.baseUrl.toString().replaceFirst(RegExp(r'/+$'), '');
-    final local = token.engineUrl == null && _isLoopback(client.baseUrl.host);
+    final command = PairingCommand.of(token, fallback: client.baseUrl);
     final heading =
         'Pairing token for the runner "${token.name}". On the runner '
         'machine, within 15 minutes:';
@@ -136,10 +133,10 @@ class RunnersPairCommand extends XpCommand {
       token.toJson(),
       () => [
         heading,
-        '  xp runner pair --engine $engine --token ${token.token}',
+        '  ${command.text}',
         '',
         expiry,
-        if (local) ...[
+        if (command.onlyHere) ...[
           '',
           loopback,
           'How runners reach the engine: $reachingTheEngine',
@@ -148,12 +145,6 @@ class RunnersPairCommand extends XpCommand {
     );
     return XpExit.ok;
   }
-
-  static bool _isLoopback(String host) =>
-      host == 'localhost' ||
-      host == '::1' ||
-      host == '[::1]' ||
-      host.startsWith('127.');
 }
 
 /// `xp runners revoke <runner>`.

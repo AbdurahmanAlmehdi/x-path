@@ -313,6 +313,14 @@ void main() {
         missing.explanation,
         'no JDK: java not found. Install JDK 17 or set JAVA_HOME.',
       );
+      expect(
+        const MissingCapability(
+          capability: 'android',
+          reason: 'no JDK',
+          fix: '',
+        ).explanation,
+        'no JDK.',
+      );
     });
 
     test('leaves out what a frame lacks', () {

@@ -407,8 +407,9 @@ final class MissingCapability extends Equatable {
 
   /// The reason and the fix as two sentences: `no JDK: java not found.
   /// Install JDK 17 or set JAVA_HOME.`
-  String get explanation =>
-      '$reason. ${fix[0].toUpperCase()}${fix.substring(1)}.';
+  String get explanation => fix.isEmpty
+      ? '$reason.'
+      : '$reason. ${fix[0].toUpperCase()}${fix.substring(1)}.';
 
   /// The JSON form.
   Map<String, dynamic> toJson() => {

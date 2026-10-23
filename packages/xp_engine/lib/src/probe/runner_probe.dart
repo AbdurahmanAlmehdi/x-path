@@ -284,8 +284,8 @@ exit 1
         : const <String>[];
     if (names.isEmpty) {
       return (
-        'no curl, unzip or xz: '
-            '${_problem(result, 'the check for them')}',
+        'no curl, unzip or xz: they could not be checked '
+            '(${_problem(result, 'sh')})',
         _packages.values.toList(),
       );
     }

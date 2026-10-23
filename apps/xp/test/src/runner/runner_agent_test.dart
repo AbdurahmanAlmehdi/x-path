@@ -29,6 +29,13 @@ void main() {
   late List<Duration> waited;
   late List<_Started> started;
   late FakeProcessRunner processes;
+  // The lease fence's periodic callback; a test calls it when time passed.
+  void Function(Timer timer)? fenceTick;
+
+  Future<void> checkLeases() async {
+    fenceTick!(_QuietTimer());
+    await pumpEventQueue();
+  }
 
   FakeRunnerSocket socket() {
     final fake = FakeRunnerSocket();
@@ -48,7 +55,6 @@ void main() {
     void Function(String engineVersion)? onWelcomed,
     Future<void> Function()? beforeConnect,
     Duration Function()? elapsed,
-    Duration fenceInterval = const Duration(seconds: 5),
   }) => RunnerAgent(
     connect: () async {
       await beforeConnect?.call();
@@ -82,7 +88,10 @@ void main() {
     wantsUpdateTo: wantsUpdateTo,
     onWelcomed: onWelcomed,
     elapsed: elapsed,
-    fenceInterval: fenceInterval,
+    timers: (interval, tick) {
+      fenceTick = tick;
+      return _QuietTimer();
+    },
   );
 
   setUp(() {
@@ -299,19 +308,16 @@ void main() {
     test(
       'stops a job whose lease the engine gave up while it was away',
       () async {
-        final running = agent(
-          elapsed: () => now,
-          fenceInterval: const Duration(milliseconds: 5),
-        );
+        final running = agent(elapsed: () => now);
         final fake = await holding(running.run);
         expect(started.single.work.cancelled, isFalse);
 
         now = const Duration(seconds: 90 + 15);
-        await Future<void>.delayed(const Duration(milliseconds: 30));
+        await checkLeases();
         expect(started.single.work.cancelled, isFalse, reason: 'not yet over');
 
         now = const Duration(seconds: 90 + 16);
-        await Future<void>.delayed(const Duration(milliseconds: 30));
+        await checkLeases();
 
         expect(started.single.work.cancelled, isTrue);
         expect(
@@ -327,10 +333,7 @@ void main() {
     );
 
     test('keeps a job whose lease the engine renews', () async {
-      final running = agent(
-        elapsed: () => now,
-        fenceInterval: const Duration(milliseconds: 5),
-      );
+      final running = agent(elapsed: () => now);
       final fake = await holding(running.run);
 
       now = const Duration(seconds: 80);
@@ -359,7 +362,7 @@ void main() {
       );
       await pumpEventQueue();
       now = const Duration(seconds: 80 + 100);
-      await Future<void>.delayed(const Duration(milliseconds: 30));
+      await checkLeases();
 
       expect(started.single.work.cancelled, isFalse);
       expect(running.activeJobs, 1);
@@ -367,10 +370,7 @@ void main() {
     });
 
     test('follows the lease length of the welcome', () async {
-      final running = agent(
-        elapsed: () => now,
-        fenceInterval: const Duration(milliseconds: 5),
-      );
+      final running = agent(elapsed: () => now);
       final fake = socket();
       unawaited(running.run());
       await pumpEventQueue();
@@ -387,7 +387,7 @@ void main() {
       await offer(fake, 'job_1');
 
       now = const Duration(seconds: 6 + 15 + 1);
-      await Future<void>.delayed(const Duration(milliseconds: 30));
+      await checkLeases();
 
       expect(started.single.work.cancelled, isTrue);
       await fake.engineCloses(runnerRevokedCloseCode);
@@ -1081,7 +1081,7 @@ void main() {
         ..add(Exception('socket'))
         ..add(const ApiException('Busy.', statusCode: 503));
       final fake = socket();
-      final running = agent().run();
+      final running = agent(elapsed: () => Duration.zero).run();
       await pumpEventQueue();
       await welcome(fake);
       await fake.engineCloses(runnerRevokedCloseCode);
@@ -1146,6 +1146,31 @@ void main() {
         'The engine revoked this runner. It does not connect again.',
       ]);
     });
+
+    test(
+      'says the first failed attempt after a connection that was lost',
+      () async {
+        final first = socket();
+        connections
+          ..add(const ConnectionException('refused'))
+          ..add(const ConnectionException('refused'));
+        final second = socket();
+        final running = agent(elapsed: () => Duration.zero).run();
+        await pumpEventQueue();
+        await welcome(first);
+        await first.engineCloses(1006);
+        await pumpEventQueue(times: 50);
+        await welcome(second);
+        await second.engineCloses(runnerRevokedCloseCode);
+        await running;
+
+        expect(log.take(3), [
+          'The connection to the engine ended; connecting again.',
+          'Cannot connect: refused',
+          'Connected again after 0 s.',
+        ]);
+      },
+    );
 
     test('says how long it was away in hours', () async {
       var now = Duration.zero;
@@ -1496,4 +1521,15 @@ class _FixedRandom implements Random {
 
   @override
   int nextInt(int max) => 0;
+}
+
+class _QuietTimer implements Timer {
+  @override
+  void cancel() {}
+
+  @override
+  bool get isActive => true;
+
+  @override
+  int get tick => 0;
 }

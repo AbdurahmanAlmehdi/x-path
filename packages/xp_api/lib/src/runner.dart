@@ -235,6 +235,56 @@ class PairingToken extends Equatable {
   List<Object?> get props => [token, name, expiresAt, engineUrl];
 }
 
+/// Whether [host], the host of a URI (without brackets), is this machine:
+/// `localhost`, `127.0.0.0/8` or `::1`.
+bool isLoopbackHost(String host) {
+  final name = host.toLowerCase();
+  return name == 'localhost' || name == '::1' || name.startsWith('127.');
+}
+
+/// The `xp runner pair` command a [PairingToken] goes with.
+class PairingCommand extends Equatable {
+  /// The command for [token]: the runner URL it carries, else [runnerUrl]
+  /// (one the owner set since), else [fallback], the address the asking
+  /// client reaches the engine at.
+  factory of(PairingToken token, {required Uri fallback, String? runnerUrl}) {
+    final engine =
+        token.engineUrl ??
+        runnerUrl ??
+        fallback.toString().replaceFirst(RegExp(r'/+$'), '');
+    return PairingCommand._(
+      engine: engine,
+      token: token.token,
+      onlyHere:
+          token.engineUrl == null &&
+          runnerUrl == null &&
+          isLoopbackHost(fallback.host),
+    );
+  }
+
+  const new _({
+    required this.engine,
+    required this.token,
+    required this.onlyHere,
+  });
+
+  /// The address the runner pairs with.
+  final String engine;
+
+  /// The pairing token.
+  final String token;
+
+  /// Whether [engine] only works on the engine's machine: no runner URL is
+  /// set and the client reaches the engine on loopback.
+  final bool onlyHere;
+
+  /// The command line.
+  String get text => 'xp runner pair --engine $engine --token $token';
+
+  @override
+  List<Object?> get props => [engine, token, onlyHere];
+}
+
 /// The address runners reach the engine at: the body of `GET` and `PUT
 /// /settings/runner-url`.
 @JsonSerializable(includeIfNull: false)

@@ -265,6 +265,24 @@ void main() {
       expect(h.hub.missingOf(runner.id), probed.missing);
     });
 
+    test('lists the paired runners that are not revoked, and which are '
+        'connected', () async {
+      final online = await h.online(name: 'online');
+      final away = await h.pair('away');
+      await away.connection.closed();
+      final gone = await h.pair('gone');
+      await h.service.revoke(gone.id, by: h.owner);
+
+      final paired = await h.hub.pairedRunners();
+
+      expect(paired.map((r) => (r.name, r.connected)), [
+        ('online', true),
+        ('away', false),
+      ]);
+      expect(paired.first.capabilities, contains(Capability.flutter));
+      expect(paired.first.id, online.id);
+    });
+
     test('nothing is missing for a runner that is not connected', () async {
       final runner = await h.pair();
       await runner.hello();

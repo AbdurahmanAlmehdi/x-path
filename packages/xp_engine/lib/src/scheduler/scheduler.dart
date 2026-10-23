@@ -7,9 +7,8 @@ import 'package:xp_engine/src/jobs/job_record.dart';
 import 'package:xp_engine/src/jobs/job_repository.dart';
 import 'package:xp_engine/src/jobs/job_runner.dart';
 import 'package:xp_engine/src/repositories/event_log.dart';
-import 'package:xp_engine/src/runners/runner_record.dart';
-import 'package:xp_engine/src/runners/runner_repository.dart';
 import 'package:xp_engine/src/scheduler/capability.dart';
+import 'package:xp_engine/src/scheduler/paired_runners.dart';
 import 'package:xp_engine/src/scheduler/run_record.dart';
 import 'package:xp_engine/src/scheduler/scheduler_runner.dart';
 
@@ -58,7 +57,6 @@ class Scheduler implements JobControl {
     required this._events,
     required Iterable<SchedulerRunner> runners,
     this.onError,
-    this._paired,
   }) : _targets = List.of(runners);
 
   /// Hears about failures of a pass.
@@ -68,7 +66,6 @@ class Scheduler implements JobControl {
   final JobRepository _records;
   final RunRepository _runs;
   final EventLog _events;
-  final RunnerRepository? _paired;
   final List<SchedulerRunner> _targets;
   final _watched = <String>{};
   Future<void> _tail = Future.value();
@@ -89,6 +86,10 @@ class Scheduler implements JobControl {
   /// there is one. Set once, after the runners hub exists: the hub needs the
   /// scheduler, so the scheduler cannot take it in its constructor.
   RemoteJobs? remoteJobs;
+
+  /// The paired runners, to name the offline ones that could take a job no
+  /// connected runner can do. Set once, like [remoteJobs].
+  PairedRunners? pairedRunners;
 
   /// Stops starting jobs: the engine is shutting down.
   void stop() => _stopped = true;
@@ -229,6 +230,10 @@ class Scheduler implements JobControl {
         if (snapshot.run.lockHeld) snapshot.run.projectId: snapshot.run.id,
     };
     final waitingOn = <String, String>{};
+    // Read once per pass, and only when a job waits for a capability.
+    Future<List<PairedRunner>>? paired;
+    Future<List<PairedRunner>> readPaired() => paired ??=
+        pairedRunners?.pairedRunners() ?? Future.value(const <PairedRunner>[]);
 
     for (final snapshot in runs) {
       final queued = snapshot.nextJobs;
@@ -258,7 +263,10 @@ class Scheduler implements JobControl {
         ];
         final runner = _place(job, kinds, used, signing);
         if (runner == null) {
-          await _note(job, await _whyNoRunner(job, kinds, used, signing));
+          await _note(
+            job,
+            await _whyNoRunner(job, kinds, used, signing, readPaired),
+          );
           continue;
         }
         if (await _launch(runner, job)) {
@@ -324,6 +332,7 @@ class Scheduler implements JobControl {
     List<String> kinds,
     Map<String, int> used,
     Set<String> signing,
+    Future<List<PairedRunner>> Function() paired,
   ) async {
     final needs = _needs(job);
     final capable = _targets
@@ -331,12 +340,9 @@ class Scheduler implements JobControl {
         .toList();
     if (capable.isEmpty) {
       final wires = needs.map((c) => c.wire).join(', ');
-      final connected = {for (final runner in _targets) runner.id};
       final offline = [
-        for (final runner in await _paired?.list() ?? const <RunnerRecord>[])
-          if (!runner.isRevoked &&
-              !connected.contains(runner.id) &&
-              runner.capabilities.containsAll(needs))
+        for (final runner in await paired())
+          if (!runner.connected && runner.capabilities.containsAll(needs))
             _offline(runner, wires),
       ];
       if (offline.isEmpty) return 'No runner can do $wires.';
@@ -359,8 +365,8 @@ class Scheduler implements JobControl {
         '${accepting.map((runner) => runner.id).join(', ')}.';
   }
 
-  static String _offline(RunnerRecord runner, String wires) {
-    final since = runner.lastHeartbeat;
+  static String _offline(PairedRunner runner, String wires) {
+    final since = runner.lastSeen;
     return '${runner.name} offers $wires; offline'
         '${since == null ? '' : ' since ${_at(since)}'}.';
   }

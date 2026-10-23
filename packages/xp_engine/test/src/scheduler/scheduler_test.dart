@@ -343,47 +343,33 @@ void main() {
     test(
       'name the paired runners that could do a job and are offline',
       () async {
-        final paired = InMemoryRunnerRepository();
-        final created = DateTime.utc(2026, 10, 22, 9);
-        await paired.add(
-          RunnerRecord(
+        final paired = _PairedRunners([
+          PairedRunner(
             id: 'rnr_aws',
             name: 'AWS Instance',
-            tokenId: 'tok_aws',
-            createdAt: created,
             capabilities: const {Capability.flutter, Capability.iosSign},
-            lastHeartbeat: DateTime.utc(2026, 10, 22, 14, 2, 30),
+            connected: false,
+            lastSeen: DateTime.utc(2026, 10, 22, 14, 2, 30),
           ),
-        );
-        await paired.add(
-          RunnerRecord(
+          const PairedRunner(
             id: 'rnr_new',
             name: 'never seen',
-            tokenId: 'tok_new',
-            createdAt: created,
-            capabilities: const {Capability.iosSign},
+            capabilities: {Capability.iosSign},
+            connected: false,
           ),
-        );
-        await paired.add(
-          RunnerRecord(
-            id: 'rnr_gone',
-            name: 'gone',
-            tokenId: 'tok_gone',
-            createdAt: created,
-            capabilities: const {Capability.iosSign},
-            revokedAt: created,
+          // Connected but not probed yet: not offline.
+          const PairedRunner(
+            id: 'rnr_now',
+            name: 'connecting',
+            capabilities: {Capability.iosSign},
+            connected: true,
           ),
-        );
-        f.scheduler = Scheduler(
-          runner: f.harness.runner,
-          records: f.harness.jobs,
-          runs: f.runs,
-          events: f.harness.events,
-          runners: [f.local()],
-          paired: paired,
-        );
+        ]);
+        f.build([f.local()]);
+        f.scheduler.pairedRunners = paired;
         final ids = await f.run([
           const _Spec('ios', needs: ['ios-sign']),
+          const _Spec('mac', needs: ['ios-sign']),
           const _Spec('linux', needs: ['swift-linux']),
         ]);
 
@@ -395,7 +381,9 @@ void main() {
           'offline since 2026-10-22 14:02 UTC. never seen offers ios-sign; '
           'offline.',
         );
+        expect(await f.message(ids['mac']!), await f.message(ids['ios']!));
         expect(await f.message(ids['linux']!), 'No runner can do swift-linux.');
+        expect(paired.reads, 1, reason: 'read once per pass');
       },
     );
 
@@ -1197,5 +1185,18 @@ class _Remote implements RemoteJobs {
   Future<bool> cancel(String id) async {
     asked.add(id);
     return handled.contains(id);
+  }
+}
+
+class _PairedRunners implements PairedRunners {
+  new(this.runners);
+
+  final List<PairedRunner> runners;
+  int reads = 0;
+
+  @override
+  Future<List<PairedRunner>> pairedRunners() async {
+    reads++;
+    return runners;
   }
 }
