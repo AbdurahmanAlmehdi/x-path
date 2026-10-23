@@ -1,11 +1,21 @@
-# The check branch protection requires: the job `gate` runs the whole Linux
-# gate on every pull request and every push to main, with no path filters, so
-# it always reports. It runs what CONTRIBUTING.md asks before a push: analyze,
-# format, the layer check, every package's tests with its coverage threshold
-# (`melos run test:coverage`: 100% for xp_api, xp_client, xp_engine and
-# xp_repositories, 90% for the rest), the contract tests and the xpd bundle
-# smoke test. Tests tagged `macos` or `golden` run on macOS only (the `macos`
-# workflow, on a public repository).
+# The check branch protection requires is the job `gate`: it waits for every
+# other job and fails unless all of them passed. The workflow runs on every
+# pull request and every push to main, with no path filters, so it always
+# reports. It runs what CONTRIBUTING.md asks before a push, split into jobs
+# that run in parallel:
+#
+#   - analyze: analyze, format, the layer check and the CI matrix check,
+#   - coverage: one job per package, each running the `test:coverage:*`
+#     script that `melos run test:coverage` runs it with (100% for xp_api,
+#     xp_client, xp_engine and xp_repositories, 90% for the rest),
+#   - contract: the contract tests,
+#   - smoke: the xpd bundle smoke test,
+#   - runner-offline: tool/e2e/runner_offline_e2e.sh.
+#
+# A new workspace package goes into the coverage matrix below (and into the
+# one of macos.yaml if it has macOS-only tests); `dart run
+# tool/check_ci_matrix.dart` fails until it does. Tests tagged `macos` or
+# `golden` run on macOS only (the `macos` workflow, on a public repository).
 #
 # Flutter 3.47.6 ships Dart 3.13.5; keep both in sync with .fvmrc. The
 # workspace has Flutter members, so even `dart pub get` needs the Flutter SDK.
@@ -26,26 +36,24 @@ permissions:
   contents: read
 
 jobs:
-  gate:
-    name: gate
+  analyze:
+    name: analyze
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 20
     steps:
-      - name: Git Checkout
+      - &checkout
+        name: Git Checkout
         uses: actions/checkout@v7
 
-      - name: Setup Flutter
+      - &setup-flutter
+        name: Setup Flutter
         uses: subosito/flutter-action@v2.23.0
         with:
           flutter-version: "3.47.6"
           cache: true
 
-      - name: Install melos and very_good_cli
-        run: |
-          dart pub global activate melos 8.9.0
-          dart pub global activate very_good_cli 1.5.0
-
-      - name: Install Dependencies
+      - &install-dependencies
+        name: Install Dependencies
         run: dart pub get
 
       - name: Analyze
@@ -57,14 +65,106 @@ jobs:
       - name: Check Layers
         run: dart run tool/check_layers.dart
 
+      - name: Check the CI Matrix
+        run: dart run tool/check_ci_matrix.dart
+
+  coverage:
+    name: coverage (${{ matrix.package }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        # `script` is the `test:coverage:<script>` that sets the threshold.
+        include:
+          - { package: xp_api, script: strict }
+          - { package: xp_client, script: strict }
+          - { package: xp_engine, script: strict }
+          - { package: xp_repositories, script: strict }
+          - { package: xp, script: floor }
+          - { package: xpd, script: floor }
+          - { package: xp_adapters, script: floor }
+          - { package: xp_secrets, script: floor }
+          - { package: xp_tool, script: floor }
+          - { package: xp_fake_asc, script: floor }
+          - { package: xp_fake_firebase, script: floor }
+          - { package: xp_fake_play, script: floor }
+          - { package: xp_desktop, script: flutter }
+          - { package: xp_macos_services, script: flutter }
+    steps:
+      - *checkout
+      - *setup-flutter
+
+      - &install-tools
+        name: Install melos and very_good_cli
+        run: |
+          dart pub global activate melos 8.9.0
+          dart pub global activate very_good_cli 1.5.0
+
+      - *install-dependencies
+
       - name: Test with Coverage
-        run: melos run test:coverage
+        run: >-
+          melos run "test:coverage:${{ matrix.script }}" --include-private
+          --scope="${{ matrix.package }}"
+
+  contract:
+    name: contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - *checkout
+      - *setup-flutter
+      - *install-tools
+      - *install-dependencies
 
       - name: Contract Tests
         run: melos run test:contract
 
+  smoke:
+    name: smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - *checkout
+      - *setup-flutter
+      - *install-dependencies
+
       - name: Smoke Test the xpd Bundle
         run: tool/e2e/smoke_bundle.sh
 
+  runner-offline:
+    name: runner-offline
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # The e2e commits the fixture app and at once clones it bare. Background
+    # auto-maintenance after the commit can pack and delete the loose objects
+    # while the clone copies them ("failed to copy file ... No such file or
+    # directory"), so it is off for every git the e2e runs.
+    env:
+      GIT_CONFIG_COUNT: "2"
+      GIT_CONFIG_KEY_0: maintenance.auto
+      GIT_CONFIG_VALUE_0: "false"
+      GIT_CONFIG_KEY_1: gc.auto
+      GIT_CONFIG_VALUE_1: "0"
+    steps:
+      - *checkout
+      - *setup-flutter
+      - *install-dependencies
+
       - name: Runner Offline E2E
         run: tool/e2e/runner_offline_e2e.sh
+
+  gate:
+    name: gate
+    if: ${{ always() }}
+    needs: [analyze, coverage, contract, smoke, runner-offline]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require Every Job to Pass
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+        run: |
+          jq -r 'to_entries[] | "\(.key): \(.value.result)"' <<< "$NEEDS"
+          jq -e 'all(.[]; .result == "success")' <<< "$NEEDS" > /dev/null
