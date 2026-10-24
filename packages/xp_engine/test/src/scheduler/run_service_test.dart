@@ -106,6 +106,75 @@ void main() {
     );
   });
 
+  group('rerunFailed', () {
+    test('runs the failed jobs again, from the step that failed', () async {
+      var attempts = 0;
+      final flaky = JobHarness.create(
+        scripted: ScriptedStep(
+          onRun: (input, context) async {
+            if (attempts++ == 0) return const StepFailed('flaky');
+            return const StepSucceeded({'ran': true});
+          },
+        ),
+      );
+      final again = RunService(
+        runs: runs,
+        jobs: flaky.jobs,
+        control: flaky.runner,
+      );
+      final done = await flaky.runner.create(
+        workflowVersionId: 'wfv_1',
+        projectId: 'prj_1',
+        runId: 'run_1',
+        name: 'build',
+        steps: [flaky.script()],
+      );
+      final failed = await flaky.runner.create(
+        workflowVersionId: 'wfv_1',
+        projectId: 'prj_1',
+        runId: 'run_1',
+        name: 'upload',
+        steps: [flaky.script(), flaky.script()],
+      );
+      // The build succeeds; the upload fails at its first step.
+      attempts = 1;
+      await flaky.runner.start(done.id);
+      await flaky.runner.whenFinished(done.id);
+      attempts = 0;
+      await flaky.runner.start(failed.id);
+      await flaky.runner.whenFinished(failed.id);
+      expect((await again.get('run_1')).state, RunState.failed);
+
+      await again.rerunFailed('run_1');
+      await flaky.runner.whenFinished(failed.id);
+
+      final run = await again.get('run_1');
+      expect(run.state, RunState.succeeded);
+      expect(attempts, 3, reason: 'the build did not run again');
+    });
+
+    test('refuses a run without a failed job, and no run', () async {
+      final done = await job('done');
+      await harness.runner.start(done.id);
+      await harness.runner.whenFinished(done.id);
+
+      await expectLater(
+        service.rerunFailed('run_1'),
+        throwsA(
+          isA<RunStateException>().having(
+            (e) => e.message,
+            'message',
+            'Run run_1 has no failed job to run again.',
+          ),
+        ),
+      );
+      await expectLater(
+        service.rerunFailed('run_nope'),
+        throwsA(isA<RunNotFoundException>()),
+      );
+    });
+  });
+
   test('the exceptions print their messages', () {
     expect(const RunException('m').toString(), 'RunException: m');
     expect(

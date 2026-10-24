@@ -101,6 +101,46 @@ void main() {
     });
   });
 
+  group('POST /runs/{id}/run-again and rerun-failed', () {
+    test('runs a run again as a new run of the same version', () async {
+      final first = await dispatch(echoWorkflow);
+      await client.until(first.id, {RunState.succeeded});
+
+      final response = await client.send('POST', '/runs/${first.id}/run-again');
+
+      expect(response.statusCode, 202);
+      final again = Run.fromJson(response.json);
+      expect(again.id, isNot(first.id));
+      expect(again.workflowVersionId, first.workflowVersionId);
+      expect(response.headers['location'], '/runs/${again.id}');
+      expect(
+        (await client.send('POST', '/runs/run_nope/run-again')).statusCode,
+        404,
+      );
+    });
+
+    test('runs the failed jobs of a run again', () async {
+      var attempt = 0;
+      engine.supervisor.handler = (process) => attempt++ == 0 ? 1 : 0;
+      final run = await dispatch(echoWorkflow);
+      await client.until(run.id, {RunState.failed});
+
+      final response = await client.send(
+        'POST',
+        '/runs/${run.id}/rerun-failed',
+      );
+
+      expect(response.statusCode, 200);
+      await client.until(run.id, {RunState.succeeded});
+      final again = await client.send('POST', '/runs/${run.id}/rerun-failed');
+      expect(again.statusCode, 409);
+      expect(
+        (await client.send('POST', '/runs/run_nope/rerun-failed')).statusCode,
+        404,
+      );
+    });
+  });
+
   group('POST /runs/{id}/cancel', () {
     test('cancels a run that waits for its turn', () async {
       final hold = Completer<void>();

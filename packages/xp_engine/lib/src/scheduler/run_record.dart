@@ -77,7 +77,7 @@ class RunRecord extends Equatable {
 
   /// The API form, with its [jobs] in the order they were made.
   Run toRun(List<JobRecord> jobs) => Run(
-    request: _request,
+    request: dispatchRequest,
     id: id,
     projectId: projectId,
     workflowId: workflowId,
@@ -104,7 +104,7 @@ class RunRecord extends Equatable {
 
   /// [request] as the API reads it; `null` for a run with none stored, or
   /// one stored in a form this engine no longer reads.
-  DispatchRequest? get _request {
+  DispatchRequest? get dispatchRequest {
     if (request.isEmpty) return null;
     try {
       return DispatchRequest.fromJson(request);

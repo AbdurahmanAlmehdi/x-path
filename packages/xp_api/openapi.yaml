@@ -1499,6 +1499,65 @@ paths:
           $ref: "#/components/responses/NotFound"
         "500":
           $ref: "#/components/responses/InternalError"
+  /runs/{id}/run-again:
+    parameters:
+      - $ref: "#/components/parameters/RunId"
+    post:
+      operationId: runAgain
+      summary: Dispatch a run again.
+      description: |
+        A new run of the version of the workflow the run ran, at its commit,
+        with its request (inputs, flavors, platforms, bump). It gets a build
+        number of its own. What a dispatch refuses, this refuses.
+      responses:
+        "202":
+          description: The new run, its jobs queued.
+          headers:
+            Location:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Run"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/WorkflowInvalid"
+        "500":
+          $ref: "#/components/responses/InternalError"
+        "502":
+          $ref: "#/components/responses/UpstreamError"
+        "503":
+          $ref: "#/components/responses/SecretsLocked"
+  /runs/{id}/rerun-failed:
+    parameters:
+      - $ref: "#/components/parameters/RunId"
+    post:
+      operationId: rerunFailedJobs
+      summary: Run the failed jobs of a run again.
+      description: |
+        Each failed, interrupted or waiting-for-resume job runs again from the
+        step that failed; what the jobs before it made (their artifacts, the
+        commit) is used as it is. A cancelled job is not run again. A run
+        without such a job answers `409 conflict`.
+      responses:
+        "200":
+          description: The run.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Run"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "500":
+          $ref: "#/components/responses/InternalError"
   /runs/{id}/cancel:
     parameters:
       - $ref: "#/components/parameters/RunId"

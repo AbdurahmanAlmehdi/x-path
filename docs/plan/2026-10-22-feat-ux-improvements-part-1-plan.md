@@ -410,7 +410,7 @@ Details:
 
 ### Phase U4b-1: Run again and re-run failed jobs (engine and API)
 
-- **Status:** Not started
+- **Status:** Done
 - **Scope:** The engine can re-dispatch a finished run and resume a failed run's failed jobs,
   reusing artifacts already produced.
 - **Files touched:** `packages/xp_engine/lib/src/**` (re-dispatch, re-run failed),

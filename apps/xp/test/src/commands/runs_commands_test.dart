@@ -638,6 +638,43 @@ void main() {
     });
   });
 
+  group('runs rerun', () {
+    test('runs a run again as a new run', () async {
+      when(() => env.client.runAgain('run_1'))
+          .thenAnswer((_) async => sample.run(id: 'run_2'));
+
+      await env.runOk(['runs', 'rerun', 'run_1']);
+
+      expect(env.logger.out, startsWith('Started run_2, again of run_1.'));
+      verifyNever(() => env.client.rerunFailed(any()));
+    });
+
+    test('with --failed runs the failed jobs again, and follows', () async {
+      when(() => env.client.rerunFailed('run_1'))
+          .thenAnswer((_) async => sample.run());
+      when(() => env.client.getRun('run_1')).thenAnswer(
+        (_) async => Run(
+          id: 'run_1',
+          projectId: 'prj_1',
+          workflowId: 'wf_1',
+          workflowVersionId: 'wfv_1',
+          sha: 'a' * 40,
+          state: RunState.succeeded,
+          locksProject: false,
+          createdAt: sample.at,
+          jobs: const [],
+        ),
+      );
+
+      expect(await env.run(['runs', 'rerun', 'run_1', '--failed', '-f']), 0);
+
+      expect(env.logger.infos, [
+        'Running the failed jobs of run_1 again.',
+        '-- run succeeded',
+      ]);
+    });
+  });
+
   group('following a run', () {
     LogLineFrame line(String text) => LogLineFrame(
       seq: 1,

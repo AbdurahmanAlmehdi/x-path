@@ -293,9 +293,10 @@ String _waitingFor(Approval approval) =>
 
 /// `xp runs`: the runs a dispatch made.
 XpGroup runsCommand(XpContext context) =>
-    XpGroup(context, 'runs', 'List, show and cancel runs.', [
+    XpGroup(context, 'runs', 'List, show, run again and cancel runs.', [
       RunsListCommand(context),
       RunsShowCommand(context),
+      RunsRerunCommand(context),
       RunsCancelCommand(context),
     ]);
 
@@ -524,6 +525,56 @@ class RunsShowCommand extends XpCommand {
       if (approvals.isNotEmpty)
         'pendingApprovals': [for (final a in approvals) a.toJson()],
     }, () => describeRun(run, approvals: approvals));
+    return XpExit.ok;
+  }
+}
+
+/// `xp runs rerun <run> [--failed]`.
+class RunsRerunCommand extends XpCommand {
+  /// Creates the command.
+  new(super.context) {
+    argParser
+      ..addFlag(
+        'failed',
+        negatable: false,
+        help:
+            'Run only the failed jobs again, each from the step that failed, '
+            'in the same run: nothing that succeeded is built again.',
+      )
+      ..addFlag(
+        'follow',
+        abbr: 'f',
+        negatable: false,
+        help: 'Follow the run, as xp dispatch --follow does.',
+      );
+  }
+
+  @override
+  String get name => 'rerun';
+
+  @override
+  String get description =>
+      'Run a run again: a new run of the version of the workflow it ran, at '
+      'its commit, with its inputs; with --failed, its failed jobs only.';
+
+  @override
+  String get invocation => 'xp runs rerun <run> [--failed] [-f]';
+
+  @override
+  Future<int> execute(XpClient client) async {
+    final [id] = positionals(['run']);
+    final failed = argResults!.flag('failed');
+    final run = failed
+        ? await client.rerunFailed(id)
+        : await client.runAgain(id);
+    final started = failed
+        ? 'Running the failed jobs of $id again.'
+        : 'Started ${run.id}, again of $id.';
+    if (argResults!.flag('follow')) {
+      if (!asJson) logger.info(started);
+      return await printRunLogs(this, client, run.id, follow: true);
+    }
+    emit(run.toJson(), () => '$started\n\n${describeRun(run)}');
     return XpExit.ok;
   }
 }

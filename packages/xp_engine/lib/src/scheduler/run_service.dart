@@ -95,6 +95,34 @@ class RunService {
     return run.toRun(await _jobs.forRun(id));
   }
 
+  /// Runs the failed jobs of the run [id] again, each from the step that
+  /// failed: what the jobs before made (their artifacts, the commit) is
+  /// used as it is, nothing is built again that did not fail. The later
+  /// stages then go on. A failed, interrupted or waiting-for-resume job is
+  /// run again; a cancelled one is not. Returns the run.
+  ///
+  /// Throws a [RunNotFoundException] if there is none and a
+  /// [RunStateException] if no job of it failed.
+  Future<Run> rerunFailed(String id) async {
+    final run = await _runs.get(id) ?? (throw RunNotFoundException(id));
+    const again = {
+      JobState.failed,
+      JobState.interrupted,
+      JobState.waitingForResume,
+    };
+    final failed = [
+      for (final job in await _jobs.forRun(id))
+        if (again.contains(job.state)) job,
+    ];
+    if (failed.isEmpty) {
+      throw RunStateException('Run $id has no failed job to run again.');
+    }
+    for (final job in failed) {
+      await _control.resume(job.id);
+    }
+    return run.toRun(await _jobs.forRun(id));
+  }
+
   /// Cancels every job of the run [id] that has not ended: running jobs have
   /// their process groups stopped, queued and waiting ones are cancelled at
   /// once. Returns the run.

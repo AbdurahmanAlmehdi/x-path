@@ -108,6 +108,23 @@ void main() {
       expected: 'removed',
     ),
     _Endpoint(
+      'runAgain',
+      method: 'POST',
+      path: '/runs/run_1/run-again',
+      status: 202,
+      response: sample.run.toJson(),
+      call: (client) => client.runAgain('run_1'),
+      expected: sample.run,
+    ),
+    _Endpoint(
+      'rerunFailed',
+      method: 'POST',
+      path: '/runs/run_1/rerun-failed',
+      response: sample.run.toJson(),
+      call: (client) => client.rerunFailed('run_1'),
+      expected: sample.run,
+    ),
+    _Endpoint(
       'listRuns',
       method: 'GET',
       path: '/runs',

@@ -132,6 +132,24 @@ class WorkflowService {
     );
   }
 
+  /// The workflow [workflowId] with its version [versionId], to run that
+  /// version again.
+  ///
+  /// Throws a [ProjectNotFoundException] or a [WorkflowNotFoundException]
+  /// (also when the version is not one of the workflow).
+  Future<StoredWorkflow> stored(
+    String projectId,
+    String workflowId,
+    String versionId,
+  ) async {
+    final workflow = await _require(projectId, workflowId);
+    final version = await _repository.versionById(versionId);
+    if (version == null || version.workflowId != workflowId) {
+      throw WorkflowNotFoundException(workflowId);
+    }
+    return StoredWorkflow(workflow, version);
+  }
+
   /// Creates a workflow called [name] from [yaml], at version 1; a copy of
   /// the built-in [basedOn] names, when it names one.
   ///

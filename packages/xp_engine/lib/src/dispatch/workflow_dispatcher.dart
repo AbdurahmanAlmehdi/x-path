@@ -20,6 +20,7 @@ import 'package:xp_engine/src/repositories/event_log.dart';
 import 'package:xp_engine/src/runners/remote_step_policy.dart';
 import 'package:xp_engine/src/scan/scan_source.dart';
 import 'package:xp_engine/src/scheduler/run_record.dart';
+import 'package:xp_engine/src/scheduler/run_service.dart';
 import 'package:xp_engine/src/scheduler/scheduler.dart';
 import 'package:xp_engine/src/steps/step.dart';
 import 'package:xp_engine/src/versioning/app_version.dart';
@@ -125,16 +126,20 @@ class WorkflowDispatcher {
   /// [DispatchException] when the request asks for something the project
   /// cannot do, and a `GitException` or `GitHub` failure when the mirror
   /// cannot be fetched.
+  ///
+  /// With [versionId] it runs that version of the workflow, not the newest.
   Future<Run> dispatch(
     String projectId,
     String workflowId,
-    DispatchRequest request,
-  ) async {
+    DispatchRequest request, {
+    String? versionId,
+  }) async {
     final (:stored, :definition, :context, :kinds) = await _prepare(
       projectId,
       workflowId,
       request,
       dryRun: false,
+      versionId: versionId,
     );
     final runId = context.runId;
     final sha = context.sha;
@@ -268,6 +273,32 @@ class WorkflowDispatcher {
     );
   }
 
+  /// Dispatches the run [runId] again: a new run of the same version of the
+  /// workflow, at the same commit, with the same request (inputs, flavors,
+  /// platforms, bump). It gets a build number of its own.
+  ///
+  /// Throws a [RunNotFoundException], and what [dispatch] throws.
+  Future<Run> again(String runId) async {
+    final run = await _runs.get(runId) ?? (throw RunNotFoundException(runId));
+    final asked = run.dispatchRequest ?? const DispatchRequest();
+    return await dispatch(
+      run.projectId,
+      run.workflowId,
+      DispatchRequest(
+        ref: run.sha,
+        app: asked.app,
+        flavors: asked.flavors,
+        platforms: asked.platforms,
+        bump: asked.bump,
+        version: asked.version,
+        releaseVersion: asked.releaseVersion,
+        release: asked.release,
+        inputs: asked.inputs,
+      ),
+      versionId: run.workflowVersionId,
+    );
+  }
+
   /// What [dispatch] and [plan] work out before planning the jobs: the
   /// workflow, the request read against the project, the commit, the
   /// version and (outside a [dryRun]) the build number it allocates.
@@ -284,8 +315,11 @@ class WorkflowDispatcher {
     String workflowId,
     DispatchRequest request, {
     required bool dryRun,
+    String? versionId,
   }) async {
-    final stored = await _workflows.latest(projectId, workflowId);
+    final stored = versionId == null
+        ? await _workflows.latest(projectId, workflowId)
+        : await _workflows.stored(projectId, workflowId, versionId);
     if (stored.workflow.archivedAt != null) {
       throw DispatchException(
         'The workflow "${stored.workflow.name}" is archived. Unarchive it to '

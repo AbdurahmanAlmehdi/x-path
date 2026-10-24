@@ -285,6 +285,17 @@ class XpClient {
   Future<Run> getRun(String id) async =>
       Run.fromJson(await _json(await _send('GET', ['runs', id])));
 
+  /// `POST /runs/{id}/run-again`: a new run of the same version of the
+  /// workflow, at the same commit, with the same request.
+  Future<Run> runAgain(String id) async =>
+      Run.fromJson(await _json(await _send('POST', ['runs', id, 'run-again'])));
+
+  /// `POST /runs/{id}/rerun-failed`: runs the failed jobs of the run again,
+  /// each from the step that failed.
+  Future<Run> rerunFailed(String id) async => Run.fromJson(
+    await _json(await _send('POST', ['runs', id, 'rerun-failed'])),
+  );
+
   /// `POST /runs/{id}/cancel`.
   Future<Run> cancelRun(String id) async =>
       Run.fromJson(await _json(await _send('POST', ['runs', id, 'cancel'])));

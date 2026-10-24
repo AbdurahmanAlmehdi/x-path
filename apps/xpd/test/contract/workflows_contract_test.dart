@@ -391,6 +391,39 @@ void main() {
       }
     });
 
+    test('POST run-again 202 and 404, rerun-failed 200, 404 and 409', () async {
+      var attempt = 0;
+      engine.supervisor.handler = (process) => attempt++ == 0 ? 1 : 0;
+      final id = await client.create('echo', echoWorkflow);
+      final run = Run.fromJson((await client.dispatch(id)).json);
+      await client.until(run.id, {RunState.failed});
+
+      for (final (path, status) in [
+        ('/runs/${run.id}/rerun-failed', 200),
+        ('/runs/run_nope/rerun-failed', 404),
+        ('/runs/run_nope/run-again', 404),
+      ]) {
+        expectContract(
+          await client.send('POST', path),
+          path: path,
+          method: 'POST',
+          status: status,
+        );
+      }
+      await client.until(run.id, {RunState.succeeded});
+      for (final (path, status) in [
+        ('/runs/${run.id}/rerun-failed', 409),
+        ('/runs/${run.id}/run-again', 202),
+      ]) {
+        expectContract(
+          await client.send('POST', path),
+          path: path,
+          method: 'POST',
+          status: status,
+        );
+      }
+    });
+
     test('GET and cancel a run', () async {
       final id = await client.create('ship', gatedWorkflow);
       final run = Run.fromJson((await client.dispatch(id)).json);

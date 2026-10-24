@@ -1288,6 +1288,64 @@ stages:
       );
     });
 
+    test('runs a run again: the same version of the workflow, commit and '
+        'request', () async {
+      const yaml = '''
+schema: 1
+inputs:
+  notes:
+stages:
+  - name: a
+    jobs:
+      j:
+        steps:
+          - kind: git.checkout
+''';
+      final id = await harness.custom(yaml);
+      final first = await harness.dispatcher.dispatch(
+        'prj_1',
+        id,
+        const DispatchRequest(inputs: {'notes': 'hi'}),
+      );
+      await harness.workflows.save('prj_1', id, '$yaml# two\n');
+      // Git reads a commit as the ref of itself.
+      harness.git.refs[first.sha] = first.sha;
+
+      final second = await harness.dispatcher.again(first.id);
+
+      expect(second.id, isNot(first.id));
+      expect(second.workflowVersionId, first.workflowVersionId);
+      expect(second.sha, first.sha);
+      expect(second.request?.inputs, {'notes': 'hi'});
+      expect(second.request?.ref, first.sha);
+      await expectLater(
+        harness.dispatcher.again('run_nope'),
+        throwsA(isA<RunNotFoundException>()),
+      );
+    });
+
+    test('refuses a version that is not one of the workflow', () async {
+      final id = await harness.custom('''
+schema: 1
+stages:
+  - name: a
+    jobs:
+      j:
+        steps:
+          - kind: git.checkout
+''');
+
+      await expectLater(
+        harness.dispatcher.dispatch(
+          'prj_1',
+          id,
+          const DispatchRequest(),
+          versionId: 'wfv_nope',
+        ),
+        throwsA(isA<WorkflowNotFoundException>()),
+      );
+    });
+
     test('refuses an archived workflow, in a dry run too (UX-06)', () async {
       final id = await harness.custom('''
 schema: 1

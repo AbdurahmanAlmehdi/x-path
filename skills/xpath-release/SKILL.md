@@ -161,6 +161,8 @@ xp dispatch acme/app test --input 'paths=["test/unit"]' --input 'tags=["fast"]'
 xp runs list --project <p>   # the runs, newest first, wherever they were dispatched from
 xp runs show <run>           # jobs, states, and the approval a waiting run needs
 xp logs <run> -f             # every job's log as it runs; exits with how the run ended
+xp runs rerun <run>          # a new run: same workflow version, commit and inputs
+xp runs rerun <run> --failed # the failed jobs again, from the step that failed
 xp jobs show <job>           # steps with their state and attempts
 xp logs -f <job>             # follow until the job ends; exit 1 if it failed or was cancelled
 xp logs <job> --after 120    # the lines after seq 120, then stop when the engine is quiet

@@ -5,7 +5,8 @@ import 'package:xp_engine/xp_engine.dart';
 import 'package:xpd/src/api/responses.dart';
 
 /// The `/runs` endpoints: list the runs, of every project or one, look at
-/// a run and cancel it.
+/// a run, cancel it, and run its failed jobs again. Running a whole run again
+/// is a dispatch, in `WorkflowsRoutes`.
 class RunsRoutes {
   /// Creates the routes over [_runs]; [_projects], when given, tells a
   /// project that is not there.
@@ -20,7 +21,8 @@ class RunsRoutes {
       ..get('/runs', _list)
       ..get('/projects/<id>/runs', _listOfProject)
       ..get('/runs/<id>', _get)
-      ..post('/runs/<id>/cancel', _cancel);
+      ..post('/runs/<id>/cancel', _cancel)
+      ..post('/runs/<id>/rerun-failed', _rerunFailed);
   }
 
   Future<Response> _list(Request request, {String? projectId}) =>
@@ -68,6 +70,10 @@ class RunsRoutes {
 
   Future<Response> _cancel(Request request, String id) => _guard(() async {
     return jsonResponse((await _runs.cancel(id)).toJson());
+  });
+
+  Future<Response> _rerunFailed(Request request, String id) => _guard(() async {
+    return jsonResponse((await _runs.rerunFailed(id)).toJson());
   });
 }
 

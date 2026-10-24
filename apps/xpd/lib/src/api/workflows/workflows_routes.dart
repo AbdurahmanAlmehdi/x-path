@@ -29,7 +29,8 @@ class WorkflowsRoutes {
       ..put('/projects/<id>/workflows/<workflowId>', _save)
       ..patch('/projects/<id>/workflows/<workflowId>', _update)
       ..delete('/projects/<id>/workflows/<workflowId>', _remove)
-      ..post('/projects/<id>/workflows/<workflowId>/dispatch', _dispatch);
+      ..post('/projects/<id>/workflows/<workflowId>/dispatch', _dispatch)
+      ..post('/runs/<id>/run-again', _again);
   }
 
   Response _schema(Request request) =>
@@ -105,6 +106,16 @@ class WorkflowsRoutes {
         );
       });
 
+  Future<Response> _again(Request request, String id) =>
+      guardWorkflows(() async {
+        final run = await _dispatcher.again(id);
+        return jsonResponse(
+          run.toJson(),
+          statusCode: 202,
+          headers: {'location': '/runs/${run.id}'},
+        );
+      });
+
   Future<Response> _remove(Request request, String id, String workflowId) =>
       guardWorkflows(() async {
         await _workflows.remove(id, workflowId);
@@ -147,6 +158,8 @@ Future<Response> guardWorkflows(Future<Response> Function() action) async {
   } on ProjectNotFoundException catch (error) {
     return errorResponse(ApiErrorCode.notFound, error.message);
   } on WorkflowNotFoundException catch (error) {
+    return errorResponse(ApiErrorCode.notFound, error.message);
+  } on RunNotFoundException catch (error) {
     return errorResponse(ApiErrorCode.notFound, error.message);
   } on WorkflowExistsException catch (error) {
     return errorResponse(ApiErrorCode.conflict, error.message);
