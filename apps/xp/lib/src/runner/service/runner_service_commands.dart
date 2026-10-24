@@ -10,7 +10,6 @@ import 'package:xp/src/runner/service/runner_service.dart';
 import 'package:xp/src/runner/update/runner_versions.dart';
 import 'package:xp/src/version.dart';
 import 'package:xp_adapters/xp_adapters.dart';
-import 'package:xp_engine/xp_engine.dart' show iosLinuxDirectoryVariable;
 
 /// The manager of the runner service on [host], in [scope].
 ServiceManager runnerServiceManager(RunnerHost host, ServiceScope scope) =>

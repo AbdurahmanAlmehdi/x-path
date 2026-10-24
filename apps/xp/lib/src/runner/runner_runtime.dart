@@ -27,6 +27,12 @@ import 'package:xp_secrets/xp_secrets.dart';
 /// GitHub (and no SSH key) to fetch from. A real runner never sets it.
 const testSourceUrlVariable = 'XP_RUNNER_TEST_SOURCE_URL';
 
+/// The variable that names the omarchy-apple-dev checkout of a runner that
+/// builds iOS apps on Linux. `xp runner start` and `xp runner doctor` read
+/// it, and `xp runner install-service` writes it into the service when it is
+/// set.
+const iosLinuxDirectoryVariable = 'XP_IOS_LINUX_DIR';
+
 /// What `xp runner` needs to know of the machine it runs on. Tests pass their
 /// own.
 class RunnerHost {
@@ -91,7 +97,7 @@ class RunnerHost {
   String get home => environment['HOME'] ?? '';
 
   /// The omarchy-apple-dev checkout of a runner configured to build iOS apps
-  /// on Linux ([iosLinuxDirectoryVariable]), or `null` (ADR 0014).
+  /// on Linux ([iosLinuxDirectoryVariable]), or `null`.
   String? get iosLinuxDirectory =>
       switch (environment[iosLinuxDirectoryVariable]) {
         final directory? when directory.isNotEmpty => directory,

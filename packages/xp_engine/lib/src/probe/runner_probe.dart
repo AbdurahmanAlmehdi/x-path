@@ -3,12 +3,6 @@ import 'package:xp_api/xp_api.dart';
 import 'package:xp_engine/src/scheduler/capability.dart';
 import 'package:xp_engine/src/toolchain/version_parsers.dart';
 
-/// The variable that names the omarchy-apple-dev checkout of a runner that
-/// builds iOS apps on Linux (ADR 0014). `xp runner start` and `xp runner
-/// doctor` read it, and `xp runner install-service` writes it into the
-/// service when it is set.
-const iosLinuxDirectoryVariable = 'XP_IOS_LINUX_DIR';
-
 /// What the engine concluded from the results of a probe.
 class ProbeFindings extends Equatable {
   /// Creates the findings.
@@ -55,7 +49,7 @@ class ProbeFindings extends Equatable {
 ///   a job fails with a clear message when a signing identity is missing.
 /// - `swift-linux`: Linux with `swift` installed.
 /// - `ios-linux` (opt-in, ADR 0014): Linux, on a runner configured with an
-///   omarchy-apple-dev checkout ([iosLinuxDirectoryVariable]) at
+///   omarchy-apple-dev checkout (`XP_IOS_LINUX_DIR`) at
 ///   [iosLinuxPin], whose toolchain is installed: `swift`, the darwin SDK
 ///   bundle, `rcodesign`, the pymobile3 python and LLVM's binutils. The
 ///   runner adds [iosLinuxCommands] to the engine's commands, since only it
@@ -344,7 +338,20 @@ exit 1
     String directory,
     String? swift,
   ) {
-    final setup = 'run install-toolchain.sh in $directory';
+    // The runner names the folder: only an absolute path is taken, and it is
+    // quoted in the commands it is pasted into.
+    if (!directory.startsWith('/') ||
+        directory.contains(RegExp(r'[\x00-\x1f\x7f]'))) {
+      return const [
+        (
+          'XP_IOS_LINUX_DIR is not an absolute path of a folder',
+          'set XP_IOS_LINUX_DIR to the absolute path of the omarchy-apple-dev '
+              'checkout',
+        ),
+      ];
+    }
+    final quoted = _shellQuoted(directory);
+    final setup = 'run install-toolchain.sh in $quoted';
     final commit = byId['ios_linux_commit'];
     final checkout = _problem(commit, 'git');
     final at = commit?.stdout.trim() ?? '';
@@ -353,14 +360,14 @@ exit 1
       if (checkout != null)
         (
           '$directory is not an omarchy-apple-dev checkout: $checkout',
-          'git clone $iosLinuxRepository $directory && git -C $directory '
+          'git clone $iosLinuxRepository $quoted && git -C $quoted '
               'checkout $iosLinuxPin',
         )
       else if (at != iosLinuxPin)
         (
           'omarchy-apple-dev is at ${_short(at)}; this XPath needs '
               '${_short(iosLinuxPin)}',
-          'git -C $directory fetch && git -C $directory checkout '
+          'git -C $quoted fetch && git -C $quoted checkout '
               '$iosLinuxPin',
         ),
       if (swift != null) ('no Swift: $swift', setup),
@@ -389,6 +396,13 @@ exit 1
     return 'no ${names.map((name) => _iosLinuxTools[name]).join(', ')}: '
         'omarchy-apple-dev needs ${names.length == 1 ? 'it' : 'them'}';
   }
+
+  /// [path] as one word of a shell command: as it is when it is plain, else
+  /// in single quotes.
+  static String _shellQuoted(String path) =>
+      RegExp(r'^[A-Za-z0-9_./~+-]+$').hasMatch(path)
+      ? path
+      : "'${path.replaceAll("'", r"'\''")}'";
 
   /// The first 12 characters of a commit, or `nothing`.
   static String _short(String commit) => commit.isEmpty

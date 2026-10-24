@@ -484,6 +484,44 @@ void main() {
         ]);
       });
 
+      test('takes only an absolute folder without control characters', () {
+        for (final folder in ['omarchy', '/srv/omar\nchy', '']) {
+          final findings = probe.evaluate([
+            ...linuxProbe(swift: true),
+            ...iosLinuxProbe(),
+          ], iosLinuxDirectory: folder);
+
+          expect(findings.capabilities, isNot(contains(Capability.iosLinux)));
+          expect(missing(findings), [
+            (
+              'XP_IOS_LINUX_DIR is not an absolute path of a folder',
+              'set XP_IOS_LINUX_DIR to the absolute path of the '
+                  'omarchy-apple-dev checkout',
+            ),
+          ], reason: folder);
+        }
+      });
+
+      test('quotes a folder with spaces in the commands it gives', () {
+        final findings = probe.evaluate([
+          ...linuxProbe(swift: true),
+          ...iosLinuxProbe(commit: 'f' * 40, missingTools: 'llvm-ar'),
+        ], iosLinuxDirectory: "/srv/apple dev's");
+
+        const quoted = r"'/srv/apple dev'\''s'";
+        expect(missing(findings), [
+          (
+            'omarchy-apple-dev is at ffffffffffff; this XPath needs '
+                '955127bf7d27',
+            'git -C $quoted fetch && git -C $quoted checkout $pin',
+          ),
+          (
+            'no llvm-ar: omarchy-apple-dev needs it',
+            'run install-toolchain.sh in $quoted',
+          ),
+        ]);
+      });
+
       test('one missing tool is it, and tools not checked say so', () {
         expect(missing(evaluate(iosLinuxProbe(missingTools: 'llvm-ar'))), [
           ('no llvm-ar: omarchy-apple-dev needs it', setup),

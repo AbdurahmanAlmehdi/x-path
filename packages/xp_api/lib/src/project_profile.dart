@@ -357,8 +357,7 @@ class AppProfile extends Equatable {
   final IosPackageManager iosPackageManager;
 
   /// The app extension targets of the Xcode project (widgets, share,
-  /// notification service), which Linux iOS builds cannot make yet (ADR
-  /// 0014).
+  /// notification service).
   final List<String> iosAppExtensions;
 
   /// The build variants.

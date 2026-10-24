@@ -618,8 +618,8 @@ final class ProbeResultFrame extends RunnerFrame {
   final List<ProbeResult> results;
 
   /// The omarchy-apple-dev checkout of a runner configured to build iOS apps
-  /// on Linux (`XP_IOS_LINUX_DIR`, ADR 0014), whose probe commands the runner
-  /// ran after the engine's; `null` for a runner that is not.
+  /// on Linux (`XP_IOS_LINUX_DIR`), whose probe commands the runner ran
+  /// after the engine's; `null` for a runner that is not.
   final String? iosLinuxDir;
 
   @override
