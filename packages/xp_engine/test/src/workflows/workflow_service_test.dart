@@ -418,6 +418,25 @@ void main() {
       expect(schema.matrixAxes, ['platform', 'flavor']);
       expect(schema.platforms, ['android', 'ios']);
     });
+
+    test('labels the gates and lists the variables (UX-02)', () {
+      final schema = service.schema();
+
+      expect(schema.gateLabels['prod_release'], 'Production release');
+      expect(schema.gateLabels.keys, schema.gates);
+      expect(
+        schema.variables,
+        containsAll([
+          'app.name',
+          'flavor.prod',
+          'flavor.credentials.play_sa',
+          'flavor.firebaseAppId.ios',
+          'inputs',
+          'platform',
+        ]),
+      );
+      expect(schema.variables, [...schema.variables]..sort());
+    });
   });
 
   group('validate', () {

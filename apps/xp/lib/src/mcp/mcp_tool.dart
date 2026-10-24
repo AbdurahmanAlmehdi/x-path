@@ -53,6 +53,34 @@ class McpTool {
   final McpToolHandler handler;
 }
 
+/// A document `xp mcp` offers an agent to read, described without any MCP
+/// library, like [McpTool].
+class McpResource {
+  /// Creates a resource at [uri].
+  const new({
+    required this.uri,
+    required this.name,
+    required this.description,
+    required this.read,
+    this.mimeType = 'application/json',
+  });
+
+  /// Where the agent reads it, such as `xpath://workflows/schema`.
+  final String uri;
+
+  /// Its name.
+  final String name;
+
+  /// What it holds.
+  final String description;
+
+  /// Its media type.
+  final String mimeType;
+
+  /// Reads its text.
+  final Future<String> Function() read;
+}
+
 /// An argument is missing or has the wrong type.
 class McpArgumentError implements Exception {
   /// Creates the error.

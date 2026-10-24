@@ -1,27 +1,32 @@
+import 'package:xp_api/xp_api.dart';
+
 /// What a key of `with` holds.
 enum StepValue {
   /// A string.
-  text('a string'),
+  text('a string', StepKeyType.string),
 
   /// `true` or `false`.
-  flag('true or false'),
+  flag('true or false', StepKeyType.boolean),
 
   /// A number.
-  number('a number'),
+  number('a number', StepKeyType.number),
 
   /// A list of strings.
-  texts('a list of strings'),
+  texts('a list of strings', StepKeyType.list),
 
   /// A mapping of strings to strings.
-  textMap('a mapping of strings'),
+  textMap('a mapping of strings', StepKeyType.map),
 
   /// Anything; the step type checks it.
-  any('anything');
+  any('anything', StepKeyType.any);
 
-  new(this.shape);
+  new(this.shape, this.wire);
 
   /// The value in words, as in `"track" must be a string`.
   final String shape;
+
+  /// The type the schema gives editors.
+  final StepKeyType wire;
 
   /// Whether [given] is such a value.
   bool fits(Object? given) => switch (this) {
@@ -37,18 +42,31 @@ enum StepValue {
 /// A key a step type takes under `with`.
 class StepKey {
   /// Creates the key [name], holding [value].
-  const new(this.name, [this.value = StepValue.text])
-    : required = false,
-      options = null;
+  const new(
+    this.name, {
+    this.value = StepValue.text,
+    this.description = '',
+    this.defaultValue,
+  }) : required = false,
+       options = null;
 
   /// Creates a key the step cannot do without.
-  const new needed(this.name, [this.value = StepValue.text])
-    : required = true,
-      options = null;
+  const new needed(
+    this.name, {
+    this.value = StepValue.text,
+    this.description = '',
+  }) : required = true,
+       options = null,
+       defaultValue = null;
 
   /// Creates a key that takes one of [options], or a list of them.
-  const new choice(this.name, this.options, {this.value = StepValue.text})
-    : required = false;
+  const new choice(
+    this.name,
+    this.options, {
+    this.value = StepValue.text,
+    this.description = '',
+    this.defaultValue,
+  }) : required = false;
 
   /// Its name under `with`.
   final String name;
@@ -61,6 +79,22 @@ class StepKey {
 
   /// The strings it may take, when they are fixed.
   final List<String>? options;
+
+  /// What it is for, in a sentence.
+  final String description;
+
+  /// What the step uses when it is not given, when that is one value.
+  final Object? defaultValue;
+
+  /// The key as the schema gives it to editors.
+  StepKeySchema toWire() => StepKeySchema(
+    name: name,
+    type: value.wire,
+    required: required,
+    defaultValue: defaultValue,
+    options: options,
+    description: description,
+  );
 
   /// What is wrong with [given] for this key, as in `"track" must be a
   /// string`, or `null` when it fits. A string with a placeholder is only
@@ -91,6 +125,10 @@ abstract interface class StepCatalog {
   /// The keys the step type [kind] takes under `with`, by name, or `null` if
   /// there is no such step type.
   Map<String, StepKey>? keysOf(String kind);
+
+  /// The step type [kind] as the schema gives it to editors, or `null` if
+  /// there is no such step type.
+  StepType? describe(String kind);
 }
 
 /// A [StepCatalog] over a map, for tests.
@@ -112,10 +150,22 @@ class MapStepCatalog implements StepCatalog {
   Set<String>? withKeys(String kind) => keys[kind];
 
   @override
+  StepType? describe(String kind) => switch (keysOf(kind)) {
+    null => null,
+    final keys => StepType(
+      kind: kind,
+      withKeys: keys.keys.toList()..sort(),
+      title: kind,
+      keys: [for (final key in keys.values) key.toWire()],
+    ),
+  };
+
+  @override
   Map<String, StepKey>? keysOf(String kind) => keys[kind] == null
       ? null
       : {
-          for (final name in keys[kind]!) name: StepKey(name, StepValue.any),
+          for (final name in keys[kind]!)
+            name: StepKey(name, value: StepValue.any),
           for (final key in typed[kind] ?? const <StepKey>[]) key.name: key,
         };
 }

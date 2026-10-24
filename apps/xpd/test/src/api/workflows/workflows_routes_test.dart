@@ -32,6 +32,14 @@ void main() {
       expect(schema.schema, 1);
       expect(schema.steps.map((step) => step.kind), contains('build.ios'));
       expect(schema.gates, contains('push'));
+      final ios = schema.steps.firstWhere((step) => step.kind == 'build.ios');
+      expect(ios.title, 'Build iOS');
+      expect(
+        ios.keys.firstWhere((key) => key.name == 'exportOptionsPlist').required,
+        isTrue,
+      );
+      expect(schema.gateLabels['push'], 'Push');
+      expect(schema.variables, contains('flavor.prod'));
     });
 
     test('needs a token', () async {

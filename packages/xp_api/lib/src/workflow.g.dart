@@ -177,16 +177,67 @@ Map<String, dynamic> _$ValidateWorkflowResponseToJson(
   'issues': instance.issues.map((e) => e.toJson()).toList(),
 };
 
+StepKeySchema _$StepKeySchemaFromJson(Map<String, dynamic> json) =>
+    StepKeySchema(
+      name: json['name'] as String,
+      type:
+          $enumDecodeNullable(_$StepKeyTypeEnumMap, json['type']) ??
+          StepKeyType.any,
+      required: json['required'] as bool? ?? false,
+      defaultValue: json['default'],
+      options: (json['options'] as List<dynamic>?)
+          ?.map((e) => e as String)
+          .toList(),
+      description: json['description'] as String? ?? '',
+    );
+
+Map<String, dynamic> _$StepKeySchemaToJson(StepKeySchema instance) =>
+    <String, dynamic>{
+      'name': instance.name,
+      'type': _$StepKeyTypeEnumMap[instance.type]!,
+      'required': instance.required,
+      'default': ?instance.defaultValue,
+      'options': ?instance.options,
+      'description': instance.description,
+    };
+
+const _$StepKeyTypeEnumMap = {
+  StepKeyType.string: 'string',
+  StepKeyType.boolean: 'boolean',
+  StepKeyType.number: 'number',
+  StepKeyType.list: 'list',
+  StepKeyType.map: 'map',
+  StepKeyType.any: 'any',
+};
+
 StepType _$StepTypeFromJson(Map<String, dynamic> json) => StepType(
   kind: json['kind'] as String,
   withKeys:
       (json['with'] as List<dynamic>?)?.map((e) => e as String).toList() ??
+      const [],
+  title: json['title'] as String? ?? '',
+  description: json['description'] as String? ?? '',
+  group: json['group'] as String? ?? '',
+  capabilities:
+      (json['capabilities'] as List<dynamic>?)
+          ?.map((e) => (e as List<dynamic>).map((e) => e as String).toList())
+          .toList() ??
+      const [],
+  keys:
+      (json['keys'] as List<dynamic>?)
+          ?.map((e) => StepKeySchema.fromJson(e as Map<String, dynamic>))
+          .toList() ??
       const [],
 );
 
 Map<String, dynamic> _$StepTypeToJson(StepType instance) => <String, dynamic>{
   'kind': instance.kind,
   'with': instance.withKeys,
+  'title': instance.title,
+  'description': instance.description,
+  'group': instance.group,
+  'capabilities': instance.capabilities,
+  'keys': instance.keys.map((e) => e.toJson()).toList(),
 };
 
 WorkflowSchema _$WorkflowSchemaFromJson(Map<String, dynamic> json) =>
@@ -205,6 +256,16 @@ WorkflowSchema _$WorkflowSchemaFromJson(Map<String, dynamic> json) =>
       platforms: (json['platforms'] as List<dynamic>)
           .map((e) => e as String)
           .toList(),
+      gateLabels:
+          (json['gateLabels'] as Map<String, dynamic>?)?.map(
+            (k, e) => MapEntry(k, e as String),
+          ) ??
+          const {},
+      variables:
+          (json['variables'] as List<dynamic>?)
+              ?.map((e) => e as String)
+              .toList() ??
+          const [],
     );
 
 Map<String, dynamic> _$WorkflowSchemaToJson(WorkflowSchema instance) =>
@@ -215,4 +276,6 @@ Map<String, dynamic> _$WorkflowSchemaToJson(WorkflowSchema instance) =>
       'capabilities': instance.capabilities,
       'matrixAxes': instance.matrixAxes,
       'platforms': instance.platforms,
+      'gateLabels': instance.gateLabels,
+      'variables': instance.variables,
     };

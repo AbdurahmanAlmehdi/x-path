@@ -305,7 +305,7 @@ Details:
 
 ### Phase U3b: Rich step schema and typed step editor
 
-- **Status:** Not started
+- **Status:** Done
 - **Scope:** Every step kind describes itself, and the builder edits `with` fields by type.
 - **Files touched:** `packages/xp_api/lib/src/workflow.dart`,
   `packages/xp_engine/lib/src/workflows/step_catalog.dart`,

@@ -58,20 +58,19 @@ class WorkflowService {
   final Random _random;
 
   /// What a workflow document may name: the step types of the engine with
-  /// their `with` keys, the gates, the capabilities and the matrix axes.
+  /// what each does and its typed `with` keys, the gates with their labels,
+  /// the capabilities, the matrix axes and the variables.
   WorkflowSchema schema() => WorkflowSchema(
     schema: workflowSchemaVersion,
-    steps: [
-      for (final kind in _catalog.kinds)
-        StepType(
-          kind: kind,
-          withKeys: _catalog.withKeys(kind)!.toList()..sort(),
-        ),
-    ],
+    steps: [for (final kind in _catalog.kinds) _catalog.describe(kind)!],
     gates: [for (final action in GateAction.values) action.wire],
+    gateLabels: {
+      for (final action in GateAction.values) action.wire: action.label,
+    },
     capabilities: [for (final capability in Capability.values) capability.wire],
     matrixAxes: matrixAxes,
     platforms: platformNames,
+    variables: variablePaths,
   );
 
   /// Checks [yaml] against schema 1 and the step types of the engine.

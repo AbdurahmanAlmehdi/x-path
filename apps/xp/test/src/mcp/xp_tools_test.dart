@@ -68,6 +68,7 @@ void main() {
           'scan_project',
           'list_workflows',
           'get_workflow',
+          'get_workflow_schema',
           'validate_workflow',
           'create_workflow',
           'update_workflow',
@@ -287,6 +288,60 @@ void main() {
           {'line': 4, 'column': 2, 'message': 'Unknown step.'},
         ],
       });
+    });
+
+    test('get_workflow_schema gives the schema, or one step type', () async {
+      const ios = StepType(
+        kind: 'build.ios',
+        title: 'Build iOS',
+        keys: [
+          StepKeySchema(
+            name: 'exportOptionsPlist',
+            type: StepKeyType.string,
+            required: true,
+          ),
+        ],
+      );
+      when(client.getWorkflowSchema).thenAnswer(
+        (_) async => const WorkflowSchema(
+          schema: 1,
+          steps: [ios],
+          gates: [],
+          capabilities: [],
+          matrixAxes: [],
+          platforms: [],
+        ),
+      );
+
+      final all = await call('get_workflow_schema', {});
+      final one = await call('get_workflow_schema', {'kind': 'build.ios'});
+      final none = await call('get_workflow_schema', {'kind': 'nope'});
+
+      expect((decoded(all)! as Map)['steps'], [ios.toJson()]);
+      expect(decoded(one), ios.toJson());
+      expect(none.isError, isTrue);
+      expect(message(none), contains('No step type "nope"'));
+    });
+
+    test('serves the workflow schema as a resource', () async {
+      when(client.getWorkflowSchema).thenAnswer(
+        (_) async => const WorkflowSchema(
+          schema: 1,
+          steps: [],
+          gates: ['push'],
+          capabilities: [],
+          matrixAxes: [],
+          platforms: [],
+        ),
+      );
+
+      final resource = buildXpResources(client).single;
+
+      expect(resource.uri, workflowSchemaUri);
+      expect(
+        jsonDecode(await resource.read()),
+        containsPair('gates', ['push']),
+      );
     });
 
     test('validate_workflow needs no project', () async {

@@ -82,6 +82,86 @@ void main() {
     });
   });
 
+  group('schema', () {
+    const schema = WorkflowSchema(
+      schema: 1,
+      steps: [
+        StepType(
+          kind: 'build.ios',
+          title: 'Build iOS',
+          description: 'Builds and signs an IPA.',
+          group: 'Build',
+          capabilities: [
+            ['ios-sign', 'flutter'],
+          ],
+          keys: [
+            StepKeySchema(
+              name: 'exportOptionsPlist',
+              type: StepKeyType.string,
+              required: true,
+              description: 'The export options plist.',
+            ),
+            StepKeySchema(
+              name: 'obfuscate',
+              type: StepKeyType.boolean,
+              defaultValue: false,
+              description: 'Obfuscate.',
+            ),
+          ],
+        ),
+        StepType(kind: 'version.bump', title: 'Bump', group: 'Source'),
+        StepType(kind: 'x'),
+      ],
+      gates: ['push', 'merge'],
+      gateLabels: {'push': 'Push'},
+      capabilities: [],
+      matrixAxes: [],
+      platforms: [],
+      variables: ['flavor', 'platform'],
+    );
+
+    setUp(() {
+      when(env.client.getWorkflowSchema).thenAnswer((_) async => schema);
+    });
+
+    test('lists the step types by group, the gates and variables', () async {
+      await env.runOk(['workflows', 'schema']);
+
+      final out = env.logger.out;
+      expect(out, contains('Build\n  build.ios'));
+      expect(out, contains('Build iOS'));
+      expect(out, contains('Source\n  version.bump'));
+      expect(out, contains('Other\n  x'));
+      expect(out, contains('  push  Push\n  merge'));
+      expect(out, contains('Variables\n  flavor, platform'));
+    });
+
+    test('shows one step type with its keys', () async {
+      await env.runOk(['workflows', 'schema', '--kind', 'build.ios']);
+
+      final out = env.logger.out;
+      expect(out, startsWith('build.ios: Build iOS\nBuilds and signs an IPA.'));
+      expect(out, contains('Needs ios-sign and flutter.'));
+      expect(out, contains('string, required'));
+      expect(out, contains('boolean, default false'));
+
+      env.logger.infos.clear();
+      await env.runOk(['workflows', 'schema', '--kind', 'version.bump']);
+      expect(env.logger.out, contains('It takes nothing under "with".'));
+    });
+
+    test('prints JSON', () async {
+      await env.runOk(['workflows', 'schema', '--kind', 'x', '--json']);
+
+      expect(jsonDecode(env.logger.out), const StepType(kind: 'x').toJson());
+    });
+
+    test('says when there is no such step type', () async {
+      expect(await env.run(['workflows', 'schema', '--kind', 'nope']), 64);
+      expect(env.logger.errors.single, contains('No step type "nope"'));
+    });
+  });
+
   group('validate', () {
     test('says a document is valid, without a project', () async {
       when(() => env.client.validateWorkflow(null, 'name: dev-build\n'))

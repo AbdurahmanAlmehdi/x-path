@@ -559,12 +559,9 @@ class WorkflowBuilderBloc
         ),
       );
     } on Exception {
-      emit(
-        state.copyWith(
-          engineIssues: const [],
-          validation: WorkflowValidation.unavailable,
-        ),
-      );
+      // The issues the engine found last stay: the document did not get
+      // better because the engine went away.
+      emit(state.copyWith(validation: WorkflowValidation.unavailable));
     }
   }
 

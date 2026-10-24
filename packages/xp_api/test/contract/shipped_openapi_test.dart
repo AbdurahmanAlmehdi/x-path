@@ -597,12 +597,33 @@ void main() {
           const WorkflowSchema(
             schema: 1,
             steps: [
-              StepType(kind: 'build.android', withKeys: ['artifact']),
+              StepType(
+                kind: 'build.android',
+                withKeys: ['artifact', 'obfuscate'],
+                title: 'Build Android',
+                description: 'Builds an APK.',
+                group: 'Build',
+                capabilities: [
+                  ['android', 'flutter'],
+                ],
+                keys: [
+                  StepKeySchema(
+                    name: 'artifact',
+                    type: StepKeyType.string,
+                    options: ['apk', 'aab'],
+                    defaultValue: 'apk',
+                    description: 'What to build.',
+                  ),
+                  StepKeySchema(name: 'obfuscate', type: StepKeyType.boolean),
+                ],
+              ),
             ],
             gates: ['prod_release'],
+            gateLabels: {'prod_release': 'Production release'},
             capabilities: ['flutter'],
             matrixAxes: ['platform', 'flavor'],
             platforms: ['android', 'ios'],
+            variables: ['flavor', 'flavor.prod'],
           ).toJson(),
         ),
         isEmpty,

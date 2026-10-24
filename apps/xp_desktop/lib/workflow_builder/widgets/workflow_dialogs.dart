@@ -1,5 +1,6 @@
 import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:xp_api/xp_api.dart';
 import 'package:xp_desktop/l10n/l10n.dart';
 import 'package:xp_desktop/theme/theme.dart';
 import 'package:xp_desktop/widgets/widgets.dart';
@@ -56,6 +57,148 @@ Future<bool> confirmRemove(
     keep: l10n.confirmKeep,
     confirm: l10n.confirmRemove,
   );
+}
+
+/// Asks which of [steps] to add: grouped as the engine groups them,
+/// searchable by kind, title and description; `null` when the owner
+/// closes it.
+Future<String?> pickStepType(BuildContext context, List<StepType> steps) =>
+    showDialog<String>(
+      context: context,
+      barrierColor: context.xpColors.scrimDefault,
+      builder: (_) => StepPickerDialog(steps: steps),
+    );
+
+/// The groups of the engine's step types, in the order of a pipeline.
+const _stepGroups = ['Source', 'Checks', 'Build', 'Upload', 'GitHub', 'Other'];
+
+class StepPickerDialog extends StatefulWidget {
+  const new({required this.steps, super.key});
+
+  final List<StepType> steps;
+
+  @override
+  State<StepPickerDialog> createState() => _StepPickerDialogState();
+}
+
+class _StepPickerDialogState extends State<StepPickerDialog> {
+  final _search = TextEditingController();
+
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
+  }
+
+  /// The step types that match the search, by group.
+  Map<String, List<StepType>> get _groups {
+    final query = _search.text.trim().toLowerCase();
+    final groups = <String, List<StepType>>{
+      for (final group in _stepGroups) group: [],
+    };
+    for (final step in widget.steps) {
+      final text = '${step.kind} ${step.title} ${step.description}';
+      if (!text.toLowerCase().contains(query)) continue;
+      (groups[step.group.isEmpty ? 'Other' : step.group] ??= []).add(step);
+    }
+    return {
+      for (final MapEntry(:key, :value) in groups.entries)
+        if (value.isNotEmpty) key: value,
+    };
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    final colors = context.xpColors;
+    final type = context.xpType;
+    final groups = _groups;
+    return _BuilderDialog(
+      title: l10n.workflowsStepPickerTitle,
+      children: [
+        XpTextField(
+          controller: _search,
+          hint: l10n.workflowsStepSearchHint,
+          onChanged: (_) => setState(() {}),
+        ),
+        const SizedBox(height: 12),
+        ConstrainedBox(
+          constraints: const BoxConstraints(maxHeight: 420),
+          child: groups.isEmpty
+              ? Text(
+                  l10n.workflowsStepNoMatch,
+                  style: type.body.copyWith(color: colors.textSecondary),
+                )
+              : ListView(
+                  shrinkWrap: true,
+                  children: [
+                    for (final MapEntry(key: group, value: steps)
+                        in groups.entries) ...[
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8, bottom: 4),
+                        child: XpSectionLabel(group),
+                      ),
+                      for (final step in steps)
+                        InkWell(
+                          key: ValueKey(('step-type', step.kind)),
+                          onTap: () => Navigator.of(context).pop(step.kind),
+                          borderRadius: BorderRadius.circular(
+                            context.xpRadii.md,
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 6,
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Text(
+                                      step.title.isEmpty
+                                          ? step.kind
+                                          : step.title,
+                                      style: type.body.copyWith(
+                                        color: colors.textPrimary,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    XpCode(
+                                      step.kind,
+                                      color: colors.textSecondary,
+                                    ),
+                                  ],
+                                ),
+                                if (step.description.isNotEmpty)
+                                  Text(
+                                    step.description,
+                                    style: type.caption.copyWith(
+                                      color: colors.textSecondary,
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ),
+                    ],
+                  ],
+                ),
+        ),
+        const SizedBox(height: 16),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            XpButton(
+              label: l10n.workflowsCancel,
+              size: XpButtonSize.large,
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
 }
 
 class _BuilderDialog extends StatelessWidget {

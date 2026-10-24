@@ -12,10 +12,12 @@ import 'package:xp_client/xp_client.dart';
 XpGroup workflowsCommand(XpContext context) => XpGroup(
   context,
   'workflows',
-  'List, show, validate, create and edit workflows.',
+  'List, show, validate, create and edit workflows, and see what they may '
+      'name.',
   [
     WorkflowsListCommand(context),
     WorkflowsShowCommand(context),
+    WorkflowsSchemaCommand(context),
     WorkflowsValidateCommand(context),
     WorkflowsCreateCommand(context),
     WorkflowsEditCommand(context),
@@ -101,6 +103,108 @@ class WorkflowsShowCommand extends XpCommand {
     return XpExit.ok;
   }
 }
+
+/// `xp workflows schema [--kind <kind>]`.
+class WorkflowsSchemaCommand extends XpCommand {
+  /// Creates the command.
+  new(super.context) {
+    argParser.addOption(
+      'kind',
+      help: 'One step type, with its keys.',
+      valueHelp: 'kind',
+    );
+  }
+
+  @override
+  String get name => 'schema';
+
+  @override
+  String get description =>
+      'Show what a workflow document may name: the step types and their '
+      'keys, the gates and the variables.';
+
+  @override
+  String get invocation => 'xp workflows schema [--kind <kind>]';
+
+  @override
+  Future<int> execute(XpClient client) async {
+    positionals(const []);
+    final schema = await client.getWorkflowSchema();
+    final kind = argResults!.option('kind');
+    if (kind == null) {
+      emit(schema.toJson(), () => describeSchema(schema));
+      return XpExit.ok;
+    }
+    final type = schema.steps.where((step) => step.kind == kind).firstOrNull;
+    if (type == null) {
+      usageException(
+        'No step type "$kind". Run xp workflows schema for the list.',
+      );
+    }
+    emit(type.toJson(), () => describeStepType(type));
+    return XpExit.ok;
+  }
+}
+
+/// The step types of [schema] by group, then its gates and variables.
+String describeSchema(WorkflowSchema schema) {
+  final groups = <String, List<StepType>>{};
+  for (final step in schema.steps) {
+    (groups[step.group.isEmpty ? 'Other' : step.group] ??= []).add(step);
+  }
+  return [
+    for (final MapEntry(key: group, value: steps) in groups.entries) ...[
+      group,
+      renderTable(
+        const ['KIND', 'TITLE'],
+        [
+          for (final step in steps) [step.kind, step.title],
+        ],
+      ).split('\n').skip(1).map((line) => '  $line').join('\n'),
+      '',
+    ],
+    'Gates',
+    for (final gate in schema.gates)
+      '  $gate${switch (schema.gateLabels[gate]) {
+        final label? => '  $label',
+        null => '',
+      }}',
+    '',
+    'Variables',
+    '  ${schema.variables.join(', ')}',
+  ].join('\n');
+}
+
+/// [type] with what it does, what runs it and its keys.
+String describeStepType(StepType type) => [
+  '${type.kind}${type.title.isEmpty ? '' : ': ${type.title}'}',
+  if (type.description.isNotEmpty) type.description,
+  if (type.capabilities.isNotEmpty) 'Needs ${_runners(type.capabilities)}.',
+  if (type.keys.isEmpty)
+    'It takes nothing under "with".'
+  else ...[
+    '',
+    renderTable(
+      const ['KEY', 'TYPE', 'DESCRIPTION'],
+      [
+        for (final key in type.keys)
+          [
+            key.name,
+            [
+              key.type.name,
+              if (key.required) 'required',
+              if (key.options case final options?) options.join('|'),
+              if (key.defaultValue case final value?) 'default $value',
+            ].join(', '),
+            key.description,
+          ],
+      ],
+    ),
+  ],
+].join('\n');
+
+String _runners(List<List<String>> sets) =>
+    sets.map((set) => set.join(' and ')).join(', or ');
 
 /// Reads the workflow document at `--file`.
 String readWorkflowFile(XpCommand command) {

@@ -98,11 +98,21 @@ credentials. Every step kind and its `with` keys are in
 [references/step-kinds.md](references/step-kinds.md). The live list for the engine you talk to:
 
 ```sh
-curl -s -H "Authorization: Bearer $XP_TOKEN" http://127.0.0.1:7480/workflows/schema
+xp workflows schema                     # the step types by group, the gates, the variables
+xp workflows schema --kind build.ios    # one step type: what it does, what runs it, its keys
 ```
 
-It answers the schema version, every step type with its `with` keys, the gates, the
-capabilities, the matrix axes and the platforms.
+With MCP, call `get_workflow_schema` (`kind` optional) or read the resource
+`xpath://workflows/schema`. Each step type comes with a title, a description, its group, the
+runner capabilities it needs (any one set), and its `with` keys typed (`string`, `boolean`,
+`number`, `list`, `map`) with `required`, `default`, `options` and a description. The gates come
+with labels, and `variables` lists every path an expression can read.
+
+For completion in an editor, start the file with:
+
+```yaml
+# yaml-language-server: $schema=https://xpath.abdurahman.ly/schema/workflow-1.json
+```
 
 Rules that shape every workflow:
 

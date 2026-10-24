@@ -414,7 +414,8 @@ void main() {
   });
 
   group('checking', () {
-    test('shows the issues the engine finds, and when it cannot', () async {
+    test('shows the issues the engine finds, and keeps them when it cannot '
+        'check', () async {
       const issue = WorkflowIssue(line: 3, column: 1, message: 'Bad.');
       when(() => workflows.validate('prj_1', 'bad: 1\n')).thenAnswer(
         (_) async =>
@@ -434,7 +435,8 @@ void main() {
       final away = await bloc.stream.firstWhere(
         (s) => s.validation == WorkflowValidation.unavailable,
       );
-      expect(away.engineIssues, isEmpty);
+      expect(away.engineIssues, const [issue]);
+      expect(away.issues, contains(issue));
       await bloc.close();
     });
   });

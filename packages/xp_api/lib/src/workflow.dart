@@ -350,11 +350,98 @@ class ValidateWorkflowResponse extends Equatable {
   List<Object?> get props => [valid, issues];
 }
 
-/// A step type of the engine and the keys it takes under `with`.
-@JsonSerializable()
+/// What a key of `with` holds.
+enum StepKeyType {
+  /// A string, such as a path.
+  @JsonValue('string')
+  string,
+
+  /// `true` or `false`.
+  @JsonValue('boolean')
+  boolean,
+
+  /// A number.
+  @JsonValue('number')
+  number,
+
+  /// A list of strings.
+  @JsonValue('list')
+  list,
+
+  /// A mapping of strings to strings.
+  @JsonValue('map')
+  map,
+
+  /// Anything; the step type checks it.
+  @JsonValue('any')
+  any,
+}
+
+/// A key a step type takes under `with`.
+@JsonSerializable(includeIfNull: false)
+class StepKeySchema extends Equatable {
+  /// Creates the key.
+  const new({
+    required this.name,
+    this.type = StepKeyType.any,
+    this.required = false,
+    this.defaultValue,
+    this.options,
+    this.description = '',
+  });
+
+  /// Reads a key from its JSON form.
+  factory StepKeySchema.fromJson(Map<String, dynamic> json) =>
+      _$StepKeySchemaFromJson(json);
+
+  /// Its name under `with`.
+  final String name;
+
+  /// What it holds.
+  final StepKeyType type;
+
+  /// Whether a step of its type must give it.
+  final bool required;
+
+  /// What the step uses when it is not given, when that is one value.
+  @JsonKey(name: 'default')
+  final Object? defaultValue;
+
+  /// The strings it may take, when they are fixed: one of them, or for a
+  /// list, some of them.
+  final List<String>? options;
+
+  /// What it is for, in a sentence.
+  final String description;
+
+  /// The JSON form.
+  Map<String, dynamic> toJson() => _$StepKeySchemaToJson(this);
+
+  @override
+  List<Object?> get props => [
+    name,
+    type,
+    required,
+    defaultValue,
+    options,
+    description,
+  ];
+}
+
+/// A step type of the engine: what it does and the keys it takes under
+/// `with`.
+@JsonSerializable(explicitToJson: true)
 class StepType extends Equatable {
   /// Creates a step type.
-  const new({required this.kind, this.withKeys = const []});
+  const new({
+    required this.kind,
+    this.withKeys = const [],
+    this.title = '',
+    this.description = '',
+    this.group = '',
+    this.capabilities = const [],
+    this.keys = const [],
+  });
 
   /// Reads a step type from its JSON form.
   factory StepType.fromJson(Map<String, dynamic> json) =>
@@ -367,11 +454,37 @@ class StepType extends Equatable {
   @JsonKey(name: 'with')
   final List<String> withKeys;
 
+  /// Its name for people, for example "Build Android".
+  final String title;
+
+  /// What it does, in a sentence or two.
+  final String description;
+
+  /// Where an editor lists it: Source, Checks, Build, Upload, GitHub or
+  /// Other.
+  final String group;
+
+  /// What a runner needs to run it: any one of these sets will do. Empty
+  /// when the engine runs it.
+  final List<List<String>> capabilities;
+
+  /// The keys of [withKeys] with their types, in the order the step type
+  /// gives them.
+  final List<StepKeySchema> keys;
+
   /// The JSON form.
   Map<String, dynamic> toJson() => _$StepTypeToJson(this);
 
   @override
-  List<Object?> get props => [kind, withKeys];
+  List<Object?> get props => [
+    kind,
+    withKeys,
+    title,
+    description,
+    group,
+    capabilities,
+    keys,
+  ];
 }
 
 /// The body of `GET /workflows/schema`: what a workflow document of this
@@ -386,6 +499,8 @@ class WorkflowSchema extends Equatable {
     required this.capabilities,
     required this.matrixAxes,
     required this.platforms,
+    this.gateLabels = const {},
+    this.variables = const [],
   });
 
   /// Reads the schema from its JSON form.
@@ -410,6 +525,15 @@ class WorkflowSchema extends Equatable {
   /// The values of the `platform` axis.
   final List<String> platforms;
 
+  /// What each of [gates] approves, for people: `prod_release` is
+  /// "Release to production".
+  final Map<String, String> gateLabels;
+
+  /// What an expression can read, as paths: `platform`, `flavor.prod`,
+  /// `app.name`. `inputs` holds the inputs a workflow declares, and
+  /// `flavor` and `platform` are there in a job whose matrix has them.
+  final List<String> variables;
+
   /// The JSON form.
   Map<String, dynamic> toJson() => _$WorkflowSchemaToJson(this);
 
@@ -421,5 +545,7 @@ class WorkflowSchema extends Equatable {
     capabilities,
     matrixAxes,
     platforms,
+    gateLabels,
+    variables,
   ];
 }

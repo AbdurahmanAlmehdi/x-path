@@ -865,11 +865,11 @@ stages:
         typed: {
           'build.ios': [
             StepKey.needed('exportOptionsPlist'),
-            StepKey('obfuscate', StepValue.flag),
+            StepKey('obfuscate', value: StepValue.flag),
           ],
           'upload.play': [
             StepKey.choice('status', ['completed', 'draft']),
-            StepKey('releaseNotes', StepValue.textMap),
+            StepKey('releaseNotes', value: StepValue.textMap),
           ],
           'guard': [
             StepKey.choice('checks', ['source'], value: StepValue.texts),

@@ -1,5 +1,6 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:xp_api/xp_api.dart';
+import 'package:xp_desktop/job/widgets/job_status.dart';
 import 'package:xp_desktop/l10n/l10n.dart';
 import 'package:xp_desktop/theme/theme.dart';
 import 'package:xp_desktop/widgets/widgets.dart';
@@ -370,7 +371,7 @@ class _JobFields extends StatelessWidget {
             XpSectionLabel(l10n.workflowsStepsLabel),
             const Spacer(),
             _AddStep(
-              kinds: [...?schema?.steps.map((s) => s.kind)],
+              steps: schema?.steps,
               enabled: enabled,
               onAdd: (kind) => _edit((j) => j.addStep(kind)),
             ),
@@ -384,6 +385,10 @@ class _JobFields extends StatelessWidget {
             count: current.steps.length,
             step: step,
             schema: schema,
+            variables: [
+              ...?schema?.variables,
+              for (final input in document.inputs) 'inputs.${input.name}',
+            ],
             enabled: enabled,
             onChanged: (value) => _edit((j) => j.editStep(index, (_) => value)),
             onMove: (delta) => _edit((j) => j.moveStep(index, delta)),
@@ -507,55 +512,34 @@ class _AxisRow extends StatelessWidget {
   }
 }
 
-/// "Add step": a menu of the engine's step types; a `command` step when the
-/// types are not known.
+/// "Add step": picks one of the engine's step types. While the engine
+/// cannot give them, it is disabled and says why.
 class _AddStep extends StatelessWidget {
-  const new({required this.kinds, required this.enabled, required this.onAdd});
+  const new({required this.steps, required this.enabled, required this.onAdd});
 
-  final List<String> kinds;
+  /// The engine's step types; `null` while they are not known.
+  final List<StepType>? steps;
   final bool enabled;
   final ValueChanged<String> onAdd;
 
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
-    if (kinds.isEmpty) {
-      return XpButton(
-        label: l10n.workflowsAddStep,
-        icon: PhosphorIconsRegular.plus,
-        kind: XpButtonKind.tertiary,
-        size: XpButtonSize.small,
-        onPressed: enabled ? () => onAdd('command') : null,
-      );
-    }
-    return PopupMenuButton<String>(
-      enabled: enabled,
-      tooltip: '',
-      position: PopupMenuPosition.under,
-      onSelected: onAdd,
-      itemBuilder: (context) => [
-        for (final kind in kinds)
-          PopupMenuItem<String>(
-            value: kind,
-            height: context.xpSizes.rowDefault,
-            child: Text(
-              kind,
-              style: context.xpType.code.copyWith(
-                color: context.xpColors.textPrimary,
-              ),
-            ),
-          ),
-      ],
-      child: IgnorePointer(
-        child: XpButton(
-          label: l10n.workflowsAddStep,
-          icon: PhosphorIconsRegular.plus,
-          kind: XpButtonKind.tertiary,
-          size: XpButtonSize.small,
-          onPressed: enabled ? () {} : null,
-        ),
-      ),
+    final steps = this.steps;
+    final button = XpButton(
+      label: l10n.workflowsAddStep,
+      icon: PhosphorIconsRegular.plus,
+      kind: XpButtonKind.tertiary,
+      size: XpButtonSize.small,
+      onPressed: enabled && steps != null
+          ? () async {
+              final kind = await pickStepType(context, steps);
+              if (kind != null) onAdd(kind);
+            }
+          : null,
     );
+    if (steps != null) return button;
+    return Tooltip(message: l10n.workflowsAddStepUnavailable, child: button);
   }
 }
 
@@ -570,6 +554,7 @@ class StepEditor extends StatefulWidget {
     required this.onMove,
     required this.onRemove,
     this.schema,
+    this.variables = const [],
     this.enabled = true,
     super.key,
   });
@@ -578,6 +563,9 @@ class StepEditor extends StatefulWidget {
   final int count;
   final WorkflowStep step;
   final WorkflowSchema? schema;
+
+  /// What the `if` field completes: the paths an expression reads.
+  final List<String> variables;
   final bool enabled;
   final ValueChanged<WorkflowStep> onChanged;
   final ValueChanged<int> onMove;
@@ -633,7 +621,10 @@ class _StepEditorState extends State<StepEditor> {
                   ),
                   if (step.gate case final gate?) ...[
                     const SizedBox(width: 8),
-                    XpStatusLabel(XpStatus.approvalPending, gate),
+                    XpStatusLabel(
+                      XpStatus.approvalPending,
+                      l10n.gateAction(gate),
+                    ),
                   ],
                   const SizedBox(width: 8),
                   Expanded(
@@ -665,6 +656,7 @@ class _StepEditorState extends State<StepEditor> {
               child: _StepFields(
                 step: step,
                 schema: widget.schema,
+                variables: widget.variables,
                 enabled: widget.enabled,
                 onChanged: widget.onChanged,
               ),
@@ -680,12 +672,14 @@ class _StepFields extends StatelessWidget {
   const new({
     required this.step,
     required this.schema,
+    required this.variables,
     required this.enabled,
     required this.onChanged,
   });
 
   final WorkflowStep step;
   final WorkflowSchema? schema;
+  final List<String> variables;
   final bool enabled;
   final ValueChanged<WorkflowStep> onChanged;
 
@@ -696,7 +690,10 @@ class _StepFields extends StatelessWidget {
     String? orNull(String text) => text.trim().isEmpty ? null : text;
     final kinds = {...?schema?.steps.map((s) => s.kind), step.kind}.toList();
     final known = schema?.steps.where((s) => s.kind == step.kind).firstOrNull;
-    final keys = {...?known?.withKeys, ...step.withValues.keys};
+    final typed = {
+      for (final key in known?.keys ?? const <StepKeySchema>[]) key.name: key,
+    };
+    final keys = {...?known?.withKeys, ...typed.keys, ...step.withValues.keys};
     final gates = <String?>{null, ...?schema?.gates, step.gate}.toList();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -733,8 +730,8 @@ class _StepFields extends StatelessWidget {
               child: XpSelect<String?>(
                 value: step.gate,
                 values: gates,
-                labelOf: (gate) => gate ?? l10n.workflowsNoGate,
-                code: true,
+                labelOf: (gate) =>
+                    gate == null ? l10n.workflowsNoGate : l10n.gateAction(gate),
                 onChanged: enabled
                     ? (gate) => onChanged(step.copyWith(gate: () => gate))
                     : null,
@@ -749,6 +746,7 @@ class _StepFields extends StatelessWidget {
           hint: l10n.workflowsConditionHint,
           code: true,
           enabled: enabled,
+          completions: variables,
           onChanged: (text) =>
               onChanged(step.copyWith(condition: () => orNull(text))),
         ),
@@ -760,25 +758,15 @@ class _StepFields extends StatelessWidget {
             Padding(
               key: ValueKey(('with', key)),
               padding: const EdgeInsets.only(bottom: 6),
-              child: Row(
-                children: [
-                  SizedBox(width: 150, child: XpCode(key)),
-                  Expanded(
-                    child: BoundTextField(
-                      value: step.withValues.containsKey(key)
-                          ? formatYamlValue(step.withValues[key])
-                          : '',
-                      hint: l10n.workflowsWithHint,
-                      code: true,
-                      enabled: enabled,
-                      onChanged: (text) => onChanged(
-                        step.copyWith(
-                          withValues: _withValue(step.withValues, key, text),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
+              child: _WithField(
+                name: key,
+                schema: typed[key],
+                given: step.withValues.containsKey(key),
+                value: step.withValues[key],
+                enabled: enabled,
+                onChanged: (values) => onChanged(
+                  step.copyWith(withValues: values(step.withValues)),
+                ),
               ),
             ),
         ],
@@ -814,3 +802,161 @@ Map<String, Object?> _withValue(
     if (!blank && !values.containsKey(key)) key: parseYamlValue(text),
   };
 }
+
+/// One key of `with`, edited by its type: On and Off for a boolean, a menu
+/// for a string with options, chips for a list with options, YAML text for
+/// the rest and for a placeholder. A key the step type needs is marked, and
+/// says so while it is missing.
+class _WithField extends StatelessWidget {
+  const new({
+    required this.name,
+    required this.schema,
+    required this.given,
+    required this.value,
+    required this.enabled,
+    required this.onChanged,
+  });
+
+  final String name;
+
+  /// What the engine says of the key; `null` for one it does not know.
+  final StepKeySchema? schema;
+  final bool given;
+  final Object? value;
+  final bool enabled;
+
+  /// Reports the change as a function of the values of `with`.
+  final ValueChanged<Map<String, Object?> Function(Map<String, Object?>)>
+  onChanged;
+
+  void _set(Object? value) =>
+      onChanged((values) => _withTyped(values, name, value));
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    final colors = context.xpColors;
+    final schema = this.schema;
+    final value = this.value;
+    final placeholder = value is String && value.contains(r'${{');
+    final options = schema?.options;
+    final defaultLabel = schema?.defaultValue == null
+        ? l10n.workflowsKeyDefault
+        : l10n.workflowsKeyDefaultValue(formatYamlValue(schema!.defaultValue));
+    final flag = value is bool ? value : null;
+    final choice = value is String ? value : null;
+    final chosen = value is List ? value : const <Object?>[];
+    final field = switch (schema?.type) {
+      _ when placeholder || schema == null => _text(context),
+      StepKeyType.boolean when value == null || value is bool =>
+        XpSegmented<bool?>(
+          value: flag,
+          values: const [null, true, false],
+          labelOf: (on) => switch (on) {
+            null => defaultLabel,
+            true => l10n.workflowsOn,
+            false => l10n.workflowsOff,
+          },
+          onChanged: enabled ? _set : null,
+        ),
+      StepKeyType.string
+          when options != null && (value == null || value is String) =>
+        XpSelect<String?>(
+          value: choice,
+          values: [
+            null,
+            ...options,
+            ?(options.contains(choice) ? null : choice),
+          ],
+          labelOf: (option) => option ?? defaultLabel,
+          code: true,
+          onChanged: enabled ? _set : null,
+        ),
+      StepKeyType.list
+          when options != null && (value == null || value is List) =>
+        Wrap(
+          spacing: 8,
+          runSpacing: 4,
+          children: [
+            for (final option in options)
+              XpChip(
+                label: option,
+                selected: chosen.contains(option),
+                onChanged: enabled
+                    ? (on) => _set([
+                        for (final o in options)
+                          if (o == option ? on : chosen.contains(o)) o,
+                      ])
+                    : null,
+              ),
+          ],
+        ),
+      _ => _text(context),
+    };
+    final missing = (schema?.required ?? false) && !given;
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 150,
+          child: Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: Tooltip(
+              message: schema?.description ?? '',
+              child: Row(
+                children: [
+                  Flexible(child: XpCode(name)),
+                  if (schema?.required ?? false)
+                    Text(
+                      ' *',
+                      style: context.xpType.code.copyWith(
+                        color: colors.negativeDefault,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              field,
+              if (missing)
+                Padding(
+                  padding: const EdgeInsets.only(top: 2),
+                  child: Text(
+                    l10n.workflowsKeyNeeded,
+                    style: context.xpType.caption.copyWith(
+                      color: colors.negativeDefault,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _text(BuildContext context) => BoundTextField(
+    value: given ? formatYamlValue(value) : '',
+    hint: schema?.description ?? context.l10n.workflowsWithHint,
+    code: true,
+    enabled: enabled,
+    onChanged: (text) => onChanged((values) => _withValue(values, name, text)),
+  );
+}
+
+/// [values] with [key] set to [value] in its place (at the end if new), or
+/// without [key] when [value] is `null`.
+Map<String, Object?> _withTyped(
+  Map<String, Object?> values,
+  String key,
+  Object? value,
+) => {
+  for (final MapEntry(key: k, value: v) in values.entries)
+    if (k != key) k: v else k: ?value,
+  if (value != null && !values.containsKey(key)) key: value,
+};

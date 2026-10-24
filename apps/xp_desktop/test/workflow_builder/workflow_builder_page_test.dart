@@ -230,10 +230,8 @@ void main() {
     await pumpBuilder(tester, repository: repository);
     await press(tester, find.text('build').first);
 
-    await tester.ensureVisible(find.text('Add step'));
-    await tester.tap(find.text('Add step'));
-    await tester.pumpAndSettle();
-    await press(tester, find.text('command').last);
+    await press(tester, find.text('Add step'));
+    await press(tester, find.byKey(const ValueKey(('step-type', 'command'))));
     await press(tester, find.text('command'));
 
     await type(tester, field('If').last, "platform == 'ios'");
@@ -294,23 +292,164 @@ void main() {
     expect(steps.map((s) => s.kind), ['git.checkout', 'guard', 'upload.play']);
   });
 
-  testWidgets('takes step types as text when the engine has no schema', (
-    tester,
-  ) async {
-    when(repository.schema).thenThrow(const ConnectionException('away'));
+  testWidgets(
+    'says why no step can be added while the engine is away, and takes '
+    'the type of a step as text',
+    (tester) async {
+      when(repository.schema).thenThrow(const ConnectionException('away'));
+      await pumpBuilder(tester, repository: repository);
+      await press(tester, find.text('build').first);
+
+      final add = find.widgetWithText(XpButton, 'Add step');
+      await tester.ensureVisible(add);
+      expect(tester.widget<XpButton>(add).onPressed, isNull);
+      expect(
+        find.byTooltip(
+          'The engine cannot be reached, so its step types are not known. '
+          'Edit the YAML for now, or try again once it answers.',
+        ),
+        findsOneWidget,
+      );
+
+      await press(tester, find.text('build.android'));
+      await type(tester, field('Step type'), 'shell');
+
+      final steps = WorkflowDocument.parse(yamlOf(tester))
+          .stages[1]
+          .jobs
+          .single
+          .steps;
+      expect(steps[1].kind, 'shell');
+    },
+  );
+
+  testWidgets('picks a step type by group and search', (tester) async {
     await pumpBuilder(tester, repository: repository);
     await press(tester, find.text('build').first);
-
     await press(tester, find.text('Add step'));
-    await press(tester, find.text('command'));
-    await type(tester, field('Step type'), 'shell');
 
+    expect(find.text('Add a step'), findsOneWidget);
+    expect(find.text('BUILD'), findsOneWidget);
+    expect(find.text('Build iOS'), findsOneWidget);
+    expect(find.text('Builds and signs an IPA.'), findsOneWidget);
+
+    await type(
+      tester,
+      find.descendant(
+        of: find.byType(StepPickerDialog),
+        matching: find.byType(TextField),
+      ),
+      'sign',
+    );
+    expect(find.byKey(const ValueKey(('step-type', 'build.ios'))), findsOne);
+    expect(find.byKey(const ValueKey(('step-type', 'command'))), findsNothing);
+
+    await type(
+      tester,
+      find.descendant(
+        of: find.byType(StepPickerDialog),
+        matching: find.byType(TextField),
+      ),
+      'zzz',
+    );
+    expect(find.text('No step type matches.'), findsOneWidget);
+
+    await press(tester, find.text('Cancel'));
+    expect(find.byType(StepPickerDialog), findsNothing);
     final steps = WorkflowDocument.parse(yamlOf(tester))
         .stages[1]
         .jobs
         .single
         .steps;
-    expect(steps.last, const WorkflowStep(kind: 'shell'));
+    expect(steps, hasLength(3));
+  });
+
+  testWidgets('edits with by type and marks a key the step needs (UX-02)', (
+    tester,
+  ) async {
+    when(repository.schema).thenAnswer(
+      (_) async => WorkflowSchema(
+        schema: 1,
+        steps: [
+          for (final step in schema.steps)
+            if (step.kind != 'guard') step,
+          const StepType(
+            kind: 'guard',
+            withKeys: ['checks'],
+            keys: [
+              StepKeySchema(
+                name: 'checks',
+                type: StepKeyType.list,
+                options: ['source', 'credentials', 'versionSync'],
+              ),
+            ],
+          ),
+        ],
+        gates: schema.gates,
+        capabilities: schema.capabilities,
+        matrixAxes: schema.matrixAxes,
+        platforms: schema.platforms,
+      ),
+    );
+    await pumpBuilder(tester, repository: repository);
+    await press(tester, find.text('build').first);
+    List<WorkflowStep> steps() =>
+        WorkflowDocument.parse(yamlOf(tester)).stages[1].jobs.single.steps;
+
+    await press(tester, find.text('Add step'));
+    await press(tester, find.byKey(const ValueKey(('step-type', 'build.ios'))));
+    await press(tester, find.text('build.ios'));
+    expect(find.text('Needed'), findsOneWidget);
+    await type(
+      tester,
+      find.widgetWithText(TextField, 'The export options plist.'),
+      'ios/ExportOptions.plist',
+    );
+    expect(find.text('Needed'), findsNothing);
+    expect(steps().last.withValues, {
+      'exportOptionsPlist': 'ios/ExportOptions.plist',
+    });
+
+    await press(tester, find.text('build.android'));
+    await press(tester, find.text('On').first);
+    expect(steps()[1].withValues, {'artifact': 'aab', 'obfuscate': true});
+    await press(tester, find.text('Default (false)').first);
+    expect(steps()[1].withValues, {'artifact': 'aab'});
+    await press(tester, find.text('aab').first);
+    await press(tester, find.text('Default (apk)').last);
+    expect(steps()[1].withValues, isEmpty);
+
+    await press(tester, find.text('Add step'));
+    await press(tester, find.byKey(const ValueKey(('step-type', 'guard'))));
+    await press(tester, find.text('guard').last);
+    await press(tester, find.text('versionSync').last);
+    expect(steps().last.withValues, {
+      'checks': ['versionSync'],
+    });
+  });
+
+  testWidgets('completes the variables in an if, and labels gates', (
+    tester,
+  ) async {
+    await pumpBuilder(tester, repository: repository);
+    await press(tester, find.text('build').first);
+    await press(tester, find.text('upload.play'));
+    expect(find.text('store submission'), findsWidgets);
+
+    await type(tester, field('If').last, 'flavor.n');
+    expect(find.text('flavor.name'), findsOneWidget);
+    await press(tester, find.text('flavor.name'));
+
+    expect(
+      WorkflowDocument.parse(yamlOf(tester))
+          .stages[1]
+          .jobs
+          .single
+          .steps
+          .last
+          .condition,
+      'flavor.name',
+    );
   });
 
   testWidgets('typed YAML updates the pipeline, or locks it with issues', (

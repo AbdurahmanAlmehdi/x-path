@@ -15,8 +15,13 @@ import 'package:xp_engine/src/workflows/workflow_exceptions.dart';
 /// gets, and what a runner needs to run it.
 class StepPlanSpec {
   /// Creates a spec.
-  new(this.kind, List<StepKey> keys, this.input, {this.capabilities})
-    : keys = {for (final key in keys) key.name: key};
+  new(
+    this.kind,
+    List<StepKey> keys,
+    this.input, {
+    this.needs = const [],
+    this.pick,
+  }) : keys = {for (final key in keys) key.name: key};
 
   /// The step type.
   final String kind;
@@ -27,9 +32,17 @@ class StepPlanSpec {
   /// The stored input of the step, in the JSON its `decodeInput` reads.
   final Future<Map<String, dynamic>> Function(StepPlanning planning) input;
 
-  /// The capabilities the step needs, when it needs any.
-  final Set<Capability> Function(StepPlanning planning)? capabilities;
+  /// What a runner needs to run the step: any one of these sets will do.
+  /// Empty when the engine runs it.
+  final List<Set<Capability>> needs;
+
+  /// Which of [needs] a step needs, when that depends on the step.
+  final Set<Capability> Function(StepPlanning planning)? pick;
 }
+
+/// What a step type is for people: its title, what it does, and the group
+/// an editor lists it in.
+typedef StepAbout = ({String title, String description, String group});
 
 /// The step types a workflow can use and how each is planned when a workflow
 /// is dispatched.
@@ -59,9 +72,31 @@ class StepPlanners implements StepCatalog {
   @override
   Map<String, StepKey>? keysOf(String kind) => _bySpec[kind]?.keys;
 
+  @override
+  StepType? describe(String kind) {
+    final spec = _bySpec[kind];
+    if (spec == null) return null;
+    final about = stepAbout[kind]!;
+    return StepType(
+      kind: kind,
+      withKeys: spec.keys.keys.toList()..sort(),
+      title: about.title,
+      description: about.description,
+      group: about.group,
+      capabilities: [
+        for (final set in spec.needs)
+          [for (final capability in set) capability.wire],
+      ],
+      keys: [for (final key in spec.keys.values) key.toWire()],
+    );
+  }
+
   /// The capabilities the step needs.
-  Set<Capability> capabilitiesOf(StepPlanning planning) =>
-      _bySpec[planning.kind]?.capabilities?.call(planning) ?? const {};
+  Set<Capability> capabilitiesOf(StepPlanning planning) {
+    final spec = _bySpec[planning.kind];
+    if (spec == null) return const {};
+    return spec.pick?.call(planning) ?? spec.needs.firstOrNull ?? const {};
+  }
 
   /// The plan of the step [planning].
   ///
@@ -112,14 +147,45 @@ class StepPlanners implements StepCatalog {
     StepPlanSpec(
       'command',
       const [
-        StepKey.needed('executable'),
-        StepKey('arguments', StepValue.texts),
-        StepKey('workingDirectory'),
-        StepKey('environment', StepValue.textMap),
-        StepKey('passThroughEnvironment', StepValue.texts),
-        StepKey('secretEnvironment', StepValue.textMap),
-        StepKey('secretFiles', StepValue.textMap),
-        StepKey('sideEffect', StepValue.flag),
+        StepKey.needed(
+          'executable',
+          description: 'The program to run, such as dart or ./tool/x.sh.',
+        ),
+        StepKey(
+          'arguments',
+          value: StepValue.texts,
+          description: 'Its arguments, one item each.',
+        ),
+        StepKey(
+          'workingDirectory',
+          description: 'A folder inside the app to run it in.',
+        ),
+        StepKey(
+          'environment',
+          value: StepValue.textMap,
+          description: 'Environment variables to set.',
+        ),
+        StepKey(
+          'passThroughEnvironment',
+          value: StepValue.texts,
+          description: 'Environment variables of the engine to pass on.',
+        ),
+        StepKey(
+          'secretEnvironment',
+          value: StepValue.textMap,
+          description: 'Variables set to stored secrets, by variable.',
+        ),
+        StepKey(
+          'secretFiles',
+          value: StepValue.textMap,
+          description: 'Variables set to the path of a stored secret file.',
+        ),
+        StepKey(
+          'sideEffect',
+          value: StepValue.flag,
+          description: 'Whether it changes something outside the job.',
+          defaultValue: false,
+        ),
       ],
       (p) async {
         final directory = p.text('workingDirectory');
@@ -135,25 +201,40 @@ class StepPlanners implements StepCatalog {
         };
       },
     ),
-    StepPlanSpec('git.checkout', const [StepKey('commitFrom')], (p) async {
-      final source = p.text('commitFrom');
-      return {
-        'worktree': p.job.worktree.toJson(),
-        if (source != null)
-          'commitFromJob':
-              p.job.commitSources[source] ??
-              p.fail('The job "$source" has no job to start from here.'),
-      };
-    }),
+    StepPlanSpec(
+      'git.checkout',
+      const [
+        StepKey(
+          'commitFrom',
+          description: 'A job of an earlier stage whose commit to start from.',
+        ),
+      ],
+      (p) async {
+        final source = p.text('commitFrom');
+        return {
+          'worktree': p.job.worktree.toJson(),
+          if (source != null)
+            'commitFromJob':
+                p.job.commitSources[source] ??
+                p.fail('The job "$source" has no job to start from here.'),
+        };
+      },
+    ),
     StepPlanSpec(
       'guard',
       [
-        StepKey.choice('checks', [
-          for (final check in GuardCheckName.values) check.name,
-        ], value: StepValue.texts),
-        StepKey.choice('credentialKinds', [
-          for (final kind in CredentialKind.values) kind.wire,
-        ], value: StepValue.texts),
+        StepKey.choice(
+          'checks',
+          [for (final check in GuardCheckName.values) check.name],
+          value: StepValue.texts,
+          description: 'The checks to run before going on.',
+        ),
+        StepKey.choice(
+          'credentialKinds',
+          [for (final kind in CredentialKind.values) kind.wire],
+          value: StepValue.texts,
+          description: 'The credentials the flavor must have, checked.',
+        ),
       ],
       (p) async {
         final flavor = p.job.flavor;
@@ -184,37 +265,89 @@ class StepPlanners implements StepCatalog {
     StepPlanSpec(
       'build.android',
       const [
-        StepKey.choice('artifact', ['apk', 'aab']),
-        StepKey('dartDefineFile'),
-        StepKey('obfuscate', StepValue.flag),
-        StepKey('keystore', StepValue.flag),
+        StepKey.choice(
+          'artifact',
+          ['apk', 'aab'],
+          description: 'An APK to install, or an App Bundle for Google Play.',
+          defaultValue: 'apk',
+        ),
+        StepKey(
+          'dartDefineFile',
+          description:
+              'A JSON or .env file of --dart-define values, in the app.',
+        ),
+        StepKey(
+          'obfuscate',
+          value: StepValue.flag,
+          description: 'Obfuscate the Dart code and keep its symbols.',
+          defaultValue: false,
+        ),
+        StepKey(
+          'keystore',
+          value: StepValue.flag,
+          description: 'Sign with the keystore of the flavor, when it has one.',
+          defaultValue: true,
+        ),
       ],
       (p) async => {
         ..._settings(p, signing: p.flag('keystore', otherwise: true)),
         'artifact': p.text('artifact') ?? 'apk',
       },
-      capabilities: (_) => const {Capability.android, Capability.flutter},
+      needs: const [
+        {Capability.android, Capability.flutter},
+      ],
     ),
     StepPlanSpec(
       'build.ios',
       const [
-        StepKey.needed('exportOptionsPlist'),
-        StepKey('dartDefineFile'),
-        StepKey('obfuscate', StepValue.flag),
+        StepKey.needed(
+          'exportOptionsPlist',
+          description: 'The export options plist, in the app.',
+        ),
+        StepKey(
+          'dartDefineFile',
+          description:
+              'A JSON or .env file of --dart-define values, in the app.',
+        ),
+        StepKey(
+          'obfuscate',
+          value: StepValue.flag,
+          description: 'Obfuscate the Dart code and keep its symbols.',
+          defaultValue: false,
+        ),
       ],
       (p) async => {
         ..._settings(p),
         'exportOptionsPlist': p.requireText('exportOptionsPlist'),
       },
-      capabilities: (_) => const {Capability.iosSign, Capability.flutter},
+      needs: const [
+        {Capability.iosSign, Capability.flutter},
+      ],
     ),
     StepPlanSpec(
       'build.verifyCompiledConfig',
       const [
-        StepKey('artifactName'),
-        StepKey('dartDefineFile'),
-        StepKey('keys', StepValue.texts),
-        StepKey('needles', StepValue.texts),
+        StepKey(
+          'artifactName',
+          description:
+              'The artifact to look in; the one of the job by default.',
+        ),
+        StepKey(
+          'dartDefineFile',
+          description:
+              'A JSON or .env file of --dart-define values, in the app.',
+        ),
+        StepKey(
+          'keys',
+          value: StepValue.texts,
+          description:
+              'The keys of the file whose values must be in the build.',
+        ),
+        StepKey(
+          'needles',
+          value: StepValue.texts,
+          description: 'Other text that must be in the build.',
+        ),
       ],
       (p) async => {
         'worktree': p.job.worktree.toJson(),
@@ -227,27 +360,69 @@ class StepPlanners implements StepCatalog {
     StepPlanSpec(
       'ios.stripAndReexport',
       const [
-        StepKey('frameworks', StepValue.texts),
-        StepKey.needed('exportOptionsPlist'),
-        StepKey('dartDefineFile'),
+        StepKey(
+          'frameworks',
+          value: StepValue.texts,
+          description: 'The frameworks to strip from the archive.',
+        ),
+        StepKey.needed(
+          'exportOptionsPlist',
+          description: 'The export options plist, in the app.',
+        ),
+        StepKey(
+          'dartDefineFile',
+          description:
+              'A JSON or .env file of --dart-define values, in the app.',
+        ),
       ],
       (p) async => {
         ..._settings(p),
         'exportOptionsPlist': p.requireText('exportOptionsPlist'),
         'frameworks': p.list('frameworks'),
       },
-      capabilities: (_) => const {Capability.iosSign},
+      needs: const [
+        {Capability.iosSign},
+      ],
     ),
     StepPlanSpec(
       'shorebird.release',
       const [
-        StepKey.choice('platform', platformNames),
-        StepKey.choice('artifact', ['apk', 'aab']),
-        StepKey('exportOptionsPlist'),
-        StepKey('dartDefineFile'),
-        StepKey('obfuscate', StepValue.flag),
-        StepKey('keystore', StepValue.flag),
-        StepKey('shorebirdAppId'),
+        StepKey.choice(
+          'platform',
+          platformNames,
+          description: 'The platform; the one of the job by default.',
+        ),
+        StepKey.choice(
+          'artifact',
+          ['apk', 'aab'],
+          description: 'For Android, an APK or an App Bundle.',
+          defaultValue: 'aab',
+        ),
+        StepKey(
+          'exportOptionsPlist',
+          description: 'For iOS, the export options plist, in the app.',
+        ),
+        StepKey(
+          'dartDefineFile',
+          description:
+              'A JSON or .env file of --dart-define values, in the app.',
+        ),
+        StepKey(
+          'obfuscate',
+          value: StepValue.flag,
+          description: 'Obfuscate the Dart code and keep its symbols.',
+          defaultValue: false,
+        ),
+        StepKey(
+          'keystore',
+          value: StepValue.flag,
+          description: 'Sign with the keystore of the flavor, when it has one.',
+          defaultValue: true,
+        ),
+        StepKey(
+          'shorebirdAppId',
+          description: 'The Shorebird app; the one of the flavor by default.',
+        ),
       ],
       (p) async {
         final platform = _platformOf(p);
@@ -269,17 +444,42 @@ class StepPlanners implements StepCatalog {
           'tokenSecret': ?_secretOf(p, CredentialKind.shorebird),
         };
       },
-      capabilities: (p) => _shorebirdCapabilities(_platformOf(p)),
+      needs: _shorebirdNeeds,
+      pick: (p) => _shorebirdCapabilities(_platformOf(p)),
     ),
     StepPlanSpec(
       'shorebird.patch',
       const [
-        StepKey.choice('platform', platformNames),
-        StepKey('exportOptionsPlist'),
-        StepKey('dartDefineFile'),
-        StepKey('obfuscate', StepValue.flag),
-        StepKey('allowNativeDiffs', StepValue.flag),
-        StepKey('shorebirdAppId'),
+        StepKey.choice(
+          'platform',
+          platformNames,
+          description: 'The platform; the one of the job by default.',
+        ),
+        StepKey(
+          'exportOptionsPlist',
+          description: 'For iOS, the export options plist, in the app.',
+        ),
+        StepKey(
+          'dartDefineFile',
+          description:
+              'A JSON or .env file of --dart-define values, in the app.',
+        ),
+        StepKey(
+          'obfuscate',
+          value: StepValue.flag,
+          description: 'Obfuscate the Dart code and keep its symbols.',
+          defaultValue: false,
+        ),
+        StepKey(
+          'allowNativeDiffs',
+          value: StepValue.flag,
+          description: 'Patch even when native code changed since the release.',
+          defaultValue: false,
+        ),
+        StepKey(
+          'shorebirdAppId',
+          description: 'The Shorebird app; the one of the flavor by default.',
+        ),
       ],
       (p) async {
         final platform = _platformOf(p);
@@ -297,16 +497,38 @@ class StepPlanners implements StepCatalog {
           'tokenSecret': ?_secretOf(p, CredentialKind.shorebird),
         };
       },
-      capabilities: (p) => _shorebirdCapabilities(_platformOf(p)),
+      needs: _shorebirdNeeds,
+      pick: (p) => _shorebirdCapabilities(_platformOf(p)),
     ),
     StepPlanSpec(
       'symbols.archive',
       const [
-        StepKey('android', StepValue.flag),
-        StepKey('ios', StepValue.flag),
-        StepKey('debugInfoDirectory'),
-        StepKey('dartDefineFile'),
-        StepKey('obfuscate', StepValue.flag),
+        StepKey(
+          'android',
+          value: StepValue.flag,
+          description:
+              'Keep the Android symbols; in an Android job by default.',
+        ),
+        StepKey(
+          'ios',
+          value: StepValue.flag,
+          description: 'Keep the iOS symbols; in an iOS job by default.',
+        ),
+        StepKey(
+          'debugInfoDirectory',
+          description: 'Where the build wrote the Dart symbols.',
+        ),
+        StepKey(
+          'dartDefineFile',
+          description:
+              'A JSON or .env file of --dart-define values, in the app.',
+        ),
+        StepKey(
+          'obfuscate',
+          value: StepValue.flag,
+          description: 'Whether the build was obfuscated.',
+          defaultValue: false,
+        ),
       ],
       (p) async => {
         ..._settings(p),
@@ -315,23 +537,39 @@ class StepPlanners implements StepCatalog {
         'debugInfoDirectory': ?p.text('debugInfoDirectory'),
       },
     ),
-    StepPlanSpec('record.manifest', const [StepKey('dartDefineFile')], (
-      p,
-    ) async {
-      final version = p.job.run.stepVersion;
-      if (version?.build == null) return _needsBuild(p);
-      return {
-        'worktree': p.job.worktree.toJson(),
-        'version': '$version',
-        'flavors': [?p.job.flavor?.name],
-        'dartDefineFile': ?p.text('dartDefineFile'),
-      };
-    }),
+    StepPlanSpec(
+      'record.manifest',
+      const [
+        StepKey(
+          'dartDefineFile',
+          description:
+              'A JSON or .env file of --dart-define values, in the app.',
+        ),
+      ],
+      (p) async {
+        final version = p.job.run.stepVersion;
+        if (version?.build == null) return _needsBuild(p);
+        return {
+          'worktree': p.job.worktree.toJson(),
+          'version': '$version',
+          'flavors': [?p.job.flavor?.name],
+          'dartDefineFile': ?p.text('dartDefineFile'),
+        };
+      },
+    ),
     StepPlanSpec(
       'test',
       const [
-        StepKey('paths', StepValue.texts),
-        StepKey('tags', StepValue.texts),
+        StepKey(
+          'paths',
+          value: StepValue.texts,
+          description: 'The test files or folders; all tests by default.',
+        ),
+        StepKey(
+          'tags',
+          value: StepValue.texts,
+          description: 'Run only the tests with these tags.',
+        ),
       ],
       (p) async => {
         'worktree': p.job.worktree.toJson(),
@@ -341,27 +579,55 @@ class StepPlanners implements StepCatalog {
         'paths': p.list('paths'),
         'tags': p.list('tags'),
       },
-      capabilities: (_) => const {Capability.flutter},
+      needs: const [
+        {Capability.flutter},
+      ],
     ),
     StepPlanSpec(
       'analyze',
-      const [StepKey('failOn')],
+      const [
+        StepKey.choice(
+          'failOn',
+          ['error', 'warning', 'info'],
+          description: 'The least severe issue that fails the step.',
+          defaultValue: 'error',
+        ),
+      ],
       (p) async => {
         'worktree': p.job.worktree.toJson(),
         'flutterVersion': ?p.job.run.app.flutterVersion,
         'failOn': ?p.text('failOn'),
       },
-      capabilities: (_) => const {Capability.flutter},
+      needs: const [
+        {Capability.flutter},
+      ],
     ),
     StepPlanSpec(
       'upload.firebase',
       const [
-        StepKey('artifactName'),
-        StepKey('artifactsFrom'),
-        StepKey.needed('appId'),
-        StepKey('testerEmails', StepValue.texts),
-        StepKey('groupAliases', StepValue.texts),
-        StepKey('releaseNotes'),
+        StepKey(
+          'artifactName',
+          description: 'The file to upload; the APK of the job by default.',
+        ),
+        StepKey(
+          'artifactsFrom',
+          description: 'A build job of an earlier stage to take the file from.',
+        ),
+        StepKey.needed(
+          'appId',
+          description: 'The Firebase app id, such as 1:123:android:abc.',
+        ),
+        StepKey(
+          'testerEmails',
+          value: StepValue.texts,
+          description: 'Testers to invite, by email.',
+        ),
+        StepKey(
+          'groupAliases',
+          value: StepValue.texts,
+          description: 'Tester groups to invite, by alias.',
+        ),
+        StepKey('releaseNotes', description: 'What the testers see.'),
       ],
       (p) async {
         final version = _version(p);
@@ -380,14 +646,42 @@ class StepPlanners implements StepCatalog {
     StepPlanSpec(
       'upload.play',
       const [
-        StepKey('artifactName'),
-        StepKey('artifactsFrom'),
-        StepKey('packageName'),
-        StepKey('track'),
-        StepKey.choice('status', ['completed', 'inProgress', 'draft']),
-        StepKey('userFraction', StepValue.number),
-        StepKey('releaseName'),
-        StepKey('releaseNotes', StepValue.textMap),
+        StepKey(
+          'artifactName',
+          description:
+              'The file to upload; the App Bundle of the job by default.',
+        ),
+        StepKey(
+          'artifactsFrom',
+          description: 'A build job of an earlier stage to take the file from.',
+        ),
+        StepKey(
+          'packageName',
+          description: 'The application id; the one of the flavor by default.',
+        ),
+        StepKey(
+          'track',
+          description: 'The track: internal, alpha, beta, production or yours.',
+          defaultValue: 'internal',
+        ),
+        StepKey.choice(
+          'status',
+          ['completed', 'inProgress', 'draft'],
+          description: 'Release now, roll out to a fraction, or keep a draft.',
+          defaultValue: 'completed',
+        ),
+        StepKey(
+          'userFraction',
+          value: StepValue.number,
+          description:
+              'For a roll-out, the fraction of users, above 0, below 1.',
+        ),
+        StepKey('releaseName', description: 'The name of the release.'),
+        StepKey(
+          'releaseNotes',
+          value: StepValue.textMap,
+          description: 'What is new, by language, such as en-US.',
+        ),
       ],
       (p) async {
         final version = _version(p);
@@ -411,10 +705,22 @@ class StepPlanners implements StepCatalog {
     StepPlanSpec(
       'upload.appStore',
       const [
-        StepKey('artifactName'),
-        StepKey('artifactsFrom'),
-        StepKey('bundleId'),
-        StepKey.needed('appleAppId'),
+        StepKey(
+          'artifactName',
+          description: 'The file to upload; the IPA of the job by default.',
+        ),
+        StepKey(
+          'artifactsFrom',
+          description: 'A build job of an earlier stage to take the file from.',
+        ),
+        StepKey(
+          'bundleId',
+          description: 'The bundle id; the one of the flavor by default.',
+        ),
+        StepKey.needed(
+          'appleAppId',
+          description: 'The App Store Connect app id, a number.',
+        ),
       ],
       (p) async {
         final version = _version(p);
@@ -446,7 +752,9 @@ class StepPlanners implements StepCatalog {
           'artifactJob': ?_artifactJob(p),
         };
       },
-      capabilities: (_) => const {Capability.iosSign},
+      needs: const [
+        {Capability.iosSign},
+      ],
     ),
     StepPlanSpec('git.releaseBranch', const [], (p) async {
       final version = p.job.run.version;
@@ -483,7 +791,20 @@ class StepPlanners implements StepCatalog {
     }),
     StepPlanSpec(
       'git.push',
-      const [StepKey('branch', StepValue.flag), StepKey('tag', StepValue.flag)],
+      const [
+        StepKey(
+          'branch',
+          value: StepValue.flag,
+          description:
+              'Push the release branch; when the run bumps by default.',
+        ),
+        StepKey(
+          'tag',
+          value: StepValue.flag,
+          description: 'Push the tag.',
+          defaultValue: true,
+        ),
+      ],
       (p) async {
         final run = p.job.run;
         final release = run.releaseVersion;
@@ -508,28 +829,36 @@ class StepPlanners implements StepCatalog {
         };
       },
     ),
-    StepPlanSpec('github.createPr', const [StepKey('title'), StepKey('body')], (
-      p,
-    ) async {
-      final run = p.job.run;
-      final version = run.version;
-      if (version == null) {
-        return p.fail('There is no release version: this run bumps none.');
-      }
-      final flavor = p.job.flavor;
-      return {
-        'githubRepoId': run.project.githubRepoId,
-        'head': run.model.branchName(version.name, scope: p.job.worktree.scope),
-        'base': run.project.defaultBaseBranch,
-        'title':
-            p.text('title') ??
-            'Release ${version.name}${_flavorSuffix(flavor)}',
-        'body':
-            p.text('body') ??
-            'The release branch of ${version.name}, opened by XPath. Merge '
-                'it once every store has the release live.',
-      };
-    }),
+    StepPlanSpec(
+      'github.createPr',
+      const [
+        StepKey('title', description: 'The title; "Release x.y.z" by default.'),
+        StepKey('body', description: 'The description of the pull request.'),
+      ],
+      (p) async {
+        final run = p.job.run;
+        final version = run.version;
+        if (version == null) {
+          return p.fail('There is no release version: this run bumps none.');
+        }
+        final flavor = p.job.flavor;
+        return {
+          'githubRepoId': run.project.githubRepoId,
+          'head': run.model.branchName(
+            version.name,
+            scope: p.job.worktree.scope,
+          ),
+          'base': run.project.defaultBaseBranch,
+          'title':
+              p.text('title') ??
+              'Release ${version.name}${_flavorSuffix(flavor)}',
+          'body':
+              p.text('body') ??
+              'The release branch of ${version.name}, opened by XPath. Merge '
+                  'it once every store has the release live.',
+        };
+      },
+    ),
     StepPlanSpec(
       'github.mergePr',
       const [],
@@ -586,10 +915,13 @@ class StepPlanners implements StepCatalog {
     return platform!;
   }
 
-  static Set<Capability> _shorebirdCapabilities(String platform) => {
-    Capability.flutter,
-    if (platform == 'ios') Capability.iosSign else Capability.android,
-  };
+  static const List<Set<Capability>> _shorebirdNeeds = [
+    {Capability.flutter, Capability.android},
+    {Capability.flutter, Capability.iosSign},
+  ];
+
+  static Set<Capability> _shorebirdCapabilities(String platform) =>
+      _shorebirdNeeds[platform == 'ios' ? 1 : 0];
 
   static String? _shorebirdAppId(StepPlanning p) {
     final flavor = p.job.flavor;
@@ -672,3 +1004,126 @@ const keystoreStorePasswordVariable = 'XPATH_KEYSTORE_STORE_PASSWORD';
 
 /// The variable that holds the key password of the keystore.
 const keystoreKeyPasswordVariable = 'XPATH_KEYSTORE_KEY_PASSWORD';
+
+/// What each step type is, for people: the schema gives it to editors.
+const stepAbout = <String, StepAbout>{
+  'git.checkout': (
+    title: 'Check out',
+    description:
+        'Makes the worktree of the job at the commit of the run, or at the '
+        'commit an earlier job left.',
+    group: 'Source',
+  ),
+  'version.bump': (
+    title: 'Bump the version',
+    description:
+        'Writes the version and build number of the run to the pubspec and '
+        'commits it in the job.',
+    group: 'Source',
+  ),
+  'git.releaseBranch': (
+    title: 'Make the release branch',
+    description: 'Makes the release branch of the version at the commit.',
+    group: 'Source',
+  ),
+  'git.tag': (
+    title: 'Tag the release',
+    description: 'Tags the commit with the version and build number.',
+    group: 'Source',
+  ),
+  'git.push': (
+    title: 'Push',
+    description: 'Pushes the release branch and the tag to GitHub.',
+    group: 'Source',
+  ),
+  'guard': (
+    title: 'Check before going on',
+    description:
+        'Stops the job when a check fails: the version, the store, the '
+        'credentials, native changes in a patch.',
+    group: 'Checks',
+  ),
+  'analyze': (
+    title: 'Analyze',
+    description: 'Runs flutter analyze and fails on issues.',
+    group: 'Checks',
+  ),
+  'test': (
+    title: 'Run the tests',
+    description: 'Runs flutter test and keeps the results.',
+    group: 'Checks',
+  ),
+  'build.verifyCompiledConfig': (
+    title: 'Verify the compiled config',
+    description:
+        'Checks that the build has the values of the dart-define file in it.',
+    group: 'Checks',
+  ),
+  'build.android': (
+    title: 'Build Android',
+    description: 'Builds an APK or an App Bundle of the flavor.',
+    group: 'Build',
+  ),
+  'build.ios': (
+    title: 'Build iOS',
+    description: 'Builds and signs an IPA of the flavor.',
+    group: 'Build',
+  ),
+  'ios.stripAndReexport': (
+    title: 'Strip frameworks and export again',
+    description:
+        'Removes frameworks from the iOS archive and exports the IPA again.',
+    group: 'Build',
+  ),
+  'shorebird.release': (
+    title: 'Shorebird release',
+    description: 'Builds a release that Shorebird can patch later.',
+    group: 'Build',
+  ),
+  'shorebird.patch': (
+    title: 'Shorebird patch',
+    description: 'Builds a patch of a Shorebird release and publishes it.',
+    group: 'Build',
+  ),
+  'symbols.archive': (
+    title: 'Keep the symbols',
+    description:
+        'Keeps the debug symbols of the build, to read crash reports later.',
+    group: 'Build',
+  ),
+  'record.manifest': (
+    title: 'Record the release',
+    description: 'Records what the release was built from.',
+    group: 'Build',
+  ),
+  'upload.firebase': (
+    title: 'Upload to Firebase',
+    description: 'Sends the build to testers with Firebase App Distribution.',
+    group: 'Upload',
+  ),
+  'upload.play': (
+    title: 'Upload to Google Play',
+    description: 'Uploads the App Bundle to a track of Google Play.',
+    group: 'Upload',
+  ),
+  'upload.appStore': (
+    title: 'Upload to App Store Connect',
+    description: 'Uploads the IPA to App Store Connect, for TestFlight.',
+    group: 'Upload',
+  ),
+  'github.createPr': (
+    title: 'Open a pull request',
+    description: 'Opens a pull request from the release branch.',
+    group: 'GitHub',
+  ),
+  'github.mergePr': (
+    title: 'Merge the pull request',
+    description: 'Merges the pull request of the release.',
+    group: 'GitHub',
+  ),
+  'command': (
+    title: 'Run a command',
+    description: 'Runs a program in the app, with the variables you give it.',
+    group: 'Other',
+  ),
+};

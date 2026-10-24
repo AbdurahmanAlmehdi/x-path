@@ -4696,6 +4696,60 @@ abstract class AppLocalizations {
   /// **'YAML value'**
   String get workflowsWithHint;
 
+  /// Why Add step is disabled.
+  ///
+  /// In en, this message translates to:
+  /// **'The engine cannot be reached, so its step types are not known. Edit the YAML for now, or try again once it answers.'**
+  String get workflowsAddStepUnavailable;
+
+  /// Title of the step type picker.
+  ///
+  /// In en, this message translates to:
+  /// **'Add a step'**
+  String get workflowsStepPickerTitle;
+
+  /// Placeholder of the step type search.
+  ///
+  /// In en, this message translates to:
+  /// **'Search step types'**
+  String get workflowsStepSearchHint;
+
+  /// Step type picker with no result.
+  ///
+  /// In en, this message translates to:
+  /// **'No step type matches.'**
+  String get workflowsStepNoMatch;
+
+  /// A with key the step type needs and the step does not give.
+  ///
+  /// In en, this message translates to:
+  /// **'Needed'**
+  String get workflowsKeyNeeded;
+
+  /// A with key left to the step type's default.
+  ///
+  /// In en, this message translates to:
+  /// **'Default'**
+  String get workflowsKeyDefault;
+
+  /// No description provided for @workflowsKeyDefaultValue.
+  ///
+  /// In en, this message translates to:
+  /// **'Default ({value})'**
+  String workflowsKeyDefaultValue(String value);
+
+  /// A true with value.
+  ///
+  /// In en, this message translates to:
+  /// **'On'**
+  String get workflowsOn;
+
+  /// A false with value.
+  ///
+  /// In en, this message translates to:
+  /// **'Off'**
+  String get workflowsOff;
+
   /// Inspector of a stage.
   ///
   /// In en, this message translates to:

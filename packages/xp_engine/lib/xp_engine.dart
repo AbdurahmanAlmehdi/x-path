@@ -217,6 +217,7 @@ export 'src/workflows/gate_action.dart';
 export 'src/workflows/step_catalog.dart';
 export 'src/workflows/workflow_definition.dart';
 export 'src/workflows/workflow_exceptions.dart';
+export 'src/workflows/workflow_json_schema.dart';
 export 'src/workflows/workflow_matrix.dart';
 export 'src/workflows/workflow_parser.dart';
 export 'src/workflows/workflow_repository.dart';

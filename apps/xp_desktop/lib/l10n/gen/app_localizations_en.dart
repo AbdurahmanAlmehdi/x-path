@@ -2906,6 +2906,36 @@ class AppLocalizationsEn extends AppLocalizations {
   String get workflowsWithHint => 'YAML value';
 
   @override
+  String get workflowsAddStepUnavailable =>
+      'The engine cannot be reached, so its step types are not known. Edit the YAML for now, or try again once it answers.';
+
+  @override
+  String get workflowsStepPickerTitle => 'Add a step';
+
+  @override
+  String get workflowsStepSearchHint => 'Search step types';
+
+  @override
+  String get workflowsStepNoMatch => 'No step type matches.';
+
+  @override
+  String get workflowsKeyNeeded => 'Needed';
+
+  @override
+  String get workflowsKeyDefault => 'Default';
+
+  @override
+  String workflowsKeyDefaultValue(String value) {
+    return 'Default ($value)';
+  }
+
+  @override
+  String get workflowsOn => 'On';
+
+  @override
+  String get workflowsOff => 'Off';
+
+  @override
   String get workflowsSelectJob =>
       'Select a job in the pipeline to edit its matrix and steps.';
 

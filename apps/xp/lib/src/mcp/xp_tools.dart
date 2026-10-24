@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:json_annotation/json_annotation.dart';
 import 'package:xp/src/mcp/mcp_tool.dart';
 import 'package:xp/src/output/error_json.dart';
+import 'package:xp/src/output/format.dart';
 import 'package:xp/src/resolve.dart';
 import 'package:xp/src/run_approvals.dart';
 import 'package:xp_api/xp_api.dart';
@@ -212,6 +213,28 @@ List<McpTool> buildXpTools(
         )).toJson();
       },
       required: ['project', 'workflow'],
+      readOnly: true,
+    ),
+    tool(
+      'get_workflow_schema',
+      'What a workflow document may name: each step type with what it does, '
+          'the runners it needs and its typed "with" keys (required, '
+          'default, options), the gates with labels, and the variables an '
+          'expression reads. With "kind", only that step type.',
+      {'kind': text('A step type, such as build.ios.')},
+      (args) async {
+        final schema = await client.getWorkflowSchema();
+        final kind = args.optionalString('kind');
+        if (kind == null) return schema.toJson();
+        final type = schema.steps.where((step) => step.kind == kind);
+        if (type.isEmpty) {
+          throw McpArgumentError(
+            'No step type "$kind". Call get_workflow_schema without "kind" '
+            'for the list.',
+          );
+        }
+        return type.single.toJson();
+      },
       readOnly: true,
     ),
     tool(
@@ -615,6 +638,22 @@ Future<Map<String, Object?>> _tail(
   }
   return {'lines': kept, 'jobEnded': ended != null, 'jobState': ?ended?.wire};
 }
+
+/// The documents of `xp mcp`, over [client]: the workflow schema, so an
+/// agent reads it instead of fetching it from the engine itself.
+List<McpResource> buildXpResources(XpClient client) => [
+  McpResource(
+    uri: workflowSchemaUri,
+    name: 'Workflow schema',
+    description:
+        'The step types with their typed with keys, the gates, the '
+        'capabilities and the variables of workflow documents (schema 1).',
+    read: () async => prettyJson((await client.getWorkflowSchema()).toJson()),
+  ),
+];
+
+/// Where `xp mcp` serves the workflow schema.
+const workflowSchemaUri = 'xpath://workflows/schema';
 
 /// Runs a tool and turns its failure into an error result: [errorJson],
 /// with the engine's code and a hint that names MCP tools, not commands.

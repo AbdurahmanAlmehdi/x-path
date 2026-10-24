@@ -92,7 +92,42 @@ WorkflowSummary summaryOf(Workflow workflow) => WorkflowSummary(
 const schema = WorkflowSchema(
   schema: 1,
   steps: [
-    StepType(kind: 'build.android', withKeys: ['artifact', 'obfuscate']),
+    StepType(
+      kind: 'build.android',
+      withKeys: ['artifact', 'obfuscate'],
+      title: 'Build Android',
+      description: 'Builds an APK or an App Bundle.',
+      group: 'Build',
+      keys: [
+        StepKeySchema(
+          name: 'artifact',
+          type: StepKeyType.string,
+          options: ['apk', 'aab'],
+          defaultValue: 'apk',
+          description: 'What to build.',
+        ),
+        StepKeySchema(
+          name: 'obfuscate',
+          type: StepKeyType.boolean,
+          defaultValue: false,
+        ),
+      ],
+    ),
+    StepType(
+      kind: 'build.ios',
+      withKeys: ['exportOptionsPlist'],
+      title: 'Build iOS',
+      description: 'Builds and signs an IPA.',
+      group: 'Build',
+      keys: [
+        StepKeySchema(
+          name: 'exportOptionsPlist',
+          type: StepKeyType.string,
+          required: true,
+          description: 'The export options plist.',
+        ),
+      ],
+    ),
     StepType(kind: 'command', withKeys: ['run']),
     StepType(kind: 'git.checkout', withKeys: ['commitFrom']),
     StepType(kind: 'guard', withKeys: ['checks']),
@@ -102,6 +137,7 @@ const schema = WorkflowSchema(
   capabilities: ['android', 'flutter', 'ios-sign'],
   matrixAxes: ['platform', 'flavor'],
   platforms: ['android', 'ios'],
+  variables: ['flavor', 'flavor.name', 'flavor.prod', 'platform'],
 );
 
 /// A workflows repository over [releaseWorkflow] and [devBuild], whose

@@ -89,6 +89,41 @@ void main() {
       expect(planners.withKeys('nope'), isNull);
     });
 
+    test('every step type describes itself and types its keys (UX-02)', () {
+      final planners = StepPlanners(allSteps());
+
+      expect(stepAbout.keys.toSet(), planners.kinds.toSet());
+      for (final kind in planners.kinds) {
+        final type = planners.describe(kind)!;
+        expect(type.title, isNotEmpty, reason: kind);
+        expect(type.description, isNotEmpty, reason: kind);
+        expect(
+          type.group,
+          isIn(['Source', 'Checks', 'Build', 'Upload', 'GitHub', 'Other']),
+          reason: kind,
+        );
+        expect(type.withKeys, [...type.withKeys]..sort(), reason: kind);
+        for (final key in type.keys) {
+          expect(key.type, isNot(StepKeyType.any), reason: '$kind.${key.name}');
+          expect(key.description, isNotEmpty, reason: '$kind.${key.name}');
+        }
+      }
+      expect(planners.describe('nope'), isNull);
+    });
+
+    test('says what a runner needs for each step type', () {
+      final planners = StepPlanners(allSteps());
+
+      expect(planners.describe('build.android')!.capabilities, [
+        ['android', 'flutter'],
+      ]);
+      expect(planners.describe('shorebird.release')!.capabilities, [
+        ['flutter', 'android'],
+        ['flutter', 'ios-sign'],
+      ]);
+      expect(planners.describe('upload.firebase')!.capabilities, isEmpty);
+    });
+
     test('says which keys a step type needs and what each holds', () {
       final planners = StepPlanners(allSteps());
 

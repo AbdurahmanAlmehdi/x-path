@@ -51,6 +51,20 @@ final variableFields = <String, Set<String>>{
   'flavor.credentials': {for (final kind in CredentialKind.values) kind.wire},
 };
 
+/// Every path an expression can read: the variables of the dispatch and the
+/// matrix, and the fields of each that [variableFields] knows, sorted.
+List<String> get variablePaths {
+  Iterable<String> below(String path) => [
+    path,
+    for (final field in (variableFields[path]?.toList() ?? const [])..sort())
+      ...below('$path.$field'),
+  ];
+  return [
+    for (final name in {...dispatchVariables, ...matrixAxes}.toList()..sort())
+      ...below(name),
+  ];
+}
+
 /// What the variables that have no fields hold, as in "`build` is a number".
 const scalarVariables = {
   'platform': 'a string',

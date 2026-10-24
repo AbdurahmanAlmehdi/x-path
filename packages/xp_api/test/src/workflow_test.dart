@@ -192,8 +192,68 @@ void main() {
       expect(schema.steps.first.toJson(), {
         'kind': 'build.android',
         'with': ['artifact', 'flavor'],
+        'title': '',
+        'description': '',
+        'group': '',
+        'capabilities': <Object?>[],
+        'keys': <Object?>[],
       });
       expect(StepType.fromJson(const {'kind': 'test'}), schema.steps.last);
+    });
+
+    test('a step type says what it does and types its keys (UX-02)', () {
+      const type = StepType(
+        kind: 'upload.play',
+        withKeys: ['status'],
+        title: 'Upload to Google Play',
+        description: 'Uploads.',
+        group: 'Upload',
+        keys: [
+          StepKeySchema(
+            name: 'status',
+            type: StepKeyType.string,
+            options: ['completed', 'draft'],
+            defaultValue: 'completed',
+            description: 'Release now or keep a draft.',
+          ),
+        ],
+      );
+
+      expect(type.toJson()['keys'], [
+        {
+          'name': 'status',
+          'type': 'string',
+          'required': false,
+          'default': 'completed',
+          'options': ['completed', 'draft'],
+          'description': 'Release now or keep a draft.',
+        },
+      ]);
+      expect(StepType.fromJson(type.toJson()), type);
+      expect(
+        StepKeySchema.fromJson(const {'name': 'x'}),
+        const StepKeySchema(name: 'x'),
+      );
+    });
+
+    test('labels the gates and lists the variables', () {
+      const labelled = WorkflowSchema(
+        schema: 1,
+        steps: [],
+        gates: ['push'],
+        gateLabels: {'push': 'Push'},
+        capabilities: [],
+        matrixAxes: [],
+        platforms: [],
+        variables: ['platform'],
+      );
+
+      expect(labelled.toJson()['gateLabels'], {'push': 'Push'});
+      expect(WorkflowSchema.fromJson(labelled.toJson()), labelled);
+      expect(
+        WorkflowSchema.fromJson(schema.toJson()..remove('variables')),
+        schema,
+      );
     });
 
     test('round-trips through JSON', () {
