@@ -51,6 +51,18 @@ void main() {
       );
     });
 
+    testWidgets('lists the recent runs of the project', (tester) async {
+      final shell = ShellCubit();
+      await OverviewHarness(recentRuns: [failedRun().run])
+          .pump(tester, shell: shell);
+
+      await tester.scrollUntilVisible(find.text('RECENT RUNS'), 200);
+      expect(find.text('Prod release'), findsWidgets);
+      await tester.tap(find.text('All runs'));
+      await tester.pump();
+      expect(shell.state, const RunsDestination('prj_1'));
+    });
+
     testWidgets('opens the job view of the release in flight', (tester) async {
       final shell = ShellCubit();
       await OverviewHarness().pump(tester, shell: shell);

@@ -29,6 +29,14 @@ typedef FileSaver = Future<String?> Function(
 /// Shows the file at [path] in Finder, selected.
 typedef FileRevealer = Future<void> Function(String path);
 
+/// Asks the user where to save the file whose bytes arrive on [content]
+/// (offering [suggestedName]) and writes it there; the path, or `null` when
+/// they cancel.
+typedef DownloadSaver = Future<String?> Function(
+  String suggestedName,
+  Stream<List<int>> content,
+);
+
 /// A file the user picked.
 class PickedFile extends Equatable {
   const new({required this.name, required this.bytes});
@@ -73,6 +81,7 @@ class AppServices {
     required this.pickFolder,
     required this.pickFile,
     required this.saveFile,
+    required this.saveDownload,
     required this.revealFile,
     required this.engineLog,
     required this.deviceName,
@@ -116,6 +125,17 @@ class AppServices {
         await File(location.path).writeAsString(contents);
         return location.path;
       },
+      saveDownload: (suggestedName, content) async {
+        final location = await getSaveLocation(suggestedName: suggestedName);
+        if (location == null) return null;
+        final sink = File(location.path).openWrite();
+        try {
+          await sink.addStream(content);
+        } finally {
+          await sink.close();
+        }
+        return location.path;
+      },
       revealFile: (path) async {
         await Process.run('/usr/bin/open', ['-R', path]);
       },
@@ -140,6 +160,9 @@ class AppServices {
   final FolderPicker pickFolder;
   final FilePicker pickFile;
   final FileSaver saveFile;
+
+  /// Saves a downloaded file, an artifact.
+  final DownloadSaver saveDownload;
   final FileRevealer revealFile;
 
   /// The log of the engine on this Mac, as its service writes it.

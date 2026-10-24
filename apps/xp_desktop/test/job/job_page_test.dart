@@ -9,6 +9,7 @@ import 'package:xp_desktop/l10n/l10n.dart';
 import 'package:xp_desktop/shell/cubit/shell_cubit.dart';
 import 'package:xp_repositories/xp_repositories.dart';
 
+import '../helpers/fakes.dart';
 import '../helpers/job_fixtures.dart';
 import '../helpers/pump_app.dart';
 import 'job_harness.dart';
@@ -435,7 +436,97 @@ void main() {
       );
     });
 
-    testWidgets('a finished run offers nothing to do', (tester) async {
+    testWidgets(
+      'a failed run is run again, or its failed jobs, and says what it made',
+      (tester) async {
+        final harness = JobHarness(run: failedRun());
+        final shell = ShellCubit();
+        when(() => harness.jobs.rerunFailed('run_1'))
+            .thenAnswer((_) async => failedRun().run);
+        when(() => harness.jobs.runAgain('run_1')).thenAnswer(
+          (_) async => Run(
+            id: 'run_2',
+            projectId: 'prj_1',
+            workflowId: 'wf_prod',
+            workflowVersionId: 'wfv_1',
+            sha: 'a' * 40,
+            state: RunState.queued,
+            locksProject: true,
+            createdAt: at,
+            jobs: const [],
+          ),
+        );
+        when(() => harness.workflows.getWorkflow(any(), any())).thenAnswer(
+          (_) async => Workflow(
+            id: 'wf_prod',
+            projectId: 'prj_1',
+            name: 'Prod release',
+            builtin: true,
+            version: WorkflowVersionInfo(
+              id: 'wfv_2',
+              version: 2,
+              createdAt: at,
+            ),
+            versions: [
+              ...prodWorkflow.versions,
+              WorkflowVersionInfo(id: 'wfv_2', version: 2, createdAt: at),
+            ],
+            yaml: workflowYaml,
+          ),
+        );
+        await harness.pump(tester, shell: shell);
+
+        expect(find.text('VERSION'), findsOneWidget);
+        expect(find.text('3283'), findsOneWidget);
+        expect(
+          find.text(
+            'Run again runs version 1 of the workflow, the one this run ran; '
+            'it has version 2 now.',
+          ),
+          findsOneWidget,
+        );
+        await tester.tap(find.text('Re-run failed jobs'));
+        await tester.pump();
+        verify(() => harness.jobs.rerunFailed('run_1')).called(1);
+
+        await tester.tap(find.text('Run again'));
+        await tester.pump();
+        await tester.pump();
+        expect(shell.state, const JobDestination('run_2', projectId: 'prj_1'));
+      },
+    );
+
+    testWidgets('downloads an artifact, then reveals it', (tester) async {
+      final revealed = <String>[];
+      final harness = JobHarness(
+        run: runningRun(
+          iosState: JobState.succeeded,
+          buildState: StepState.succeeded,
+          runState: RunState.succeeded,
+          iosEnd: local(14, 8, 30),
+        ),
+      );
+      when(() => harness.jobs.downloadArtifact('art_1')).thenAnswer(
+        (_) async => ArtifactDownload(content: Stream.value([1]), sha256: null),
+      );
+      await harness.pump(
+        tester,
+        services: testServices(
+          saveDownload: (name, content) async => '/Downloads/$name',
+          revealFile: (path) async => revealed.add(path),
+        ),
+      );
+      await tester.tap(find.byTooltip('Download…'));
+      await tester.pump();
+      await tester.pump();
+
+      await tester.tap(find.byTooltip('Reveal in Finder'));
+      await tester.pump();
+      expect(revealed, ['/Downloads/mataa.ipa']);
+      expect(find.byTooltip('Copy path'), findsOneWidget);
+    });
+
+    testWidgets('a finished run offers to run again only', (tester) async {
       final run = runningRun(
         iosState: JobState.succeeded,
         buildState: StepState.succeeded,
@@ -466,6 +557,8 @@ void main() {
       await harness.pump(tester);
       expect(find.text('Succeeded'), findsOneWidget);
       expect(find.text('Cancel'), findsNothing);
+      expect(find.text('Run again'), findsOneWidget);
+      expect(find.text('Re-run failed jobs'), findsNothing);
       for (final key in [LogicalKeyboardKey.keyR, LogicalKeyboardKey.period]) {
         await tester.sendKeyDownEvent(LogicalKeyboardKey.metaLeft);
         await tester.sendKeyEvent(key);

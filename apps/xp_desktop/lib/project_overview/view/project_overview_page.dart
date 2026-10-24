@@ -12,6 +12,7 @@ import 'package:xp_desktop/project_overview/widgets/flavor_ledger.dart';
 import 'package:xp_desktop/project_overview/widgets/release_rail.dart';
 import 'package:xp_desktop/projects/bloc/projects_bloc.dart';
 import 'package:xp_desktop/projects/widgets/scan_summary.dart';
+import 'package:xp_desktop/runs/view/runs_page.dart';
 import 'package:xp_desktop/shell/widgets/shell_page.dart';
 import 'package:xp_desktop/theme/theme.dart';
 import 'package:xp_desktop/widgets/widgets.dart';
@@ -185,6 +186,7 @@ class _ProjectOverviewViewState extends State<ProjectOverviewView> {
                       ),
                       const SizedBox(height: 16),
                     ],
+                    RecentRuns(projectId: project.id),
                   ],
                 ),
               ),

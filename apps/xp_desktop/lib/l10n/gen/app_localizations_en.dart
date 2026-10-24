@@ -1135,6 +1135,59 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get jobRunAgain => 'Run again';
+
+  @override
+  String jobRunAgainOlder(int ran, int newest) {
+    return 'Run again runs version $ran of the workflow, the one this run ran; it has version $newest now.';
+  }
+
+  @override
+  String get jobRerunFailed => 'Re-run failed jobs';
+
+  @override
+  String get jobArtifactDownload => 'Download…';
+
+  @override
+  String get jobArtifactReveal => 'Reveal in Finder';
+
+  @override
+  String get jobArtifactCopyPath => 'Copy path';
+
+  @override
+  String get jobArtifactCopied => 'Copied the path';
+
+  @override
+  String get runSummaryVersion => 'Version';
+
+  @override
+  String get runSummaryBuild => 'Build';
+
+  @override
+  String get runSummaryJobs => 'Jobs';
+
+  @override
+  String get runSummaryTests => 'Tests';
+
+  @override
+  String runSummaryTestCounts(int passed, int failed, int skipped) {
+    return '$passed passed · $failed failed · $skipped skipped';
+  }
+
+  @override
+  String get runSummaryFlavors => 'Flavors';
+
+  @override
+  String logCopyLine(int line) {
+    return 'Copy line $line';
+  }
+
+  @override
+  String logCopiedLine(int line) {
+    return 'Copied line $line';
+  }
+
+  @override
   String jobArtifacts(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
@@ -2645,6 +2698,31 @@ class AppLocalizationsEn extends AppLocalizations {
   String freeSpaceConfirm(String size) {
     return 'Free $size';
   }
+
+  @override
+  String get sidebarRuns => 'Runs';
+
+  @override
+  String get runsTitle => 'Runs';
+
+  @override
+  String get runsAllWorkflows => 'All workflows';
+
+  @override
+  String get runsAllStates => 'All states';
+
+  @override
+  String get runsNone => 'No run matches.';
+
+  @override
+  String get runsNoneYet =>
+      'Nothing has run yet. Dispatch a workflow to see its runs here.';
+
+  @override
+  String get runsRecent => 'Recent runs';
+
+  @override
+  String get runsAll => 'All runs';
 
   @override
   String get sidebarWorkflows => 'Workflows';

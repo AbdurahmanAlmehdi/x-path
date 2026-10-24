@@ -13,6 +13,12 @@ import 'package:flutter/widgets.dart';
 const _package = 'phosphor_flutter';
 
 abstract final class PhosphorIconsRegular {
+  static const playCircle = IconData(
+    0xe3d2,
+    fontFamily: 'PhosphorRegular',
+    fontPackage: _package,
+    matchTextDirection: true,
+  );
   static const gearSix = IconData(
     0xe272,
     fontFamily: 'PhosphorRegular',
@@ -454,6 +460,12 @@ abstract final class PhosphorIconsRegular {
 }
 
 abstract final class PhosphorIconsFill {
+  static const playCircle = IconData(
+    0xe3d2,
+    fontFamily: 'PhosphorFill',
+    fontPackage: _package,
+    matchTextDirection: true,
+  );
   static const gearSix = IconData(
     0xe272,
     fontFamily: 'PhosphorFill',

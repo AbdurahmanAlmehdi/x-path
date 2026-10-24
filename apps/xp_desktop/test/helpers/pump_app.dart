@@ -186,7 +186,7 @@ extension PumpApp on WidgetTester {
             value: runnersRepository ?? quietRunners(),
           ),
           RepositoryProvider<WorkflowsRepository>.value(
-            value: workflowsRepository ?? MockWorkflowsRepository(),
+            value: workflowsRepository ?? quietWorkflows(),
           ),
           RepositoryProvider<ApprovalsRepository>.value(
             value: approvalsRepository ?? quietApprovals(),

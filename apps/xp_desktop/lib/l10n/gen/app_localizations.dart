@@ -1990,6 +1990,96 @@ abstract class AppLocalizations {
   /// **'ran {duration} · started {time}'**
   String jobRan(String duration, String time);
 
+  /// Dispatches a finished run again.
+  ///
+  /// In en, this message translates to:
+  /// **'Run again'**
+  String get jobRunAgain;
+
+  /// No description provided for @jobRunAgainOlder.
+  ///
+  /// In en, this message translates to:
+  /// **'Run again runs version {ran} of the workflow, the one this run ran; it has version {newest} now.'**
+  String jobRunAgainOlder(int ran, int newest);
+
+  /// Runs the failed jobs of a run again, from the steps that failed.
+  ///
+  /// In en, this message translates to:
+  /// **'Re-run failed jobs'**
+  String get jobRerunFailed;
+
+  /// Tooltip: saves an artifact where the owner picks.
+  ///
+  /// In en, this message translates to:
+  /// **'Download…'**
+  String get jobArtifactDownload;
+
+  /// Tooltip: shows a downloaded artifact in Finder.
+  ///
+  /// In en, this message translates to:
+  /// **'Reveal in Finder'**
+  String get jobArtifactReveal;
+
+  /// Tooltip: copies where a downloaded artifact is.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy path'**
+  String get jobArtifactCopyPath;
+
+  /// Toast.
+  ///
+  /// In en, this message translates to:
+  /// **'Copied the path'**
+  String get jobArtifactCopied;
+
+  /// Run summary.
+  ///
+  /// In en, this message translates to:
+  /// **'Version'**
+  String get runSummaryVersion;
+
+  /// Run summary: the build number.
+  ///
+  /// In en, this message translates to:
+  /// **'Build'**
+  String get runSummaryBuild;
+
+  /// Run summary.
+  ///
+  /// In en, this message translates to:
+  /// **'Jobs'**
+  String get runSummaryJobs;
+
+  /// Run summary.
+  ///
+  /// In en, this message translates to:
+  /// **'Tests'**
+  String get runSummaryTests;
+
+  /// No description provided for @runSummaryTestCounts.
+  ///
+  /// In en, this message translates to:
+  /// **'{passed} passed · {failed} failed · {skipped} skipped'**
+  String runSummaryTestCounts(int passed, int failed, int skipped);
+
+  /// Run summary.
+  ///
+  /// In en, this message translates to:
+  /// **'Flavors'**
+  String get runSummaryFlavors;
+
+  /// No description provided for @logCopyLine.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy line {line}'**
+  String logCopyLine(int line);
+
+  /// No description provided for @logCopiedLine.
+  ///
+  /// In en, this message translates to:
+  /// **'Copied line {line}'**
+  String logCopiedLine(int line);
+
   /// Artifacts of the shown job.
   ///
   /// In en, this message translates to:
@@ -4287,6 +4377,54 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Free {size}'**
   String freeSpaceConfirm(String size);
+
+  /// Sidebar row under the selected project.
+  ///
+  /// In en, this message translates to:
+  /// **'Runs'**
+  String get sidebarRuns;
+
+  /// Title of the runs page.
+  ///
+  /// In en, this message translates to:
+  /// **'Runs'**
+  String get runsTitle;
+
+  /// Runs filter: no workflow picked.
+  ///
+  /// In en, this message translates to:
+  /// **'All workflows'**
+  String get runsAllWorkflows;
+
+  /// Runs filter: no state picked.
+  ///
+  /// In en, this message translates to:
+  /// **'All states'**
+  String get runsAllStates;
+
+  /// Runs page with nothing to show.
+  ///
+  /// In en, this message translates to:
+  /// **'No run matches.'**
+  String get runsNone;
+
+  /// Recent runs of a project without runs.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing has run yet. Dispatch a workflow to see its runs here.'**
+  String get runsNoneYet;
+
+  /// Overview section.
+  ///
+  /// In en, this message translates to:
+  /// **'Recent runs'**
+  String get runsRecent;
+
+  /// Opens the runs page.
+  ///
+  /// In en, this message translates to:
+  /// **'All runs'**
+  String get runsAll;
 
   /// Sidebar row under the selected project.
   ///

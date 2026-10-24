@@ -62,6 +62,16 @@ final class TestsDestination extends ShellDestination {
   List<Object?> get props => [projectId, jobId];
 }
 
+/// The runs of [projectId], newest first.
+final class RunsDestination extends ShellDestination {
+  const new(this.projectId);
+
+  final String projectId;
+
+  @override
+  List<Object?> get props => [projectId];
+}
+
 /// The workflows of [projectId] in the builder, showing [workflowId] first
 /// if given.
 final class WorkflowsDestination extends ShellDestination {

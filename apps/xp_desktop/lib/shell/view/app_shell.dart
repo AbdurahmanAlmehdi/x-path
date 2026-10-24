@@ -20,6 +20,7 @@ import 'package:xp_desktop/projects/bloc/projects_bloc.dart';
 import 'package:xp_desktop/projects/view/no_projects_page.dart';
 import 'package:xp_desktop/releases/view/releases_page.dart';
 import 'package:xp_desktop/runners/view/runners_page.dart';
+import 'package:xp_desktop/runs/view/runs_page.dart';
 import 'package:xp_desktop/settings/view/settings_page.dart';
 import 'package:xp_desktop/shell/cubit/shell_cubit.dart';
 import 'package:xp_desktop/shell/widgets/shell_page.dart';
@@ -149,6 +150,9 @@ class _AppShellState extends State<AppShell> {
                 TestsDestination(:final projectId, :final jobId) => TestsPage(
                   projectId: projectId,
                   jobId: jobId,
+                ),
+                RunsDestination(:final projectId) => RunsPage(
+                  projectId: projectId,
                 ),
                 WorkflowsDestination(:final projectId, :final workflowId) =>
                   WorkflowBuilderPage(

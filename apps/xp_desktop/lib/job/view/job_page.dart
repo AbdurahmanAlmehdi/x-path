@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:material_ui/material_ui.dart' hide StepState;
 import 'package:xp_api/xp_api.dart';
+import 'package:xp_desktop/app/app_services.dart';
 import 'package:xp_desktop/app/bloc/engine_connection_bloc.dart';
 import 'package:xp_desktop/job/bloc/job_log_bloc.dart';
 import 'package:xp_desktop/job/bloc/job_view_bloc.dart';
@@ -37,8 +38,18 @@ class JobPage extends StatelessWidget {
       jobs: context.read<JobsRepository>(),
       workflows: context.read<WorkflowsRepository>(),
       runners: context.read<RunnersRepository>(),
+      tests: context.read<TestsRepository>(),
+      saveDownload: context.read<AppServices>().saveDownload,
     )..add(JobViewSubscriptionRequested(runId, jobId: jobId)),
-    child: const JobView(),
+    child: BlocListener<JobViewBloc, JobViewState>(
+      listenWhen: (previous, current) =>
+          current.startedRunId != null &&
+          previous.startedRunId != current.startedRunId,
+      listener: (context, state) => context.read<ShellCubit>().show(
+        JobDestination(state.startedRunId!, projectId: state.run?.projectId),
+      ),
+      child: const JobView(),
+    ),
   );
 }
 
@@ -98,6 +109,10 @@ class JobView extends StatelessWidget {
                     const SizedBox(height: 10),
                   ],
                   _Hero(state),
+                  if (run.state.isFinished) ...[
+                    const SizedBox(height: 10),
+                    RunSummary(state),
+                  ],
                   if (job != null && job.state == JobState.queued)
                     if (job.message case final reason?) ...[
                       const SizedBox(height: 6),
@@ -164,9 +179,31 @@ class JobView extends StatelessWidget {
     final open = jobs.any((job) => !job.state.isFinished);
     final resumable = job != null && isResumable(job.state);
     final from = job == null ? null : resumeFrom(job, state.selectedStep);
+    final run = state.run!;
     return [
       if (running > 0)
         XpStatusLabel(XpStatus.jobRunning, l10n.jobRunningCount(running)),
+      if (run.state == RunState.failed)
+        XpButton(
+          label: l10n.jobRerunFailed,
+          icon: PhosphorIconsRegular.arrowClockwise,
+          busy: state.command == JobViewCommand.resuming && !resumable,
+          onPressed: canCommand
+              ? () => bloc.add(const JobViewRerunFailedRequested())
+              : null,
+        ),
+      if (run.state.isFinished)
+        XpButton(
+          label: l10n.jobRunAgain,
+          icon: PhosphorIconsRegular.play,
+          tooltip: state.workflowChanged
+              ? l10n.jobRunAgainOlder(state.ranVersion!, state.newestVersion!)
+              : null,
+          busy: state.command == JobViewCommand.dispatching,
+          onPressed: canCommand
+              ? () => bloc.add(const JobViewRunAgainRequested())
+              : null,
+        ),
       if (resumable) ...[
         XpButton(
           label: l10n.jobRestart,
@@ -360,6 +397,83 @@ class _Hero extends StatelessWidget {
   }
 }
 
+/// What a finished run made: its version and build number, its jobs by
+/// how they ended, its tests, and that "Run again" runs the version of the
+/// workflow it ran when there is a newer one.
+class RunSummary extends StatelessWidget {
+  const new(this.state, {super.key});
+
+  final JobViewState state;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    final colors = context.xpColors;
+    final type = context.xpType;
+    final runJobs = state.runJobs!;
+    final run = runJobs.run;
+    final ended = <JobState, int>{};
+    for (final job in runJobs.jobs) {
+      ended[job.state] = (ended[job.state] ?? 0) + 1;
+    }
+    final tests = state.tests;
+    Widget fact(String label, String value) => Padding(
+      padding: const EdgeInsets.only(right: 20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          XpSectionLabel(label),
+          const SizedBox(height: 2),
+          Text(value, style: type.code.copyWith(color: colors.textPrimary)),
+        ],
+      ),
+    );
+    return XpPanel(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Wrap(
+            runSpacing: 8,
+            children: [
+              if (run.version case final version?)
+                fact(l10n.runSummaryVersion, version),
+              if (run.build case final build?)
+                fact(l10n.runSummaryBuild, '$build'),
+              fact(
+                l10n.runSummaryJobs,
+                [
+                  for (final MapEntry(key: state, value: count)
+                      in ended.entries)
+                    '$count ${l10n.jobState(state).toLowerCase()}',
+                ].join(' · '),
+              ),
+              if (tests != null)
+                fact(
+                  l10n.runSummaryTests,
+                  l10n.runSummaryTestCounts(
+                    tests.passed,
+                    tests.failed + tests.errored,
+                    tests.skipped,
+                  ),
+                ),
+              if (run.request case DispatchRequest(:final flavors?))
+                fact(l10n.runSummaryFlavors, flavors.join(', ')),
+            ],
+          ),
+          if (state.workflowChanged) ...[
+            const SizedBox(height: 6),
+            Text(
+              l10n.jobRunAgainOlder(state.ranVersion!, state.newestVersion!),
+              style: type.caption.copyWith(color: colors.textSecondary),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
 /// The hero of a run: its status and what to call it. A run with an
 /// interrupted job is interrupted; a failed run says where it failed.
 (XpStatus, String) heroOf(RunJobs runJobs, AppLocalizations l10n) {
@@ -535,6 +649,7 @@ class _JobLogState extends State<_JobLog> {
     final runner = widget.runnerName;
     final ran = elapsed(job.startedAt, job.finishedAt, XpClock.now(context));
     return LogView(
+      jobId: job.id,
       steps: job.steps,
       lines: log.lines,
       live: job.state == JobState.running,

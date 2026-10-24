@@ -423,7 +423,7 @@ Details:
 
 ### Phase U4b-2: Desktop runs, logs and summaries
 
-- **Status:** Not started
+- **Status:** Done
 - **Scope:** Runs are findable from Overview, can be run again from the app, and their logs
   and artifacts are readable.
 - **Files touched:** `apps/xp_desktop/lib/{project_overview,job}/**`,

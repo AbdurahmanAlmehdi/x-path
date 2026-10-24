@@ -21,6 +21,7 @@ import 'package:xp_desktop/projects/bloc/projects_bloc.dart';
 import 'package:xp_desktop/projects/view/no_projects_page.dart';
 import 'package:xp_desktop/releases/view/releases_page.dart';
 import 'package:xp_desktop/runners/runners.dart';
+import 'package:xp_desktop/runs/view/runs_page.dart';
 import 'package:xp_desktop/settings/settings.dart';
 import 'package:xp_desktop/shell/shell.dart';
 import 'package:xp_desktop/storage/storage.dart';
@@ -181,6 +182,7 @@ void main() {
       (const AddProjectDestination(), AddProjectPage),
       (const ReleasesDestination('prj_1'), ReleasesPage),
       (const TestsDestination('prj_1'), TestsPage),
+      (const RunsDestination('prj_1'), RunsPage),
       (const RunnersDestination(), RunnersPage),
       (const StorageDestination(), StoragePage),
       (const ApprovalsDestination(), ApprovalsPage),

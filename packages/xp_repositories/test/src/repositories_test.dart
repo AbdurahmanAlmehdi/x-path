@@ -613,6 +613,62 @@ void main() {
       expect(await repository.followLogs('job_1', after: 5).toList(), frames);
       expect(await repository.listArtifacts('job_1'), artifacts);
     });
+
+    test('watches the runs of a project through its runs and jobs', () async {
+      final page = RunsResponse([_run]);
+      when(
+        () => harness.client.listRuns(
+          projectId: 'prj_1',
+          state: RunState.failed,
+          limit: 5,
+        ),
+      ).thenAnswer((_) async => page);
+      final loads = await _loadsFor(
+        harness: harness,
+        stream: repository.watchRuns('prj_1', state: RunState.failed, limit: 5),
+        events: const [
+          RunDispatched(
+            runId: 'run_2',
+            projectId: 'prj_1',
+            workflowId: 'wf_1',
+            jobIds: ['job_3'],
+          ),
+          JobStateChanged(
+            jobId: 'job_3',
+            projectId: 'prj_1',
+            state: JobState.running,
+          ),
+          JobStateChanged(
+            jobId: 'job_9',
+            projectId: 'prj_9',
+            state: JobState.running,
+          ),
+        ],
+      );
+      expect(loads, 3);
+      expect(
+        await repository
+            .watchRuns('prj_1', state: RunState.failed, limit: 5)
+            .first,
+        Snapshot(page, cached: true),
+      );
+    });
+
+    test('runs a run again, its failed jobs, and downloads', () async {
+      final client = harness.client;
+      final download = ArtifactDownload(
+        content: Stream.value([1, 2]),
+        sha256: null,
+      );
+      when(() => client.runAgain('run_1')).thenAnswer((_) async => _run);
+      when(() => client.rerunFailed('run_1')).thenAnswer((_) async => _run);
+      when(() => client.downloadArtifact('art_1'))
+          .thenAnswer((_) async => download);
+
+      expect(await repository.runAgain('run_1'), _run);
+      expect(await repository.rerunFailed('run_1'), _run);
+      expect(await repository.downloadArtifact('art_1'), download);
+    });
   });
 
   group('WorkflowsRepository', () {
