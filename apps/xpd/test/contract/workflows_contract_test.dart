@@ -371,6 +371,26 @@ void main() {
       expect(run.build, 1, reason: 'the dry run took no build number');
     });
 
+    test('GET runs 200, 400 and 404', () async {
+      final id = await client.create('echo', echoWorkflow);
+      final run = Run.fromJson((await client.dispatch(id)).json);
+      await client.until(run.id, {RunState.succeeded});
+      final project = '/projects/${client.projectId}/runs';
+
+      for (final (path, status) in [
+        ('/runs', 200),
+        ('/runs?project=${client.projectId}&limit=1', 200),
+        ('/runs?state=sleeping', 400),
+        ('/runs?limit=0', 400),
+        ('/runs?before=run_nope', 404),
+        (project, 200),
+        ('/projects/prj_nope/runs', 404),
+      ]) {
+        final response = await client.send('GET', path);
+        expectContract(response, path: path.split('?').first, status: status);
+      }
+    });
+
     test('GET and cancel a run', () async {
       final id = await client.create('ship', gatedWorkflow);
       final run = Run.fromJson((await client.dispatch(id)).json);

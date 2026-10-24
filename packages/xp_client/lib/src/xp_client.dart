@@ -256,6 +256,31 @@ class XpClient {
 
   // ------------------------------------------------------------- runs, jobs
 
+  /// `GET /runs`: the runs newest first, of [projectId], of [workflowId]
+  /// and in [state] when given, dispatched before the run [before] when
+  /// given, at most [limit].
+  Future<RunsResponse> listRuns({
+    String? projectId,
+    String? workflowId,
+    RunState? state,
+    String? before,
+    int? limit,
+  }) async => RunsResponse.fromJson(
+    await _json(
+      await _send(
+        'GET',
+        ['runs'],
+        query: {
+          'project': ?projectId,
+          'workflow': ?workflowId,
+          'state': ?state?.wire,
+          'before': ?before,
+          'limit': ?limit?.toString(),
+        },
+      ),
+    ),
+  );
+
   /// `GET /runs/{id}`.
   Future<Run> getRun(String id) async =>
       Run.fromJson(await _json(await _send('GET', ['runs', id])));
@@ -953,7 +978,8 @@ class XpClient {
       );
     } on Object catch (error) {
       throw ConnectionException(
-        'Cannot reach the engine at $baseUrl: $error',
+        'Cannot reach the engine at $baseUrl. Is xpd running? Its health is '
+        'at ${_uri(const ['health'], const {})}.',
         cause: error,
       );
     }

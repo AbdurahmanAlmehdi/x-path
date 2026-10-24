@@ -574,6 +574,188 @@ void main() {
     });
   });
 
+  group('runs list', () {
+    setUp(() {
+      when(() => env.client.listProjects())
+          .thenAnswer((_) async => [sample.project]);
+      when(() => env.client.listWorkflows('prj_1'))
+          .thenAnswer((_) async => [sample.workflowSummary]);
+    });
+
+    test('lists the runs newest first, with names and local times', () async {
+      when(() => env.client.listRuns(state: RunState.failed, limit: 20))
+          .thenAnswer(
+            (_) async => RunsResponse([
+              sample.run(state: RunState.failed, version: '1.2.3', build: 45),
+            ], next: 'run_1'),
+          );
+
+      await env.runOk(['runs', 'list', '--state', 'failed']);
+
+      final out = env.logger.out;
+      expect(out, startsWith('RUN'));
+      expect(out, contains('PROJECT'));
+      expect(out, contains('dev-build'));
+      expect(out, contains('failed'));
+      expect(out, contains('1.2.3+45'));
+      expect(out, contains(' UTC'));
+      expect(out, endsWith('More with: xp runs list --before run_1'));
+    });
+
+    test('of a project and workflow, by name', () async {
+      when(
+        () => env.client.listRuns(
+          projectId: 'prj_1',
+          workflowId: 'wf_1',
+          limit: 5,
+          before: 'run_9',
+        ),
+      ).thenAnswer((_) async => const RunsResponse([]));
+
+      await env.runOk([
+        'runs',
+        'list',
+        '--project',
+        'prj_1',
+        '--workflow',
+        'dev-build',
+        '--limit',
+        '5',
+        '--before',
+        'run_9',
+      ]);
+
+      expect(env.logger.out, 'No runs.');
+    });
+
+    test('prints JSON, and refuses a limit it does not take', () async {
+      when(() => env.client.listRuns(limit: 20))
+          .thenAnswer((_) async => RunsResponse([sample.run()]));
+
+      await env.runOk(['--json', 'runs', 'list']);
+      expect((jsonDecode(env.logger.out) as Map)['runs'], hasLength(1));
+      expect(await env.run(['runs', 'list', '--limit', '0']), 64);
+    });
+  });
+
+  group('following a run', () {
+    LogLineFrame line(String text) => LogLineFrame(
+      seq: 1,
+      step: 0,
+      at: sample.at,
+      stream: LogStream.stdout,
+      text: text,
+    );
+
+    Run runOf(RunState state, JobState job) => Run(
+      id: 'run_1',
+      projectId: 'prj_1',
+      workflowId: 'wf_1',
+      workflowVersionId: 'wfv_1',
+      sha: 'a' * 40,
+      state: state,
+      locksProject: false,
+      createdAt: sample.at,
+      jobs: [
+        RunJob(id: 'job_1', name: 'build', stage: 0, state: job),
+        const RunJob(
+          id: 'job_2',
+          name: 'upload',
+          stage: 1,
+          state: JobState.queued,
+        ),
+      ],
+    );
+
+    setUp(() {
+      when(() => env.client.getWorkflow('prj_1', 'wf_1'))
+          .thenAnswer((_) async => sample.workflow);
+      when(() => env.client.dispatchWorkflow('prj_1', 'wf_1', any()))
+          .thenAnswer((_) async => runOf(RunState.queued, JobState.queued));
+      when(() => env.client.followJobLogs('job_1', after: any(named: 'after')))
+          .thenAnswer(
+            (_) => Stream.fromIterable([
+              line('built'),
+              const LogEndFrame(state: JobState.failed),
+            ]),
+          );
+    });
+
+    test('dispatch --follow prints each job and exits 1 on failure', () async {
+      final states = [
+        runOf(RunState.queued, JobState.queued),
+        runOf(RunState.running, JobState.running),
+        runOf(RunState.failed, JobState.failed),
+      ];
+      when(() => env.client.getRun('run_1')).thenAnswer(
+        (_) async => states.length > 1 ? states.removeAt(0) : states.first,
+      );
+
+      final code = await env.run(['dispatch', 'prj_1', 'wf_1', '--follow']);
+
+      expect(code, 1);
+      expect(env.logger.infos, [
+        'Dispatched run_1.',
+        'build | built',
+        '-- run failed',
+      ]);
+      verifyNever(
+        () => env.client.followJobLogs('job_2', after: any(named: 'after')),
+      );
+    });
+
+    test('exits 0 when the run succeeded', () async {
+      when(() => env.client.getRun('run_1')).thenAnswer(
+        (_) async => Run(
+          id: 'run_1',
+          projectId: 'prj_1',
+          workflowId: 'wf_1',
+          workflowVersionId: 'wfv_1',
+          sha: 'a' * 40,
+          state: RunState.succeeded,
+          locksProject: false,
+          createdAt: sample.at,
+          jobs: const [
+            RunJob(
+              id: 'job_1',
+              name: 'build',
+              stage: 0,
+              state: JobState.succeeded,
+            ),
+          ],
+        ),
+      );
+
+      expect(await env.run(['logs', 'run_1', '-f']), 0);
+      expect(env.logger.infos.last, '-- run succeeded');
+    });
+
+    test('logs <run> without -f prints what there is, and exits 0', () async {
+      final states = [
+        runOf(RunState.running, JobState.running),
+        runOf(RunState.running, JobState.succeeded),
+      ];
+      when(() => env.client.getRun('run_1')).thenAnswer(
+        (_) async => states.length > 1 ? states.removeAt(0) : states.first,
+      );
+
+      expect(await env.run(['logs', 'run_1']), 0);
+      expect(env.logger.infos, ['build | built', '-- run running']);
+    });
+
+    test('with --json prints the frames with their job', () async {
+      when(() => env.client.getRun('run_1'))
+          .thenAnswer((_) async => runOf(RunState.failed, JobState.failed));
+
+      await env.run(['--json', 'logs', 'run_1']);
+
+      expect(
+        [for (final text in env.logger.infos) (jsonDecode(text) as Map)['job']],
+        ['job_1', 'job_1'],
+      );
+    });
+  });
+
   group('logs', () {
     setUp(() {
       when(() => env.client.getJob('job_1'))

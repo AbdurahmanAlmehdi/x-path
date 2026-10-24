@@ -8,6 +8,7 @@ import 'package:xp/src/command_runner.dart';
 import 'package:xp/src/config/token_vault.dart';
 import 'package:xp/src/config/xp_config.dart';
 import 'package:xp/src/context.dart';
+import 'package:xp/src/output/format.dart';
 import 'package:xp/src/secret_prompt.dart';
 import 'package:xp/src/update/update_check.dart';
 import 'package:xp_api/xp_api.dart';
@@ -121,8 +122,10 @@ class TestEnv {
       stdout: stdout,
       logIdle: const Duration(milliseconds: 50),
       secretPrompt: prompt,
+      pollInterval: Duration.zero,
     );
     runner = XpCommandRunner(context: context);
+    formatTimesInUtc = true;
   }
 
   late final Directory directory;

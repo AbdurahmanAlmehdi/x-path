@@ -27,6 +27,58 @@ void main() {
     return Run.fromJson((await client.dispatch(id)).json);
   }
 
+  group('GET /runs', () {
+    test('lists the runs newest first, wherever they came from', () async {
+      final first = await dispatch(echoWorkflow);
+      engine.clock.advance(const Duration(minutes: 1));
+      final second = await dispatch(echoWorkflow);
+      await client.until(first.id, {RunState.succeeded});
+      await client.until(second.id, {RunState.succeeded});
+
+      final all = RunsResponse.fromJson(
+        (await client.send('GET', '/runs')).json,
+      );
+      expect(all.runs.map((r) => r.id), [second.id, first.id]);
+      expect(all.runs.first.request, isNotNull);
+
+      final page = RunsResponse.fromJson(
+        (await client.send('GET', '/runs?limit=1&state=succeeded')).json,
+      );
+      expect(page.runs.single.id, second.id);
+      expect(page.next, second.id);
+      final rest = RunsResponse.fromJson(
+        (await client.send('GET', '/runs?before=${page.next}')).json,
+      );
+      expect(rest.runs.single.id, first.id);
+
+      final mine = RunsResponse.fromJson(
+        (await client.send(
+          'GET',
+          '/projects/${client.projectId}/runs?workflow=${first.workflowId}',
+        )).json,
+      );
+      expect(mine.runs.single.id, first.id);
+    });
+
+    test('answers 400 for a limit or a state it does not take', () async {
+      for (final query in ['limit=0', 'limit=201', 'limit=x', 'state=x']) {
+        final response = await client.send('GET', '/runs?$query');
+        expect(response.statusCode, 400, reason: query);
+      }
+    });
+
+    test('answers 404 for no project, and no run to page from', () async {
+      expect(
+        (await client.send('GET', '/projects/prj_nope/runs')).statusCode,
+        404,
+      );
+      expect(
+        (await client.send('GET', '/runs?before=run_nope')).statusCode,
+        404,
+      );
+    });
+  });
+
   group('GET /runs/{id}', () {
     test('shows a run with its jobs', () async {
       final run = await dispatch(echoWorkflow);

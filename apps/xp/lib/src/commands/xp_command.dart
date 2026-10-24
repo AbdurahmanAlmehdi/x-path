@@ -119,7 +119,7 @@ String describeApiError(ApiException error) => error.issues.isNotEmpty
           'Not allowed with this token: ${error.message}'
         else
           error.message,
-        ?cliHint(error),
+        ?(cliHint(error) ?? error.hint),
       ].join(' ');
 
 /// The lines for the issues of a workflow document, `line:column: message`
@@ -159,7 +159,7 @@ Future<int> guarded(
           errorJson(
             apiCodeOf(error),
             error.message,
-            cliHint(error),
+            cliHint(error) ?? error.hint,
             error.issues,
           ),
         ),

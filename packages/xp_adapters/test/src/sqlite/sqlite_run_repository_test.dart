@@ -49,6 +49,64 @@ void main() {
     jobs = SqliteJobRepository(database);
   });
 
+  test(
+    'lists the runs newest first, by project and workflow, in pages',
+    () async {
+      database.connection
+        ..execute(
+          'INSERT INTO project (id, github_repo_id, remote, '
+          "default_base_branch) VALUES ('prj_2', 2, 'r', 'main')",
+        )
+        ..execute(
+          'INSERT INTO workflow (id, project_id, name) '
+          "VALUES ('wf_2', 'prj_2', 'w')",
+        )
+        ..execute(
+          'INSERT INTO workflow_version (id, workflow_id, version, yaml) '
+          "VALUES ('wfv_2', 'wf_2', 1, '')",
+        );
+      for (final (id, minutes) in [('run_a', 1), ('run_b', 2), ('run_c', 2)]) {
+        await repository.create(
+          _run(id, at: _created.add(Duration(minutes: minutes))),
+        );
+      }
+      await repository.create(
+        RunRecord(
+          id: 'run_z',
+          projectId: 'prj_2',
+          workflowId: 'wf_2',
+          workflowVersionId: 'wfv_2',
+          sha: 'b' * 40,
+          locksProject: false,
+          createdAt: _created.add(const Duration(minutes: 9)),
+        ),
+      );
+
+      Future<List<String>> ids({
+        String? project,
+        String? workflow,
+        String? before,
+        int limit = 50,
+      }) async => [
+        for (final run in await repository.list(
+          projectId: project,
+          workflowId: workflow,
+          before: before,
+          limit: limit,
+        ))
+          run.id,
+      ];
+
+      expect(await ids(), ['run_z', 'run_c', 'run_b', 'run_a']);
+      expect(await ids(project: 'prj_1'), ['run_c', 'run_b', 'run_a']);
+      expect(await ids(workflow: 'wf_2'), ['run_z']);
+      expect(await ids(project: 'prj_1', limit: 2), ['run_c', 'run_b']);
+      expect(await ids(project: 'prj_1', before: 'run_c'), ['run_b', 'run_a']);
+      expect(await ids(before: 'run_b'), ['run_a']);
+      expect(await ids(before: 'run_nope'), isEmpty);
+    },
+  );
+
   test('stores a run and reads it back, times to the microsecond', () async {
     await repository.create(_run('run_1'));
 

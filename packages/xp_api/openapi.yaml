@@ -1038,6 +1038,56 @@ paths:
           $ref: "#/components/responses/SecretsLocked"
         "500":
           $ref: "#/components/responses/InternalError"
+  /projects/{id}/runs:
+    parameters:
+      - $ref: "#/components/parameters/ProjectId"
+    get:
+      operationId: listProjectRuns
+      summary: The runs of a project, newest first.
+      description: Like `GET /runs?project={id}`, and `404` for no project.
+      parameters:
+        - name: workflow
+          in: query
+          required: false
+          description: Only the runs of this workflow (an id).
+          schema:
+            type: string
+        - name: state
+          in: query
+          required: false
+          schema:
+            $ref: "#/components/schemas/RunState"
+        - name: limit
+          in: query
+          required: false
+          description: At most this many runs, 1 to 200; 50 by default.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+        - name: before
+          in: query
+          required: false
+          description: |
+            Only the runs dispatched before this one (a run id): the `next` of
+            the page before.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: The runs.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RunsResponse"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
   /projects/{id}/workflows:
     parameters:
       - $ref: "#/components/parameters/ProjectId"
@@ -1373,6 +1423,61 @@ paths:
           $ref: "#/components/responses/UpstreamError"
         "503":
           $ref: "#/components/responses/SecretsLocked"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /runs:
+    get:
+      operationId: listRuns
+      summary: The runs, newest first, of every project or one.
+      description: |
+        Every run of the engine, wherever it was dispatched from (the app,
+        the CLI, MCP). `next` is there when there may be more: pass it as
+        `before`.
+      parameters:
+        - name: project
+          in: query
+          required: false
+          description: Only the runs of this project (an id).
+          schema:
+            type: string
+        - name: workflow
+          in: query
+          required: false
+          description: Only the runs of this workflow (an id).
+          schema:
+            type: string
+        - name: state
+          in: query
+          required: false
+          schema:
+            $ref: "#/components/schemas/RunState"
+        - name: limit
+          in: query
+          required: false
+          description: At most this many runs, 1 to 200; 50 by default.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+        - name: before
+          in: query
+          required: false
+          description: |
+            Only the runs dispatched before this one (a run id): the `next` of
+            the page before.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: The runs.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RunsResponse"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
         "500":
           $ref: "#/components/responses/InternalError"
   /runs/{id}:
@@ -2655,6 +2760,16 @@ components:
               type: array
               items:
                 $ref: "#/components/schemas/WorkflowIssue"
+            hint:
+              type: string
+              description: |
+                What to do about it, for the owner (UX-05). It names no
+                command; a client adds its own.
+            details:
+              type: object
+              description: |
+                Facts of the error a client can act on, for example the `kind`
+                of a missing credential.
     AlreadyDecidedResponse:
       type: object
       required: [error, approval]
@@ -3750,6 +3865,20 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/RunJob"
+        request:
+          $ref: "#/components/schemas/DispatchRequest"
+    RunsResponse:
+      type: object
+      required: [runs]
+      additionalProperties: false
+      properties:
+        runs:
+          type: array
+          items:
+            $ref: "#/components/schemas/Run"
+        next:
+          type: string
+          description: The `before` of the next page, when there may be one.
     ResumeJobRequest:
       type: object
       additionalProperties: false

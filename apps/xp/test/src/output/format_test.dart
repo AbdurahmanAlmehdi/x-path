@@ -23,8 +23,21 @@ void main() {
     });
   });
 
-  test('formatTime prints UTC to the minute', () {
-    expect(formatTime(DateTime.utc(2026, 1, 2, 3, 4, 5)), '2026-01-02 03:04');
+  test('formatTime prints the local time to the minute, with its zone', () {
+    final previous = formatTimesInUtc;
+    addTearDown(() => formatTimesInUtc = previous);
+
+    formatTimesInUtc = false;
+    final local = DateTime(2026, 1, 2, 3, 4, 5);
+    expect(
+      formatTime(local),
+      '2026-01-02 03:04 ${local.isUtc ? 'UTC' : local.timeZoneName}',
+    );
+    formatTimesInUtc = true;
+    expect(
+      formatTime(DateTime.utc(2026, 1, 2, 3, 4, 5)),
+      '2026-01-02 03:04 UTC',
+    );
     expect(formatTime(null), '-');
   });
 

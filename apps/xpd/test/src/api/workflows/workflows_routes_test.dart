@@ -533,6 +533,32 @@ void main() {
 
       expect(response.statusCode, 503);
       expect(errorCode(response), 'secrets_locked');
+      expect(
+        ErrorResponse.fromJson(response.json).error.hint,
+        startsWith('Unlock them in the XPath app'),
+      );
+    });
+
+    test('says what to do about a missing credential (UX-05)', () async {
+      final id = await client.create('upload', r'''
+schema: 1
+stages:
+  - name: a
+    jobs:
+      j:
+        matrix:
+          platform: [android]
+          flavor: ${{ flavors }}
+        steps:
+          - kind: upload.play
+''');
+
+      final response = await client.dispatch(id);
+
+      expect(response.statusCode, 422);
+      final error = ErrorResponse.fromJson(response.json).error;
+      expect(error.hint, contains('Google Play service account'));
+      expect(error.details, containsPair('kind', 'play_sa'));
     });
 
     test('queues a second production release behind the first', () async {

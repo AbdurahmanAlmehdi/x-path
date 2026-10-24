@@ -124,8 +124,15 @@ class WorkflowInvalidException extends WorkflowException {
 
 /// A dispatch asks for something the project cannot do.
 class DispatchException extends WorkflowException {
-  /// Creates the exception.
-  const new(super.message);
+  /// Creates the exception, with what to do about it ([hint]) and the
+  /// [details] a client can act on.
+  const new(super.message, {this.hint, this.details});
+
+  /// What to do about it, for the owner; it names no command (UX-09).
+  final String? hint;
+
+  /// Facts a client can act on, such as the `kind` of a missing credential.
+  final Map<String, Object?>? details;
 
   @override
   String toString() => 'DispatchException: $message';

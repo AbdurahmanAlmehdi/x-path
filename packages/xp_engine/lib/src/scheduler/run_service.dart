@@ -46,6 +46,47 @@ class RunService {
   final JobRepository _jobs;
   final JobControl _control;
 
+  /// The runs, newest first: of [projectId], of [workflowId] and in [state]
+  /// when given, dispatched before the run [before] when given, at most
+  /// [limit]; and the `before` of the next page when there may be one.
+  ///
+  /// Throws a [RunNotFoundException] if there is no run [before].
+  Future<RunsResponse> list({
+    String? projectId,
+    String? workflowId,
+    RunState? state,
+    String? before,
+    int limit = 50,
+  }) async {
+    if (before != null && await _runs.get(before) == null) {
+      throw RunNotFoundException(before);
+    }
+    final found = <Run>[];
+    var cursor = before;
+    while (found.length < limit) {
+      // A state is known once a run's jobs are read, so with one the runs
+      // are read a page at a time until enough of them are in it.
+      final asked = state == null ? limit - found.length : 100;
+      final page = await _runs.list(
+        projectId: projectId,
+        workflowId: workflowId,
+        before: cursor,
+        limit: asked,
+      );
+      for (final record in page) {
+        final run = record.toRun(await _jobs.forRun(record.id));
+        if (state == null || run.state == state) found.add(run);
+        if (found.length == limit) break;
+      }
+      if (page.length < asked) break;
+      cursor = page.last.id;
+    }
+    return RunsResponse(
+      found,
+      next: found.length == limit ? found.last.id : null,
+    );
+  }
+
   /// The run [id] with the state of its jobs.
   ///
   /// Throws a [RunNotFoundException] if there is none.

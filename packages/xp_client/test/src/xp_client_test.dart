@@ -108,6 +108,27 @@ void main() {
       expected: 'removed',
     ),
     _Endpoint(
+      'listRuns',
+      method: 'GET',
+      path: '/runs',
+      query: {
+        'project': 'prj_1',
+        'workflow': 'wf_1',
+        'state': 'failed',
+        'before': 'run_9',
+        'limit': '5',
+      },
+      response: const RunsResponse([]).toJson(),
+      call: (client) => client.listRuns(
+        projectId: 'prj_1',
+        workflowId: 'wf_1',
+        state: RunState.failed,
+        before: 'run_9',
+        limit: 5,
+      ),
+      expected: const RunsResponse([]),
+    ),
+    _Endpoint(
       'listWorkflowTemplates',
       method: 'GET',
       path: '/workflows/templates',
@@ -1087,6 +1108,11 @@ void main() {
         throwsA(
           isA<ConnectionException>()
               .having((e) => e.message, 'message', contains(url.toString()))
+              .having(
+                (e) => e.message,
+                'message',
+                contains('Is xpd running? Its health is at'),
+              )
               .having((e) => e.cause, 'cause', isNotNull)
               .having(
                 (e) => '$e',

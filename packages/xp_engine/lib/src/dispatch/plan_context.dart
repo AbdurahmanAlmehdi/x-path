@@ -225,9 +225,14 @@ class StepPlanning {
   /// Where the step starts in the document.
   final SourcePosition position;
 
-  /// Stops the dispatch: this step cannot be planned.
-  Never fail(String message) =>
-      throw DispatchException('Line ${position.line}, $kind: $message');
+  /// Stops the dispatch: this step cannot be planned. [hint] says what to do
+  /// about it, and [details] what a client can act on.
+  Never fail(String message, {String? hint, Map<String, Object?>? details}) =>
+      throw DispatchException(
+        'Line ${position.line}, $kind: $message',
+        hint: hint,
+        details: details,
+      );
 
   /// The string at [key], or `null` if the step was not given it.
   String? text(String key) {

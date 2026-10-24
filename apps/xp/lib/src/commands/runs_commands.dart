@@ -57,6 +57,14 @@ class DispatchCommand extends XpCommand {
         help:
             'Print what would run, where, what is left out and why, and the '
             'build number it would take; start nothing.',
+      )
+      ..addFlag(
+        'follow',
+        abbr: 'f',
+        negatable: false,
+        help:
+            'Follow the run: print the log of each job as it runs, and exit '
+            'with how the run ended (0 when it succeeded).',
       );
   }
 
@@ -137,6 +145,10 @@ class DispatchCommand extends XpCommand {
       return plan.blocked ? XpExit.invalid : XpExit.ok;
     }
     final run = await client.dispatchWorkflow(projectId, workflowId, request);
+    if (results.flag('follow')) {
+      if (!asJson) logger.info('Dispatched ${run.id}.');
+      return await printRunLogs(this, client, run.id, follow: true);
+    }
     emit(run.toJson(), () => 'Dispatched ${run.id}.\n\n${describeRun(run)}');
     return XpExit.ok;
   }
@@ -260,6 +272,8 @@ String describeRun(Run run, {List<Approval> approvals = const []}) {
   final lines = [
     head,
     'sha: ${run.sha}  dispatched: ${formatTime(run.createdAt)}',
+    if (run.request case DispatchRequest(:final flavors?, :final platforms?))
+      'flavors: ${flavors.join(', ')}  platforms: ${platforms.join(', ')}',
     '',
     renderTable(
       ['JOB', 'NAME', 'STAGE', 'STATE'],
@@ -278,12 +292,212 @@ String _waitingFor(Approval approval) =>
     'with: xp approvals approve ${approval.id}';
 
 /// `xp runs`: the runs a dispatch made.
-XpGroup runsCommand(XpContext context) => XpGroup(
-  context,
-  'runs',
-  'Show and cancel runs.',
-  [RunsShowCommand(context), RunsCancelCommand(context)],
-);
+XpGroup runsCommand(XpContext context) =>
+    XpGroup(context, 'runs', 'List, show and cancel runs.', [
+      RunsListCommand(context),
+      RunsShowCommand(context),
+      RunsCancelCommand(context),
+    ]);
+
+/// `xp runs list [--project <p>] [--workflow <w>] [--state <s>]`.
+class RunsListCommand extends XpCommand {
+  /// Creates the command.
+  new(super.context) {
+    argParser
+      ..addOption('project', help: 'Only the runs of this project.')
+      ..addOption(
+        'workflow',
+        help: 'Only the runs of this workflow (needs --project for a name).',
+      )
+      ..addOption(
+        'state',
+        help: 'Only the runs in this state.',
+        allowed: [for (final state in RunState.values) state.wire],
+      )
+      ..addOption(
+        'limit',
+        help: 'At most this many runs.',
+        valueHelp: 'n',
+        defaultsTo: '20',
+      )
+      ..addOption(
+        'before',
+        help: 'Only the runs dispatched before this run: the next page.',
+        valueHelp: 'run',
+      );
+  }
+
+  @override
+  String get name => 'list';
+
+  @override
+  String get description =>
+      'List the runs, newest first, wherever they were dispatched from.';
+
+  @override
+  String get invocation =>
+      'xp runs list [--project <p>] [--workflow <w>] [--state <s>]';
+
+  @override
+  Future<int> execute(XpClient client) async {
+    positionals(const []);
+    final results = argResults!;
+    final limit = int.tryParse(results.option('limit')!);
+    if (limit == null || limit < 1 || limit > 200) {
+      usageException('--limit must be a number from 1 to 200.');
+    }
+    final projectReference = results.option('project');
+    final projectId = projectReference == null
+        ? null
+        : await resolveProject(client, projectReference);
+    final workflowReference = results.option('workflow');
+    final workflowId = workflowReference == null
+        ? null
+        : projectId == null
+        ? workflowReference
+        : await resolveWorkflow(client, projectId, workflowReference);
+    final page = await client.listRuns(
+      projectId: projectId,
+      workflowId: workflowId,
+      state: switch (results.option('state')) {
+        null => null,
+        final state => RunState.fromWire(state),
+      },
+      before: results.option('before'),
+      limit: limit,
+    );
+    if (asJson) {
+      emit(page.toJson(), () => '');
+      return XpExit.ok;
+    }
+    final names = <String, String>{
+      for (final project in {for (final run in page.runs) run.projectId})
+        for (final workflow in await client.listWorkflows(project))
+          workflow.id: workflow.name,
+    };
+    final projects = projectId != null
+        ? const <String, String>{}
+        : {
+            for (final project in await client.listProjects())
+              project.id: project.fullName.isEmpty
+                  ? project.id
+                  : project.fullName,
+          };
+    emit(page.toJson(), () {
+      if (page.runs.isEmpty) return 'No runs.';
+      return [
+        renderTable(
+          [
+            'RUN',
+            if (projectId == null) 'PROJECT',
+            'WORKFLOW',
+            'STATE',
+            'VERSION',
+            'DISPATCHED',
+          ],
+          [
+            for (final run in page.runs)
+              [
+                run.id,
+                if (projectId == null) projects[run.projectId] ?? run.projectId,
+                names[run.workflowId] ?? run.workflowId,
+                paintState(run.state.wire, ansi: context.ansi),
+                [?run.version, ?run.build?.toString()].join('+'),
+                formatTime(run.createdAt),
+              ],
+          ],
+        ),
+        if (page.next case final next?)
+          '\nMore with: xp runs list --before $next',
+      ].join('\n');
+    });
+    return XpExit.ok;
+  }
+}
+
+/// Prints the log of every job of the run [runId], each line after the
+/// name of its job, a job at a time in the order the run made them; with
+/// [follow], waiting for each to start and until the run ends. Returns the
+/// exit code: with [follow], [XpExit.ok] only when the run succeeded.
+Future<int> printRunLogs(
+  XpCommand command,
+  XpClient client,
+  String runId, {
+  required bool follow,
+}) async {
+  final context = command.context;
+  var run = await client.getRun(runId);
+  for (var index = 0; index < run.jobs.length; index++) {
+    var job = run.jobs[index];
+    bool waits() =>
+        follow && job.state == JobState.queued && !run.state.isFinished;
+    // A spinner on a terminal while the job waits for its turn.
+    final progress = waits() && context.ansi && !command.asJson
+        ? command.logger.progress('${job.name} waits for its turn')
+        : null;
+    while (waits()) {
+      await Future<void>.delayed(context.pollInterval);
+      run = await client.getRun(runId);
+      job = run.jobs[index];
+    }
+    progress?.complete('${job.name} ${job.state.wire}');
+    if (job.state == JobState.queued) continue;
+    await streamJobLog(
+      command,
+      client,
+      job.id,
+      whole: follow || job.state.isFinished,
+      prefix: '${job.name} | ',
+    );
+    run = await client.getRun(runId);
+  }
+  while (follow && !run.state.isFinished) {
+    await Future<void>.delayed(context.pollInterval);
+    run = await client.getRun(runId);
+  }
+  if (!command.asJson) {
+    command.logger.info(
+      '-- run ${paintState(run.state.wire, ansi: context.ansi)}',
+    );
+  }
+  return follow && run.state != RunState.succeeded ? XpExit.failed : XpExit.ok;
+}
+
+/// Prints the log of the job [jobId] from line [after], each line after
+/// [prefix]: to its end when [whole], else until the engine is quiet for
+/// `XpContext.logIdle`. Returns the end of the log, when it came.
+Future<LogEndFrame?> streamJobLog(
+  XpCommand command,
+  XpClient client,
+  String jobId, {
+  required bool whole,
+  int after = 0,
+  String prefix = '',
+}) async {
+  final lines = StreamIterator(client.followJobLogs(jobId, after: after));
+  LogEndFrame? end;
+  try {
+    while (true) {
+      final more = whole
+          ? await lines.moveNext()
+          : await lines.moveNext().timeout(
+              command.context.logIdle,
+              onTimeout: () => false,
+            );
+      if (!more) break;
+      final frame = lines.current;
+      if (frame is LogEndFrame) end = frame;
+      if (command.asJson) {
+        command.logger.info(jsonEncode({'job': jobId, ...frame.toJson()}));
+      } else if (frame is LogLineFrame) {
+        command.logger.info('$prefix${frame.text}');
+      }
+    }
+  } finally {
+    await lines.cancel();
+  }
+  return end;
+}
 
 /// `xp runs show <run>`.
 class RunsShowCommand extends XpCommand {
@@ -501,10 +715,11 @@ class LogsCommand extends XpCommand {
   String get name => 'logs';
 
   @override
-  String get description => 'Print the log of a job; with -f, follow it.';
+  String get description =>
+      'Print the log of a job, or of every job of a run; with -f, follow it.';
 
   @override
-  String get invocation => 'xp logs <job> [-f] [--after <seq>]';
+  String get invocation => 'xp logs <job|run> [-f] [--after <seq>]';
 
   @override
   Future<int> execute(XpClient client) async {
@@ -514,33 +729,21 @@ class LogsCommand extends XpCommand {
       usageException('--after must be a non-negative number.');
     }
     final follow = argResults!.flag('follow');
+    if (id.startsWith('run_')) {
+      return await printRunLogs(this, client, id, follow: follow);
+    }
     // A job that ended has its whole log: read it to its end, however long
     // the engine takes. One that runs prints what it has so far.
     final whole = follow || (await client.getJob(id)).state.isFinished;
-    final lines = StreamIterator(client.followJobLogs(id, after: after));
-    LogEndFrame? end;
-    try {
-      while (true) {
-        final more = whole
-            ? await lines.moveNext()
-            : await lines.moveNext().timeout(
-                context.logIdle,
-                onTimeout: () => false,
-              );
-        if (!more) break;
-        final frame = lines.current;
-        if (frame is LogEndFrame) end = frame;
-        if (asJson) {
-          logger.info(jsonEncode(frame.toJson()));
-        } else if (frame is LogLineFrame) {
-          logger.info(frame.text);
-        }
-      }
-    } finally {
-      await lines.cancel();
-    }
+    final end = await streamJobLog(
+      this,
+      client,
+      id,
+      whole: whole,
+      after: after,
+    );
     if (!asJson && end != null) {
-      logger.info('-- job ${end.state.wire}');
+      logger.info('-- job ${paintState(end.state.wire, ansi: context.ansi)}');
     }
     return switch (end?.state) {
       JobState.failed ||

@@ -114,4 +114,93 @@ void main() {
     );
     expect(const RunStateException('m').toString(), 'RunStateException: m');
   });
+
+  group('list', () {
+    setUp(() async {
+      for (final (id, project, minutes) in [
+        ('run_2', 'prj_1', 2),
+        ('run_3', 'prj_2', 3),
+        ('run_4', 'prj_1', 4),
+      ]) {
+        await runs.create(
+          RunRecord(
+            id: id,
+            projectId: project,
+            workflowId: 'wf_1',
+            workflowVersionId: 'wfv_1',
+            sha: 'a' * 40,
+            locksProject: false,
+            createdAt: DateTime.utc(2026).add(Duration(minutes: minutes)),
+            request: const {
+              'flavors': ['dev'],
+              'inputs': <String, Object?>{},
+            },
+          ),
+        );
+      }
+    });
+
+    test(
+      'gives the runs newest first, with where the next page starts',
+      () async {
+        final first = await service.list(limit: 2);
+        expect(first.runs.map((r) => r.id), ['run_4', 'run_3']);
+        expect(first.next, 'run_3');
+        expect(first.runs.first.request?.flavors, ['dev']);
+
+        final second = await service.list(limit: 2, before: first.next);
+        expect(second.runs.map((r) => r.id), ['run_2', 'run_1']);
+        expect(second.next, 'run_1');
+        expect(second.runs.last.request, isNull, reason: 'none stored');
+
+        final last = await service.list(limit: 2, before: second.next);
+        expect(last.runs, isEmpty);
+        expect(last.next, isNull);
+      },
+    );
+
+    test('filters by project, workflow and state', () async {
+      expect((await service.list(projectId: 'prj_1')).runs.map((r) => r.id), [
+        'run_4',
+        'run_2',
+        'run_1',
+      ]);
+      expect((await service.list(workflowId: 'wf_x')).runs, isEmpty);
+
+      await job('prepare');
+      final queued = await service.list(state: RunState.queued, limit: 1);
+      expect(queued.runs.single.id, 'run_1');
+      expect(queued.next, 'run_1');
+      expect((await service.list(state: RunState.succeeded)).runs, isEmpty);
+      expect(
+        (await service.list(state: RunState.cancelled)).runs.map((r) => r.id),
+        ['run_4', 'run_3', 'run_2'],
+        reason: 'a run without jobs ran nothing',
+      );
+    });
+
+    test('says when the run to page from is not there', () async {
+      await expectLater(
+        service.list(before: 'run_nope'),
+        throwsA(isA<RunNotFoundException>()),
+      );
+    });
+
+    test('reads a request it cannot read as none', () async {
+      await runs.create(
+        RunRecord(
+          id: 'run_odd',
+          projectId: 'prj_1',
+          workflowId: 'wf_1',
+          workflowVersionId: 'wfv_1',
+          sha: 'a' * 40,
+          locksProject: false,
+          createdAt: DateTime.utc(2027),
+          request: const {'flavors': 'dev'},
+        ),
+      );
+
+      expect((await service.get('run_odd')).request, isNull);
+    });
+  });
 }

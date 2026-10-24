@@ -1217,6 +1217,19 @@ class _FailingRuns implements RunRepository {
 
   @override
   Future<List<RunRecord>> held() => _inner.held();
+
+  @override
+  Future<List<RunRecord>> list({
+    String? projectId,
+    String? workflowId,
+    String? before,
+    int limit = 50,
+  }) => _inner.list(
+    projectId: projectId,
+    workflowId: workflowId,
+    before: before,
+    limit: limit,
+  );
 }
 
 /// A job repository whose list of waiting jobs is out of date.

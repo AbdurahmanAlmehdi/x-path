@@ -320,6 +320,33 @@ void main() {
       expect(env.logger.infos, isEmpty);
     });
 
+    test(
+      'passes on the hint of the engine when it adds none (UX-05)',
+      () async {
+        const locked = ApiException(
+          'The engine cannot read its secrets right now.',
+          statusCode: 503,
+          code: ApiErrorCode.secretsLocked,
+          hint: 'Unlock them in the XPath app.',
+        );
+        when(() => env.client.getRun('run_1')).thenThrow(locked);
+
+        await env.run(['--json', 'runs', 'show', 'run_1']);
+        expect(
+          (jsonDecode(env.logger.errors.single) as Map)['hint'],
+          'Unlock them in the XPath app.',
+        );
+
+        env.logger.errors.clear();
+        await env.run(['runs', 'show', 'run_1']);
+        expect(
+          env.logger.errors.single,
+          'The engine cannot read its secrets right now. Unlock them in the '
+          'XPath app.',
+        );
+      },
+    );
+
     test('prints the issues of a workflow document as JSON', () async {
       when(() => env.client.getRun('bad_id')).thenThrow(
         const ApiException(

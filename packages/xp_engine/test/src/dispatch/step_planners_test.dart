@@ -850,7 +850,24 @@ stages:
             flavors: ['dev'],
           ),
         ),
-        _fails(contains('has no play_sa credential assigned')),
+        throwsA(
+          isA<DispatchException>()
+              .having(
+                (e) => e.message,
+                'message',
+                contains('has no play_sa credential assigned'),
+              )
+              .having(
+                (e) => e.hint,
+                'hint',
+                'Add a Google Play service account credential and assign it '
+                    'to dev, then dispatch again.',
+              )
+              .having((e) => e.details, 'details', {
+                'kind': 'play_sa',
+                'flavor': 'dev',
+              }),
+        ),
       );
       await harness.saveCredential('dev', CredentialKind.playSa);
       await expectLater(

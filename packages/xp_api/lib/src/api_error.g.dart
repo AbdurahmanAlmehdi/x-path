@@ -12,12 +12,16 @@ ApiError _$ApiErrorFromJson(Map<String, dynamic> json) => ApiError(
   issues: (json['issues'] as List<dynamic>?)
       ?.map((e) => WorkflowIssue.fromJson(e as Map<String, dynamic>))
       .toList(),
+  hint: json['hint'] as String?,
+  details: json['details'] as Map<String, dynamic>?,
 );
 
 Map<String, dynamic> _$ApiErrorToJson(ApiError instance) => <String, dynamic>{
   'code': _$ApiErrorCodeEnumMap[instance.code]!,
   'message': instance.message,
   'issues': ?instance.issues?.map((e) => e.toJson()).toList(),
+  'hint': ?instance.hint,
+  'details': ?instance.details,
 };
 
 const _$ApiErrorCodeEnumMap = {

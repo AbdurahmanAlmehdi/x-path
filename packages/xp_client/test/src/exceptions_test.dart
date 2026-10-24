@@ -69,6 +69,24 @@ void main() {
       );
     });
 
+    test('reads the hint and the details of the engine', () {
+      final error = ApiException.fromResponse(
+        503,
+        '{"error": {"code": "secrets_locked", "message": "Locked.", '
+        '"hint": "Unlock them.", "details": {"a": 1}}}',
+      );
+
+      expect(error.hint, 'Unlock them.');
+      expect(error.details, {'a': 1});
+      expect(
+        ApiException.fromResponse(
+          403,
+          '{"error": {"code": "forbidden", "message": "No."}}',
+        ).details,
+        isEmpty,
+      );
+    });
+
     test('a code it does not know is no envelope', () {
       final error = ApiException.fromResponse(
         400,

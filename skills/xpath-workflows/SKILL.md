@@ -276,7 +276,7 @@ Save and run it:
 ```sh
 xp workflows validate dev-firebase.yaml
 xp workflows create acme/app dev-firebase -f dev-firebase.yaml
-xp dispatch acme/app dev-firebase --flavor dev
+xp dispatch acme/app dev-firebase --flavor dev --follow   # prints the logs, exits 0 on success
 xp dispatch acme/app dev-firebase --flavor dev --input 'notes=Try the new checkout'
 ```
 

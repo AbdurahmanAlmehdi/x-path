@@ -384,7 +384,7 @@ Details:
 
 ### Phase U4a: Runs API, CLI follow, MCP runs
 
-- **Status:** Not started
+- **Status:** Done
 - **Scope:** Runs can be listed and followed from every client, and API errors carry a hint.
 - **Files touched:** `packages/xp_api/**`, `packages/xp_engine/lib/src/**` (run queries),
   `packages/xp_adapters/lib/src/sqlite/**`, `apps/xpd/lib/src/api/runs/**`,

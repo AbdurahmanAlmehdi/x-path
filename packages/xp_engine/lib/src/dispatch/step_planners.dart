@@ -727,9 +727,20 @@ class StepPlanners implements StepCatalog {
         final key = p.job.credential(CredentialKind.ascKey);
         final appleId = p.job.credential(CredentialKind.appleId);
         if (key == null && appleId == null) {
+          final flavor = p.job.flavor?.name ?? 'default';
           p.fail(
             'The flavor has no App Store Connect key or Apple ID assigned. '
             'Assign one to the flavor first.',
+            hint:
+                'Add an App Store Connect API key or an Apple ID credential '
+                'and assign it to $flavor, then dispatch again.',
+            details: {
+              'kinds': [
+                CredentialKind.ascKey.wire,
+                CredentialKind.appleId.wire,
+              ],
+              'flavor': flavor,
+            },
           );
         }
         return {
@@ -944,12 +955,18 @@ class StepPlanners implements StepCatalog {
   static String? _secretOf(StepPlanning p, CredentialKind kind) =>
       p.job.credential(kind)?.secretKey;
 
-  static String _requiredSecret(StepPlanning p, CredentialKind kind) =>
-      _secretOf(p, kind) ??
-      p.fail(
-        'The flavor "${p.job.flavor?.name ?? 'default'}" has no '
-        '${kind.wire} credential assigned. Assign one to the flavor first.',
-      );
+  static String _requiredSecret(StepPlanning p, CredentialKind kind) {
+    final flavor = p.job.flavor?.name ?? 'default';
+    return _secretOf(p, kind) ??
+        p.fail(
+          'The flavor "$flavor" has no ${kind.wire} credential assigned. '
+          'Assign one to the flavor first.',
+          hint:
+              'Add a ${kind.label} credential and assign it to $flavor, then '
+              'dispatch again.',
+          details: {'kind': kind.wire, 'flavor': flavor},
+        );
+  }
 
   static String? _blankToNull(String? text) =>
       text == null || text.trim().isEmpty ? null : text;

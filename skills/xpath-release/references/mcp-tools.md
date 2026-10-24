@@ -17,6 +17,9 @@ server tells the agent so when it connects.
 | `list_workflows` | **`project`** | The built-in workflows and the project's own. |
 | `get_workflow` | **`project`**, **`workflow`**, `version` (integer; newest by default) | The workflow with its YAML, versions and `inputs`: each with its `type` (`string`, `boolean`, `choice` with `options`, `json`, `release`, or none for any value), `default` and `required`. |
 | `get_run` | **`run`** (`run_...`) | `{run, pendingApprovals, note?}`: the run with its jobs, and the approvals it waits for. |
+| `list_runs` | `project`, `workflow`, `state`, `limit` (1–50, 20), `before` | `{runs, next?}`: the runs newest first, wherever they were dispatched from. Pass `next` as `before` for more. |
+| `wait_for_run` | **`run`**, `timeoutSeconds` (0–300, 60) | As `get_run`, once the run ended or waits for an approval, with `timedOut` when it did neither in time: call it again. |
+| `wait_for_approval` | **`approval`**, `timeoutSeconds` (0–300, 60) | As `get_approval`, once the owner decided or it expired, with `timedOut` while it is still pending. |
 | `get_job` | **`job`** (`job_...`) | The job with its steps and their results. |
 | `get_job_log_tail` | **`job`**, `lines` (100 by default) | `{lines, jobEnded, jobState?}`: the last lines, masked. |
 | `list_artifacts` | **`job`** | The files the job produced (builds, manifests, symbols). |
@@ -74,8 +77,8 @@ next, or is empty.
 1. `list_projects`, then `list_workflows` for the project.
 2. `get_workflow` to read the inputs of the workflow you will run.
 3. `dispatch_workflow`; keep the run id.
-4. `get_run` until it is `succeeded`, `failed`, `cancelled` or `waiting_for_approval`;
-   `get_job_log_tail` for a job that runs or failed.
-5. On `waiting_for_approval`: report the approval to the owner (see the main skill), then poll
-   `get_approval`.
+4. `wait_for_run` (or `get_run` in a loop) until it is `succeeded`, `failed`, `cancelled` or
+   `waiting_for_approval`; `get_job_log_tail` for a job that runs or failed.
+5. On `waiting_for_approval`: report the approval to the owner (see the main skill), then
+   `wait_for_approval`.
 6. For a release: `list_releases` (state `in_review`, say) and `get_release` for the store lanes.

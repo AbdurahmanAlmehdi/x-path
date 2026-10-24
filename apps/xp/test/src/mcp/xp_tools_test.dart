@@ -22,6 +22,7 @@ void main() {
       for (final tool in buildXpTools(
         client,
         tailIdle: const Duration(milliseconds: 50),
+        pollInterval: Duration.zero,
       ))
         tool.name: tool,
     };
@@ -74,6 +75,9 @@ void main() {
           'update_workflow',
           'archive_workflow',
           'dispatch_workflow',
+          'list_runs',
+          'wait_for_run',
+          'wait_for_approval',
           'get_run',
           'get_job',
           'get_job_log_tail',
@@ -289,6 +293,74 @@ void main() {
           {'line': 4, 'column': 2, 'message': 'Unknown step.'},
         ],
       });
+    });
+
+    test('list_runs lists them, by project, workflow and state', () async {
+      when(
+        () => client.listRuns(
+          projectId: 'prj_1',
+          workflowId: 'wf_1',
+          state: RunState.failed,
+          limit: 5,
+        ),
+      ).thenAnswer((_) async => RunsResponse([sample.run()], next: 'run_1'));
+      when(() => client.listRuns(limit: 20, workflowId: 'wf_x'))
+          .thenAnswer((_) async => const RunsResponse([]));
+
+      final result = await call('list_runs', {
+        'project': 'prj_1',
+        'workflow': 'dev-build',
+        'state': 'failed',
+        'limit': 5,
+      });
+      final all = await call('list_runs', {'workflow': 'wf_x'});
+      final bad = await call('list_runs', {'limit': 99});
+      final odd = await call('list_runs', {'state': 'sleeping'});
+
+      expect((decoded(result)! as Map)['next'], 'run_1');
+      expect((decoded(all)! as Map)['runs'], isEmpty);
+      expect(bad.isError, isTrue);
+      expect(odd.isError, isTrue);
+    });
+
+    test('wait_for_run waits until the run ends, or times out', () async {
+      final states = [RunState.running, RunState.running, RunState.succeeded];
+      when(() => client.getRun('run_1')).thenAnswer(
+        (_) async => sample.run(
+          state: states.length > 1 ? states.removeAt(0) : states.first,
+        ),
+      );
+
+      final done = await call('wait_for_run', {'run': 'run_1'});
+      expect((decoded(done)! as Map)['timedOut'], isFalse);
+      expect(((decoded(done)! as Map)['run'] as Map)['state'], 'succeeded');
+
+      when(() => client.getRun('run_2'))
+          .thenAnswer((_) async => sample.run(id: 'run_2'));
+      final waiting = await call('wait_for_run', {
+        'run': 'run_2',
+        'timeoutSeconds': 0,
+      });
+      expect((decoded(waiting)! as Map)['timedOut'], isTrue);
+      final bad = await call('wait_for_run', {
+        'run': 'run_2',
+        'timeoutSeconds': 301,
+      });
+      expect(bad.isError, isTrue);
+    });
+
+    test('wait_for_approval waits until the owner decides', () async {
+      final states = [ApprovalState.pending, ApprovalState.approved];
+      when(() => client.getApproval('apr_1')).thenAnswer(
+        (_) async => sample.approval(
+          state: states.length > 1 ? states.removeAt(0) : states.first,
+        ),
+      );
+
+      final result = await call('wait_for_approval', {'approval': 'apr_1'});
+
+      expect((decoded(result)! as Map)['state'], 'approved');
+      expect((decoded(result)! as Map)['timedOut'], isFalse);
     });
 
     test('archive_workflow archives, and unarchives', () async {

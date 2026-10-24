@@ -26,6 +26,8 @@ class XpContext {
     required this.stdout,
     this.logIdle = const Duration(milliseconds: 750),
     this.secretPrompt = const TerminalSecretPrompt(),
+    this.pollInterval = const Duration(seconds: 2),
+    this.ansi = false,
   });
 
   /// The context of the real process.
@@ -53,6 +55,7 @@ class XpContext {
       updateCheck: UpdateCheck.system(directory, env),
       stdin: io.stdin,
       stdout: io.stdout,
+      ansi: io.stdout.hasTerminal && io.stdout.supportsAnsiEscapes,
     );
   }
 
@@ -84,4 +87,11 @@ class XpContext {
 
   /// Asks the person at the terminal for a secret (`xp credentials add`).
   final SecretPrompt secretPrompt;
+
+  /// How long a command that waits for a run looks again.
+  final Duration pollInterval;
+
+  /// Whether the output is a terminal that shows colours: states are
+  /// coloured then.
+  final bool ansi;
 }

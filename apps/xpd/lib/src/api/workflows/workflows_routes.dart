@@ -163,15 +163,18 @@ Future<Response> guardWorkflows(Future<Response> Function() action) async {
       ApiErrorCode.workflowInvalid,
       error.message,
       issues: error.issues,
+      hint: 'Fix the issues at their lines, then save or dispatch again.',
     );
   } on DispatchException catch (error) {
-    return errorResponse(ApiErrorCode.workflowInvalid, error.message);
+    return errorResponse(
+      ApiErrorCode.workflowInvalid,
+      error.message,
+      hint: error.hint,
+      details: error.details,
+    );
   } on GitException catch (error) {
     return errorResponse(ApiErrorCode.upstreamError, error.message);
   } on SecretsLockedException {
-    return errorResponse(
-      ApiErrorCode.secretsLocked,
-      'The engine cannot read its secrets right now. Unlock them and retry.',
-    );
+    return secretsLockedResponse();
   }
 }

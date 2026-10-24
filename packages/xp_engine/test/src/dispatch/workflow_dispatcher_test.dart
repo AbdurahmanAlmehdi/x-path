@@ -339,7 +339,23 @@ void main() {
             },
           ),
         ),
-        _dispatchError(contains('no App Store Connect key or Apple ID')),
+        throwsA(
+          isA<DispatchException>()
+              .having(
+                (e) => e.message,
+                'message',
+                contains('no App Store Connect key or Apple ID'),
+              )
+              .having(
+                (e) => e.hint,
+                'hint',
+                contains('assign it to dev, then dispatch again'),
+              )
+              .having((e) => e.details, 'details', {
+                'kinds': ['asc_key', 'apple_id'],
+                'flavor': 'dev',
+              }),
+        ),
       );
     });
 

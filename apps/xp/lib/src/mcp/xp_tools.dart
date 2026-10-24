@@ -13,7 +13,7 @@ import 'package:xp_client/xp_client.dart';
 const mcpInstructions = '''
 XPath releases Flutter apps. These tools read projects, workflows, runs, jobs, logs, releases, approvals, test runs, storage, credentials (never a secret) and runners; create and edit projects and workflows (a workflow is checked first and its errors come back with their lines); and dispatch workflows.
 
-Gated actions (a production release, a production OTA patch, a store submission, a push, a merge, a delete) wait for the owner's approval. This server can never approve or deny: when a dispatched run reaches a gate, get_run shows it as waiting_for_approval with the pending approval ids; tell the owner, who approves in the XPath app or with `xp approvals approve <id>`, and poll get_approval until its state is no longer pending. Expired counts as denied.
+Gated actions (a production release, a production OTA patch, a store submission, a push, a merge, a delete) wait for the owner's approval. This server can never approve or deny: when a dispatched run reaches a gate, get_run shows it as waiting_for_approval with the pending approval ids; tell the owner, who approves in the XPath app or with `xp approvals approve <id>`, and wait_for_approval (or poll get_approval) until its state is no longer pending. Expired counts as denied. wait_for_run waits for a run to end or reach a gate; list_runs finds runs dispatched anywhere.
 
 Projects can be named by id (prj_...), owner/name or just name. Workflows by id (wf_...) or name.''';
 
@@ -26,6 +26,7 @@ Projects can be named by id (prj_...), owner/name or just name. Workflows by id 
 List<McpTool> buildXpTools(
   XpClient client, {
   Duration tailIdle = const Duration(seconds: 1),
+  Duration pollInterval = const Duration(seconds: 2),
 }) {
   McpTool tool(
     String name,
@@ -376,6 +377,97 @@ List<McpTool> buildXpTools(
       readOnly: true,
     ),
     tool(
+      'list_runs',
+      'List the runs, newest first, wherever they were dispatched from: of a '
+          'project, a workflow (needs project for a name) and a state when '
+          'given. "next" is there when there may be more: pass it as '
+          '"before".',
+      {
+        'project': project,
+        'workflow': workflow,
+        'state': text(
+          'Only runs in this state.',
+          values: [for (final state in RunState.values) state.wire],
+        ),
+        'limit': integer('At most this many runs, 1 to 50; 20 by default.'),
+        'before': text('Only runs dispatched before this run id.'),
+      },
+      (args) async {
+        final limit = args.optionalInt('limit') ?? 20;
+        if (limit < 1 || limit > 50) {
+          throw const McpArgumentError('"limit" must be from 1 to 50.');
+        }
+        final id = args.optionalString('project') == null
+            ? null
+            : await projectId(args);
+        final workflowReference = args.optionalString('workflow');
+        return (await client.listRuns(
+          projectId: id,
+          workflowId: workflowReference == null || id == null
+              ? workflowReference
+              : await resolveWorkflow(client, id, workflowReference),
+          state: switch (args.optionalString('state')) {
+            null => null,
+            final wire =>
+              RunState.fromWire(wire) ??
+                  (throw McpArgumentError('No run state "$wire".')),
+          },
+          before: args.optionalString('before'),
+          limit: limit,
+        )).toJson();
+      },
+      readOnly: true,
+    ),
+    tool(
+      'wait_for_run',
+      'Wait until a run ends or waits for an approval, at most '
+          '"timeoutSeconds" (60 by default, 300 at most). Returns the run as '
+          'get_run does, and "timedOut" when it neither ended nor waits yet; '
+          'call it again then.',
+      {
+        'run': text('The run id (run_...).'),
+        'timeoutSeconds': integer('How long to wait, 0 to 300.'),
+      },
+      (args) async {
+        final id = args.string('run');
+        final run = await _poll(
+          () => client.getRun(id),
+          (run) =>
+              run.state.isFinished || run.state == RunState.waitingForApproval,
+          _timeout(args),
+          pollInterval,
+        );
+        return {
+          ...await _runWithApprovals(client, run.value),
+          'timedOut': run.timedOut,
+        };
+      },
+      required: ['run'],
+      readOnly: true,
+    ),
+    tool(
+      'wait_for_approval',
+      'Wait until the owner decides an approval or it expires, at most '
+          '"timeoutSeconds" (60 by default, 300 at most). Returns it as '
+          'get_approval does, and "timedOut" while it is still pending.',
+      {
+        'approval': text('The approval id (apr_...).'),
+        'timeoutSeconds': integer('How long to wait, 0 to 300.'),
+      },
+      (args) async {
+        final id = args.string('approval');
+        final approval = await _poll(
+          () => client.getApproval(id),
+          (approval) => approval.state != ApprovalState.pending,
+          _timeout(args),
+          pollInterval,
+        );
+        return {...approval.value.toJson(), 'timedOut': approval.timedOut};
+      },
+      required: ['approval'],
+      readOnly: true,
+    ),
+    tool(
       'get_job',
       'Show a job with its steps and their results.',
       {'job': text('The job id (job_...).')},
@@ -664,6 +756,33 @@ Future<Map<String, Object?>> _tail(
   return {'lines': kept, 'jobEnded': ended != null, 'jobState': ?ended?.wire};
 }
 
+/// How long a wait tool waits: `timeoutSeconds`, 60 by default.
+Duration _timeout(McpArgs args) {
+  final seconds = args.optionalInt('timeoutSeconds') ?? 60;
+  if (seconds < 0 || seconds > 300) {
+    throw const McpArgumentError('"timeoutSeconds" must be from 0 to 300.');
+  }
+  return Duration(seconds: seconds);
+}
+
+/// Reads [read] every [interval] until [done] says so or [timeout] passes;
+/// the last value, and whether the time ran out first.
+Future<({T value, bool timedOut})> _poll<T>(
+  Future<T> Function() read,
+  bool Function(T value) done,
+  Duration timeout,
+  Duration interval,
+) async {
+  final watch = Stopwatch()..start();
+  var value = await read();
+  while (!done(value)) {
+    if (watch.elapsed >= timeout) return (value: value, timedOut: true);
+    await Future<void>.delayed(interval);
+    value = await read();
+  }
+  return (value: value, timedOut: false);
+}
+
 /// The documents of `xp mcp`, over [client]: the workflow schema, so an
 /// agent reads it instead of fetching it from the engine itself.
 List<McpResource> buildXpResources(XpClient client) => [
@@ -703,7 +822,12 @@ Future<McpToolResult> _guard(Future<McpToolResult> Function() body) async {
                 'and save it with `xp connect --mcp-token <token>`.',
           )
         : McpToolResult.json(
-            errorJson(apiCodeOf(error), error.message, null, error.issues),
+            errorJson(
+              apiCodeOf(error),
+              error.message,
+              error.hint,
+              error.issues,
+            ),
             isError: true,
           );
   } on ConnectionException catch (error) {
