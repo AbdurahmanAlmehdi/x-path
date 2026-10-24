@@ -1881,5 +1881,5 @@
   "removeTrashFailed": "XPath could not move itself to the Trash. Quit, then drag XPath from Applications to the Trash.",
   "@removeTrashFailed": {"description": "When the Trash refused."},
   "removeQuit": "Quit XPath",
-  "@removeQuit": {"description": "Quits without the Trash."},
+  "@removeQuit": {"description": "Quits without the Trash."}
 }

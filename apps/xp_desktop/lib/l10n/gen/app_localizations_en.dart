@@ -3482,12 +3482,4 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get removeQuit => 'Quit XPath';
-
-  @override
-  String get addProjectNoGitHub =>
-      'The engine has no GitHub token, so it cannot add a project. Connect GitHub below first.';
-
-  @override
-  String get addProjectGitHubRejected =>
-      'GitHub refuses the engine\'s token, so it cannot add a project. Save a new one below.';
 }

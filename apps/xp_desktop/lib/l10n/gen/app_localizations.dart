@@ -5697,18 +5697,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Quit XPath'**
   String get removeQuit;
-
-  /// Add project without a GitHub token.
-  ///
-  /// In en, this message translates to:
-  /// **'The engine has no GitHub token, so it cannot add a project. Connect GitHub below first.'**
-  String get addProjectNoGitHub;
-
-  /// Add project with a refused token.
-  ///
-  /// In en, this message translates to:
-  /// **'GitHub refuses the engine\'s token, so it cannot add a project. Save a new one below.'**
-  String get addProjectGitHubRejected;
 }
 
 class _AppLocalizationsDelegate
