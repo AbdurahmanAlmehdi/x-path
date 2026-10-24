@@ -11,7 +11,7 @@ const String dispatchedSha = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 const String otherSha = 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
 
 /// A mirror that does not exist; [StubGit] never opens it.
-const mirror = GitMirror(githubRepoId: 42, path: '/mirrors/42.git');
+const mirror = GitMirror(key: '42', path: '/mirrors/42.git');
 
 /// A tag of a release on [commit].
 GitTagInfo tag(String name, [String? commit]) =>

@@ -1,6 +1,7 @@
 import 'package:xp_api/xp_api.dart';
 import 'package:xp_engine/src/credentials/credential_material.dart';
 import 'package:xp_engine/src/dispatch/plan_context.dart';
+import 'package:xp_engine/src/projects/project_record.dart';
 import 'package:xp_engine/src/scheduler/capability.dart';
 import 'package:xp_engine/src/steps/step.dart';
 import 'package:xp_engine/src/steps/step_registry.dart';
@@ -467,7 +468,7 @@ class StepPlanners implements StepCatalog {
       }
       final flavor = p.job.flavor;
       return {
-        'githubRepoId': run.project.githubRepoId,
+        'githubRepoId': _githubRepoIdOf(run.project, p.fail),
         'head': run.model.branchName(version.name, scope: p.job.worktree.scope),
         'base': run.project.defaultBaseBranch,
         'title':
@@ -489,12 +490,22 @@ class StepPlanners implements StepCatalog {
               'There is no release to merge: dispatch this workflow with '
               '"release", or with POST /releases/{id}/merge.',
             ),
-        'githubRepoId': p.job.run.project.githubRepoId,
+        'githubRepoId': _githubRepoIdOf(p.job.run.project, p.fail),
       },
     ),
   ];
 
   // --------------------------------------------------------------- helpers
+
+  /// The GitHub id of [project] for a GitHub step. The dispatcher refuses
+  /// these steps on any other project (ADR 0015); [fail] says so if one gets
+  /// here all the same.
+  static int _githubRepoIdOf(
+    ProjectRecord project,
+    Never Function(String message) fail,
+  ) =>
+      project.githubRepoId ??
+      fail('${project.fullName} is not on GitHub, so it has no pull request.');
 
   static String _flavorSuffix(FlavorProfile? flavor) =>
       flavor == null || flavor.implicit ? '' : ' (${flavor.name})';

@@ -74,10 +74,7 @@ void main() {
     projectId: 'prj_1',
     sha: 'a' * 40,
     name: 'Job',
-    repository: const LeaseRepository(
-      githubRepoId: 42,
-      sshUrl: 'git@x:y/z.git',
-    ),
+    repository: const LeaseRepository(cacheKey: '42', sshUrl: 'git@x:y/z.git'),
     stage: 0,
     capabilities: const [],
     expiresAt: DateTime.utc(2026, 10, 14, 12),

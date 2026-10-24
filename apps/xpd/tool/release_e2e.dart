@@ -50,7 +50,14 @@
 // back on the same address the runner reconnects by itself and the job
 // follows the loss rule: see `_runnerOffline`.
 //
-// Usage: dart run tool/release_e2e.dart --mode dev|prod|mcp|runner-loss|runner-build|runner-offline
+// `--mode runner-any-host` (runner onboarding R10c, ADR 0015,
+// tool/e2e/runner_any_host_e2e.sh) is `runner-build` for a project whose
+// origin is a `file://` bare repository, on an engine with no GitHub token:
+// the engine adds it without GitHub, the runner fetches the commit from the
+// URL the lease names (no test hook), and `prod-release` is refused at
+// dispatch with the host and the step: see `_runnerAnyHost`.
+//
+// Usage: dart run tool/release_e2e.dart --mode dev|prod|mcp|runner-loss|runner-build|runner-offline|runner-any-host
 //          --xpd <executable> --fixture <dir> --work <dir>
 //          [--flutter-sdk <dir>] [--xp <executable>]
 //
@@ -81,6 +88,7 @@ Future<void> main(List<String> arguments) async {
         'runner-loss',
         'runner-build',
         'runner-offline',
+        'runner-any-host',
       ],
       defaultsTo: 'dev',
     )
@@ -210,6 +218,10 @@ class _E2e {
     }
     if (mode == 'runner-build') {
       await _runnerBuild(projectId);
+      return;
+    }
+    if (mode == 'runner-any-host') {
+      await _runnerAnyHost(project);
       return;
     }
     if (mode == 'runner-offline') {
@@ -751,8 +763,10 @@ class _E2e {
     'XP_TEST_FILE_SECRETS': '1',
     'XP_NO_UPDATE_CHECK': '1',
     // The offer names the repository the engine knows (here a local path
-    // that plays GitHub). A test points the runner at it all the same.
-    'XP_RUNNER_TEST_SOURCE_URL': p.join(work, 'origin.git'),
+    // that plays GitHub). A test points the runner at it all the same. A
+    // project on another host is fetched from the URL of the offer itself.
+    if (mode != 'runner-any-host')
+      'XP_RUNNER_TEST_SOURCE_URL': p.join(work, 'origin.git'),
     'PATH': ?path,
   };
 
@@ -1228,6 +1242,64 @@ class _E2e {
     );
   }
 
+  // ------------------------------------------------------- any git host
+
+  /// Runner onboarding R10c (ADR 0015): a project whose origin is a
+  /// `file://` bare repository, on an engine with no GitHub token.
+  ///
+  ///   1. the project was added without GitHub: its host is `local`, its
+  ///      source key `h` and 16 hex digits, and it has no GitHub id,
+  ///   2. `dev-build` runs as in `runner-build`, the build job on the runner,
+  ///      which fetches the commit from the `file://` URL the lease names
+  ///      (no `XP_RUNNER_TEST_SOURCE_URL`) into a cache named by the key,
+  ///   3. `prod-release`, which pushes and opens a pull request, is refused at
+  ///      dispatch with the host and the step.
+  Future<void> _runnerAnyHost(Map<String, dynamic> project) async {
+    final projectId = project['id']! as String;
+    final key = project['sourceKey'];
+    _expect(
+      project['host'] == 'local' &&
+          key is String &&
+          RegExp(r'^h[0-9a-f]{16}$').hasMatch(key) &&
+          !project.containsKey('githubRepoId') &&
+          (project['remote'] as String).startsWith('file://'),
+      'the project was added from its file:// origin without GitHub: '
+      '${project['host']} $key ${project['remote']}',
+    );
+    _log('added the file:// project with the source key $key, no GitHub');
+
+    await _runnerBuild(projectId);
+    final mirrors = Directory(p.join(work, 'runner-data', 'source', 'mirrors'))
+        .listSync()
+        .map((entry) => p.basename(entry.path));
+    _expect(
+      mirrors.single == '$key.git',
+      "the runner's cache is named by the source key: $mirrors",
+    );
+
+    final workflows = await _get('/projects/$projectId/workflows');
+    final prodRelease =
+        ((workflows['workflows'] as List).firstWhere(
+              (w) => (w as Map)['name'] == 'prod-release',
+            ) as Map)['id']!
+            as String;
+    final refused = await _post(
+      '/projects/$projectId/workflows/$prodRelease/dispatch',
+      {
+        'flavors': ['prod'],
+      },
+      expect: 422,
+    );
+    final message = (refused['error'] as Map)['message']! as String;
+    _expect(
+      message.contains('is a local repository, not on GitHub') &&
+          message.contains('"git.push"') &&
+          message.contains('dev-build or test'),
+      'prod-release was refused with the host and the step: $message',
+    );
+    _log('prod-release was refused: $message');
+  }
+
   // ------------------------------------------------------------- MCP gate
 
   /// Phase 13: an agent that dispatches a production release through
@@ -1558,7 +1630,10 @@ class _E2e {
       'remote',
       'add',
       'origin',
-      'https://github.com/e2e/build-app.git',
+      if (mode == 'runner-any-host')
+        Uri.file(origin).toString()
+      else
+        'https://github.com/e2e/build-app.git',
     ], clone);
     return origin;
   }
@@ -1606,7 +1681,7 @@ class _E2e {
       if (mode == 'runner-loss')
         // `keytool` accepts the made-up keystore the script saves.
         'PATH': '${_keytoolShim()}:${Platform.environment['PATH']}',
-      if (mode == 'runner-build')
+      if (mode == 'runner-build' || mode == 'runner-any-host')
         // No fvm answers, so the engine takes the Flutter SDK of its cache
         // (its home folder is not the one fvm keeps its SDKs in).
         'PATH': '${_fvmShim()}:${Platform.environment['PATH']}',
@@ -1618,7 +1693,7 @@ class _E2e {
         'PATH': '${p.join(work, 'shims')}:${Platform.environment['PATH']}',
       },
     };
-    if (mode == 'runner-build') {
+    if (mode == 'runner-build' || mode == 'runner-any-host') {
       // An engine that cannot build Android: no SDK in its environment, and a
       // home folder where Android Studio has put none.
       environment
@@ -1629,19 +1704,22 @@ class _E2e {
         )..createSync(recursive: true)).path;
     }
     // The GitHub CLI of the engine is a script that prints a made-up token.
-    final gh = File(p.join(work, 'gh'))
-      ..writeAsStringSync('#!/bin/sh\necho $_githubToken\n');
-    Process.runSync('chmod', ['+x', gh.path]);
-    final imported = await Process.run(xpd, [
-      'secrets',
-      'import-gh',
-      '--data-dir',
-      data,
-      '--gh',
-      gh.path,
-    ], environment: environment);
-    if (imported.exitCode != 0) {
-      throw _Failure('xpd secrets import-gh failed: ${imported.stderr}');
+    // An engine for a project on another host has no GitHub token at all.
+    if (mode != 'runner-any-host') {
+      final gh = File(p.join(work, 'gh'))
+        ..writeAsStringSync('#!/bin/sh\necho $_githubToken\n');
+      Process.runSync('chmod', ['+x', gh.path]);
+      final imported = await Process.run(xpd, [
+        'secrets',
+        'import-gh',
+        '--data-dir',
+        data,
+        '--gh',
+        gh.path,
+      ], environment: environment);
+      if (imported.exitCode != 0) {
+        throw _Failure('xpd secrets import-gh failed: ${imported.stderr}');
+      }
     }
     final created = await Process.run(xpd, [
       'token',
@@ -1677,7 +1755,8 @@ class _E2e {
         if (mode == 'runner-loss' || mode == 'runner-offline') '1' else '2',
       ],
       environment: _engineEnvironment,
-      includeParentEnvironment: mode != 'runner-build',
+      includeParentEnvironment:
+          mode != 'runner-build' && mode != 'runner-any-host',
     );
     final listening = Completer<Uri>();
     engine.stdout

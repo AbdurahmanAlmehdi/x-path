@@ -334,7 +334,8 @@ void main() {
       }
 
       final (listed, projects) = await call('GET', '/projects');
-      final (refused, _) = await call(
+      // An HTTPS remote on another host is offered its SSH URL (ADR 0015).
+      final (refused, offer) = await call(
         'POST',
         '/projects',
         '{"remote": "https://example.com/not/github"}',
@@ -343,7 +344,8 @@ void main() {
 
       expect(listed, 200);
       expect(projects['projects'], isEmpty);
-      expect(refused, 400);
+      expect(refused, 422);
+      expect(offer['sshUrl'], 'git@example.com:not/github.git');
       expect(missing, 404);
       shutdown.add(null);
       expect(await exit, 0);
@@ -640,6 +642,8 @@ void main() {
         await SqliteProjectRepository(database).add(
           ProjectRecord(
             id: 'prj_real',
+            host: 'github.com',
+            sourceKey: '7',
             githubRepoId: 7,
             fullName: 'octo/real',
             remote: 'x',
@@ -749,6 +753,8 @@ void main() {
         await SqliteProjectRepository(database).add(
           ProjectRecord(
             id: 'prj_real',
+            host: 'github.com',
+            sourceKey: '7',
             githubRepoId: 7,
             fullName: 'octo/real',
             remote: 'x',
@@ -854,6 +860,8 @@ void main() {
         await SqliteProjectRepository(database).add(
           ProjectRecord(
             id: 'prj_real',
+            host: 'github.com',
+            sourceKey: '7',
             githubRepoId: 7,
             fullName: 'octo/real',
             remote: 'x',
@@ -981,6 +989,8 @@ void main() {
       final projectId = await withDatabase((database) async {
         final record = ProjectRecord(
           id: 'prj_real',
+          host: 'github.com',
+          sourceKey: '7',
           githubRepoId: 7,
           fullName: 'octo/real',
           remote: '${root.path}/no-such-repository.git',
@@ -1188,8 +1198,9 @@ void main() {
               .isEmpty) {
             connection
               ..execute(
-                'INSERT INTO project (id, github_repo_id, remote, '
-                "default_base_branch) VALUES ('prj_1', 1, 'r', 'main')",
+                'INSERT INTO project (id, host, source_key, github_repo_id, '
+                'remote, default_base_branch) '
+                "VALUES ('prj_1', 'github.com', '1', 1, 'r', 'main')",
               )
               ..execute(
                 'INSERT INTO workflow (id, project_id, name) '

@@ -39,6 +39,8 @@ void main() {
     await projects.add(
       ProjectRecord(
         id: 'prj_1',
+        host: 'github.com',
+        sourceKey: '1',
         githubRepoId: 1,
         fullName: 'o/r',
         remote: 'x',
