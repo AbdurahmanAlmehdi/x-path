@@ -818,15 +818,7 @@ Future<McpToolResult> _guard(Future<McpToolResult> Function() body) async {
             'Ask the owner to create one with `xpd token create --kind mcp` '
                 'and save it with `xp connect --mcp-token <token>`.',
           )
-        : McpToolResult.json(
-            errorJson(
-              apiCodeOf(error),
-              error.message,
-              error.hint,
-              error.issues,
-            ),
-            isError: true,
-          );
+        : McpToolResult.json(apiErrorJson(error), isError: true);
   } on ConnectionException catch (error) {
     return fail('unreachable', error.message);
   } on ReferenceException catch (error) {

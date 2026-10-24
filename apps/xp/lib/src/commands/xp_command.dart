@@ -95,19 +95,18 @@ abstract class XpCommand extends Command<int> {
 
 /// What the CLI adds to an error of the engine, for the cases a person can
 /// fix: the command that fixes it. The engine names no command (UX-09).
-String? cliHint(ApiException error) => switch (error.code) {
-  ApiErrorCode.unauthorized => 'Run: xp connect <url> --token <token>',
-  ApiErrorCode.conflict when error.message.contains('has been run') =>
-    'Archive it instead: xp workflows archive <project> <workflow>',
-  ApiErrorCode.workflowInvalid when error.message.contains('is archived') =>
-    'Unarchive it with: xp workflows archive <project> <workflow> --undo',
-  ApiErrorCode.workflowInvalid when error.message.contains(' assigned') =>
-    'Assign one with: xp credentials assign',
-  ApiErrorCode.workflowInvalid
-      when error.message.contains('is a production flavor') =>
-    'Name the flavors with --flavor.',
-  _ => null,
-};
+String? cliHint(ApiException error) =>
+    switch ((error.code, error.details['reason'])) {
+      (ApiErrorCode.unauthorized, _) => 'Run: xp connect <url> --token <token>',
+      (_, ErrorReason.hasRuns) =>
+        'Archive it instead: xp workflows archive <project> <workflow>',
+      (_, ErrorReason.archived) =>
+        'Unarchive it with: xp workflows archive <project> <workflow> --undo',
+      (_, ErrorReason.credentialUnassigned) =>
+        'Assign one with: xp credentials assign',
+      (_, ErrorReason.productionFlavor) => 'Name the flavors with --flavor.',
+      _ => null,
+    };
 
 /// A message for an error of the engine: what it said, and for the cases a
 /// person can fix, what to do. The issues of a workflow document come one
@@ -153,20 +152,11 @@ Future<int> guarded(
     );
     return error.notFound ? XpExit.notFound : XpExit.usage;
   } on ApiException catch (error) {
-    if (json) {
-      logger.err(
-        jsonEncode(
-          errorJson(
-            apiCodeOf(error),
-            error.message,
-            cliHint(error) ?? error.hint,
-            error.issues,
-          ),
-        ),
-      );
-    } else {
-      logger.err(describeApiError(error));
-    }
+    logger.err(
+      json
+          ? jsonEncode(apiErrorJson(error, hint: cliHint(error)))
+          : describeApiError(error),
+    );
     return XpExit.forApi(error);
   } on ConnectionException catch (error) {
     fail('unreachable', error.message);

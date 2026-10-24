@@ -1417,6 +1417,12 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "404":
           $ref: "#/components/responses/NotFound"
+        "409":
+          description: The workflow is archived (`details.reason` is `archived`).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
         "422":
           $ref: "#/components/responses/WorkflowInvalid"
         "502":
@@ -2830,7 +2836,9 @@ components:
               type: object
               description: |
                 Facts of the error a client can act on, for example the `kind`
-                of a missing credential.
+                of a missing credential. `reason` tells the errors a client
+                answers differently apart: `archived`, `has_runs`,
+                `credential_unassigned`, `production_flavor`, `ref_unknown`.
     AlreadyDecidedResponse:
       type: object
       required: [error, approval]

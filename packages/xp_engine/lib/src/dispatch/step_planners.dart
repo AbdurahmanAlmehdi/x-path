@@ -735,6 +735,7 @@ class StepPlanners implements StepCatalog {
                 'Add an App Store Connect API key or an Apple ID credential '
                 'and assign it to $flavor, then dispatch again.',
             details: {
+              'reason': ErrorReason.credentialUnassigned,
               'kinds': [
                 CredentialKind.ascKey.wire,
                 CredentialKind.appleId.wire,
@@ -964,7 +965,11 @@ class StepPlanners implements StepCatalog {
           hint:
               'Add a ${kind.label} credential and assign it to $flavor, then '
               'dispatch again.',
-          details: {'kind': kind.wire, 'flavor': flavor},
+          details: {
+            'reason': ErrorReason.credentialUnassigned,
+            'kind': kind.wire,
+            'flavor': flavor,
+          },
         );
   }
 

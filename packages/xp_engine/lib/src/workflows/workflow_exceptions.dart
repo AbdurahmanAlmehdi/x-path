@@ -62,6 +62,16 @@ class WorkflowBuiltinException extends WorkflowException {
   String toString() => 'WorkflowBuiltinException: $message';
 }
 
+/// The workflow is archived, so it does not run until it is unarchived.
+class WorkflowArchivedException extends WorkflowException {
+  /// Creates the exception for the workflow called [name].
+  const new(String name)
+    : super('The workflow "$name" is archived. Unarchive it to run it.');
+
+  @override
+  String toString() => 'WorkflowArchivedException: $message';
+}
+
 /// Jobs ran the workflow, so it cannot be deleted.
 class WorkflowInUseException extends WorkflowException {
   /// Creates the exception.

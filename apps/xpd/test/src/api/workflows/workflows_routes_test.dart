@@ -343,6 +343,12 @@ void main() {
         (await client.send('GET', client.base)).json,
       ).workflows;
       expect(list.firstWhere((w) => w.id == id).archived, isTrue);
+
+      final refused = await client.dispatch(id);
+      expect(refused.statusCode, 409);
+      expect(ErrorResponse.fromJson(refused.json).error.details, {
+        'reason': ErrorReason.archived,
+      });
     });
 
     test('keeps what a copy of a built-in is based on', () async {
@@ -425,6 +431,9 @@ void main() {
       final inUse = await client.send('DELETE', '${client.base}/$id');
       expect(inUse.statusCode, 409);
       expect(errorMessage(inUse), contains('has been run'));
+      expect(ErrorResponse.fromJson(inUse.json).error.details, {
+        'reason': ErrorReason.hasRuns,
+      });
     });
 
     test('answers 404 for an unknown workflow', () async {

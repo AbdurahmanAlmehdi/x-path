@@ -84,6 +84,29 @@ enum ApiErrorCode {
 
   /// The HTTP status code of a response with this code.
   final int statusCode;
+
+  /// The code on the wire, such as `not_found`.
+  String get wire => _$ApiErrorCodeEnumMap[this]!;
+}
+
+/// The `reason` in the `details` of an error, for the errors a client
+/// answers differently: it suggests by reason, never by the message.
+abstract final class ErrorReason {
+  /// The workflow is archived; unarchiving it lets it run.
+  static const archived = 'archived';
+
+  /// Jobs ran the workflow, so it is kept: archive it instead.
+  static const hasRuns = 'has_runs';
+
+  /// A flavor has no credential of a kind its steps need.
+  static const credentialUnassigned = 'credential_unassigned';
+
+  /// No flavor is picked by default for the workflow; name the flavors.
+  static const productionFlavor = 'production_flavor';
+
+  /// The engine's copy of the repository has no such ref yet; a dispatch
+  /// fetches before it looks again.
+  static const refUnknown = 'ref_unknown';
 }
 
 /// The body of an error: a code, a human-readable message and, where it

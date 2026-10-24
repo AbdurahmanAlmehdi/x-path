@@ -24,6 +24,13 @@ void main() {
         },
       );
     });
+
+    test('names each code as it is on the wire', () {
+      expect(ApiErrorCode.notFound.wire, 'not_found');
+      for (final code in ApiErrorCode.values) {
+        expect(ApiError(code: code, message: '').toJson()['code'], code.wire);
+      }
+    });
   });
 
   group('ErrorResponse', () {

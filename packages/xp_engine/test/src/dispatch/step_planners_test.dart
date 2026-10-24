@@ -864,6 +864,7 @@ stages:
                     'to dev, then dispatch again.',
               )
               .having((e) => e.details, 'details', {
+                'reason': ErrorReason.credentialUnassigned,
                 'kind': 'play_sa',
                 'flavor': 'dev',
               }),

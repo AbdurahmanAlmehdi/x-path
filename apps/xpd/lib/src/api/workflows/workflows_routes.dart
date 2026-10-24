@@ -166,7 +166,17 @@ Future<Response> guardWorkflows(Future<Response> Function() action) async {
   } on WorkflowBuiltinException catch (error) {
     return errorResponse(ApiErrorCode.conflict, error.message);
   } on WorkflowInUseException catch (error) {
-    return errorResponse(ApiErrorCode.conflict, error.message);
+    return errorResponse(
+      ApiErrorCode.conflict,
+      error.message,
+      details: const {'reason': ErrorReason.hasRuns},
+    );
+  } on WorkflowArchivedException catch (error) {
+    return errorResponse(
+      ApiErrorCode.conflict,
+      error.message,
+      details: const {'reason': ErrorReason.archived},
+    );
   } on WorkflowNameException catch (error) {
     return errorResponse(ApiErrorCode.invalidRequest, error.message);
   } on WorkflowEditException catch (error) {

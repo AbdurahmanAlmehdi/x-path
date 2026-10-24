@@ -17,9 +17,16 @@ Map<String, Object?> errorJson(
   if (issues.isNotEmpty) 'issues': [for (final issue in issues) issue.toJson()],
 };
 
+/// [errorJson] for an error of the engine: its code, its words, [hint] or
+/// else the engine's hint, and the issues of a workflow document.
+Map<String, Object?> apiErrorJson(ApiException error, {String? hint}) =>
+    errorJson(
+      apiCodeOf(error),
+      error.message,
+      hint ?? error.hint,
+      error.issues,
+    );
+
 /// The machine-readable code of [error]: the engine's (`not_found`), or
 /// `unknown` when its answer was not an error envelope.
-String apiCodeOf(ApiException error) => switch (error.code) {
-  null => 'unknown',
-  final code => ApiError(code: code, message: '').toJson()['code']! as String,
-};
+String apiCodeOf(ApiException error) => error.code?.wire ?? 'unknown';

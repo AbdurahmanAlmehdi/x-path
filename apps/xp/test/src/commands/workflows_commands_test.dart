@@ -436,6 +436,7 @@ void main() {
           'ran, so it cannot be deleted.',
           statusCode: 409,
           code: ApiErrorCode.conflict,
+          details: {'reason': ErrorReason.hasRuns},
         ),
       );
       expect(await env.run(['workflows', 'delete', 'prj_1', 'wf_1']), 73);

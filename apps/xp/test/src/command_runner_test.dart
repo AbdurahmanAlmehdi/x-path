@@ -448,27 +448,33 @@ void main() {
   });
 
   group('cliHint', () {
-    ApiException invalid(String message) => ApiException(
-      message,
+    ApiException invalid(String? reason) => ApiException(
+      'The engine says no.',
       statusCode: 422,
       code: ApiErrorCode.workflowInvalid,
+      details: {'reason': ?reason},
     );
 
-    test('names the command that fixes what the engine said', () {
-      expect(
-        cliHint(
-          invalid(
-            'The flavor "dev" has no firebase_sa credential assigned. '
-            'Assign one to the flavor first.',
-          ),
+    test('names the command that fixes what the engine said, by reason', () {
+      for (final (reason, hint) in [
+        (
+          ErrorReason.credentialUnassigned,
+          'Assign one with: xp credentials assign',
         ),
-        'Assign one with: xp credentials assign',
-      );
-      expect(
-        cliHint(invalid('No flavor of the app is a production flavor; ...')),
-        'Name the flavors with --flavor.',
-      );
-      expect(cliHint(invalid('Something else.')), isNull);
+        (ErrorReason.productionFlavor, 'Name the flavors with --flavor.'),
+        (
+          ErrorReason.archived,
+          'Unarchive it with: xp workflows archive <project> <workflow> --undo',
+        ),
+        (
+          ErrorReason.hasRuns,
+          'Archive it instead: xp workflows archive <project> <workflow>',
+        ),
+      ]) {
+        expect(cliHint(invalid(reason)), hint);
+      }
+      expect(cliHint(invalid(null)), isNull);
+      expect(cliHint(invalid('something_else')), isNull);
       expect(
         describeApiError(
           const ApiException(
