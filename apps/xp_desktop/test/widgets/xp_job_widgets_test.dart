@@ -37,6 +37,17 @@ void main() {
       expect(relative(DateTime(2026, 10, 11, 9, 30)), 'Oct 11 09:30');
     });
 
+    test('times within a day, else dates, and in full', () {
+      final now = DateTime(2026, 10, 13, 14, 8);
+      expect(formatWhen(DateTime(2026, 10, 13, 9, 5), now), '09:05');
+      expect(formatWhen(DateTime(2026, 10, 11, 9, 5), now), 'Oct 11 09:05');
+      final time = DateTime(2026, 10, 13, 14, 2, 41);
+      expect(
+        formatAbsolute(time),
+        'Tue, Oct 13, 2026 14:02:41 ${time.timeZoneName}',
+      );
+    });
+
     test('times, SHAs, versions and sizes', () {
       expect(formatTime(DateTime(2026, 10, 13, 9, 5)), '09:05');
       expect(formatClock(DateTime(2026, 10, 13, 9, 5, 7)), '09:05:07');

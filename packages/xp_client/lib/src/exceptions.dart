@@ -22,6 +22,9 @@ final class ApiException extends XpClientException {
     this.code,
     this.approval,
     this.usedBy = const [],
+    this.issues = const [],
+    this.hint,
+    this.details = const {},
   });
 
   /// Reads the error out of the [body] of a response with [statusCode].
@@ -47,6 +50,9 @@ final class ApiException extends XpClientException {
                   CredentialUsage.fromJson(usage as Map<String, dynamic>),
               ]
             : const [],
+        issues: envelope.error.issues ?? const [],
+        hint: envelope.error.hint,
+        details: envelope.error.details ?? const {},
       );
     } on Object {
       return ApiException(
@@ -70,6 +76,16 @@ final class ApiException extends XpClientException {
   /// The flavors that use the credential, when the error is
   /// [ApiErrorCode.credentialInUse].
   final List<CredentialUsage> usedBy;
+
+  /// The issues of the workflow document, each at its line, when the error
+  /// is [ApiErrorCode.workflowInvalid] about a document.
+  final List<WorkflowIssue> issues;
+
+  /// What the engine says to do about it (UX-05), when it says.
+  final String? hint;
+
+  /// Facts of the error, such as the `kind` of a missing credential.
+  final Map<String, Object?> details;
 
   /// Whether the credential was not deleted because flavors use it.
   bool get isCredentialInUse => code == ApiErrorCode.credentialInUse;

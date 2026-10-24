@@ -2,7 +2,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:xp_api/xp_api.dart';
-import 'package:xp_desktop/app/bloc/engine_connection_bloc.dart';
 import 'package:xp_desktop/approvals/widgets/needs_you_bar.dart';
 import 'package:xp_desktop/credentials/view/flavor_credentials_sheet.dart';
 import 'package:xp_desktop/dispatch/view/dispatch_sheet.dart';
@@ -13,7 +12,7 @@ import 'package:xp_desktop/project_overview/widgets/flavor_ledger.dart';
 import 'package:xp_desktop/project_overview/widgets/release_rail.dart';
 import 'package:xp_desktop/projects/bloc/projects_bloc.dart';
 import 'package:xp_desktop/projects/widgets/scan_summary.dart';
-import 'package:xp_desktop/shell/cubit/shell_cubit.dart';
+import 'package:xp_desktop/runs/view/runs_page.dart';
 import 'package:xp_desktop/shell/widgets/shell_page.dart';
 import 'package:xp_desktop/theme/theme.dart';
 import 'package:xp_desktop/widgets/widgets.dart';
@@ -65,14 +64,7 @@ class ProjectOverviewView extends StatefulWidget {
 class _ProjectOverviewViewState extends State<ProjectOverviewView> {
   var _console = true;
 
-  Future<void> _dispatch() async {
-    if (!context.read<EngineConnectionBloc>().state.status.canCommand) return;
-    final shell = context.read<ShellCubit>();
-    final run = await showDispatchSheet(context, widget.project);
-    if (run != null) {
-      shell.show(JobDestination(run.id, projectId: widget.project.id));
-    }
-  }
+  Future<void> _dispatch() => dispatchFor(context, widget.project);
 
   Future<void> _showScan() {
     final projects = context.read<ProjectsBloc>();
@@ -117,6 +109,7 @@ class _ProjectOverviewViewState extends State<ProjectOverviewView> {
         autofocus: true,
         child: ShellPage(
           title: project.fullName.split('/').last,
+          cached: state.cached,
           subtitle: l10n.projectSubtitle(
             project.defaultBaseBranch,
             l10n.projectApps(apps.length),
@@ -164,7 +157,12 @@ class _ProjectOverviewViewState extends State<ProjectOverviewView> {
                   padding: const EdgeInsets.all(20),
                   children: [
                     if (state.error case final error?) ...[
-                      XpMessage(XpStatus.scanError, error),
+                      XpErrorState(
+                        error,
+                        onRetry: () => bloc.add(
+                          ProjectOverviewSubscriptionRequested(project.id),
+                        ),
+                      ),
                       const SizedBox(height: 12),
                     ],
                     if (apps.isEmpty)
@@ -194,6 +192,7 @@ class _ProjectOverviewViewState extends State<ProjectOverviewView> {
                       ),
                       const SizedBox(height: 16),
                     ],
+                    RecentRuns(projectId: project.id),
                   ],
                 ),
               ),
@@ -264,7 +263,7 @@ class ScanDialog extends StatelessWidget {
                 padding: const EdgeInsets.all(20),
                 children: [
                   if (state.error case final error?) ...[
-                    XpMessage(XpStatus.scanError, error),
+                    XpMessage.error(error),
                     const SizedBox(height: 12),
                   ],
                   if (project != null) ScanSummary(project),

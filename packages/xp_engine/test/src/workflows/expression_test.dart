@@ -145,6 +145,25 @@ void main() {
     });
   });
 
+  group('paths', () {
+    test('lists what an expression reads, with the keys written out', () {
+      expect(
+        Expression.parse(
+          "inputs.ids[flavor.name].android == 'a' || "
+          '!flavor.credentials.play_sa',
+        ).paths,
+        {'inputs.ids', 'flavor.name', 'flavor.credentials.play_sa'},
+      );
+      expect(Expression.parse("app['name'] && list[0]").paths, {
+        'app.name',
+        'list',
+      });
+      expect(Expression.parse("'a' != 1").paths, isEmpty);
+      expect(Expression.parse('platform').paths, {'platform'});
+      expect(Expression.parse('(a || b).c').paths, {'a', 'b'});
+    });
+  });
+
   group('errors', () {
     test('name the problem and where it is', () {
       expect(failure('').message, contains('empty'));
@@ -276,6 +295,49 @@ void main() {
             .expand((e) => e.variables),
         ['a', 'b'],
       );
+    });
+  });
+
+  group('falseParts and source', () {
+    List<String> falseParts(String source, Map<String, Object?> scope) => [
+      for (final part in Expression.parse(source).falseParts(scope))
+        part.source,
+    ];
+
+    test('name the false operands, both of a false ||', () {
+      const scope = {
+        'platform': 'android',
+        'inputs': {'ids': <String, Object?>{}},
+        'flavor': {'name': 'dev', 'prod': false},
+      };
+
+      expect(falseParts("platform == 'android'", scope), isEmpty);
+      expect(
+        falseParts(
+          "(platform == 'android' && inputs.ids[flavor.name].android) || "
+          "(platform == 'ios' && flavor.prod)",
+          scope,
+        ),
+        ['inputs.ids[flavor.name].android', "platform == 'ios'"],
+      );
+      expect(falseParts('!flavor.name', scope), ['!flavor.name']);
+      expect(falseParts("platform != 'android'", scope), [
+        "platform != 'android'",
+      ]);
+    });
+
+    test('read back the way they are written', () {
+      for (final source in [
+        "a['b c'][0] == 'it''s'",
+        '(a && b)',
+        '(a || !b)',
+        'a.b == null',
+        'x == 3',
+        'flag == true',
+      ]) {
+        expect(Expression.parse(source).source, source);
+      }
+      expect(Expression.parse('a').toString(), 'a');
     });
   });
 }

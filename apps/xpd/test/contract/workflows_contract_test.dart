@@ -160,6 +160,32 @@ void main() {
       );
     });
 
+    test('GET templates 200 and 401', () async {
+      final response = await client.send('GET', '/workflows/templates');
+      final unauthorized = await engine.request(
+        '/workflows/templates',
+        token: '',
+      );
+
+      expectContract(response, path: '/workflows/templates', status: 200);
+      expectContract(unauthorized, path: '/workflows/templates', status: 401);
+    });
+
+    test('POST validate without a project 200, 400 and 401', () async {
+      const path = '/workflows/validate';
+
+      for (final (response, status) in [
+        (
+          await client.send('POST', path, {'yaml': 'schema: 1\nstage: []'}),
+          200,
+        ),
+        (await client.send('POST', path, {}), 400),
+        (await engine.request(path, method: 'POST', token: ''), 401),
+      ]) {
+        expectContract(response, path: path, method: 'POST', status: status);
+      }
+    });
+
     test('GET one 200 and 404', () async {
       final id = await client.create('mine', echoWorkflow);
       final path = '${client.base}/$id';
@@ -180,6 +206,24 @@ void main() {
         path: path,
         status: 400,
       );
+    });
+
+    test('GET one carries its typed inputs (UX-04)', () async {
+      final id = await client.builtin('shorebird-patch');
+      final path = '${client.base}/$id';
+
+      final response = await client.send('GET', path);
+
+      expectContract(response, path: path, status: 200);
+      final inputs = response.json['inputs']! as List<Object?>;
+      expect(inputs.first, {
+        'name': 'releaseVersion',
+        'type': 'release',
+        'description':
+            'The release the patch applies to, for example 5.4.1+3283. The '
+            "dispatch's releaseVersion when it gives none.",
+        'required': false,
+      });
     });
 
     test('PUT 200, 404, 409 and 422', () async {
@@ -215,6 +259,25 @@ void main() {
         method: 'PUT',
         status: 404,
       );
+    });
+
+    test('PATCH 200, 400, 404 and 409', () async {
+      final id = await client.create('mine', echoWorkflow);
+      final builtin = await client.builtin('test');
+
+      for (final (path, body, status) in [
+        ('${client.base}/$id', {'name': 'nightly', 'archived': true}, 200),
+        ('${client.base}/$id', {'archived': 'yes'}, 400),
+        ('${client.base}/wf_nope', {'archived': true}, 404),
+        ('${client.base}/$builtin', {'archived': true}, 409),
+      ]) {
+        expectContract(
+          await client.send('PATCH', path, body),
+          path: path,
+          method: 'PATCH',
+          status: status,
+        );
+      }
     });
 
     test('DELETE 204, 404 and 409', () async {
@@ -283,6 +346,86 @@ void main() {
         method: 'POST',
         status: 503,
       );
+    });
+
+    test('POST dispatch?dryRun=true 200 and 400 (UX-01)', () async {
+      final id = await client.builtin('dev-build');
+      final path = '${client.base}/$id/dispatch';
+
+      final planned = await client.send('POST', '$path?dryRun=true');
+
+      expectContract(planned, path: path, method: 'POST', status: 200);
+      final plan = DispatchPlan.fromJson(planned.json);
+      expect(plan.build, 1);
+      expect(
+        plan.skipped.map((job) => job.reason),
+        contains('no Firebase app id for default'),
+      );
+      expectContract(
+        await client.send('POST', '$path?dryRun=maybe'),
+        path: path,
+        method: 'POST',
+        status: 400,
+      );
+      final again = await client.send('POST', '$path?dryRun=true');
+      expect(
+        DispatchPlan.fromJson(again.json).build,
+        1,
+        reason: 'the dry run took no build number',
+      );
+    });
+
+    test('GET runs 200, 400 and 404', () async {
+      final id = await client.create('echo', echoWorkflow);
+      final run = Run.fromJson((await client.dispatch(id)).json);
+      await client.until(run.id, {RunState.succeeded});
+      final project = '/projects/${client.projectId}/runs';
+
+      for (final (path, status) in [
+        ('/runs', 200),
+        ('/runs?project=${client.projectId}&limit=1', 200),
+        ('/runs?state=sleeping', 400),
+        ('/runs?limit=0', 400),
+        ('/runs?before=run_nope', 404),
+        (project, 200),
+        ('/projects/prj_nope/runs', 404),
+      ]) {
+        final response = await client.send('GET', path);
+        expectContract(response, path: path.split('?').first, status: status);
+      }
+    });
+
+    test('POST run-again 202 and 404, rerun-failed 200, 404 and 409', () async {
+      var attempt = 0;
+      engine.supervisor.handler = (process) => attempt++ == 0 ? 1 : 0;
+      final id = await client.create('echo', echoWorkflow);
+      final run = Run.fromJson((await client.dispatch(id)).json);
+      await client.until(run.id, {RunState.failed});
+
+      for (final (path, status) in [
+        ('/runs/${run.id}/rerun-failed', 200),
+        ('/runs/run_nope/rerun-failed', 404),
+        ('/runs/run_nope/run-again', 404),
+      ]) {
+        expectContract(
+          await client.send('POST', path),
+          path: path,
+          method: 'POST',
+          status: status,
+        );
+      }
+      await client.until(run.id, {RunState.succeeded});
+      for (final (path, status) in [
+        ('/runs/${run.id}/rerun-failed', 409),
+        ('/runs/${run.id}/run-again', 202),
+      ]) {
+        expectContract(
+          await client.send('POST', path),
+          path: path,
+          method: 'POST',
+          status: status,
+        );
+      }
     });
 
     test('GET and cancel a run', () async {

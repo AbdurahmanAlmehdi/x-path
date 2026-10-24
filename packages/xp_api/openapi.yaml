@@ -1038,6 +1038,56 @@ paths:
           $ref: "#/components/responses/SecretsLocked"
         "500":
           $ref: "#/components/responses/InternalError"
+  /projects/{id}/runs:
+    parameters:
+      - $ref: "#/components/parameters/ProjectId"
+    get:
+      operationId: listProjectRuns
+      summary: The runs of a project, newest first.
+      description: Like `GET /runs?project={id}`, and `404` for no project.
+      parameters:
+        - name: workflow
+          in: query
+          required: false
+          description: Only the runs of this workflow (an id).
+          schema:
+            type: string
+        - name: state
+          in: query
+          required: false
+          schema:
+            $ref: "#/components/schemas/RunState"
+        - name: limit
+          in: query
+          required: false
+          description: At most this many runs, 1 to 200; 50 by default.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+        - name: before
+          in: query
+          required: false
+          description: |
+            Only the runs dispatched before this one (a run id): the `next` of
+            the page before.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: The runs.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RunsResponse"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
   /projects/{id}/workflows:
     parameters:
       - $ref: "#/components/parameters/ProjectId"
@@ -1069,7 +1119,9 @@ paths:
         The document must be valid (`POST .../workflows/validate` lists its
         issues with their lines): otherwise `422 workflow_invalid`, and the
         message lists the issues. The name is unique in the project. To change
-        a built-in workflow, create a workflow of your own with its YAML.
+        a built-in workflow, create a workflow of your own with its YAML and
+        `basedOn` naming the built-in and its version: the app then offers to
+        compare when the built-in changes.
       requestBody:
         required: true
         content:
@@ -1104,10 +1156,11 @@ paths:
       operationId: getWorkflowSchema
       summary: What a workflow document may name.
       description: |
-        The schema version, the step types with the keys each takes under
-        `with`, the gates, the capabilities, the matrix axes and the platforms
-        of this engine. Editors offer them; `POST .../workflows/validate`
-        still checks a document.
+        The schema version, the step types with what each does and the typed
+        keys it takes under `with`, the gates with their labels, the
+        capabilities, the matrix axes, the platforms and the variables of this
+        engine. Editors offer them; `POST /workflows/validate` still checks a
+        document.
       responses:
         "200":
           description: The schema.
@@ -1115,6 +1168,51 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/WorkflowSchema"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /workflows/templates:
+    get:
+      operationId: listWorkflowTemplates
+      summary: The documents a new workflow can start from.
+      description: |
+        Blank, Android to Firebase, iOS to TestFlight, tests only and a
+        Shorebird patch, each valid as it is. Save one under a name with
+        `POST /projects/{id}/workflows`.
+      responses:
+        "200":
+          description: The templates, in the order to offer them.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkflowTemplatesResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /workflows/validate:
+    post:
+      operationId: validateWorkflowDocument
+      summary: Check a workflow document without a project.
+      description: |
+        The same check as `POST /projects/{id}/workflows/validate`: a document
+        is valid or not whatever project it is for. Nothing is stored.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WorkflowYamlRequest"
+      responses:
+        "200":
+          description: The result of the check.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidateWorkflowResponse"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "500":
@@ -1211,12 +1309,43 @@ paths:
           $ref: "#/components/responses/WorkflowInvalid"
         "500":
           $ref: "#/components/responses/InternalError"
+    patch:
+      operationId: updateWorkflow
+      summary: Rename, archive or unarchive a workflow of your own.
+      description: |
+        No new version is made. An archived workflow keeps its versions and
+        runs and is not dispatched. `basedOnVersion` marks a copy of a
+        built-in as caught up with that version of it. A built-in workflow
+        answers `409 conflict`, a name in use `409 conflict`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateWorkflowRequest"
+      responses:
+        "200":
+          description: The workflow at its newest version.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Workflow"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "500":
+          $ref: "#/components/responses/InternalError"
     delete:
       operationId: deleteWorkflow
       summary: Delete a workflow of your own.
       description: |
         A built-in workflow, and a workflow that jobs ran, answer `409
-        conflict`: the jobs keep the version they ran.
+        conflict`: the jobs keep the version they ran. Archive it instead.
       responses:
         "204":
           description: The workflow is gone.
@@ -1248,6 +1377,17 @@ paths:
         `422 workflow_invalid` when the document no longer is valid or the
         request asks for something the project cannot do (an unknown flavor,
         a step without a credential it needs); the message says what.
+
+        With `dryRun=true` the engine plans the dispatch and starts nothing
+        (UX-01): `200` with the plan, which lists the jobs it would start and
+        where, the jobs it leaves out and why, the gates, and the version and
+        build number it would take (no number is taken).
+      parameters:
+        - name: dryRun
+          in: query
+          required: false
+          schema:
+            type: boolean
       requestBody:
         required: false
         content:
@@ -1255,6 +1395,12 @@ paths:
             schema:
               $ref: "#/components/schemas/DispatchRequest"
       responses:
+        "200":
+          description: The plan of a dry run.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DispatchPlan"
         "202":
           description: The run, with its jobs.
           headers:
@@ -1279,6 +1425,63 @@ paths:
           $ref: "#/components/responses/SecretsLocked"
         "500":
           $ref: "#/components/responses/InternalError"
+  /runs:
+    get:
+      operationId: listRuns
+      summary: The runs, newest first, of every project or one.
+      description: |
+        Every run of the engine, wherever it was dispatched from (the app,
+        the CLI, MCP). `next` is there when there may be more: pass it as
+        `before`.
+      parameters:
+        - name: project
+          in: query
+          required: false
+          description: Only the runs of this project (an id).
+          schema:
+            type: string
+        - name: workflow
+          in: query
+          required: false
+          description: Only the runs of this workflow (an id).
+          schema:
+            type: string
+        - name: state
+          in: query
+          required: false
+          schema:
+            $ref: "#/components/schemas/RunState"
+        - name: limit
+          in: query
+          required: false
+          description: At most this many runs, 1 to 200; 50 by default.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+        - name: before
+          in: query
+          required: false
+          description: |
+            Only the runs dispatched before this one (a run id): the `next` of
+            the page before.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: The runs.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RunsResponse"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
   /runs/{id}:
     parameters:
       - $ref: "#/components/parameters/RunId"
@@ -1296,6 +1499,65 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "404":
           $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /runs/{id}/run-again:
+    parameters:
+      - $ref: "#/components/parameters/RunId"
+    post:
+      operationId: runAgain
+      summary: Dispatch a run again.
+      description: |
+        A new run of the version of the workflow the run ran, at its commit,
+        with its request (inputs, flavors, platforms, bump). It gets a build
+        number of its own. What a dispatch refuses, this refuses.
+      responses:
+        "202":
+          description: The new run, its jobs queued.
+          headers:
+            Location:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Run"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/WorkflowInvalid"
+        "500":
+          $ref: "#/components/responses/InternalError"
+        "502":
+          $ref: "#/components/responses/UpstreamError"
+        "503":
+          $ref: "#/components/responses/SecretsLocked"
+  /runs/{id}/rerun-failed:
+    parameters:
+      - $ref: "#/components/parameters/RunId"
+    post:
+      operationId: rerunFailedJobs
+      summary: Run the failed jobs of a run again.
+      description: |
+        Each failed, interrupted or waiting-for-resume job runs again from the
+        step that failed; what the jobs before it made (their artifacts, the
+        commit) is used as it is. A cancelled job is not run again. A run
+        without such a job answers `409 conflict`.
+      responses:
+        "200":
+          description: The run.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Run"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
         "500":
           $ref: "#/components/responses/InternalError"
   /runs/{id}/cancel:
@@ -2427,7 +2689,8 @@ components:
     WorkflowInvalid:
       description: |
         The workflow document has issues, or the dispatch asks for something
-        the project cannot do. The message lists them.
+        the project cannot do. The message lists them; for a document,
+        `issues` has each with its line, column and hint.
       content:
         application/json:
           schema:
@@ -2551,6 +2814,23 @@ components:
               $ref: "#/components/schemas/ErrorCode"
             message:
               type: string
+            issues:
+              description: |
+                For `workflow_invalid` about a document, its issues, each at
+                its line and column.
+              type: array
+              items:
+                $ref: "#/components/schemas/WorkflowIssue"
+            hint:
+              type: string
+              description: |
+                What to do about it, for the owner (UX-05). It names no
+                command; a client adds its own.
+            details:
+              type: object
+              description: |
+                Facts of the error a client can act on, for example the `kind`
+                of a missing credential.
     AlreadyDecidedResponse:
       type: object
       required: [error, approval]
@@ -2619,11 +2899,13 @@ components:
           type: string
           description: |
             `engine.started`, `stream.opened`, `project.added`,
-            `project.scanned`, `project.removed`, `job.state_changed`,
+            `project.scanned`, `project.edited`, `project.removed`,
+            `job.state_changed`,
             `job.step_changed`, `test_run.completed`, `credential.saved`,
             `credential.verified`, `credential.expired`, `credential.removed`,
             `credential.renamed`, `credential.assigned`,
-            `credential.unassigned`, `workflow.saved`, `workflow.removed`, `run.dispatched`,
+            `credential.unassigned`, `workflow.saved`, `workflow.removed`,
+            `workflow.updated`, `run.dispatched`,
             `approval.requested`, `approval.decided`, `approval.expired`,
             `project.gates_changed`, `release.created`,
             `release.state_changed`, `release.store_changed`,
@@ -2752,6 +3034,23 @@ components:
           items:
             type: string
             enum: [gradle, flavorizr, xcscheme, entrypoint]
+        firebaseAppId:
+          type: object
+          description: |
+            The Firebase app id of the flavor by platform: what the Firebase
+            files of the app name, or the owner's edit. The built-in
+            workflows upload to it when no input gives one.
+          additionalProperties: false
+          properties:
+            android:
+              type: string
+            ios:
+              type: string
+        appleAppId:
+          type: string
+          description: |
+            The App Store Connect app id of the flavor. The built-in
+            workflows upload iOS builds to it when no input gives one.
     IosPackageManager:
       type: string
       enum: [cocoapods, spm, both, none]
@@ -2928,6 +3227,23 @@ components:
           type: array
           items:
             type: string
+        firebaseAppId:
+          type: object
+          description: |
+            The Firebase app id by platform, for example
+            `1:123456789012:android:abcdef`. An empty id removes it.
+          additionalProperties: false
+          properties:
+            android:
+              type: string
+              pattern: "^$|^[0-9]+:[0-9]+:android:[0-9a-f]+$"
+            ios:
+              type: string
+              pattern: "^$|^[0-9]+:[0-9]+:ios:[0-9a-f]+$"
+        appleAppId:
+          type: string
+          description: The App Store Connect app id. Empty removes it.
+          pattern: "^[0-9]*$"
     AppEdit:
       type: object
       required: [path]
@@ -3104,6 +3420,154 @@ components:
         yaml:
           type: string
           description: The workflow document of `version`.
+        inputs:
+          type: array
+          description: |
+            The inputs `yaml` declares, as the engine reads them; empty when
+            it declares none or no longer reads as a workflow.
+          items:
+            $ref: "#/components/schemas/WorkflowInput"
+        basedOn:
+          $ref: "#/components/schemas/WorkflowBasedOn"
+        archivedAt:
+          type: string
+          format: date-time
+          description: |
+            When it was archived (UX-06): it keeps its runs and versions and
+            is not offered to dispatch. Absent while it is not archived.
+    WorkflowBasedOn:
+      type: object
+      required: [builtin, version]
+      additionalProperties: false
+      description: |
+        The built-in a workflow was copied from, and the version of it the
+        copy started from or last caught up with.
+      properties:
+        builtin:
+          type: string
+        version:
+          type: integer
+          minimum: 1
+    DispatchPlan:
+      type: object
+      required: [flavors, platforms, stages, skipped]
+      additionalProperties: false
+      properties:
+        flavors:
+          type: array
+          items:
+            type: string
+        platforms:
+          type: array
+          items:
+            type: string
+        stages:
+          type: array
+          items:
+            $ref: "#/components/schemas/PlannedStage"
+        skipped:
+          type: array
+          description: |
+            The jobs the run leaves out (their `if` is false) and the ones the
+            engine cannot plan (`blocks`), which it would refuse to dispatch.
+          items:
+            $ref: "#/components/schemas/SkippedJob"
+        currentVersion:
+          type: string
+          description: The pubspec version at the commit, `x.y.z+build`.
+        version:
+          type: string
+          description: The version the run would release.
+        build:
+          type: integer
+          description: The build number the run would take; not taken yet.
+        releaseVersion:
+          type: string
+    PlannedStage:
+      type: object
+      required: [name, jobs, gates]
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+        jobs:
+          type: array
+          items:
+            $ref: "#/components/schemas/PlannedJob"
+        gates:
+          type: array
+          items:
+            type: string
+    PlannedJob:
+      type: object
+      required: [name, capabilities, engineOnly, local]
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+        flavor:
+          type: string
+        platform:
+          type: string
+        capabilities:
+          type: array
+          items:
+            type: string
+        engineOnly:
+          type: boolean
+        local:
+          type: boolean
+          description: Whether the engine itself can run it.
+        runner:
+          type: string
+          description: The connected runner it would go to otherwise.
+        waitReason:
+          type: string
+          description: Why it would wait to start.
+    SkippedJob:
+      type: object
+      required: [name, stage, reason, blocks]
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+        stage:
+          type: string
+        flavor:
+          type: string
+        platform:
+          type: string
+        reason:
+          type: string
+        blocks:
+          type: boolean
+    InputType:
+      type: string
+      description: |
+        What an input takes (UX-04): text, true or false, one of `options`,
+        any JSON value, or a release `x.y.z+build` of the project (the
+        dispatch's `releaseVersion` when it gives none).
+      enum: [string, boolean, choice, json, release]
+    WorkflowInput:
+      type: object
+      required: [name, required]
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+        type:
+          $ref: "#/components/schemas/InputType"
+        description:
+          type: string
+        options:
+          type: array
+          description: The values a `choice` input may take.
+          items:
+            type: string
+        default:
+          description: The value when a dispatch gives none.
+        required:
+          type: boolean
     WorkflowSummary:
       type: object
       required: [id, projectId, name, builtin, version]
@@ -3119,6 +3583,20 @@ components:
           type: boolean
         version:
           $ref: "#/components/schemas/WorkflowVersionInfo"
+        title:
+          type: string
+          description: The `name` the newest version gives the workflow.
+        description:
+          type: string
+          description: What the newest version says it is for.
+        basedOn:
+          $ref: "#/components/schemas/WorkflowBasedOn"
+        archivedAt:
+          type: string
+          format: date-time
+          description: |
+            When it was archived (UX-06): it keeps its runs and versions and
+            is not offered to dispatch. Absent while it is not archived.
     WorkflowsResponse:
       type: object
       required: [workflows]
@@ -3138,6 +3616,46 @@ components:
           pattern: "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$"
         yaml:
           type: string
+        basedOn:
+          $ref: "#/components/schemas/WorkflowBasedOn"
+    UpdateWorkflowRequest:
+      type: object
+      additionalProperties: false
+      description: What changes; each field only when it is given.
+      properties:
+        name:
+          type: string
+          pattern: "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$"
+        archived:
+          type: boolean
+        basedOnVersion:
+          type: integer
+          minimum: 1
+          description: |
+            The version of its built-in a copy has caught up with, after a
+            compare.
+    WorkflowTemplate:
+      type: object
+      required: [id, title, description, yaml]
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        yaml:
+          type: string
+    WorkflowTemplatesResponse:
+      type: object
+      required: [templates]
+      additionalProperties: false
+      properties:
+        templates:
+          type: array
+          items:
+            $ref: "#/components/schemas/WorkflowTemplate"
     WorkflowYamlRequest:
       type: object
       required: [yaml]
@@ -3158,6 +3676,11 @@ components:
           minimum: 1
         message:
           type: string
+        hint:
+          type: string
+          description: |
+            What to write instead (`Did you mean "inputs.appIds"?`), or what
+            is allowed there.
     ValidateWorkflowResponse:
       type: object
       required: [valid, issues]
@@ -3169,9 +3692,36 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/WorkflowIssue"
+    StepKeyType:
+      type: string
+      enum: [string, boolean, number, list, map, any]
+      description: |
+        What a key of `with` holds: `list` is a list of strings, `map` a
+        mapping of strings to strings.
+    StepKeySchema:
+      type: object
+      required: [name, type, required, description]
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+        type:
+          $ref: "#/components/schemas/StepKeyType"
+        required:
+          type: boolean
+        default:
+          description: What the step uses when it is not given.
+        options:
+          type: array
+          description: |
+            The strings it may take: one of them, or for a list, some of them.
+          items:
+            type: string
+        description:
+          type: string
     StepType:
       type: object
-      required: [kind, with]
+      required: [kind, with, title, description, group, capabilities, keys]
       additionalProperties: false
       properties:
         kind:
@@ -3180,9 +3730,37 @@ components:
           type: array
           items:
             type: string
+        title:
+          type: string
+        description:
+          type: string
+        group:
+          type: string
+          description: Source, Checks, Build, Upload, GitHub or Other.
+        capabilities:
+          type: array
+          description: |
+            What a runner needs to run a step of this type: any one of these
+            sets will do. Empty when the engine runs it.
+          items:
+            type: array
+            items:
+              type: string
+        keys:
+          type: array
+          items:
+            $ref: "#/components/schemas/StepKeySchema"
     WorkflowSchema:
       type: object
-      required: [schema, steps, gates, capabilities, matrixAxes, platforms]
+      required:
+        - schema
+        - steps
+        - gates
+        - capabilities
+        - matrixAxes
+        - platforms
+        - gateLabels
+        - variables
       additionalProperties: false
       properties:
         schema:
@@ -3206,6 +3784,18 @@ components:
             type: string
         platforms:
           type: array
+          items:
+            type: string
+        gateLabels:
+          type: object
+          description: What each gate approves, for people.
+          additionalProperties:
+            type: string
+        variables:
+          type: array
+          description: |
+            The paths an expression can read, such as `flavor.prod`; `inputs`
+            holds the inputs a workflow declares.
           items:
             type: string
     VersionBump:
@@ -3336,6 +3926,20 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/RunJob"
+        request:
+          $ref: "#/components/schemas/DispatchRequest"
+    RunsResponse:
+      type: object
+      required: [runs]
+      additionalProperties: false
+      properties:
+        runs:
+          type: array
+          items:
+            $ref: "#/components/schemas/Run"
+        next:
+          type: string
+          description: The `before` of the next page, when there may be one.
     ResumeJobRequest:
       type: object
       additionalProperties: false

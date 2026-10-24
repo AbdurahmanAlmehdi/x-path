@@ -4,6 +4,7 @@ import 'package:xp_api/xp_api.dart';
 import 'package:xp_desktop/app/app_services.dart';
 import 'package:xp_desktop/app/bloc/engine_connection_bloc.dart';
 import 'package:xp_desktop/credentials/bloc/project_credentials_bloc.dart';
+import 'package:xp_desktop/credentials/cubit/store_ids_cubit.dart';
 import 'package:xp_desktop/credentials/widgets/credential_form.dart';
 import 'package:xp_desktop/credentials/widgets/credential_labels.dart';
 import 'package:xp_desktop/l10n/l10n.dart';
@@ -15,11 +16,13 @@ import 'package:xp_repositories/xp_repositories.dart';
 /// Opens the credentials of the flavor [target] of [project]: for each kind,
 /// the credential it uses with what the checks found, and the picker that
 /// assigns one (an existing one or a new one, to this flavor or every flavor
-/// of the app) or removes it.
+/// of the app) or removes it; then the flavor's store ids. [focusStoreIds]
+/// puts the cursor in them (a scan finding of a missing id).
 Future<void> showFlavorCredentialsSheet(
   BuildContext context, {
   required Project project,
   required FlavorTarget target,
+  bool focusStoreIds = false,
 }) {
   final projects = context.read<ProjectsRepository>();
   final credentials = context.read<CredentialsRepository>();
@@ -39,18 +42,32 @@ Future<void> showFlavorCredentialsSheet(
               credentials: credentials,
             )..add(ProjectCredentialsSubscriptionRequested(project.id)),
           ),
+          BlocProvider(
+            create: (_) =>
+                StoreIdsCubit(projects: projects, projectId: project.id),
+          ),
         ],
-        child: FlavorCredentialsSheet(project: project, target: target),
+        child: FlavorCredentialsSheet(
+          project: project,
+          target: target,
+          focusStoreIds: focusStoreIds,
+        ),
       ),
     ),
   );
 }
 
 class FlavorCredentialsSheet extends StatefulWidget {
-  const new({required this.project, required this.target, super.key});
+  const new({
+    required this.project,
+    required this.target,
+    this.focusStoreIds = false,
+    super.key,
+  });
 
   final Project project;
   final FlavorTarget target;
+  final bool focusStoreIds;
 
   @override
   State<FlavorCredentialsSheet> createState() => _FlavorCredentialsSheetState();
@@ -133,7 +150,7 @@ class _FlavorCredentialsSheetState extends State<FlavorCredentialsSheet> {
                           when _editing == null ||
                               state.assign != AssignStatus.failed) ...[
                         const SizedBox(height: 12),
-                        XpMessage(XpStatus.scanError, error),
+                        XpMessage.error(error),
                       ],
                       const SizedBox(height: 8),
                       for (final kind in namedKinds)
@@ -149,6 +166,12 @@ class _FlavorCredentialsSheetState extends State<FlavorCredentialsSheet> {
                           onEdit: () => _edit(kind),
                           onCancel: () => _edit(null),
                         ),
+                      const SizedBox(height: 16),
+                      StoreIdsSection(
+                        flavor: flavorOf(widget.project, target),
+                        target: target,
+                        autofocus: widget.focusStoreIds,
+                      ),
                     ],
                   ),
                 ),
@@ -157,6 +180,139 @@ class _FlavorCredentialsSheetState extends State<FlavorCredentialsSheet> {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// The flavor [target] names in [project], if it still has it.
+FlavorProfile? flavorOf(Project project, FlavorTarget target) => project
+    .profile
+    .apps
+    .where((app) => app.path == target.app)
+    .expand((app) => app.flavors)
+    .where((flavor) => flavor.name == target.flavor)
+    .firstOrNull;
+
+/// The store ids of the flavor [target] (UX-03): the Firebase app id of each
+/// platform and the App Store Connect app id, which the built-in workflows
+/// upload to when a dispatch names none. An empty field removes the id.
+class StoreIdsSection extends StatefulWidget {
+  const new({
+    required this.flavor,
+    required this.target,
+    this.autofocus = false,
+    super.key,
+  });
+
+  /// The flavor as the project knows it, for the ids it has now.
+  final FlavorProfile? flavor;
+  final FlavorTarget target;
+  final bool autofocus;
+
+  @override
+  State<StoreIdsSection> createState() => _StoreIdsSectionState();
+}
+
+class _StoreIdsSectionState extends State<StoreIdsSection> {
+  late final _android = TextEditingController(
+    text: widget.flavor?.firebaseAppId?['android'] ?? '',
+  );
+  late final _ios = TextEditingController(
+    text: widget.flavor?.firebaseAppId?['ios'] ?? '',
+  );
+  late final _apple = TextEditingController(
+    text: widget.flavor?.appleAppId ?? '',
+  );
+  final _focus = FocusNode();
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.autofocus) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _focus.requestFocus();
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _android.dispose();
+    _ios.dispose();
+    _apple.dispose();
+    _focus.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    final colors = context.xpColors;
+    final state = context.watch<StoreIdsCubit>().state;
+    final canCommand = context.canCommand;
+    return Column(
+      key: const Key('flavorCredentials.storeIds'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        XpSectionLabel(l10n.flavorStoreIds),
+        const SizedBox(height: 4),
+        Text(
+          l10n.flavorStoreIdsHelp,
+          style: context.xpType.caption.copyWith(color: colors.textSecondary),
+        ),
+        const SizedBox(height: 10),
+        XpTextField(
+          key: const Key('storeIds.firebaseAndroid'),
+          label: l10n.flavorFirebaseAndroid,
+          hint: l10n.flavorFirebaseHint('android'),
+          controller: _android,
+          focusNode: _focus,
+          code: true,
+        ),
+        const SizedBox(height: 8),
+        XpTextField(
+          key: const Key('storeIds.firebaseIos'),
+          label: l10n.flavorFirebaseIos,
+          hint: l10n.flavorFirebaseHint('ios'),
+          controller: _ios,
+          code: true,
+        ),
+        const SizedBox(height: 8),
+        XpTextField(
+          key: const Key('storeIds.apple'),
+          label: l10n.flavorAppleAppId,
+          hint: l10n.flavorAppleAppIdHint,
+          controller: _apple,
+          code: true,
+        ),
+        if (state.status == StoreIdsStatus.failed) ...[
+          const SizedBox(height: 8),
+          XpMessage.error(state.error!),
+        ],
+        if (state.status == StoreIdsStatus.saved) ...[
+          const SizedBox(height: 8),
+          XpMessage(XpStatus.jobSucceeded, l10n.flavorStoreIdsSaved),
+        ],
+        const SizedBox(height: 10),
+        Align(
+          alignment: Alignment.centerRight,
+          child: XpButton(
+            label: l10n.flavorStoreIdsSave,
+            kind: XpButtonKind.primary,
+            busy: state.status == StoreIdsStatus.saving,
+            tooltip: canCommand ? null : l10n.readOnlyHint,
+            onPressed: canCommand && state.status != StoreIdsStatus.saving
+                ? () => context.read<StoreIdsCubit>().save(
+                    app: widget.target.app,
+                    flavor: widget.target.flavor,
+                    firebaseAndroid: _android.text,
+                    firebaseIos: _ios.text,
+                    appleAppId: _apple.text,
+                  )
+                : null,
+          ),
+        ),
+      ],
     );
   }
 }
@@ -435,7 +591,7 @@ class _AssignEditorState extends State<_AssignEditor> {
             )
           else ...[
             if (failed != null) ...[
-              XpMessage(XpStatus.scanError, failed),
+              XpMessage.error(failed),
               const SizedBox(height: 10),
             ],
             Row(

@@ -3,6 +3,7 @@
 
 import 'package:equatable/equatable.dart';
 import 'package:json_annotation/json_annotation.dart';
+import 'package:xp_api/src/workflow.dart';
 
 part 'api_error.g.dart';
 
@@ -85,11 +86,18 @@ enum ApiErrorCode {
   final int statusCode;
 }
 
-/// The body of an error: a code and a human-readable message.
-@JsonSerializable()
+/// The body of an error: a code, a human-readable message and, where it
+/// helps, what to do (UX-05).
+@JsonSerializable(explicitToJson: true, includeIfNull: false)
 class ApiError extends Equatable {
   /// Creates an error.
-  const new({required this.code, required this.message});
+  const new({
+    required this.code,
+    required this.message,
+    this.issues,
+    this.hint,
+    this.details,
+  });
 
   /// Reads an error from its JSON form.
   factory ApiError.fromJson(Map<String, dynamic> json) =>
@@ -101,11 +109,23 @@ class ApiError extends Equatable {
   /// Human-readable explanation. Never contains secrets.
   final String message;
 
+  /// For `workflow_invalid`, the issues of the document, each at its line.
+  final List<WorkflowIssue>? issues;
+
+  /// What to do about it, in a sentence for the owner, for example "Unlock
+  /// the secrets in the XPath app.". It names no command: a client adds its
+  /// own.
+  final String? hint;
+
+  /// Facts of the error a client can act on, by name, for example the
+  /// `kind` of a credential that is missing.
+  final Map<String, Object?>? details;
+
   /// The JSON form.
   Map<String, dynamic> toJson() => _$ApiErrorToJson(this);
 
   @override
-  List<Object?> get props => [code, message];
+  List<Object?> get props => [code, message, issues, hint, details];
 }
 
 /// The envelope of every non-2xx JSON response: `{"error": {...}}`.
@@ -114,9 +134,21 @@ class ErrorResponse extends Equatable {
   /// Creates an envelope around [error].
   const new(this.error);
 
-  /// Creates an envelope from a [code] and a [message].
-  ErrorResponse.of(ApiErrorCode code, String message)
-    : error = ApiError(code: code, message: message);
+  /// Creates an envelope from a [code], a [message] and the [issues] of a
+  /// workflow document.
+  ErrorResponse.of(
+    ApiErrorCode code,
+    String message, {
+    List<WorkflowIssue>? issues,
+    String? hint,
+    Map<String, Object?>? details,
+  }) : error = ApiError(
+         code: code,
+         message: message,
+         issues: issues,
+         hint: hint,
+         details: details,
+       );
 
   /// Reads an envelope from its JSON form.
   factory ErrorResponse.fromJson(Map<String, dynamic> json) =>

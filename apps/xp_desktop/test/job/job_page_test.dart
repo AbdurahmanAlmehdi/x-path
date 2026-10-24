@@ -7,8 +7,10 @@ import 'package:xp_client/xp_client.dart';
 import 'package:xp_desktop/job/job.dart';
 import 'package:xp_desktop/l10n/l10n.dart';
 import 'package:xp_desktop/shell/cubit/shell_cubit.dart';
+import 'package:xp_desktop/widgets/widgets.dart';
 import 'package:xp_repositories/xp_repositories.dart';
 
+import '../helpers/fakes.dart';
 import '../helpers/job_fixtures.dart';
 import '../helpers/pump_app.dart';
 import 'job_harness.dart';
@@ -42,7 +44,7 @@ void main() {
         findsOneWidget,
       );
       expect(find.text('2 lines'), findsOneWidget);
-      expect(find.text('Re-run all'), findsNothing);
+      expect(find.text('Restart job'), findsNothing);
     });
 
     testWidgets('says what the engine answered without a run', (tester) async {
@@ -54,6 +56,19 @@ void main() {
       await failing.pump(tester);
       expect(find.text('No such run.'), findsOneWidget);
       expect(find.text('Job'), findsOneWidget);
+      verify(() => failing.jobs.watchRunJobs('run_1')).called(1);
+
+      await tester.tap(find.text('Retry'));
+      await tester.pump();
+      verify(() => failing.jobs.watchRunJobs('run_1')).called(1);
+    });
+
+    testWidgets('stands bars in while the run loads', (tester) async {
+      final loading = JobHarness();
+      when(() => loading.jobs.watchRunJobs('run_1'))
+          .thenAnswer((_) => const Stream.empty());
+      await loading.pump(tester);
+      expect(find.byType(XpLoading), findsOneWidget);
     });
 
     testWidgets('shows another job when its node is clicked', (tester) async {
@@ -117,6 +132,7 @@ void main() {
       await tester.tap(find.text('Cancel run'));
       await tester.pumpAndSettle();
       verify(() => harness.jobs.cancelRun('run_1')).called(1);
+      expect(find.text('Run cancelled'), findsOneWidget);
 
       await tester.sendKeyDownEvent(LogicalKeyboardKey.metaLeft);
       await tester.sendKeyEvent(LogicalKeyboardKey.period);
@@ -143,7 +159,7 @@ void main() {
       expect(find.text('First 2 steps'), findsOneWidget);
       expect(find.text('Build iOS and after'), findsOneWidget);
 
-      await tester.tap(find.text('Re-run all'));
+      await tester.tap(find.text('Restart job'));
       await tester.pump();
       verify(() => harness.jobs.resumeJob('job_ios', fromStep: 0)).called(1);
 
@@ -181,7 +197,7 @@ void main() {
       when(() => harness.jobs.resumeJob('job_ios', fromStep: 0))
           .thenThrow(const ApiException('Not resumable.', statusCode: 409));
       await harness.pump(tester);
-      await tester.tap(find.text('Re-run all'));
+      await tester.tap(find.text('Restart job'));
       await tester.pump();
       expect(find.text('Not resumable.'), findsOneWidget);
     });
@@ -268,13 +284,106 @@ void main() {
       );
     });
 
+    testWidgets('says why a failed job failed without hovering', (
+      tester,
+    ) async {
+      final run = failedRun();
+      Job withMessages(Job job) => Job(
+        id: job.id,
+        projectId: job.projectId,
+        workflowVersionId: job.workflowVersionId,
+        runId: job.runId,
+        name: job.name,
+        stage: job.stage,
+        state: job.state,
+        startedAt: job.startedAt,
+        finishedAt: job.finishedAt,
+        createdAt: job.createdAt,
+        message: 'Build iOS failed.',
+        steps: [
+          for (final step in job.steps)
+            JobStep(
+              ordinal: step.ordinal,
+              kind: step.kind,
+              state: step.state,
+              sideEffect: step.sideEffect,
+              attempts: step.attempts,
+              startedAt: step.startedAt,
+              finishedAt: step.finishedAt,
+              message: step.state == StepState.failed
+                  ? 'xcodebuild exited with 65.'
+                  : null,
+            ),
+        ],
+      );
+      final failed = RunJobs(
+        run: run.run,
+        jobs: [
+          for (final job in run.jobs)
+            if (job.id == 'job_ios') withMessages(job) else job,
+        ],
+      );
+      await JobHarness(run: failed, log: failedLog).pump(tester);
+      expect(
+        find.text('xcodebuild exited with 65. Build iOS failed.'),
+        findsOneWidget,
+      );
+      expect(find.text('Failed'), findsWidgets);
+
+      expect(failureOf(run.jobs[1]), isNull);
+      expect(
+        failureOf(
+          job(
+            'j',
+            'j',
+            0,
+            JobState.failed,
+            message: 'Same.',
+            steps: const [
+              JobStep(
+                ordinal: 0,
+                kind: 'command',
+                state: StepState.failed,
+                sideEffect: false,
+                attempts: 1,
+                message: 'Same.',
+              ),
+            ],
+          ),
+        ),
+        'Same.',
+      );
+    });
+
+    testWidgets('says why a queued job waits', (tester) async {
+      final run = runningRun();
+      final waiting = RunJobs(
+        run: run.run,
+        jobs: [
+          for (final candidate in run.jobs)
+            if (candidate.id == 'job_upload')
+              job(
+                'job_upload',
+                'Upload prod for ios',
+                2,
+                JobState.queued,
+                message: 'No runner can do ios-sign.',
+              )
+            else
+              candidate,
+        ],
+      );
+      await JobHarness(run: waiting).pump(tester, jobId: 'job_upload');
+      expect(find.text('Waiting: No runner can do ios-sign.'), findsOneWidget);
+    });
+
     testWidgets('is read-only while the engine is away', (tester) async {
       final harness = JobHarness(run: interruptedRun());
       await harness.pump(
         tester,
         connection: connectionIn(connectedTo(status: EngineStatus.unreachable)),
       );
-      await tester.tap(find.text('Re-run all'));
+      await tester.tap(find.text('Restart job'));
       await tester.tap(find.text('Cancel'));
       await tester.pumpAndSettle();
       for (final key in [LogicalKeyboardKey.keyR, LogicalKeyboardKey.period]) {
@@ -342,7 +451,97 @@ void main() {
       );
     });
 
-    testWidgets('a finished run offers nothing to do', (tester) async {
+    testWidgets(
+      'a failed run is run again, or its failed jobs, and says what it made',
+      (tester) async {
+        final harness = JobHarness(run: failedRun());
+        final shell = ShellCubit();
+        when(() => harness.jobs.rerunFailed('run_1'))
+            .thenAnswer((_) async => failedRun().run);
+        when(() => harness.jobs.runAgain('run_1')).thenAnswer(
+          (_) async => Run(
+            id: 'run_2',
+            projectId: 'prj_1',
+            workflowId: 'wf_prod',
+            workflowVersionId: 'wfv_1',
+            sha: 'a' * 40,
+            state: RunState.queued,
+            locksProject: true,
+            createdAt: at,
+            jobs: const [],
+          ),
+        );
+        when(() => harness.workflows.getWorkflow(any(), any())).thenAnswer(
+          (_) async => Workflow(
+            id: 'wf_prod',
+            projectId: 'prj_1',
+            name: 'Prod release',
+            builtin: true,
+            version: WorkflowVersionInfo(
+              id: 'wfv_2',
+              version: 2,
+              createdAt: at,
+            ),
+            versions: [
+              ...prodWorkflow.versions,
+              WorkflowVersionInfo(id: 'wfv_2', version: 2, createdAt: at),
+            ],
+            yaml: workflowYaml,
+          ),
+        );
+        await harness.pump(tester, shell: shell);
+
+        expect(find.text('VERSION'), findsOneWidget);
+        expect(find.text('3283'), findsOneWidget);
+        expect(
+          find.text(
+            'Run again runs version 1 of the workflow, the one this run ran; '
+            'it has version 2 now.',
+          ),
+          findsOneWidget,
+        );
+        await tester.tap(find.text('Re-run failed jobs'));
+        await tester.pump();
+        verify(() => harness.jobs.rerunFailed('run_1')).called(1);
+
+        await tester.tap(find.text('Run again'));
+        await tester.pump();
+        await tester.pump();
+        expect(shell.state, const JobDestination('run_2', projectId: 'prj_1'));
+      },
+    );
+
+    testWidgets('downloads an artifact, then reveals it', (tester) async {
+      final revealed = <String>[];
+      final harness = JobHarness(
+        run: runningRun(
+          iosState: JobState.succeeded,
+          buildState: StepState.succeeded,
+          runState: RunState.succeeded,
+          iosEnd: local(14, 8, 30),
+        ),
+      );
+      when(() => harness.jobs.downloadArtifact('art_1')).thenAnswer(
+        (_) async => ArtifactDownload(content: Stream.value([1]), sha256: null),
+      );
+      await harness.pump(
+        tester,
+        services: testServices(
+          saveDownload: (name, content) async => '/Downloads/$name',
+          revealFile: (path) async => revealed.add(path),
+        ),
+      );
+      await tester.tap(find.byTooltip('Download…'));
+      await tester.pump();
+      await tester.pump();
+
+      await tester.tap(find.byTooltip('Reveal in Finder'));
+      await tester.pump();
+      expect(revealed, ['/Downloads/mataa.ipa']);
+      expect(find.byTooltip('Copy path'), findsOneWidget);
+    });
+
+    testWidgets('a finished run offers to run again only', (tester) async {
       final run = runningRun(
         iosState: JobState.succeeded,
         buildState: StepState.succeeded,
@@ -373,6 +572,8 @@ void main() {
       await harness.pump(tester);
       expect(find.text('Succeeded'), findsOneWidget);
       expect(find.text('Cancel'), findsNothing);
+      expect(find.text('Run again'), findsOneWidget);
+      expect(find.text('Re-run failed jobs'), findsNothing);
       for (final key in [LogicalKeyboardKey.keyR, LogicalKeyboardKey.period]) {
         await tester.sendKeyDownEvent(LogicalKeyboardKey.metaLeft);
         await tester.sendKeyEvent(key);

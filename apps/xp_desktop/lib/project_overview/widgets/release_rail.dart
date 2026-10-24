@@ -62,14 +62,19 @@ class _InFlight extends StatelessWidget {
             ),
             const SizedBox(width: 12),
             Expanded(
-              child: Text(
-                [
-                  release.flavor,
-                  ?sha == null ? null : shortSha(sha),
-                  l10n.overviewStarted(formatTime(release.createdAt)),
-                ].join(' · '),
-                overflow: TextOverflow.ellipsis,
-                style: type.caption.copyWith(color: colors.textSecondary),
+              child: Tooltip(
+                message: formatAbsolute(release.createdAt),
+                child: Text(
+                  [
+                    release.flavor,
+                    ?sha == null ? null : shortSha(sha),
+                    l10n.overviewStarted(
+                      formatWhen(release.createdAt, XpClock.now(context)),
+                    ),
+                  ].join(' · '),
+                  overflow: TextOverflow.ellipsis,
+                  style: type.caption.copyWith(color: colors.textSecondary),
+                ),
               ),
             ),
             XpButton(

@@ -404,6 +404,20 @@ void main() {
       expect(find.text('Connected to GitHub as octo.'), findsOneWidget);
       await tester.tap(find.byKey(const Key('settings.githubRemove')));
       await tester.pumpAndSettle();
+      expect(find.text('Remove the GitHub token?'), findsOneWidget);
+      await tester.tap(find.text('Keep'));
+      await tester.pumpAndSettle();
+      verifyNever(settings.clearGitHubToken);
+
+      await tester.tap(find.byKey(const Key('settings.githubRemove')));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.descendant(
+          of: find.byType(XpConfirmDialog),
+          matching: find.text('Remove token'),
+        ),
+      );
+      await tester.pumpAndSettle();
 
       verify(settings.clearGitHubToken).called(1);
       expect(

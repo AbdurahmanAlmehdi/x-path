@@ -13,6 +13,7 @@ import 'package:xp_engine/src/workflows/workflow_definition.dart';
 import 'package:xp_engine/src/workflows/workflow_exceptions.dart';
 import 'package:xp_engine/src/workflows/workflow_parser.dart';
 import 'package:xp_engine/src/workflows/workflow_repository.dart';
+import 'package:xp_engine/src/workflows/workflow_templates.dart';
 
 final _workflowName = RegExp(r'^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$');
 
@@ -58,21 +59,32 @@ class WorkflowService {
   final Random _random;
 
   /// What a workflow document may name: the step types of the engine with
-  /// their `with` keys, the gates, the capabilities and the matrix axes.
+  /// what each does and its typed `with` keys, the gates with their labels,
+  /// the capabilities, the matrix axes and the variables.
   WorkflowSchema schema() => WorkflowSchema(
     schema: workflowSchemaVersion,
-    steps: [
-      for (final kind in _catalog.kinds)
-        StepType(
-          kind: kind,
-          withKeys: _catalog.withKeys(kind)!.toList()..sort(),
-        ),
-    ],
+    steps: [for (final kind in _catalog.kinds) _catalog.describe(kind)!],
     gates: [for (final action in GateAction.values) action.wire],
+    gateLabels: {
+      for (final action in GateAction.values) action.wire: action.label,
+    },
     capabilities: [for (final capability in Capability.values) capability.wire],
     matrixAxes: matrixAxes,
     platforms: platformNames,
+    variables: variablePaths,
   );
+
+  /// The documents a new workflow can start from, in the order to offer
+  /// them.
+  List<WorkflowTemplate> templates() => [
+    for (final MapEntry(key: id, value: template) in workflowTemplates.entries)
+      WorkflowTemplate(
+        id: id,
+        title: template.title,
+        description: template.description,
+        yaml: template.yaml,
+      ),
+  ];
 
   /// Checks [yaml] against schema 1 and the step types of the engine.
   ValidateWorkflowResponse validate(String yaml) {
@@ -120,19 +132,42 @@ class WorkflowService {
     );
   }
 
-  /// Creates a workflow called [name] from [yaml], at version 1.
+  /// The workflow [workflowId] with its version [versionId], to run that
+  /// version again.
+  ///
+  /// Throws a [ProjectNotFoundException] or a [WorkflowNotFoundException]
+  /// (also when the version is not one of the workflow).
+  Future<StoredWorkflow> stored(
+    String projectId,
+    String workflowId,
+    String versionId,
+  ) async {
+    final workflow = await _require(projectId, workflowId);
+    final version = await _repository.versionById(versionId);
+    if (version == null || version.workflowId != workflowId) {
+      throw WorkflowNotFoundException(workflowId);
+    }
+    return StoredWorkflow(workflow, version);
+  }
+
+  /// Creates a workflow called [name] from [yaml], at version 1; a copy of
+  /// the built-in [basedOn] names, when it names one.
   ///
   /// Throws a [WorkflowNameException], a [WorkflowExistsException], a
-  /// [WorkflowInvalidException] or a [ProjectNotFoundException].
+  /// [WorkflowInvalidException], a [WorkflowEditException] (no such
+  /// built-in) or a [ProjectNotFoundException].
   Future<Workflow> create(
     String projectId, {
     required String name,
     required String yaml,
+    WorkflowBasedOn? basedOn,
   }) async {
     await _ensureBuiltIns(projectId);
-    if (!_workflowName.hasMatch(name)) throw WorkflowNameException(name);
-    if (await _repository.findByName(projectId, name) != null) {
-      throw WorkflowExistsException(name);
+    await _requireFreeName(projectId, name);
+    if (basedOn != null && !builtinWorkflows.containsKey(basedOn.builtin)) {
+      throw WorkflowEditException(
+        '"${basedOn.builtin}" is not a built-in workflow.',
+      );
     }
     _requireValid(yaml);
     final workflow = WorkflowRecord(
@@ -140,6 +175,8 @@ class WorkflowService {
       projectId: projectId,
       name: name,
       builtin: false,
+      basedOnBuiltin: basedOn?.builtin,
+      basedOnVersion: basedOn?.version,
     );
     final first = WorkflowVersionRecord(
       id: _id('wfv'),
@@ -175,6 +212,52 @@ class WorkflowService {
     return _detail(workflow, next, await _repository.versions(workflowId));
   }
 
+  /// Renames, archives or unarchives the workflow [workflowId], or marks a
+  /// copy of a built-in as caught up with a version of it, as [request]
+  /// says. No new version is made.
+  ///
+  /// Throws a [WorkflowBuiltinException], a [WorkflowNameException], a
+  /// [WorkflowExistsException], a [WorkflowEditException], a
+  /// [WorkflowNotFoundException] or a [ProjectNotFoundException].
+  Future<Workflow> update(
+    String projectId,
+    String workflowId,
+    UpdateWorkflowRequest request,
+  ) async {
+    final workflow = await _require(projectId, workflowId);
+    if (workflow.builtin) throw WorkflowBuiltinException(workflow.name);
+    final name = request.name;
+    if (name != null && name != workflow.name) {
+      await _requireFreeName(projectId, name);
+    }
+    if (request.basedOnVersion != null && workflow.basedOnBuiltin == null) {
+      throw WorkflowEditException(
+        'Workflow ${workflow.name} is not a copy of a built-in workflow.',
+      );
+    }
+    final archived = request.archived;
+    final updated = workflow.copyWith(
+      name: name,
+      basedOnVersion: request.basedOnVersion,
+      archivedAt: archived == null
+          ? null
+          : () => archived ? workflow.archivedAt ?? _clock.now() : null,
+    );
+    if (updated != workflow) {
+      await _repository.update(updated);
+      _events.append(
+        WorkflowUpdated(
+          workflowId: workflowId,
+          projectId: projectId,
+          name: updated.name,
+          archived: updated.archivedAt != null,
+        ),
+      );
+    }
+    final versions = await _repository.versions(workflowId);
+    return _detail(updated, versions.last, versions);
+  }
+
   /// Deletes the workflow [workflowId].
   ///
   /// Throws a [WorkflowBuiltinException], a [WorkflowInUseException] (jobs
@@ -205,6 +288,15 @@ class WorkflowService {
       throw WorkflowNotFoundException(workflowId);
     }
     return workflow;
+  }
+
+  /// Throws a [WorkflowNameException] or a [WorkflowExistsException] unless
+  /// [name] is a name a new workflow of the project can have.
+  Future<void> _requireFreeName(String projectId, String name) async {
+    if (!_workflowName.hasMatch(name)) throw WorkflowNameException(name);
+    if (await _repository.findByName(projectId, name) != null) {
+      throw WorkflowExistsException(name);
+    }
   }
 
   void _requireValid(String yaml) {
@@ -264,13 +356,20 @@ class WorkflowService {
   WorkflowSummary _summary(
     WorkflowRecord workflow,
     WorkflowVersionRecord newest,
-  ) => WorkflowSummary(
-    id: workflow.id,
-    projectId: workflow.projectId,
-    name: workflow.name,
-    builtin: workflow.builtin,
-    version: _info(newest),
-  );
+  ) {
+    final definition = _parser.parse(newest.yaml).definition;
+    return WorkflowSummary(
+      id: workflow.id,
+      projectId: workflow.projectId,
+      name: workflow.name,
+      builtin: workflow.builtin,
+      version: _info(newest),
+      title: definition?.name,
+      description: definition?.description,
+      basedOn: _basedOn(workflow),
+      archivedAt: workflow.archivedAt,
+    );
+  }
 
   Workflow _detail(
     WorkflowRecord workflow,
@@ -284,7 +383,24 @@ class WorkflowService {
     version: _info(chosen),
     versions: [for (final version in versions) _info(version)],
     yaml: chosen.yaml,
+    inputs: [
+      for (final input
+          in _parser.parse(chosen.yaml).definition?.inputs ??
+              const <InputDefinition>[])
+        input.toWire(),
+    ],
+    basedOn: _basedOn(workflow),
+    archivedAt: workflow.archivedAt,
   );
+
+  static WorkflowBasedOn? _basedOn(WorkflowRecord workflow) =>
+      switch ((workflow.basedOnBuiltin, workflow.basedOnVersion)) {
+        (final String builtin, final int version) => WorkflowBasedOn(
+          builtin: builtin,
+          version: version,
+        ),
+        _ => null,
+      };
 
   WorkflowVersionInfo _info(WorkflowVersionRecord version) =>
       WorkflowVersionInfo(

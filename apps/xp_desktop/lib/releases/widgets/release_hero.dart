@@ -112,10 +112,7 @@ class ReleaseHero extends StatelessWidget {
                   Text(release.flavor, style: meta),
                   if (release.headSha case final sha?) ...[
                     Text('·', style: meta),
-                    Tooltip(
-                      message: sha,
-                      child: Text(shortSha(sha), style: code),
-                    ),
+                    XpSha(sha, style: code),
                   ],
                   if (release.tag case final tag?) ...[
                     Text('·', style: meta),

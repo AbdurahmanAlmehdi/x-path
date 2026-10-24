@@ -83,6 +83,11 @@ void main() {
       ],
     );
 
+    test('events compare by value', () {
+      expect(const ProjectsSubscriptionRequested().props, isEmpty);
+      expect(const ProjectScanRequested('prj_1').props, ['prj_1']);
+    });
+
     test('finds a project by id', () {
       const state = ProjectsState(projects: [mataa, captain]);
       expect(state.byId('prj_2'), captain);

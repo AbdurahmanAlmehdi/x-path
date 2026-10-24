@@ -22,6 +22,7 @@ void main() {
       for (final tool in buildXpTools(
         client,
         tailIdle: const Duration(milliseconds: 50),
+        pollInterval: Duration.zero,
       ))
         tool.name: tool,
     };
@@ -36,6 +37,10 @@ void main() {
   ]) => tools[name]!.handler(arguments);
 
   Object? decoded(McpToolResult result) => jsonDecode(result.text);
+
+  /// The message of an error result, which is `{"code", "message", "hint"}`.
+  String message(McpToolResult result) =>
+      (decoded(result)! as Map<String, Object?>)['message']! as String;
 
   group('the tool list', () {
     test('has no way to approve, deny, loosen a gate, merge or delete', () {
@@ -64,10 +69,15 @@ void main() {
           'scan_project',
           'list_workflows',
           'get_workflow',
+          'get_workflow_schema',
           'validate_workflow',
           'create_workflow',
           'update_workflow',
+          'archive_workflow',
           'dispatch_workflow',
+          'list_runs',
+          'wait_for_run',
+          'wait_for_approval',
           'get_run',
           'get_job',
           'get_job_log_tail',
@@ -235,9 +245,10 @@ void main() {
         'edits': {'apps': 'nope'},
       });
 
-      expect(missing.text, contains('"edits" is required'));
+      expect(message(missing), '"edits" is required.');
       expect(broken.isError, isTrue);
-      expect(broken.text, startsWith('Invalid arguments'));
+      expect(message(broken), startsWith('Invalid arguments'));
+      expect((decoded(broken)! as Map)['code'], 'invalid_request');
     });
   });
 
@@ -280,6 +291,213 @@ void main() {
         'saved': false,
         'issues': [
           {'line': 4, 'column': 2, 'message': 'Unknown step.'},
+        ],
+      });
+    });
+
+    test('list_runs lists them, by project, workflow and state', () async {
+      when(
+        () => client.listRuns(
+          projectId: 'prj_1',
+          workflowId: 'wf_1',
+          state: RunState.failed,
+          limit: 5,
+        ),
+      ).thenAnswer((_) async => RunsResponse([sample.run()], next: 'run_1'));
+      when(() => client.listRuns(limit: 20, workflowId: 'wf_x'))
+          .thenAnswer((_) async => const RunsResponse([]));
+
+      final result = await call('list_runs', {
+        'project': 'prj_1',
+        'workflow': 'dev-build',
+        'state': 'failed',
+        'limit': 5,
+      });
+      final all = await call('list_runs', {'workflow': 'wf_x'});
+      final bad = await call('list_runs', {'limit': 99});
+      final odd = await call('list_runs', {'state': 'sleeping'});
+
+      expect((decoded(result)! as Map)['next'], 'run_1');
+      expect((decoded(all)! as Map)['runs'], isEmpty);
+      expect(bad.isError, isTrue);
+      expect(odd.isError, isTrue);
+    });
+
+    test('wait_for_run waits until the run ends, or times out', () async {
+      final states = [RunState.running, RunState.running, RunState.succeeded];
+      when(() => client.getRun('run_1')).thenAnswer(
+        (_) async => sample.run(
+          state: states.length > 1 ? states.removeAt(0) : states.first,
+        ),
+      );
+
+      final done = await call('wait_for_run', {'run': 'run_1'});
+      expect((decoded(done)! as Map)['timedOut'], isFalse);
+      expect(((decoded(done)! as Map)['run'] as Map)['state'], 'succeeded');
+
+      when(() => client.getRun('run_2'))
+          .thenAnswer((_) async => sample.run(id: 'run_2'));
+      final waiting = await call('wait_for_run', {
+        'run': 'run_2',
+        'timeoutSeconds': 0,
+      });
+      expect((decoded(waiting)! as Map)['timedOut'], isTrue);
+      final bad = await call('wait_for_run', {
+        'run': 'run_2',
+        'timeoutSeconds': 301,
+      });
+      expect(bad.isError, isTrue);
+    });
+
+    test('wait_for_approval waits until the owner decides', () async {
+      final states = [ApprovalState.pending, ApprovalState.approved];
+      when(() => client.getApproval('apr_1')).thenAnswer(
+        (_) async => sample.approval(
+          state: states.length > 1 ? states.removeAt(0) : states.first,
+        ),
+      );
+
+      final result = await call('wait_for_approval', {'approval': 'apr_1'});
+
+      expect((decoded(result)! as Map)['state'], 'approved');
+      expect((decoded(result)! as Map)['timedOut'], isFalse);
+    });
+
+    test('archive_workflow archives, and unarchives', () async {
+      when(() => client.updateWorkflow('prj_1', 'wf_1', any()))
+          .thenAnswer((_) async => sample.workflow);
+
+      await call('archive_workflow', {'project': 'prj_1', 'workflow': 'wf_1'});
+      final back = await call('archive_workflow', {
+        'project': 'prj_1',
+        'workflow': 'wf_1',
+        'archived': false,
+      });
+      final bad = await call('archive_workflow', {
+        'project': 'prj_1',
+        'workflow': 'wf_1',
+        'archived': 'no',
+      });
+
+      expect(back.isError, isFalse);
+      expect(bad.isError, isTrue);
+      expect(
+        verify(() => client.updateWorkflow('prj_1', 'wf_1', captureAny()))
+            .captured,
+        const [
+          UpdateWorkflowRequest(archived: true),
+          UpdateWorkflowRequest(archived: false),
+        ],
+      );
+    });
+
+    test('get_workflow_schema gives the schema, or one step type', () async {
+      const ios = StepType(
+        kind: 'build.ios',
+        title: 'Build iOS',
+        keys: [
+          StepKeySchema(
+            name: 'exportOptionsPlist',
+            type: StepKeyType.string,
+            required: true,
+          ),
+        ],
+      );
+      when(client.getWorkflowSchema).thenAnswer(
+        (_) async => const WorkflowSchema(
+          schema: 1,
+          steps: [ios],
+          gates: [],
+          capabilities: [],
+          matrixAxes: [],
+          platforms: [],
+        ),
+      );
+
+      final all = await call('get_workflow_schema', {});
+      final one = await call('get_workflow_schema', {'kind': 'build.ios'});
+      final none = await call('get_workflow_schema', {'kind': 'nope'});
+
+      expect((decoded(all)! as Map)['steps'], [ios.toJson()]);
+      expect(decoded(one), ios.toJson());
+      expect(none.isError, isTrue);
+      expect(message(none), contains('No step type "nope"'));
+    });
+
+    test('serves the workflow schema as a resource', () async {
+      when(client.getWorkflowSchema).thenAnswer(
+        (_) async => const WorkflowSchema(
+          schema: 1,
+          steps: [],
+          gates: ['push'],
+          capabilities: [],
+          matrixAxes: [],
+          platforms: [],
+        ),
+      );
+
+      final resource = buildXpResources(client).single;
+
+      expect(resource.uri, workflowSchemaUri);
+      expect(
+        jsonDecode(await resource.read()),
+        containsPair('gates', ['push']),
+      );
+    });
+
+    test('validate_workflow needs no project', () async {
+      when(() => client.validateWorkflow(null, 'ok')).thenAnswer(
+        (_) async => const ValidateWorkflowResponse(
+          valid: false,
+          issues: [
+            WorkflowIssue(
+              line: 4,
+              column: 2,
+              message: 'The workflow has no input "notez".',
+              hint: 'Did you mean "inputs.notes"?',
+            ),
+          ],
+        ),
+      );
+
+      final result = await call('validate_workflow', {'yaml': 'ok'});
+
+      expect(decoded(result), {
+        'valid': false,
+        'saved': false,
+        'issues': [
+          {
+            'line': 4,
+            'column': 2,
+            'message': 'The workflow has no input "notez".',
+            'hint': 'Did you mean "inputs.notes"?',
+          },
+        ],
+      });
+    });
+
+    test('a workflow_invalid error carries the issues', () async {
+      when(() => client.validateWorkflow('prj_1', 'ok')).thenThrow(
+        const ApiException(
+          'The workflow has 1 issue.',
+          statusCode: 422,
+          code: ApiErrorCode.workflowInvalid,
+          issues: [WorkflowIssue(line: 2, column: 1, message: 'Bad.')],
+        ),
+      );
+
+      final result = await call('validate_workflow', {
+        'project': 'prj_1',
+        'yaml': 'ok',
+      });
+
+      expect(result.isError, isTrue);
+      expect(decoded(result), {
+        'code': 'workflow_invalid',
+        'message': 'The workflow has 1 issue.',
+        'hint': '',
+        'issues': [
+          {'line': 2, 'column': 1, 'message': 'Bad.'},
         ],
       });
     });
@@ -421,6 +639,28 @@ void main() {
       ).called(1);
     });
 
+    test('plan_dispatch plans without dispatching', () async {
+      const plan = DispatchPlan(flavors: ['dev'], platforms: ['android']);
+      when(
+        () => client.planDispatch(
+          'prj_1',
+          'wf_1',
+          const DispatchRequest(flavors: ['dev']),
+        ),
+      ).thenAnswer((_) async => plan);
+
+      final result = await call('plan_dispatch', {
+        'project': 'prj_1',
+        'workflow': 'wf_1',
+        'flavors': ['dev'],
+      });
+
+      expect(result.isError, isFalse);
+      expect(decoded(result), plan.toJson());
+      expect(tools['plan_dispatch']!.readOnly, isTrue);
+      verifyNever(() => client.dispatchWorkflow(any(), any(), any()));
+    });
+
     test('refuses a bad argument without calling the engine', () async {
       final result = await call('dispatch_workflow', {
         'project': 'prj_1',
@@ -429,7 +669,7 @@ void main() {
       });
 
       expect(result.isError, isTrue);
-      expect(result.text, '"flavors" must be a list of strings.');
+      expect(message(result), '"flavors" must be a list of strings.');
       verifyNever(() => client.dispatchWorkflow(any(), any(), any()));
     });
 
@@ -602,7 +842,11 @@ void main() {
 
       final result = await call('get_job_tests', {'job': 'job_1'});
 
-      expect(result.text, 'No tests.');
+      expect(decoded(result), {
+        'code': 'not_found',
+        'message': 'No tests.',
+        'hint': '',
+      });
     });
 
     test('get_job_tests refuses a status it does not know', () async {
@@ -611,7 +855,7 @@ void main() {
         'statuses': ['great'],
       });
 
-      expect(result.text, 'Unknown status "great".');
+      expect(message(result), 'Unknown status "great".');
     });
 
     test('get_test_baselines lists them', () async {
@@ -863,7 +1107,9 @@ void main() {
         ),
       );
 
-      expect((await call('list_projects')).text, 'Busy.');
+      final result = await call('list_projects');
+      expect(message(result), 'Busy.');
+      expect((decoded(result)! as Map)['code'], 'secrets_locked');
     });
 
     test('an engine that cannot be reached', () async {
@@ -873,7 +1119,11 @@ void main() {
       final result = await call('list_projects');
 
       expect(result.isError, isTrue);
-      expect(result.text, 'Cannot reach the engine.');
+      expect(decoded(result), {
+        'code': 'unreachable',
+        'message': 'Cannot reach the engine.',
+        'hint': '',
+      });
     });
 
     test('a project that does not exist', () async {
@@ -882,7 +1132,41 @@ void main() {
       final result = await call('get_project', {'project': 'ghost'});
 
       expect(result.isError, isTrue);
-      expect(result.text, contains('ghost'));
+      expect(decoded(result), {
+        'code': 'not_found',
+        'message': 'No project "ghost".',
+        'hint': 'See: list_projects',
+      });
+    });
+
+    test('a name that is more than one project names no tool', () async {
+      when(() => client.listProjects())
+          .thenAnswer((_) async => [sample.project, sample.project]);
+
+      final result = await call('get_project', {'project': 'app'});
+
+      expect((decoded(result)! as Map)['code'], 'ambiguous');
+      expect((decoded(result)! as Map)['hint'], '');
+    });
+
+    test('an error that is not about the arguments says what it was', () async {
+      when(() => client.listProjects()).thenThrow(const _Broken());
+
+      final result = await call('list_projects');
+
+      expect(decoded(result), {
+        'code': 'internal',
+        'message': 'Broken.',
+        'hint': '',
+      });
+    });
+
+    test('a value that does not parse is an argument error', () async {
+      when(() => client.listProjects()).thenThrow(const FormatException('x'));
+
+      final result = await call('list_projects');
+
+      expect(message(result), 'Invalid arguments: x');
     });
 
     test('an argument error reads as its message', () {
@@ -890,19 +1174,26 @@ void main() {
     });
 
     test('a missing or mistyped argument', () async {
-      expect((await call('get_job')).text, '"job" is required.');
+      expect(message(await call('get_job')), '"job" is required.');
       expect(
-        (await call('get_job', {'job': 3})).text,
+        message(await call('get_job', {'job': 3})),
         '"job" must be a string.',
       );
       expect(
-        (await call('get_job_log_tail', {'job': 'j', 'lines': 'x'})).text,
+        message(await call('get_job_log_tail', {'job': 'j', 'lines': 'x'})),
         '"lines" must be an integer.',
       );
       expect(
-        (await call('update_project', {'project': 'p', 'edits': 'x'})).text,
+        message(await call('update_project', {'project': 'p', 'edits': 'x'})),
         '"edits" must be an object.',
       );
     });
   });
+}
+
+class _Broken implements Exception {
+  const new();
+
+  @override
+  String toString() => 'Broken.';
 }

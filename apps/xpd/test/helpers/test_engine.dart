@@ -80,9 +80,21 @@ class _AutoCounters implements BuildCounterRepository {
     required String appPath,
     required int seed,
   }) async {
-    final key = (projectId, appPath);
-    final current = _counters[key] ?? 0;
-    return _counters[key] = (current > seed ? current : seed) + 1;
+    return _counters[(projectId, appPath)] = await peek(
+      projectId: projectId,
+      appPath: appPath,
+      seed: seed,
+    );
+  }
+
+  @override
+  Future<int> peek({
+    required String projectId,
+    required String appPath,
+    required int seed,
+  }) async {
+    final current = _counters[(projectId, appPath)] ?? 0;
+    return (current > seed ? current : seed) + 1;
   }
 }
 
@@ -175,9 +187,10 @@ class TestEngine {
     final gate = FakeApprovalGate();
     late final Scheduler scheduler;
     final approvalRepository = InMemoryApprovalRepository();
+    final gateConfigs = InMemoryGateConfigRepository();
     final approvals = ApprovalService(
       approvals: approvalRepository,
-      gates: InMemoryGateConfigRepository(),
+      gates: gateConfigs,
       projects: projects,
       jobs: jobRepository,
       events: events,
@@ -276,6 +289,7 @@ class TestEngine {
       }),
       worktreeAt: (mirror, name) => '/worktrees/$name',
       releases: releaseService,
+      gates: gateConfigs,
     );
     final runnerRepository = InMemoryRunnerRepository();
     final runnerHub = RunnerHub(

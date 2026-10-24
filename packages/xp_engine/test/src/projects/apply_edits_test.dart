@@ -59,6 +59,60 @@ void main() {
       expect(edited.apps.last, profile.apps.last);
     });
 
+    test('sets, keeps and removes the store ids', () {
+      const scanned = ProjectProfile(
+        apps: [
+          AppProfile(
+            name: 'one',
+            path: '.',
+            flavors: [
+              FlavorProfile(
+                name: 'dev',
+                entrypoint: 'lib/main_dev.dart',
+                firebaseAppId: {'android': '1:1:android:a'},
+                appleAppId: '7',
+              ),
+            ],
+          ),
+        ],
+      );
+      FlavorProfile edit(FlavorEdit change) => applyEdits(
+        scanned,
+        ProfileEdits(
+          apps: [
+            AppEdit(path: '.', flavors: [change]),
+          ],
+        ),
+      ).apps.single.flavors.single;
+
+      final added = edit(
+        const FlavorEdit(
+          name: 'dev',
+          firebaseAppId: {'ios': '1:1:ios:b'},
+          appleAppId: '9',
+        ),
+      );
+      expect(added.firebaseAppId, {
+        'android': '1:1:android:a',
+        'ios': '1:1:ios:b',
+      });
+      expect(added.appleAppId, '9');
+
+      final kept = edit(const FlavorEdit(name: 'dev', prod: true));
+      expect(kept.firebaseAppId, {'android': '1:1:android:a'});
+      expect(kept.appleAppId, '7');
+
+      final removed = edit(
+        const FlavorEdit(
+          name: 'dev',
+          firebaseAppId: {'android': ''},
+          appleAppId: '',
+        ),
+      );
+      expect(removed.firebaseAppId, isNull);
+      expect(removed.appleAppId, isNull);
+    });
+
     test('ignores edits of apps and flavors that are gone', () {
       final edited = applyEdits(
         profile,
@@ -157,6 +211,42 @@ void main() {
           'two letters',
         );
       }
+    });
+
+    test('accepts store ids and empty ones, and rejects the rest', () {
+      ProfileEdits ids({Map<String, String>? firebase, String? apple}) =>
+          ProfileEdits(
+            apps: [
+              AppEdit(
+                path: '.',
+                flavors: [
+                  FlavorEdit(
+                    name: 'dev',
+                    firebaseAppId: firebase,
+                    appleAppId: apple,
+                  ),
+                ],
+              ),
+            ],
+          );
+
+      expect(
+        validateEdits(
+          profile,
+          ids(
+            firebase: {'android': '1:123456789012:android:abcdef', 'ios': ''},
+            apple: '1234567890',
+          ),
+        ).apps.single.flavors.single.appleAppId,
+        '1234567890',
+      );
+      validateEdits(profile, ids(apple: ''));
+      expectInvalid(ids(firebase: {'web': '1:1:web:a'}), 'android or ios');
+      expectInvalid(
+        ids(firebase: {'android': '1:1:ios:a'}),
+        'not a Firebase app id of android',
+      );
+      expectInvalid(ids(apple: 'com.app'), 'appleAppId');
     });
 
     test('rejects paths that are absolute, empty or leave the repository', () {

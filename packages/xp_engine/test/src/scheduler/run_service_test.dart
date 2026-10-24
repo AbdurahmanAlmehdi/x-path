@@ -106,6 +106,75 @@ void main() {
     );
   });
 
+  group('rerunFailed', () {
+    test('runs the failed jobs again, from the step that failed', () async {
+      var attempts = 0;
+      final flaky = JobHarness.create(
+        scripted: ScriptedStep(
+          onRun: (input, context) async {
+            if (attempts++ == 0) return const StepFailed('flaky');
+            return const StepSucceeded({'ran': true});
+          },
+        ),
+      );
+      final again = RunService(
+        runs: runs,
+        jobs: flaky.jobs,
+        control: flaky.runner,
+      );
+      final done = await flaky.runner.create(
+        workflowVersionId: 'wfv_1',
+        projectId: 'prj_1',
+        runId: 'run_1',
+        name: 'build',
+        steps: [flaky.script()],
+      );
+      final failed = await flaky.runner.create(
+        workflowVersionId: 'wfv_1',
+        projectId: 'prj_1',
+        runId: 'run_1',
+        name: 'upload',
+        steps: [flaky.script(), flaky.script()],
+      );
+      // The build succeeds; the upload fails at its first step.
+      attempts = 1;
+      await flaky.runner.start(done.id);
+      await flaky.runner.whenFinished(done.id);
+      attempts = 0;
+      await flaky.runner.start(failed.id);
+      await flaky.runner.whenFinished(failed.id);
+      expect((await again.get('run_1')).state, RunState.failed);
+
+      await again.rerunFailed('run_1');
+      await flaky.runner.whenFinished(failed.id);
+
+      final run = await again.get('run_1');
+      expect(run.state, RunState.succeeded);
+      expect(attempts, 3, reason: 'the build did not run again');
+    });
+
+    test('refuses a run without a failed job, and no run', () async {
+      final done = await job('done');
+      await harness.runner.start(done.id);
+      await harness.runner.whenFinished(done.id);
+
+      await expectLater(
+        service.rerunFailed('run_1'),
+        throwsA(
+          isA<RunStateException>().having(
+            (e) => e.message,
+            'message',
+            'Run run_1 has no failed job to run again.',
+          ),
+        ),
+      );
+      await expectLater(
+        service.rerunFailed('run_nope'),
+        throwsA(isA<RunNotFoundException>()),
+      );
+    });
+  });
+
   test('the exceptions print their messages', () {
     expect(const RunException('m').toString(), 'RunException: m');
     expect(
@@ -113,5 +182,94 @@ void main() {
       'RunNotFoundException: There is no run r.',
     );
     expect(const RunStateException('m').toString(), 'RunStateException: m');
+  });
+
+  group('list', () {
+    setUp(() async {
+      for (final (id, project, minutes) in [
+        ('run_2', 'prj_1', 2),
+        ('run_3', 'prj_2', 3),
+        ('run_4', 'prj_1', 4),
+      ]) {
+        await runs.create(
+          RunRecord(
+            id: id,
+            projectId: project,
+            workflowId: 'wf_1',
+            workflowVersionId: 'wfv_1',
+            sha: 'a' * 40,
+            locksProject: false,
+            createdAt: DateTime.utc(2026).add(Duration(minutes: minutes)),
+            request: const {
+              'flavors': ['dev'],
+              'inputs': <String, Object?>{},
+            },
+          ),
+        );
+      }
+    });
+
+    test(
+      'gives the runs newest first, with where the next page starts',
+      () async {
+        final first = await service.list(limit: 2);
+        expect(first.runs.map((r) => r.id), ['run_4', 'run_3']);
+        expect(first.next, 'run_3');
+        expect(first.runs.first.request?.flavors, ['dev']);
+
+        final second = await service.list(limit: 2, before: first.next);
+        expect(second.runs.map((r) => r.id), ['run_2', 'run_1']);
+        expect(second.next, 'run_1');
+        expect(second.runs.last.request, isNull, reason: 'none stored');
+
+        final last = await service.list(limit: 2, before: second.next);
+        expect(last.runs, isEmpty);
+        expect(last.next, isNull);
+      },
+    );
+
+    test('filters by project, workflow and state', () async {
+      expect((await service.list(projectId: 'prj_1')).runs.map((r) => r.id), [
+        'run_4',
+        'run_2',
+        'run_1',
+      ]);
+      expect((await service.list(workflowId: 'wf_x')).runs, isEmpty);
+
+      await job('prepare');
+      final queued = await service.list(state: RunState.queued, limit: 1);
+      expect(queued.runs.single.id, 'run_1');
+      expect(queued.next, 'run_1');
+      expect((await service.list(state: RunState.succeeded)).runs, isEmpty);
+      expect(
+        (await service.list(state: RunState.cancelled)).runs.map((r) => r.id),
+        ['run_4', 'run_3', 'run_2'],
+        reason: 'a run without jobs ran nothing',
+      );
+    });
+
+    test('says when the run to page from is not there', () async {
+      await expectLater(
+        service.list(before: 'run_nope'),
+        throwsA(isA<RunNotFoundException>()),
+      );
+    });
+
+    test('reads a request it cannot read as none', () async {
+      await runs.create(
+        RunRecord(
+          id: 'run_odd',
+          projectId: 'prj_1',
+          workflowId: 'wf_1',
+          workflowVersionId: 'wfv_1',
+          sha: 'a' * 40,
+          locksProject: false,
+          createdAt: DateTime.utc(2027),
+          request: const {'flavors': 'dev'},
+        ),
+      );
+
+      expect((await service.get('run_odd')).request, isNull);
+    });
   });
 }

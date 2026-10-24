@@ -2,17 +2,24 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:xp_desktop/app/bloc/engine_connection_bloc.dart';
 import 'package:xp_desktop/shell/widgets/connection_banner.dart';
+import 'package:xp_desktop/shell/widgets/engine_staleness.dart';
 import 'package:xp_desktop/theme/theme.dart';
 
 /// One page of the content area: the toolbar (`size.toolbar.height`,
 /// `surface.base`, a hairline under it) with the page's [title], [subtitle]
-/// and [actions], the connection banner, then [child].
+/// and [actions], the connection banner, then [child]. A page that shows
+/// the engine's data passes [cached], so the toolbar says when what it shows
+/// is cached (`CachedChip`).
+///
+/// The page takes the keyboard focus when it opens (unless a page above it
+/// took it first), so the shell's shortcuts (⌘N, ⌘1–⌘9) work on every page.
 class ShellPage extends StatelessWidget {
   const new({
     required this.title,
     required this.child,
     this.subtitle,
     this.actions = const [],
+    this.cached,
     super.key,
   });
 
@@ -21,11 +28,15 @@ class ShellPage extends StatelessWidget {
   final List<Widget> actions;
   final Widget child;
 
+  /// Whether the page's snapshot came from the cache; `null` for a page
+  /// that shows nothing of the engine's.
+  final bool? cached;
+
   @override
   Widget build(BuildContext context) {
     final colors = context.xpColors;
     final type = context.xpType;
-    return Column(
+    final page = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Container(
@@ -59,6 +70,7 @@ class ShellPage extends StatelessWidget {
                         ),
                       ),
                     ],
+                    if (cached case final cached?) CachedChip(cached: cached),
                   ],
                 ),
               ),
@@ -73,6 +85,7 @@ class ShellPage extends StatelessWidget {
         Expanded(child: child),
       ],
     );
+    return Focus(autofocus: true, skipTraversal: true, child: page);
   }
 }
 

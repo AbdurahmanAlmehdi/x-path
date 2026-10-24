@@ -46,11 +46,80 @@ class RunService {
   final JobRepository _jobs;
   final JobControl _control;
 
+  /// The runs, newest first: of [projectId], of [workflowId] and in [state]
+  /// when given, dispatched before the run [before] when given, at most
+  /// [limit]; and the `before` of the next page when there may be one.
+  ///
+  /// Throws a [RunNotFoundException] if there is no run [before].
+  Future<RunsResponse> list({
+    String? projectId,
+    String? workflowId,
+    RunState? state,
+    String? before,
+    int limit = 50,
+  }) async {
+    if (before != null && await _runs.get(before) == null) {
+      throw RunNotFoundException(before);
+    }
+    final found = <Run>[];
+    var cursor = before;
+    while (found.length < limit) {
+      // A state is known once a run's jobs are read, so with one the runs
+      // are read a page at a time until enough of them are in it.
+      final asked = state == null ? limit - found.length : 100;
+      final page = await _runs.list(
+        projectId: projectId,
+        workflowId: workflowId,
+        before: cursor,
+        limit: asked,
+      );
+      for (final record in page) {
+        final run = record.toRun(await _jobs.forRun(record.id));
+        if (state == null || run.state == state) found.add(run);
+        if (found.length == limit) break;
+      }
+      if (page.length < asked) break;
+      cursor = page.last.id;
+    }
+    return RunsResponse(
+      found,
+      next: found.length == limit ? found.last.id : null,
+    );
+  }
+
   /// The run [id] with the state of its jobs.
   ///
   /// Throws a [RunNotFoundException] if there is none.
   Future<Run> get(String id) async {
     final run = await _runs.get(id) ?? (throw RunNotFoundException(id));
+    return run.toRun(await _jobs.forRun(id));
+  }
+
+  /// Runs the failed jobs of the run [id] again, each from the step that
+  /// failed: what the jobs before made (their artifacts, the commit) is
+  /// used as it is, nothing is built again that did not fail. The later
+  /// stages then go on. A failed, interrupted or waiting-for-resume job is
+  /// run again; a cancelled one is not. Returns the run.
+  ///
+  /// Throws a [RunNotFoundException] if there is none and a
+  /// [RunStateException] if no job of it failed.
+  Future<Run> rerunFailed(String id) async {
+    final run = await _runs.get(id) ?? (throw RunNotFoundException(id));
+    const again = {
+      JobState.failed,
+      JobState.interrupted,
+      JobState.waitingForResume,
+    };
+    final failed = [
+      for (final job in await _jobs.forRun(id))
+        if (again.contains(job.state)) job,
+    ];
+    if (failed.isEmpty) {
+      throw RunStateException('Run $id has no failed job to run again.');
+    }
+    for (final job in failed) {
+      await _control.resume(job.id);
+    }
     return run.toRun(await _jobs.forRun(id));
   }
 

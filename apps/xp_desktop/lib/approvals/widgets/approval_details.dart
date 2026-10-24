@@ -59,7 +59,7 @@ class ApprovalStateLine extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     final colors = context.xpColors;
-    final now = XpClock.now(context);
+    final now = XpClock.wall(context);
     final soon = expiresSoon(approval, now);
     final text = switch (approval.state) {
       ApprovalState.pending => l10n.approvalExpiresIn(
@@ -157,7 +157,12 @@ class ApprovalDetails extends StatelessWidget {
         (l10n.approvalVersion, XpCode(pubspecLabel(version))),
       (
         l10n.approvalCommit,
-        Tooltip(message: approval.sha, child: XpCode(shortSha(approval.sha))),
+        XpSha(
+          approval.sha,
+          style: context.xpType.code.copyWith(
+            color: context.xpColors.textPrimary,
+          ),
+        ),
       ),
       if (job != null)
         (

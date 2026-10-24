@@ -201,6 +201,8 @@ class FlavorProfile extends Equatable {
     this.prod = false,
     this.versionFiles = const [],
     this.sources = const [],
+    this.firebaseAppId,
+    this.appleAppId,
   });
 
   /// Reads a flavor from its JSON form.
@@ -253,7 +255,19 @@ class FlavorProfile extends Equatable {
   /// `flavorizr`, `xcscheme`, `entrypoint`.
   final List<String> sources;
 
-  /// A copy with the editable fields replaced where given.
+  /// The Firebase app id of the flavor by platform (`android`, `ios`), for
+  /// example `{"android": "1:123456789012:android:abcdef"}`: what the
+  /// Firebase files of the app name, or the owner's edit. The built-in
+  /// workflows upload to it when no input gives one (UX-03).
+  final Map<String, String>? firebaseAppId;
+
+  /// The App Store Connect app id of the flavor, for example `1234567890`.
+  /// Only the owner sets it; the built-ins upload iOS builds to it when no
+  /// input gives one.
+  final String? appleAppId;
+
+  /// A copy with the editable fields replaced where given. A function sets
+  /// a field that may become `null`.
   FlavorProfile copyWith({
     String? entrypoint,
     String? iosBundleId,
@@ -261,6 +275,8 @@ class FlavorProfile extends Equatable {
     bool? shorebird,
     bool? prod,
     List<String>? versionFiles,
+    Map<String, String>? Function()? firebaseAppId,
+    String? Function()? appleAppId,
   }) => FlavorProfile(
     name: name,
     implicit: implicit,
@@ -275,6 +291,8 @@ class FlavorProfile extends Equatable {
     prod: prod ?? this.prod,
     versionFiles: versionFiles ?? this.versionFiles,
     sources: sources,
+    firebaseAppId: firebaseAppId == null ? this.firebaseAppId : firebaseAppId(),
+    appleAppId: appleAppId == null ? this.appleAppId : appleAppId(),
   );
 
   /// The JSON form.
@@ -295,6 +313,8 @@ class FlavorProfile extends Equatable {
     prod,
     versionFiles,
     sources,
+    firebaseAppId,
+    appleAppId,
   ];
 }
 

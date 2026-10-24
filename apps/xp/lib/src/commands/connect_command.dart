@@ -45,71 +45,75 @@ class ConnectCommand extends Command<int> {
   void printUsage() => _context.logger.info(usage);
 
   @override
-  Future<int> run() => guarded(_context.logger, () async {
-    final logger = _context.logger;
-    final rest = argResults!.rest;
-    if (rest.length > 1) usageException('Unexpected "${rest[1]}".');
-    final token = argResults!.option('token');
-    final mcpToken = argResults!.option('mcp-token');
-    if (token == null && mcpToken == null) {
-      usageException('Give --token, --mcp-token or both.');
-    }
-    final Uri url;
-    try {
-      final given = rest.isEmpty ? null : parseEngineUrl(rest.single);
-      final known = given ?? await _context.config.engineUrl();
-      if (known == null) usageException('Missing <url>.');
-      url = known;
-    } on FormatException catch (error) {
-      usageException(error.message);
-    }
+  Future<int> run() => guarded(
+    _context.logger,
+    json: globalResults?['json'] == true,
+    () async {
+      final logger = _context.logger;
+      final rest = argResults!.rest;
+      if (rest.length > 1) usageException('Unexpected "${rest[1]}".');
+      final token = argResults!.option('token');
+      final mcpToken = argResults!.option('mcp-token');
+      if (token == null && mcpToken == null) {
+        usageException('Give --token, --mcp-token or both.');
+      }
+      final Uri url;
+      try {
+        final given = rest.isEmpty ? null : parseEngineUrl(rest.single);
+        final known = given ?? await _context.config.engineUrl();
+        if (known == null) usageException('Missing <url>.');
+        url = known;
+      } on FormatException catch (error) {
+        usageException(error.message);
+      }
 
-    final tokens = {
-      DeviceTokenKind.cli: ?token,
-      DeviceTokenKind.mcp: ?mcpToken,
-    };
-    final probe = _context.clientFactory(Connection(url: url, token: ''));
-    try {
-      final version = await probe.version();
-      await probe.health();
-      if (version.apiVersion != apiVersion) {
-        logger.err(
-          'The engine at $url speaks API v${version.apiVersion}; this xp '
-          'speaks v$apiVersion. Install the xp that matches the engine.',
-        );
-        return XpExit.unavailable;
-      }
-      for (final entry in tokens.entries) {
-        final client = _context.clientFactory(
-          Connection(url: url, token: entry.value),
-        );
-        try {
-          await client.listProjects();
-        } on ApiException catch (error) {
-          if (error.isUnauthorized) {
-            logger.err(
-              'The engine rejected the ${entry.key.name} token. Create one '
-              'with: xpd token create --name <name> --kind ${entry.key.name}',
-            );
-            return XpExit.permission;
-          }
-          rethrow;
-        } finally {
-          client.close();
+      final tokens = {
+        DeviceTokenKind.cli: ?token,
+        DeviceTokenKind.mcp: ?mcpToken,
+      };
+      final probe = _context.clientFactory(Connection(url: url, token: ''));
+      try {
+        final version = await probe.version();
+        await probe.health();
+        if (version.apiVersion != apiVersion) {
+          logger.err(
+            'The engine at $url speaks API v${version.apiVersion}; this xp '
+            'speaks v$apiVersion. Install the xp that matches the engine.',
+          );
+          return XpExit.unavailable;
         }
+        for (final entry in tokens.entries) {
+          final client = _context.clientFactory(
+            Connection(url: url, token: entry.value),
+          );
+          try {
+            await client.listProjects();
+          } on ApiException catch (error) {
+            if (error.isUnauthorized) {
+              logger.err(
+                'The engine rejected the ${entry.key.name} token. Create one '
+                'with: xpd token create --name <name> --kind ${entry.key.name}',
+              );
+              return XpExit.permission;
+            }
+            rethrow;
+          } finally {
+            client.close();
+          }
+        }
+        await _context.config.saveEngineUrl(url);
+        for (final entry in tokens.entries) {
+          await _context.config.saveToken(entry.key, entry.value);
+        }
+        final saved = tokens.keys.map((kind) => kind.name).join(' and ');
+        logger.success(
+          'Connected to $url (xpd ${version.version}, '
+          'API v${version.apiVersion}); saved the $saved token.',
+        );
+        return XpExit.ok;
+      } finally {
+        probe.close();
       }
-      await _context.config.saveEngineUrl(url);
-      for (final entry in tokens.entries) {
-        await _context.config.saveToken(entry.key, entry.value);
-      }
-      final saved = tokens.keys.map((kind) => kind.name).join(' and ');
-      logger.success(
-        'Connected to $url (xpd ${version.version}, '
-        'API v${version.apiVersion}); saved the $saved token.',
-      );
-      return XpExit.ok;
-    } finally {
-      probe.close();
-    }
-  });
+    },
+  );
 }

@@ -1,8 +1,11 @@
+import 'dart:convert';
+
 import 'package:args/command_runner.dart';
 import 'package:mason_logger/mason_logger.dart';
 import 'package:xp/src/config/xp_config.dart';
 import 'package:xp/src/context.dart';
 import 'package:xp/src/exit_codes.dart';
+import 'package:xp/src/output/error_json.dart';
 import 'package:xp/src/output/format.dart';
 import 'package:xp/src/resolve.dart';
 import 'package:xp_api/xp_api.dart';
@@ -62,7 +65,7 @@ abstract class XpCommand extends Command<int> {
   void printUsage() => logger.info(usage);
 
   @override
-  Future<int> run() => guarded(logger, () async {
+  Future<int> run() => guarded(logger, json: asJson, () async {
     final connection = await context.config.connection(DeviceTokenKind.cli);
     final client = context.clientFactory(connection);
     try {
@@ -90,34 +93,86 @@ abstract class XpCommand extends Command<int> {
       logger.info(asJson ? prettyJson(value) : human());
 }
 
-/// A message for an error of the engine: what it said, and for the cases a
-/// person can fix, what to do.
-String describeApiError(ApiException error) => switch (error.code) {
-  ApiErrorCode.unauthorized =>
-    '${error.message} Run: xp connect <url> --token <token>',
-  ApiErrorCode.forbidden => 'Not allowed with this token: ${error.message}',
-  _ => error.message,
+/// What the CLI adds to an error of the engine, for the cases a person can
+/// fix: the command that fixes it. The engine names no command (UX-09).
+String? cliHint(ApiException error) => switch (error.code) {
+  ApiErrorCode.unauthorized => 'Run: xp connect <url> --token <token>',
+  ApiErrorCode.conflict when error.message.contains('has been run') =>
+    'Archive it instead: xp workflows archive <project> <workflow>',
+  ApiErrorCode.workflowInvalid when error.message.contains('is archived') =>
+    'Unarchive it with: xp workflows archive <project> <workflow> --undo',
+  ApiErrorCode.workflowInvalid when error.message.contains(' assigned') =>
+    'Assign one with: xp credentials assign',
+  ApiErrorCode.workflowInvalid
+      when error.message.contains('is a production flavor') =>
+    'Name the flavors with --flavor.',
+  _ => null,
 };
 
+/// A message for an error of the engine: what it said, and for the cases a
+/// person can fix, what to do. The issues of a workflow document come one
+/// per line.
+String describeApiError(ApiException error) => error.issues.isNotEmpty
+    ? 'The workflow has issues:\n${describeIssues(error.issues)}'
+    : [
+        if (error.code == ApiErrorCode.forbidden)
+          'Not allowed with this token: ${error.message}'
+        else
+          error.message,
+        ?(cliHint(error) ?? error.hint),
+      ].join(' ');
+
+/// The lines for the issues of a workflow document, `line:column: message`
+/// and the hint.
+String describeIssues(List<WorkflowIssue> issues) =>
+    issues.map((issue) => '  $issue').join('\n');
+
 /// Runs [body] and turns the failures every command can meet into a message
-/// on [logger] and an exit code (see [XpExit]).
-Future<int> guarded(Logger logger, Future<int> Function() body) async {
+/// on [logger] and an exit code (see [XpExit]). With [json] the message is
+/// [errorJson].
+Future<int> guarded(
+  Logger logger,
+  Future<int> Function() body, {
+  bool json = false,
+}) async {
+  void fail(String code, String message, [String? hint]) => logger.err(
+    json
+        ? jsonEncode(errorJson(code, message, hint))
+        : [message, ?hint].join(' '),
+  );
   try {
     return await body();
   } on NotConnectedException catch (error) {
-    logger.err(error.message);
+    fail('not_connected', error.message);
     return XpExit.config;
   } on ReferenceException catch (error) {
-    logger.err(error.message);
+    fail(
+      error.notFound ? 'not_found' : 'ambiguous',
+      error.message,
+      error.cliHint,
+    );
     return error.notFound ? XpExit.notFound : XpExit.usage;
   } on ApiException catch (error) {
-    logger.err(describeApiError(error));
+    if (json) {
+      logger.err(
+        jsonEncode(
+          errorJson(
+            apiCodeOf(error),
+            error.message,
+            cliHint(error) ?? error.hint,
+            error.issues,
+          ),
+        ),
+      );
+    } else {
+      logger.err(describeApiError(error));
+    }
     return XpExit.forApi(error);
   } on ConnectionException catch (error) {
-    logger.err(error.message);
+    fail('unreachable', error.message);
     return XpExit.unavailable;
   } on DownloadException catch (error) {
-    logger.err(error.message);
+    fail('download_failed', error.message);
     return XpExit.failed;
   }
 }

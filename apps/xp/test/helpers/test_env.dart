@@ -8,6 +8,7 @@ import 'package:xp/src/command_runner.dart';
 import 'package:xp/src/config/token_vault.dart';
 import 'package:xp/src/config/xp_config.dart';
 import 'package:xp/src/context.dart';
+import 'package:xp/src/output/format.dart';
 import 'package:xp/src/secret_prompt.dart';
 import 'package:xp/src/update/update_check.dart';
 import 'package:xp_api/xp_api.dart';
@@ -36,6 +37,15 @@ class RecordingLogger extends Logger {
 
   @override
   void success(String? message, {LogStyle? style}) => successes.add('$message');
+
+  /// What each spinner said while it turned.
+  final progresses = <String>[];
+
+  @override
+  Progress progress(String message, {ProgressOptions? options}) {
+    progresses.add(message);
+    return super.progress(message, options: options);
+  }
 
   /// Everything printed to standard output, one line per entry.
   String get out => infos.join('\n');
@@ -75,7 +85,7 @@ class FakeSecretPrompt implements SecretPrompt {
   final questions = <String>[];
 
   @override
-  String ask(String question) {
+  String ask(String question, {bool secret = true}) {
     questions.add(question);
     return answers.removeAt(0);
   }
@@ -95,7 +105,7 @@ class FakeUpdateCheck implements UpdateCheck {
 /// Everything a command test needs: a context whose client is a mock, a
 /// recording logger, a temporary config folder.
 class TestEnv {
-  new({Map<String, String>? environment}) {
+  new({Map<String, String>? environment, bool ansi = false}) {
     directory = Directory.systemTemp.createTempSync('xp_test');
     this.environment = {
       engineUrlVariable: 'http://engine:7480',
@@ -121,8 +131,11 @@ class TestEnv {
       stdout: stdout,
       logIdle: const Duration(milliseconds: 50),
       secretPrompt: prompt,
+      pollInterval: Duration.zero,
+      ansi: ansi,
     );
     runner = XpCommandRunner(context: context);
+    formatTimesInUtc = true;
   }
 
   late final Directory directory;
@@ -157,6 +170,7 @@ void registerFallbacks() {
   registerFallbackValue(const AddProjectRequest());
   registerFallbackValue(const DispatchRequest());
   registerFallbackValue(const CreateWorkflowRequest(name: 'n', yaml: 'y'));
+  registerFallbackValue(const UpdateWorkflowRequest());
   registerFallbackValue(const FreeSpaceRequest());
   registerFallbackValue(const RetentionSettings());
   registerFallbackValue(const ProjectGates({}));

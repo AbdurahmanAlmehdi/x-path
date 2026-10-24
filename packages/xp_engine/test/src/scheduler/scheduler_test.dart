@@ -496,6 +496,82 @@ void main() {
     });
   });
 
+  group('placement (a dry run, UX-01)', () {
+    PairedRunner paired(String id, String name, {bool connected = true}) =>
+        PairedRunner(
+          id: id,
+          name: name,
+          capabilities: const {Capability.iosSign},
+          connected: connected,
+        );
+
+    test('says the engine can run a job it has what for', () async {
+      f.build([f.local()]);
+
+      expect(await f.scheduler.placement(['flutter'], ['build.android']), (
+        local: true,
+        runner: null,
+        waitReason: null,
+      ));
+    });
+
+    test('names the connected runner a job can go to', () async {
+      f
+        ..build([f.local(), _Named('linux', f.local())])
+        ..scheduler.pairedRunners = _PairedRunners([
+          paired('linux', 'linux-builder-01'),
+        ]);
+
+      expect(await f.scheduler.placement(['android'], ['build.android']), (
+        local: true,
+        runner: 'linux-builder-01',
+        waitReason: null,
+      ));
+      f.build([_Named('linux', f.local())]);
+      expect(
+        (await f.scheduler.placement(['android'], ['build.android'])).runner,
+        'linux',
+      );
+    });
+
+    test('says why a job no runner can take would wait', () async {
+      f.build([]);
+      expect(
+        (await f.scheduler.placement([], ['command'])).waitReason,
+        'No runner is connected.',
+      );
+      f.build([f.local()]);
+      expect(
+        (await f.scheduler.placement(['ios-sign'], ['build.ios'])).waitReason,
+        'No runner can do ios-sign.',
+      );
+
+      f.scheduler.pairedRunners = _PairedRunners([
+        paired('rnr_mini', 'mini', connected: false),
+      ]);
+      expect(await f.scheduler.placement(['ios-sign'], ['build.ios']), (
+        local: false,
+        runner: null,
+        waitReason:
+            'No connected runner can do ios-sign. mini offers ios-sign; '
+            'offline.',
+      ));
+
+      f.build([
+        f.local(capabilities: {Capability.flutter}),
+        _EngineOnlyRefused(f.local(capabilities: {Capability.iosSign})),
+      ]);
+      expect(
+        (await f.scheduler.placement(
+          ['ios-sign'],
+          ['upload.appStore'],
+        )).waitReason,
+        'Only the engine runs upload.appStore, and the engine cannot do '
+        'ios-sign.',
+      );
+    });
+  });
+
   group('the project lock', () {
     test(
       'keeps a second production release queued until the first ended',
@@ -1069,6 +1145,32 @@ class _Named implements SchedulerRunner {
   Future<void> whenFinished(String jobId) => _inner.whenFinished(jobId);
 }
 
+/// A remote runner: it takes no step only the engine runs.
+class _EngineOnlyRefused implements SchedulerRunner {
+  const new(this._inner);
+
+  final LocalRunner _inner;
+
+  @override
+  String get id => 'rnr_remote';
+
+  @override
+  Set<Capability> get capabilities => _inner.capabilities;
+
+  @override
+  int get slots => _inner.slots;
+
+  @override
+  bool accepts(Iterable<String> stepKinds) =>
+      RemoteStepPolicy.canRunRemotely(stepKinds);
+
+  @override
+  Future<void> launch(String jobId) => _inner.launch(jobId);
+
+  @override
+  Future<void> whenFinished(String jobId) => _inner.whenFinished(jobId);
+}
+
 /// A runner that finds the job cancelled when it is asked to start it.
 class _Cancelling implements SchedulerRunner {
   const new(this._fixture);
@@ -1115,6 +1217,19 @@ class _FailingRuns implements RunRepository {
 
   @override
   Future<List<RunRecord>> held() => _inner.held();
+
+  @override
+  Future<List<RunRecord>> list({
+    String? projectId,
+    String? workflowId,
+    String? before,
+    int limit = 50,
+  }) => _inner.list(
+    projectId: projectId,
+    workflowId: workflowId,
+    before: before,
+    limit: limit,
+  );
 }
 
 /// A job repository whose list of waiting jobs is out of date.

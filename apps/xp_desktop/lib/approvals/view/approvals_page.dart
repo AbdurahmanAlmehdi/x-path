@@ -60,6 +60,7 @@ class ApprovalsView extends StatelessWidget {
         autofocus: true,
         child: ShellPage(
           title: l10n.approvalsTitle,
+          cached: state.cached,
           subtitle: l10n.approvalsSubtitle(
             context.engineName,
             state.pendingCount,
@@ -121,8 +122,17 @@ class _List extends StatelessWidget {
           if (state.error case final error?)
             Padding(
               padding: const EdgeInsets.all(4),
-              child: XpMessage(XpStatus.scanError, error),
-            ),
+              child: XpErrorState(
+                error,
+                onRetry: () => context.read<ApprovalsInboxBloc>().add(
+                  ApprovalsInboxSubscriptionRequested(
+                    approvalId: state.selectedId,
+                  ),
+                ),
+              ),
+            )
+          else if (!state.loaded)
+            const Padding(padding: EdgeInsets.all(4), child: XpLoading()),
           for (final approval in visible)
             _Row(
               approval: approval,
@@ -148,7 +158,7 @@ class _Row extends StatelessWidget {
     final project = context.watch<ProjectsBloc>().state.byId(
       approval.projectId,
     );
-    final now = XpClock.now(context);
+    final now = XpClock.wall(context);
     return Semantics(
       button: true,
       selected: selected,
@@ -186,8 +196,8 @@ class _Row extends StatelessWidget {
                         ),
                       ),
                     ),
-                    Text(
-                      formatTime(approval.createdAt),
+                    XpTime(
+                      approval.createdAt,
                       style: type.code.copyWith(color: colors.textSecondary),
                     ),
                   ],
@@ -301,7 +311,10 @@ class _Detail extends StatelessWidget {
                 hint: '⇧⌘A',
                 kind: XpButtonKind.primary,
                 size: XpButtonSize.large,
-                onPressed: () => showApprovalReview(context, approval.id),
+                tooltip: canCommand ? null : l10n.readOnlyHint,
+                onPressed: canCommand
+                    ? () => showApprovalReview(context, approval.id)
+                    : null,
               ),
             ],
           ),

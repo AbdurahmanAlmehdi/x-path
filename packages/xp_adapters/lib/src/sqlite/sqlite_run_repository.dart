@@ -56,6 +56,25 @@ class SqliteRunRepository implements RunRepository {
       _fromRow(row),
   ];
 
+  @override
+  Future<List<RunRecord>> list({
+    String? projectId,
+    String? workflowId,
+    String? before,
+    int limit = 50,
+  }) async => [
+    for (final row in _db.select(
+      'SELECT $_columns FROM run '
+      'WHERE (?1 IS NULL OR project_id = ?1) '
+      'AND (?2 IS NULL OR workflow_id = ?2) '
+      'AND (?3 IS NULL OR (created_at, id) < '
+      '(SELECT created_at, id FROM run WHERE id = ?3)) '
+      'ORDER BY created_at DESC, id DESC LIMIT ?4',
+      [projectId, workflowId, before, limit],
+    ))
+      _fromRow(row),
+  ];
+
   static RunRecord _fromRow(Row row) {
     return RunRecord(
       id: row['id'] as String,

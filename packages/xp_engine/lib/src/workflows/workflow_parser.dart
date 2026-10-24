@@ -3,6 +3,7 @@ import 'package:xp_engine/src/scheduler/capability.dart';
 import 'package:xp_engine/src/workflows/expression.dart';
 import 'package:xp_engine/src/workflows/gate_action.dart';
 import 'package:xp_engine/src/workflows/step_catalog.dart';
+import 'package:xp_engine/src/workflows/suggestion.dart';
 import 'package:xp_engine/src/workflows/workflow_definition.dart';
 import 'package:yaml/yaml.dart';
 
@@ -78,6 +79,7 @@ class _Reader {
   final StepCatalog catalog;
   final issues = <WorkflowIssue>[];
   final _jobIds = <String, SourcePosition>{};
+  var _inputNames = const <String>{};
 
   WorkflowDefinition? read(String source) {
     final YamlNode root;
@@ -128,7 +130,8 @@ class _Reader {
       }
     }
     final inputs = _inputs(root.nodes['inputs']);
-    final stages = _stages(root.nodes['stages'], root, inputs);
+    _inputNames = {for (final input in inputs) input.name};
+    final stages = _stages(root.nodes['stages'], root);
     _checkCommitSources(stages);
     return WorkflowDefinition(
       name: name,
@@ -165,9 +168,12 @@ class _Reader {
       }
       _checkKeys(value, 'input "$name"', const {
         'description',
+        'type',
+        'options',
         'default',
         'required',
       });
+      final (type, options) = _inputType(value);
       final requiredNode = value.nodes['required'];
       var isRequired = false;
       if (requiredNode != null) {
@@ -180,26 +186,68 @@ class _Reader {
       if (isRequired && value.nodes.containsKey('default')) {
         _issueAt(value, 'An input with a default cannot be required.');
       }
-      inputs.add(
-        InputDefinition(
-          name: name,
-          position: _position(key),
-          description: _optionalText(value, 'description'),
-          defaultValue: _plain(value.nodes['default']),
-          required: isRequired,
-        ),
+      final input = InputDefinition(
+        name: name,
+        position: _position(key),
+        type: type,
+        options: options,
+        description: _optionalText(value, 'description'),
+        defaultValue: _plain(value.nodes['default']),
+        required: isRequired,
       );
+      if (value.nodes['default'] case final node?) {
+        if (input.problemOf(input.defaultValue) case final problem?) {
+          _issueAt(node, 'The default of "$name" $problem.');
+        }
+      }
+      inputs.add(input);
     }
     return inputs;
   }
 
+  /// The `type` of an input and the `options` of a choice (UX-04).
+  (InputType?, List<String>?) _inputType(YamlMap input) {
+    final typeNode = input.nodes['type'];
+    InputType? type;
+    if (typeNode != null) {
+      type = InputType.values
+          .where((candidate) => '${typeNode.value}' == candidate.wire)
+          .firstOrNull;
+      if (type == null || typeNode is! YamlScalar) {
+        _issueAt(
+          typeNode,
+          'Unknown input type "${typeNode.value}".',
+          hint: suggestion('${typeNode.value}', [
+            for (final type in InputType.values) type.wire,
+          ]),
+        );
+        type = null;
+      }
+    }
+    final optionsNode = input.nodes['options'];
+    List<String>? options;
+    if (optionsNode != null) {
+      if (optionsNode is YamlList &&
+          optionsNode.nodes.isNotEmpty &&
+          optionsNode.nodes.every(
+            (option) => option is YamlScalar && option.value is String,
+          )) {
+        options = [for (final option in optionsNode.nodes) '${option.value}'];
+      } else {
+        _issueAt(optionsNode, '"options" is a list of strings.');
+      }
+      if (type != InputType.choice) {
+        _issueAt(optionsNode, '"options" go with "type: choice".');
+      }
+    } else if (type == InputType.choice) {
+      _issueAt(input, 'A choice input needs "options".');
+    }
+    return (type, options);
+  }
+
   // ---------------------------------------------------------------- stages
 
-  List<StageDefinition> _stages(
-    YamlNode? node,
-    YamlMap root,
-    List<InputDefinition> inputs,
-  ) {
+  List<StageDefinition> _stages(YamlNode? node, YamlMap root) {
     if (node == null) {
       _issueAt(root, 'Add "stages", a list of stages that run in order.');
       return const [];
@@ -305,7 +353,8 @@ class _Reader {
       if (!matrixAxes.contains(name)) {
         _issueAt(
           key,
-          'Unknown matrix axis "$name". Allowed: ${matrixAxes.join(', ')}.',
+          'Unknown matrix axis "$name".',
+          hint: suggestion(name, matrixAxes),
         );
         continue;
       }
@@ -321,7 +370,8 @@ class _Reader {
           } else if (name == 'platform' && !platformNames.contains(text)) {
             _issueAt(
               item,
-              'Unknown platform "$text". Allowed: ${platformNames.join(', ')}.',
+              'Unknown platform "$text".',
+              hint: suggestion(text, platformNames),
             );
           } else {
             values.add(text);
@@ -368,10 +418,13 @@ class _Reader {
           ? Capability.fromWire(item.value as String)
           : null;
       if (capability == null) {
+        final name = item is YamlScalar ? '${item.value}' : '';
         _issueAt(
           item,
-          'Unknown capability. Allowed: '
-          '${Capability.values.map((c) => c.wire).join(', ')}.',
+          'Unknown capability "$name".',
+          hint: suggestion(name, [
+            for (final capability in Capability.values) capability.wire,
+          ]),
         );
       } else {
         capabilities.add(capability);
@@ -407,13 +460,14 @@ class _Reader {
     _checkKeys(node, 'a step', const {'kind', 'with', 'if', 'gate'});
     final kindNode = node.nodes['kind'];
     final kind = _requiredText(node, 'kind', 'a step');
-    Set<String>? withKeys;
+    Map<String, StepKey>? keys;
     if (kind != null) {
-      withKeys = catalog.withKeys(kind);
-      if (withKeys == null) {
+      keys = catalog.keysOf(kind);
+      if (keys == null) {
         _issueAt(
           kindNode!,
-          'Unknown step type "$kind". Known: ${catalog.kinds.join(', ')}.',
+          'Unknown step type "$kind".',
+          hint: suggestion(kind, catalog.kinds, label: 'Known'),
         );
       }
     }
@@ -426,16 +480,27 @@ class _Reader {
         for (final entry in withNode.nodes.entries) {
           final key = entry.key as YamlScalar;
           final name = '${key.value}';
-          if (withKeys != null && !withKeys.contains(name)) {
+          final stepKey = keys?[name];
+          if (keys != null && stepKey == null) {
             _issueAt(
               key,
-              '"$kind" does not take "$name". It takes: '
-              '${(withKeys.toList()..sort()).join(', ')}.',
+              '"$kind" does not take "$name".',
+              hint: keys.isEmpty
+                  ? 'It takes nothing under "with".'
+                  : suggestion(name, keys.keys, label: 'It takes'),
             );
           }
           _checkTemplates(entry.value, variables);
           values[name] = _plain(entry.value);
+          if (stepKey?.problemOf(values[name]) case final problem?) {
+            _issueAt(entry.value, '$problem.');
+          }
         }
+      }
+    }
+    for (final key in keys?.values ?? const <StepKey>[]) {
+      if (key.required && values[key.name] == null) {
+        _issueAt(withNode ?? node, '"$kind" needs "${key.name}" under "with".');
       }
     }
     final (condition, conditionText) = _condition(node, variables);
@@ -446,14 +511,17 @@ class _Reader {
           ? GateAction.fromWire(gateNode.value as String)
           : null;
       if (gate == null) {
+        final name = gateNode is YamlScalar ? '${gateNode.value}' : '';
         _issueAt(
           gateNode,
-          'Unknown gate. Allowed: '
-          '${GateAction.values.map((a) => a.wire).join(', ')}.',
+          'Unknown gate "$name".',
+          hint: suggestion(name, [
+            for (final action in GateAction.values) action.wire,
+          ]),
         );
       }
     }
-    if (kind == null || withKeys == null) return null;
+    if (kind == null || keys == null) return null;
     return StepDefinition(
       kind: kind,
       withValues: values,
@@ -549,13 +617,52 @@ class _Reader {
     Expression expression,
     Set<String> variables,
   ) {
-    for (final name in expression.variables) {
+    for (final path in expression.paths) {
+      final [name, ...fields] = path.split('.');
       if (!variables.contains(name)) {
         _issueAt(
           node,
-          'Unknown variable "$name". Known here: '
-          '${(variables.toList()..sort()).join(', ')}.',
+          'Unknown variable "$name".',
+          hint: suggestion(name, variables, label: 'Known here'),
         );
+      } else if (fields.isNotEmpty) {
+        _checkFields(node, name, fields);
+      }
+    }
+  }
+
+  /// Checks that the variable [name] has the [fields] read from it, as far as
+  /// they are known: the inputs the workflow declares, the fields of
+  /// `flavor`, `app` and `project`, and none for a string or a number.
+  void _checkFields(YamlNode node, String name, List<String> fields) {
+    final [field, ...] = fields;
+    if (name == 'inputs') {
+      if (!_inputNames.contains(field)) {
+        _issueAt(
+          node,
+          'The workflow has no input "$field".',
+          hint:
+              suggestion(field, _inputNames, prefix: 'inputs.') ??
+              'Declare it under "inputs".',
+        );
+      }
+      return;
+    }
+    if (scalarVariables[name] case final holds?) {
+      _issueAt(node, '"$name" is $holds; it has no "$field".');
+      return;
+    }
+    for (final (depth, field) in fields.indexed) {
+      final path = [name, ...fields.take(depth)].join('.');
+      final known = variableFields[path];
+      if (known == null) return;
+      if (!known.contains(field)) {
+        _issueAt(
+          node,
+          '"$path" has no "$field".',
+          hint: suggestion(field, known, prefix: '$path.', label: 'It has'),
+        );
+        return;
       }
     }
   }
@@ -568,8 +675,8 @@ class _Reader {
       if (!allowed.contains(name)) {
         _issueAt(
           key as YamlNode,
-          'Unknown key "$name" in $where. Allowed: '
-          '${(allowed.toList()..sort()).join(', ')}.',
+          'Unknown key "$name" in $where.',
+          hint: suggestion(name, allowed),
         );
       }
     }
@@ -612,7 +719,7 @@ class _Reader {
   static SourcePosition _position(YamlNode node) =>
       SourcePosition(node.span.start.line + 1, node.span.start.column + 1);
 
-  void _issueAt(YamlNode node, String message, {int offset = 0}) {
+  void _issueAt(YamlNode node, String message, {int offset = 0, String? hint}) {
     var column = node.span.start.column + 1;
     if (node is YamlScalar && offset > 0) {
       column += switch (node.style) {
@@ -621,9 +728,11 @@ class _Reader {
         _ => 0,
       };
     }
-    _issue(node.span.start.line + 1, column, message);
+    _issue(node.span.start.line + 1, column, message, hint);
   }
 
-  void _issue(int line, int column, String message) =>
-      issues.add(WorkflowIssue(line: line, column: column, message: message));
+  void _issue(int line, int column, String message, [String? hint]) =>
+      issues.add(
+        WorkflowIssue(line: line, column: column, message: message, hint: hint),
+      );
 }

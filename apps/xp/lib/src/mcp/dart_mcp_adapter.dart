@@ -16,11 +16,13 @@ Future<void> serveMcp({
   required StreamSink<List<int>> output,
   required String name,
   required String version,
+  List<McpResource> resources = const [],
   String? instructions,
 }) async {
   final server = _XpMcpServer(
     stdioChannel(input: input, output: output),
     tools: tools,
+    resources: resources,
     name: name,
     version: version,
     instructions: instructions,
@@ -28,10 +30,11 @@ Future<void> serveMcp({
   await server.done;
 }
 
-base class _XpMcpServer extends MCPServer with ToolsSupport {
+base class _XpMcpServer extends MCPServer with ToolsSupport, ResourcesSupport {
   new(
     super.channel, {
     required List<McpTool> tools,
+    required List<McpResource> resources,
     required String name,
     required String version,
     super.instructions,
@@ -53,6 +56,25 @@ base class _XpMcpServer extends MCPServer with ToolsSupport {
             isError: result.isError,
           );
         },
+      );
+    }
+    for (final resource in resources) {
+      addResource(
+        Resource(
+          uri: resource.uri,
+          name: resource.name,
+          description: resource.description,
+          mimeType: resource.mimeType,
+        ),
+        (request) async => ReadResourceResult(
+          contents: [
+            TextResourceContents(
+              uri: resource.uri,
+              text: await resource.read(),
+              mimeType: resource.mimeType,
+            ),
+          ],
+        ),
       );
     }
   }

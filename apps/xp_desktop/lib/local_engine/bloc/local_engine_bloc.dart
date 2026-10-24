@@ -249,7 +249,7 @@ class LocalEngineBloc extends Bloc<LocalEngineEvent, LocalEngineState> {
       return _fail(emit, LocalEngineFailure.token, switch (error) {
         LocalEngineException(:final message) => message,
         MacosServiceException(:final message) => message,
-        _ => '$error',
+        _ => errorMessage(error),
       });
     }
     _log(

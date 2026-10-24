@@ -77,6 +77,7 @@ class RunRecord extends Equatable {
 
   /// The API form, with its [jobs] in the order they were made.
   Run toRun(List<JobRecord> jobs) => Run(
+    request: dispatchRequest,
     id: id,
     projectId: projectId,
     workflowId: workflowId,
@@ -100,6 +101,19 @@ class RunRecord extends Equatable {
         ),
     ],
   );
+
+  /// [request] as the API reads it; `null` for a run with none stored, or
+  /// one stored in a form this engine no longer reads.
+  DispatchRequest? get dispatchRequest {
+    if (request.isEmpty) return null;
+    try {
+      return DispatchRequest.fromJson(request);
+    } on Exception {
+      // A CheckedFromJsonException: a field of a type this engine does not
+      // read.
+      return null;
+    }
+  }
 
   @override
   List<Object?> get props => [
@@ -161,6 +175,15 @@ abstract interface class RunRepository {
 
   /// The runs that hold the project lock now.
   Future<List<RunRecord>> held();
+
+  /// The runs, newest first: of [projectId] and of [workflowId] when given,
+  /// dispatched before the run [before] when given, at most [limit].
+  Future<List<RunRecord>> list({
+    String? projectId,
+    String? workflowId,
+    String? before,
+    int limit = 50,
+  });
 }
 
 /// A [RunRepository] that forgets everything on exit.
@@ -186,4 +209,30 @@ class InMemoryRunRepository implements RunRepository {
     for (final run in _runs.values)
       if (run.lockHeld) run,
   ];
+
+  @override
+  Future<List<RunRecord>> list({
+    String? projectId,
+    String? workflowId,
+    String? before,
+    int limit = 50,
+  }) async {
+    final newest = _runs.values.toList()..sort(_newestFirst);
+    final from = before == null ? null : _runs[before];
+    if (before != null && from == null) return const [];
+    return newest
+        .where(
+          (run) =>
+              (projectId == null || run.projectId == projectId) &&
+              (workflowId == null || run.workflowId == workflowId) &&
+              (from == null || _newestFirst(from, run) < 0),
+        )
+        .take(limit)
+        .toList();
+  }
+
+  static int _newestFirst(RunRecord a, RunRecord b) {
+    final time = b.createdAt.compareTo(a.createdAt);
+    return time != 0 ? time : b.id.compareTo(a.id);
+  }
 }

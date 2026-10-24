@@ -102,6 +102,9 @@ Run _$RunFromJson(Map<String, dynamic> json) => Run(
   ref: json['ref'] as String?,
   version: json['version'] as String?,
   build: (json['build'] as num?)?.toInt(),
+  request: json['request'] == null
+      ? null
+      : DispatchRequest.fromJson(json['request'] as Map<String, dynamic>),
 );
 
 Map<String, dynamic> _$RunToJson(Run instance) => <String, dynamic>{
@@ -117,6 +120,7 @@ Map<String, dynamic> _$RunToJson(Run instance) => <String, dynamic>{
   'build': ?instance.build,
   'createdAt': instance.createdAt.toIso8601String(),
   'jobs': instance.jobs.map((e) => e.toJson()).toList(),
+  'request': ?instance.request?.toJson(),
 };
 
 const _$RunStateEnumMap = {
@@ -127,3 +131,16 @@ const _$RunStateEnumMap = {
   RunState.failed: 'failed',
   RunState.cancelled: 'cancelled',
 };
+
+RunsResponse _$RunsResponseFromJson(Map<String, dynamic> json) => RunsResponse(
+  (json['runs'] as List<dynamic>)
+      .map((e) => Run.fromJson(e as Map<String, dynamic>))
+      .toList(),
+  next: json['next'] as String?,
+);
+
+Map<String, dynamic> _$RunsResponseToJson(RunsResponse instance) =>
+    <String, dynamic>{
+      'runs': instance.runs.map((e) => e.toJson()).toList(),
+      'next': ?instance.next,
+    };

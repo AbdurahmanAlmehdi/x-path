@@ -85,9 +85,6 @@ Future<Response> _guard(Future<Response> Function() action) async {
   } on GitException catch (error) {
     return errorResponse(ApiErrorCode.upstreamError, error.message);
   } on SecretsLockedException {
-    return errorResponse(
-      ApiErrorCode.secretsLocked,
-      'The engine cannot read its secrets right now. Unlock them and retry.',
-    );
+    return secretsLockedResponse();
   }
 }

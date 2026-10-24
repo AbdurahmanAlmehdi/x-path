@@ -1,6 +1,7 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:xp_api/xp_api.dart';
+import 'package:xp_desktop/dispatch/view/dispatch_sheet.dart';
 import 'package:xp_desktop/l10n/l10n.dart';
 import 'package:xp_desktop/projects/bloc/projects_bloc.dart';
 import 'package:xp_desktop/shell/cubit/shell_cubit.dart';
@@ -74,6 +75,7 @@ class TestsView extends StatelessWidget {
     final name = project.fullName.split('/').last;
     return ShellPage(
       title: l10n.testsTitle,
+      cached: state.runCached,
       subtitle: [
         name,
         if (run?.appPath case final app? when app != '.') app,
@@ -102,8 +104,20 @@ class TestsView extends StatelessWidget {
       child: ListView(
         padding: const EdgeInsets.all(20),
         children: [
-          for (final error in [?state.error, ?state.runError]) ...[
-            XpMessage(XpStatus.scanError, error),
+          if (state.error case final error?) ...[
+            XpErrorState(
+              error,
+              onRetry: () => bloc.add(
+                TestsSubscriptionRequested(project.id, jobId: shown),
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
+          if (state.runError case final error? when shown != null) ...[
+            XpErrorState(
+              error,
+              onRetry: () => bloc.add(TestsRunSelected(shown)),
+            ),
             const SizedBox(height: 12),
           ],
           if (response != null) ...[
@@ -114,8 +128,11 @@ class TestsView extends StatelessWidget {
             ),
             const SizedBox(height: 24),
             TestLists(response: response),
-          ] else if (state.loaded && runs.isEmpty)
-            const _NoRuns(),
+          ] else if (state.error == null &&
+              (!state.loaded || (shown != null && state.runError == null)))
+            const XpLoading(rows: 6)
+          else if (state.loaded && runs.isEmpty)
+            _NoRuns(project: project),
           if (state.baselines.isNotEmpty) ...[
             const SizedBox(height: 24),
             BaselinesPanel(
@@ -131,7 +148,9 @@ class TestsView extends StatelessWidget {
 }
 
 class _NoRuns extends StatelessWidget {
-  const new();
+  const new({required this.project});
+
+  final Project project;
 
   @override
   Widget build(BuildContext context) {
@@ -159,6 +178,17 @@ class _NoRuns extends StatelessWidget {
               textAlign: TextAlign.center,
               style: context.xpType.body.copyWith(color: colors.textSecondary),
             ),
+          ),
+          const SizedBox(height: 16),
+          XpButton(
+            label: l10n.testsRun,
+            icon: PhosphorIconsRegular.testTube,
+            kind: XpButtonKind.primary,
+            hint: '⌘N',
+            tooltip: context.canCommand ? null : l10n.readOnlyHint,
+            onPressed: context.canCommand
+                ? () => dispatchFor(context, project, workflowId: 'test')
+                : null,
           ),
         ],
       ),

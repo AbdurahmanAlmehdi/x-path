@@ -51,6 +51,29 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get releaseMarkedToast => 'Store status saved';
+
+  @override
+  String get releaseMergedToast => 'Release branch merged';
+
+  @override
+  String get jobCancelledToast => 'Run cancelled';
+
+  @override
+  String get retry => 'Retry';
+
+  @override
+  String get loading => 'Loading';
+
+  @override
+  String get cached => 'Cached';
+
+  @override
+  String cachedSince(String time) {
+    return 'Cached · $time';
+  }
+
+  @override
   String get bannerRetry => 'Retry';
 
   @override
@@ -61,6 +84,16 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get bannerLocalStarting => 'Starting the engine on this Mac…';
+
+  @override
+  String get bannerSecretsLockedSteps =>
+      'Sign in to that Mac, or unlock its login keychain in Keychain Access; jobs start again by themselves.';
+
+  @override
+  String get bannerShowLog => 'Show log in Finder';
+
+  @override
+  String get bannerSetUpAgain => 'Set up this Mac again';
 
   @override
   String get localEngineStart => 'Start engine';
@@ -177,6 +210,20 @@ class AppLocalizationsEn extends AppLocalizations {
   String get enginesRemove => 'Remove';
 
   @override
+  String enginesRemoveTitle(String name) {
+    return 'Remove $name?';
+  }
+
+  @override
+  String enginesRemoveForget(String name) {
+    return 'This Mac forgets $name and its token.';
+  }
+
+  @override
+  String get enginesRemoveKeeps =>
+      'The engine keeps running, with its projects and releases. Adding it again needs a new token.';
+
+  @override
   String get enginesSetUpLocal => 'Set up this Mac…';
 
   @override
@@ -235,7 +282,10 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get engineNoTokenBody =>
-      'The Keychain of this Mac has no token for this engine, or it could not be read. Remove the engine and add it again.';
+      'The Keychain of this Mac has no token for this engine, or it could not be read. Try again once the Keychain is unlocked, or remove the engine and add it again.';
+
+  @override
+  String get engineNoTokenRetry => 'Try again';
 
   @override
   String get onboardingTitle => 'Set up XPath on this Mac';
@@ -451,6 +501,19 @@ class AppLocalizationsEn extends AppLocalizations {
   String get addProjectDiscard => 'Remove project';
 
   @override
+  String addProjectRemoveTitle(String name) {
+    return 'Remove $name?';
+  }
+
+  @override
+  String get addProjectRemoveForget =>
+      'The engine forgets the project and what its scan found.';
+
+  @override
+  String get addProjectRemoveKeeps =>
+      'Nothing in the folder or on GitHub changes.';
+
+  @override
   String get scanAgain => 'Scan again';
 
   @override
@@ -606,6 +669,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get credentialUnchecked => 'Not checked';
 
   @override
+  String get credentialSavedToast => 'Credential saved';
+
+  @override
   String credentialFailed(String message) {
     return 'Not saved: $message';
   }
@@ -705,8 +771,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get fieldChooseFile => 'Choose file…';
 
   @override
-  String fieldFileChosen(String name, int bytes) {
-    return '$name · $bytes bytes';
+  String fieldFileChosen(String name, String size) {
+    return '$name · $size';
   }
 
   @override
@@ -768,6 +834,40 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get flavorCredentialsHelp =>
       'The credential this flavor uses for each kind, with what the last checks found: does it work, and can it reach this flavor\'s app.';
+
+  @override
+  String get flavorStoreIds => 'Store ids';
+
+  @override
+  String get flavorStoreIdsHelp =>
+      'The built-in workflows upload this flavor\'s builds to these apps when a dispatch names none. The scan fills in the Firebase ids its files name.';
+
+  @override
+  String get flavorFirebaseAndroid => 'Firebase app id · Android';
+
+  @override
+  String get flavorFirebaseIos => 'Firebase app id · iOS';
+
+  @override
+  String flavorFirebaseHint(String platform) {
+    return '1:123456789012:$platform:abc123';
+  }
+
+  @override
+  String get flavorAppleAppId => 'App Store Connect app id';
+
+  @override
+  String get flavorAppleAppIdHint => '1234567890';
+
+  @override
+  String get flavorStoreIdsSave => 'Save ids';
+
+  @override
+  String get flavorStoreIdsSaved =>
+      'Saved. The next dispatch uploads to these apps.';
+
+  @override
+  String get scanSetStoreId => 'Set the id…';
 
   @override
   String get flavorCredentialsNotAssigned => 'Not assigned';
@@ -1035,7 +1135,7 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get jobRerunAll => 'Re-run all';
+  String get jobRestart => 'Restart job';
 
   @override
   String jobResumeFrom(String step) {
@@ -1058,6 +1158,59 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String jobRan(String duration, String time) {
     return 'ran $duration · started $time';
+  }
+
+  @override
+  String get jobRunAgain => 'Run again';
+
+  @override
+  String jobRunAgainOlder(int ran, int newest) {
+    return 'Run again runs version $ran of the workflow, the one this run ran; it has version $newest now.';
+  }
+
+  @override
+  String get jobRerunFailed => 'Re-run failed jobs';
+
+  @override
+  String get jobArtifactDownload => 'Download…';
+
+  @override
+  String get jobArtifactReveal => 'Reveal in Finder';
+
+  @override
+  String get jobArtifactCopyPath => 'Copy path';
+
+  @override
+  String get jobArtifactCopied => 'Copied the path';
+
+  @override
+  String get runSummaryVersion => 'Version';
+
+  @override
+  String get runSummaryBuild => 'Build';
+
+  @override
+  String get runSummaryJobs => 'Jobs';
+
+  @override
+  String get runSummaryTests => 'Tests';
+
+  @override
+  String runSummaryTestCounts(int passed, int failed, int skipped) {
+    return '$passed passed · $failed failed · $skipped skipped';
+  }
+
+  @override
+  String get runSummaryFlavors => 'Flavors';
+
+  @override
+  String logCopyLine(int line) {
+    return 'Copy line $line';
+  }
+
+  @override
+  String logCopiedLine(int line) {
+    return 'Copied line $line';
   }
 
   @override
@@ -1108,6 +1261,11 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String jobWaitingForResumeBody(String step) {
     return 'The engine stopped during $step, which changes something outside the engine, so it never runs again by itself. Check, then resume.';
+  }
+
+  @override
+  String jobWaitReason(String reason) {
+    return 'Waiting: $reason';
   }
 
   @override
@@ -1231,7 +1389,31 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String dispatchFromPubspec(String version) {
-    return 'from $version in the pubspec at the last scan';
+    return 'from $version in the pubspec of the commit';
+  }
+
+  @override
+  String get dispatchVersionHint => 'or x.y.z';
+
+  @override
+  String get dispatchInputs => 'Inputs';
+
+  @override
+  String get dispatchYes => 'Yes';
+
+  @override
+  String get dispatchNo => 'No';
+
+  @override
+  String get dispatchJsonInvalid => 'Not valid JSON.';
+
+  @override
+  String get dispatchNoReleases =>
+      'No releases yet: this workflow needs a release that reached a store.';
+
+  @override
+  String dispatchRelease(String version, String flavor) {
+    return '$version · $flavor';
   }
 
   @override
@@ -1267,8 +1449,23 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String dispatchOnRunner(String engine, String runner, int slot, int slots) {
-    return '$engine first, else $runner · slot $slot of $slots';
+  String dispatchOnRunner(String engine, String runner) {
+    return '$engine first, else $runner';
+  }
+
+  @override
+  String dispatchSkipped(String reason) {
+    return 'skipped, $reason';
+  }
+
+  @override
+  String dispatchBlocked(String reason) {
+    return 'cannot run: $reason';
+  }
+
+  @override
+  String dispatchBuildNumber(int build) {
+    return 'build $build';
   }
 
   @override
@@ -1722,6 +1919,9 @@ class AppLocalizationsEn extends AppLocalizations {
       'A production release dispatched from the overview shows up here.';
 
   @override
+  String get releasesDispatchProd => 'Dispatch Prod release…';
+
+  @override
   String releaseTitle(String version) {
     return 'Release $version';
   }
@@ -1793,6 +1993,19 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get laneMarkLive => 'Mark live';
+
+  @override
+  String laneMarkTitle(String version, String state) {
+    return 'Mark $version $state?';
+  }
+
+  @override
+  String get laneMarkManual =>
+      'The engine cannot read this store, so it records your mark as manual, at this time.';
+
+  @override
+  String get laneMarkFinal =>
+      'The release moves on from it; a mark cannot be taken back.';
 
   @override
   String get laneAddApiKey => 'Add API key…';
@@ -1974,6 +2187,17 @@ class AppLocalizationsEn extends AppLocalizations {
   String get copied => 'Copied';
 
   @override
+  String get confirmKeep => 'Keep';
+
+  @override
+  String get confirmRemove => 'Remove';
+
+  @override
+  String copyHint(String text) {
+    return '$text · click to copy';
+  }
+
+  @override
   String get minVersionTitle => 'Forced update';
 
   @override
@@ -2078,6 +2302,9 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get testsEmptyBody =>
       'Run the Tests workflow. Its runs on the base branch become the baseline that later runs are compared with; a run\'s results also open from its job.';
+
+  @override
+  String get testsRun => 'Run Tests…';
 
   @override
   String testsIsBaseline(String branch) {
@@ -2499,6 +2726,31 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get sidebarRuns => 'Runs';
+
+  @override
+  String get runsTitle => 'Runs';
+
+  @override
+  String get runsAllWorkflows => 'All workflows';
+
+  @override
+  String get runsAllStates => 'All states';
+
+  @override
+  String get runsNone => 'No run matches.';
+
+  @override
+  String get runsNoneYet =>
+      'Nothing has run yet. Dispatch a workflow to see its runs here.';
+
+  @override
+  String get runsRecent => 'Recent runs';
+
+  @override
+  String get runsAll => 'All runs';
+
+  @override
   String get sidebarWorkflows => 'Workflows';
 
   @override
@@ -2526,6 +2778,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get workflowsImport => 'Import…';
+
+  @override
+  String get workflowsRun => 'Run…';
 
   @override
   String get workflowsExport => 'Export…';
@@ -2619,10 +2874,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get workflowsLock => 'One run at a time per project';
 
   @override
+  String get workflowsLockHint =>
+      'It also makes the production flavors the default when a dispatch names none.';
+
+  @override
   String get workflowsInputs => 'Inputs';
 
   @override
-  String get workflowsInputsHint => 'Inputs are edited in the YAML.';
+  String get workflowsInputsHint =>
+      'A dispatch sets them; the steps read them as inputs.<name>.';
 
   @override
   String get workflowsNoInputs => 'No inputs';
@@ -2708,6 +2968,236 @@ class AppLocalizationsEn extends AppLocalizations {
   String get workflowsWithHint => 'YAML value';
 
   @override
+  String get toastDismiss => 'Dismiss';
+
+  @override
+  String get toastUndo => 'Undo';
+
+  @override
+  String workflowsRemovedStage(String name) {
+    return 'Removed stage $name';
+  }
+
+  @override
+  String workflowsRemovedJob(String id) {
+    return 'Removed job $id';
+  }
+
+  @override
+  String workflowsRemovedStep(String kind) {
+    return 'Removed step $kind';
+  }
+
+  @override
+  String get workflowsAddInput => 'Add input';
+
+  @override
+  String get workflowsRemoveInput => 'Remove input';
+
+  @override
+  String workflowsRemovedInput(String name) {
+    return 'Removed input $name';
+  }
+
+  @override
+  String get workflowsInputName => 'Name';
+
+  @override
+  String get workflowsInputNameInvalid =>
+      'Letters, digits and _, starting with a letter or _.';
+
+  @override
+  String get workflowsInputType => 'Type';
+
+  @override
+  String get workflowsInputTypeAny => 'Any';
+
+  @override
+  String get workflowsInputTypeString => 'Text';
+
+  @override
+  String get workflowsInputTypeBoolean => 'On or off';
+
+  @override
+  String get workflowsInputTypeChoice => 'Choice';
+
+  @override
+  String get workflowsInputTypeJson => 'JSON';
+
+  @override
+  String get workflowsInputTypeRelease => 'Release';
+
+  @override
+  String get workflowsInputRequired => 'Required';
+
+  @override
+  String get workflowsInputDescription => 'Description';
+
+  @override
+  String get workflowsInputOptions => 'Options';
+
+  @override
+  String get workflowsInputOptionsHint => 'internal, beta, production';
+
+  @override
+  String get workflowsInputDefault => 'Default';
+
+  @override
+  String get workflowsInputNoDefault => 'None';
+
+  @override
+  String get workflowsMore => 'More';
+
+  @override
+  String get workflowsVersions => 'Versions…';
+
+  @override
+  String get workflowsRename => 'Rename…';
+
+  @override
+  String get workflowsRenameTitle => 'Rename the workflow';
+
+  @override
+  String get workflowsArchive => 'Archive';
+
+  @override
+  String get workflowsUnarchive => 'Unarchive';
+
+  @override
+  String workflowsArchivedToast(String name) {
+    return 'Archived $name';
+  }
+
+  @override
+  String get workflowsArchivedNote =>
+      'Archived: kept with its versions and runs, and not offered to dispatch.';
+
+  @override
+  String workflowsArchivedName(String name) {
+    return '$name (archived)';
+  }
+
+  @override
+  String get workflowsDelete => 'Delete…';
+
+  @override
+  String workflowsDeleteTitle(String name) {
+    return 'Delete $name?';
+  }
+
+  @override
+  String get workflowsDeleteVersions => 'Its versions go with it.';
+
+  @override
+  String get workflowsDeleteRan =>
+      'A workflow that ran cannot be deleted; archive it instead.';
+
+  @override
+  String get workflowsDeleteConfirm => 'Delete';
+
+  @override
+  String workflowsDeleted(String name) {
+    return 'Deleted $name.';
+  }
+
+  @override
+  String workflowsRestored(int from, int version, String name) {
+    return 'Saved version $from again as version $version of $name.';
+  }
+
+  @override
+  String workflowsVersionsTitle(String name) {
+    return 'Versions of $name';
+  }
+
+  @override
+  String workflowsVersionLabel(int version, String time) {
+    return 'Version $version · $time';
+  }
+
+  @override
+  String get workflowsVersionFrom => 'From';
+
+  @override
+  String get workflowsVersionTo => 'to';
+
+  @override
+  String workflowsRestoreVersion(int version) {
+    return 'Restore version $version';
+  }
+
+  @override
+  String get workflowsNoChanges => 'No changes.';
+
+  @override
+  String get workflowsClose => 'Close';
+
+  @override
+  String workflowsBuiltinUpdated(String builtin, int latest, int base) {
+    return 'The built-in $builtin has a newer version ($latest); this copy is based on version $base.';
+  }
+
+  @override
+  String get workflowsCompare => 'Compare';
+
+  @override
+  String workflowsCompareTitle(String builtin) {
+    return 'Compare with $builtin';
+  }
+
+  @override
+  String workflowsBuiltinChanged(String builtin, int base, int latest) {
+    return 'What $builtin changed, version $base to $latest';
+  }
+
+  @override
+  String workflowsYouChanged(int base) {
+    return 'What this copy changed since version $base';
+  }
+
+  @override
+  String get workflowsMarkUpToDate => 'Mark as up to date';
+
+  @override
+  String get workflowsTemplateTitle => 'Start a new workflow';
+
+  @override
+  String get workflowsUndo => 'Undo';
+
+  @override
+  String get workflowsRedo => 'Redo';
+
+  @override
+  String get workflowsAddStepUnavailable =>
+      'The engine cannot be reached, so its step types are not known. Edit the YAML for now, or try again once it answers.';
+
+  @override
+  String get workflowsStepPickerTitle => 'Add a step';
+
+  @override
+  String get workflowsStepSearchHint => 'Search step types';
+
+  @override
+  String get workflowsStepNoMatch => 'No step type matches.';
+
+  @override
+  String get workflowsKeyNeeded => 'Needed';
+
+  @override
+  String get workflowsKeyDefault => 'Default';
+
+  @override
+  String workflowsKeyDefaultValue(String value) {
+    return 'Default ($value)';
+  }
+
+  @override
+  String get workflowsOn => 'On';
+
+  @override
+  String get workflowsOff => 'Off';
+
+  @override
   String get workflowsSelectJob =>
       'Select a job in the pipeline to edit its matrix and steps.';
 
@@ -2717,6 +3207,15 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get workflowsNameBody =>
       'Letters, digits, dots, dashes and underscores; unique in the project.';
+
+  @override
+  String get workflowsNameInvalid =>
+      'Start with a letter or digit; then letters, digits, dots, dashes and underscores, 64 at most.';
+
+  @override
+  String workflowsNameTaken(String name) {
+    return 'The project already has a workflow called $name.';
+  }
 
   @override
   String get workflowsCancel => 'Cancel';
@@ -2867,6 +3366,17 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsGitHubRemove => 'Remove token';
 
   @override
+  String get settingsGitHubRemoveTitle => 'Remove the GitHub token?';
+
+  @override
+  String get settingsGitHubRemoveStops =>
+      'The engine can no longer clone, tag or open pull requests, so jobs that need GitHub fail.';
+
+  @override
+  String get settingsGitHubRemoveKeeps =>
+      'The token stays valid on GitHub; revoke it there if it leaked.';
+
+  @override
   String settingsGitHubFailed(String message) {
     return 'Not saved: $message';
   }
@@ -2975,12 +3485,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get addProjectNoGitHub =>
-      'The engine has no GitHub token, so it cannot add a project. Connect GitHub in Settings first.';
+      'The engine has no GitHub token, so it cannot add a project. Connect GitHub below first.';
 
   @override
   String get addProjectGitHubRejected =>
-      'GitHub refuses the engine\'s token, so it cannot add a project. Save a new one in Settings.';
-
-  @override
-  String get addProjectOpenGitHub => 'Connect GitHub…';
+      'GitHub refuses the engine\'s token, so it cannot add a project. Save a new one below.';
 }

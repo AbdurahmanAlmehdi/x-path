@@ -10,6 +10,21 @@ void main() {
       expect(RunState.waitingForApproval.wire, 'waiting_for_approval');
       expect(RunState.queued.wire, 'queued');
     });
+
+    test('says whether a run has ended, and reads its wire name', () {
+      expect(
+        [
+          for (final state in RunState.values)
+            if (state.isFinished) state,
+        ],
+        [RunState.succeeded, RunState.failed, RunState.cancelled],
+      );
+      expect(
+        RunState.fromWire('waiting_for_approval'),
+        RunState.waitingForApproval,
+      );
+      expect(RunState.fromWire('sleeping'), isNull);
+    });
   });
 
   group('DispatchRequest', () {
@@ -71,6 +86,29 @@ void main() {
         ),
       ],
     );
+
+    test('carries the request it was dispatched with, and pages', () {
+      final dispatched = Run(
+        id: 'run_2',
+        projectId: 'prj_1',
+        workflowId: 'wf_1',
+        workflowVersionId: 'wfv_1',
+        sha: 'a' * 40,
+        state: RunState.succeeded,
+        locksProject: false,
+        createdAt: created,
+        jobs: const [],
+        request: const DispatchRequest(flavors: ['dev']),
+      );
+      final page = RunsResponse([dispatched, run], next: 'run_1');
+
+      expect(dispatched.toJson()['request'], {
+        'flavors': ['dev'],
+        'inputs': <String, Object?>{},
+      });
+      expect(RunsResponse.fromJson(page.toJson()), page);
+      expect(const RunsResponse([]).toJson(), {'runs': <Object?>[]});
+    });
 
     test('serializes its jobs inline', () {
       final json = run.toJson();

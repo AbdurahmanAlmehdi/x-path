@@ -35,6 +35,42 @@ void main() {
       });
     });
 
+    test('carries the issues of a workflow document (UX-02)', () {
+      final response = ErrorResponse.of(
+        ApiErrorCode.workflowInvalid,
+        'Issues.',
+        issues: const [WorkflowIssue(line: 2, column: 1, message: 'Bad.')],
+      );
+
+      expect(response.toJson(), {
+        'error': {
+          'code': 'workflow_invalid',
+          'message': 'Issues.',
+          'issues': [
+            {'line': 2, 'column': 1, 'message': 'Bad.'},
+          ],
+        },
+      });
+      expect(ErrorResponse.fromJson(response.toJson()), response);
+    });
+
+    test('carries a hint and details (UX-05)', () {
+      final response = ErrorResponse.of(
+        ApiErrorCode.workflowInvalid,
+        'No credential.',
+        hint: 'Assign one.',
+        details: const {'kind': 'play_sa'},
+      );
+
+      expect(response.toJson()['error'], {
+        'code': 'workflow_invalid',
+        'message': 'No credential.',
+        'hint': 'Assign one.',
+        'details': {'kind': 'play_sa'},
+      });
+      expect(ErrorResponse.fromJson(response.toJson()), response);
+    });
+
     test('round-trips through JSON', () {
       for (final code in ApiErrorCode.values) {
         final response = ErrorResponse.of(code, 'm');

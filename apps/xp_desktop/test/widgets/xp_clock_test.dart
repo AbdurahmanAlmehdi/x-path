@@ -109,18 +109,60 @@ void main() {
       expect(find.text('3 true'), findsOneWidget);
     });
 
+    testWidgets('a pause holds the time and motion, not the wall', (
+      tester,
+    ) async {
+      await lifecycle(tester, AppLifecycleState.resumed);
+      addTearDown(() => lifecycle(tester, AppLifecycleState.resumed));
+      DateTime? pausedAt;
+      late StateSetter setPause;
+      await tester.pumpWidget(
+        XpClock(
+          clock: () => now,
+          child: StatefulBuilder(
+            builder: (context, setState) {
+              setPause = setState;
+              return XpClockPause(
+                at: pausedAt,
+                child: Builder(
+                  builder: (context) => Text(
+                    '${XpClock.now(context).second} '
+                    '${XpClock.wall(context).second} '
+                    '${XpClock.isLive(context)} '
+                    '${XpClock.read(context).second}',
+                    textDirection: TextDirection.ltr,
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      );
+      expect(find.text('0 0 true 0'), findsOneWidget);
+
+      setPause(() => pausedAt = now);
+      await wait(tester, 3);
+      expect(find.text('0 3 false 0'), findsOneWidget);
+
+      setPause(() => pausedAt = null);
+      await tester.pump();
+      expect(find.text('3 3 true 3'), findsOneWidget);
+    });
+
     testWidgets('without a clock above, the system time is live', (
       tester,
     ) async {
       await tester.pumpWidget(
         Builder(
           builder: (context) => Text(
-            '${XpClock.isLive(context)}',
+            '${XpClock.isLive(context)} '
+            '${XpClock.wall(context).year == DateTime.now().year} '
+            '${XpClock.read(context).year == DateTime.now().year}',
             textDirection: TextDirection.ltr,
           ),
         ),
       );
-      expect(find.text('true'), findsOneWidget);
+      expect(find.text('true true true'), findsOneWidget);
     });
 
     testWidgets('spinners stand still while the app is away', (tester) async {

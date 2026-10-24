@@ -30,6 +30,8 @@ class JobHarness {
     when(() => jobs.listArtifacts(any())).thenAnswer((_) async => iosArtifacts);
     when(() => workflows.workflowOf(any()))
         .thenAnswer((_) async => prodWorkflow);
+    when(() => workflows.getWorkflow(any(), any()))
+        .thenAnswer((_) async => prodWorkflow);
     when(runners.watchRunners)
         .thenAnswer((_) => Stream.value(Snapshot([linuxRunner])));
     runs.add(Snapshot(run ?? runningRun()));
@@ -49,9 +51,11 @@ class JobHarness {
     EngineConnectionBloc? connection,
     ShellCubit? shell,
     String? jobId,
+    AppServices? services,
   }) async {
     await tester.pumpApp(
       JobPage(runId: 'run_1', jobId: jobId),
+      services: services,
       brightness: brightness,
       connection: connection,
       shell: shell,

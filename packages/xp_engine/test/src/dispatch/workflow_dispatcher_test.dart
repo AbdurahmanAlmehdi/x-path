@@ -145,6 +145,69 @@ void main() {
       },
     );
 
+    group('with store ids on the dev flavor', () {
+      final withIds = AppProfile(
+        name: demoApp.name,
+        path: demoApp.path,
+        version: demoApp.version,
+        flutterVersion: demoApp.flutterVersion,
+        hasAndroid: true,
+        hasIos: true,
+        flavors: [
+          demoApp.flavors.first.copyWith(
+            firebaseAppId: () => {'android': '1:111:android:aaa'},
+            appleAppId: () => '1234567890',
+          ),
+          demoApp.flavors.last,
+        ],
+      );
+
+      setUp(() async {
+        harness = await DispatchHarness.create(apps: [withIds]);
+        await harness.saveCredential('dev', CredentialKind.firebaseSa);
+        await harness.saveCredential('dev', CredentialKind.ascKey);
+      });
+
+      test('uploads with them and no inputs (UX-03)', () async {
+        final run = await harness.dispatchBuiltin('dev-build');
+
+        expect(
+          run.jobs.map((job) => job.name),
+          containsAll(['Upload dev for android', 'Upload dev for ios']),
+        );
+        final android = await harness.input(
+          await jobNamed(run, 'Upload dev for android'),
+          'upload.firebase',
+        );
+        expect(android['appId'], '1:111:android:aaa');
+        final ios = await harness.input(
+          await jobNamed(run, 'Upload dev for ios'),
+          'upload.appStore',
+        );
+        expect(ios['appleAppId'], '1234567890');
+      });
+
+      test('an input still wins over them', () async {
+        final run = await harness.dispatchBuiltin(
+          'dev-build',
+          const DispatchRequest(
+            platforms: ['android'],
+            inputs: {
+              'firebaseAppIds': {
+                'dev': {'android': '1:222:android:bbb'},
+              },
+            },
+          ),
+        );
+
+        final upload = await harness.input(
+          await jobNamed(run, 'Upload dev for android'),
+          'upload.firebase',
+        );
+        expect(upload['appId'], '1:222:android:bbb');
+      });
+    });
+
     test('leaves blank release notes out', () async {
       await harness.saveCredential('dev', CredentialKind.firebaseSa);
 
@@ -276,7 +339,23 @@ void main() {
             },
           ),
         ),
-        _dispatchError(contains('no App Store Connect key or Apple ID')),
+        throwsA(
+          isA<DispatchException>()
+              .having(
+                (e) => e.message,
+                'message',
+                contains('no App Store Connect key or Apple ID'),
+              )
+              .having(
+                (e) => e.hint,
+                'hint',
+                contains('assign it to dev, then dispatch again'),
+              )
+              .having((e) => e.details, 'details', {
+                'kinds': ['asc_key', 'apple_id'],
+                'flavor': 'dev',
+              }),
+        ),
       );
     });
 
@@ -651,6 +730,16 @@ stages:
       );
     });
 
+    test('says a release version it cannot read is not one', () async {
+      await expectLater(
+        harness.dispatchBuiltin(
+          'dev-build',
+          const DispatchRequest(releaseVersion: 'latest'),
+        ),
+        _dispatchError('"latest" is not a version like 5.4.1.'),
+      );
+    });
+
     test('patches the shorebird flavors of the release', () async {
       harness.git.tags.addAll({
         'v1.2.0+30': 'c1',
@@ -739,6 +828,44 @@ stages:
       expect(
         (await harness.input(jobs[1], 'shorebird.patch'))['allowNativeDiffs'],
         isTrue,
+      );
+    });
+
+    test('takes the release from its release input (UX-04)', () async {
+      final run = await harness.dispatchBuiltin(
+        'shorebird-patch',
+        const DispatchRequest(
+          platforms: ['android'],
+          inputs: {'releaseVersion': '1.2.0+30'},
+        ),
+      );
+
+      final jobs = await harness.jobsOf(run);
+      expect(
+        (await harness.input(jobs[1], 'shorebird.patch'))['version'],
+        '1.2.0+30',
+      );
+    });
+
+    test('refuses an input of the wrong type', () async {
+      await expectLater(
+        harness.dispatchBuiltin(
+          'shorebird-patch',
+          const DispatchRequest(
+            releaseVersion: '1.2.0+30',
+            inputs: {'allowNativeDiffs': 'true'},
+          ),
+        ),
+        _dispatchError('The input "allowNativeDiffs" must be true or false.'),
+      );
+      await expectLater(
+        harness.dispatchBuiltin(
+          'shorebird-patch',
+          const DispatchRequest(inputs: {'releaseVersion': '1.2.0'}),
+        ),
+        _dispatchError(
+          'The input "releaseVersion" must be a release, x.y.z+build.',
+        ),
       );
     });
 
@@ -1171,6 +1298,92 @@ stages:
       );
     });
 
+    test('runs a run again: the same version of the workflow, commit and '
+        'request', () async {
+      const yaml = '''
+schema: 1
+inputs:
+  notes:
+stages:
+  - name: a
+    jobs:
+      j:
+        steps:
+          - kind: git.checkout
+''';
+      final id = await harness.custom(yaml);
+      final first = await harness.dispatcher.dispatch(
+        'prj_1',
+        id,
+        const DispatchRequest(inputs: {'notes': 'hi'}),
+      );
+      await harness.workflows.save('prj_1', id, '$yaml# two\n');
+      // Git reads a commit as the ref of itself.
+      harness.git.refs[first.sha] = first.sha;
+
+      final second = await harness.dispatcher.again(first.id);
+
+      expect(second.id, isNot(first.id));
+      expect(second.workflowVersionId, first.workflowVersionId);
+      expect(second.sha, first.sha);
+      expect(second.request?.inputs, {'notes': 'hi'});
+      expect(second.request?.ref, first.sha);
+      await expectLater(
+        harness.dispatcher.again('run_nope'),
+        throwsA(isA<RunNotFoundException>()),
+      );
+    });
+
+    test('refuses a version that is not one of the workflow', () async {
+      final id = await harness.custom('''
+schema: 1
+stages:
+  - name: a
+    jobs:
+      j:
+        steps:
+          - kind: git.checkout
+''');
+
+      await expectLater(
+        harness.dispatcher.dispatch(
+          'prj_1',
+          id,
+          const DispatchRequest(),
+          versionId: 'wfv_nope',
+        ),
+        throwsA(isA<WorkflowNotFoundException>()),
+      );
+    });
+
+    test('refuses an archived workflow, in a dry run too (UX-06)', () async {
+      final id = await harness.custom('''
+schema: 1
+stages:
+  - name: a
+    jobs:
+      j:
+        steps:
+          - kind: git.checkout
+''', name: 'old-flow');
+      await harness.workflows.update(
+        'prj_1',
+        id,
+        const UpdateWorkflowRequest(archived: true),
+      );
+
+      const refusal =
+          'The workflow "old-flow" is archived. Unarchive it to run it.';
+      await expectLater(
+        harness.dispatcher.dispatch('prj_1', id, const DispatchRequest()),
+        _dispatchError(refusal),
+      );
+      await expectLater(
+        harness.dispatcher.plan('prj_1', id, const DispatchRequest()),
+        _dispatchError(refusal),
+      );
+    });
+
     test('says when the workflow is not there', () async {
       await expectLater(
         harness.dispatcher.dispatch(
@@ -1180,6 +1393,89 @@ stages:
         ),
         throwsA(isA<WorkflowNotFoundException>()),
       );
+    });
+  });
+
+  group('a dry run (UX-01)', () {
+    test('plans a dev build without starting it or taking a number', () async {
+      final plan = await harness.planBuiltin('dev-build');
+
+      expect(plan.flavors, ['dev']);
+      expect(plan.platforms, ['android', 'ios']);
+      expect(plan.currentVersion, '1.2.3+45');
+      expect(plan.version, '1.2.3');
+      expect(plan.build, 1);
+      expect(plan.stages.map((stage) => stage.name), ['check', 'build']);
+      expect(plan.jobCount, 4);
+      final check = plan.stages.first.jobs.first;
+      expect(check.name, 'Check dev for android');
+      expect(check.engineOnly, isTrue);
+      final build = plan.stages.last.jobs.first;
+      expect(build.engineOnly, isFalse);
+      expect(build.capabilities, ['android', 'flutter']);
+      expect(build.waitReason, 'No runner can do android, flutter.');
+      expect(plan.skipped.map((job) => (job.name, job.reason, job.blocks)), [
+        ('Upload dev for android', 'no Firebase app id for dev', false),
+        ('Upload dev for ios', 'no App Store app id for dev', false),
+      ]);
+      expect(plan.blocked, isFalse);
+      expect(
+        harness.counters.counterOf('prj_1', '.'),
+        0,
+        reason: 'a dry run takes no build number',
+      );
+      expect(
+        await harness.jobs.jobs.list(states: JobState.values.toSet()),
+        isEmpty,
+      );
+    });
+
+    test('lists a job it cannot plan as one that blocks', () async {
+      final plan = await harness.planBuiltin(
+        'dev-build',
+        const DispatchRequest(
+          platforms: ['android'],
+          inputs: {
+            'firebaseAppIds': {
+              'dev': {'android': '1:1:android:a'},
+            },
+          },
+        ),
+      );
+
+      final upload = plan.skipped.single;
+      expect(upload.name, 'Upload dev for android');
+      expect(upload.stage, 'upload');
+      expect(upload.flavor, 'dev');
+      expect(upload.platform, 'android');
+      expect(upload.blocks, isTrue);
+      expect(upload.reason, contains('has no firebase_sa credential'));
+      expect(plan.blocked, isTrue);
+    });
+
+    test('names the gates that are on', () async {
+      final gates = InMemoryGateConfigRepository();
+      harness = await DispatchHarness.create(gates: gates);
+      await gates.set('prj_1', const GateConfig({GateAction.push: false}));
+
+      final plan = await harness.planBuiltin(
+        'shorebird-patch',
+        const DispatchRequest(releaseVersion: '1.2.0+30'),
+      );
+
+      expect(plan.releaseVersion, '1.2.0+30');
+      expect(plan.gates, ['prod_patch']);
+    });
+
+    test('fetches only when the mirror does not know the ref', () async {
+      await harness.planBuiltin('dev-build');
+      expect(harness.git.calls, isNot(contains('fetch')));
+
+      await expectLater(
+        harness.planBuiltin('dev-build', const DispatchRequest(ref: 'nope')),
+        _dispatchError(isA<String>()),
+      );
+      expect(harness.git.calls, contains('fetch'));
     });
   });
 }

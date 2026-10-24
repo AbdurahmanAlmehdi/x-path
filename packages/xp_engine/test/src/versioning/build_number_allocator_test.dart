@@ -96,4 +96,19 @@ void main() {
       expect(await allocate(), 3283);
     },
   );
+
+  test('peeks at the number it would allocate without taking it', () async {
+    store.builds = const StoreBuilds({3282});
+
+    final peeked = await allocator.peek(
+      projectId: 'prj_1',
+      appPath: '.',
+      mirror: mirror,
+      iosBundleId: 'com.mataa.app',
+    );
+
+    expect(peeked, 3283);
+    expect(counters.counterOf('prj_1', '.'), 0);
+    expect(await allocate(), 3283);
+  });
 }

@@ -126,6 +126,7 @@ void main() {
     test('events compare by value', () {
       expect(const AddProjectSubmitted('a').props, ['a']);
       expect(const AddProjectRescanned(), const AddProjectRescanned());
+      expect(const AddProjectDiscarded().props, isEmpty);
     });
   });
 }

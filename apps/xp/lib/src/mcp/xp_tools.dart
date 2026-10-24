@@ -1,6 +1,9 @@
 import 'dart:async';
 
+import 'package:json_annotation/json_annotation.dart';
 import 'package:xp/src/mcp/mcp_tool.dart';
+import 'package:xp/src/output/error_json.dart';
+import 'package:xp/src/output/format.dart';
 import 'package:xp/src/resolve.dart';
 import 'package:xp/src/run_approvals.dart';
 import 'package:xp_api/xp_api.dart';
@@ -10,7 +13,7 @@ import 'package:xp_client/xp_client.dart';
 const mcpInstructions = '''
 XPath releases Flutter apps. These tools read projects, workflows, runs, jobs, logs, releases, approvals, test runs, storage, credentials (never a secret) and runners; create and edit projects and workflows (a workflow is checked first and its errors come back with their lines); and dispatch workflows.
 
-Gated actions (a production release, a production OTA patch, a store submission, a push, a merge, a delete) wait for the owner's approval. This server can never approve or deny: when a dispatched run reaches a gate, get_run shows it as waiting_for_approval with the pending approval ids; tell the owner, who approves in the XPath app or with `xp approvals approve <id>`, and poll get_approval until its state is no longer pending. Expired counts as denied.
+Gated actions (a production release, a production OTA patch, a store submission, a push, a merge, a delete) wait for the owner's approval. This server can never approve or deny: when a dispatched run reaches a gate, get_run shows it as waiting_for_approval with the pending approval ids; tell the owner, who approves in the XPath app or with `xp approvals approve <id>`, and wait_for_approval (or poll get_approval) until its state is no longer pending. Expired counts as denied. wait_for_run waits for a run to end or reach a gate; list_runs finds runs dispatched anywhere.
 
 Projects can be named by id (prj_...), owner/name or just name. Workflows by id (wf_...) or name.''';
 
@@ -23,6 +26,7 @@ Projects can be named by id (prj_...), owner/name or just name. Workflows by id 
 List<McpTool> buildXpTools(
   XpClient client, {
   Duration tailIdle = const Duration(seconds: 1),
+  Duration pollInterval = const Duration(seconds: 2),
 }) {
   McpTool tool(
     String name,
@@ -66,6 +70,44 @@ List<McpTool> buildXpTools(
 
   Future<String> projectId(McpArgs args) =>
       resolveProject(client, args.string('project'));
+  final dispatchArgs = <String, Object?>{
+    'project': project,
+    'workflow': workflow,
+    'ref': text('Branch, tag or commit; the base branch by default.'),
+    'app': text('The app by path ("." for the root).'),
+    'flavors': strings('The flavors to run for.'),
+    'platforms': strings('"android" and/or "ios".'),
+    'bump': text(
+      'How to bump the version.',
+      values: [for (final bump in VersionBump.values) bump.wire],
+    ),
+    'version': text('The version x.y.z to release, instead of bump.'),
+    'releaseVersion': text('The release x.y.z+build a patch applies to.'),
+    'inputs': {
+      'type': 'object',
+      'description':
+          'The inputs the workflow declares, by name. get_workflow lists '
+          'them with their type: string (text), boolean (true or false), '
+          'choice (one of its options), json (any JSON value) or release '
+          '(x.y.z+build; the releaseVersion when it gives none). An input '
+          'without a type takes any value.',
+    },
+  };
+  DispatchRequest dispatchRequestOf(McpArgs args) {
+    final bump = args.optionalString('bump');
+    return DispatchRequest(
+      ref: args.optionalString('ref'),
+      app: args.optionalString('app'),
+      flavors: args.optionalStrings('flavors'),
+      platforms: args.optionalStrings('platforms'),
+      bump: bump == null
+          ? null
+          : VersionBump.values.firstWhere((value) => value.wire == bump),
+      version: args.optionalString('version'),
+      releaseVersion: args.optionalString('releaseVersion'),
+      inputs: args.optionalObject('inputs') ?? const {},
+    );
+  }
 
   return [
     tool(
@@ -117,7 +159,10 @@ List<McpTool> buildXpTools(
       'update_project',
       "Edit the project's profile: the base branch, and per app the store "
           'country and per flavor prod, shorebird, entrypoint, iosBundleId, '
-          'androidAppId and versionFiles. Edits survive rescans.',
+          'androidAppId, versionFiles, firebaseAppId ({"android": "1:..."}; '
+          'an empty id removes it) and appleAppId, which the built-in '
+          'workflows upload to when no input gives one. Edits survive '
+          'rescans.',
       {
         'project': project,
         'edits': {
@@ -172,18 +217,41 @@ List<McpTool> buildXpTools(
       readOnly: true,
     ),
     tool(
+      'get_workflow_schema',
+      'What a workflow document may name: each step type with what it does, '
+          'the runners it needs and its typed "with" keys (required, '
+          'default, options), the gates with labels, and the variables an '
+          'expression reads. With "kind", only that step type.',
+      {'kind': text('A step type, such as build.ios.')},
+      (args) async {
+        final schema = await client.getWorkflowSchema();
+        final kind = args.optionalString('kind');
+        if (kind == null) return schema.toJson();
+        final type = schema.steps.where((step) => step.kind == kind);
+        if (type.isEmpty) {
+          throw McpArgumentError(
+            'No step type "$kind". Call get_workflow_schema without "kind" '
+            'for the list.',
+          );
+        }
+        return type.single.toJson();
+      },
+      readOnly: true,
+    ),
+    tool(
       'validate_workflow',
       'Check a workflow document without saving it. Returns the issues with '
-          'their line and column.',
+          'their line, column and a hint such as "Did you mean ...". The '
+          'check is the same for every project, so "project" is optional.',
       {'project': project, 'yaml': text('The workflow document.')},
       (args) async => _validation(
         await client.validateWorkflow(
-          await projectId(args),
+          args.optionalString('project') == null ? null : await projectId(args),
           args.string('yaml'),
         ),
         saved: false,
       ),
-      required: ['project', 'yaml'],
+      required: ['yaml'],
       readOnly: true,
     ),
     tool(
@@ -233,52 +301,68 @@ List<McpTool> buildXpTools(
       failed: _isInvalid,
     ),
     tool(
+      'archive_workflow',
+      "Archive a workflow of the project's own (UX-06): it keeps its versions "
+          'and runs and is no longer dispatched. "archived": false brings it '
+          'back. Built-ins cannot be archived.',
+      {
+        'project': project,
+        'workflow': workflow,
+        'archived': {
+          'type': 'boolean',
+          'description': 'false to unarchive; true by default.',
+        },
+      },
+      (args) async {
+        final id = await projectId(args);
+        return (await client.updateWorkflow(
+          id,
+          await resolveWorkflow(client, id, args.string('workflow')),
+          UpdateWorkflowRequest(
+            archived: args.optionalBool('archived') ?? true,
+          ),
+        )).toJson();
+      },
+      required: ['project', 'workflow'],
+    ),
+    tool(
       'dispatch_workflow',
       'Run a workflow. Returns the run. A workflow that reaches a gated '
           'action (a production release, for one) stops there: the run '
           'becomes waiting_for_approval and an approval is pending. Poll '
           'get_run for the approval ids, then get_approval; only the owner '
           'can approve.',
-      {
-        'project': project,
-        'workflow': workflow,
-        'ref': text('Branch, tag or commit; the base branch by default.'),
-        'app': text('The app by path ("." for the root).'),
-        'flavors': strings('The flavors to run for.'),
-        'platforms': strings('"android" and/or "ios".'),
-        'bump': text(
-          'How to bump the version.',
-          values: [for (final bump in VersionBump.values) bump.wire],
-        ),
-        'version': text('The version x.y.z to release, instead of bump.'),
-        'releaseVersion': text('The release x.y.z+build a patch applies to.'),
-        'inputs': {
-          'type': 'object',
-          'description': 'The inputs the workflow declares.',
-        },
-      },
+      dispatchArgs,
       (args) async {
         final id = await projectId(args);
-        final bump = args.optionalString('bump');
         final run = await client.dispatchWorkflow(
           id,
           await resolveWorkflow(client, id, args.string('workflow')),
-          DispatchRequest(
-            ref: args.optionalString('ref'),
-            app: args.optionalString('app'),
-            flavors: args.optionalStrings('flavors'),
-            platforms: args.optionalStrings('platforms'),
-            bump: bump == null
-                ? null
-                : VersionBump.values.firstWhere((value) => value.wire == bump),
-            version: args.optionalString('version'),
-            releaseVersion: args.optionalString('releaseVersion'),
-            inputs: args.optionalObject('inputs') ?? const {},
-          ),
+          dispatchRequestOf(args),
         );
         return await _runWithApprovals(client, run);
       },
       required: ['project', 'workflow'],
+    ),
+    tool(
+      'plan_dispatch',
+      'What dispatch_workflow would start, planned by the engine; nothing '
+          'starts and no build number is taken. Lists the jobs of each stage '
+          'and where each would run (or why it would wait), the jobs it '
+          'leaves out and why (skipped), the gates, and the version and '
+          'build number. A skipped job that blocks means dispatch_workflow '
+          'would be refused; fix what its reason says first.',
+      dispatchArgs,
+      (args) async {
+        final id = await projectId(args);
+        return (await client.planDispatch(
+          id,
+          await resolveWorkflow(client, id, args.string('workflow')),
+          dispatchRequestOf(args),
+        )).toJson();
+      },
+      required: ['project', 'workflow'],
+      readOnly: true,
     ),
     tool(
       'get_run',
@@ -290,6 +374,97 @@ List<McpTool> buildXpTools(
         await client.getRun(args.string('run')),
       ),
       required: ['run'],
+      readOnly: true,
+    ),
+    tool(
+      'list_runs',
+      'List the runs, newest first, wherever they were dispatched from: of a '
+          'project, a workflow (needs project for a name) and a state when '
+          'given. "next" is there when there may be more: pass it as '
+          '"before".',
+      {
+        'project': project,
+        'workflow': workflow,
+        'state': text(
+          'Only runs in this state.',
+          values: [for (final state in RunState.values) state.wire],
+        ),
+        'limit': integer('At most this many runs, 1 to 50; 20 by default.'),
+        'before': text('Only runs dispatched before this run id.'),
+      },
+      (args) async {
+        final limit = args.optionalInt('limit') ?? 20;
+        if (limit < 1 || limit > 50) {
+          throw const McpArgumentError('"limit" must be from 1 to 50.');
+        }
+        final id = args.optionalString('project') == null
+            ? null
+            : await projectId(args);
+        final workflowReference = args.optionalString('workflow');
+        return (await client.listRuns(
+          projectId: id,
+          workflowId: workflowReference == null || id == null
+              ? workflowReference
+              : await resolveWorkflow(client, id, workflowReference),
+          state: switch (args.optionalString('state')) {
+            null => null,
+            final wire =>
+              RunState.fromWire(wire) ??
+                  (throw McpArgumentError('No run state "$wire".')),
+          },
+          before: args.optionalString('before'),
+          limit: limit,
+        )).toJson();
+      },
+      readOnly: true,
+    ),
+    tool(
+      'wait_for_run',
+      'Wait until a run ends or waits for an approval, at most '
+          '"timeoutSeconds" (60 by default, 300 at most). Returns the run as '
+          'get_run does, and "timedOut" when it neither ended nor waits yet; '
+          'call it again then.',
+      {
+        'run': text('The run id (run_...).'),
+        'timeoutSeconds': integer('How long to wait, 0 to 300.'),
+      },
+      (args) async {
+        final id = args.string('run');
+        final run = await _poll(
+          () => client.getRun(id),
+          (run) =>
+              run.state.isFinished || run.state == RunState.waitingForApproval,
+          _timeout(args),
+          pollInterval,
+        );
+        return {
+          ...await _runWithApprovals(client, run.value),
+          'timedOut': run.timedOut,
+        };
+      },
+      required: ['run'],
+      readOnly: true,
+    ),
+    tool(
+      'wait_for_approval',
+      'Wait until the owner decides an approval or it expires, at most '
+          '"timeoutSeconds" (60 by default, 300 at most). Returns it as '
+          'get_approval does, and "timedOut" while it is still pending.',
+      {
+        'approval': text('The approval id (apr_...).'),
+        'timeoutSeconds': integer('How long to wait, 0 to 300.'),
+      },
+      (args) async {
+        final id = args.string('approval');
+        final approval = await _poll(
+          () => client.getApproval(id),
+          (approval) => approval.state != ApprovalState.pending,
+          _timeout(args),
+          pollInterval,
+        );
+        return {...approval.value.toJson(), 'timedOut': approval.timedOut};
+      },
+      required: ['approval'],
       readOnly: true,
     ),
     tool(
@@ -536,10 +711,7 @@ Map<String, Object?> _validation(
 }) => {
   'valid': response.valid,
   'saved': saved,
-  'issues': [
-    for (final issue in response.issues)
-      {'line': issue.line, 'column': issue.column, 'message': issue.message},
-  ],
+  'issues': [for (final issue in response.issues) issue.toJson()],
 };
 
 Future<Map<String, Object?>> _runWithApprovals(XpClient client, Run run) async {
@@ -581,28 +753,96 @@ Future<Map<String, Object?>> _tail(
   return {'lines': kept, 'jobEnded': ended != null, 'jobState': ?ended?.wire};
 }
 
+/// How long a wait tool waits: `timeoutSeconds`, 60 by default.
+Duration _timeout(McpArgs args) {
+  final seconds = args.optionalInt('timeoutSeconds') ?? 60;
+  if (seconds < 0 || seconds > 300) {
+    throw const McpArgumentError('"timeoutSeconds" must be from 0 to 300.');
+  }
+  return Duration(seconds: seconds);
+}
+
+/// Reads [read] every [interval] until [done] says so or [timeout] passes;
+/// the last value, and whether the time ran out first.
+Future<({T value, bool timedOut})> _poll<T>(
+  Future<T> Function() read,
+  bool Function(T value) done,
+  Duration timeout,
+  Duration interval,
+) async {
+  final watch = Stopwatch()..start();
+  var value = await read();
+  while (!done(value)) {
+    if (watch.elapsed >= timeout) return (value: value, timedOut: true);
+    await Future<void>.delayed(interval);
+    value = await read();
+  }
+  return (value: value, timedOut: false);
+}
+
+/// The documents of `xp mcp`, over [client]: the workflow schema, so an
+/// agent reads it instead of fetching it from the engine itself.
+List<McpResource> buildXpResources(XpClient client) => [
+  McpResource(
+    uri: workflowSchemaUri,
+    name: 'Workflow schema',
+    description:
+        'The step types with their typed with keys, the gates, the '
+        'capabilities and the variables of workflow documents (schema 1).',
+    read: () async => prettyJson((await client.getWorkflowSchema()).toJson()),
+  ),
+];
+
+/// Where `xp mcp` serves the workflow schema.
+const workflowSchemaUri = 'xpath://workflows/schema';
+
+/// Runs a tool and turns its failure into an error result: [errorJson],
+/// with the engine's code and a hint that names MCP tools, not commands.
 Future<McpToolResult> _guard(Future<McpToolResult> Function() body) async {
+  McpToolResult fail(String code, String message, [String? hint]) =>
+      McpToolResult.json(errorJson(code, message, hint), isError: true);
   try {
     return await body();
   } on ApiException catch (error) {
-    return McpToolResult.error(
-      error.isForbidden
-          ? 'The engine refused: ${error.message} This MCP token reads, '
-                'creates and edits projects and workflows and dispatches; it '
-                'can never approve or loosen a gate.'
-          : error.isUnauthorized
-          ? 'The engine rejected the MCP token. Create one with `xpd token '
-                'create --kind mcp` and save it with `xp connect --mcp-token '
-                '<token>`.'
-          : error.message,
-    );
+    return error.isForbidden
+        ? fail(
+            apiCodeOf(error),
+            'The engine refused: ${error.message} This MCP token reads, '
+            'creates and edits projects and workflows and dispatches; it can '
+            'never approve or loosen a gate.',
+          )
+        : error.isUnauthorized
+        ? fail(
+            apiCodeOf(error),
+            'The engine rejected the MCP token.',
+            'Ask the owner to create one with `xpd token create --kind mcp` '
+                'and save it with `xp connect --mcp-token <token>`.',
+          )
+        : McpToolResult.json(
+            errorJson(
+              apiCodeOf(error),
+              error.message,
+              error.hint,
+              error.issues,
+            ),
+            isError: true,
+          );
   } on ConnectionException catch (error) {
-    return McpToolResult.error(error.message);
+    return fail('unreachable', error.message);
   } on ReferenceException catch (error) {
-    return McpToolResult.error(error.message);
+    return fail(
+      error.notFound ? 'not_found' : 'ambiguous',
+      error.message,
+      error.mcpHint,
+    );
   } on McpArgumentError catch (error) {
-    return McpToolResult.error(error.message);
+    return fail('invalid_request', error.message);
+  } on CheckedFromJsonException catch (error) {
+    // A malformed object argument (`edits`) fails as it is read.
+    return fail('invalid_request', 'Invalid arguments: ${error.message}');
+  } on FormatException catch (error) {
+    return fail('invalid_request', 'Invalid arguments: ${error.message}');
   } on Exception catch (error) {
-    return McpToolResult.error('Invalid arguments: $error');
+    return fail('internal', '$error');
   }
 }

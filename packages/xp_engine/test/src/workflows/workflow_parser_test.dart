@@ -1,4 +1,5 @@
 import 'package:test/test.dart';
+import 'package:xp_api/xp_api.dart';
 import 'package:xp_engine/xp_engine.dart';
 
 const _catalog = MapStepCatalog({
@@ -58,7 +59,7 @@ void main() {
 
   List<String> issues(String source) => [
     for (final issue in parser.parse(source).issues)
-      '${issue.line}:${issue.column} ${issue.message}',
+      '${issue.line}:${issue.column} ${[issue.message, ?issue.hint].join(' ')}',
   ];
 
   group('a valid document', () {
@@ -220,8 +221,7 @@ stages:
 
     test('must not have an unknown key', () {
       const unknown =
-          '2:1 Unknown key "stage" in the workflow. Allowed: description, '
-          'inputs, lock, name, schema, stages.';
+          '2:1 Unknown key "stage" in the workflow. Did you mean "stages"?';
 
       expect(issues('schema: 1\nstage: []\nstages: []\n'), [
         unknown,
@@ -250,6 +250,11 @@ stages:
     String document(String inputs) =>
         'schema: 1\ninputs:\n$inputs\nstages: []\n';
 
+    /// [inputs] in a workflow that is valid otherwise.
+    String typed(String inputs) =>
+        'schema: 1\ninputs:\n$inputs\nstages:\n  - name: s\n    jobs:\n'
+        '      j:\n        steps:\n          - kind: version.bump\n';
+
     test('are a mapping', () {
       expect(issues(document('  - a')).first, startsWith('3:3 "inputs" is a'));
     });
@@ -273,8 +278,88 @@ stages:
       expect(
         issues(document('  a: {color: red}')).first,
         '3:7 Unknown key "color" in input "a". Allowed: default, '
-        'description, required.',
+        'description, options, required, type.',
       );
+    });
+
+    test('have a type and, for a choice, options (UX-04)', () {
+      final inputs = parser
+          .parse(
+            typed(
+              '  track: {type: choice, options: [internal, beta], '
+              'default: beta}\n'
+              '  release: {type: release}\n'
+              '  flag: {type: boolean, default: false}\n'
+              '  ids: {type: json, default: {dev: 1}}\n'
+              '  notes: {type: string, default: ""}\n'
+              '  bare:',
+            ),
+          )
+          .definition!
+          .inputs;
+
+      expect(inputs.map((input) => input.type), [
+        InputType.choice,
+        InputType.release,
+        InputType.boolean,
+        InputType.json,
+        InputType.string,
+        null,
+      ]);
+      expect(inputs.first.options, ['internal', 'beta']);
+      expect(inputs.first.toWire().options, ['internal', 'beta']);
+      expect(inputs.last.toWire(), const WorkflowInput(name: 'bare'));
+    });
+
+    test('name a type the engine knows, and options that fit it', () {
+      expect(
+        issues(typed('  a: {type: number}')).first,
+        '3:13 Unknown input type "number". Allowed: boolean, choice, json, '
+        'release, string.',
+      );
+      expect(
+        issues(typed('  a: {type: [string]}')).first,
+        startsWith('3:13 Unknown input type'),
+      );
+      expect(
+        issues(typed('  a: {type: strng}')).first,
+        '3:13 Unknown input type "strng". Did you mean "string"?',
+      );
+      expect(
+        issues(typed('  a: {type: choice}')).first,
+        '3:6 A choice input needs "options".',
+      );
+      expect(
+        issues(typed('  a: {type: choice, options: []}')).first,
+        '3:30 "options" is a list of strings.',
+      );
+      expect(
+        issues(typed('  a: {type: choice, options: [1]}')).first,
+        '3:30 "options" is a list of strings.',
+      );
+      expect(
+        issues(typed('  a: {type: string, options: [x]}')).first,
+        '3:30 "options" go with "type: choice".',
+      );
+    });
+
+    test('have a default of their type', () {
+      for (final (input, message) in [
+        ('{type: boolean, default: yes}', 'must be true or false'),
+        ('{type: string, default: 3}', 'must be text'),
+        ('{type: choice, options: [a], default: b}', 'must be one of a'),
+        ('{type: release, default: 1.2.3}', 'must be a release, x.y.z+build'),
+        ('{type: release, default: latest}', 'must be a release'),
+        ('{type: release, default: 3}', 'must be a release'),
+      ]) {
+        expect(
+          issues(typed('  a: $input')).single,
+          contains('The default of "a" $message'),
+          reason: input,
+        );
+      }
+      expect(issues(typed('  a: {type: release, default: 1.2.3+4}')), isEmpty);
+      expect(issues(typed('  a: {type: json, default: [1]}')), isEmpty);
     });
 
     test('are required with true or false, and without a default', () {
@@ -350,8 +435,7 @@ stages:
 
     test('know their keys and need steps', () {
       const unknown =
-          '6:9 Unknown key "step" in job "j". Allowed: capabilities, if, '
-          'matrix, name, steps.';
+          '6:9 Unknown key "step" in job "j". Did you mean "steps"?';
 
       expect(
         issues(stages('  - name: a\n    jobs:\n      j:\n        step: []')),
@@ -402,8 +486,8 @@ stages:
 
     test('have capabilities from the known ones', () {
       const unknown =
-          '6:33 Unknown capability. Allowed: ios-sign, android, flutter, '
-          'swift-linux.';
+          '6:33 Unknown capability "lasers". Allowed: android, flutter, '
+          'ios-sign, swift-linux.';
 
       expect(
         issues(
@@ -484,7 +568,7 @@ stages:
       expect(
         issues(job('          color: [red]')).single,
         '7:11 Unknown '
-        'matrix axis "color". Allowed: platform, flavor.',
+        'matrix axis "color". Allowed: flavor, platform.',
       );
       expect(
         issues(job('          - a')).single,
@@ -498,6 +582,10 @@ stages:
       expect(
         issues(job('          platform: [android, windows]')).single,
         '7:31 Unknown platform "windows". Allowed: android, ios.',
+      );
+      expect(
+        issues(job('          platform: [andriod]')).single,
+        '7:22 Unknown platform "andriod". Did you mean "android"?',
       );
     });
 
@@ -600,12 +688,17 @@ stages:
     test('have a condition and a gate that are valid', () {
       expect(
         issues(step('          - kind: guard\n            gate: ship')).single,
-        '8:19 Unknown gate. Allowed: prod_release, prod_patch, '
-        'store_submission, push, merge, delete.',
+        '8:19 Unknown gate "ship". Allowed: delete, merge, prod_patch, '
+        'prod_release, push, store_submission.',
       );
       expect(
         issues(step('          - kind: guard\n            gate: 3')).single,
-        startsWith('8:19 Unknown gate.'),
+        startsWith('8:19 Unknown gate "3".'),
+      );
+      expect(
+        issues(step('          - kind: guard\n            gate: prod_relase'))
+            .single,
+        '8:19 Unknown gate "prod_relase". Did you mean "prod_release"?',
       );
       expect(
         issues(step('          - kind: guard\n            if: a ==')).single,
@@ -633,7 +726,7 @@ stages:
               commitFrom: first
           - kind: git.checkout
             with:
-              commitFrom: ${{ inputs.job }}
+              commitFrom: ${{ ref }}
 ''');
 
       expect(problems, [
@@ -680,6 +773,186 @@ stages:
 ''');
 
       expect(problems.length, 3);
+    });
+  });
+
+  group('the paths an expression reads (UX-02)', () {
+    String job(String condition, {String inputs = ''}) =>
+        'schema: 1\n$inputs'
+        'stages:\n  - name: a\n    jobs:\n      j:\n'
+        '        matrix: {platform: [android], flavor: [dev]}\n'
+        '        if: "$condition"\n'
+        '        steps: [{kind: guard}]\n';
+
+    const ids = 'inputs:\n  firebaseAppIds: {type: json}\n  notes:\n';
+
+    test('name an input the workflow declares', () {
+      expect(
+        issues(job('inputs.firebaseAppId != null', inputs: ids)).single,
+        '10:13 The workflow has no input "firebaseAppId". Did you mean '
+        '"inputs.firebaseAppIds"?',
+      );
+      expect(
+        issues(job('inputs.groups', inputs: ids)).single,
+        '10:13 The workflow has no input "groups". Allowed: '
+        'inputs.firebaseAppIds, inputs.notes.',
+      );
+      expect(
+        issues(job('inputs.notes')).single,
+        '7:13 The workflow has no input "notes". Declare it under "inputs".',
+      );
+      expect(
+        issues(
+          job(
+            'inputs.firebaseAppIds[flavor.name][platform] || inputs.notes',
+            inputs: ids,
+          ),
+        ),
+        isEmpty,
+      );
+    });
+
+    test('name a field of flavor, app and project', () {
+      expect(
+        issues(job('flavor.prd')).single,
+        '7:13 "flavor" has no "prd". Did you mean "flavor.prod"?',
+      );
+      expect(
+        issues(job('flavor.credentials.play_sx')).single,
+        '7:13 "flavor.credentials" has no "play_sx". Did you mean '
+        '"flavor.credentials.play_sa"?',
+      );
+      expect(
+        issues(job('flavor.firebaseAppId.web')).single,
+        '7:13 "flavor.firebaseAppId" has no "web". It has: '
+        'flavor.firebaseAppId.android, flavor.firebaseAppId.ios.',
+      );
+      const fullName =
+          '7:13 "project" has no "fullname". Did you mean "project.fullName"?';
+      expect(issues(job('app.hasIOS && project.fullname')), [
+        '7:13 "app" has no "hasIOS". Did you mean "app.hasIos"?',
+        fullName,
+      ]);
+      expect(
+        issues(
+          job(
+            'flavor.credentials.play_sa && flavor.firebaseAppId.ios && '
+            "app.name == 'a' && project.baseBranch",
+          ),
+        ),
+        isEmpty,
+      );
+    });
+
+    test('read no field of a string, a number or a list', () {
+      expect(issues(job('platform.name || build.next || platforms.first')), [
+        '7:13 "platform" is a string; it has no "name".',
+        '7:13 "build" is a number; it has no "next".',
+        '7:13 "platforms" is a list; it has no "first".',
+      ]);
+      expect(issues(job('platforms[0] == platform')), isEmpty);
+    });
+  });
+
+  group('the with of a step, by its keys (UX-02)', () {
+    const typed = WorkflowParser(
+      MapStepCatalog(
+        {
+          'build.ios': {'exportOptionsPlist', 'obfuscate', 'dartDefineFile'},
+          'upload.play': {'status', 'releaseNotes'},
+          'guard': {'checks'},
+        },
+        typed: {
+          'build.ios': [
+            StepKey.needed('exportOptionsPlist'),
+            StepKey('obfuscate', value: StepValue.flag),
+          ],
+          'upload.play': [
+            StepKey.choice('status', ['completed', 'draft']),
+            StepKey('releaseNotes', value: StepValue.textMap),
+          ],
+          'guard': [
+            StepKey.choice('checks', ['source'], value: StepValue.texts),
+          ],
+        },
+      ),
+    );
+
+    List<String> typedIssues(String steps) => [
+      for (final issue
+          in typed
+              .parse(
+                'schema: 1\nstages:\n  - name: a\n    jobs:\n      j:\n'
+                '        steps:\n$steps',
+              )
+              .issues)
+        '${issue.line}:${issue.column} ${issue.message}',
+    ];
+
+    test('give the keys a step type needs', () {
+      expect(typedIssues('          - kind: build.ios\n'), [
+        '7:13 "build.ios" needs "exportOptionsPlist" under "with".',
+      ]);
+      expect(
+        typedIssues(
+          '          - kind: build.ios\n'
+          '            with: {obfuscate: true}\n',
+        ),
+        ['8:19 "build.ios" needs "exportOptionsPlist" under "with".'],
+      );
+      expect(
+        typedIssues(
+          '          - kind: build.ios\n'
+          r'            with: {exportOptionsPlist: "${{ inputs }}"}'
+          '\n',
+        ),
+        isEmpty,
+      );
+    });
+
+    test('give each key a value of its shape', () {
+      expect(
+        typedIssues(
+          '          - kind: build.ios\n'
+          '            with: {exportOptionsPlist: 3, obfuscate: "yes"}\n',
+        ),
+        [
+          '8:40 "exportOptionsPlist" must be a string.',
+          '8:54 "obfuscate" must be true or false.',
+        ],
+      );
+      expect(
+        typedIssues(
+          '          - kind: upload.play\n'
+          '            with: {status: live, releaseNotes: [a]}\n',
+        ),
+        [
+          '8:28 "status" takes completed, draft.',
+          '8:48 "releaseNotes" must be a mapping of strings.',
+        ],
+      );
+      expect(
+        typedIssues(
+          '          - kind: guard\n'
+          '            with: {checks: [source, nope]}\n',
+        ),
+        ['8:28 "checks" takes source.'],
+      );
+    });
+
+    test('the step types of the engine need what their steps need', () {
+      final result = WorkflowParser(StepPlanners(StepRegistry(const []))).parse(
+        'schema: 1\nstages:\n  - name: a\n    jobs:\n      ios:\n'
+        '        steps:\n          - kind: build.ios\n',
+      );
+
+      expect(result.issues, const [
+        WorkflowIssue(
+          line: 7,
+          column: 13,
+          message: '"build.ios" needs "exportOptionsPlist" under "with".',
+        ),
+      ]);
     });
   });
 }

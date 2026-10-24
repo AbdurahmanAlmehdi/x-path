@@ -19,6 +19,8 @@ class FlavorEdit extends Equatable {
     this.iosBundleId,
     this.androidAppId,
     this.versionFiles,
+    this.firebaseAppId,
+    this.appleAppId,
   });
 
   /// Reads a flavor edit from its JSON form.
@@ -46,7 +48,15 @@ class FlavorEdit extends Equatable {
   /// The files a version bump writes.
   final List<String>? versionFiles;
 
-  /// This edit with [newer] on top: where [newer] sets a field it wins.
+  /// The Firebase app id by platform (`android`, `ios`). An empty id removes
+  /// the one the flavor had.
+  final Map<String, String>? firebaseAppId;
+
+  /// The App Store Connect app id. Empty removes it.
+  final String? appleAppId;
+
+  /// This edit with [newer] on top: where [newer] sets a field it wins, and
+  /// the Firebase app ids of the platforms it names.
   FlavorEdit merge(FlavorEdit newer) => FlavorEdit(
     name: name,
     prod: newer.prod ?? prod,
@@ -55,6 +65,10 @@ class FlavorEdit extends Equatable {
     iosBundleId: newer.iosBundleId ?? iosBundleId,
     androidAppId: newer.androidAppId ?? androidAppId,
     versionFiles: newer.versionFiles ?? versionFiles,
+    firebaseAppId: firebaseAppId == null && newer.firebaseAppId == null
+        ? null
+        : {...?firebaseAppId, ...?newer.firebaseAppId},
+    appleAppId: newer.appleAppId ?? appleAppId,
   );
 
   /// The JSON form.
@@ -69,6 +83,8 @@ class FlavorEdit extends Equatable {
     iosBundleId,
     androidAppId,
     versionFiles,
+    firebaseAppId,
+    appleAppId,
   ];
 }
 

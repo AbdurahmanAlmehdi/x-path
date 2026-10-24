@@ -426,6 +426,7 @@ void main() {
       expect(updated.profile.apps.single.storeCountry, 'ly');
       expect(updated.profile.apps.single.flavors.single.prod, isTrue);
       expect(await service.get(project.id), updated);
+      expect((await eventsSoFar()).last, ProjectEdited(projectId: project.id));
     });
 
     test('merges successive edits', () async {

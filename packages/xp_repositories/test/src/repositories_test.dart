@@ -236,11 +236,12 @@ void main() {
         events: const [
           ProjectAdded(projectId: 'prj_2', fullName: 'a/b'),
           ProjectScanned(projectId: 'prj_1', errors: 0, warnings: 1),
+          ProjectEdited(projectId: 'prj_1'),
           ProjectRemoved(projectId: 'prj_2'),
           RunnerPaired(runnerId: 'r', name: 'r'),
         ],
       );
-      expect(loads, 4);
+      expect(loads, 5);
       final cached = await repository.watchProjects().first;
       expect(cached, const Snapshot([project], cached: true));
     });
@@ -275,6 +276,9 @@ void main() {
           .thenAnswer((_) async => project);
       when(() => client.scanProject('prj_1')).thenAnswer((_) async => project);
       when(() => client.removeProject('prj_1')).thenAnswer((_) async {});
+      const edits = ProfileEdits(defaultBaseBranch: 'dev');
+      when(() => client.updateProject('prj_1', edits))
+          .thenAnswer((_) async => project);
       when(
         () => client.assignCredential(
           'prj_1',
@@ -299,6 +303,7 @@ void main() {
       expect(await repository.getProject('prj_1'), project);
       expect(await repository.addProject('/src/app'), project);
       expect(await repository.scanProject('prj_1'), project);
+      expect(await repository.editProject('prj_1', edits), project);
       await repository.removeProject('prj_1');
       expect(
         await repository.assignCredential(
@@ -608,6 +613,62 @@ void main() {
       expect(await repository.followLogs('job_1', after: 5).toList(), frames);
       expect(await repository.listArtifacts('job_1'), artifacts);
     });
+
+    test('watches the runs of a project through its runs and jobs', () async {
+      final page = RunsResponse([_run]);
+      when(
+        () => harness.client.listRuns(
+          projectId: 'prj_1',
+          state: RunState.failed,
+          limit: 5,
+        ),
+      ).thenAnswer((_) async => page);
+      final loads = await _loadsFor(
+        harness: harness,
+        stream: repository.watchRuns('prj_1', state: RunState.failed, limit: 5),
+        events: const [
+          RunDispatched(
+            runId: 'run_2',
+            projectId: 'prj_1',
+            workflowId: 'wf_1',
+            jobIds: ['job_3'],
+          ),
+          JobStateChanged(
+            jobId: 'job_3',
+            projectId: 'prj_1',
+            state: JobState.running,
+          ),
+          JobStateChanged(
+            jobId: 'job_9',
+            projectId: 'prj_9',
+            state: JobState.running,
+          ),
+        ],
+      );
+      expect(loads, 3);
+      expect(
+        await repository
+            .watchRuns('prj_1', state: RunState.failed, limit: 5)
+            .first,
+        Snapshot(page, cached: true),
+      );
+    });
+
+    test('runs a run again, its failed jobs, and downloads', () async {
+      final client = harness.client;
+      final download = ArtifactDownload(
+        content: Stream.value([1, 2]),
+        sha256: null,
+      );
+      when(() => client.runAgain('run_1')).thenAnswer((_) async => _run);
+      when(() => client.rerunFailed('run_1')).thenAnswer((_) async => _run);
+      when(() => client.downloadArtifact('art_1'))
+          .thenAnswer((_) async => download);
+
+      expect(await repository.runAgain('run_1'), _run);
+      expect(await repository.rerunFailed('run_1'), _run);
+      expect(await repository.downloadArtifact('art_1'), download);
+    });
   });
 
   group('WorkflowsRepository', () {
@@ -634,6 +695,19 @@ void main() {
     );
 
     setUp(() => repository = WorkflowsRepository(harness.session));
+
+    test('remembers the last workflow and its inputs in the cache', () async {
+      expect(await repository.lastInputs('prj_1', 'wf_1'), isEmpty);
+      expect(await repository.lastWorkflow('prj_1'), isNull);
+
+      await repository.rememberDispatch('prj_1', 'wf_1', {'notes': 'Hi'});
+
+      expect(await repository.lastWorkflow('prj_1'), 'wf_1');
+      expect(await repository.lastInputs('prj_1', 'wf_1'), {'notes': 'Hi'});
+      expect(await repository.lastInputs('prj_1', 'wf_2'), isEmpty);
+      await harness.cache.write('dispatch-inputs.prj_1.wf_3', 'not a map');
+      expect(await repository.lastInputs('prj_1', 'wf_3'), isEmpty);
+    });
 
     test('lists and reads workflows', () async {
       final client = harness.client;
@@ -693,6 +767,55 @@ void main() {
       );
     });
 
+    test('copies, updates and deletes workflows', () async {
+      final client = harness.client;
+      const basedOn = WorkflowBasedOn(builtin: 'dev-build', version: 2);
+      const archive = UpdateWorkflowRequest(archived: true);
+      when(
+        () => client.createWorkflow(
+          'prj_1',
+          const CreateWorkflowRequest(
+            name: 'mine',
+            yaml: 'y',
+            basedOn: basedOn,
+          ),
+        ),
+      ).thenAnswer((_) async => workflow(version1));
+      when(() => client.updateWorkflow('prj_1', 'wf_1', archive))
+          .thenAnswer((_) async => workflow(version2));
+      when(() => client.deleteWorkflow('prj_1', 'wf_1'))
+          .thenAnswer((_) async {});
+
+      expect(
+        await repository.createWorkflow(
+          'prj_1',
+          name: 'mine',
+          yaml: 'y',
+          basedOn: basedOn,
+        ),
+        workflow(version1),
+      );
+      expect(
+        await repository.updateWorkflow('prj_1', 'wf_1', archive),
+        workflow(version2),
+      );
+      await repository.deleteWorkflow('prj_1', 'wf_1');
+      verify(() => client.deleteWorkflow('prj_1', 'wf_1')).called(1);
+    });
+
+    test('reads the templates of new workflows', () async {
+      const template = WorkflowTemplate(
+        id: 'blank',
+        title: 'Blank',
+        description: 'One job.',
+        yaml: 'schema: 1\n',
+      );
+      when(harness.client.listWorkflowTemplates)
+          .thenAnswer((_) async => [template]);
+
+      expect(await repository.templates(), [template]);
+    });
+
     test('reads the version of the workflow a run runs', () async {
       final client = harness.client;
       when(() => client.getWorkflow('prj_1', 'wf_1'))
@@ -715,25 +838,16 @@ void main() {
       expect(await repository.workflowOf(runOf('wfv_9')), workflow(version2));
     });
 
-    test('previews and dispatches a run', () async {
+    test('plans and dispatches a run', () async {
       final client = harness.client;
       const request = DispatchRequest(flavors: ['dev']);
-      when(client.listRunners).thenAnswer((_) async => [_runner]);
-      when(() => client.getGates('prj_1'))
-          .thenAnswer((_) async => const ProjectGates({}));
-      when(() => client.listCredentials('prj_1'))
-          .thenAnswer((_) async => [_credential]);
+      const plan = DispatchPlan(flavors: ['dev'], platforms: ['android']);
+      when(() => client.planDispatch('prj_1', 'wf_1', request))
+          .thenAnswer((_) async => plan);
       when(() => client.dispatchWorkflow('prj_1', 'wf_1', request))
           .thenAnswer((_) async => _run);
-      final preview = await repository.preview(
-        project: project,
-        workflow: workflow(version2),
-        request: request,
-      );
-      expect(
-        preview,
-        const DispatchPreview(flavors: [], platforms: [], stages: []),
-      );
+
+      expect(await repository.plan('prj_1', 'wf_1', request), plan);
       expect(await repository.dispatch('prj_1', 'wf_1', request), _run);
     });
   });

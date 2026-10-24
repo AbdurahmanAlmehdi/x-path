@@ -51,6 +51,32 @@ void main() {
     expect(await repository.get('wf_x'), isNull);
   });
 
+  test('keeps what a copy is based on, and renames and archives', () async {
+    const copy = WorkflowRecord(
+      id: 'wf_1',
+      projectId: 'prj_1',
+      name: 'mine',
+      builtin: false,
+      basedOnBuiltin: 'dev-build',
+      basedOnVersion: 2,
+    );
+    await repository.create(copy, _version('wf_1', 1));
+    expect(await repository.get('wf_1'), copy);
+
+    final archived = copy.copyWith(
+      name: 'nightly',
+      basedOnVersion: 3,
+      archivedAt: () => _at,
+    );
+    await repository.update(archived);
+    expect(await repository.get('wf_1'), archived);
+    expect(await repository.findByName('prj_1', 'nightly'), archived);
+    expect((await repository.list('prj_1')).single.archivedAt, _at);
+
+    await repository.update(archived.copyWith(archivedAt: () => null));
+    expect((await repository.get('wf_1'))!.archivedAt, isNull);
+  });
+
   test('keeps the time of a version to the microsecond, in UTC', () async {
     await repository.create(_workflow('wf_1', 'a'), _version('wf_1', 1));
 
