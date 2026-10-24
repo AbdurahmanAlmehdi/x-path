@@ -26,7 +26,7 @@ const ascAppPasswordVariable = 'XPATH_ASC_APP_PASSWORD';
 /// the parts App Store Connect asks for are sent, then the upload is polled
 /// every [pollInterval] until App Store Connect accepts or refuses it, for at
 /// most [processingTimeout]. Its errors are reported the way altool's are
-/// (`AltoolOutput`), its warnings are kept in the result.
+/// (`AltoolOutput`).
 ///
 /// With an Apple ID and an app-specific password it runs `xcrun altool
 /// --upload-package` on macOS: the REST API takes API keys only. altool can
@@ -228,10 +228,8 @@ class UploadAppStoreStep
     final (:key, :problem) = await _usableKey(keySecret);
     if (key == null) return StepFailed(problem!);
     final client = connect(key);
-    final kept =
-        'The IPA is still ${input.artifactName} in the artifact store.';
     try {
-      var upload = await client.uploadBuild(
+      final upload = await client.uploadBuild(
         input.appleAppId,
         version: '${input.version.name}',
         buildNumber: input.build,
@@ -239,53 +237,63 @@ class UploadAppStoreStep
         length: ipa.size,
         content: () => store.read(ipa.path),
       );
-      final maxPolls =
-          processingTimeout.inMilliseconds ~/ pollInterval.inMilliseconds;
-      for (var polls = 0; !upload.state.isFinal; polls++) {
-        if (context.isStopping) {
-          return const StepFailed(
-            'The upload to App Store Connect was cancelled.',
-          );
-        }
-        if (polls >= maxPolls) {
-          return StepFailed(
-            'App Store Connect did not accept or refuse the upload '
-            '(${upload.id}) of build ${input.build} in '
-            '${_span(processingTimeout)}. Resume the step later: '
-            'it finds the build if App Store Connect made it. $kept',
-          );
-        }
-        await sleep(pollInterval);
-        upload = await client.buildUpload(upload.id);
-      }
-      if (upload.state == AscBuildUploadState.failed) {
-        final output = AltoolOutput.ofUploadIssues(upload.errors);
-        final what = output.rejected ? ': ${output.describe()}' : '.';
-        final hint = output.hint;
-        return StepFailed(
-          'App Store Connect rejected the build$what'
-          '${hint == null ? '' : ' $hint'} $kept',
-        );
-      }
-      return StepSucceeded(
-        UploadAppStoreResult(
-          confirmed: true,
-          buildId: upload.buildId,
-          warnings: [for (final warning in upload.warnings) '$warning'],
-        ),
-      );
+      return await _awaitVerdict(client, upload, input, context);
     } on AppStoreConnectException catch (error) {
       final hint =
-          AltoolOutput.ofUploadIssues([
-            AscUploadIssue(code: error.code ?? '', description: error.message),
-          ]).hint ??
-          error.fix;
+          AltoolOutput.ofUploadErrors([error.message]).hint ?? error.fix;
       return StepFailed(
         'App Store Connect refused the upload: ${error.message}'
-        '${hint == null ? '' : ' $hint'} $kept',
+        '${hint == null ? '' : ' $hint'} ${_kept(input)}',
       );
     }
   }
+
+  /// Polls [started] until App Store Connect accepts or refuses it, for at
+  /// most [processingTimeout].
+  Future<StepOutcome<UploadAppStoreResult>> _awaitVerdict(
+    AppStoreConnect client,
+    AscBuildUpload started,
+    UploadAppStoreInput input,
+    StepContext context,
+  ) async {
+    var upload = started;
+    final maxPolls =
+        processingTimeout.inMilliseconds ~/ pollInterval.inMilliseconds;
+    for (var polls = 0; !upload.state.isFinal; polls++) {
+      if (context.isStopping) {
+        return const StepFailed(
+          'The upload to App Store Connect was cancelled.',
+        );
+      }
+      if (polls >= maxPolls) {
+        return StepFailed(
+          'App Store Connect did not accept or refuse the upload '
+          '(${upload.id}) of build ${input.build} in '
+          '${processingTimeout.inMinutes} minutes. Resume the step later: it '
+          'finds the build if App Store Connect made it. ${_kept(input)}',
+        );
+      }
+      await sleep(pollInterval);
+      upload = await client.buildUpload(upload.id);
+    }
+    if (upload.state == AscBuildUploadState.failed) {
+      final output = AltoolOutput.ofUploadErrors([
+        for (final error in upload.errors) '$error',
+      ]);
+      final what = output.rejected ? ': ${output.describe()}' : '.';
+      final hint = output.hint;
+      return StepFailed(
+        'App Store Connect rejected the build$what'
+        '${hint == null ? '' : ' $hint'} ${_kept(input)}',
+      );
+    }
+    return StepSucceeded(
+      UploadAppStoreResult(confirmed: true, buildId: upload.buildId),
+    );
+  }
+
+  static String _kept(UploadAppStoreInput input) =>
+      'The IPA is still ${input.artifactName} in the artifact store.';
 
   Future<StepOutcome<UploadAppStoreResult>> _uploadWithAltool(
     UploadAppStoreInput input,
@@ -327,10 +335,6 @@ class UploadAppStoreStep
       ),
     );
   }
-
-  static String _span(Duration duration) => duration.inMinutes > 0
-      ? '${duration.inMinutes} minutes'
-      : '${duration.inSeconds} seconds';
 
   List<String> _uploadArguments(UploadAppStoreInput input, String path) => [
     '--upload-package',

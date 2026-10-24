@@ -153,12 +153,12 @@ void main() {
   });
 
   group('the errors of a build upload', () {
-    test('are lines of code and description with the codes found', () {
-      final output = AltoolOutput.ofUploadIssues(const [
-        AscUploadIssue(code: '90189', description: 'Redundant binary.'),
-        AscUploadIssue(code: 'STATE_ERROR', description: 'ITMS-90186: Closed.'),
-        AscUploadIssue(code: 'ENTITY_ERROR', description: 'Higher (90062).'),
-        AscUploadIssue(code: 'ITMS-90189', description: 'Again.'),
+    test('are its lines, with the codes found in them', () {
+      final output = AltoolOutput.ofUploadErrors(const [
+        '90189: Redundant binary.',
+        'STATE_ERROR: ITMS-90186: Closed.',
+        'ENTITY_ERROR: Higher (90062).',
+        'ITMS-90189: Again.',
       ]);
 
       expect(output.errors, [
@@ -173,9 +173,7 @@ void main() {
     });
 
     test('without a code have no cure', () {
-      final output = AltoolOutput.ofUploadIssues(const [
-        AscUploadIssue(code: 'UNKNOWN', description: 'Odd.'),
-      ]);
+      final output = AltoolOutput.ofUploadErrors(const ['UNKNOWN: Odd.']);
 
       expect(output.codes, isEmpty);
       expect(output.hint, isNull);

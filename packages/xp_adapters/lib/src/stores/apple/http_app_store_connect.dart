@@ -680,7 +680,6 @@ class HttpAppStoreConnect implements AppStoreConnect {
       id: _string(resource, 'id'),
       state: AscBuildUploadState.fromWire(_optional(state, 'state')),
       errors: issues('errors'),
-      warnings: issues('warnings'),
       buildId: _optional(_object(build['data']), 'id'),
     );
   }

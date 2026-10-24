@@ -99,8 +99,8 @@ void main() {
   group('AscBuildUploadState', () {
     test('reads the values of the API and knows the final ones', () {
       expect(
-        AscBuildUploadState.fromWire('AWAITING_UPLOAD'),
-        AscBuildUploadState.awaitingUpload,
+        AscBuildUploadState.fromWire('PROCESSING'),
+        AscBuildUploadState.processing,
       );
       expect(
         AscBuildUploadState.fromWire('COMPLETE'),
@@ -116,9 +116,9 @@ void main() {
     });
 
     test('maps anything else to unknown', () {
-      expect(AscBuildUploadState.fromWire('NEW'), AscBuildUploadState.unknown);
-      expect(AscBuildUploadState.fromWire(null), AscBuildUploadState.unknown);
-      expect(AscBuildUploadState.fromWire(''), AscBuildUploadState.unknown);
+      for (final wire in ['AWAITING_UPLOAD', null, '']) {
+        expect(AscBuildUploadState.fromWire(wire), AscBuildUploadState.unknown);
+      }
     });
   });
 

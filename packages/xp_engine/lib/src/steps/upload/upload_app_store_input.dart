@@ -163,7 +163,6 @@ class UploadAppStoreResult extends Equatable {
     this.deliveryId,
     this.buildId,
     this.processingState,
-    this.warnings = const [],
   });
 
   /// Whether App Store Connect had the build before this run, so nothing was
@@ -185,10 +184,6 @@ class UploadAppStoreResult extends Equatable {
   /// the build.
   final String? processingState;
 
-  /// What App Store Connect warned about when it accepted an upload through
-  /// the API, as `code: description`.
-  final List<String> warnings;
-
   /// The stored form.
   Map<String, dynamic> toJson() => {
     'alreadyUploaded': alreadyUploaded,
@@ -196,7 +191,6 @@ class UploadAppStoreResult extends Equatable {
     'deliveryId': ?deliveryId,
     'buildId': ?buildId,
     'processingState': ?processingState,
-    if (warnings.isNotEmpty) 'warnings': warnings,
   };
 
   @override
@@ -206,6 +200,5 @@ class UploadAppStoreResult extends Equatable {
     deliveryId,
     buildId,
     processingState,
-    warnings,
   ];
 }

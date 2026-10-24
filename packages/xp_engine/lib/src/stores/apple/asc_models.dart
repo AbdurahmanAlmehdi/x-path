@@ -41,10 +41,8 @@ enum AscProcessingState {
   final String wire;
 
   /// The state called [wire]; [unknown] for any other.
-  static AscProcessingState fromWire(String? wire) => values.firstWhere(
-    (state) => state.wire == wire && state != unknown,
-    orElse: () => unknown,
-  );
+  static AscProcessingState fromWire(String? wire) =>
+      values.firstWhere((state) => state.wire == wire, orElse: () => unknown);
 }
 
 /// A build App Store Connect has received.
@@ -93,9 +91,6 @@ class AscBuild extends Equatable {
 
 /// Where App Store Connect is with a build upload (`buildUploads`).
 enum AscBuildUploadState {
-  /// The file was not sent yet.
-  awaitingUpload('AWAITING_UPLOAD'),
-
   /// The file arrived; App Store Connect is checking it.
   processing('PROCESSING'),
 
@@ -105,7 +100,8 @@ enum AscBuildUploadState {
   /// App Store Connect refused the file; the errors say why.
   failed('FAILED'),
 
-  /// A state this version of XPath does not know.
+  /// A state this version of XPath does not know, such as
+  /// `AWAITING_UPLOAD`.
   unknown('');
 
   new(this.wire);
@@ -117,13 +113,11 @@ enum AscBuildUploadState {
   bool get isFinal => this == complete || this == failed;
 
   /// The state called [wire]; [unknown] for any other.
-  static AscBuildUploadState fromWire(String? wire) => values.firstWhere(
-    (state) => state.wire == wire && state != unknown,
-    orElse: () => unknown,
-  );
+  static AscBuildUploadState fromWire(String? wire) =>
+      values.firstWhere((state) => state.wire == wire, orElse: () => unknown);
 }
 
-/// An error or warning App Store Connect reports about a build upload.
+/// An error App Store Connect reports about a build upload.
 class AscUploadIssue extends Equatable {
   /// Creates an issue.
   const new({required this.code, required this.description});
@@ -148,7 +142,6 @@ class AscBuildUpload extends Equatable {
     required this.id,
     required this.state,
     this.errors = const [],
-    this.warnings = const [],
     this.buildId,
   });
 
@@ -161,14 +154,11 @@ class AscBuildUpload extends Equatable {
   /// Why App Store Connect refused it, when it did.
   final List<AscUploadIssue> errors;
 
-  /// What App Store Connect warns about; the upload goes through.
-  final List<AscUploadIssue> warnings;
-
   /// The build it became, once App Store Connect made one.
   final String? buildId;
 
   @override
-  List<Object?> get props => [id, state, errors, warnings, buildId];
+  List<Object?> get props => [id, state, errors, buildId];
 }
 
 /// The state of an App Store version (`appVersionState`).

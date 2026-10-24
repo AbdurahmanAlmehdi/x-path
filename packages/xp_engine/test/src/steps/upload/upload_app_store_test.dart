@@ -50,10 +50,7 @@ void main() {
   late AscKey? keyConnectedWith;
   late List<Duration> sleeps;
 
-  UploadAppStoreStep step({
-    bool isMacOS = true,
-    Duration processingTimeout = const Duration(minutes: 2),
-  }) => UploadAppStoreStep(
+  UploadAppStoreStep step({bool isMacOS = true}) => UploadAppStoreStep(
     repository: repository,
     store: store,
     secrets: secrets,
@@ -62,7 +59,8 @@ void main() {
       return connect;
     },
     isMacOS: isMacOS,
-    processingTimeout: processingTimeout,
+    pollInterval: const Duration(seconds: 10),
+    processingTimeout: const Duration(minutes: 2),
     sleep: (duration) async => sleeps.add(duration),
   );
 
@@ -142,12 +140,6 @@ void main() {
           id: 'upload-1',
           state: AscBuildUploadState.complete,
           buildId: 'build-9',
-          warnings: [
-            AscUploadIssue(
-              code: '90683',
-              description: 'A purpose string is missing.',
-            ),
-          ],
         ),
       ]);
 
@@ -160,18 +152,11 @@ void main() {
         'buildUpload upload-1',
         'buildUpload upload-1',
       ]);
-      expect(sleeps, const [Duration(seconds: 15), Duration(seconds: 15)]);
+      expect(sleeps, const [Duration(seconds: 10), Duration(seconds: 10)]);
       expect(
         (outcome as StepSucceeded<UploadAppStoreResult>).result,
-        const UploadAppStoreResult(
-          confirmed: true,
-          buildId: 'build-9',
-          warnings: ['90683: A purpose string is missing.'],
-        ),
+        const UploadAppStoreResult(confirmed: true, buildId: 'build-9'),
       );
-      expect(outcome.result.toJson()['warnings'], [
-        '90683: A purpose string is missing.',
-      ]);
     });
 
     test('reports a rejected build the way altool does', () async {
@@ -239,22 +224,7 @@ void main() {
         ),
       );
       expect(message, contains('Resume the step later'));
-      expect(sleeps, hasLength(8));
-    });
-
-    test('says a short wait in seconds', () async {
-      connect.uploadAnswers.add(
-        const AscBuildUpload(
-          id: 'upload-1',
-          state: AscBuildUploadState.processing,
-        ),
-      );
-
-      final outcome = await step(processingTimeout: const Duration(seconds: 30))
-          .run(_input(), StreamingContext.single(const []));
-
-      expect((outcome as StepFailed).message, contains('in 30 seconds.'));
-      expect(sleeps, hasLength(2));
+      expect(sleeps, List.filled(12, const Duration(seconds: 10)));
     });
 
     test('stops polling when the job is cancelled', () async {

@@ -455,33 +455,22 @@ void main() {
       expect(done.errors, isEmpty);
     });
 
-    test('carry the errors of a rejection and the warnings', () async {
+    test('carry the errors of a rejection', () async {
       server
         ..uploadPollsBeforeDone = 1
-        ..uploadOutcomes.addAll(const [
-          FakeAscUploadOutcome.rejected([
+        ..uploadOutcomes.add(
+          const FakeAscUploadOutcome.rejected([
             FakeAscIssue('90186', 'The train is closed.'),
           ]),
-          FakeAscUploadOutcome.complete(
-            warnings: [FakeAscIssue('90683', 'A purpose string is missing.')],
-          ),
-        ]);
+        );
 
       final rejected = await upload();
-      final warned = await upload();
 
       expect(rejected.state, AscBuildUploadState.failed);
       expect(rejected.errors, const [
         AscUploadIssue(code: '90186', description: 'The train is closed.'),
       ]);
       expect(rejected.buildId, isNull);
-      expect(warned.state, AscBuildUploadState.complete);
-      expect(warned.warnings, const [
-        AscUploadIssue(
-          code: '90683',
-          description: 'A purpose string is missing.',
-        ),
-      ]);
     });
 
     test('of a used build number are a conflict with its code', () async {

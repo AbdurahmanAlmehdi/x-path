@@ -1,5 +1,4 @@
 import 'package:equatable/equatable.dart';
-import 'package:xp_engine/src/stores/apple/asc_models.dart';
 
 /// The lines altool prints when Apple or altool refused something. altool can
 /// exit 0 after printing one (a closed version train, for example), so the
@@ -29,7 +28,7 @@ final _successMarkers = [
 ];
 
 final _itmsCode = RegExp(r'ITMS-(\d{5})');
-final _bareCode = RegExp(r'^(\d{5})$');
+final _leadingCode = RegExp(r'^(\d{5}):');
 final _parenthesizedCode = RegExp(r'\((\d{5})\)');
 final _deliveryId = RegExp(
   r'Delivery (?:UUID|ID):\s*([0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12})',
@@ -77,24 +76,22 @@ class AltoolOutput extends Equatable {
     );
   }
 
-  /// Reads the errors App Store Connect reported about a build upload through
-  /// the API, so that they are told and cured the way altool's are. Each
-  /// becomes the line `code: description`; a code may be `90189`,
-  /// `ITMS-90189` or in the description.
-  factory ofUploadIssues(Iterable<AscUploadIssue> issues) {
-    final errors = <String>[];
+  /// Reads the errors App Store Connect reported about a build upload, or
+  /// its refusal of one, so that they are told and cured the way altool's
+  /// are. A code may lead an error (`90189: ...`), be `ITMS-90189` or be in
+  /// parentheses.
+  factory ofUploadErrors(Iterable<String> errors) {
     final codes = <String>[];
-    for (final issue in issues) {
-      errors.add('$issue');
+    for (final error in errors) {
       for (final match in [
-        ..._bareCode.allMatches(issue.code),
-        ..._itmsCode.allMatches('$issue'),
-        ..._parenthesizedCode.allMatches(issue.description),
+        ..._leadingCode.allMatches(error),
+        ..._itmsCode.allMatches(error),
+        ..._parenthesizedCode.allMatches(error),
       ]) {
         if (!codes.contains(match[1])) codes.add(match[1]!);
       }
     }
-    return AltoolOutput(errors: errors, codes: codes);
+    return AltoolOutput(errors: [...errors], codes: codes);
   }
 
   /// The lines that report an error, in order.

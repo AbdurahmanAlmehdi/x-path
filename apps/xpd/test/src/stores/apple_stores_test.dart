@@ -162,17 +162,17 @@ void main() {
     expect(step.processingTimeout, const Duration(minutes: 30));
   });
 
-  test('wires a shorter wait for a build upload, polled every second', () {
+  test('wires a shorter wait for a build upload, polled as often', () {
     final step = apple.uploadStep(
       repository: InMemoryArtifactRepository(),
       store: _Store(),
       secrets: secrets,
       isMacOS: false,
-      processingTimeout: const Duration(seconds: 5),
+      uploadWait: const Duration(seconds: 6),
     );
 
-    expect(step.pollInterval, const Duration(seconds: 1));
-    expect(step.processingTimeout, const Duration(seconds: 5));
+    expect(step.pollInterval, const Duration(milliseconds: 50));
+    expect(step.processingTimeout, const Duration(seconds: 6));
   });
 }
 

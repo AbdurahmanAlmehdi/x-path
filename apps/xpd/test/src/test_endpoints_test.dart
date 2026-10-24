@@ -11,7 +11,7 @@ void main() {
     expect(endpoints.playUrl, isNull);
     expect(endpoints.fileSecrets, isFalse);
     expect(endpoints.leaseSeconds, isNull);
-    expect(endpoints.ascUploadSeconds, isNull);
+    expect(endpoints.ascUploadWait, isNull);
     expect(endpoints.isActive, isFalse);
     expect(endpoints.secretStoreSystem('macos'), 'macos');
   });
@@ -60,8 +60,8 @@ void main() {
     expect(
       TestEndpoints.fromEnvironment({
         TestEndpoints.ascUploadSecondsVariable: '5',
-      }).ascUploadSeconds,
-      5,
+      }).ascUploadWait,
+      const Duration(seconds: 5),
     );
   });
 
