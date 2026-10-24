@@ -3,30 +3,6 @@ import 'package:xp_engine/src/jobs/job_control.dart';
 import 'package:xp_engine/src/jobs/job_repository.dart';
 import 'package:xp_engine/src/scheduler/run_record.dart';
 
-/// A run cannot be found or changed.
-class RunException implements Exception {
-  /// Creates the exception with a [message] for the owner.
-  const new(this.message);
-
-  /// What is wrong.
-  final String message;
-
-  @override
-  String toString() => 'RunException: $message';
-}
-
-/// There is no such run.
-class RunNotFoundException extends RunException {
-  /// Creates the exception.
-  const new(this.id) : super('There is no run $id.');
-
-  /// The id that was asked for.
-  final String id;
-
-  @override
-  String toString() => 'RunNotFoundException: $message';
-}
-
 /// The run has ended, so it cannot be cancelled.
 class RunStateException extends RunException {
   /// Creates the exception.
@@ -40,15 +16,28 @@ class RunStateException extends RunException {
 class RunService {
   /// Creates the service. Jobs are cancelled through [_control], so that the
   /// scheduler hears about it.
-  new({required this._runs, required this._jobs, required this._control});
+  ///
+  /// A list in a state reads the runs [_statePage] at a time, at most
+  /// [_statePages] pages per call.
+  new({
+    required this._runs,
+    required this._jobs,
+    required this._control,
+    this._statePage = 100,
+    this._statePages = 10,
+  });
 
   final RunRepository _runs;
   final JobRepository _jobs;
   final JobControl _control;
+  final int _statePage;
+  final int _statePages;
 
   /// The runs, newest first: of [projectId], of [workflowId] and in [state]
   /// when given, dispatched before the run [before] when given, at most
-  /// [limit]; and the `before` of the next page when there may be one.
+  /// [limit]; and the `before` of the next page when there may be one. In a
+  /// [state], a page may come back short once enough runs were read: its
+  /// `next` goes on from the last run read.
   ///
   /// Throws a [RunNotFoundException] if there is no run [before].
   Future<RunsResponse> list({
@@ -63,10 +52,11 @@ class RunService {
     }
     final found = <Run>[];
     var cursor = before;
-    while (found.length < limit) {
+    String? next;
+    for (var pages = 1; found.length < limit; pages++) {
       // A state is known once a run's jobs are read, so with one the runs
       // are read a page at a time until enough of them are in it.
-      final asked = state == null ? limit - found.length : 100;
+      final asked = state == null ? limit - found.length : _statePage;
       final page = await _runs.list(
         projectId: projectId,
         workflowId: workflowId,
@@ -80,10 +70,14 @@ class RunService {
       }
       if (page.length < asked) break;
       cursor = page.last.id;
+      if (state != null && pages == _statePages) {
+        next = cursor;
+        break;
+      }
     }
     return RunsResponse(
       found,
-      next: found.length == limit ? found.last.id : null,
+      next: found.length == limit ? found.last.id : next,
     );
   }
 

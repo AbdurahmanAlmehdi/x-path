@@ -219,8 +219,11 @@ void main() {
         const [],
       );
       final router = Router();
-      RunsRoutes(RunService(runs: runs, jobs: jobs, control: _EndedJobs()))
-          .addTo(router);
+      RunsRoutes(
+        RunService(runs: runs, jobs: jobs, control: _EndedJobs()),
+        _Unused<ProjectService>(),
+        _Unused<WorkflowDispatcher>(),
+      ).addTo(router);
 
       final response = await router.call(
         Request('POST', Uri.parse('http://localhost/runs/run_1/cancel')),
@@ -242,4 +245,11 @@ class _EndedJobs implements JobControl {
 
   @override
   Future<Job> resume(String id, {int? fromStep}) => throw UnimplementedError();
+}
+
+/// A dependency the route under test never reaches.
+class _Unused<T> implements ProjectService, WorkflowDispatcher {
+  @override
+  Never noSuchMethod(Invocation invocation) =>
+      throw StateError('$T is not used here.');
 }

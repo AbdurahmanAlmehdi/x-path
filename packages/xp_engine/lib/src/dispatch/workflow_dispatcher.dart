@@ -20,7 +20,6 @@ import 'package:xp_engine/src/repositories/event_log.dart';
 import 'package:xp_engine/src/runners/remote_step_policy.dart';
 import 'package:xp_engine/src/scan/scan_source.dart';
 import 'package:xp_engine/src/scheduler/run_record.dart';
-import 'package:xp_engine/src/scheduler/run_service.dart';
 import 'package:xp_engine/src/scheduler/scheduler.dart';
 import 'package:xp_engine/src/steps/step.dart';
 import 'package:xp_engine/src/versioning/app_version.dart';

@@ -29,8 +29,7 @@ class WorkflowsRoutes {
       ..put('/projects/<id>/workflows/<workflowId>', _save)
       ..patch('/projects/<id>/workflows/<workflowId>', _update)
       ..delete('/projects/<id>/workflows/<workflowId>', _remove)
-      ..post('/projects/<id>/workflows/<workflowId>/dispatch', _dispatch)
-      ..post('/runs/<id>/run-again', _again);
+      ..post('/projects/<id>/workflows/<workflowId>/dispatch', _dispatch);
   }
 
   Response _schema(Request request) =>
@@ -103,16 +102,6 @@ class WorkflowsRoutes {
         );
         return jsonResponse(
           (await _workflows.update(id, workflowId, body)).toJson(),
-        );
-      });
-
-  Future<Response> _again(Request request, String id) =>
-      guardWorkflows(() async {
-        final run = await _dispatcher.again(id);
-        return jsonResponse(
-          run.toJson(),
-          statusCode: 202,
-          headers: {'location': '/runs/${run.id}'},
         );
       });
 

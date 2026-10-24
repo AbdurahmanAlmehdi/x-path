@@ -169,7 +169,7 @@ class WorkflowService {
         '"${basedOn.builtin}" is not a built-in workflow.',
       );
     }
-    _requireValid(yaml);
+    final definition = _requireValid(yaml);
     final workflow = WorkflowRecord(
       id: _id('wf'),
       projectId: projectId,
@@ -187,7 +187,7 @@ class WorkflowService {
     );
     await _repository.create(workflow, first);
     _saved(workflow, first);
-    return _detail(workflow, first, [first]);
+    return _detail(workflow, first, [first], definition: definition);
   }
 
   /// Saves [yaml] as the next version of the workflow [workflowId].
@@ -201,7 +201,7 @@ class WorkflowService {
   ) async {
     final workflow = await _require(projectId, workflowId);
     if (workflow.builtin) throw WorkflowBuiltinException(workflow.name);
-    _requireValid(yaml);
+    final definition = _requireValid(yaml);
     final next = await _repository.addVersion(
       workflowId: workflowId,
       versionId: _id('wfv'),
@@ -209,7 +209,12 @@ class WorkflowService {
       createdAt: _clock.now(),
     );
     _saved(workflow, next);
-    return _detail(workflow, next, await _repository.versions(workflowId));
+    return _detail(
+      workflow,
+      next,
+      await _repository.versions(workflowId),
+      definition: definition,
+    );
   }
 
   /// Renames, archives or unarchives the workflow [workflowId], or marks a
@@ -299,9 +304,15 @@ class WorkflowService {
     }
   }
 
-  void _requireValid(String yaml) {
+  /// [yaml] read as a workflow; throws a [WorkflowInvalidException] if it
+  /// has issues.
+  WorkflowDefinition _requireValid(String yaml) {
     final result = _parser.parse(yaml);
-    if (!result.isValid) throw WorkflowInvalidException(result.issues);
+    final definition = result.definition;
+    if (!result.isValid || definition == null) {
+      throw WorkflowInvalidException(result.issues);
+    }
+    return definition;
   }
 
   /// Makes the built-in workflows of the project, and gives a built-in a new
@@ -371,11 +382,14 @@ class WorkflowService {
     );
   }
 
+  /// [chosen] of [workflow] for a client; [definition] is [chosen] already
+  /// read, when the caller has it.
   Workflow _detail(
     WorkflowRecord workflow,
     WorkflowVersionRecord chosen,
-    List<WorkflowVersionRecord> versions,
-  ) => Workflow(
+    List<WorkflowVersionRecord> versions, {
+    WorkflowDefinition? definition,
+  }) => Workflow(
     id: workflow.id,
     projectId: workflow.projectId,
     name: workflow.name,
@@ -385,7 +399,7 @@ class WorkflowService {
     yaml: chosen.yaml,
     inputs: [
       for (final input
-          in _parser.parse(chosen.yaml).definition?.inputs ??
+          in (definition ?? _parser.parse(chosen.yaml).definition)?.inputs ??
               const <InputDefinition>[])
         input.toWire(),
     ],

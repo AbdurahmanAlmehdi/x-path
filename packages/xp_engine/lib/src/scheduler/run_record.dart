@@ -2,6 +2,30 @@ import 'package:equatable/equatable.dart';
 import 'package:xp_api/xp_api.dart';
 import 'package:xp_engine/src/jobs/job_record.dart';
 
+/// A run cannot be found or changed.
+class RunException implements Exception {
+  /// Creates the exception with a [message] for the owner.
+  const new(this.message);
+
+  /// What is wrong.
+  final String message;
+
+  @override
+  String toString() => 'RunException: $message';
+}
+
+/// There is no such run.
+class RunNotFoundException extends RunException {
+  /// Creates the exception.
+  const new(this.id) : super('There is no run $id.');
+
+  /// The id that was asked for.
+  final String id;
+
+  @override
+  String toString() => 'RunNotFoundException: $message';
+}
+
 /// What the engine stores about a run: one dispatch of a workflow.
 class RunRecord extends Equatable {
   /// Creates a record.

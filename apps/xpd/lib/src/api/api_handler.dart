@@ -74,7 +74,7 @@ Handler buildApiHandler({
   CredentialsRoutes(credentials).addTo(router);
   GitHubTokenRoutes(githubToken).addTo(router);
   WorkflowsRoutes(workflows, dispatcher).addTo(router);
-  RunsRoutes(runs, projects).addTo(router);
+  RunsRoutes(runs, projects, dispatcher).addTo(router);
   ApprovalsRoutes(approvals).addTo(router);
   ReleasesRoutes(releases, releaseNotes).addTo(router);
   StorageRoutes(housekeeping).addTo(router);

@@ -267,6 +267,30 @@ void main() {
       );
     });
 
+    test('reads a few pages for a state, then says where to go on', () async {
+      final short = RunService(
+        runs: runs,
+        jobs: harness.jobs,
+        control: harness.runner,
+        statePage: 1,
+        statePages: 2,
+      );
+      await job('prepare');
+
+      // run_4 and run_3 are read and are not queued; run_2 is not read.
+      final first = await short.list(state: RunState.queued);
+      expect(first.runs, isEmpty);
+      expect(first.next, 'run_3');
+
+      final second = await short.list(state: RunState.queued, before: 'run_3');
+      expect(second.runs.map((r) => r.id), ['run_1']);
+      expect(second.next, 'run_1', reason: 'two pages read; there may be more');
+
+      final last = await short.list(state: RunState.queued, before: 'run_1');
+      expect(last.runs, isEmpty);
+      expect(last.next, isNull);
+    });
+
     test('says when the run to page from is not there', () async {
       await expectLater(
         service.list(before: 'run_nope'),

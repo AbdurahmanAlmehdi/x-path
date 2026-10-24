@@ -3,17 +3,18 @@ import 'package:shelf_router/shelf_router.dart';
 import 'package:xp_api/xp_api.dart';
 import 'package:xp_engine/xp_engine.dart';
 import 'package:xpd/src/api/responses.dart';
+import 'package:xpd/src/api/workflows/workflows_routes.dart';
 
 /// The `/runs` endpoints: list the runs, of every project or one, look at
-/// a run, cancel it, and run its failed jobs again. Running a whole run again
-/// is a dispatch, in `WorkflowsRoutes`.
+/// a run, cancel it, run its failed jobs again or the whole run again.
 class RunsRoutes {
-  /// Creates the routes over [_runs]; [_projects], when given, tells a
-  /// project that is not there.
-  const new(this._runs, [this._projects]);
+  /// Creates the routes over [_runs]; [_projects] tells a project that is
+  /// not there, and [_dispatcher] dispatches a run again.
+  const new(this._runs, this._projects, this._dispatcher);
 
   final RunService _runs;
-  final ProjectService? _projects;
+  final ProjectService _projects;
+  final WorkflowDispatcher _dispatcher;
 
   /// Registers the routes on [router].
   void addTo(Router router) {
@@ -22,7 +23,8 @@ class RunsRoutes {
       ..get('/projects/<id>/runs', _listOfProject)
       ..get('/runs/<id>', _get)
       ..post('/runs/<id>/cancel', _cancel)
-      ..post('/runs/<id>/rerun-failed', _rerunFailed);
+      ..post('/runs/<id>/rerun-failed', _rerunFailed)
+      ..post('/runs/<id>/run-again', _again);
   }
 
   Future<Response> _list(Request request, {String? projectId}) =>
@@ -57,7 +59,7 @@ class RunsRoutes {
 
   Future<Response> _listOfProject(Request request, String id) async {
     try {
-      await _projects?.get(id);
+      await _projects.get(id);
     } on ProjectNotFoundException catch (error) {
       return errorResponse(ApiErrorCode.notFound, error.message);
     }
@@ -75,6 +77,18 @@ class RunsRoutes {
   Future<Response> _rerunFailed(Request request, String id) => _guard(() async {
     return jsonResponse((await _runs.rerunFailed(id)).toJson());
   });
+
+  /// A new run of the same workflow version: a dispatch, so it fails as a
+  /// dispatch does.
+  Future<Response> _again(Request request, String id) =>
+      guardWorkflows(() async {
+        final run = await _dispatcher.again(id);
+        return jsonResponse(
+          run.toJson(),
+          statusCode: 202,
+          headers: {'location': '/runs/${run.id}'},
+        );
+      });
 }
 
 Future<Response> _guard(Future<Response> Function() action) async {
