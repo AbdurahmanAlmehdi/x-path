@@ -200,7 +200,12 @@ void main() {
     final stored = (await repository.get('job_ios'))!;
     expect(stored.capabilities, ['flutter', 'ios-sign|ios-linux']);
     expect(stored.narrowing, ['the app uses the flavor prod']);
-    expect((await repository.get('job_1'))?.narrowing, isNull);
+  });
+
+  test('keeps no reason for a job that was not narrowed', () async {
+    await repository.create(_job('job_1'), const []);
+
+    expect((await repository.get('job_1'))!.narrowing, isEmpty);
   });
 
   test('keeps the times to the microsecond, in UTC', () async {

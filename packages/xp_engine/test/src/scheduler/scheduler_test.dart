@@ -603,6 +603,27 @@ void main() {
       );
     });
 
+    test('say why Linux was ruled out while a busy Mac is awaited', () async {
+      const flavor =
+          'the app uses the flavor prod, which Linux iOS builds do not '
+          'support yet (omarchy-apple-dev: flavors)';
+      final mac = spy('rnr_mac', Capability.iosSign);
+      final linux = spy('rnr_linux', Capability.iosLinux);
+      f.build([mac, linux]);
+      final ids = await f.run([
+        const _Spec('signing', needs: ['ios-sign']),
+        const _Spec('narrowed', needs: ['ios-sign'], narrowing: [flavor]),
+      ]);
+
+      await f.scheduler.pump();
+
+      expect(mac.launched, [ids['signing']]);
+      expect(linux.launched, isEmpty);
+      final message = await f.message(ids['narrowed']!);
+      expect(message, startsWith('Waiting for the ios-sign job that runs now'));
+      expect(message, endsWith('It needs ios-sign: $flavor.'));
+    });
+
     test('know whether any runner could ever take a job', () async {
       final mac = [
         const CapabilityNeed([Capability.iosSign]),

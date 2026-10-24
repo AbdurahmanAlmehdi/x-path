@@ -134,6 +134,8 @@ void main() {
     },
   );
 
+  // Two cases through the dispatcher: a flavor, and Shorebird iOS, whose
+  // step needs ios-sign itself. iosLinuxLimits' own tests have the others.
   for (final (name, app, steps, flavors, reason)
       in <(String, AppProfile, String, bool, String)>[
         (
@@ -157,61 +159,6 @@ void main() {
           false,
           'the job uses Shorebird iOS, which needs macOS (Shorebird iOS on '
               'Linux is not decided)',
-        ),
-        (
-          'a debug build',
-          _plain,
-          '''
-          - kind: command
-            with:
-              executable: flutter
-              arguments: [build, ios, --debug]
-''',
-          false,
-          'the job makes a debug build of the iOS app, and Linux iOS builds '
-              'are release builds only',
-        ),
-        (
-          'a profile build',
-          _plain,
-          '''
-          - kind: command
-            with:
-              executable: flutter
-              arguments: [build, ipa, --profile]
-''',
-          false,
-          'the job makes a profile build of the iOS app, and Linux iOS builds '
-              'are release builds only',
-        ),
-        (
-          'an app extension',
-          const AppProfile(
-            name: 'demo',
-            path: '.',
-            version: '1.2.3+45',
-            flutterVersion: '3.47.6',
-            hasIos: true,
-            iosAppExtensions: ['Widgets'],
-            flavors: [_main],
-          ),
-          '',
-          false,
-          'the app has the app extension Widgets, which Linux iOS builds do '
-              'not support yet (omarchy-apple-dev: app extensions)',
-        ),
-        (
-          'an iOS Simulator target',
-          _plain,
-          '''
-          - kind: command
-            with:
-              executable: xcrun
-              arguments: [simctl, list]
-''',
-          false,
-          'the job uses the iOS Simulator, which needs macOS (Linux workflows '
-              'test on an Android emulator)',
         ),
       ]) {
     group(name, () {
