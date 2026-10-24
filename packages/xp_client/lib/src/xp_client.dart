@@ -238,7 +238,7 @@ class XpClient {
 
   /// `POST /projects/{id}/workflows/{workflowId}/dispatch?dryRun=true`:
   /// what dispatching would start, planned by the engine; nothing starts and
-  /// no build number is taken (UX-01).
+  /// no build number is taken.
   Future<DispatchPlan> planDispatch(
     String projectId,
     String workflowId,

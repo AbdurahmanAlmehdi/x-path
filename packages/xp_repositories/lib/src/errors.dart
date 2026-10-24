@@ -11,7 +11,7 @@ const unexpectedErrorMessage =
     'happening, restart XPath.';
 
 /// What to tell the user about [error], thrown by a repository: the engine's
-/// own words for an error it answered, with what it says to do (UX-05), the
+/// own words for an error it answered, with what it says to do, the
 /// network's for one it did not, the file system's for a file it refused
 /// (with the path), and [unexpectedErrorMessage] for anything else.
 String errorMessage(Object error) => switch (error) {

@@ -138,7 +138,7 @@ class DispatchException extends WorkflowException {
   /// [details] a client can act on.
   const new(super.message, {this.hint, this.details});
 
-  /// What to do about it, for the owner; it names no command (UX-09).
+  /// What to do about it, for the owner; it names no command.
   final String? hint;
 
   /// Facts a client can act on, such as the `kind` of a missing credential.

@@ -154,7 +154,7 @@ class DispatchCommand extends XpCommand {
   }
 
   /// The value [text] gives the input [name], read as its declared [input]
-  /// type (UX-04): text stays text, a boolean is true or false, JSON is
+  /// type: text stays text, a boolean is true or false, JSON is
   /// decoded. An input without a type, or one the workflow does not declare
   /// (the engine refuses it), is JSON if it parses as JSON, else text.
   Object? _coerce(String name, WorkflowInput? input, String text) {
@@ -222,7 +222,7 @@ Object? _plain(Object? value) => switch (value) {
 };
 
 /// The lines `xp dispatch --dry-run` prints: what the engine would start,
-/// where, what it leaves out and why (UX-01).
+/// where, what it leaves out and why.
 String describePlan(DispatchPlan plan) {
   final version = plan.version;
   final lines = [

@@ -125,29 +125,29 @@ class XpPageHeader extends StatelessWidget {
 /// colour, no container. [XpMessage.error] tells why a command failed; the
 /// command's own button tries again.
 class XpMessage extends StatelessWidget {
-  const new(XpStatus this.status, this.text, {super.key});
+  /// A message in the colour and icon of [status].
+  new(XpStatus status, this.text, {super.key})
+    : pair = status.pair,
+      icon = status.icon;
 
-  /// A command that failed, in the negative pair.
-  const new error(this.text, {super.key}) : status = null;
+  /// A command that failed: the negative pair and a warning.
+  const new error(this.text, {super.key})
+    : pair = XpStatusPair.negative,
+      icon = PhosphorIconsRegular.warningCircle;
 
-  /// The status the message is in; `null` for an error.
-  final XpStatus? status;
+  final XpStatusPair pair;
+  final IconData icon;
   final String text;
 
   @override
   Widget build(BuildContext context) {
-    final pair = status?.pair ?? XpStatusPair.negative;
     final color = context.xpColors.onContainer(pair);
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
           padding: const EdgeInsets.only(top: 3),
-          child: Icon(
-            status?.icon ?? PhosphorIconsRegular.warningCircle,
-            size: context.xpSizes.iconSm,
-            color: color,
-          ),
+          child: Icon(icon, size: context.xpSizes.iconSm, color: color),
         ),
         const SizedBox(width: 6),
         Expanded(

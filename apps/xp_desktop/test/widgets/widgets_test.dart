@@ -141,21 +141,21 @@ void main() {
       tester,
     ) async {
       await tester.pumpApp(
-        const Column(
+        Column(
           children: [
-            XpSectionLabel('Projects'),
-            XpPanel(child: Text('panel')),
-            XpHairline(),
-            SizedBox(height: 10, child: XpHairline(vertical: true)),
-            XpCode('5.4.1 (3283)', size: 13),
-            XpPageHeader(
+            const XpSectionLabel('Projects'),
+            const XpPanel(child: Text('panel')),
+            const XpHairline(),
+            const SizedBox(height: 10, child: XpHairline(vertical: true)),
+            const XpCode('5.4.1 (3283)', size: 13),
+            const XpPageHeader(
               title: 'Engines',
               subtitle: 'Where XPath runs',
               actions: [Text('action')],
             ),
-            XpPageHeader(title: 'Bare'),
+            const XpPageHeader(title: 'Bare'),
             XpMessage(XpStatus.scanError, 'Broken'),
-            XpMessage.error('Not saved.'),
+            const XpMessage.error('Not saved.'),
           ],
         ),
       );
@@ -297,7 +297,7 @@ void _never() {
       // Return does nothing.
       await tester.sendKeyEvent(LogicalKeyboardKey.enter);
       await tester.pumpAndSettle();
-      expect(find.byType(XpConfirmDialog), findsOneWidget);
+      expect(find.byKey(confirmDialogKey), findsOneWidget);
       await tester.sendKeyEvent(LogicalKeyboardKey.escape);
       await tester.pumpAndSettle();
       await open();

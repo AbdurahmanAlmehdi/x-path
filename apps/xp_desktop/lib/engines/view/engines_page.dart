@@ -117,7 +117,7 @@ class _EngineRow extends StatelessWidget {
   }
 }
 
-/// Asks, then removes [engine] from this Mac (UX-08).
+/// Asks, then removes [engine] from this Mac.
 Future<void> removeEngine(BuildContext context, EngineProfile engine) async {
   final l10n = context.l10n;
   final bloc = context.read<EngineConnectionBloc>();

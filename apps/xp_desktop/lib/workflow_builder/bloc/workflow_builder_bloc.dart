@@ -134,7 +134,7 @@ final class WorkflowRenameRequested extends WorkflowBuilderEvent {
   List<Object?> get props => [name];
 }
 
-/// Archives the open workflow of the owner, or unarchives it (UX-06).
+/// Archives the open workflow of the owner, or unarchives it.
 final class WorkflowArchiveRequested extends WorkflowBuilderEvent {
   const new({required this.archived, this.workflowId});
 

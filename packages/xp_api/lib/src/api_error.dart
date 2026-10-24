@@ -110,7 +110,7 @@ abstract final class ErrorReason {
 }
 
 /// The body of an error: a code, a human-readable message and, where it
-/// helps, what to do (UX-05).
+/// helps, what to do.
 @JsonSerializable(explicitToJson: true, includeIfNull: false)
 class ApiError extends Equatable {
   /// Creates an error.

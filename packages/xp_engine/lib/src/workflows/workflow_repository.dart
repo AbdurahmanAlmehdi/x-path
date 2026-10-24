@@ -33,7 +33,7 @@ class WorkflowRecord extends Equatable {
   /// with.
   final int? basedOnVersion;
 
-  /// When it was archived (UX-06), or `null`.
+  /// When it was archived, or `null`.
   final DateTime? archivedAt;
 
   /// This record with [name], [archivedAt] or [basedOnVersion] changed; a

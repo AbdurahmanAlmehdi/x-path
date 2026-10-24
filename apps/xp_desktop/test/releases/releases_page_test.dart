@@ -37,7 +37,7 @@ Release _noKey({StoreState apple = StoreState.uploaded}) => reviewRelease(
 
 /// The confirming button [label] of the open confirmation.
 Finder confirm(String label) => find.descendant(
-  of: find.byType(XpConfirmDialog),
+  of: find.byKey(confirmDialogKey),
   matching: find.text(label),
 );
 
@@ -134,7 +134,7 @@ void main() {
 
       await tester.tap(find.text('Mark approved'));
       await tester.pumpAndSettle();
-      expect(find.byType(XpConfirmDialog), findsOneWidget);
+      expect(find.byKey(confirmDialogKey), findsOneWidget);
       await tester.tap(find.text('Keep'));
       await tester.pumpAndSettle();
       verifyNever(() => repository.setStoreStatus(any(), any(), any()));

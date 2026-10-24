@@ -18,7 +18,7 @@ class StoreIdsState extends Equatable {
   List<Object?> get props => [status, error];
 }
 
-/// Saves the store ids of a flavor of [_projectId] (UX-03): its Firebase app
+/// Saves the store ids of a flavor of [_projectId]: its Firebase app
 /// id per platform and its App Store Connect app id, which the built-in
 /// workflows upload to when a dispatch gives none. An empty id removes it.
 class StoreIdsCubit extends Cubit<StoreIdsState> {

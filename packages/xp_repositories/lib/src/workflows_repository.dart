@@ -86,7 +86,7 @@ class WorkflowsRepository {
   }
 
   /// What dispatching [workflowId] of [projectId] with [request] would
-  /// start, planned by the engine without starting it (UX-01).
+  /// start, planned by the engine without starting it.
   Future<DispatchPlan> plan(
     String projectId,
     String workflowId,

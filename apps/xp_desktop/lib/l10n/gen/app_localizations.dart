@@ -5032,7 +5032,7 @@ abstract class AppLocalizations {
   /// **'Rename the workflow'**
   String get workflowsRenameTitle;
 
-  /// Archives the workflow (UX-06).
+  /// Archives the workflow.
   ///
   /// In en, this message translates to:
   /// **'Archive'**

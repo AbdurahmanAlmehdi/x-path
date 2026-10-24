@@ -22,7 +22,7 @@ abstract interface class BuildCounterRepository {
   });
 
   /// The number [allocate] would hand out now with [seed], without storing
-  /// it (a dry run, UX-01).
+  /// it (a dry run).
   ///
   /// Throws an [UnknownAppException] if the project has no such app.
   Future<int> peek({

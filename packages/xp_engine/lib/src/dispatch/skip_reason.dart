@@ -1,6 +1,6 @@
 import 'package:xp_engine/src/workflows/expression.dart';
 
-/// Why a job of a matrix cell is left out, in words (UX-01): what its false
+/// Why a job of a matrix cell is left out, in words: what its false
 /// [condition] lacks in [scope], for example "no Firebase app id for dev".
 ///
 /// The parts that only say the cell is of another platform or flavor are

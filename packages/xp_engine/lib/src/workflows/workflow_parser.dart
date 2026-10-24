@@ -205,7 +205,7 @@ class _Reader {
     return inputs;
   }
 
-  /// The `type` of an input and the `options` of a choice (UX-04).
+  /// The `type` of an input and the `options` of a choice.
   (InputType?, List<String>?) _inputType(YamlMap input) {
     final typeNode = input.nodes['type'];
     InputType? type;

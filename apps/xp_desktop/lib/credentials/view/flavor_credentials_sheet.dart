@@ -193,7 +193,7 @@ FlavorProfile? flavorOf(Project project, FlavorTarget target) => project
     .where((flavor) => flavor.name == target.flavor)
     .firstOrNull;
 
-/// The store ids of the flavor [target] (UX-03): the Firebase app id of each
+/// The store ids of the flavor [target]: the Firebase app id of each
 /// platform and the App Store Connect app id, which the built-in workflows
 /// upload to when a dispatch names none. An empty field removes the id.
 class StoreIdsSection extends StatefulWidget {

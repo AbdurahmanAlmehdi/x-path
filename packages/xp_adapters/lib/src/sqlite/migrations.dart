@@ -519,7 +519,7 @@ CREATE TABLE engine_setting (
 ) STRICT;
 ''';
 
-// UX U2a: the store ids of a flavor (UX-03), from its profile like its bundle
+// UX U2a: the store ids of a flavor, from its profile like its bundle
 // and application ids: the Firebase app id of each platform and the App Store
 // Connect app id. The built-in workflows upload to them when no input gives
 // one.
@@ -531,7 +531,7 @@ ALTER TABLE flavor ADD COLUMN apple_app_id TEXT;
 
 // UX U3d: a workflow copied from a built-in remembers which one and the
 // version it started from, so the app can offer to compare when the
-// built-in changes; and a workflow can be archived (UX-06): kept with its
+// built-in changes; and a workflow can be archived: kept with its
 // versions and runs, and not dispatched.
 const _v17 = '''
 ALTER TABLE workflow ADD COLUMN based_on_builtin TEXT;

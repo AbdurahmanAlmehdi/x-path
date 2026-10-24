@@ -94,7 +94,7 @@ abstract class XpCommand extends Command<int> {
 }
 
 /// What the CLI adds to an error of the engine, for the cases a person can
-/// fix: the command that fixes it. The engine names no command (UX-09).
+/// fix: the command that fixes it. The engine names no command.
 String? cliHint(ApiException error) =>
     switch ((error.code, error.details['reason'])) {
       (ApiErrorCode.unauthorized, _) => 'Run: xp connect <url> --token <token>',

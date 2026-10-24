@@ -166,7 +166,7 @@ void main() {
       verifyNever(() => engines.remove(any()));
       await tester.tap(
         find.descendant(
-          of: find.byType(XpConfirmDialog),
+          of: find.byKey(confirmDialogKey),
           matching: find.text('Remove'),
         ),
       );

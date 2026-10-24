@@ -68,7 +68,7 @@ const _unversionedKinds = {
 /// The plan is complete before anything is stored, so a dispatch that cannot
 /// work (an unknown flavor, a credential that is missing) leaves nothing
 /// behind but the build number it allocated. [plan] makes the same plan and
-/// stores nothing, not even the build number (a dry run, UX-01). A job gets
+/// stores nothing, not even the build number (a dry run). A job gets
 /// no worktree here: its first step, `git.checkout`, makes it when the job
 /// runs.
 class WorkflowDispatcher {
@@ -212,7 +212,7 @@ class WorkflowDispatcher {
   }
 
   /// Plans dispatching the workflow [workflowId] of [projectId] with
-  /// [request] and starts nothing (a dry run, UX-01): the jobs it would
+  /// [request] and starts nothing (a dry run): the jobs it would
   /// make and where each would run, the jobs it leaves out and why (a job
   /// it cannot plan is left out too, and [DispatchPlan.blocked] says that a
   /// dispatch would be refused), the gates, and the version and build number
@@ -575,7 +575,7 @@ class WorkflowDispatcher {
 
   /// The values of the inputs of [definition]: what [request] gives, the
   /// dispatch's `releaseVersion` for a release input it leaves out, else
-  /// the default. Each must be a value its input takes (UX-04).
+  /// the default. Each must be a value its input takes.
   Map<String, Object?> _inputs(
     WorkflowDefinition definition,
     DispatchRequest request,

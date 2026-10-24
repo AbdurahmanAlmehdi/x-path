@@ -333,7 +333,7 @@ class Scheduler implements JobControl {
   }
 
   /// Where a job that needs [capabilities] and is made of steps of [kinds]
-  /// could start, without queueing it (a dry run, UX-01): whether the engine
+  /// could start, without queueing it (a dry run): whether the engine
   /// can run it, the connected runner it can go to (by name), and why it
   /// would wait when neither can. Free slots are not counted: they change
   /// before the job's stage starts.

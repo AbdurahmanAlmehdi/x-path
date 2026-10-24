@@ -315,7 +315,7 @@ class StoreLane extends StatelessWidget {
     return widgets;
   }
 
-  /// Asks, then marks the store [state] by hand (UX-08).
+  /// Asks, then marks the store [state] by hand.
   Future<void> _mark(
     BuildContext context,
     ReleaseBoardBloc bloc,

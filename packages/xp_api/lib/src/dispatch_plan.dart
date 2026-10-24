@@ -7,7 +7,7 @@ import 'package:json_annotation/json_annotation.dart';
 part 'dispatch_plan.g.dart';
 
 /// What a dispatch would start, as the engine plans it without starting it
-/// (`POST .../dispatch?dryRun=true`, UX-01): the jobs of each stage and
+/// (`POST .../dispatch?dryRun=true`): the jobs of each stage and
 /// where each would run, the jobs it leaves out and why, the gates, and the
 /// version and build number it would allocate. Nothing is allocated.
 @JsonSerializable(explicitToJson: true, includeIfNull: false)

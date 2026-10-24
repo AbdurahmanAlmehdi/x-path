@@ -777,7 +777,7 @@ void main() {
       await press(
         tester,
         find.descendant(
-          of: find.byType(XpConfirmDialog),
+          of: find.byKey(confirmDialogKey),
           matching: find.text('Delete'),
         ),
       );

@@ -81,7 +81,7 @@ final class ApiException extends XpClientException {
   /// is [ApiErrorCode.workflowInvalid] about a document.
   final List<WorkflowIssue> issues;
 
-  /// What the engine says to do about it (UX-05), when it says.
+  /// What the engine says to do about it, when it says.
   final String? hint;
 
   /// Facts of the error, such as the `kind` of a missing credential.

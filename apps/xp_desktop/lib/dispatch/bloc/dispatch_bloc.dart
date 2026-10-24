@@ -190,7 +190,7 @@ class DispatchState extends Equatable {
   /// arrive or when the workflow has none.
   final List<Release>? releases;
 
-  /// What the dispatch would start, as the engine plans it (UX-01).
+  /// What the dispatch would start, as the engine plans it.
   final DispatchPlan? preview;
 
   /// Whether the preview is being worked out again.
@@ -339,7 +339,7 @@ const _reachedAStore = <ReleaseState>{
   ReleaseState.merged,
 };
 
-/// Whether the sheet leaves [workflow] out: an archived one (UX-06), and the
+/// Whether the sheet leaves [workflow] out: an archived one, and the
 /// merge of a release pull request, which starts from the release.
 bool _hidden(WorkflowSummary workflow) =>
     workflow.archived || (workflow.builtin && workflow.name == 'release-merge');

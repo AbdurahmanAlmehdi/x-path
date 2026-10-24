@@ -38,7 +38,7 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(
         find.descendant(
-          of: find.byType(XpConfirmDialog),
+          of: find.byKey(confirmDialogKey),
           matching: find.text('Remove'),
         ),
       );

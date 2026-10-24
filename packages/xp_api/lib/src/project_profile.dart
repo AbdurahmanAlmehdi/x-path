@@ -258,7 +258,7 @@ class FlavorProfile extends Equatable {
   /// The Firebase app id of the flavor by platform (`android`, `ios`), for
   /// example `{"android": "1:123456789012:android:abcdef"}`: what the
   /// Firebase files of the app name, or the owner's edit. The built-in
-  /// workflows upload to it when no input gives one (UX-03).
+  /// workflows upload to it when no input gives one.
   final Map<String, String>? firebaseAppId;
 
   /// The App Store Connect app id of the flavor, for example `1234567890`.

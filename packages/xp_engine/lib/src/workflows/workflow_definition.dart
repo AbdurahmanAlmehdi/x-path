@@ -122,7 +122,7 @@ class InputDefinition extends Equatable {
   /// The name under `inputs`.
   final String name;
 
-  /// What it takes (UX-04); `null` for an input without a type, which
+  /// What it takes; `null` for an input without a type, which
   /// takes any value.
   final InputType? type;
 

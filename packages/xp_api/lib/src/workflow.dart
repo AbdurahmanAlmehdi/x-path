@@ -33,7 +33,7 @@ class WorkflowVersionInfo extends Equatable {
   List<Object?> get props => [id, version, createdAt];
 }
 
-/// What kind of value an input of a workflow takes (UX-04).
+/// What kind of value an input of a workflow takes.
 @JsonEnum(valueField: 'wire')
 enum InputType {
   /// Text, sent as it is typed.
@@ -159,7 +159,7 @@ class Workflow extends Equatable {
   /// The built-in this workflow was copied from, and its version then.
   final WorkflowBasedOn? basedOn;
 
-  /// When it was archived (UX-06): it keeps its runs and versions, and is
+  /// When it was archived: it keeps its runs and versions, and is
   /// not offered to dispatch. `null` while it is not archived.
   final DateTime? archivedAt;
 
@@ -389,7 +389,7 @@ class UpdateWorkflowRequest extends Equatable {
   /// A new name.
   final String? name;
 
-  /// Whether the workflow is archived (UX-06).
+  /// Whether the workflow is archived.
   final bool? archived;
 
   /// The version of its built-in the copy has caught up with, after a

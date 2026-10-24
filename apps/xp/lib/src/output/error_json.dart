@@ -2,7 +2,7 @@ import 'package:xp_api/xp_api.dart';
 import 'package:xp_client/xp_client.dart';
 
 /// The JSON form of an error, as `--json` prints it on standard error and an
-/// MCP tool returns it: `{"code", "message", "hint"}` (UX-05), and the
+/// MCP tool returns it: `{"code", "message", "hint"}`, and the
 /// [issues] of a workflow document when there are any. The [hint] is what
 /// this client suggests, in its own words; empty when there is none.
 Map<String, Object?> errorJson(

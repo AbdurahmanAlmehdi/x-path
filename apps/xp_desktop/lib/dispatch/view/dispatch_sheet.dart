@@ -463,7 +463,7 @@ class _Field extends StatelessWidget {
   );
 }
 
-/// One input of the workflow, by its type (UX-04): a switch, a menu, a
+/// One input of the workflow, by its type: a switch, a menu, a
 /// release picker, JSON checked as it is typed, or text.
 class _InputField extends StatelessWidget {
   const new({

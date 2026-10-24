@@ -3,7 +3,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:xp_desktop/theme/theme.dart';
 import 'package:xp_desktop/widgets/xp_button.dart';
 
-/// Asks before a destructive action (UX-08): [title] names the object and
+/// Asks before a destructive action: [title] names the object and
 /// [points] say what happens. `true` when the owner presses [confirm];
 /// Return does nothing, Escape and [keep] change nothing.
 Future<bool> confirmAction(
@@ -16,7 +16,8 @@ Future<bool> confirmAction(
     await showDialog<bool>(
       context: context,
       barrierColor: context.xpColors.scrimDefault,
-      builder: (_) => XpConfirmDialog(
+      builder: (_) => _ConfirmDialog(
+        key: confirmDialogKey,
         title: title,
         points: points,
         keep: keep,
@@ -25,8 +26,11 @@ Future<bool> confirmAction(
     ) ??
     false;
 
+/// The key of the dialog [confirmAction] shows, for finding it.
+const confirmDialogKey = Key('xp.confirmAction');
+
 /// The dialog of [confirmAction]; it pops `true` or `false`.
-class XpConfirmDialog extends StatelessWidget {
+class _ConfirmDialog extends StatelessWidget {
   const new({
     required this.title,
     required this.points,

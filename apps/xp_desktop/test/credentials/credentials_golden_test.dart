@@ -77,7 +77,7 @@ void main() {
     await tester.tap(find.text('Every flavor of Mataa customer app'));
     await tester.pumpAndSettle();
     await expectLater(
-      find.byType(Dialog),
+      find.byKey(confirmDialogKey),
       matchesGoldenFile('goldens/flavor_credentials_sheet.png'),
     );
   });

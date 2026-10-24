@@ -1661,7 +1661,7 @@
   "workflowsRenameTitle": "Rename the workflow",
   "@workflowsRenameTitle": {"description": "Title of the name dialog when renaming."},
   "workflowsArchive": "Archive",
-  "@workflowsArchive": {"description": "Archives the workflow (UX-06)."},
+  "@workflowsArchive": {"description": "Archives the workflow."},
   "workflowsUnarchive": "Unarchive",
   "@workflowsUnarchive": {"description": "Unarchives the workflow."},
   "workflowsArchivedToast": "Archived {name}",
