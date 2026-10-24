@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:isolate';
 
 import 'package:test/test.dart';
 import 'package:xp_engine/xp_engine.dart';
@@ -7,8 +8,15 @@ import 'package:xp_engine/xp_engine.dart';
 import '../../helpers/all_steps.dart';
 
 void main() {
-  test('the site publishes the schema the engine gives (UX-02)', () {
-    final published = File('../../site/public/schema/workflow-1.json');
+  test('the site publishes the schema the engine gives', () {
+    // From the package, wherever the test runs from: the repository is two
+    // folders above it.
+    final library = Isolate.resolvePackageUriSync(
+      Uri.parse('package:xp_engine/xp_engine.dart'),
+    )!;
+    final published = File.fromUri(
+      library.resolve('../../../site/public/schema/workflow-1.json'),
+    );
     final schema = workflowJsonSchema(StepPlanners(allSteps()));
 
     expect(

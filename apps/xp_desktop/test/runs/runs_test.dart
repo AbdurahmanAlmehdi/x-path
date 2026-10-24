@@ -79,11 +79,13 @@ void main() {
   );
 
   test('events compare by value', () {
+    RunsFilterChanged filter(RunState? state, String? workflowId) =>
+        RunsFilterChanged(state: state, workflowId: workflowId);
+
+    expect(filter(RunState.failed, 'w'), filter(RunState.failed, 'w'));
+    expect(filter(RunState.failed, 'w'), isNot(filter(RunState.failed, 'x')));
+    expect(filter(RunState.failed, 'w'), isNot(filter(null, 'w')));
     expect(const RunsSubscriptionRequested().props, isEmpty);
-    expect(
-      const RunsFilterChanged(state: RunState.failed, workflowId: 'w').props,
-      [RunState.failed, 'w'],
-    );
   });
 
   group('RunsBloc', () {
@@ -99,8 +101,8 @@ void main() {
             cached: true,
           ),
         );
+        await pumpEventQueue();
       },
-      wait: const Duration(milliseconds: 10),
       verify: (bloc) {
         expect(bloc.state.loaded, isTrue);
         expect(bloc.state.cached, isTrue);
@@ -128,8 +130,8 @@ void main() {
         streams[('wf_prod', RunState.failed, 20)]!.add(
           Snapshot(RunsResponse([_run('run_2', RunState.failed)])),
         );
+        await pumpEventQueue();
       },
-      wait: const Duration(milliseconds: 10),
       verify: (bloc) {
         expect(bloc.state.state, RunState.failed);
         expect(bloc.state.workflowId, 'wf_prod');
@@ -148,8 +150,8 @@ void main() {
         bloc.add(const RunsSubscriptionRequested());
         await Future<void>.delayed(Duration.zero);
         streams[(null, null, 20)]!.addError(const ConnectionException('down'));
+        await pumpEventQueue();
       },
-      wait: const Duration(milliseconds: 10),
       verify: (bloc) {
         expect(bloc.state.error, 'down');
         expect(bloc.state.loaded, isTrue);

@@ -363,6 +363,20 @@ void main() {
       expect((decoded(result)! as Map)['timedOut'], isFalse);
     });
 
+    test('wait_for_approval says when it stopped waiting', () async {
+      // The sample approval is pending.
+      when(() => client.getApproval('apr_1'))
+          .thenAnswer((_) async => sample.approval());
+
+      final result = await call('wait_for_approval', {
+        'approval': 'apr_1',
+        'timeoutSeconds': 0,
+      });
+
+      expect((decoded(result)! as Map)['state'], 'pending');
+      expect((decoded(result)! as Map)['timedOut'], isTrue);
+    });
+
     test('archive_workflow archives, and unarchives', () async {
       when(() => client.updateWorkflow('prj_1', 'wf_1', any()))
           .thenAnswer((_) async => sample.workflow);

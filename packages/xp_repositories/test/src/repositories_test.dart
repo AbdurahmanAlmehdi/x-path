@@ -654,19 +654,28 @@ void main() {
       );
     });
 
-    test('runs a run again, its failed jobs, and downloads', () async {
-      final client = harness.client;
+    test('runs a run again', () async {
+      when(() => harness.client.runAgain('run_1'))
+          .thenAnswer((_) async => _run);
+
+      expect(await repository.runAgain('run_1'), _run);
+    });
+
+    test('runs the failed jobs of a run again', () async {
+      when(() => harness.client.rerunFailed('run_1'))
+          .thenAnswer((_) async => _run);
+
+      expect(await repository.rerunFailed('run_1'), _run);
+    });
+
+    test('downloads an artifact', () async {
       final download = ArtifactDownload(
         content: Stream.value([1, 2]),
         sha256: null,
       );
-      when(() => client.runAgain('run_1')).thenAnswer((_) async => _run);
-      when(() => client.rerunFailed('run_1')).thenAnswer((_) async => _run);
-      when(() => client.downloadArtifact('art_1'))
+      when(() => harness.client.downloadArtifact('art_1'))
           .thenAnswer((_) async => download);
 
-      expect(await repository.runAgain('run_1'), _run);
-      expect(await repository.rerunFailed('run_1'), _run);
       expect(await repository.downloadArtifact('art_1'), download);
     });
   });

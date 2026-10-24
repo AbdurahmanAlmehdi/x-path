@@ -152,17 +152,23 @@ void main() {
     testWidgets('without a clock above, the system time is live', (
       tester,
     ) async {
+      late bool live;
+      late DateTime wall;
+      late DateTime read;
       await tester.pumpWidget(
         Builder(
-          builder: (context) => Text(
-            '${XpClock.isLive(context)} '
-            '${XpClock.wall(context).year == DateTime.now().year} '
-            '${XpClock.read(context).year == DateTime.now().year}',
-            textDirection: TextDirection.ltr,
-          ),
+          builder: (context) {
+            live = XpClock.isLive(context);
+            wall = XpClock.wall(context);
+            read = XpClock.read(context);
+            return const SizedBox();
+          },
         ),
       );
-      expect(find.text('true true true'), findsOneWidget);
+      final now = DateTime.now();
+      expect(live, isTrue);
+      expect(now.difference(wall).inSeconds.abs(), lessThan(5));
+      expect(now.difference(read).inSeconds.abs(), lessThan(5));
     });
 
     testWidgets('spinners stand still while the app is away', (tester) async {

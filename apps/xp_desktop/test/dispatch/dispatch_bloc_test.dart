@@ -164,20 +164,27 @@ void main() {
   });
 
   test('events compare by value', () {
-    expect(const DispatchStarted().props, [null]);
-    expect(const DispatchStarted(workflowId: 'w').props, ['w']);
-    expect(const DispatchWorkflowChanged('w').props, ['w']);
-    expect(const DispatchAppChanged('.').props, ['.']);
-    expect(const DispatchFlavorToggled('dev').props, ['dev']);
-    expect(const DispatchPlatformToggled('ios').props, ['ios']);
-    expect(const DispatchRefChanged('main').props, ['main']);
-    expect(const DispatchRefKindChanged(RefKind.tag).props, [RefKind.tag]);
-    expect(const DispatchBumpChanged(VersionBump.patch).props, [
-      VersionBump.patch,
-    ]);
+    // Built from values, not constants, so that each pair is two objects.
+    List<DispatchEvent> events(String name) => [
+      DispatchStarted(workflowId: name),
+      DispatchWorkflowChanged(name),
+      DispatchAppChanged(name),
+      DispatchFlavorToggled(name),
+      DispatchPlatformToggled(name),
+      DispatchRefChanged(name),
+      DispatchInputChanged(name, 1),
+      DispatchVersionChanged(name),
+    ];
+    final a = events('a');
+    expect(a, events('a'));
+    for (final (index, event) in a.indexed) {
+      expect(event, isNot(events('b')[index]));
+    }
+    RefKind kind(int i) => RefKind.values[i];
+    VersionBump bump(int i) => VersionBump.values[i];
+    expect(DispatchRefKindChanged(kind(1)), DispatchRefKindChanged(kind(1)));
+    expect(DispatchBumpChanged(bump(1)), isNot(DispatchBumpChanged(bump(2))));
     expect(const DispatchSubmitted().props, isEmpty);
-    expect(const DispatchInputChanged('a', 1).props, ['a', 1, true]);
-    expect(const DispatchVersionChanged('1.2.3').props, ['1.2.3']);
   });
 
   group('DispatchBloc', () {

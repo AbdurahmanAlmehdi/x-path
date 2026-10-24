@@ -921,22 +921,28 @@ void main() {
     });
 
     test('without -f reads the whole log of a job that ended', () async {
-      when(() => env.client.getJob('job_1'))
+      // An engine that is never quiet long enough: only a job that ended is
+      // read to its end.
+      final impatient = TestEnv(logIdle: Duration.zero);
+      addTearDown(impatient.dispose);
+      when(() => impatient.client.getJob('job_1'))
           .thenAnswer((_) async => sample.job(state: JobState.succeeded));
       final controller = StreamController<LogFrame>();
-      final run = logs(controller.stream);
+      when(
+        () =>
+            impatient.client.followJobLogs('job_1', after: any(named: 'after')),
+      ).thenAnswer((_) => controller.stream);
       controller.add(line(1));
-      // Slower than logIdle: a job that ended is read to its end.
-      Timer(const Duration(milliseconds: 120), () {
-        controller
-          ..add(line(2))
-          ..add(const LogEndFrame(state: JobState.succeeded));
-        unawaited(controller.close());
-      });
 
-      expect(await run(['logs', 'job_1']), 0);
+      final code = impatient.run(['logs', 'job_1']);
+      await pumpEventQueue();
+      controller
+        ..add(line(2))
+        ..add(const LogEndFrame(state: JobState.succeeded));
+      unawaited(controller.close());
 
-      expect(env.logger.infos, ['line 1', 'line 2', '-- job succeeded']);
+      expect(await code, 0);
+      expect(impatient.logger.infos, ['line 1', 'line 2', '-- job succeeded']);
     });
 
     test('with -f waits for the end and fails with a failed job', () async {

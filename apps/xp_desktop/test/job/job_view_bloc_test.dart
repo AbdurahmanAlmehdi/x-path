@@ -163,7 +163,7 @@ void main() {
       build: build,
       act: (bloc) async {
         bloc.add(JobViewArtifactDownloadRequested(iosArtifacts.single));
-        await Future<void>.delayed(const Duration(milliseconds: 5));
+        await pumpEventQueue();
         bloc.add(
           JobViewArtifactDownloadRequested(
             Artifact(
@@ -178,8 +178,8 @@ void main() {
             ),
           ),
         );
+        await pumpEventQueue();
       },
-      wait: const Duration(milliseconds: 10),
       verify: (bloc) {
         expect(
           [for (final (name, bytes) in saved) '$name ${bytes.join(',')}'],
@@ -283,8 +283,10 @@ void main() {
         run.add(Snapshot(withTests));
       },
       build: build,
-      act: (bloc) => bloc.add(const JobViewSubscriptionRequested('run_1')),
-      wait: const Duration(milliseconds: 20),
+      act: (bloc) async {
+        bloc.add(const JobViewSubscriptionRequested('run_1'));
+        await pumpEventQueue();
+      },
       verify: (bloc) {
         expect(bloc.state.tests?.passed, 7);
         expect(bloc.state.tests?.failed, 1);
@@ -305,8 +307,8 @@ void main() {
         run.add(Snapshot(runningRun(), cached: true));
         await Future<void>.delayed(Duration.zero);
         run.add(Snapshot(runningRun()));
+        await pumpEventQueue();
       },
-      wait: const Duration(milliseconds: 20),
       verify: (bloc) {
         final state = bloc.state;
         expect(state.loaded, isTrue);
@@ -343,8 +345,8 @@ void main() {
         );
         await Future<void>.delayed(Duration.zero);
         run.add(Snapshot(runningRun()));
+        await pumpEventQueue();
       },
-      wait: const Duration(milliseconds: 20),
       verify: (bloc) {
         expect(bloc.state.selectedJobId, 'job_android');
         expect(bloc.state.workflowName, 'Custom');
@@ -374,8 +376,8 @@ void main() {
         bloc.add(const JobViewSubscriptionRequested('run_1'));
         await Future<void>.delayed(Duration.zero);
         run.add(Snapshot(runningRun()));
+        await pumpEventQueue();
       },
-      wait: const Duration(milliseconds: 20),
       verify: (bloc) {
         expect(bloc.state.workflowName, 'Broken');
         expect(bloc.state.outline, isNull);
@@ -393,8 +395,8 @@ void main() {
         bloc.add(const JobViewSubscriptionRequested('run_1'));
         await Future<void>.delayed(Duration.zero);
         run.add(Snapshot(runningRun()));
+        await pumpEventQueue();
       },
-      wait: const Duration(milliseconds: 20),
       verify: (bloc) {
         expect(bloc.state.workflowName, isNull);
         expect(bloc.state.loaded, isTrue);
@@ -408,8 +410,8 @@ void main() {
         bloc.add(const JobViewSubscriptionRequested('run_1'));
         await Future<void>.delayed(Duration.zero);
         run.addError(const ApiException('No such run.', statusCode: 404));
+        await pumpEventQueue();
       },
-      wait: const Duration(milliseconds: 20),
       verify: (bloc) {
         expect(bloc.state.loaded, isTrue);
         expect(bloc.state.error, 'No such run.');
@@ -426,11 +428,13 @@ void main() {
         selectedJobId: 'job_ios',
         selectedStep: 2,
       ),
-      act: (bloc) => bloc
-        ..add(const JobViewJobSelected('job_ios'))
-        ..add(const JobViewJobSelected('job_android'))
-        ..add(const JobViewStepSelected(1)),
-      wait: const Duration(milliseconds: 20),
+      act: (bloc) async {
+        bloc
+          ..add(const JobViewJobSelected('job_ios'))
+          ..add(const JobViewJobSelected('job_android'))
+          ..add(const JobViewStepSelected(1));
+        await pumpEventQueue();
+      },
       verify: (bloc) {
         expect(bloc.state.selectedJobId, 'job_android');
         expect(bloc.state.selectedStep, 1);

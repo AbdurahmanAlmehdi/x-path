@@ -105,7 +105,11 @@ class FakeUpdateCheck implements UpdateCheck {
 /// Everything a command test needs: a context whose client is a mock, a
 /// recording logger, a temporary config folder.
 class TestEnv {
-  new({Map<String, String>? environment, bool ansi = false}) {
+  new({
+    Map<String, String>? environment,
+    bool ansi = false,
+    Duration logIdle = const Duration(milliseconds: 50),
+  }) {
     directory = Directory.systemTemp.createTempSync('xp_test');
     this.environment = {
       engineUrlVariable: 'http://engine:7480',
@@ -129,7 +133,7 @@ class TestEnv {
       updateCheck: update,
       stdin: stdin.stream,
       stdout: stdout,
-      logIdle: const Duration(milliseconds: 50),
+      logIdle: logIdle,
       secretPrompt: prompt,
       pollInterval: Duration.zero,
       ansi: ansi,
