@@ -334,7 +334,8 @@ void main() {
       }
 
       final (listed, projects) = await call('GET', '/projects');
-      final (refused, _) = await call(
+      // An HTTPS remote on another host is offered its SSH URL (ADR 0015).
+      final (refused, offer) = await call(
         'POST',
         '/projects',
         '{"remote": "https://example.com/not/github"}',
@@ -343,7 +344,8 @@ void main() {
 
       expect(listed, 200);
       expect(projects['projects'], isEmpty);
-      expect(refused, 400);
+      expect(refused, 422);
+      expect(offer['sshUrl'], 'git@example.com:not/github.git');
       expect(missing, 404);
       shutdown.add(null);
       expect(await exit, 0);

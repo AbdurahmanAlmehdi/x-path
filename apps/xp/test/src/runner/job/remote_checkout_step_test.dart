@@ -528,7 +528,11 @@ void main() {
         testUrl: origin,
       ).run(_input(root.path), ProcessContext());
 
-      expect(message(outcome), contains('GitHub has no commit cccccccccccc'));
+      // The test URL is a local folder, so no host is named.
+      expect(
+        message(outcome),
+        contains('The repository has no commit cccccccccccc'),
+      );
     });
 
     test('fails clearly for a repository it cannot read', () async {

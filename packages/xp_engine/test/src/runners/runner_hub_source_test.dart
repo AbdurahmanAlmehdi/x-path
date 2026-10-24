@@ -67,20 +67,26 @@ void main() {
       expect(offer.repository!.sshUrl, '/srv/git/app.git');
     });
 
-    test('keeps the user of an ssh:// URL but never a password', () async {
+    test('keeps the user of an ssh:// URL', () async {
       final project = (await h.projects.get('prj_1'))!;
       await h.projects.update(
         project.copyWith(remote: 'ssh://git@example.com/r.git'),
       );
-      expect(
-        (await offered()).repository!.sshUrl,
-        'ssh://git@example.com/r.git',
-      );
 
+      final offer = await offered();
+
+      expect(offer.repository!.sshUrl, 'ssh://git@example.com/r.git');
+    });
+
+    test('drops the password of an ssh:// URL', () async {
+      final project = (await h.projects.get('prj_1'))!;
       await h.projects.update(
         project.copyWith(remote: 'ssh://git:secret@example.com/r.git'),
       );
-      expect((await offered()).repository!.sshUrl, 'ssh://example.com/r.git');
+
+      final offer = await offered();
+
+      expect(offer.repository!.sshUrl, 'ssh://example.com/r.git');
     });
 
     test('keys the cache of a project on another host by its source key '
