@@ -33,11 +33,12 @@
 #
 # What is real and what is faked in `prod`: the engine, its database, git
 # mirror, worktrees, tag and push, the Android build (a real AAB through Gradle)
-# and its upload to the fake Play are real. This Mac has no signing identity and
-# Apple has no fake, so `flutter build ipa` (an SDK wrapper writes a placeholder
-# IPA) and `xcrun altool` (a shim prints a successful upload) are faked; the
-# engine still schedules the iOS job on a Mac with Xcode, reads the IPA from the
-# artifact store and calls altool as it would. `prod` needs macOS with Xcode.
+# and its upload to the fake Play, and the upload of the IPA through the
+# build-upload API of the fake App Store Connect (refused once, stalled once,
+# each resumed) are real. This Mac has no signing identity, so `flutter build
+# ipa` is faked (an SDK wrapper writes a placeholder IPA); the engine still
+# schedules the iOS build on a Mac with Xcode and reads the IPA from the
+# artifact store. `prod` needs macOS with Xcode.
 #
 # Needs the repo's Dart and Flutter (3.47.6) first on PATH, git, perl, and the
 # Android SDK (ANDROID_HOME, ANDROID_SDK_ROOT, or the default location of

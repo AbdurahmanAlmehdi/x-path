@@ -47,6 +47,17 @@ void main() {
     expect(running.stage, 2);
     expect(running.name, 'job a');
     expect(running.capabilities, ['flutter']);
+    expect(
+      JobRecord(
+        id: 'n',
+        workflowVersionId: 'wfv_1',
+        projectId: 'prj_1',
+        state: JobState.queued,
+        createdAt: DateTime.utc(2026),
+        narrowing: const ['a flavor'],
+      ).copyWith(state: JobState.running).narrowing,
+      ['a flavor'],
+    );
     expect(running, isNot(job));
     expect(job, _job('a', runId: 'run_1', stage: 2));
     expect(job, isNot(_job('a', runId: 'run_2', stage: 2)));

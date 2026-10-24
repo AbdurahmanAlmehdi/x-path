@@ -443,6 +443,24 @@ flavors:
     });
   });
 
+  group('app extensions', () {
+    test('are the extension targets of the Xcode project', () async {
+      final plain = await scanApp1({});
+      final widgets = await scanApp1({
+        'ios/Runner.xcodeproj/project.pbxproj': pbxproj(
+          runner: configurations(
+            null,
+            iosSettings(bundleId: 'com.example.demo', team: 'T'),
+          ),
+          extensions: ['Widgets', 'Share'],
+        ),
+      });
+
+      expect(only(plain).iosAppExtensions, isEmpty);
+      expect(only(widgets).iosAppExtensions, ['Widgets', 'Share']);
+    });
+  });
+
   group('signing teams', () {
     test('missing or variable are a warning', () async {
       for (final team in [null, r'$(TEAM)']) {

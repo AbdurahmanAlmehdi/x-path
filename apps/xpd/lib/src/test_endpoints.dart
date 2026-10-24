@@ -11,6 +11,7 @@ class TestEndpoints {
     this.playUrl,
     this.fileSecrets = false,
     this.leaseSeconds,
+    this.ascUploadWait,
   });
 
   /// Reads the settings from [environment].
@@ -27,6 +28,12 @@ class TestEndpoints {
       playUrl: url(playVariable),
       fileSecrets: environment[fileSecretsVariable] == '1',
       leaseSeconds: int.tryParse(environment[leaseSecondsVariable] ?? ''),
+      ascUploadWait: switch (int.tryParse(
+        environment[ascUploadSecondsVariable] ?? '',
+      )) {
+        final seconds? => Duration(seconds: seconds),
+        null => null,
+      },
     );
   }
 
@@ -52,6 +59,11 @@ class TestEndpoints {
   /// offline end-to-end test waits out a few leases in seconds.
   static const leaseSecondsVariable = 'XPD_TEST_LEASE_SECONDS';
 
+  /// How long `upload.appStore` waits for App Store Connect to accept or
+  /// refuse a build upload, in seconds, instead of 30 minutes: the release
+  /// end-to-end test waits out a stalled upload.
+  static const ascUploadSecondsVariable = 'XPD_TEST_ASC_UPLOAD_SECONDS';
+
   /// Where GitHub is, when it is not GitHub.
   final Uri? githubApiUrl;
 
@@ -71,6 +83,9 @@ class TestEndpoints {
   /// How long a runner's lease lasts, when it is not the usual 90 seconds.
   final int? leaseSeconds;
 
+  /// How long a build upload may take, when it is not the usual 30 minutes.
+  final Duration? ascUploadWait;
+
   /// Whether anything differs from a real engine.
   bool get isActive =>
       githubApiUrl != null ||
@@ -78,7 +93,8 @@ class TestEndpoints {
       ascUrl != null ||
       playUrl != null ||
       fileSecrets ||
-      leaseSeconds != null;
+      leaseSeconds != null ||
+      ascUploadWait != null;
 
   /// The operating system the secret store is chosen for.
   String secretStoreSystem(String operatingSystem) =>

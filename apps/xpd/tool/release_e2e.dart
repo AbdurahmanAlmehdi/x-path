@@ -1613,6 +1613,8 @@ class _E2e {
       if (mode == 'prod') ...{
         TestEndpoints.ascVariable: _asc!.baseUrl.toString(),
         TestEndpoints.playVariable: _play!.baseUrl.toString(),
+        // A stalled App Store upload fails after 5 seconds, not 30 minutes.
+        TestEndpoints.ascUploadSecondsVariable: '5',
         // The shims come first, so that every program the engine starts by
         // name is looked up there.
         'PATH': '${p.join(work, 'shims')}:${Platform.environment['PATH']}',
@@ -1723,12 +1725,16 @@ class _E2e {
   ///
   /// What is real: the engine process, its SQLite database, its git mirror,
   /// worktrees, tag and push, `flutter build appbundle` (a real AAB, built
-  /// with Gradle), the upload to the fake Play, the polling of the fake stores
-  /// and the merge. What is faked, because this machine has no signing
-  /// identity and Apple has no fake: `flutter build ipa` (a wrapper around the
-  /// SDK writes a placeholder IPA) and `xcrun altool` (a shim that prints what
-  /// a successful upload prints). Both are PATH shims or an SDK wrapper in the
-  /// work folder; the engine runs unchanged.
+  /// with Gradle), the uploads to the fake Play and, through the build-upload
+  /// API, to the fake App Store Connect, the polling of the fake stores and
+  /// the merge. What is faked, because this machine has no signing identity:
+  /// `flutter build ipa` (a wrapper around the SDK in the work folder writes a
+  /// placeholder IPA); the engine runs unchanged.
+  ///
+  /// The App Store Connect upload is refused once (a closed train) and stalls
+  /// once (the engine waits 5 seconds for it, not 30 minutes): each time the
+  /// upload job fails with the reason, and is resumed. The third upload goes
+  /// through, without altool and without the token on the parts.
   ///
   /// It checks that the release walks `draft`, `building`, `uploaded`,
   /// `in_review`, `approved`, `live`, `merged`; that the tag is
@@ -1774,6 +1780,12 @@ class _E2e {
       ..addApp(bundleId!, id: appleAppId)
       ..addBuild(appleAppId, buildNumber: '40', version: '0.9.0');
     final appleVersion = _asc!.addVersion(appleAppId, '1.0.0');
+    _asc!.uploadOutcomes.addAll(const [
+      FakeAscUploadOutcome.rejected([
+        FakeAscIssue('90186', 'The version train 1.0.0 is closed.'),
+      ]),
+      FakeAscUploadOutcome.stalled(),
+    ]);
     final playApp = _play!.addApp(androidId!)..addRelease('internal', [41]);
 
     await _addCredential(
@@ -1853,10 +1865,16 @@ class _E2e {
     // ---- build, upload, tag, push, pull request (the owner approves the
     // release and the push, as an app does)
     final approvals = <Map<String, dynamic>>[];
-    await _driveRun(runId, const Duration(minutes: 30), approvals, {
-      'prod_release',
-      'push',
-    });
+    await _driveRun(
+      runId,
+      const Duration(minutes: 30),
+      approvals,
+      {'prod_release', 'push'},
+      failures: [
+        ('Upload prod for ios', 'App Store Connect rejected the build'),
+        ('Upload prod for ios', 'did not accept or refuse the upload'),
+      ],
+    );
     _expect(
       approvals.map((a) => a['action']).toList().toString() ==
           ['prod_release', 'push'].toString(),
@@ -1907,6 +1925,38 @@ class _E2e {
       'Play got version code $build in one commit that cannot cancel a '
       'review: $commits',
     );
+
+    // The Apple side: three build uploads (refused, stalled, through), the
+    // last with the bytes of the IPA, its parts sent without the token, and
+    // no altool anywhere.
+    final uploads = _asc!.buildUploads.values.toList();
+    _expect(
+      uploads.map((u) => u.state).join(' ') == 'FAILED PROCESSING COMPLETE' &&
+          uploads.every((u) => u.buildNumber == '$build'),
+      'App Store Connect got build $build three times, refused, stalled and '
+      'complete: ${uploads.map((u) => '${u.buildNumber} ${u.state}')}',
+    );
+    final ipa = uploads.last.file?.bytes;
+    _expect(
+      ipa != null &&
+          utf8.decode(ipa, allowMalformed: true) ==
+              'not a real IPA (release_e2e)\n' &&
+          uploads.last.build != null,
+      'the upload that went through carried the IPA of the build job and '
+      'became a build',
+    );
+    final parts = _asc!.requests.where(
+      (r) => r.uri.path.startsWith('/upload/'),
+    );
+    _expect(
+      parts.isNotEmpty && parts.every((r) => r.authorization == null),
+      'the parts of the uploads were sent without the token',
+    );
+    _expect(
+      !File(_argvLog).readAsStringSync().contains('altool'),
+      'no process ran altool: an API key uploads through the API',
+    );
+    _log('App Store Connect took build $build on the third upload');
 
     // ---- the stores review it: in_review, approved, live
     appleVersion.appVersionState = 'WAITING_FOR_REVIEW';
@@ -2083,14 +2133,20 @@ class _E2e {
   /// the owner, the pending approvals are approved with an app token, and
   /// each is recorded in [approved]. A pending approval of an action that is
   /// not in [allowed] fails the check.
+  ///
+  /// [failures] are the jobs expected to fail on the way, in order, each by
+  /// its name and a part of its message: each is checked and resumed. Any
+  /// other failure fails the check.
   Future<void> _driveRun(
     String id,
     Duration timeout,
     List<Map<String, dynamic>> approved,
-    Set<String> allowed,
-  ) async {
+    Set<String> allowed, {
+    List<(String, String)> failures = const [],
+  }) async {
     _lastRun = id;
     final deadline = DateTime.now().add(timeout);
+    final expected = [...failures];
     var last = '';
     while (DateTime.now().isBefore(deadline)) {
       final run = await _get('/runs/$id');
@@ -2099,7 +2155,14 @@ class _E2e {
         last = state;
         _log('run $id is $state');
       }
-      if (state == 'succeeded') return;
+      if (state == 'succeeded') {
+        _expect(expected.isEmpty, 'run $id failed as expected: $expected');
+        return;
+      }
+      if (state == 'failed' && expected.isNotEmpty) {
+        await _resumeFailedJob(run, expected.removeAt(0));
+        continue;
+      }
       if (state == 'failed' || state == 'cancelled') {
         throw _Failure('run $id $state');
       }
@@ -2123,6 +2186,34 @@ class _E2e {
       await Future<void>.delayed(const Duration(seconds: 2));
     }
     throw _Failure('run $id did not end in $timeout');
+  }
+
+  /// Checks that the one failed job of [run] is the job named in [failure]
+  /// and says what it says, then resumes it.
+  Future<void> _resumeFailedJob(
+    Map<String, dynamic> run,
+    (String, String) failure,
+  ) async {
+    final (name, says) = failure;
+    final failed = <Map<String, dynamic>>[];
+    for (final entry in run['jobs'] as List) {
+      final job = await _get('/jobs/${(entry as Map)['id']}');
+      if (job['state'] == 'failed') failed.add(job);
+    }
+    final job = failed.singleOrNull;
+    final text = [
+      job?['message'],
+      for (final step in job?['steps'] as List? ?? const [])
+        (step as Map)['message'],
+    ].whereType<String>().join(' ');
+    _expect(
+      job != null && job['name'] == name && text.contains(says),
+      'the failed job is $name and says "$says": '
+      '${failed.map((j) => '${j['name']}: $text')}',
+    );
+    _lastJob = job!['id']! as String;
+    _log('$name failed as expected ($says); resuming it');
+    await _post('/jobs/${job['id']}/resume', null, expect: 202);
   }
 
   Future<void> _waitForRunState(String id, String wanted) async {
@@ -2268,9 +2359,7 @@ class _E2e {
   ///     log has the arguments of all of them (`flutter`, `gradle` through it,
   ///     `xcrun`, ...), and every git call of the engine goes through `git`.
   ///     The log is the file `argv.log` of the work folder.
-  ///   - `xcrun` logs, and answers `altool` the way a successful upload
-  ///     does; it runs the real `xcrun` for anything else. (Faked: there is
-  ///     no Apple to upload to.)
+  ///   - `xcrun` logs, and runs the real `xcrun`.
   ///   - `fvm` fails, so that the engine takes the Flutter SDK that was put
   ///     in its cache instead of one of fvm's.
   void _writeShims() {
@@ -2287,18 +2376,7 @@ class _E2e {
     shim('perl', "${log('perl')}exec '${_real('perl')}' \"\$@\"\n");
     shim('git', "${log('git')}exec '${_real('git')}' \"\$@\"\n");
     shim('fvm', 'exit 1\n');
-    shim(
-      'xcrun',
-      '${log('xcrun')}'
-          'if [ "\$1" = altool ]; then\n'
-          '  echo "release_e2e: this stands in for xcrun altool"\n'
-          '  echo "No errors uploading the package."\n'
-          '  echo "UPLOAD SUCCEEDED with no errors"\n'
-          '  echo "Delivery UUID: 123e4567-e89b-12d3-a456-426614174000"\n'
-          '  exit 0\n'
-          'fi\n'
-          "exec '${_real('xcrun')}' \"\$@\"\n",
-    );
+    shim('xcrun', "${log('xcrun')}exec '${_real('xcrun')}' \"\$@\"\n");
   }
 
   /// Puts a Flutter SDK in the cache of the engine that runs everything with
@@ -2359,7 +2437,7 @@ class _E2e {
     final logs = haystacks.keys.where((path) => path.contains('/logs/'));
     final argv = haystacks[_argvLog]!;
     _expect(
-      logs.isNotEmpty && argv.contains('altool'),
+      logs.isNotEmpty && argv.contains('flutter'),
       'there are logs and a record of the arguments to scan',
     );
     final needles = <String, String>{

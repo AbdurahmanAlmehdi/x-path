@@ -783,7 +783,10 @@ class RunnerHub
       ..probeId = null
       ..probeDeadline = null;
     final before = session.record.capabilities;
-    final findings = _probe.evaluate(frame.results);
+    final findings = _probe.evaluate(
+      frame.results,
+      iosLinuxDirectory: frame.iosLinuxDir,
+    );
     final found = findings.capabilities;
     await _save(session, (stored) => stored.copyWith(capabilities: found));
     final record = session.record;

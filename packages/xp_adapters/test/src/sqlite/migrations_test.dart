@@ -234,6 +234,34 @@ INSERT INTO credential (id, name, kind, secret_key)
     });
   });
 
+  test('v16 gives the jobs of before no narrowing', () {
+    final path = '${tempDirectory().path}/xpath.db';
+    sqlite3.open(path)
+      ..execute(_golden(15))
+      ..userVersion = 15
+      ..execute('''
+INSERT INTO project (id, github_repo_id, remote, default_base_branch)
+  VALUES ('prj_1', 1, 'r', 'main');
+INSERT INTO workflow (id, project_id, name) VALUES ('wf_1', 'prj_1', 'w');
+INSERT INTO workflow_version (id, workflow_id, version, yaml)
+  VALUES ('wfv_1', 'wf_1', 1, '');
+INSERT INTO job (id, workflow_version_id, project_id, state)
+  VALUES ('job_1', 'wfv_1', 'prj_1', 'succeeded');
+''')
+      ..close();
+
+    final database = SqliteDatabase.open(path);
+    addTearDown(database.close);
+
+    expect(database.connection.userVersion, latest);
+    expect(
+      database.connection
+          .select("SELECT narrowing FROM job WHERE id = 'job_1'")
+          .single['narrowing'],
+      '[]',
+    );
+  });
+
   group('snapshot', () {
     for (var version = 1; version <= latest; version++) {
       test('v$version is what the first $version migration(s) build', () {

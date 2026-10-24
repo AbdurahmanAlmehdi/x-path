@@ -792,15 +792,19 @@ only ever faked or read from captured output.
   `SqliteAscCredentialSource` finds the key through the `asc_key` credential assigned to the flavor with the bundle id.
   `xpd serve` wires all of it in `apps/xpd/lib/src/stores/apple_stores.dart`; the `appStoreTrain` check and the
   step are registered there, and `buildNumberReuse` over both stores' numbers in `store_guard_checks.dart`.
-- **`upload.appStore`** (side effect, macOS only, always on the engine, D-09) runs `xcrun altool --upload-package
-  <ipa> --type ios --apple-id <id> --bundle-id <id> --bundle-version <build> --bundle-short-version-string
-  <version>` on the IPA of the job (it must still have the SHA-256 recorded for it). With an API key it adds
-  `--apiKey --apiIssuer` and writes the `.p8` as `AuthKey_<id>.p8` (`ApiKey_<id>.p8` for an individual key,
-  which is how altool tells them apart) into the job's private secret folder, pointing `API_PRIVATE_KEYS_DIR`
-  at it: never `~/.appstoreconnect`. The folder is deleted when the job ends and when the engine starts. With an
-  Apple ID it adds `-u <apple id> -p @env:XPATH_ASC_APP_PASSWORD`, so the app-specific password is in the
-  environment of altool only, masked in the log, never in `ps`.
-- **altool's output decides, not its exit code** (`AltoolOutput`). altool can exit 0 after Apple rejected the
+- **`upload.appStore`** (side effect, always on the engine, D-09; ADR 0014). With an API key (`asc_key`) it
+  uploads through the App Store Connect build-upload API on any engine, a Linux or Docker one included:
+  `POST /v1/buildUploads`, `POST /v1/buildUploadFiles`, a `PUT` of each part of the IPA to the address Apple
+  names (without the token, and never quoted in an error, since the address is signed), `PATCH` the file
+  uploaded with its MD5, then it polls the upload until App Store Connect accepts or refuses it, for at most
+  30 minutes. A refusal is told the way altool's are (`AltoolOutput.ofUploadErrors`, with the same fixes);
+  an upload still undecided fails with "resume the step later", and the resumed step finds the build if Apple
+  made one. The IPA must still have the SHA-256 recorded for it. With an Apple ID it runs, on macOS only,
+  `xcrun altool --upload-package <ipa> --type ios --apple-id <id> --bundle-id <id> --bundle-version <build>
+  --bundle-short-version-string <version> -u <apple id> -p @env:XPATH_ASC_APP_PASSWORD`, so the app-specific
+  password is in the environment of altool only, masked in the log, never in `ps`. Only that case needs
+  `ios-sign`.
+- **altool's output decides, not its exit code** (`AltoolOutput`, Apple ID uploads). altool can exit 0 after Apple rejected the
   build (a closed version train, for example). The step fails on any line with `ERROR:`, `ERROR ITMS-`, `*** Error:`,
   `validation failed`, `upload failed`, `VALIDATION_ERROR`, `failed to upload|validate package` or `unable to
   authenticate`, and tells the first three. Known codes get a fix: 90186 and 90062 (bump the version), 90189
@@ -1155,8 +1159,14 @@ stages:                        # required; run in order
   true. The default platforms are what the app has; the default flavors are the production flavors for a
   workflow with `lock: project` and the others otherwise (an app with one flavor always uses it).
 - **Capabilities.** A job needs what it declares plus what its steps imply: `android` and `flutter` for
-  `build.android`, `ios-sign` and `flutter` for `build.ios` and `upload.appStore`, the platform's for
-  Shorebird steps, `flutter` for `test` and `analyze`.
+  `build.android`, `ios-sign` and `flutter` for `build.ios`, `ios-sign` for `upload.appStore` with an Apple
+  ID (nothing with an API key), the platform's for Shorebird steps, `flutter` for `test` and `analyze`. A
+  need can be any of several capabilities, written `ios-sign|ios-linux` in the job's `capabilities`, the
+  first preferred. Once Linux iOS builds exist (part 2 of ADR 0014), `build.ios` needs any of `ios-sign`
+  and `ios-linux`, and the planner narrows a job Linux cannot build (a flavor, Shorebird iOS, a debug or
+  profile build, an app extension, the iOS Simulator) to `ios-sign` with the reasons (`iosLinuxLimits`),
+  which its queue message repeats; with no paired runner that offers `ios-sign` the dispatch fails. A
+  workflow cannot name `ios-linux` yet.
 
 ### Built-in workflows and versions
 
@@ -1226,8 +1236,9 @@ nothing, and the same state always gives the same pass.
 - **Capabilities.** The engine probes this machine (`LocalCapabilities`): `flutter` when `git` runs (the
   pinned SDK is fetched on demand), `android` when an Android SDK is found (`ANDROID_HOME`,
   `ANDROID_SDK_ROOT`, the default places of Android Studio), `ios-sign` when `xcode-select` and
-  `xcodebuild` find an Xcode, `swift-linux` when Linux has `swift`. A job goes to a runner that has all
-  it needs; if none does the job says "No runner can do ios-sign." and waits. `xpd serve` prints what it
+  `xcodebuild` find an Xcode, `swift-linux` when Linux has `swift`. A job goes to a runner that meets
+  every need, preferring the runner that meets an any-of need with its first capability (a Mac before a
+  Linux runner); if none does the job says "No runner can do ios-sign." and waits. `xpd serve` prints what it
   found. The `SchedulerRunner` interface (`id`, `capabilities`, `slots`, `accepts`, `launch`, `whenFinished`) is
   what the engine (`LocalRunner`) and the remote runners (`RemoteRunner`, see Runners) implement.
 - **Placement.** The engine is preferred: a job that fits it and finds a free slot there runs there. A remote
@@ -1365,10 +1376,15 @@ sends fixed commands (`RunnerProbe`) and derives the capabilities from what they
 `LocalCapabilities` for the engine's own machine: `flutter` when `git --version` runs, `android` when a folder with
 `platform-tools`, `cmdline-tools` or `build-tools` is `ANDROID_HOME`, `ANDROID_SDK_ROOT` or a default place of Android
 Studio, `ios-sign` on macOS (`uname -s`) when `xcode-select -p` and `xcodebuild -version` find an Xcode, `swift-linux` on
-Linux when `swift --version` runs. Nothing touches a keychain, and `xcodebuild` and `swift` are not even started where
+Linux when `swift --version` runs, and `ios-linux` on a Linux runner started with `XP_IOS_LINUX_DIR`: the runner adds
+the commands of that omarchy-apple-dev checkout and sends the folder (`iosLinuxDir`), and the engine checks its
+commit against the pin of this release, Swift, the darwin SDK bundle, `rcodesign`, the llvm tools and
+the pymobile3 python, each missing piece with its fix (`xp runner doctor` runs the same checks, and
+`install-service` writes the variable into the service). A runner without the variable never lists `ios-linux` as
+missing. Nothing touches a keychain, and `xcodebuild` and `swift` are not even started where
 macOS would answer with a dialog (`requires` and `onlyOn` in the command). A runner gets jobs only after it answered; a
 change of capabilities since the last connection is recorded as a `runner.capabilities_changed` event. The slots are
-`maxJobs` of the `hello`, else a quarter of the cores, at least one; `ios-sign` jobs run one at a time per runner.
+`maxJobs` of the `hello`, else a quarter of the cores, at least one; iOS jobs (`ios-sign` or `ios-linux`) run one at a time per runner.
 
 ### Leases and the 90 second rule (D-08)
 

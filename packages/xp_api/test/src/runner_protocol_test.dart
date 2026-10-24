@@ -37,6 +37,11 @@ void main() {
           ProbeResult(id: 'slow', status: ProbeStatus.timedOut, stderr: 'x'),
         ],
       ),
+      const ProbeResultFrame(
+        probeId: 'prb_2',
+        results: [],
+        iosLinuxDir: '/home/me/omarchy-apple-dev',
+      ),
       const LeaseAcceptFrame(jobId: 'job_1', leaseId: 'lse_1'),
       const LeaseRejectFrame(jobId: 'job_1', leaseId: 'lse_1', reason: 'busy'),
       const HeartbeatFrame(),
@@ -93,7 +98,7 @@ void main() {
     });
 
     test('leaves out what a frame lacks', () {
-      expect(frames[0].toJson().keys, {
+      expect(frames.whereType<HelloFrame>().first.toJson().keys, {
         'type',
         'version',
         'os',
@@ -102,7 +107,7 @@ void main() {
         'draining',
         'leases',
       });
-      expect(frames[8].toJson().keys, {
+      expect(frames.whereType<StepStateFrame>().first.toJson().keys, {
         'type',
         'jobId',
         'leaseId',
