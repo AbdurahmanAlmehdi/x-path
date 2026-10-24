@@ -25,6 +25,7 @@ void main() {
     Uri? baseUrl,
     int maxAttempts = 3,
     Duration timeout = const Duration(seconds: 60),
+    Duration uploadTimeout = const Duration(minutes: 10),
   }) {
     final created = HttpAppStoreConnect(
       key: key,
@@ -33,6 +34,7 @@ void main() {
       baseUrl: baseUrl ?? server.baseUrl,
       maxAttempts: maxAttempts,
       timeout: timeout,
+      uploadTimeout: uploadTimeout,
       sleep: (duration) async => sleeps.add(duration),
     );
     addTearDown(created.close);
@@ -429,6 +431,10 @@ void main() {
       expect(parts.map((part) => part.method).toSet(), {'PUT'});
       expect(parts.map((part) => part.authorization).toSet(), {null});
       expect(
+        parts.map((part) => part.contentType),
+        everyElement('application/octet-stream'),
+      );
+      expect(
         server.requests
             .where((request) => request.uri.path.startsWith('/v1/'))
             .map((request) => request.tokenProblem)
@@ -507,6 +513,101 @@ void main() {
         ),
       );
       expect(sleeps, isEmpty);
+    });
+
+    /// A client whose App Store Connect answers every call with a file of
+    /// one part at [partUrl], and whose upload host does what [part] says.
+    HttpAppStoreConnect onePart(
+      Uri partUrl,
+      Future<http.Response> Function(http.BaseRequest request) part, {
+      Duration uploadTimeout = const Duration(minutes: 10),
+    }) => client(
+      uploadTimeout: uploadTimeout,
+      httpClient: MockClient((request) async {
+        if (request.url.host == partUrl.host) return await part(request);
+        return http.Response(
+          jsonEncode({
+            'data': {
+              'type': 'buildUploadFiles',
+              'id': 'x',
+              'attributes': {
+                'uploadOperations': [
+                  {
+                    'method': 'PUT',
+                    'url': '$partUrl',
+                    'offset': 0,
+                    'length': ipa.length,
+                    'requestHeaders': [
+                      {
+                        'name': 'Content-Type',
+                        'value': 'application/octet-stream',
+                      },
+                    ],
+                  },
+                ],
+              },
+            },
+          }),
+          201,
+        );
+      }),
+    );
+
+    final signed = Uri.parse(
+      'https://upload.example/part/1?X-Amz-Signature=SECRET&expires=9',
+    );
+
+    test('send each part as told, without following a redirect', () async {
+      http.BaseRequest? sent;
+      final api = onePart(signed, (request) async {
+        sent = request;
+        return http.Response('', 200);
+      });
+
+      await upload(api: api);
+
+      expect(sent!.method, 'PUT');
+      expect(sent!.url, signed);
+      expect(sent!.followRedirects, isFalse);
+      expect(sent!.headers['Content-Type'], 'application/octet-stream');
+      expect(sent!.headers.containsKey('Authorization'), isFalse);
+    });
+
+    test('never name the signed address of a part that fails', () async {
+      final api = onePart(
+        signed,
+        (request) async =>
+            throw http.ClientException('Connection reset by $signed', signed),
+      );
+
+      final error = await upload(api: api)
+          .then<Object?>((_) => null, onError: (Object error) => error);
+
+      final message = (error! as AscServerException).message;
+      expect(message, startsWith('App Store Connect is not reachable: '));
+      expect(message, isNot(contains('SECRET')));
+      expect(message, isNot(contains('X-Amz-Signature')));
+      expect('$error', isNot(contains('SECRET')));
+    });
+
+    test('give up on a part that is not answered in time', () async {
+      final never = Completer<http.Response>();
+      final api = onePart(
+        signed,
+        (request) => never.future,
+        uploadTimeout: const Duration(milliseconds: 20),
+      );
+
+      await expectLater(
+        upload(api: api),
+        throwsA(
+          isA<AscServerException>().having(
+            (e) => e.message,
+            'message',
+            contains('did not answer in time'),
+          ),
+        ),
+      );
     });
 
     test('refuse an IPA that is not the size it was said to be', () async {

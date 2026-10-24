@@ -516,7 +516,9 @@ void main() {
     );
 
     Future<http.Response> put(Uri url, List<int> bytes) async {
-      final request = http.Request('PUT', url)..bodyBytes = bytes;
+      final request = http.Request('PUT', url)
+        ..headers['Content-Type'] = 'application/octet-stream'
+        ..bodyBytes = bytes;
       return await http.Response.fromStream(await client.send(request));
     }
 
@@ -665,8 +667,34 @@ void main() {
       );
     });
 
-    test('refuse what is missing or wrong', () async {
-      final noVersion = await call(
+    Future<String> uploadId() async =>
+        (json(await createUpload())['data'] as Map)['id'] as String;
+
+    /// A file of a new upload, with its operations.
+    Future<(String, List<Map<String, dynamic>>)> newFile() async {
+      final file = await createFile(await uploadId());
+      return (
+        (json(file)['data'] as Map)['id'] as String,
+        [
+          for (final operation
+              in attributes(file)['uploadOperations'] as List<dynamic>)
+            operation as Map<String, dynamic>,
+        ],
+      );
+    }
+
+    Future<void> sendAll(List<Map<String, dynamic>> operations) async {
+      for (final operation in operations) {
+        final offset = operation['offset'] as int;
+        await put(
+          Uri.parse(operation['url'] as String),
+          ipa.sublist(offset, offset + (operation['length'] as int)),
+        );
+      }
+    }
+
+    test('refuse an upload without its version', () async {
+      final response = await call(
         'POST',
         '/v1/buildUploads',
         body: {
@@ -676,45 +704,82 @@ void main() {
           },
         },
       );
-      final upload =
-          (json(await createUpload())['data'] as Map)['id'] as String;
-      final badFile = await call(
+
+      expect(response.statusCode, 409);
+    });
+
+    test('refuse a file that is not an IPA', () async {
+      final response = await call(
         'POST',
         '/v1/buildUploadFiles',
         body: {
           'data': {
             'type': 'buildUploadFiles',
             'attributes': {'fileName': 'app.ipa', 'fileSize': 12},
-            'relationships': {'buildUpload': link('buildUploads', upload)},
+            'relationships': {
+              'buildUpload': link('buildUploads', await uploadId()),
+            },
           },
         },
       );
-      final file = await createFile(upload);
-      final secondFile = await createFile(upload);
-      final fileId = (json(file)['data'] as Map)['id'] as String;
-      final operations = attributes(file)['uploadOperations'] as List<dynamic>;
-      final firstUrl = Uri.parse(
-        (operations.first as Map<String, dynamic>)['url'] as String,
-      );
-      final wrongSize = await put(firstUrl, ipa);
-      final early = await commit(fileId);
-      for (final operation in operations) {
-        final part = operation as Map<String, dynamic>;
-        final offset = part['offset'] as int;
-        await put(
-          Uri.parse(part['url'] as String),
-          ipa.sublist(offset, offset + (part['length'] as int)),
-        );
-      }
-      final wrongHash = await commit(fileId, hash: '0' * 32);
 
-      expect(noVersion.statusCode, 409);
-      expect(badFile.statusCode, 409);
-      expect(secondFile.statusCode, 409);
-      expect(wrongSize.statusCode, 400);
-      expect(early.statusCode, 409);
-      expect(wrongHash.statusCode, 409);
-      expect((await commit(fileId)).statusCode, 200);
+      expect(response.statusCode, 409);
+    });
+
+    test('refuse a second file of an upload', () async {
+      final upload = await uploadId();
+      await createFile(upload);
+
+      expect((await createFile(upload)).statusCode, 409);
+    });
+
+    test('refuse a part of the wrong size', () async {
+      final (_, operations) = await newFile();
+
+      final response = await put(
+        Uri.parse(operations.first['url'] as String),
+        ipa,
+      );
+
+      expect(response.statusCode, 400);
+    });
+
+    test('refuse to mark a file uploaded before every part is in', () async {
+      final (file, _) = await newFile();
+
+      expect((await commit(file)).statusCode, 409);
+    });
+
+    test('refuse a wrong checksum, or none', () async {
+      final (file, operations) = await newFile();
+      await sendAll(operations);
+      final none = await call(
+        'PATCH',
+        '/v1/buildUploadFiles/$file',
+        body: {
+          'data': {
+            'type': 'buildUploadFiles',
+            'id': file,
+            'attributes': {'uploaded': true},
+          },
+        },
+      );
+
+      expect((await commit(file, hash: '0' * 32)).statusCode, 409);
+      expect(none.statusCode, 409);
+      expect((await commit(file)).statusCode, 200);
+    });
+
+    test('record the media type of each part', () async {
+      final (_, operations) = await newFile();
+      await sendAll(operations);
+
+      expect(
+        server.requests
+            .where((request) => request.uri.path.startsWith('/upload/'))
+            .map((request) => request.contentType),
+        everyElement('application/octet-stream'),
+      );
     });
 
     test('answer 404 for what does not exist', () async {

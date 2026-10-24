@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart';
@@ -53,7 +54,7 @@ class HttpAppStoreConnect implements AppStoreConnect {
   /// How long one request has to be answered.
   final Duration timeout;
 
-  /// How long one part of a build upload has to be answered.
+  /// How long a part of a build upload has to be answered.
   final Duration uploadTimeout;
 
   final AscTokenProvider _tokens;
@@ -374,12 +375,18 @@ class HttpAppStoreConnect implements AppStoreConnect {
         'App Store Connect did not answer in time.',
       );
     } on http.ClientException catch (error) {
-      throw AscServerException(0, 'App Store Connect is not reachable: $error');
+      // Not the error itself: it names the address, and the address of an
+      // upload part is signed. Its message can quote it too.
+      final message = error.message.replaceAll(RegExp(r'\?\S*'), '');
+      throw AscServerException(
+        0,
+        'App Store Connect is not reachable: $message',
+      );
     }
   }
 
-  /// The upload operations of a build upload file, in the order of their
-  /// offsets. They must cover the [length] bytes of the file exactly.
+  /// The upload operations of a build upload file. They must cover the
+  /// [length] bytes of the file in order, as App Store Connect lists them.
   List<_UploadOperation> _operations(Object? value, int length) {
     final operations = [
       for (final operation in _resources(value))
@@ -393,7 +400,7 @@ class HttpAppStoreConnect implements AppStoreConnect {
               _string(header, 'name'): _string(header, 'value'),
           },
         ),
-    ]..sort((a, b) => a.offset.compareTo(b.offset));
+    ];
     var covered = 0;
     for (final operation in operations) {
       if (operation.offset != covered) break;
@@ -413,30 +420,57 @@ class HttpAppStoreConnect implements AppStoreConnect {
     List<_UploadOperation> operations,
     Stream<List<int>> content,
   ) async {
-    final digest = _DigestSink();
-    final hash = md5.startChunkedConversion(digest);
-    final pending = BytesBuilder(copy: false);
+    late Digest digest;
+    final hash = md5.startChunkedConversion(
+      ChunkedConversionSink<Digest>.withCallback(
+        (digests) => digest = digests.single,
+      ),
+    );
     var next = 0;
-    await for (final chunk in content) {
-      hash.add(chunk);
-      pending.add(chunk);
-      while (next < operations.length &&
-          pending.length >= operations[next].length) {
-        final operation = operations[next++];
-        final bytes = pending.takeBytes();
-        await _sendPart(operation, next, bytes.sublist(0, operation.length));
-        pending.add(bytes.sublist(operation.length));
-      }
+    await for (final part in _cut(content, [
+      for (final operation in operations) operation.length,
+    ])) {
+      hash.add(part);
+      await _sendPart(operations[next], ++next, part);
     }
     hash.close();
-    if (next < operations.length || pending.isNotEmpty) {
-      throw const AscServerException(
-        0,
-        'The IPA is not the size App Store Connect was told; nothing more '
-        'was sent.',
-      );
+    return '$digest';
+  }
+
+  /// [content] cut into parts of [lengths] bytes, copying each byte once.
+  static Stream<Uint8List> _cut(
+    Stream<List<int>> content,
+    List<int> lengths,
+  ) async* {
+    const wrongSize = AscServerException(
+      0,
+      'The IPA is not the size App Store Connect was told; nothing more was '
+      'sent.',
+    );
+    final chunks = StreamIterator(content);
+    var chunk = const <int>[];
+    var at = 0;
+    for (final length in lengths) {
+      final part = Uint8List(length);
+      var filled = 0;
+      while (filled < length) {
+        if (at == chunk.length) {
+          if (!await chunks.moveNext()) throw wrongSize;
+          chunk = chunks.current;
+          at = 0;
+          continue;
+        }
+        final taken = min(length - filled, chunk.length - at);
+        part.setRange(filled, filled + taken, chunk, at);
+        filled += taken;
+        at += taken;
+      }
+      yield part;
     }
-    return '${digest.value}';
+    if (at < chunk.length) throw wrongSize;
+    while (await chunks.moveNext()) {
+      if (chunks.current.isNotEmpty) throw wrongSize;
+    }
   }
 
   Future<void> _sendPart(
@@ -544,10 +578,12 @@ class HttpAppStoreConnect implements AppStoreConnect {
         if (item is Map<String, dynamic>) item,
   ];
 
-  Map<String, dynamic> _attributes(Map<String, dynamic> resource) {
-    final attributes = resource['attributes'];
-    return attributes is Map<String, dynamic> ? attributes : const {};
-  }
+  Map<String, dynamic> _attributes(Map<String, dynamic> resource) =>
+      _object(resource['attributes']);
+
+  /// [value] if it is a JSON object, else an empty one.
+  Map<String, dynamic> _object(Object? value) =>
+      value is Map<String, dynamic> ? value : const {};
 
   String _string(Map<String, dynamic> map, String field) {
     final value = map[field];
@@ -631,30 +667,21 @@ class HttpAppStoreConnect implements AppStoreConnect {
   }
 
   AscBuildUpload _buildUpload(Map<String, dynamic> resource) {
-    final state = _attributes(resource)['state'];
-    final details = state is Map<String, dynamic>
-        ? state
-        : const <String, dynamic>{};
+    final state = _object(_attributes(resource)['state']);
     List<AscUploadIssue> issues(String field) => [
-      for (final issue in _resources(details[field]))
+      for (final issue in _resources(state[field]))
         AscUploadIssue(
           code: _optional(issue, 'code') ?? '',
           description: _optional(issue, 'description') ?? '',
         ),
     ];
-    final relationships = resource['relationships'];
-    final build = relationships is Map<String, dynamic>
-        ? relationships['build']
-        : null;
-    final buildData = build is Map<String, dynamic> ? build['data'] : null;
+    final build = _object(_object(resource['relationships'])['build']);
     return AscBuildUpload(
       id: _string(resource, 'id'),
-      state: AscBuildUploadState.fromWire(_optional(details, 'state')),
+      state: AscBuildUploadState.fromWire(_optional(state, 'state')),
       errors: issues('errors'),
       warnings: issues('warnings'),
-      buildId: buildData is Map<String, dynamic>
-          ? _optional(buildData, 'id')
-          : null,
+      buildId: _optional(_object(build['data']), 'id'),
     );
   }
 
@@ -678,7 +705,6 @@ class HttpAppStoreConnect implements AppStoreConnect {
   }
 }
 
-/// A part of a build upload: where to send which bytes of the IPA.
 class _UploadOperation {
   const new({
     required this.method,
@@ -693,15 +719,4 @@ class _UploadOperation {
   final int offset;
   final int length;
   final Map<String, String> headers;
-}
-
-/// Keeps the digest a chunked hash ends with.
-class _DigestSink implements Sink<Digest> {
-  Digest? value;
-
-  @override
-  void add(Digest data) => value = data;
-
-  @override
-  void close() {}
 }

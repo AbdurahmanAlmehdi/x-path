@@ -279,6 +279,7 @@ class FakeAscRequest {
     required this.body,
     required this.tokenProblem,
     this.authorization,
+    this.contentType,
   });
 
   /// `GET`, `POST`, ...
@@ -297,6 +298,9 @@ class FakeAscRequest {
 
   /// The `Authorization` header, if the request had one.
   final String? authorization;
+
+  /// The media type of the `Content-Type` header, if it had one.
+  final String? contentType;
 
   @override
   String toString() => '$method ${uri.path}';

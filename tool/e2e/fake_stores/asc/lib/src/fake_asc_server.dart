@@ -220,6 +220,7 @@ class FakeAscServer {
         body: body,
         tokenProblem: problem,
         authorization: authorization,
+        contentType: request.headers.contentType?.mimeType,
       ),
     );
 
@@ -671,12 +672,12 @@ class FakeAscServer {
       for (final byte in MD5Digest().process(Uint8List.fromList(bytes)))
         byte.toRadixString(16).padLeft(2, '0'),
     ].join();
-    if (checksum != null && checksum != md5) {
+    if (checksum != md5) {
       throw const _AscError(
         409,
         'ENTITY_ERROR.ATTRIBUTE.INVALID',
         'The checksum does not match.',
-        'The MD5 of the parts is not the one sent.',
+        'sourceFileChecksums must hold the MD5 of the parts.',
       );
     }
     file.uploaded = true;
