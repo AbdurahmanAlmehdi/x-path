@@ -539,7 +539,26 @@ void main() {
       await tester.tap(find.byTooltip('Reveal in Finder'));
       await tester.pump();
       expect(revealed, ['/Downloads/mataa.ipa']);
-      expect(find.byTooltip('Copy path'), findsOneWidget);
+      String? copied;
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        (call) async {
+          if (call.method == 'Clipboard.setData') {
+            copied = (call.arguments as Map)['text'] as String;
+          }
+          return null;
+        },
+      );
+      addTearDown(
+        () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          SystemChannels.platform,
+          null,
+        ),
+      );
+      await tester.tap(find.byTooltip('Copy path'));
+      await tester.pump();
+      expect(copied, '/Downloads/mataa.ipa');
+      expect(find.text('Copied the path'), findsOneWidget);
     });
 
     testWidgets(
@@ -553,7 +572,46 @@ void main() {
           JobState.succeeded,
           steps: [step(0, 'test', StepState.succeeded)],
         );
-        final run = runningRun(runState: RunState.succeeded).run;
+        final ran = runningRun(runState: RunState.succeeded).run;
+        final run = Run(
+          id: ran.id,
+          projectId: ran.projectId,
+          workflowId: ran.workflowId,
+          workflowVersionId: ran.workflowVersionId,
+          sha: ran.sha,
+          state: RunState.succeeded,
+          locksProject: true,
+          createdAt: ran.createdAt,
+          jobs: const [],
+          request: const DispatchRequest(flavors: ['prod']),
+        );
+        final prod = mataa.profile.apps.single.flavors.first;
+        final withAppleId = Project(
+          id: mataa.id,
+          githubRepoId: mataa.githubRepoId,
+          fullName: mataa.fullName,
+          remote: mataa.remote,
+          defaultBaseBranch: mataa.defaultBaseBranch,
+          profile: ProjectProfile(
+            apps: [
+              AppProfile(
+                name: 'Mataa customer app',
+                path: '.',
+                hasIos: true,
+                hasAndroid: true,
+                flavors: [
+                  FlavorProfile(
+                    name: prod.name,
+                    entrypoint: prod.entrypoint,
+                    prod: true,
+                    androidAppId: prod.androidAppId,
+                    appleAppId: '1234567890',
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
         final tests = MockTestsRepository();
         when(() => tests.watchRun('job_tests'))
             .thenAnswer((_) => Stream.value(Snapshot(devRun)));
@@ -563,6 +621,7 @@ void main() {
         await harness.pump(
           tester,
           tests: tests,
+          project: withAppleId,
           services: testServices(openUrl: (url) async => opened.add(url)),
         );
         await tester.pump();
@@ -574,9 +633,11 @@ void main() {
           find.text('1284 passed · 27 failed · 3 skipped'),
           findsOneWidget,
         );
-        expect(find.text('App Store Connect · prod'), findsNothing);
+        expect(find.text('FLAVORS'), findsOneWidget);
+        await tester.tap(find.text('App Store Connect · prod'));
         await tester.tap(find.text('Google Play · prod'));
         expect(opened, [
+          Uri.parse('https://appstoreconnect.apple.com/apps/1234567890'),
           Uri.parse('https://play.google.com/store/apps/details?id=com.mataaa'),
         ]);
       },

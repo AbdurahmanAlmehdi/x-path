@@ -689,6 +689,11 @@ void main() {
         startsWith('WorkflowInUseException: '),
       );
       expect(
+        const WorkflowArchivedException('w').toString(),
+        'WorkflowArchivedException: The workflow "w" is archived. Unarchive '
+        'it to run it.',
+      );
+      expect(
         const WorkflowNameException('w').toString(),
         startsWith('WorkflowNameException: '),
       );

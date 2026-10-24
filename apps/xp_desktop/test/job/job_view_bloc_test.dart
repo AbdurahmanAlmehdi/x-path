@@ -204,7 +204,8 @@ void main() {
     );
 
     blocTest<JobViewBloc, JobViewState>(
-      'adds up the tests of a finished run, and says a newer version ran',
+      'adds up the tests of the jobs of a finished run, and says a newer '
+      'version ran',
       setUp: () {
         final testsRan = runningRun(
           iosState: JobState.succeeded,
@@ -216,7 +217,7 @@ void main() {
           run: testsRan.run,
           jobs: [
             for (final job in testsRan.jobs)
-              if (job.id == 'job_android')
+              if (job.id == 'job_android' || job.id == 'job_preflight')
                 Job(
                   id: job.id,
                   projectId: job.projectId,
@@ -230,7 +231,7 @@ void main() {
                 job,
           ],
         );
-        when(() => tests.watchRun('job_android')).thenAnswer(
+        when(() => tests.watchRun(any())).thenAnswer(
           (_) => Stream.value(
             Snapshot(
               TestRunResponse(
@@ -288,8 +289,16 @@ void main() {
         await pumpEventQueue();
       },
       verify: (bloc) {
-        expect(bloc.state.tests?.passed, 7);
-        expect(bloc.state.tests?.failed, 1);
+        expect(
+          bloc.state.tests,
+          const TestCounts(
+            total: 20,
+            passed: 14,
+            failed: 2,
+            errored: 2,
+            skipped: 2,
+          ),
+        );
         expect(bloc.state.ranVersion, 1);
         expect(bloc.state.newestVersion, 2);
         expect(bloc.state.workflowChanged, isTrue);

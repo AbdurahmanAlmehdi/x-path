@@ -53,6 +53,7 @@ class JobHarness {
     String? jobId,
     AppServices? services,
     TestsRepository? tests,
+    Project? project,
   }) async {
     await tester.pumpApp(
       JobPage(runId: 'run_1', jobId: jobId),
@@ -65,7 +66,7 @@ class JobHarness {
       workflowsRepository: workflows,
       runnersRepository: runners,
       projects: projectsIn(
-        const ProjectsState(loaded: true, projects: [mataa]),
+        ProjectsState(loaded: true, projects: [project ?? mataa]),
       ),
     );
     await tester.pump();

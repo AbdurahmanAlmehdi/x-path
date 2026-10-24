@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:test/test.dart';
+import 'package:xp_api/xp_api.dart';
 import 'package:xp_client/xp_client.dart';
 import 'package:xp_repositories/xp_repositories.dart';
 
@@ -13,6 +14,18 @@ void main() {
       expect(errorMessage(notFound), 'No such thing.');
       expect(errorMessage(offline), 'Connection refused.');
       expect(errorMessage(StateError('bug')), unexpectedErrorMessage);
+      expect(
+        errorReason(
+          const ApiException(
+            'Archived.',
+            statusCode: 409,
+            details: {'reason': ErrorReason.archived},
+          ),
+        ),
+        ErrorReason.archived,
+      );
+      expect(errorReason(const ApiException('No.', statusCode: 409)), isNull);
+      expect(errorReason(StateError('bug')), isNull);
       expect(errorMessage(const FileSystemException('Busy')), 'Busy');
       expect(
         errorMessage(
