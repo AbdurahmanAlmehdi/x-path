@@ -367,8 +367,12 @@ void main() {
         method: 'POST',
         status: 400,
       );
-      final run = Run.fromJson((await client.dispatch(id)).json);
-      expect(run.build, 1, reason: 'the dry run took no build number');
+      final again = await client.send('POST', '$path?dryRun=true');
+      expect(
+        DispatchPlan.fromJson(again.json).build,
+        1,
+        reason: 'the dry run took no build number',
+      );
     });
 
     test('GET runs 200, 400 and 404', () async {

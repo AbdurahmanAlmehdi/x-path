@@ -108,7 +108,13 @@ class _BoundTextFieldState extends State<BoundTextField> {
                         horizontal: 12,
                         vertical: 6,
                       ),
-                      child: XpCode(option.path),
+                      // Not selectable text: that would take the click.
+                      child: Text(
+                        option.path,
+                        style: context.xpType.code.copyWith(
+                          color: colors.textPrimary,
+                        ),
+                      ),
                     ),
                   ),
               ],

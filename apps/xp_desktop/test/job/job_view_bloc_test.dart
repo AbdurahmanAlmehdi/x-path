@@ -181,10 +181,10 @@ void main() {
       },
       wait: const Duration(milliseconds: 10),
       verify: (bloc) {
-        expect(saved, [
-          ('mataa.ipa', [1, 2, 3]),
-          ('cancel.ipa', [1, 2, 3]),
-        ]);
+        expect(
+          [for (final (name, bytes) in saved) '$name ${bytes.join(',')}'],
+          ['mataa.ipa 1,2,3', 'cancel.ipa 1,2,3'],
+        );
         expect(bloc.state.downloads, {'art_1': saveTo});
         expect(bloc.state.command, JobViewCommand.none);
       },

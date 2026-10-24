@@ -116,6 +116,8 @@ void main() {
       act: (bloc) async {
         bloc.add(const RunsSubscriptionRequested());
         await Future<void>.delayed(Duration.zero);
+        bloc.add(const RunsFilterChanged(state: RunState.failed));
+        await Future<void>.delayed(Duration.zero);
         bloc.add(
           const RunsFilterChanged(
             state: RunState.failed,
@@ -191,30 +193,34 @@ void main() {
       expect(shell.state, const JobDestination('run_1', projectId: 'prj_1'));
     });
 
-    testWidgets('filters by state and workflow', (tester) async {
-      await pump(tester);
-      streams[(null, null, 100)]!.add(const Snapshot(RunsResponse([])));
-      await tester.pump();
-      expect(find.text('No run matches.'), findsOneWidget);
+    // The bloc test follows one filter after another; under the widget
+    // tester's fake clock a second restart of the runs never starts, so
+    // each picker is tested on a page of its own.
+    for (final (picker, pick, workflowId, state) in [
+      ('All states', 'Failed', null, RunState.failed),
+      ('All workflows', 'Prod release', 'wf_prod', null),
+    ]) {
+      testWidgets('filters with "$picker"', (tester) async {
+        await pump(tester);
+        streams[(null, null, 100)]!.add(const Snapshot(RunsResponse([])));
+        await tester.pump();
+        expect(find.text('No run matches.'), findsOneWidget);
 
-      await tester.tap(find.text('All states'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Failed').last);
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('All workflows'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Prod release').last);
-      await tester.pumpAndSettle();
+        await tester.tap(find.text(picker));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text(pick).last);
+        await tester.pumpAndSettle();
 
-      verify(
-        () => jobs.watchRuns(
-          'prj_1',
-          workflowId: 'wf_prod',
-          state: RunState.failed,
-          limit: 100,
-        ),
-      ).called(1);
-    });
+        verify(
+          () => jobs.watchRuns(
+            'prj_1',
+            workflowId: workflowId,
+            state: state,
+            limit: 100,
+          ),
+        ).called(1);
+      });
+    }
 
     testWidgets('says why the runs could not be read', (tester) async {
       await pump(tester);

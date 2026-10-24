@@ -170,10 +170,11 @@ void main() {
       'build',
       'stage-3',
     ]);
-    expect(find.text('NAME'), findsOneWidget);
+    // The workflow shows again: its name and its inputs.
+    expect(find.text('INPUTS'), findsOneWidget);
 
     await press(tester, find.text('STORE RELEASE'));
-    expect(find.text('NAME'), findsOneWidget);
+    expect(find.text('INPUTS'), findsOneWidget);
   });
 
   testWidgets('edits a job: id, name, if, matrix and capabilities', (
@@ -333,7 +334,13 @@ void main() {
     await press(tester, find.text('Add step'));
 
     expect(find.text('Add a step'), findsOneWidget);
-    expect(find.text('BUILD'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byType(StepPickerDialog),
+        matching: find.text('BUILD'),
+      ),
+      findsOneWidget,
+    );
     expect(find.text('Build iOS'), findsOneWidget);
     expect(find.text('Builds and signs an IPA.'), findsOneWidget);
 

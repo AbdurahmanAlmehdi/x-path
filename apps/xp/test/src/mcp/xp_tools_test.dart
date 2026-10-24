@@ -245,7 +245,7 @@ void main() {
         'edits': {'apps': 'nope'},
       });
 
-      expect(missing.text, contains('"edits" is required'));
+      expect(message(missing), '"edits" is required.');
       expect(broken.isError, isTrue);
       expect(message(broken), startsWith('Invalid arguments'));
       expect((decoded(broken)! as Map)['code'], 'invalid_request');

@@ -47,6 +47,7 @@ void main() {
     Future<void> become(WidgetTester tester, EngineStatus status) async {
       statuses.add(connectedTo(status: status));
       await tester.pump();
+      await tester.pump();
     }
 
     final cachedAt = 'Cached · ${formatTime(testNow)}';

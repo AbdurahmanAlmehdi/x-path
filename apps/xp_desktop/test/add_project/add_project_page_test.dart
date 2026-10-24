@@ -1,4 +1,3 @@
-import 'package:flutter/material.dart' show TextField;
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
@@ -70,10 +69,10 @@ void main() {
       expect(shell.state, const AddProjectDestination());
       expect(
         tester
-            .widget<TextField>(
-              find.descendant(of: folder, matching: find.byType(TextField)),
+            .widget<EditableText>(
+              find.descendant(of: folder, matching: find.byType(EditableText)),
             )
-            .controller!
+            .controller
             .text,
         '/src/app',
       );
@@ -92,7 +91,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(
-        find.textContaining("GitHub refuses the engine's token"),
+        find.textContaining("GitHub refused the engine's token"),
         findsOneWidget,
       );
     });

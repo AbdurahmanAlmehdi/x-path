@@ -56,7 +56,7 @@ void main() {
       await OverviewHarness(recentRuns: [failedRun().run])
           .pump(tester, shell: shell);
 
-      await tester.scrollUntilVisible(find.text('RECENT RUNS'), 200);
+      expect(find.text('RECENT RUNS'), findsOneWidget);
       expect(find.text('Prod release'), findsWidgets);
       await tester.tap(find.text('All runs'));
       await tester.pump();
@@ -194,7 +194,8 @@ void main() {
       await tester.sendKeyEvent(LogicalKeyboardKey.keyN);
       await tester.sendKeyUpEvent(LogicalKeyboardKey.metaLeft);
       await tester.pumpAndSettle();
-      verifyNever(() => harness.workflows.listWorkflows(any()));
+      // No dispatch sheet opened: it would read the last workflow.
+      verifyNever(() => harness.workflows.lastWorkflow(any()));
       await tester.tap(find.text('Scan'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Scan again'));

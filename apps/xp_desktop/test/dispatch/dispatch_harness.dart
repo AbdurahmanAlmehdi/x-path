@@ -96,6 +96,7 @@ const releasePreview = DispatchPlan(
 /// workflows repository.
 class DispatchHarness {
   new() {
+    registerDispatchFallbacks();
     when(() => workflows.listWorkflows(any()))
         .thenAnswer((_) async => [prodSummary, devSummary]);
     when(() => workflows.getWorkflow(any(), any())).thenAnswer(

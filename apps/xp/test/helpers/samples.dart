@@ -77,6 +77,7 @@ Run run({
   String id = 'run_1',
   String? version,
   int? build,
+  DispatchRequest? request,
 }) => Run(
   id: id,
   projectId: 'prj_1',
@@ -87,6 +88,7 @@ Run run({
   locksProject: true,
   version: version,
   build: build,
+  request: request,
   createdAt: at,
   jobs: const [
     RunJob(id: 'job_1', name: 'prepare', stage: 0, state: JobState.running),

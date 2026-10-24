@@ -389,8 +389,9 @@ void main() {
         '',
       ]);
 
-      expect(sent().apps.single.path, 'apps/x');
-      expect(sent().apps.single.flavors.single.firebaseAppId, isNull);
+      final app = sent().apps.single;
+      expect(app.path, 'apps/x');
+      expect(app.flavors.single.firebaseAppId, isNull);
       verifyNever(() => env.client.getProject(any()));
     });
 

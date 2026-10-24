@@ -1,6 +1,5 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:material_ui/material_ui.dart';
-import 'package:xp_api/xp_api.dart';
 import 'package:xp_desktop/add_project/bloc/add_project_bloc.dart';
 import 'package:xp_desktop/app/app_services.dart';
 import 'package:xp_desktop/app/bloc/engine_connection_bloc.dart';
@@ -114,14 +113,8 @@ class _FormState extends State<_Form> {
                     l10n.addProjectRemoteNote(engine?.name ?? ''),
                   ),
                 ],
+                // The section says what is wrong with the token itself.
                 if (github.needsToken) ...[
-                  const SizedBox(height: 12),
-                  XpMessage(
-                    XpStatus.credentialMissing,
-                    github.status?.status == CredentialStatus.rejected
-                        ? l10n.addProjectGitHubRejected
-                        : l10n.addProjectNoGitHub,
-                  ),
                   const SizedBox(height: 12),
                   const XpPanel(
                     key: Key('addProject.github'),

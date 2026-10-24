@@ -350,7 +350,7 @@ class WorkflowTemplatesResponse extends Equatable {
 }
 
 /// The body of `POST /projects/{id}/workflows`.
-@JsonSerializable(includeIfNull: false, checked: true)
+@JsonSerializable(includeIfNull: false, checked: true, explicitToJson: true)
 class CreateWorkflowRequest extends Equatable {
   /// Creates a request.
   const new({required this.name, required this.yaml, this.basedOn});

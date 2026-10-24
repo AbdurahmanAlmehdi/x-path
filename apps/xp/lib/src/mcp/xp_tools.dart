@@ -711,10 +711,7 @@ Map<String, Object?> _validation(
 }) => {
   'valid': response.valid,
   'saved': saved,
-  'issues': [
-    for (final issue in response.issues)
-      {'line': issue.line, 'column': issue.column, 'message': issue.message},
-  ],
+  'issues': [for (final issue in response.issues) issue.toJson()],
 };
 
 Future<Map<String, Object?>> _runWithApprovals(XpClient client, Run run) async {

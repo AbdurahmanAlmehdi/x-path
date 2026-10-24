@@ -160,6 +160,7 @@ void main() {
       });
       expect(Expression.parse("'a' != 1").paths, isEmpty);
       expect(Expression.parse('platform').paths, {'platform'});
+      expect(Expression.parse('(a || b).c').paths, {'a', 'b'});
     });
   });
 

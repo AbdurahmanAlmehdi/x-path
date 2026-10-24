@@ -193,7 +193,7 @@ Map<String, dynamic> _$CreateWorkflowRequestToJson(
 ) => <String, dynamic>{
   'name': instance.name,
   'yaml': instance.yaml,
-  'basedOn': ?instance.basedOn,
+  'basedOn': ?instance.basedOn?.toJson(),
 };
 
 UpdateWorkflowRequest _$UpdateWorkflowRequestFromJson(

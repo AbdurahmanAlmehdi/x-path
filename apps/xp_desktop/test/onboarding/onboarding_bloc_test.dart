@@ -231,6 +231,7 @@ void main() {
     test('events compare by value', () {
       expect(request.props, ['This Mac', 'XPath app on MacBook']);
       expect(const OnboardingStarted(), const OnboardingStarted());
+      expect(const OnboardingStarted().props, isEmpty);
     });
   });
 }

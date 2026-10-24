@@ -73,6 +73,10 @@ void main() {
   );
 
   group('LocalEngineBloc', () {
+    test('events compare by value', () {
+      expect(const LocalEngineChecked().props, isEmpty);
+    });
+
     blocTest<LocalEngineBloc, LocalEngineState>(
       'checks whether the engine answers',
       build: build,

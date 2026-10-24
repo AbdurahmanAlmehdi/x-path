@@ -109,6 +109,46 @@ void main() {
 
       expect(WorkflowSummary.fromJson(summary.toJson()), summary);
       expect(WorkflowsResponse.fromJson(response.toJson()), response);
+      expect(summary.archived, isFalse);
+    });
+
+    test('say what a copy is based on, and when it was archived (UX-06)', () {
+      const basedOn = WorkflowBasedOn(builtin: 'dev-build', version: 3);
+      final summary = WorkflowSummary(
+        id: 'wf_2',
+        projectId: 'prj_1',
+        name: 'my-dev-build',
+        builtin: false,
+        version: version,
+        basedOn: basedOn,
+        archivedAt: created,
+      );
+
+      expect(basedOn.toJson(), {'builtin': 'dev-build', 'version': 3});
+      expect(WorkflowBasedOn.fromJson(basedOn.toJson()), basedOn);
+      expect(summary.archived, isTrue);
+      expect(WorkflowSummary.fromJson(summary.toJson()), summary);
+    });
+  });
+
+  group('templates', () {
+    test('round-trip through JSON', () {
+      const template = WorkflowTemplate(
+        id: 'android-firebase',
+        title: 'Android to Firebase',
+        description: 'Builds an APK and sends it to testers.',
+        yaml: 'schema: 1',
+      );
+      const response = WorkflowTemplatesResponse([template]);
+
+      expect(template.toJson(), {
+        'id': 'android-firebase',
+        'title': 'Android to Firebase',
+        'description': 'Builds an APK and sends it to testers.',
+        'yaml': 'schema: 1',
+      });
+      expect(WorkflowTemplate.fromJson(template.toJson()), template);
+      expect(WorkflowTemplatesResponse.fromJson(response.toJson()), response);
     });
   });
 
@@ -128,6 +168,35 @@ void main() {
       expect(const CreateWorkflowRequest(name: 'a', yaml: 'y').toJson(), {
         'name': 'a',
         'yaml': 'y',
+      });
+    });
+
+    test('a copy names its built-in, and an update only what changes', () {
+      const create = CreateWorkflowRequest(
+        name: 'mine',
+        yaml: 'y',
+        basedOn: WorkflowBasedOn(builtin: 'dev-build', version: 3),
+      );
+      expect(create.toJson(), {
+        'name': 'mine',
+        'yaml': 'y',
+        'basedOn': {'builtin': 'dev-build', 'version': 3},
+      });
+      expect(CreateWorkflowRequest.fromJson(create.toJson()), create);
+
+      const update = UpdateWorkflowRequest(
+        name: 'renamed',
+        archived: true,
+        basedOnVersion: 4,
+      );
+      expect(update.toJson(), {
+        'name': 'renamed',
+        'archived': true,
+        'basedOnVersion': 4,
+      });
+      expect(UpdateWorkflowRequest.fromJson(update.toJson()), update);
+      expect(const UpdateWorkflowRequest(archived: false).toJson(), {
+        'archived': false,
       });
     });
 

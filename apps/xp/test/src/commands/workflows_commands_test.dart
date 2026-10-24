@@ -188,20 +188,21 @@ void main() {
     });
 
     test('lists the issues one per line with hints and exits 65', () async {
-      when(() => env.client.validateWorkflow(null, any())).thenAnswer(
-        (_) async => const ValidateWorkflowResponse(
-          valid: false,
-          issues: [
-            WorkflowIssue(
-              line: 3,
-              column: 5,
-              message: 'Unknown step type "build.andriod".',
-              hint: 'Did you mean "build.android"?',
+      when(() => env.client.validateWorkflow(null, 'name: dev-build\n'))
+          .thenAnswer(
+            (_) async => const ValidateWorkflowResponse(
+              valid: false,
+              issues: [
+                WorkflowIssue(
+                  line: 3,
+                  column: 5,
+                  message: 'Unknown step type "build.andriod".',
+                  hint: 'Did you mean "build.android"?',
+                ),
+                WorkflowIssue(line: 9, column: 1, message: 'No jobs.'),
+              ],
             ),
-            WorkflowIssue(line: 9, column: 1, message: 'No jobs.'),
-          ],
-        ),
-      );
+          );
 
       final code = await env.run([
         'workflows',
@@ -273,6 +274,11 @@ void main() {
       '"inputs.notes"?\n'
       '  7:3: No jobs.',
     );
+  });
+
+  test('create without --file is a usage error', () async {
+    expect(await env.run(['workflows', 'create', 'prj_1', 'dev']), 64);
+    expect(env.logger.errors.single, contains('--file is required.'));
   });
 
   test('create saves a file as a new workflow', () async {

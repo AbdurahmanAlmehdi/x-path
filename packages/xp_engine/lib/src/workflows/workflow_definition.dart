@@ -56,7 +56,7 @@ final variableFields = <String, Set<String>>{
 List<String> get variablePaths {
   Iterable<String> below(String path) => [
     path,
-    for (final field in (variableFields[path]?.toList() ?? const [])..sort())
+    for (final field in [...?variableFields[path]]..sort())
       ...below('$path.$field'),
   ];
   return [

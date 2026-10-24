@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math';
 
 import 'package:bloc/bloc.dart';
 import 'package:equatable/equatable.dart';
@@ -63,10 +64,11 @@ class ToastCubit extends Cubit<ToastState> {
       onAction: onAction,
     );
     final shown = [...state.toasts, toast];
-    for (final old in shown.take(shown.length - limit)) {
+    final over = max(0, shown.length - limit);
+    for (final old in shown.take(over)) {
       _timers.remove(old.id)?.cancel();
     }
-    emit(ToastState(shown.skip(shown.length - limit).toList()));
+    emit(ToastState(shown.skip(over).toList()));
     _timers[toast.id] = Timer(toast.duration, () => dismiss(toast.id));
     return toast.id;
   }

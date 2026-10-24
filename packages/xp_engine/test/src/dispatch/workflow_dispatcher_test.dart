@@ -730,6 +730,16 @@ stages:
       );
     });
 
+    test('says a release version it cannot read is not one', () async {
+      await expectLater(
+        harness.dispatchBuiltin(
+          'dev-build',
+          const DispatchRequest(releaseVersion: 'latest'),
+        ),
+        _dispatchError('"latest" is not a version like 5.4.1.'),
+      );
+    });
+
     test('patches the shorebird flavors of the release', () async {
       harness.git.tags.addAll({
         'v1.2.0+30': 'c1',

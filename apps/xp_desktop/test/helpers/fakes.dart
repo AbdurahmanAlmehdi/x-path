@@ -335,6 +335,15 @@ class SessionHarness {
     when(() => client.listReleases(projectId: any(named: 'projectId')))
         .thenAnswer((_) async => []);
     when(client.listRunners).thenAnswer((_) async => []);
+    when(() => client.listWorkflows(any())).thenAnswer((_) async => []);
+    when(
+      () => client.listRuns(
+        projectId: any(named: 'projectId'),
+        workflowId: any(named: 'workflowId'),
+        state: any(named: 'state'),
+        limit: any(named: 'limit'),
+      ),
+    ).thenAnswer((_) async => const RunsResponse([]));
     when(client.getStorage).thenAnswer(
       (_) async => StorageReport(
         generatedAt: at,

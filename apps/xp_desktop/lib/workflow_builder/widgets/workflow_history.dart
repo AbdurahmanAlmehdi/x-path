@@ -127,22 +127,27 @@ class WorkflowVersionsDialog extends StatelessWidget {
           children: [
             Text(l10n.workflowsVersionFrom),
             const SizedBox(width: 8),
-            XpSelect<int>(
-              value: diff?.from ?? numbers.first,
-              values: numbers,
-              labelOf: label,
-              onChanged: (from) =>
-                  bloc.add(WorkflowVersionsCompared(from, diff?.to ?? newest)),
+            Flexible(
+              child: XpSelect<int>(
+                value: diff?.from ?? numbers.first,
+                values: numbers,
+                labelOf: label,
+                onChanged: (from) => bloc.add(
+                  WorkflowVersionsCompared(from, diff?.to ?? newest),
+                ),
+              ),
             ),
             const SizedBox(width: 16),
             Text(l10n.workflowsVersionTo),
             const SizedBox(width: 8),
-            XpSelect<int>(
-              value: diff?.to ?? newest,
-              values: numbers,
-              labelOf: label,
-              onChanged: (to) => bloc.add(
-                WorkflowVersionsCompared(diff?.from ?? numbers.first, to),
+            Flexible(
+              child: XpSelect<int>(
+                value: diff?.to ?? newest,
+                values: numbers,
+                labelOf: label,
+                onChanged: (to) => bloc.add(
+                  WorkflowVersionsCompared(diff?.from ?? numbers.first, to),
+                ),
               ),
             ),
           ],

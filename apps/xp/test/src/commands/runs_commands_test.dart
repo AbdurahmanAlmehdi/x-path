@@ -366,12 +366,28 @@ void main() {
 
       expect(env.logger.out, contains('run_1  running'));
       expect(env.logger.out, contains('sha: ${'a' * 40}'));
+      expect(env.logger.out, isNot(contains('flavors:')));
       verifyNever(
         () => env.client.listApprovals(
           projectId: any(named: 'projectId'),
           state: any(named: 'state'),
         ),
       );
+    });
+
+    test('show names the flavors and platforms it was for', () async {
+      when(() => env.client.getRun('run_1')).thenAnswer(
+        (_) async => sample.run(
+          request: const DispatchRequest(
+            flavors: ['prod', 'dev'],
+            platforms: ['ios'],
+          ),
+        ),
+      );
+
+      await env.runOk(['runs', 'show', 'run_1']);
+
+      expect(env.logger.out, contains('flavors: prod, dev  platforms: ios'));
     });
 
     test('show names the approval a waiting run needs', () async {
@@ -602,6 +618,28 @@ void main() {
       expect(out, endsWith('More with: xp runs list --before run_1'));
     });
 
+    test('names a project without a GitHub name by its id', () async {
+      when(() => env.client.listProjects()).thenAnswer(
+        (_) async => [
+          Project(
+            id: 'prj_1',
+            githubRepoId: 7,
+            fullName: '',
+            remote: sample.project.remote,
+            defaultBaseBranch: 'main',
+            scannedAt: sample.at,
+            profile: sample.project.profile,
+          ),
+        ],
+      );
+      when(() => env.client.listRuns(limit: 20))
+          .thenAnswer((_) async => RunsResponse([sample.run()]));
+
+      await env.runOk(['runs', 'list']);
+
+      expect(env.logger.out.split('\n')[1], contains('run_1  prj_1  '));
+    });
+
     test('of a project and workflow, by name', () async {
       when(
         () => env.client.listRuns(
@@ -740,6 +778,50 @@ void main() {
         () => env.client.followJobLogs('job_2', after: any(named: 'after')),
       );
     });
+
+    test(
+      'on a terminal, spins while a job waits and waits for the run',
+      () async {
+        final terminal = TestEnv(ansi: true);
+        addTearDown(terminal.dispose);
+        Run at(RunState state, JobState job) => Run(
+          id: 'run_1',
+          projectId: 'prj_1',
+          workflowId: 'wf_1',
+          workflowVersionId: 'wfv_1',
+          sha: 'a' * 40,
+          state: state,
+          locksProject: false,
+          createdAt: sample.at,
+          jobs: [RunJob(id: 'job_1', name: 'build', stage: 0, state: job)],
+        );
+        final states = [
+          at(RunState.queued, JobState.queued),
+          at(RunState.running, JobState.running),
+          at(RunState.running, JobState.succeeded),
+          at(RunState.succeeded, JobState.succeeded),
+        ];
+        when(() => terminal.client.getRun('run_1')).thenAnswer(
+          (_) async => states.length > 1 ? states.removeAt(0) : states.first,
+        );
+        when(
+          () => terminal.client.followJobLogs(
+            'job_1',
+            after: any(named: 'after'),
+          ),
+        ).thenAnswer(
+          (_) => Stream.fromIterable([
+            line('built'),
+            const LogEndFrame(state: JobState.succeeded),
+          ]),
+        );
+
+        expect(await terminal.run(['logs', 'run_1', '-f']), 0);
+        expect(terminal.logger.progresses, ['build waits for its turn']);
+        expect(terminal.logger.infos, contains('build | built'));
+        expect(states, hasLength(1), reason: 'polled until the run ended');
+      },
+    );
 
     test('exits 0 when the run succeeded', () async {
       when(() => env.client.getRun('run_1')).thenAnswer(

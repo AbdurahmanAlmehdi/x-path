@@ -41,6 +41,7 @@ import '../workflow_builder/workflow_builder_harness.dart';
 void main() {
   setUpAll(() {
     registerFallbackValue(const EngineCheckRequested());
+    registerDispatchFallbacks();
   });
 
   late MockProjectsRepository repository;

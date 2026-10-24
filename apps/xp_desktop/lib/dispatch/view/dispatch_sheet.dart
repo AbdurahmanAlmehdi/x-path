@@ -396,10 +396,13 @@ class _Form extends StatelessWidget {
                 ),
                 const SizedBox(width: 12),
                 if (state.preview?.version case final version?) ...[
-                  Text(
-                    versionLabel(version, state.preview?.build),
-                    style: context.xpType.code.copyWith(
-                      color: context.xpColors.textPrimary,
+                  Flexible(
+                    child: Text(
+                      versionLabel(version, state.preview?.build),
+                      overflow: TextOverflow.ellipsis,
+                      style: context.xpType.code.copyWith(
+                        color: context.xpColors.textPrimary,
+                      ),
                     ),
                   ),
                   const SizedBox(width: 8),

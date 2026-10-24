@@ -38,6 +38,15 @@ class RecordingLogger extends Logger {
   @override
   void success(String? message, {LogStyle? style}) => successes.add('$message');
 
+  /// What each spinner said while it turned.
+  final progresses = <String>[];
+
+  @override
+  Progress progress(String message, {ProgressOptions? options}) {
+    progresses.add(message);
+    return super.progress(message, options: options);
+  }
+
   /// Everything printed to standard output, one line per entry.
   String get out => infos.join('\n');
 }
@@ -96,7 +105,7 @@ class FakeUpdateCheck implements UpdateCheck {
 /// Everything a command test needs: a context whose client is a mock, a
 /// recording logger, a temporary config folder.
 class TestEnv {
-  new({Map<String, String>? environment}) {
+  new({Map<String, String>? environment, bool ansi = false}) {
     directory = Directory.systemTemp.createTempSync('xp_test');
     this.environment = {
       engineUrlVariable: 'http://engine:7480',
@@ -123,6 +132,7 @@ class TestEnv {
       logIdle: const Duration(milliseconds: 50),
       secretPrompt: prompt,
       pollInterval: Duration.zero,
+      ansi: ansi,
     );
     runner = XpCommandRunner(context: context);
     formatTimesInUtc = true;

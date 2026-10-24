@@ -154,8 +154,9 @@ class ShellCubit extends Cubit<ShellDestination> {
   /// Shows [destination], once the guard of the shown one (if any) lets it
   /// go.
   void show(ShellDestination destination) {
+    if (destination == state) return;
     final canLeave = _canLeave;
-    if (canLeave == null || destination == state) {
+    if (canLeave == null) {
       emit(destination);
       return;
     }

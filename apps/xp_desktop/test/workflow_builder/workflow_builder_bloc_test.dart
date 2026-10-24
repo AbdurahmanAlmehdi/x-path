@@ -402,7 +402,7 @@ void main() {
       act: (bloc) => bloc.add(const WorkflowImportRequested()),
       expect: () => const [
         WorkflowBuilderState(command: WorkflowCommand.importing),
-        WorkflowBuilderState(error: "FileSystemException: Gone, path = ''"),
+        WorkflowBuilderState(error: 'Gone'),
       ],
     );
   });
@@ -448,9 +448,7 @@ void main() {
       act: (bloc) => bloc.add(const WorkflowExportRequested()),
       expect: () => const [
         WorkflowBuilderState(command: WorkflowCommand.exporting),
-        WorkflowBuilderState(
-          error: "FileSystemException: Read-only, path = ''",
-        ),
+        WorkflowBuilderState(error: 'Read-only'),
       ],
     );
   });
