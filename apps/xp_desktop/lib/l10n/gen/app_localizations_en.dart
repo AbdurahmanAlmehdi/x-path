@@ -1503,6 +1503,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get dispatchCancel => 'Cancel';
 
   @override
+  String get dispatchUnplanned => 'Dispatch';
+
+  @override
   String dispatchButton(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,

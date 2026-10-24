@@ -90,6 +90,50 @@ void main() {
       expect(harness.result, runningRun().run);
     });
 
+    testWidgets('dispatches a ref the engine does not have yet', (
+      tester,
+    ) async {
+      final harness = DispatchHarness();
+      when(
+        () => harness.workflows.plan(
+          any(),
+          any(),
+          any(that: isA<DispatchRequest>().having((r) => r.ref, 'ref', 'new')),
+        ),
+      ).thenThrow(
+        const ApiException(
+          'This engine has no "new" yet.',
+          statusCode: 422,
+          code: ApiErrorCode.workflowInvalid,
+          hint: 'Dispatching fetches it from the repository first.',
+          details: {'reason': ErrorReason.refUnknown, 'ref': 'new'},
+        ),
+      );
+      when(() => harness.workflows.dispatch('prj_1', 'wf_prod', any()))
+          .thenAnswer((_) async => runningRun().run);
+      await harness.open(tester);
+
+      await tester.enterText(
+        find.byWidgetPredicate(
+          (widget) => widget is TextField && widget.controller?.text == 'main',
+        ),
+        'new',
+      );
+      await tester.pump(DispatchBloc.typingPause);
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text(
+          'This engine has no "new" yet. Dispatching fetches it from the '
+          'repository first.',
+        ),
+        findsOneWidget,
+      );
+      await tester.tap(find.widgetWithText(XpButton, 'Dispatch'));
+      await tester.pumpAndSettle();
+      expect(harness.result, runningRun().run);
+    });
+
     testWidgets('changes what it previews', (tester) async {
       final harness = DispatchHarness();
       await harness.open(tester);
@@ -446,6 +490,8 @@ void main() {
         text('firebaseAppIds'),
         '{"dev": {"android": "1:1:android:a"}}',
       );
+      // The preview waits for the typing to pause.
+      await tester.pump(DispatchBloc.typingPause);
       await tester.pumpAndSettle();
       await tester.tap(find.text('Dispatch 4 jobs'));
       await tester.pumpAndSettle();
@@ -480,6 +526,12 @@ void main() {
         ),
         '6.0.0',
       );
+      await tester.pumpAndSettle();
+      final waiting = tester.widget<XpButton>(
+        find.widgetWithText(XpButton, 'Dispatch 4 jobs'),
+      );
+      expect(waiting.onPressed, isNull, reason: 'the preview waits');
+      await tester.pump(DispatchBloc.typingPause);
       await tester.pumpAndSettle();
       await tester.tap(find.text('Dispatch 4 jobs'));
       await tester.pumpAndSettle();

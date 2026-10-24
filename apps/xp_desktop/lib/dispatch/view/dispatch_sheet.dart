@@ -138,7 +138,11 @@ class DispatchSheet extends StatelessWidget {
                           ),
                           const SizedBox(width: 8),
                           XpButton(
-                            label: l10n.dispatchButton(count),
+                            // A ref the engine fetches first has no plan.
+                            label:
+                                state.preview == null && state.refNotice != null
+                                ? l10n.dispatchUnplanned
+                                : l10n.dispatchButton(count),
                             hint: '⌘↩',
                             kind: XpButtonKind.primary,
                             size: XpButtonSize.large,
@@ -486,6 +490,9 @@ class _InputField extends StatelessWidget {
     final bloc = context.read<DispatchBloc>();
     void set(Object? value, {bool valid = true}) =>
         bloc.add(DispatchInputChanged(input.name, value, valid: valid));
+    void type(Object? value, {bool valid = true}) => bloc.add(
+      DispatchInputChanged(input.name, value, valid: valid, typed: true),
+    );
     final shown = value ?? input.defaultValue;
     final field = switch (input.type) {
       InputType.boolean => Align(
@@ -510,10 +517,10 @@ class _InputField extends StatelessWidget {
         ),
       ),
       InputType.release => _releasePicker(context, set),
-      InputType.json => _JsonInput(input: input, value: shown, onChanged: set),
+      InputType.json => _JsonInput(input: input, value: shown, onChanged: type),
       InputType.string || null => _TextInput(
         initial: shown == null ? '' : '$shown',
-        onChanged: (text) => set(text.isEmpty ? null : text),
+        onChanged: (text) => type(text.isEmpty ? null : text),
       ),
     };
     return Padding(

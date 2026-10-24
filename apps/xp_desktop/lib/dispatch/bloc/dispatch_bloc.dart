@@ -90,14 +90,18 @@ final class DispatchBumpChanged extends DispatchEvent {
 /// The owner set the input [name] to [value]; [valid] is false while the
 /// text of a JSON input does not parse.
 final class DispatchInputChanged extends DispatchEvent {
-  const new(this.name, this.value, {this.valid = true});
+  const new(this.name, this.value, {this.valid = true, this.typed = false});
 
   final String name;
   final Object? value;
   final bool valid;
 
+  /// Whether the owner types the value, rather than picking it: the
+  /// preview then waits for the typing to pause.
+  final bool typed;
+
   @override
-  List<Object?> get props => [name, value, valid];
+  List<Object?> get props => [name, value, valid, typed];
 }
 
 /// The owner typed the version `x.y.z` to release, instead of a bump.
@@ -120,10 +124,8 @@ final class _DispatchPreviewRequested extends DispatchEvent {
 
   /// Whether a field the owner types in changed: the preview waits until
   /// the typing pauses, so that the engine plans once, not per keystroke.
+  /// (Requests are never compared, so it is left out of `props`.)
   final bool typed;
-
-  @override
-  List<Object?> get props => [typed];
 }
 
 /// Whether the ref is a branch or a tag. Both are sent as `ref`; the
@@ -360,7 +362,7 @@ class DispatchBloc extends Bloc<DispatchEvent, DispatchState> {
     required this._workflows,
     required this._releases,
     required Project project,
-    this._typingPause = const Duration(milliseconds: 400),
+    this._typingPause = typingPause,
   }) : super(
          DispatchState(
            project: project,
@@ -419,7 +421,7 @@ class DispatchBloc extends Bloc<DispatchEvent, DispatchState> {
               ? ({...state.invalidInputs}..remove(event.name))
               : {...state.invalidInputs, event.name},
         ),
-        typed: true,
+        typed: event.typed,
       ),
     );
     on<_DispatchPreviewRequested>(_onPreview, transformer: restartable());
@@ -429,7 +431,10 @@ class DispatchBloc extends Bloc<DispatchEvent, DispatchState> {
   final WorkflowsRepository _workflows;
   final ReleasesRepository _releases;
 
-  /// How long typing pauses before the preview is worked out again.
+  /// How long typing pauses before the preview is worked out again, by
+  /// default.
+  static const typingPause = Duration(milliseconds: 400);
+
   final Duration _typingPause;
 
   void _changed(

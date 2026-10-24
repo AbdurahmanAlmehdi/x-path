@@ -2506,6 +2506,12 @@ abstract class AppLocalizations {
   /// **'Cancel'**
   String get dispatchCancel;
 
+  /// The dispatch button while the engine fetches the ref first, so it has no plan.
+  ///
+  /// In en, this message translates to:
+  /// **'Dispatch'**
+  String get dispatchUnplanned;
+
   /// The dispatch button.
   ///
   /// In en, this message translates to:
