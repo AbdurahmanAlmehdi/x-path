@@ -1174,6 +1174,12 @@ abstract class AppLocalizations {
   /// **'Not checked'**
   String get credentialUnchecked;
 
+  /// Toast: the engine checked a credential again.
+  ///
+  /// In en, this message translates to:
+  /// **'Checked {name}: {status}'**
+  String credentialCheckedToast(String name, String status);
+
   /// Toast: the engine checked and stored the credential.
   ///
   /// In en, this message translates to:
@@ -2115,6 +2121,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Flavors'**
   String get runSummaryFlavors;
+
+  /// Run summary: links to where the stores show the build.
+  ///
+  /// In en, this message translates to:
+  /// **'In the stores'**
+  String get runSummaryStores;
+
+  /// No description provided for @runSummaryAppStore.
+  ///
+  /// In en, this message translates to:
+  /// **'App Store Connect · {flavor}'**
+  String runSummaryAppStore(String flavor);
+
+  /// No description provided for @runSummaryPlay.
+  ///
+  /// In en, this message translates to:
+  /// **'Google Play · {flavor}'**
+  String runSummaryPlay(String flavor);
 
   /// No description provided for @logCopyLine.
   ///

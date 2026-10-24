@@ -669,6 +669,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get credentialUnchecked => 'Not checked';
 
   @override
+  String credentialCheckedToast(String name, String status) {
+    return 'Checked $name: $status';
+  }
+
+  @override
   String get credentialSavedToast => 'Credential saved';
 
   @override
@@ -1202,6 +1207,19 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get runSummaryFlavors => 'Flavors';
+
+  @override
+  String get runSummaryStores => 'In the stores';
+
+  @override
+  String runSummaryAppStore(String flavor) {
+    return 'App Store Connect · $flavor';
+  }
+
+  @override
+  String runSummaryPlay(String flavor) {
+    return 'Google Play · $flavor';
+  }
 
   @override
   String logCopyLine(int line) {

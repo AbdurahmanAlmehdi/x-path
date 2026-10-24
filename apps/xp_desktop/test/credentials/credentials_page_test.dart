@@ -295,6 +295,8 @@ void main() {
       await pump(tester, list: [teamKey]);
       await tapIn(tester, 'crd_1', 'Check now');
       verify(() => credentials.verifyCredential('crd_1')).called(1);
+      await tester.pump();
+      expect(find.textContaining('Checked Team App Store key'), findsOneWidget);
     });
 
     testWidgets('deletes an unused credential after a simple confirmation', (

@@ -29,6 +29,9 @@ typedef FileSaver = Future<String?> Function(
 /// Shows the file at [path] in Finder, selected.
 typedef FileRevealer = Future<void> Function(String path);
 
+/// Opens [url] in the browser.
+typedef UrlOpener = Future<void> Function(Uri url);
+
 /// Asks the user where to save the file whose bytes arrive on [content]
 /// (offering [suggestedName]) and writes it there; the path, or `null` when
 /// they cancel.
@@ -83,6 +86,7 @@ class AppServices {
     required this.saveFile,
     required this.saveDownload,
     required this.revealFile,
+    required this.openUrl,
     required this.engineLog,
     required this.deviceName,
     required this.alerts,
@@ -139,6 +143,9 @@ class AppServices {
       revealFile: (path) async {
         await Process.run('/usr/bin/open', ['-R', path]);
       },
+      openUrl: (url) async {
+        await Process.run('/usr/bin/open', ['$url']);
+      },
       engineLog: p.join(engineDataDirectory(home), 'service-logs', 'xpd.log'),
       deviceName: Platform.localHostname.split('.').first,
       alerts: MethodChannelNeedsYouAlerts(),
@@ -164,6 +171,7 @@ class AppServices {
   /// Saves a downloaded file, an artifact.
   final DownloadSaver saveDownload;
   final FileRevealer revealFile;
+  final UrlOpener openUrl;
 
   /// The log of the engine on this Mac, as its service writes it.
   final String engineLog;

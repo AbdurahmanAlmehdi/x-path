@@ -10,6 +10,7 @@ import 'package:xp_desktop/shell/cubit/shell_cubit.dart';
 import 'package:xp_desktop/widgets/widgets.dart';
 import 'package:xp_repositories/xp_repositories.dart';
 
+import '../helpers/engine_fixtures.dart';
 import '../helpers/fakes.dart';
 import '../helpers/job_fixtures.dart';
 import '../helpers/pump_app.dart';
@@ -539,6 +540,105 @@ void main() {
       await tester.pump();
       expect(revealed, ['/Downloads/mataa.ipa']);
       expect(find.byTooltip('Copy path'), findsOneWidget);
+    });
+
+    testWidgets(
+      'a finished run sums up its jobs and tests, and links to the stores',
+      (tester) async {
+        final opened = <Uri>[];
+        final testsJob = job(
+          'job_tests',
+          'Tests prod',
+          0,
+          JobState.succeeded,
+          steps: [step(0, 'test', StepState.succeeded)],
+        );
+        final run = runningRun(runState: RunState.succeeded).run;
+        final tests = MockTestsRepository();
+        when(() => tests.watchRun('job_tests'))
+            .thenAnswer((_) => Stream.value(Snapshot(devRun)));
+        final harness = JobHarness(
+          run: RunJobs(run: run, jobs: [testsJob]),
+        );
+        await harness.pump(
+          tester,
+          tests: tests,
+          services: testServices(openUrl: (url) async => opened.add(url)),
+        );
+        await tester.pump();
+
+        expect(find.text('JOBS'), findsOneWidget);
+        expect(find.text('1 succeeded'), findsOneWidget);
+        expect(find.text('TESTS'), findsOneWidget);
+        expect(
+          find.text('1284 passed · 27 failed · 3 skipped'),
+          findsOneWidget,
+        );
+        expect(find.text('App Store Connect · prod'), findsNothing);
+        await tester.tap(find.text('Google Play · prod'));
+        expect(opened, [
+          Uri.parse('https://play.google.com/store/apps/details?id=com.mataaa'),
+        ]);
+      },
+    );
+
+    test('links to the stores of each flavor it ran for', () {
+      final ran = runningRun(runState: RunState.succeeded).run;
+      Run asked(List<String>? flavors) => Run(
+        id: ran.id,
+        projectId: ran.projectId,
+        workflowId: ran.workflowId,
+        workflowVersionId: ran.workflowVersionId,
+        sha: ran.sha,
+        state: RunState.succeeded,
+        locksProject: true,
+        createdAt: ran.createdAt,
+        jobs: const [],
+        request: DispatchRequest(flavors: flavors),
+      );
+      final withIds = Project(
+        id: mataa.id,
+        githubRepoId: mataa.githubRepoId,
+        fullName: mataa.fullName,
+        remote: mataa.remote,
+        defaultBaseBranch: mataa.defaultBaseBranch,
+        profile: const ProjectProfile(
+          apps: [
+            AppProfile(
+              name: 'app',
+              path: '.',
+              hasIos: true,
+              hasAndroid: true,
+              flavors: [
+                FlavorProfile(
+                  name: 'prod',
+                  entrypoint: 'lib/main.dart',
+                  prod: true,
+                  androidAppId: 'com.a',
+                  appleAppId: '123',
+                ),
+                FlavorProfile(
+                  name: 'dev',
+                  entrypoint: 'lib/main_dev.dart',
+                  androidAppId: 'com.a.dev',
+                  appleAppId: '456',
+                ),
+              ],
+            ),
+          ],
+        ),
+      );
+
+      expect(
+        [
+          for (final link in storeLinks(asked(['dev']), withIds)) '${link.url}',
+        ],
+        ['https://appstoreconnect.apple.com/apps/456'],
+        reason: 'Google Play only for a production flavor',
+      );
+      expect(storeLinks(asked(null), withIds), hasLength(3));
+      expect(storeLinks(asked(null), null), isEmpty);
+      expect(storeLinks(runningRun().run, withIds), isEmpty);
     });
 
     testWidgets('a finished run offers to run again only', (tester) async {

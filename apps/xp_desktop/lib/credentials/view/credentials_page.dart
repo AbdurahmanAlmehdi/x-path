@@ -95,6 +95,19 @@ class _CredentialsViewState extends State<CredentialsView> {
         ),
         BlocListener<CredentialsBloc, CredentialsState>(
           listenWhen: (previous, current) =>
+              current.checked != null && previous.checked != current.checked,
+          listener: (context, state) {
+            final checked = state.checked!;
+            context.read<ToastCubit>().show(
+              l10n.credentialCheckedToast(
+                checked.name,
+                credentialStatusLabel(l10n, checked.status).$2,
+              ),
+            );
+          },
+        ),
+        BlocListener<CredentialsBloc, CredentialsState>(
+          listenWhen: (previous, current) =>
               current.inUse != null && previous.inUse != current.inUse,
           listener: (context, state) {
             final conflict = state.inUse!;

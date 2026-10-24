@@ -52,10 +52,12 @@ class JobHarness {
     ShellCubit? shell,
     String? jobId,
     AppServices? services,
+    TestsRepository? tests,
   }) async {
     await tester.pumpApp(
       JobPage(runId: 'run_1', jobId: jobId),
       services: services,
+      testsRepository: tests,
       brightness: brightness,
       connection: connection,
       shell: shell,

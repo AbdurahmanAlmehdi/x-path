@@ -443,6 +443,10 @@ class RunSummary extends StatelessWidget {
       ended[job.state] = (ended[job.state] ?? 0) + 1;
     }
     final tests = state.tests;
+    final links = storeLinks(
+      run,
+      context.watch<ProjectsBloc>().state.byId(run.projectId),
+    );
     Widget fact(String label, String value) => Padding(
       padding: const EdgeInsets.only(right: 20),
       child: Column(
@@ -487,6 +491,31 @@ class RunSummary extends StatelessWidget {
                 fact(l10n.runSummaryFlavors, flavors.join(', ')),
             ],
           ),
+          if (links.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            XpSectionLabel(l10n.runSummaryStores),
+            const SizedBox(height: 4),
+            Wrap(
+              spacing: 8,
+              runSpacing: 4,
+              children: [
+                for (final link in links)
+                  XpButton(
+                    label: link.apple
+                        ? l10n.runSummaryAppStore(link.flavor)
+                        : l10n.runSummaryPlay(link.flavor),
+                    icon: link.apple
+                        ? PhosphorIconsRegular.appStoreLogo
+                        : PhosphorIconsRegular.googlePlayLogo,
+                    kind: XpButtonKind.tertiary,
+                    size: XpButtonSize.small,
+                    onPressed: () => unawaited(
+                      context.read<AppServices>().openUrl(link.url),
+                    ),
+                  ),
+              ],
+            ),
+          ],
           if (state.workflowChanged) ...[
             const SizedBox(height: 6),
             Text(
@@ -498,6 +527,42 @@ class RunSummary extends StatelessWidget {
       ),
     );
   }
+}
+
+/// A page of a store that shows what a run built for a flavor: App Store
+/// Connect when `apple`, else Google Play.
+typedef StoreLink = ({String flavor, bool apple, Uri url});
+
+/// Where the stores show what [run] built for [project]: App Store Connect
+/// for a flavor with its App Store app id, Google Play for a production
+/// flavor with its Android id. Only a run that succeeded put anything there.
+List<StoreLink> storeLinks(Run run, Project? project) {
+  if (run.state != RunState.succeeded || project == null) return const [];
+  final apps = project.profile.apps;
+  final path = run.request?.app ?? '.';
+  final app =
+      apps.where((app) => app.path == path).firstOrNull ?? apps.firstOrNull;
+  if (app == null) return const [];
+  final asked = run.request?.flavors;
+  return [
+    for (final flavor in app.flavors)
+      if (asked == null || asked.contains(flavor.name)) ...[
+        if (flavor.appleAppId case final id?)
+          (
+            flavor: flavor.name,
+            apple: true,
+            url: Uri.https('appstoreconnect.apple.com', '/apps/$id'),
+          ),
+        if (flavor.androidAppId case final id? when flavor.prod)
+          (
+            flavor: flavor.name,
+            apple: false,
+            url: Uri.https('play.google.com', '/store/apps/details', {
+              'id': id,
+            }),
+          ),
+      ],
+  ];
 }
 
 /// The hero of a run: its status and what to call it. A run with an
