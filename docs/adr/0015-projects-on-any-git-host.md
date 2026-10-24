@@ -32,6 +32,13 @@ mirror, the runner cache and the worktrees.
   is rebuilt with SQLite's 12-step procedure in a migration that runs with foreign keys off (Q5);
   the migration runner checks `PRAGMA foreign_key_check` before it commits. Negative synthetic
   GitHub ids were rejected: a fake id would reach the API and step inputs.
+- The `github_default_branch` column (`githubDefaultBranch`) keeps its name but now holds the
+  default branch of the origin on any host: GitHub's for a GitHub project, `git ls-remote`'s for
+  any other. Renaming it would touch every reader for no change in meaning.
+- An app of 1.x works with an engine of another 1.x (the install guide), so a newer app may read
+  projects from an engine older than this ADR, which sends neither `host` nor `sourceKey`. The
+  API model reads those as `github.com` and the GitHub repository id; the fallback can go once API
+  1 is no longer served.
 
 **Other hosts are added by SSH or `file://`.**
 
