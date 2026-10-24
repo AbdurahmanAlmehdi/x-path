@@ -5,6 +5,7 @@ import 'package:xp_api/xp_api.dart';
 import 'package:xp_desktop/app/app_services.dart';
 import 'package:xp_desktop/projects/bloc/projects_bloc.dart';
 import 'package:xp_desktop/shell/cubit/shell_cubit.dart';
+import 'package:xp_desktop/toast/cubit/toast_cubit.dart';
 import 'package:xp_desktop/workflow_builder/workflow_builder.dart';
 
 import '../helpers/fakes.dart';
@@ -189,10 +190,12 @@ Future<void> pumpBuilder(
   FilePicker? pickFile,
   FileSaver? saveFile,
   ShellCubit? shell,
+  ToastCubit? toasts,
 }) async {
   await tester.pumpApp(
     WorkflowBuilderPage(projectId: 'prj_1', workflowId: workflowId),
     shell: shell,
+    toasts: toasts,
     workflowsRepository: repository ?? workflowsRepository(),
     services: testServices(pickFile: pickFile, saveFile: saveFile),
     brightness: brightness,

@@ -71,11 +71,15 @@ class _LeaveGuard extends StatefulWidget {
 
 class _LeaveGuardState extends State<_LeaveGuard> {
   late final void Function() _release;
+  late final ToastCubit _toasts;
+  late final WorkflowBuilderBloc _bloc;
 
   @override
   void initState() {
     super.initState();
     _release = context.read<ShellCubit>().guard(_canLeave);
+    _toasts = context.read<ToastCubit>();
+    _bloc = context.read<WorkflowBuilderBloc>();
   }
 
   Future<bool> _canLeave() async {
@@ -90,6 +94,8 @@ class _LeaveGuardState extends State<_LeaveGuard> {
   @override
   void dispose() {
     _release();
+    // Their Undo would reach a builder that is gone.
+    _toasts.dismissOf(_bloc);
     super.dispose();
   }
 
@@ -253,8 +259,12 @@ class WorkflowBuilderView extends StatelessWidget {
                     l10n.workflowsArchivedToast(workflow.name),
                     action: l10n.toastUndo,
                     onAction: () => bloc.add(
-                      const WorkflowArchiveRequested(archived: false),
+                      WorkflowArchiveRequested(
+                        archived: false,
+                        workflowId: workflow.id,
+                      ),
                     ),
+                    owner: bloc,
                   );
                 }
               },
@@ -449,11 +459,16 @@ class _Visual extends StatelessWidget {
           schema: state.schema,
           enabled: enabled,
           onEdit: edit,
-          onRemoved: (message) => context.read<ToastCubit>().show(
-            message,
-            action: context.l10n.toastUndo,
-            onAction: () => bloc.add(const WorkflowUndoRequested()),
-          ),
+          onRemoved: (message) {
+            // Called before the removal: the document still has it.
+            final before = bloc.state.yaml;
+            context.read<ToastCubit>().show(
+              message,
+              action: context.l10n.toastUndo,
+              onAction: () => bloc.add(WorkflowRestored(before)),
+              owner: bloc,
+            );
+          },
         ),
       ],
     );

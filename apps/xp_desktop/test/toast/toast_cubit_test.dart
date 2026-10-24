@@ -6,22 +6,21 @@ void main() {
   group('ToastCubit', () {
     blocTest<ToastCubit, ToastState>(
       'shows toasts, oldest first, and at most its limit',
-      build: () => ToastCubit(limit: 2),
+      build: ToastCubit.new,
       act: (cubit) => cubit
         ..show('one')
         ..show('two')
-        ..show('three'),
+        ..show('three')
+        ..show('four'),
+      skip: 3,
       expect: () => const [
-        ToastState([Toast(id: 0, message: 'one')]),
-        ToastState([
-          Toast(id: 0, message: 'one'),
-          Toast(id: 1, message: 'two'),
-        ]),
         ToastState([
           Toast(id: 1, message: 'two'),
           Toast(id: 2, message: 'three'),
+          Toast(id: 3, message: 'four'),
         ]),
       ],
+      verify: (_) => expect(ToastCubit.limit, 3),
     );
 
     testWidgets('takes a toast away after its time, longer with an action', (
@@ -31,9 +30,11 @@ void main() {
         ..show('Saved')
         ..show('Removed', action: 'Undo', onAction: () {});
 
-      await tester.pump(toastShort);
+      final [saved, removed] = cubit.state.toasts;
+      expect(removed.duration, greaterThan(saved.duration));
+      await tester.pump(saved.duration);
       expect(cubit.state.toasts.map((t) => t.message), ['Removed']);
-      await tester.pump(toastLong - toastShort);
+      await tester.pump(removed.duration - saved.duration);
       expect(cubit.state.toasts, isEmpty);
       await cubit.close();
     });
@@ -56,11 +57,23 @@ void main() {
       await cubit.close();
     });
 
-    test('offers no action without one to do', () async {
-      final cubit = ToastCubit()..show('Saved', action: 'Undo');
+    test('an action comes with what it does', () async {
+      final cubit = ToastCubit();
+      expect(() => cubit.show('Saved', action: 'Undo'), throwsAssertionError);
+      expect(() => cubit.show('Saved', onAction: () {}), throwsAssertionError);
+      await cubit.close();
+    });
 
-      expect(cubit.state.toasts.single.action, isNull);
-      expect(cubit.state.toasts.single.duration, toastShort);
+    test('takes away the toasts of an owner, and only those', () async {
+      final cubit = ToastCubit();
+      final page = Object();
+      cubit
+        ..show('Removed job', action: 'Undo', onAction: () {}, owner: page)
+        ..show('Saved')
+        ..show('Removed step', action: 'Undo', onAction: () {}, owner: page)
+        ..dismissOf(page);
+
+      expect(cubit.state.toasts.map((t) => t.message), ['Saved']);
       await cubit.close();
     });
 

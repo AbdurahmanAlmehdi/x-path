@@ -48,7 +48,7 @@ void main() {
     await tester.pump();
     expect(find.text('Saved'), findsOneWidget);
 
-    await tester.pump(toastShort);
+    await tester.pump(toasts.state.toasts.single.duration);
     expect(find.text('Saved'), findsNothing);
     expect(context(tester).read<ToastCubit>(), toasts);
   });

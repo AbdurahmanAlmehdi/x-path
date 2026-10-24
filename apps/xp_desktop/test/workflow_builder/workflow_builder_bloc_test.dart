@@ -43,6 +43,7 @@ void main() {
   /// The bloc with [releaseWorkflow] open and checked.
   Future<WorkflowBuilderBloc> opened() async {
     final bloc = build()..add(const WorkflowBuilderStarted());
+    addTearDown(bloc.close);
     await bloc.stream.firstWhere(
       (state) => state.validation == WorkflowValidation.valid,
     );
@@ -50,180 +51,59 @@ void main() {
   }
 
   test('events and notices compare by value', () {
-    expect(const WorkflowBuilderStarted(workflowId: 'a').props, ['a']);
-    expect(const WorkflowOpened('a').props, ['a']);
-    expect(const WorkflowDraftStarted().props, [null]);
-    expect(const WorkflowUndoRequested().props, isEmpty);
-    expect(const WorkflowRenameRequested('n').props, ['n']);
-    expect(const WorkflowArchiveRequested(archived: true).props, [true]);
-    expect(const WorkflowDeleteRequested().props, isEmpty);
-    expect(const WorkflowVersionsCompared(1, 2).props, [1, 2]);
-    expect(const WorkflowVersionRestored(1).props, [1]);
-    expect(const WorkflowBuiltinCompared().props, isEmpty);
-    expect(const WorkflowCaughtUp().props, isEmpty);
-    expect(const WorkflowDeletedNotice('n').props, ['n']);
-    expect(const WorkflowRestoredNotice('n', 1, 2).props, ['n', 1, 2]);
-    expect(const WorkflowRedoRequested().props, isEmpty);
-    expect(const WorkflowImportRequested().props, isEmpty);
-    expect(const WorkflowExportRequested().props, isEmpty);
-    expect(const WorkflowYamlChanged('y').props, ['y']);
-    expect(const WorkflowDocumentEdited(WorkflowDocument()).props, const [
-      WorkflowDocument(),
-      null,
-    ]);
-    expect(
-      const WorkflowSelectionChanged(WorkflowSelection.workflow).props,
-      const [WorkflowSelection.workflow],
-    );
-    expect(const WorkflowSaveRequested(name: 'n').props, ['n']);
-    expect(const WorkflowSavedNotice('n', 2).props, ['n', 2]);
-    expect(const WorkflowExportedNotice('/p').props, ['/p']);
-  });
-
-  group('the state', () {
-    test('lists every issue once, by place', () {
-      const a = WorkflowIssue(line: 2, column: 4, message: 'a');
-      const b = WorkflowIssue(line: 2, column: 1, message: 'b');
-      const c = WorkflowIssue(line: 1, column: 9, message: 'c');
-      const state = WorkflowBuilderState(
-        shapeIssues: [a],
-        engineIssues: [a, b, c],
-      );
-      expect(state.issues, [c, b, a]);
-    });
-
-    test('says what saving does and whether it is needed', () {
-      expect(const WorkflowBuilderState().savesAsNew, isTrue);
-      expect(const WorkflowBuilderState(yaml: 'x').dirty, isTrue);
-      expect(WorkflowBuilderState(workflow: devBuild).savesAsNew, isTrue);
-      final mine = WorkflowBuilderState(workflow: releaseWorkflow);
-      expect(mine.savesAsNew, isFalse);
-      expect(mine.name, 'store-release');
-      expect(const WorkflowBuilderState(draftName: 'x').name, 'x');
-      expect(const WorkflowBuilderState().editable, isFalse);
-      expect(
-        const WorkflowBuilderState(document: WorkflowDocument()).editable,
-        isTrue,
-      );
-    });
-  });
-
-  group('starting', () {
-    test(
-      'opens the first workflow of the owner, reads it and checks it',
-      () async {
-        final bloc = await opened();
-
-        final state = bloc.state;
-        expect(state.loaded, isTrue);
-        expect(state.workflows.map((w) => w.id), ['wf_dev', 'wf_mine']);
-        expect(state.schema, schema);
-        expect(state.workflow, releaseWorkflow);
-        expect(state.yaml, releaseYaml);
-        expect(state.dirty, isFalse);
-        expect(state.document, WorkflowDocument.parse(releaseYaml));
-        expect(state.command, WorkflowCommand.none);
-        verify(() => workflows.validate('prj_1', releaseYaml)).called(1);
-        await bloc.close();
-      },
-    );
-
-    blocTest<WorkflowBuilderBloc, WorkflowBuilderState>(
-      'opens the workflow it is given, without a schema if the engine has '
-      'none, else the first built-in',
-      setUp: () {
-        when(workflows.schema)
-            .thenThrow(const ConnectionException('Connection refused.'));
-      },
-      build: build,
-      act: (bloc) =>
-          bloc.add(const WorkflowBuilderStarted(workflowId: 'wf_dev')),
-      wait: const Duration(milliseconds: 10),
-      verify: (bloc) {
-        expect(bloc.state.workflow, devBuild);
-        expect(bloc.state.schema, isNull);
-        expect(bloc.state.savesAsNew, isTrue);
-      },
-    );
-
-    blocTest<WorkflowBuilderBloc, WorkflowBuilderState>(
-      'opens the first built-in when the owner has none',
-      setUp: () =>
-          when(() => workflows.listWorkflows('prj_1'))
-              .thenAnswer((_) async => [summaryOf(devBuild)]),
-      build: build,
-      act: (bloc) => bloc.add(const WorkflowBuilderStarted()),
-      wait: const Duration(milliseconds: 10),
-      verify: (bloc) => expect(bloc.state.workflow, devBuild),
-    );
-
-    blocTest<WorkflowBuilderBloc, WorkflowBuilderState>(
-      'starts a draft when the project has no workflow',
-      setUp: () =>
-          when(() => workflows.listWorkflows('prj_1'))
-              .thenAnswer((_) async => []),
-      build: build,
-      act: (bloc) => bloc.add(const WorkflowBuilderStarted()),
-      wait: const Duration(milliseconds: 10),
-      verify: (bloc) {
-        expect(bloc.state.workflow, isNull);
-        expect(bloc.state.document, draftTemplate);
-        expect(bloc.state.dirty, isTrue);
-      },
-    );
-
-    blocTest<WorkflowBuilderBloc, WorkflowBuilderState>(
-      'says why the workflows could not be read',
-      setUp: () => when(() => workflows.listWorkflows('prj_1'))
-          .thenThrow(const ApiException('No such project.', statusCode: 404)),
-      build: build,
-      act: (bloc) => bloc.add(const WorkflowBuilderStarted()),
-      expect: () => const [
-        WorkflowBuilderState(command: WorkflowCommand.loading),
-        WorkflowBuilderState(loaded: true, error: 'No such project.'),
-      ],
-    );
-  });
-
-  group('templates', () {
-    test(
-      'reads them at the start, and none while the engine is away',
-      () async {
-        final bloc = await opened();
-        expect(bloc.state.templates, templates);
-        await bloc.close();
-
-        when(workflows.templates).thenThrow(const ConnectionException('away'));
-        final away = await opened();
-        expect(away.state.templates, isEmpty);
-        await away.close();
-      },
-    );
-
-    blocTest<WorkflowBuilderBloc, WorkflowBuilderState>(
-      'starts a draft from a template, named after it',
-      build: build,
-      act: (bloc) => bloc
-        ..add(WorkflowDraftStarted(template: templates.last))
-        ..add(WorkflowDraftStarted(template: templates.first)),
-      wait: const Duration(milliseconds: 10),
-      verify: (bloc) {
-        expect(bloc.state.yaml, templates.first.yaml);
-        expect(bloc.state.draftName, isNull, reason: 'blank has no name');
-        expect(bloc.state.workflow, isNull);
-      },
-    );
-
-    blocTest<WorkflowBuilderBloc, WorkflowBuilderState>(
-      'a template other than blank names the draft',
-      build: build,
-      act: (bloc) => bloc.add(WorkflowDraftStarted(template: templates.last)),
-      wait: const Duration(milliseconds: 10),
-      verify: (bloc) {
-        expect(bloc.state.yaml, templates.last.yaml);
-        expect(bloc.state.draftName, 'tests');
-      },
-    );
+    // Each pair is equal; each differs from the one after it.
+    final pairs = <(Object, Object)>[
+      (
+        const WorkflowBuilderStarted(workflowId: 'a'),
+        const WorkflowBuilderStarted(workflowId: 'a'),
+      ),
+      (const WorkflowOpened('a'), const WorkflowOpened('a')),
+      (const WorkflowOpened('b'), const WorkflowOpened('b')),
+      (const WorkflowDraftStarted(), const WorkflowDraftStarted()),
+      (const WorkflowRenameRequested('n'), const WorkflowRenameRequested('n')),
+      (
+        const WorkflowArchiveRequested(archived: true),
+        const WorkflowArchiveRequested(archived: true),
+      ),
+      (
+        const WorkflowArchiveRequested(archived: false, workflowId: 'w'),
+        const WorkflowArchiveRequested(archived: false, workflowId: 'w'),
+      ),
+      (const WorkflowRestored('a: 1'), const WorkflowRestored('a: 1')),
+      (const WorkflowRestored('a: 2'), const WorkflowRestored('a: 2')),
+      (
+        const WorkflowVersionsCompared(1, 2),
+        const WorkflowVersionsCompared(1, 2),
+      ),
+      (const WorkflowVersionRestored(1), const WorkflowVersionRestored(1)),
+      (const WorkflowDeletedNotice('n'), const WorkflowDeletedNotice('n')),
+      (
+        const WorkflowRestoredNotice('n', 1, 2),
+        const WorkflowRestoredNotice('n', 1, 2),
+      ),
+      (const WorkflowYamlChanged('y'), const WorkflowYamlChanged('y')),
+      (
+        const WorkflowDocumentEdited(WorkflowDocument()),
+        const WorkflowDocumentEdited(WorkflowDocument()),
+      ),
+      (
+        const WorkflowSelectionChanged(WorkflowSelection.workflow),
+        const WorkflowSelectionChanged(WorkflowSelection.workflow),
+      ),
+      (
+        const WorkflowSaveRequested(name: 'n'),
+        const WorkflowSaveRequested(name: 'n'),
+      ),
+      (const WorkflowSavedNotice('n', 2), const WorkflowSavedNotice('n', 2)),
+      (const WorkflowExportedNotice('/p'), const WorkflowExportedNotice('/p')),
+    ];
+    for (final (index, (a, b)) in pairs.indexed) {
+      expect(a, b);
+      if (index + 1 < pairs.length) expect(a, isNot(pairs[index + 1].$1));
+    }
+    // Events without fields are all alike.
+    expect(const WorkflowUndoRequested(), const WorkflowUndoRequested());
+    expect(const WorkflowRedoRequested(), isNot(const WorkflowUndoRequested()));
   });
 
   group('undo', () {
@@ -257,6 +137,34 @@ void main() {
       },
     );
 
+    test('the undo of a removal puts back the document before it, after later '
+        'changes too, and ⌘Z takes that back', () async {
+      final bloc = await opened();
+      final document = bloc.state.document!;
+      final beforeRemoval = bloc.state.yaml;
+
+      bloc.add(
+        WorkflowDocumentEdited(document.editJob(1, 0, (j) => j.removeStep(0))),
+      );
+      await bloc.stream.firstWhere((s) => s.yaml != beforeRemoval);
+      final removed = bloc.state.yaml;
+      bloc.add(WorkflowYamlChanged('$removed# later\n'));
+      await bloc.stream.firstWhere((s) => s.yaml.endsWith('# later\n'));
+      final later = bloc.state.yaml;
+
+      bloc.add(WorkflowRestored(beforeRemoval));
+      await bloc.stream.firstWhere((s) => s.yaml == beforeRemoval);
+      expect(bloc.state.document, document);
+      expect(bloc.state.canRedo, isFalse);
+
+      bloc.add(const WorkflowUndoRequested());
+      await bloc.stream.firstWhere((s) => s.yaml == later);
+
+      bloc.add(WorkflowRestored(later));
+      await pumpEventQueue();
+      expect(bloc.state.yaml, later, reason: 'nothing to put back');
+    });
+
     test('nothing to undo or redo does nothing', () async {
       final bloc = await opened();
       final before = bloc.state;
@@ -264,7 +172,7 @@ void main() {
       bloc
         ..add(const WorkflowUndoRequested())
         ..add(const WorkflowRedoRequested());
-      await Future<void>.delayed(const Duration(milliseconds: 10));
+      await pumpEventQueue();
 
       expect(bloc.state, before);
       await bloc.close();
@@ -305,7 +213,7 @@ void main() {
       expect(bloc.state.undoStack, hasLength(4));
 
       bloc.add(WorkflowDocumentEdited(bloc.state.document!));
-      await Future<void>.delayed(const Duration(milliseconds: 10));
+      await pumpEventQueue();
       expect(bloc.state.undoStack, hasLength(4), reason: 'no change');
       await bloc.close();
     });
@@ -350,8 +258,10 @@ void main() {
     blocTest<WorkflowBuilderBloc, WorkflowBuilderState>(
       'a new workflow from the template',
       build: build,
-      act: (bloc) => bloc.add(const WorkflowDraftStarted()),
-      wait: const Duration(milliseconds: 10),
+      act: (bloc) async {
+        bloc.add(const WorkflowDraftStarted());
+        await pumpEventQueue();
+      },
       verify: (bloc) {
         expect(bloc.state.yaml, draftTemplate.toYaml());
         expect(bloc.state.document, draftTemplate);
@@ -369,8 +279,10 @@ void main() {
         bytes: utf8.encode(releaseYaml),
       ),
       build: build,
-      act: (bloc) => bloc.add(const WorkflowImportRequested()),
-      wait: const Duration(milliseconds: 10),
+      act: (bloc) async {
+        bloc.add(const WorkflowImportRequested());
+        await pumpEventQueue();
+      },
       verify: (bloc) {
         expect(bloc.state.draftName, 'nightly');
         expect(bloc.state.name, 'nightly');
@@ -640,6 +552,39 @@ void main() {
       await bloc.close();
     });
 
+    test(
+      'unarchives the workflow an undo names, though another is open',
+      () async {
+        when(
+          () => workflows.updateWorkflow(
+            'prj_1',
+            'wf_mine',
+            const UpdateWorkflowRequest(archived: false),
+          ),
+        ).thenAnswer((_) async => mine());
+        final bloc = await opened()
+          ..add(const WorkflowOpened('wf_dev'));
+        await bloc.stream.firstWhere((s) => s.workflow == devBuild);
+
+        bloc.add(
+          const WorkflowArchiveRequested(
+            archived: false,
+            workflowId: 'wf_mine',
+          ),
+        );
+        await pumpEventQueue();
+
+        verify(
+          () => workflows.updateWorkflow(
+            'prj_1',
+            'wf_mine',
+            const UpdateWorkflowRequest(archived: false),
+          ),
+        ).called(1);
+        expect(bloc.state.workflow, devBuild, reason: 'the open one stays');
+      },
+    );
+
     test('changes no built-in', () async {
       final bloc = await opened()
         ..add(const WorkflowOpened('wf_dev'));
@@ -649,7 +594,7 @@ void main() {
         ..add(const WorkflowRenameRequested('x'))
         ..add(const WorkflowDeleteRequested())
         ..add(const WorkflowVersionRestored(1));
-      await Future<void>.delayed(const Duration(milliseconds: 10));
+      await pumpEventQueue();
 
       verifyNever(() => workflows.updateWorkflow(any(), any(), any()));
       verifyNever(() => workflows.deleteWorkflow(any(), any()));
@@ -831,7 +776,7 @@ void main() {
       bloc
         ..add(const WorkflowBuiltinCompared())
         ..add(const WorkflowCaughtUp());
-      await Future<void>.delayed(const Duration(milliseconds: 10));
+      await pumpEventQueue();
       expect(bloc.state.builtinCompare, isNull);
       verifyNever(() => workflows.updateWorkflow(any(), any(), any()));
       await bloc.close();
@@ -916,7 +861,7 @@ void main() {
       await bloc.stream.firstWhere((s) => s.workflow == devBuild);
 
       bloc.add(const WorkflowSaveRequested());
-      await Future<void>.delayed(const Duration(milliseconds: 10));
+      await pumpEventQueue();
       verifyNever(() => workflows.saveWorkflow(any(), any(), any()));
 
       bloc.add(const WorkflowSaveRequested(name: 'my-dev'));

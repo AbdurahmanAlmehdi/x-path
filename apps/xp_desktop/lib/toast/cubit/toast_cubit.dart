@@ -7,13 +7,17 @@ import 'package:equatable/equatable.dart';
 /// A short message about something that just happened, with an [action]
 /// such as Undo.
 class Toast extends Equatable {
-  /// Creates a toast.
+  /// Creates a toast; [action] and [onAction] come together.
   const new({
     required this.id,
     required this.message,
     this.action,
     this.onAction,
-  });
+    this.owner,
+  }) : assert(
+         (action == null) == (onAction == null),
+         'An action needs its label and what it does.',
+       );
 
   /// Tells it apart from the others shown.
   final int id;
@@ -23,18 +27,19 @@ class Toast extends Equatable {
   final String? action;
   final void Function()? onAction;
 
+  /// What shows the toast, such as the page whose change it undoes: the
+  /// toast goes with it (`ToastCubit.dismissOf`).
+  final Object? owner;
+
+  static const _short = Duration(seconds: 4);
+  static const _long = Duration(seconds: 6);
+
   /// How long it stays: longer when it offers an action.
-  Duration get duration => action == null ? toastShort : toastLong;
+  Duration get duration => action == null ? _short : _long;
 
   @override
   List<Object?> get props => [id, message, action];
 }
-
-/// How long a toast stays.
-const toastShort = Duration(seconds: 4);
-
-/// How long a toast with an action stays.
-const toastLong = Duration(seconds: 6);
 
 /// The toasts shown, oldest first.
 class ToastState extends Equatable {
@@ -49,19 +54,28 @@ class ToastState extends Equatable {
 /// Shows toasts, bottom right, each for its [Toast.duration]: at most
 /// [limit] at once, the oldest going first.
 class ToastCubit extends Cubit<ToastState> {
-  new({this.limit = 3}) : super(const ToastState());
+  new() : super(const ToastState());
 
-  final int limit;
+  /// The most toasts shown at once.
+  static const limit = 3;
+
   final _timers = <int, Timer>{};
   var _next = 0;
 
-  /// Shows [message], with [action] when [onAction] is given; its id.
-  int show(String message, {String? action, void Function()? onAction}) {
+  /// Shows [message], with [action] and [onAction] when it offers one, for
+  /// [owner] when given; its id.
+  int show(
+    String message, {
+    String? action,
+    void Function()? onAction,
+    Object? owner,
+  }) {
     final toast = Toast(
       id: _next++,
       message: message,
-      action: onAction == null ? null : action,
+      action: action,
       onAction: onAction,
+      owner: owner,
     );
     final shown = [...state.toasts, toast];
     final over = max(0, shown.length - limit);
@@ -83,6 +97,14 @@ class ToastCubit extends Cubit<ToastState> {
           if (t.id != id) t,
       ]),
     );
+  }
+
+  /// Takes away the toasts of [owner], whose actions would no longer
+  /// reach it.
+  void dismissOf(Object owner) {
+    for (final toast in state.toasts) {
+      if (identical(toast.owner, owner)) dismiss(toast.id);
+    }
   }
 
   /// Does what the toast [id] offers, and takes it away.

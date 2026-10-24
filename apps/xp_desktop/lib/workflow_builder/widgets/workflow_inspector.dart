@@ -38,7 +38,8 @@ class WorkflowInspector extends StatelessWidget {
   final WorkflowSelection selection;
   final DocumentEdit onEdit;
 
-  /// Called with what a removal took out, to offer its undo (UX-08).
+  /// Called with what a removal takes out, just before the removal, to
+  /// offer its undo.
   final ValueChanged<String> onRemoved;
 
   /// The step types, gates and capabilities to offer; free text without.
@@ -163,8 +164,8 @@ class _WorkflowFields extends StatelessWidget {
             onChanged: (value) =>
                 onEdit(document.editInput(index, (_) => value)),
             onRemove: () {
-              onEdit(document.removeInput(index));
               onRemoved(l10n.workflowsRemovedInput(input.name));
+              onEdit(document.removeInput(index));
             },
           ),
         const SizedBox(height: 4),
@@ -215,9 +216,10 @@ class _StageFields extends StatelessWidget {
                 WorkflowSelection(stage: stage + delta),
               ),
               onRemove: () {
-                final removed = document.stages[stage];
+                onRemoved(
+                  l10n.workflowsRemovedStage(document.stages[stage].name),
+                );
                 onEdit(document.removeStage(stage), WorkflowSelection.workflow);
-                onRemoved(l10n.workflowsRemovedStage(removed.name));
               },
             ),
           ],
@@ -294,11 +296,11 @@ class _JobFields extends StatelessWidget {
                 WorkflowSelection(stage: stage, job: job + delta),
               ),
               onRemove: () {
+                onRemoved(l10n.workflowsRemovedJob(current.id));
                 onEdit(
                   document.removeJob(stage, job),
                   WorkflowSelection(stage: stage),
                 );
-                onRemoved(l10n.workflowsRemovedJob(current.id));
               },
             ),
           ],
@@ -408,8 +410,8 @@ class _JobFields extends StatelessWidget {
             onChanged: (value) => _edit((j) => j.editStep(index, (_) => value)),
             onMove: (delta) => _edit((j) => j.moveStep(index, delta)),
             onRemove: () {
-              _edit((j) => j.removeStep(index));
               onRemoved(l10n.workflowsRemovedStep(step.kind));
+              _edit((j) => j.removeStep(index));
             },
           ),
       ],

@@ -10,6 +10,7 @@ import 'package:xp_desktop/app/app_services.dart';
 import 'package:xp_desktop/dispatch/dispatch.dart';
 import 'package:xp_desktop/projects/bloc/projects_bloc.dart';
 import 'package:xp_desktop/shell/cubit/shell_cubit.dart';
+import 'package:xp_desktop/toast/cubit/toast_cubit.dart';
 import 'package:xp_desktop/widgets/widgets.dart';
 import 'package:xp_desktop/workflow_builder/workflow_builder.dart';
 import 'package:xp_repositories/xp_repositories.dart';
@@ -175,6 +176,20 @@ void main() {
 
     await press(tester, find.text('STORE RELEASE'));
     expect(find.text('INPUTS'), findsOneWidget);
+  });
+
+  testWidgets('takes its Undo toasts away when it closes', (tester) async {
+    final toasts = ToastCubit();
+    await pumpBuilder(tester, repository: repository, toasts: toasts);
+    await press(tester, find.text('Add job').first);
+    await press(tester, find.byTooltip('Remove job'));
+    expect(find.text('Removed job check-2'), findsOneWidget);
+
+    await tester.pumpApp(const SizedBox(), toasts: toasts);
+    await tester.pump();
+
+    expect(toasts.state.toasts, isEmpty);
+    expect(find.text('Removed job check-2'), findsNothing);
   });
 
   testWidgets('edits a job: id, name, if, matrix and capabilities', (

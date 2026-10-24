@@ -52,6 +52,18 @@ final class WorkflowUndoRequested extends WorkflowBuilderEvent {
   const new();
 }
 
+/// Puts [yaml] back: the document as it was before a removal, which the
+/// removal's Undo restores whatever came after it. It is a change of its
+/// own, so ⌘Z takes it back.
+final class WorkflowRestored extends WorkflowBuilderEvent {
+  const new(this.yaml);
+
+  final String yaml;
+
+  @override
+  List<Object?> get props => [yaml];
+}
+
 /// Makes the change undone last again (⇧⌘Z).
 final class WorkflowRedoRequested extends WorkflowBuilderEvent {
   const new();
@@ -124,12 +136,16 @@ final class WorkflowRenameRequested extends WorkflowBuilderEvent {
 
 /// Archives the open workflow of the owner, or unarchives it (UX-06).
 final class WorkflowArchiveRequested extends WorkflowBuilderEvent {
-  const new({required this.archived});
+  const new({required this.archived, this.workflowId});
 
   final bool archived;
 
+  /// The workflow to archive or unarchive: the open one when `null`. An
+  /// undo names the one it undoes, which may no longer be open.
+  final String? workflowId;
+
   @override
-  List<Object?> get props => [archived];
+  List<Object?> get props => [archived, workflowId];
 }
 
 /// Deletes the open workflow of the owner; the engine refuses one that ran.
@@ -516,13 +532,17 @@ class WorkflowBuilderBloc
     on<WorkflowDocumentEdited>(_onEdited);
     on<WorkflowUndoRequested>(_onUndo);
     on<WorkflowRedoRequested>(_onRedo);
+    on<WorkflowRestored>(_onRestored);
     on<WorkflowRenameRequested>(
       (event, emit) => _update(emit, UpdateWorkflowRequest(name: event.name)),
       transformer: droppable(),
     );
     on<WorkflowArchiveRequested>(
-      (event, emit) =>
-          _update(emit, UpdateWorkflowRequest(archived: event.archived)),
+      (event, emit) => _update(
+        emit,
+        UpdateWorkflowRequest(archived: event.archived),
+        workflowId: event.workflowId,
+      ),
       transformer: droppable(),
     );
     on<WorkflowCaughtUp>(_onCaughtUp, transformer: droppable());
@@ -837,6 +857,21 @@ class WorkflowBuilderBloc
     add(const _WorkflowValidationRequested());
   }
 
+  void _onRestored(WorkflowRestored event, Emitter<WorkflowBuilderState> emit) {
+    if (event.yaml == state.yaml) return;
+    emit(
+      _read(
+        state.copyWith(
+          undoStack: _undoFor(null),
+          redoStack: const [],
+          notice: () => null,
+        ),
+        event.yaml,
+      ),
+    );
+    add(const _WorkflowValidationRequested());
+  }
+
   void _onRedo(
     WorkflowRedoRequested event,
     Emitter<WorkflowBuilderState> emit,
@@ -977,22 +1012,21 @@ class WorkflowBuilderBloc
 
   /// Changes the open workflow as [request] says, and reads the list
   /// again: it shows the new name, or that it is archived.
+  /// Changes the workflow [workflowId], else the open one of the owner.
   Future<void> _update(
     Emitter<WorkflowBuilderState> emit,
-    UpdateWorkflowRequest request,
-  ) async {
-    final workflow = state.workflow;
-    if (workflow == null || workflow.builtin) return;
+    UpdateWorkflowRequest request, {
+    String? workflowId,
+  }) async {
+    final open = state.workflow;
+    final id = workflowId ?? (open == null || open.builtin ? null : open.id);
+    if (id == null) return;
     await _command(emit, () async {
-      final updated = await _workflows.updateWorkflow(
-        _projectId,
-        workflow.id,
-        request,
-      );
+      final updated = await _workflows.updateWorkflow(_projectId, id, request);
       final workflows = await _workflows.listWorkflows(_projectId);
       emit(
         state.copyWith(
-          workflow: () => updated,
+          workflow: () => state.workflow?.id == id ? updated : state.workflow,
           workflows: workflows,
           command: WorkflowCommand.none,
         ),
