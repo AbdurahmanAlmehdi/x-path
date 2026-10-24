@@ -26,3 +26,10 @@ String errorMessage(Object error) => switch (error) {
   ].join(': '),
   _ => unexpectedErrorMessage,
 };
+
+/// The `reason` the engine gave for [error] (an `ErrorReason`), when it
+/// gave one: what a client answers differently, without reading the words.
+String? errorReason(Object error) => switch (error) {
+  ApiException(details: {'reason': final String reason}) => reason,
+  _ => null,
+};

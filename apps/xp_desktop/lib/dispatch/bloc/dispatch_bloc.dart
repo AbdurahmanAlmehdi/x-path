@@ -116,7 +116,14 @@ final class DispatchSubmitted extends DispatchEvent {
 }
 
 final class _DispatchPreviewRequested extends DispatchEvent {
-  const new();
+  const new({this.typed = false});
+
+  /// Whether a field the owner types in changed: the preview waits until
+  /// the typing pauses, so that the engine plans once, not per keystroke.
+  final bool typed;
+
+  @override
+  List<Object?> get props => [typed];
 }
 
 /// Whether the ref is a branch or a tag. Both are sent as `ref`; the
@@ -143,6 +150,7 @@ class DispatchState extends Equatable {
     this.releases,
     this.preview,
     this.previewing = false,
+    this.refNotice,
     this.run,
     this.error,
   });
@@ -187,6 +195,10 @@ class DispatchState extends Equatable {
 
   /// Whether the preview is being worked out again.
   final bool previewing;
+
+  /// That the engine does not have the ref yet, so there is no preview: the
+  /// dispatch fetches it first.
+  final String? refNotice;
 
   /// The run dispatched.
   final Run? run;
@@ -249,8 +261,8 @@ class DispatchState extends Equatable {
       workflow != null &&
       invalidInputs.isEmpty &&
       !noReleases &&
-      !(preview?.blocked ?? false) &&
-      (preview?.jobCount ?? 0) > 0;
+      (refNotice != null ||
+          (!(preview?.blocked ?? false) && (preview?.jobCount ?? 0) > 0));
 
   DispatchState copyWith({
     String? app,
@@ -266,8 +278,9 @@ class DispatchState extends Equatable {
     Map<String, Object?>? inputs,
     Set<String>? invalidInputs,
     List<Release>? Function()? releases,
-    DispatchPlan? preview,
+    DispatchPlan? Function()? preview,
     bool? previewing,
+    String? Function()? refNotice,
     Run? run,
     String? Function()? error,
   }) => DispatchState(
@@ -285,8 +298,9 @@ class DispatchState extends Equatable {
     inputs: inputs ?? this.inputs,
     invalidInputs: invalidInputs ?? this.invalidInputs,
     releases: releases == null ? this.releases : releases(),
-    preview: preview ?? this.preview,
+    preview: preview == null ? this.preview : preview(),
     previewing: previewing ?? this.previewing,
+    refNotice: refNotice == null ? this.refNotice : refNotice(),
     run: run ?? this.run,
     error: error == null ? this.error : error(),
   );
@@ -309,6 +323,7 @@ class DispatchState extends Equatable {
     releases,
     preview,
     previewing,
+    refNotice,
     run,
     error,
   ];
@@ -345,6 +360,7 @@ class DispatchBloc extends Bloc<DispatchEvent, DispatchState> {
     required this._workflows,
     required this._releases,
     required Project project,
+    this._typingPause = const Duration(milliseconds: 400),
   }) : super(
          DispatchState(
            project: project,
@@ -381,7 +397,8 @@ class DispatchBloc extends Bloc<DispatchEvent, DispatchState> {
       ),
     );
     on<DispatchRefChanged>(
-      (event, emit) => _changed(emit, state.copyWith(ref: event.ref)),
+      (event, emit) =>
+          _changed(emit, state.copyWith(ref: event.ref), typed: true),
     );
     on<DispatchRefKindChanged>(
       (event, emit) => emit(state.copyWith(refKind: event.kind)),
@@ -390,7 +407,8 @@ class DispatchBloc extends Bloc<DispatchEvent, DispatchState> {
       (event, emit) => _changed(emit, state.copyWith(bump: event.bump)),
     );
     on<DispatchVersionChanged>(
-      (event, emit) => _changed(emit, state.copyWith(version: event.version)),
+      (event, emit) =>
+          _changed(emit, state.copyWith(version: event.version), typed: true),
     );
     on<DispatchInputChanged>(
       (event, emit) => _changed(
@@ -401,6 +419,7 @@ class DispatchBloc extends Bloc<DispatchEvent, DispatchState> {
               ? ({...state.invalidInputs}..remove(event.name))
               : {...state.invalidInputs, event.name},
         ),
+        typed: true,
       ),
     );
     on<_DispatchPreviewRequested>(_onPreview, transformer: restartable());
@@ -410,9 +429,16 @@ class DispatchBloc extends Bloc<DispatchEvent, DispatchState> {
   final WorkflowsRepository _workflows;
   final ReleasesRepository _releases;
 
-  void _changed(Emitter<DispatchState> emit, DispatchState next) {
+  /// How long typing pauses before the preview is worked out again.
+  final Duration _typingPause;
+
+  void _changed(
+    Emitter<DispatchState> emit,
+    DispatchState next, {
+    bool typed = false,
+  }) {
     emit(next.copyWith(previewing: true));
-    add(const _DispatchPreviewRequested());
+    add(_DispatchPreviewRequested(typed: typed));
   }
 
   Future<void> _onStarted(
@@ -452,7 +478,15 @@ class DispatchBloc extends Bloc<DispatchEvent, DispatchState> {
     DispatchWorkflowChanged event,
     Emitter<DispatchState> emit,
   ) async {
-    emit(state.copyWith(previewing: true, error: () => null));
+    // The plan of the workflow before no longer says what would run.
+    emit(
+      state.copyWith(
+        previewing: true,
+        preview: () => null,
+        refNotice: () => null,
+        error: () => null,
+      ),
+    );
     try {
       final workflow = await _workflows.getWorkflow(
         state.project.id,
@@ -510,6 +544,10 @@ class DispatchBloc extends Bloc<DispatchEvent, DispatchState> {
     _DispatchPreviewRequested event,
     Emitter<DispatchState> emit,
   ) async {
+    // Changes that come together are planned once; typing waits longer.
+    await Future<void>.delayed(event.typed ? _typingPause : Duration.zero);
+    // A later change asked for a preview of its own.
+    if (emit.isDone) return;
     final workflow = state.workflow;
     if (workflow == null) return;
     try {
@@ -521,17 +559,21 @@ class DispatchBloc extends Bloc<DispatchEvent, DispatchState> {
       emit(
         state.copyWith(
           status: DispatchStatus.ready,
-          preview: preview,
+          preview: () => preview,
           previewing: false,
+          refNotice: () => null,
           error: () => null,
         ),
       );
     } on Exception catch (error) {
+      final unknownRef = errorReason(error) == ErrorReason.refUnknown;
       emit(
         state.copyWith(
           status: DispatchStatus.ready,
+          preview: () => null,
           previewing: false,
-          error: () => errorMessage(error),
+          refNotice: () => unknownRef ? errorMessage(error) : null,
+          error: () => unknownRef ? null : errorMessage(error),
         ),
       );
     }

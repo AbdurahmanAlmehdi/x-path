@@ -119,6 +119,10 @@ class WorkflowDispatcher {
   final GateConfigRepository? _gates;
   final Random _random;
 
+  /// The version in the pubspec of an app at a commit, by (commit, app
+  /// path): a commit never changes, so a preview reads it once.
+  final _versions = <(String, String), AppVersion>{};
+
   /// Dispatches the workflow [workflowId] of the project [projectId].
   ///
   /// Throws a `ProjectNotFoundException`, a [WorkflowNotFoundException], a
@@ -321,10 +325,7 @@ class WorkflowDispatcher {
         ? await _workflows.latest(projectId, workflowId)
         : await _workflows.stored(projectId, workflowId, versionId);
     if (stored.workflow.archivedAt != null) {
-      throw DispatchException(
-        'The workflow "${stored.workflow.name}" is archived. Unarchive it to '
-        'run it.',
-      );
+      throw WorkflowArchivedException(stored.workflow.name);
     }
     final parsed = WorkflowParser(_planners).parse(stored.version.yaml);
     final definition = parsed.definition;
@@ -399,8 +400,9 @@ class WorkflowDispatcher {
     );
   }
 
-  /// The commit [ref] names in [mirror], fetched first; a [dryRun] fetches
-  /// only when the mirror does not know [ref] yet.
+  /// The commit [ref] names in [mirror], fetched first. A [dryRun] does not
+  /// fetch: a preview runs as the owner types, so a ref the mirror does not
+  /// know yet is reported, and the dispatch fetches it.
   Future<String> _commitOf(
     GitMirror mirror,
     String ref, {
@@ -410,7 +412,11 @@ class WorkflowDispatcher {
       try {
         return await _git.resolveRef(mirror, ref);
       } on GitRefNotFoundException {
-        // Fetched below.
+        throw DispatchException(
+          'This engine has no "$ref" yet.',
+          hint: 'Dispatching fetches it from the repository first.',
+          details: {'reason': ErrorReason.refUnknown, 'ref': ref},
+        );
       }
     }
     await _git.fetch(mirror);
@@ -542,6 +548,7 @@ class WorkflowDispatcher {
                   "mark one as production in the project's profile."
             : 'Every flavor of the app is a production flavor; give '
                   '"flavors".',
+        details: const {'reason': ErrorReason.productionFlavor},
       );
     }
     return chosen;
@@ -652,6 +659,8 @@ class WorkflowDispatcher {
     AppProfile app,
     String runId,
   ) async {
+    final key = (sha, app.path);
+    if (_versions[key] case final known?) return known;
     final worktree = await _git.createWorktree(
       mirror,
       name: 'dispatch-$runId',
@@ -660,7 +669,8 @@ class WorkflowDispatcher {
     try {
       final state = await VersionFiles(_workspaces(worktree.path))
           .read([joinScanPath(app.path, 'pubspec.yaml')]);
-      return state.pubspec;
+      if (_versions.length >= 64) _versions.remove(_versions.keys.first);
+      return _versions[key] = state.pubspec;
     } on VersionFileException catch (error) {
       throw DispatchException('${error.path}: ${error.message}');
     } finally {

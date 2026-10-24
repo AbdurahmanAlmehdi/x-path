@@ -220,6 +220,10 @@ class _Form extends StatelessWidget {
           XpMessage.error(error),
           const SizedBox(height: 12),
         ],
+        if (state.refNotice case final notice?) ...[
+          XpMessage(XpStatus.scanInfo, notice),
+          const SizedBox(height: 12),
+        ],
         _Field(
           label: l10n.dispatchWorkflow,
           child: workflows.isEmpty

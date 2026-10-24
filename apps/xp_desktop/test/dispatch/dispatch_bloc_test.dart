@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
@@ -104,11 +106,15 @@ void main() {
         .thenAnswer((_) async => previewOf(2));
   });
 
-  DispatchBloc build() =>
-      DispatchBloc(workflows: workflows, releases: releases, project: mataa);
+  DispatchBloc build({Duration typingPause = Duration.zero}) => DispatchBloc(
+    workflows: workflows,
+    releases: releases,
+    project: mataa,
+    typingPause: typingPause,
+  );
 
-  Future<void> settle() =>
-      Future<void>.delayed(const Duration(milliseconds: 5));
+  /// Lets every event, and what it starts, run to its end.
+  Future<void> settle() => pumpEventQueue();
 
   group('DispatchState', () {
     test('starts on the base branch and the first app', () {
@@ -120,6 +126,23 @@ void main() {
       expect(state.chosenPlatforms, isEmpty);
       expect(state.canDispatch, isFalse);
       expect(state.request, const DispatchRequest(app: '.', ref: 'main'));
+    });
+
+    test('copyWith clears what it is given a null for', () {
+      final state = build().state.copyWith(
+        preview: () => previewOf(2),
+        refNotice: () => 'Not fetched yet.',
+        invalidInputs: const {'ids'},
+      );
+      expect(state.preview, previewOf(2));
+      final cleared = state.copyWith(
+        preview: () => null,
+        refNotice: () => null,
+        invalidInputs: const {},
+      );
+      expect(cleared.preview, isNull);
+      expect(cleared.refNotice, isNull);
+      expect(cleared.invalidInputs, isEmpty);
     });
 
     test('a project without an app runs at the root', () {
@@ -161,8 +184,10 @@ void main() {
     blocTest<DispatchBloc, DispatchState>(
       'loads the workflows and previews the first',
       build: build,
-      act: (bloc) => bloc.add(const DispatchStarted()),
-      wait: const Duration(milliseconds: 20),
+      act: (bloc) async {
+        bloc.add(const DispatchStarted());
+        await settle();
+      },
       verify: (bloc) {
         final state = bloc.state;
         expect(state.status, DispatchStatus.ready);
@@ -209,8 +234,10 @@ void main() {
             .thenAnswer((_) async => 'wf_dev');
       },
       build: build,
-      act: (bloc) => bloc.add(const DispatchStarted()),
-      wait: const Duration(milliseconds: 20),
+      act: (bloc) async {
+        bloc.add(const DispatchStarted());
+        await settle();
+      },
       verify: (bloc) {
         expect(bloc.state.workflow?.id, 'wf_dev');
         expect(bloc.state.workflows.map((w) => w.name), [
@@ -235,8 +262,10 @@ void main() {
         ],
       ),
       build: build,
-      act: (bloc) => bloc.add(const DispatchStarted(workflowId: 'dev-build')),
-      wait: const Duration(milliseconds: 20),
+      act: (bloc) async {
+        bloc.add(const DispatchStarted(workflowId: 'dev-build'));
+        await settle();
+      },
       verify: (bloc) => expect(bloc.state.workflow?.id, 'wf_dev'),
     );
 
@@ -246,8 +275,10 @@ void main() {
           when(() => workflows.plan(any(), any(), any()))
               .thenAnswer((_) async => previewOf(2, blocked: true)),
       build: build,
-      act: (bloc) => bloc.add(const DispatchStarted()),
-      wait: const Duration(milliseconds: 20),
+      act: (bloc) async {
+        bloc.add(const DispatchStarted());
+        await settle();
+      },
       verify: (bloc) {
         expect(bloc.state.preview?.blocked, isTrue);
         expect(bloc.state.canDispatch, isFalse);
@@ -260,8 +291,10 @@ void main() {
           when(() => workflows.listWorkflows('prj_1'))
               .thenAnswer((_) async => []),
       build: build,
-      act: (bloc) => bloc.add(const DispatchStarted()),
-      wait: const Duration(milliseconds: 20),
+      act: (bloc) async {
+        bloc.add(const DispatchStarted());
+        await settle();
+      },
       verify: (bloc) {
         expect(bloc.state.status, DispatchStatus.ready);
         expect(bloc.state.workflows, isEmpty);
@@ -275,58 +308,173 @@ void main() {
           when(() => workflows.listWorkflows('prj_1'))
               .thenThrow(const ConnectionException('Connection refused.')),
       build: build,
-      act: (bloc) => bloc.add(const DispatchStarted()),
-      wait: const Duration(milliseconds: 20),
-      verify: (bloc) => expect(bloc.state.error, 'Connection refused.'),
-    );
-
-    blocTest<DispatchBloc, DispatchState>(
-      'changes what it previews as the sheet changes',
-      setUp: () =>
-          when(() => workflows.plan('prj_1', 'wf_dev', any()))
-              .thenAnswer((_) async => previewOf(2, bumps: false)),
-      build: build,
       act: (bloc) async {
         bloc.add(const DispatchStarted());
         await settle();
-        bloc
-          ..add(const DispatchFlavorToggled('dev'))
-          ..add(const DispatchFlavorToggled('prod'))
-          ..add(const DispatchPlatformToggled('ios'))
-          ..add(const DispatchRefChanged('release/5.4.1'))
-          ..add(const DispatchRefKindChanged(RefKind.tag))
-          ..add(const DispatchBumpChanged(VersionBump.minor));
+      },
+      verify: (bloc) => expect(bloc.state.error, 'Connection refused.'),
+    );
+
+    test('previews what the sheet asks for once its changes settle', () async {
+      const last = DispatchRequest(
+        app: '.',
+        ref: 'release/5.4.1',
+        flavors: ['dev'],
+        platforms: ['android'],
+        bump: VersionBump.minor,
+      );
+      when(() => workflows.plan('prj_1', 'wf_prod', last))
+          .thenAnswer((_) async => previewOf(3));
+      when(() => workflows.plan('prj_1', 'wf_dev', any()))
+          .thenAnswer((_) async => previewOf(2, bumps: false));
+      final bloc = build();
+      addTearDown(bloc.close);
+
+      bloc.add(const DispatchStarted());
+      await settle();
+      bloc
+        ..add(const DispatchFlavorToggled('dev'))
+        ..add(const DispatchFlavorToggled('prod'))
+        ..add(const DispatchPlatformToggled('ios'))
+        ..add(const DispatchRefChanged('release/5.4.1'))
+        ..add(const DispatchRefKindChanged(RefKind.tag))
+        ..add(const DispatchBumpChanged(VersionBump.minor));
+      await settle();
+
+      verify(() => workflows.plan('prj_1', 'wf_prod', last)).called(1);
+      expect(bloc.state.preview, previewOf(3));
+      expect(bloc.state.refKind, RefKind.tag);
+
+      bloc.add(const DispatchWorkflowChanged('wf_dev'));
+      await settle();
+      bloc.add(const DispatchAppChanged('.'));
+      await settle();
+
+      final state = bloc.state;
+      expect(state.workflow?.id, 'wf_dev');
+      expect(state.bumps, isFalse);
+      expect(state.flavors, isNull);
+      expect(
+        state.request,
+        const DispatchRequest(app: '.', ref: 'release/5.4.1'),
+      );
+      expect(state.preview, previewOf(2, bumps: false));
+    });
+
+    test('waits for typing to pause before it previews', () async {
+      final bloc = build(typingPause: const Duration(hours: 1));
+      addTearDown(bloc.close);
+      bloc.add(const DispatchStarted());
+      await settle();
+      clearInteractions(workflows);
+
+      bloc
+        ..add(const DispatchRefChanged('r'))
+        ..add(const DispatchRefChanged('re'))
+        ..add(const DispatchRefChanged('rel'));
+      await settle();
+      verifyNever(() => workflows.plan(any(), any(), any()));
+      expect(bloc.state.previewing, isTrue);
+      expect(bloc.state.canDispatch, isFalse);
+
+      // A pick is previewed at once, with what was typed.
+      bloc.add(const DispatchBumpChanged(VersionBump.patch));
+      await settle();
+      final asked = verify(
+        () => workflows.plan('prj_1', 'wf_prod', captureAny()),
+      ).captured;
+      expect(asked, hasLength(1));
+      expect((asked.single as DispatchRequest).ref, 'rel');
+    });
+
+    test('previews what was typed once typing pauses', () async {
+      final bloc = build();
+      addTearDown(bloc.close);
+      bloc.add(const DispatchStarted());
+      await settle();
+
+      bloc.add(const DispatchRefChanged('release/5.5.0'));
+      await settle();
+
+      verify(
+        () => workflows.plan(
+          'prj_1',
+          'wf_prod',
+          const DispatchRequest(
+            app: '.',
+            ref: 'release/5.5.0',
+            bump: VersionBump.keep,
+          ),
+        ),
+      ).called(1);
+      expect(bloc.state.previewing, isFalse);
+    });
+
+    test(
+      'drops the plan of the workflow before while the next loads',
+      () async {
+        final next = Completer<Workflow>();
+        when(() => workflows.getWorkflow('prj_1', 'wf_dev'))
+            .thenAnswer((_) => next.future);
+        final bloc = build();
+        addTearDown(bloc.close);
+        bloc.add(const DispatchStarted());
         await settle();
+        expect(bloc.state.canDispatch, isTrue);
+
         bloc.add(const DispatchWorkflowChanged('wf_dev'));
         await settle();
-        bloc.add(const DispatchAppChanged('.'));
-      },
-      wait: const Duration(milliseconds: 20),
-      verify: (bloc) {
-        final state = bloc.state;
-        expect(state.workflow?.id, 'wf_dev');
-        expect(state.bumps, isFalse);
-        expect(state.flavors, isNull);
-        expect(state.refKind, RefKind.tag);
-        expect(
-          state.request,
-          const DispatchRequest(app: '.', ref: 'release/5.4.1'),
-        );
-        verify(
-          () => workflows.plan(
-            'prj_1',
-            'wf_prod',
-            const DispatchRequest(
-              app: '.',
-              ref: 'release/5.4.1',
-              flavors: ['dev'],
-              platforms: ['android'],
-              bump: VersionBump.minor,
-            ),
-          ),
-        ).called(greaterThanOrEqualTo(1));
+
+        expect(bloc.state.preview, isNull);
+        expect(bloc.state.canDispatch, isFalse);
+        next.complete(workflowWith('wf_dev', bumping));
+        await settle();
       },
     );
+
+    test('drops the plan the engine can no longer work out', () async {
+      final bloc = build();
+      addTearDown(bloc.close);
+      bloc.add(const DispatchStarted());
+      await settle();
+      when(() => workflows.plan(any(), any(), any()))
+          .thenThrow(const ConnectionException('down'));
+
+      bloc.add(const DispatchFlavorToggled('dev'));
+      await settle();
+
+      expect(bloc.state.error, 'down');
+      expect(bloc.state.preview, isNull);
+      expect(bloc.state.canDispatch, isFalse);
+    });
+
+    test('dispatches a ref the engine does not have yet', () async {
+      final bloc = build();
+      addTearDown(bloc.close);
+      bloc.add(const DispatchStarted());
+      await settle();
+      when(() => workflows.plan(any(), any(), any())).thenThrow(
+        const ApiException(
+          'This engine has no "feature/new" yet.',
+          statusCode: 422,
+          code: ApiErrorCode.workflowInvalid,
+          hint: 'Dispatching fetches it from the repository first.',
+          details: {'reason': ErrorReason.refUnknown, 'ref': 'feature/new'},
+        ),
+      );
+
+      bloc.add(const DispatchRefChanged('feature/new'));
+      await settle();
+
+      expect(
+        bloc.state.refNotice,
+        'This engine has no "feature/new" yet. Dispatching fetches it from '
+        'the repository first.',
+      );
+      expect(bloc.state.error, isNull);
+      expect(bloc.state.preview, isNull);
+      expect(bloc.state.canDispatch, isTrue);
+    });
 
     blocTest<DispatchBloc, DispatchState>(
       'says why a workflow cannot be read',
@@ -334,8 +482,10 @@ void main() {
           when(() => workflows.getWorkflow('prj_1', 'wf_dev'))
               .thenThrow(const ApiException('Gone.', statusCode: 404)),
       build: build,
-      act: (bloc) => bloc.add(const DispatchWorkflowChanged('wf_dev')),
-      wait: const Duration(milliseconds: 20),
+      act: (bloc) async {
+        bloc.add(const DispatchWorkflowChanged('wf_dev'));
+        await settle();
+      },
       verify: (bloc) {
         expect(bloc.state.error, 'Gone.');
         expect(bloc.state.previewing, isFalse);
@@ -348,8 +498,10 @@ void main() {
           when(() => workflows.plan(any(), any(), any()))
               .thenThrow(const ConnectionException('down')),
       build: build,
-      act: (bloc) => bloc.add(const DispatchStarted()),
-      wait: const Duration(milliseconds: 20),
+      act: (bloc) async {
+        bloc.add(const DispatchStarted());
+        await settle();
+      },
       verify: (bloc) {
         expect(bloc.state.error, 'down');
         expect(bloc.state.canDispatch, isFalse);
@@ -359,8 +511,10 @@ void main() {
     blocTest<DispatchBloc, DispatchState>(
       'previews nothing before a workflow is read',
       build: build,
-      act: (bloc) => bloc.add(const DispatchRefChanged('x')),
-      wait: const Duration(milliseconds: 20),
+      act: (bloc) async {
+        bloc.add(const DispatchRefChanged('x'));
+        await settle();
+      },
       verify: (_) => verifyNever(() => workflows.plan(any(), any(), any())),
     );
 
@@ -374,8 +528,8 @@ void main() {
         bloc.add(const DispatchStarted());
         await settle();
         bloc.add(const DispatchSubmitted());
+        await settle();
       },
-      wait: const Duration(milliseconds: 20),
       verify: (bloc) {
         expect(bloc.state.status, DispatchStatus.dispatched);
         expect(bloc.state.run, runningRun().run);
@@ -392,8 +546,8 @@ void main() {
         bloc.add(const DispatchStarted());
         await settle();
         bloc.add(const DispatchSubmitted());
+        await settle();
       },
-      wait: const Duration(milliseconds: 20),
       verify: (bloc) {
         expect(bloc.state.status, DispatchStatus.ready);
         expect(bloc.state.error, 'Locked.');
@@ -410,8 +564,8 @@ void main() {
         bloc.add(const DispatchStarted());
         await settle();
         bloc.add(const DispatchSubmitted());
+        await settle();
       },
-      wait: const Duration(milliseconds: 20),
       verify: (_) => verifyNever(() => workflows.dispatch(any(), any(), any())),
     );
   });
@@ -478,8 +632,8 @@ void main() {
           ..add(const DispatchVersionChanged(' 5.6.0 '));
         await settle();
         bloc.add(const DispatchSubmitted());
+        await settle();
       },
-      wait: const Duration(milliseconds: 20),
       verify: (bloc) {
         final state = bloc.state;
         expect(state.releases?.map((r) => r.build), [3283, 3200]);
@@ -513,14 +667,13 @@ void main() {
         bloc.add(const DispatchWorkflowChanged('wf_typed'));
         await settle();
         bloc.add(const DispatchInputChanged('ids', null, valid: false));
+        await settle();
       },
-      wait: const Duration(milliseconds: 20),
       verify: (bloc) {
         final state = bloc.state;
         expect(state.noReleases, isTrue);
         expect(state.invalidInputs, {'ids'});
         expect(state.canDispatch, isFalse);
-        expect(state.copyWith(invalidInputs: const {}).invalidInputs, isEmpty);
       },
     );
 
@@ -533,8 +686,8 @@ void main() {
         bloc
           ..add(const DispatchInputChanged('ids', null, valid: false))
           ..add(const DispatchInputChanged('ids', [1]));
+        await settle();
       },
-      wait: const Duration(milliseconds: 20),
       verify: (bloc) {
         expect(bloc.state.invalidInputs, isEmpty);
         expect(bloc.state.request.inputs['ids'], [1]);
@@ -576,8 +729,10 @@ void main() {
           when(() => releases.watchReleases(projectId: 'prj_1'))
               .thenAnswer((_) => const Stream.empty()),
       build: build,
-      act: (bloc) => bloc.add(const DispatchWorkflowChanged('wf_typed')),
-      wait: const Duration(milliseconds: 20),
+      act: (bloc) async {
+        bloc.add(const DispatchWorkflowChanged('wf_typed'));
+        await settle();
+      },
       verify: (bloc) => expect(bloc.state.noReleases, isTrue),
     );
   });

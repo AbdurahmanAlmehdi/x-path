@@ -352,6 +352,7 @@ void main() {
                 contains('assign it to dev, then dispatch again'),
               )
               .having((e) => e.details, 'details', {
+                'reason': ErrorReason.credentialUnassigned,
                 'kinds': ['asc_key', 'apple_id'],
                 'flavor': 'dev',
               }),
@@ -1100,8 +1101,18 @@ stages:
         harness = await DispatchHarness.create(apps: [prodOnly]);
         await expectLater(
           harness.dispatchBuiltin('dev-build'),
-          _dispatchError(
-            startsWith('Every flavor of the app is a production flavor'),
+          throwsA(
+            isA<DispatchException>()
+                .having(
+                  (e) => e.message,
+                  'message',
+                  startsWith('Every flavor of the app is a production flavor'),
+                )
+                .having(
+                  (e) => e.details?['reason'],
+                  'reason',
+                  ErrorReason.productionFlavor,
+                ),
           ),
         );
         harness = await DispatchHarness.create(apps: [devOnly]);
@@ -1372,15 +1383,20 @@ stages:
         const UpdateWorkflowRequest(archived: true),
       );
 
-      const refusal =
-          'The workflow "old-flow" is archived. Unarchive it to run it.';
+      final refusal = throwsA(
+        isA<WorkflowArchivedException>().having(
+          (e) => e.message,
+          'message',
+          'The workflow "old-flow" is archived. Unarchive it to run it.',
+        ),
+      );
       await expectLater(
         harness.dispatcher.dispatch('prj_1', id, const DispatchRequest()),
-        _dispatchError(refusal),
+        refusal,
       );
       await expectLater(
         harness.dispatcher.plan('prj_1', id, const DispatchRequest()),
-        _dispatchError(refusal),
+        refusal,
       );
     });
 
@@ -1467,15 +1483,41 @@ stages:
       expect(plan.gates, ['prod_patch']);
     });
 
-    test('fetches only when the mirror does not know the ref', () async {
-      await harness.planBuiltin('dev-build');
-      expect(harness.git.calls, isNot(contains('fetch')));
+    test(
+      'never fetches, and says which ref the mirror does not know',
+      () async {
+        await harness.planBuiltin('dev-build');
 
-      await expectLater(
-        harness.planBuiltin('dev-build', const DispatchRequest(ref: 'nope')),
-        _dispatchError(isA<String>()),
+        await expectLater(
+          harness.planBuiltin('dev-build', const DispatchRequest(ref: 'nope')),
+          throwsA(
+            isA<DispatchException>()
+                .having(
+                  (e) => e.message,
+                  'message',
+                  'This engine has no "nope" yet.',
+                )
+                .having((e) => e.details, 'details', {
+                  'reason': ErrorReason.refUnknown,
+                  'ref': 'nope',
+                }),
+          ),
+        );
+        expect(
+          harness.git.calls.where((call) => call.startsWith('fetch')),
+          isEmpty,
+        );
+      },
+    );
+
+    test('reads the version of a commit once', () async {
+      await harness.planBuiltin('dev-build');
+      await harness.planBuiltin('dev-build');
+
+      expect(
+        harness.git.calls.where((call) => call.startsWith('createWorktree')),
+        hasLength(1),
       );
-      expect(harness.git.calls, contains('fetch'));
     });
   });
 }
