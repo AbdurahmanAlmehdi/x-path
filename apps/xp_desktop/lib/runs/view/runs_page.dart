@@ -45,6 +45,7 @@ class RunsView extends StatelessWidget {
     final project = context.watch<ProjectsBloc>().state.byId(projectId);
     return ShellPage(
       title: l10n.runsTitle,
+      cached: state.cached,
       subtitle: project?.fullName,
       actions: [
         XpSelect<String?>(
@@ -89,10 +90,16 @@ class RunList extends StatelessWidget {
     if (state.error case final error? when state.runs.isEmpty) {
       return Padding(
         padding: const EdgeInsets.all(12),
-        child: XpMessage(XpStatus.scanError, error),
+        child: XpErrorState(
+          error,
+          onRetry: () =>
+              context.read<RunsBloc>().add(const RunsSubscriptionRequested()),
+        ),
       );
     }
-    if (!state.loaded) return const SizedBox(height: 40);
+    if (!state.loaded) {
+      return const Padding(padding: EdgeInsets.all(12), child: XpLoading());
+    }
     if (state.runs.isEmpty) {
       return Padding(
         padding: const EdgeInsets.all(12),

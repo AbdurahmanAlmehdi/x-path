@@ -1,6 +1,7 @@
 export 'xp_button.dart';
 export 'xp_clock.dart';
 export 'xp_confirm_dialog.dart';
+export 'xp_feedback.dart';
 export 'xp_format.dart';
 export 'xp_layout.dart';
 export 'xp_segmented.dart';

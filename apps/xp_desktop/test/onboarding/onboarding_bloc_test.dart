@@ -166,7 +166,7 @@ void main() {
         const MacosServiceException('locked', 'Keychain locked'),
         'Keychain locked',
       ),
-      (Exception('boom'), 'Exception: boom'),
+      (Exception('boom'), unexpectedErrorMessage),
     ]) {
       blocTest<OnboardingBloc, OnboardingState>(
         'reports a token that could not be made: $message',

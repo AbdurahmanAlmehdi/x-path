@@ -59,7 +59,7 @@ class ApprovalStateLine extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     final colors = context.xpColors;
-    final now = XpClock.now(context);
+    final now = XpClock.wall(context);
     final soon = expiresSoon(approval, now);
     final text = switch (approval.state) {
       ApprovalState.pending => l10n.approvalExpiresIn(

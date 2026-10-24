@@ -9,6 +9,7 @@ import 'package:xp_desktop/local_engine/local_engine.dart';
 import 'package:xp_desktop/projects/bloc/projects_bloc.dart';
 import 'package:xp_desktop/runners/bloc/runners_bloc.dart';
 import 'package:xp_desktop/shell/cubit/shell_cubit.dart';
+import 'package:xp_desktop/shell/widgets/engine_staleness.dart';
 import 'package:xp_desktop/storage/bloc/storage_bloc.dart';
 import 'package:xp_desktop/theme/theme.dart';
 import 'package:xp_desktop/toast/cubit/toast_cubit.dart';
@@ -227,7 +228,9 @@ extension PumpApp on WidgetTester {
             BlocProvider<ToastCubit>(create: (_) => toasts ?? ToastCubit()),
           ],
           child: themed(
-            Material(child: XpToastHost(child: widget)),
+            Material(
+              child: EngineStaleness(child: XpToastHost(child: widget)),
+            ),
             brightness: brightness,
           ),
         ),

@@ -150,6 +150,7 @@ void main() {
           StoreState.approved,
         ),
       ).called(1);
+      expect(find.text('Store status saved'), findsOneWidget);
       await tester.tap(find.text('Mark live'));
       await tester.pumpAndSettle();
       await tester.tap(confirm('Mark live'));
@@ -225,6 +226,7 @@ void main() {
       await tester.tap(find.text('Merge into main'));
       await tester.pump();
       expect(find.text('GitHub said no.'), findsOneWidget);
+      expect(find.text('Release branch merged'), findsNothing);
     });
 
     testWidgets('builds a rejected version again after asking', (tester) async {

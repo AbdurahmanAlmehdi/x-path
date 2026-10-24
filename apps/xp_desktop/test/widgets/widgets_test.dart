@@ -155,9 +155,11 @@ void main() {
             ),
             XpPageHeader(title: 'Bare'),
             XpMessage(XpStatus.scanError, 'Broken'),
+            XpMessage.error('Not saved.'),
           ],
         ),
       );
+      expect(find.byIcon(PhosphorIconsRegular.warningCircle), findsOneWidget);
       expect(find.text('PROJECTS'), findsOneWidget);
       for (final text in [
         'panel',
@@ -165,9 +167,32 @@ void main() {
         'Engines',
         'action',
         'Broken',
+        'Not saved.',
       ]) {
         expect(find.text(text), findsOneWidget);
       }
+    });
+
+    testWidgets('an error state retries', (tester) async {
+      var retries = 0;
+      await tester.pumpApp(
+        XpErrorState('Cannot reach the engine.', onRetry: () => retries++),
+      );
+      expect(find.text('Cannot reach the engine.'), findsOneWidget);
+      await tester.tap(find.text('Retry'));
+      expect(retries, 1);
+    });
+
+    testWidgets('loading bars stand in for what loads', (tester) async {
+      await tester.pumpApp(const XpLoading(rows: 4));
+      expect(
+        find.descendant(
+          of: find.byType(XpLoading),
+          matching: find.byType(FractionallySizedBox),
+        ),
+        findsNWidgets(4),
+      );
+      expect(find.bySemanticsLabel('Loading'), findsOneWidget);
     });
 
     testWidgets('a text field with a trailing control', (tester) async {

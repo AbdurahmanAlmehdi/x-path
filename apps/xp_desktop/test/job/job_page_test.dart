@@ -7,6 +7,7 @@ import 'package:xp_client/xp_client.dart';
 import 'package:xp_desktop/job/job.dart';
 import 'package:xp_desktop/l10n/l10n.dart';
 import 'package:xp_desktop/shell/cubit/shell_cubit.dart';
+import 'package:xp_desktop/widgets/widgets.dart';
 import 'package:xp_repositories/xp_repositories.dart';
 
 import '../helpers/fakes.dart';
@@ -55,6 +56,19 @@ void main() {
       await failing.pump(tester);
       expect(find.text('No such run.'), findsOneWidget);
       expect(find.text('Job'), findsOneWidget);
+      verify(() => failing.jobs.watchRunJobs('run_1')).called(1);
+
+      await tester.tap(find.text('Retry'));
+      await tester.pump();
+      verify(() => failing.jobs.watchRunJobs('run_1')).called(1);
+    });
+
+    testWidgets('stands bars in while the run loads', (tester) async {
+      final loading = JobHarness();
+      when(() => loading.jobs.watchRunJobs('run_1'))
+          .thenAnswer((_) => const Stream.empty());
+      await loading.pump(tester);
+      expect(find.byType(XpLoading), findsOneWidget);
     });
 
     testWidgets('shows another job when its node is clicked', (tester) async {
@@ -118,6 +132,7 @@ void main() {
       await tester.tap(find.text('Cancel run'));
       await tester.pumpAndSettle();
       verify(() => harness.jobs.cancelRun('run_1')).called(1);
+      expect(find.text('Run cancelled'), findsOneWidget);
 
       await tester.sendKeyDownEvent(LogicalKeyboardKey.metaLeft);
       await tester.sendKeyEvent(LogicalKeyboardKey.period);

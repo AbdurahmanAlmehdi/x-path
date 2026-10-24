@@ -447,7 +447,7 @@ Details:
 
 ### Phase U4c: Desktop feedback kit
 
-- **Status:** Not started
+- **Status:** Done
 - **Scope:** One toast, loading and error vocabulary across the app, and honest staleness when
   the engine is away.
 - **Files touched:** `apps/xp_desktop/lib/widgets/**`, `apps/xp_desktop/lib/theme/**`, every

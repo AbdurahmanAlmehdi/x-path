@@ -150,7 +150,7 @@ class _FlavorCredentialsSheetState extends State<FlavorCredentialsSheet> {
                           when _editing == null ||
                               state.assign != AssignStatus.failed) ...[
                         const SizedBox(height: 12),
-                        XpMessage(XpStatus.scanError, error),
+                        XpMessage.error(error),
                       ],
                       const SizedBox(height: 8),
                       for (final kind in namedKinds)
@@ -287,7 +287,7 @@ class _StoreIdsSectionState extends State<StoreIdsSection> {
         ),
         if (state.status == StoreIdsStatus.failed) ...[
           const SizedBox(height: 8),
-          XpMessage(XpStatus.scanError, state.error!),
+          XpMessage.error(state.error!),
         ],
         if (state.status == StoreIdsStatus.saved) ...[
           const SizedBox(height: 8),
@@ -591,7 +591,7 @@ class _AssignEditorState extends State<_AssignEditor> {
             )
           else ...[
             if (failed != null) ...[
-              XpMessage(XpStatus.scanError, failed),
+              XpMessage.error(failed),
               const SizedBox(height: 10),
             ],
             Row(

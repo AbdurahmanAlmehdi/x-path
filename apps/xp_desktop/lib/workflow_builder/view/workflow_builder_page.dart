@@ -349,7 +349,7 @@ class WorkflowBuilderView extends StatelessWidget {
   List<Widget> _messages(BuildContext context, WorkflowBuilderState state) {
     final l10n = context.l10n;
     final messages = [
-      if (state.error case final error?) XpMessage(XpStatus.scanError, error),
+      if (state.error case final error?) XpMessage.error(error),
       if (state.notice case final notice?)
         XpMessage(XpStatus.jobSucceeded, switch (notice) {
           WorkflowSavedNotice(:final name, :final version) =>

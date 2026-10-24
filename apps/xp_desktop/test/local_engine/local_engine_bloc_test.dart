@@ -237,7 +237,7 @@ void main() {
         const MacosServiceException('keychain', 'No access.'),
         'No access.',
       ),
-      ('anything else', Exception('boom'), 'Exception: boom'),
+      ('anything else', Exception('boom'), unexpectedErrorMessage),
     ]) {
       blocTest<LocalEngineBloc, LocalEngineState>(
         'says why there is no new token: $name',

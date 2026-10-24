@@ -109,6 +109,7 @@ class _ProjectOverviewViewState extends State<ProjectOverviewView> {
         autofocus: true,
         child: ShellPage(
           title: project.fullName.split('/').last,
+          cached: state.cached,
           subtitle: l10n.projectSubtitle(
             project.defaultBaseBranch,
             l10n.projectApps(apps.length),
@@ -156,7 +157,12 @@ class _ProjectOverviewViewState extends State<ProjectOverviewView> {
                   padding: const EdgeInsets.all(20),
                   children: [
                     if (state.error case final error?) ...[
-                      XpMessage(XpStatus.scanError, error),
+                      XpErrorState(
+                        error,
+                        onRetry: () => bloc.add(
+                          ProjectOverviewSubscriptionRequested(project.id),
+                        ),
+                      ),
                       const SizedBox(height: 12),
                     ],
                     if (apps.isEmpty)
@@ -257,7 +263,7 @@ class ScanDialog extends StatelessWidget {
                 padding: const EdgeInsets.all(20),
                 children: [
                   if (state.error case final error?) ...[
-                    XpMessage(XpStatus.scanError, error),
+                    XpMessage.error(error),
                     const SizedBox(height: 12),
                   ],
                   if (project != null) ScanSummary(project),

@@ -189,7 +189,13 @@ class _Home extends StatelessWidget {
   Widget build(BuildContext context) {
     final state = context.watch<ProjectsBloc>().state;
     if (!state.loaded) {
-      return ShellPage(title: context.l10n.appTitle, child: const SizedBox());
+      return ShellPage(
+        title: context.l10n.appTitle,
+        child: const Padding(
+          padding: EdgeInsets.all(20),
+          child: XpLoading(rows: 6),
+        ),
+      );
     }
     if (state.projects.isEmpty) return const NoProjectsPage();
     return ProjectOverviewPage(state.projects.first.id);

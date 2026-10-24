@@ -12,6 +12,7 @@ import 'package:xp_desktop/projects/bloc/projects_bloc.dart';
 import 'package:xp_desktop/runners/bloc/runners_bloc.dart';
 import 'package:xp_desktop/shell/cubit/shell_cubit.dart';
 import 'package:xp_desktop/shell/view/app_shell.dart';
+import 'package:xp_desktop/shell/widgets/engine_staleness.dart';
 import 'package:xp_desktop/storage/bloc/storage_bloc.dart';
 import 'package:xp_desktop/theme/theme.dart';
 import 'package:xp_desktop/toast/cubit/toast_cubit.dart';
@@ -150,7 +151,7 @@ class EngineScope extends StatelessWidget {
                   ..add(const StorageSubscriptionRequested()),
           ),
         ],
-        child: NeedsYouAlertsListener(child: child),
+        child: NeedsYouAlertsListener(child: EngineStaleness(child: child)),
       ),
     ),
   );

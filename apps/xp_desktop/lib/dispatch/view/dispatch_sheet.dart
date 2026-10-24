@@ -213,8 +213,11 @@ class _Form extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (state.error case final error?) ...[
-          XpMessage(XpStatus.scanError, error),
+        if (state.error case final error? when workflows.isEmpty) ...[
+          XpErrorState(error, onRetry: () => bloc.add(const DispatchStarted())),
+          const SizedBox(height: 12),
+        ] else if (state.error case final error?) ...[
+          XpMessage.error(error),
           const SizedBox(height: 12),
         ],
         _Field(

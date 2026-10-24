@@ -222,6 +222,10 @@ void main() {
       await tester.pump();
 
       expect(find.text('down'), findsOneWidget);
+      streams.remove((null, null, 100));
+      await tester.tap(find.text('Retry'));
+      await tester.pump();
+      expect(streams.keys, contains((null, null, 100)), reason: 'read again');
     });
   });
 

@@ -160,6 +160,48 @@ abstract class AppLocalizations {
   /// **'{engine} refused the token of this Mac. Add the engine again with a new token.'**
   String bannerRejected(String engine);
 
+  /// Toast: a store's state was marked by hand.
+  ///
+  /// In en, this message translates to:
+  /// **'Store status saved'**
+  String get releaseMarkedToast;
+
+  /// Toast: the release branch was merged back.
+  ///
+  /// In en, this message translates to:
+  /// **'Release branch merged'**
+  String get releaseMergedToast;
+
+  /// Toast: the jobs of the run that had not ended were cancelled.
+  ///
+  /// In en, this message translates to:
+  /// **'Run cancelled'**
+  String get jobCancelledToast;
+
+  /// Loads what could not be loaded again.
+  ///
+  /// In en, this message translates to:
+  /// **'Retry'**
+  String get retry;
+
+  /// What a screen reader says for the placeholder of a page that loads.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading'**
+  String get loading;
+
+  /// Toolbar chip: the page shows what was cached; the engine was not heard in this session.
+  ///
+  /// In en, this message translates to:
+  /// **'Cached'**
+  String get cached;
+
+  /// Toolbar chip: the page shows what was cached when the engine was last heard.
+  ///
+  /// In en, this message translates to:
+  /// **'Cached · {time}'**
+  String cachedSince(String time);
+
   /// Checks the engine now.
   ///
   /// In en, this message translates to:
@@ -1131,6 +1173,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Not checked'**
   String get credentialUnchecked;
+
+  /// Toast: the engine checked and stored the credential.
+  ///
+  /// In en, this message translates to:
+  /// **'Credential saved'**
+  String get credentialSavedToast;
 
   /// No description provided for @credentialFailed.
   ///

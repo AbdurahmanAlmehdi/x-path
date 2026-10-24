@@ -78,7 +78,7 @@ class _GitHubTokenSectionState extends State<GitHubTokenSection> {
             _status(context, state),
             if (state.error case final error?) ...[
               const SizedBox(height: 8),
-              XpMessage(XpStatus.scanError, l10n.settingsGitHubFailed(error)),
+              XpMessage.error(l10n.settingsGitHubFailed(error)),
             ],
             const SizedBox(height: 16),
             XpTextField(

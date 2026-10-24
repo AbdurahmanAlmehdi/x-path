@@ -192,7 +192,7 @@ class OnboardingBloc extends Bloc<OnboardingEvent, OnboardingState> {
           tokenError: switch (error) {
             LocalEngineException(:final message) => message,
             MacosServiceException(:final message) => message,
-            _ => '$error',
+            _ => errorMessage(error),
           },
         ),
       );

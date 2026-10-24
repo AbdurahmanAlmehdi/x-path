@@ -18,6 +18,7 @@ import 'package:xp_desktop/projects/bloc/projects_bloc.dart';
 import 'package:xp_desktop/shell/cubit/shell_cubit.dart';
 import 'package:xp_desktop/shell/widgets/shell_page.dart';
 import 'package:xp_desktop/theme/theme.dart';
+import 'package:xp_desktop/toast/cubit/toast_cubit.dart';
 import 'package:xp_desktop/widgets/widgets.dart';
 import 'package:xp_repositories/xp_repositories.dart';
 
@@ -41,20 +42,38 @@ class JobPage extends StatelessWidget {
       tests: context.read<TestsRepository>(),
       saveDownload: context.read<AppServices>().saveDownload,
     )..add(JobViewSubscriptionRequested(runId, jobId: jobId)),
-    child: BlocListener<JobViewBloc, JobViewState>(
-      listenWhen: (previous, current) =>
-          current.startedRunId != null &&
-          previous.startedRunId != current.startedRunId,
-      listener: (context, state) => context.read<ShellCubit>().show(
-        JobDestination(state.startedRunId!, projectId: state.run?.projectId),
-      ),
-      child: const JobView(),
+    child: MultiBlocListener(
+      listeners: [
+        BlocListener<JobViewBloc, JobViewState>(
+          listenWhen: (previous, current) =>
+              current.startedRunId != null &&
+              previous.startedRunId != current.startedRunId,
+          listener: (context, state) => context.read<ShellCubit>().show(
+            JobDestination(
+              state.startedRunId!,
+              projectId: state.run?.projectId,
+            ),
+          ),
+        ),
+        BlocListener<JobViewBloc, JobViewState>(
+          listenWhen: (previous, current) =>
+              previous.command == JobViewCommand.cancelling &&
+              current.command == JobViewCommand.none &&
+              current.error == null,
+          listener: (context, _) =>
+              context.read<ToastCubit>().show(context.l10n.jobCancelledToast),
+        ),
+      ],
+      child: JobView(runId: runId, jobId: jobId),
     ),
   );
 }
 
 class JobView extends StatelessWidget {
-  const new({super.key});
+  const new({required this.runId, this.jobId, super.key});
+
+  final String runId;
+  final String? jobId;
 
   @override
   Widget build(BuildContext context) {
@@ -66,9 +85,15 @@ class JobView extends StatelessWidget {
         title: l10n.jobTitle,
         child: Padding(
           padding: const EdgeInsets.all(20),
-          child: state.error == null
-              ? const SizedBox()
-              : XpMessage(XpStatus.scanError, state.error!),
+          child: switch (state.error) {
+            null => const XpLoading(rows: 6),
+            final error => XpErrorState(
+              error,
+              onRetry: () => context.read<JobViewBloc>().add(
+                JobViewSubscriptionRequested(runId, jobId: jobId),
+              ),
+            ),
+          },
         ),
       );
     }
@@ -79,6 +104,7 @@ class JobView extends StatelessWidget {
     return _JobShortcuts(
       child: ShellPage(
         title: title,
+        cached: state.cached,
         subtitle: [
           ?project?.fullName.split('/').last,
           ?run.ref,
@@ -105,7 +131,7 @@ class JobView extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   if (state.error case final error?) ...[
-                    XpMessage(XpStatus.scanError, error),
+                    XpMessage.error(error),
                     const SizedBox(height: 10),
                   ],
                   _Hero(state),

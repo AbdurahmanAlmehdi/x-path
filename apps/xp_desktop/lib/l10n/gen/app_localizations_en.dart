@@ -51,6 +51,29 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get releaseMarkedToast => 'Store status saved';
+
+  @override
+  String get releaseMergedToast => 'Release branch merged';
+
+  @override
+  String get jobCancelledToast => 'Run cancelled';
+
+  @override
+  String get retry => 'Retry';
+
+  @override
+  String get loading => 'Loading';
+
+  @override
+  String get cached => 'Cached';
+
+  @override
+  String cachedSince(String time) {
+    return 'Cached · $time';
+  }
+
+  @override
   String get bannerRetry => 'Retry';
 
   @override
@@ -644,6 +667,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get credentialUnchecked => 'Not checked';
+
+  @override
+  String get credentialSavedToast => 'Credential saved';
 
   @override
   String credentialFailed(String message) {

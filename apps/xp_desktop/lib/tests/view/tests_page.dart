@@ -75,6 +75,7 @@ class TestsView extends StatelessWidget {
     final name = project.fullName.split('/').last;
     return ShellPage(
       title: l10n.testsTitle,
+      cached: state.runCached,
       subtitle: [
         name,
         if (run?.appPath case final app? when app != '.') app,
@@ -103,8 +104,20 @@ class TestsView extends StatelessWidget {
       child: ListView(
         padding: const EdgeInsets.all(20),
         children: [
-          for (final error in [?state.error, ?state.runError]) ...[
-            XpMessage(XpStatus.scanError, error),
+          if (state.error case final error?) ...[
+            XpErrorState(
+              error,
+              onRetry: () => bloc.add(
+                TestsSubscriptionRequested(project.id, jobId: shown),
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
+          if (state.runError case final error? when shown != null) ...[
+            XpErrorState(
+              error,
+              onRetry: () => bloc.add(TestsRunSelected(shown)),
+            ),
             const SizedBox(height: 12),
           ],
           if (response != null) ...[
@@ -115,7 +128,10 @@ class TestsView extends StatelessWidget {
             ),
             const SizedBox(height: 24),
             TestLists(response: response),
-          ] else if (state.loaded && runs.isEmpty)
+          ] else if (state.error == null &&
+              (!state.loaded || (shown != null && state.runError == null)))
+            const XpLoading(rows: 6)
+          else if (state.loaded && runs.isEmpty)
             _NoRuns(project: project),
           if (state.baselines.isNotEmpty) ...[
             const SizedBox(height: 24),

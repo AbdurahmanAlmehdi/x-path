@@ -169,6 +169,7 @@ void main() {
         ),
       ]);
       expect(find.text('Check and save'), findsNothing, reason: 'closed');
+      expect(find.text('Credential saved'), findsOneWidget);
     });
 
     testWidgets('adds a keystore as base64 bytes', (tester) async {
@@ -452,6 +453,7 @@ void main() {
       named.addError(const ConnectionException('gone'));
       await tester.pumpAndSettle();
       expect(find.text('gone'), findsNWidgets(2));
+      expect(find.text('Retry'), findsOneWidget);
     });
   });
 }

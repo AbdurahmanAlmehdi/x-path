@@ -14,6 +14,7 @@ import 'package:xp_desktop/projects/bloc/projects_bloc.dart';
 import 'package:xp_desktop/shell/cubit/shell_cubit.dart';
 import 'package:xp_desktop/shell/widgets/shell_page.dart';
 import 'package:xp_desktop/theme/theme.dart';
+import 'package:xp_desktop/toast/cubit/toast_cubit.dart';
 import 'package:xp_desktop/widgets/widgets.dart';
 import 'package:xp_repositories/xp_repositories.dart';
 
@@ -87,7 +88,10 @@ class _CredentialsViewState extends State<CredentialsView> {
           listenWhen: (previous, current) =>
               previous.save != current.save &&
               current.save == CredentialSaveStatus.saved,
-          listener: (context, state) => _close(),
+          listener: (context, state) {
+            _close();
+            context.read<ToastCubit>().show(l10n.credentialSavedToast);
+          },
         ),
         BlocListener<CredentialsBloc, CredentialsState>(
           listenWhen: (previous, current) =>
@@ -114,6 +118,7 @@ class _CredentialsViewState extends State<CredentialsView> {
               : null;
           return ShellPage(
             title: l10n.credentialsTitle,
+            cached: state.cached,
             subtitle: l10n.credentialsSubtitle,
             actions: [
               XpButton(
@@ -154,8 +159,15 @@ class _CredentialsViewState extends State<CredentialsView> {
                       ),
                     const SizedBox(height: 20),
                   ],
-                  if (state.error case final error?) ...[
-                    XpMessage(XpStatus.credentialExpired, error),
+                  if (state.error case final error? when !state.loaded) ...[
+                    XpErrorState(
+                      error,
+                      onRetry: () =>
+                          bloc.add(const CredentialsSubscriptionRequested()),
+                    ),
+                    const SizedBox(height: 12),
+                  ] else if (state.error case final error?) ...[
+                    XpMessage.error(error),
                     const SizedBox(height: 12),
                   ],
                   _CredentialTable(
@@ -428,7 +440,12 @@ class _FlavorTable extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         if (state.error case final error?) ...[
-          XpMessage(XpStatus.scanError, error),
+          XpErrorState(
+            error,
+            onRetry: () => context.read<ProjectCredentialsBloc>().add(
+              ProjectCredentialsSubscriptionRequested(project.id),
+            ),
+          ),
           const SizedBox(height: 12),
         ],
         XpPanel(

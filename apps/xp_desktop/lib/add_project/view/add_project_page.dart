@@ -146,7 +146,7 @@ class _FormState extends State<_Form> {
                 ),
                 if (widget.state.error case final error?) ...[
                   const SizedBox(height: 12),
-                  XpMessage(XpStatus.scanError, l10n.addProjectFailed(error)),
+                  XpMessage.error(l10n.addProjectFailed(error)),
                 ],
                 const SizedBox(height: 16),
                 Align(
@@ -236,7 +236,7 @@ class _Review extends StatelessWidget {
           ),
           if (state.error case final error?) ...[
             const SizedBox(height: 12),
-            XpMessage(XpStatus.scanError, error),
+            XpMessage.error(error),
           ],
           const SizedBox(height: 16),
           ScanSummary(project),
