@@ -244,7 +244,7 @@ Details:
 
 ### Phase U2c: Engine dry run and dispatch picker
 
-- **Status:** Not started
+- **Status:** Done
 - **Scope:** The engine plans a dispatch without running it, and every client shows that plan.
 - **Files touched:** `packages/xp_engine/lib/src/dispatch/workflow_dispatcher.dart`,
   `apps/xpd/lib/src/api/workflows/workflows_routes.dart`, `packages/xp_api/**`,

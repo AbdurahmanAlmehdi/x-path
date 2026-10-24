@@ -67,6 +67,8 @@ void main() {
       expect(workflows.every((w) => w.version.version == 1), isTrue);
       expect(workflows.first.id, startsWith('wf_'));
       expect(workflows.first.version.id, startsWith('wfv_'));
+      expect(workflows.first.title, 'Dev build');
+      expect(workflows.first.description, startsWith('Builds the dev flavors'));
       expect(await logged(), isEmpty);
     });
 

@@ -34,9 +34,15 @@ void main() {
       expect(find.text('WILL RUN · 4 JOBS IN 3 STAGES'), findsOneWidget);
       expect(find.text('This Mac'), findsOneWidget);
       expect(
-        find.text('This Mac first, else linux-builder-01 · slot 2 of 4'),
+        find.text('This Mac first, else linux-builder-01'),
         findsOneWidget,
       );
+      expect(find.text('Upload prod for ios'), findsOneWidget);
+      expect(
+        find.text('skipped, no App Store app id for prod'),
+        findsOneWidget,
+      );
+      expect(find.text('5.4.1 (3284)'), findsOneWidget);
       expect(find.text('1 job on This Mac'), findsNWidgets(2));
       expect(find.text('Upload approval'), findsOneWidget);
       expect(
@@ -44,7 +50,7 @@ void main() {
         findsOneWidget,
       );
       expect(
-        find.text('from 5.4.1 (3283) in the pubspec at the last scan'),
+        find.text('from 5.4.1 (3283) in the pubspec of the commit'),
         findsOneWidget,
       );
       expect(find.text('Dispatch 4 jobs'), findsOneWidget);
@@ -93,13 +99,18 @@ void main() {
       await tester.tap(find.text('Android'));
       await tester.tap(find.text('Tag'));
       await tester.tap(find.text('Minor'));
-      await tester.enterText(find.byType(TextField), 'release/5.4.1');
+      await tester.enterText(
+        find.byWidgetPredicate(
+          (widget) => widget is TextField && widget.controller?.text == 'main',
+        ),
+        'release/5.4.1',
+      );
       await tester.pumpAndSettle();
       verify(
-        () => harness.workflows.preview(
-          project: any(named: 'project'),
-          workflow: any(named: 'workflow'),
-          request: const DispatchRequest(
+        () => harness.workflows.plan(
+          any(),
+          any(),
+          const DispatchRequest(
             app: '.',
             ref: 'release/5.4.1',
             flavors: ['prod', 'dev'],
@@ -114,6 +125,82 @@ void main() {
       await tester.tap(find.text('Dev build').last);
       await tester.pumpAndSettle();
       verify(() => harness.workflows.getWorkflow('prj_1', 'wf_dev')).called(1);
+    });
+
+    testWidgets('names where a job waits, and what the engine would refuse', (
+      tester,
+    ) async {
+      final harness = DispatchHarness();
+      when(() => harness.workflows.plan(any(), any(), any())).thenAnswer(
+        (_) async => const DispatchPlan(
+          flavors: ['prod'],
+          platforms: ['ios'],
+          stages: [
+            PlannedStage(
+              name: 'build',
+              jobs: [
+                PlannedJob(
+                  name: 'Build prod for ios',
+                  engineOnly: false,
+                  local: false,
+                  waitReason: 'No runner can do ios-sign.',
+                ),
+                PlannedJob(
+                  name: 'Build prod on mini',
+                  engineOnly: false,
+                  local: false,
+                  runner: 'mac-mini',
+                ),
+              ],
+            ),
+          ],
+          skipped: [
+            SkippedJob(
+              name: 'Upload prod for ios',
+              stage: 'upload',
+              reason: 'The flavor has no App Store Connect key.',
+              blocks: true,
+            ),
+          ],
+        ),
+      );
+      await harness.open(tester);
+
+      expect(find.text('No runner can do ios-sign.'), findsOneWidget);
+      expect(find.text('mac-mini'), findsOneWidget);
+      expect(
+        find.text('cannot run: The flavor has no App Store Connect key.'),
+        findsOneWidget,
+      );
+      expect(
+        tester
+            .widget<XpButton>(find.widgetWithText(XpButton, 'Dispatch 2 jobs'))
+            .onPressed,
+        isNull,
+      );
+    });
+
+    testWidgets('names a workflow by its title, with its description', (
+      tester,
+    ) async {
+      final harness = DispatchHarness();
+      when(() => harness.workflows.listWorkflows(any())).thenAnswer(
+        (_) async => [
+          WorkflowSummary(
+            id: 'wf_prod',
+            projectId: 'prj_1',
+            name: 'prod-release',
+            builtin: true,
+            version: prodSummary.version,
+            title: 'Production release',
+            description: 'Releases a production flavor.',
+          ),
+        ],
+      );
+      await harness.open(tester);
+
+      expect(find.text('Production release'), findsOneWidget);
+      expect(find.text('Releases a production flavor.'), findsOneWidget);
     });
 
     testWidgets('closes with Escape or Cancel', (tester) async {
@@ -140,10 +227,10 @@ void main() {
       await tester.tap(find.text('tablet').last);
       await tester.pumpAndSettle();
       verify(
-        () => harness.workflows.preview(
-          project: any(named: 'project'),
-          workflow: any(named: 'workflow'),
-          request: const DispatchRequest(
+        () => harness.workflows.plan(
+          any(),
+          any(),
+          const DispatchRequest(
             app: 'apps/tablet',
             ref: 'main',
             bump: VersionBump.keep,
@@ -157,15 +244,8 @@ void main() {
     ) async {
       final harness = DispatchHarness();
       when(
-        () => harness.workflows.preview(
-          project: any(named: 'project'),
-          workflow: any(named: 'workflow'),
-          request: any(named: 'request'),
-        ),
-      ).thenAnswer(
-        (_) async =>
-            const DispatchPreview(flavors: [], platforms: [], stages: []),
-      );
+        () => harness.workflows.plan(any(), any(), any()),
+      ).thenAnswer((_) async => const DispatchPlan(flavors: [], platforms: []));
       await harness.open(tester);
       expect(
         find.text('Nothing would run for these flavors and platforms.'),

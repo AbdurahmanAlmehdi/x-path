@@ -426,6 +426,28 @@ void main() {
       ).called(1);
     });
 
+    test('plan_dispatch plans without dispatching', () async {
+      const plan = DispatchPlan(flavors: ['dev'], platforms: ['android']);
+      when(
+        () => client.planDispatch(
+          'prj_1',
+          'wf_1',
+          const DispatchRequest(flavors: ['dev']),
+        ),
+      ).thenAnswer((_) async => plan);
+
+      final result = await call('plan_dispatch', {
+        'project': 'prj_1',
+        'workflow': 'wf_1',
+        'flavors': ['dev'],
+      });
+
+      expect(result.isError, isFalse);
+      expect(decoded(result), plan.toJson());
+      expect(tools['plan_dispatch']!.readOnly, isTrue);
+      verifyNever(() => client.dispatchWorkflow(any(), any(), any()));
+    });
+
     test('refuses a bad argument without calling the engine', () async {
       final result = await call('dispatch_workflow', {
         'project': 'prj_1',

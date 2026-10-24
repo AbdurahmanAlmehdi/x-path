@@ -48,6 +48,7 @@ server tells the agent so when it connects.
 | Tool | Arguments (required in bold) | Notes |
 |---|---|---|
 | `dispatch_workflow` | **`project`**, **`workflow`**, `ref`, `app`, `flavors` (list), `platforms` (list of `android`, `ios`), `bump` (`major`, `minor`, `patch`, `keep`), `version` (`x.y.z`, instead of `bump`), `releaseVersion` (`x.y.z+build`, for a patch), `inputs` (object) | Returns `{run, pendingApprovals, note?}`. A gated run becomes `waiting_for_approval`. |
+| `plan_dispatch` | the arguments of `dispatch_workflow` | What it would start, planned by the engine; nothing starts and no build number is taken. `stages` (each job with `local`, `runner`, `waitReason`), `skipped` (each with its `reason`; `blocks: true` means `dispatch_workflow` would be refused), `version`, `build`. Read-only. |
 
 ## Errors the tools return
 

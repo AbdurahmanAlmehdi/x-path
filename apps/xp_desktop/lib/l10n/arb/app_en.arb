@@ -720,7 +720,7 @@
   "@bumpMinor": {"description": "Version bump."},
   "bumpMajor": "Major",
   "@bumpMajor": {"description": "Version bump."},
-  "dispatchFromPubspec": "from {version} in the pubspec at the last scan",
+  "dispatchFromPubspec": "from {version} in the pubspec of the commit",
   "@dispatchFromPubspec": {"description": "Beside the version a dispatch releases.", "placeholders": {"version": {"type": "String"}}},
   "dispatchVersionHint": "or x.y.z",
   "@dispatchVersionHint": {"description": "Placeholder of the explicit version field next to the bump."},

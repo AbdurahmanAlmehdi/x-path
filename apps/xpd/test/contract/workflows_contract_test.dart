@@ -303,6 +303,29 @@ void main() {
       );
     });
 
+    test('POST dispatch?dryRun=true 200 and 400 (UX-01)', () async {
+      final id = await client.builtin('dev-build');
+      final path = '${client.base}/$id/dispatch';
+
+      final planned = await client.send('POST', '$path?dryRun=true');
+
+      expectContract(planned, path: path, method: 'POST', status: 200);
+      final plan = DispatchPlan.fromJson(planned.json);
+      expect(plan.build, 1);
+      expect(
+        plan.skipped.map((job) => job.reason),
+        contains('no Firebase app id for default'),
+      );
+      expectContract(
+        await client.send('POST', '$path?dryRun=maybe'),
+        path: path,
+        method: 'POST',
+        status: 400,
+      );
+      final run = Run.fromJson((await client.dispatch(id)).json);
+      expect(run.build, 1, reason: 'the dry run took no build number');
+    });
+
     test('GET and cancel a run', () async {
       final id = await client.create('ship', gatedWorkflow);
       final run = Run.fromJson((await client.dispatch(id)).json);

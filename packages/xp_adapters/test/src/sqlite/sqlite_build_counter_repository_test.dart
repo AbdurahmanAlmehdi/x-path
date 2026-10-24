@@ -74,6 +74,23 @@ void main() {
     expect(await allocate(0), 79);
   });
 
+  test('peeks at the next number without taking it', () async {
+    expect(await counters.peek(projectId: 'prj_1', appPath: '.', seed: 0), 1);
+    expect(
+      await counters.peek(projectId: 'prj_1', appPath: '.', seed: 3283),
+      3284,
+    );
+    expect(counterOf('.'), 0);
+    expect(
+      () => counters.peek(projectId: 'prj_1', appPath: 'apps/x', seed: 0),
+      throwsA(isA<UnknownAppException>()),
+    );
+    expect(
+      () => counters.peek(projectId: 'prj_1', appPath: '.', seed: -1),
+      throwsRangeError,
+    );
+  });
+
   test('refuses an unknown app and changes nothing', () async {
     await expectLater(
       allocate(9, 'apps/none'),

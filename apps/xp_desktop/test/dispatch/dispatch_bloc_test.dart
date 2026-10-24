@@ -45,27 +45,36 @@ stages:
           - kind: version.bump
 ''';
 
-DispatchPreview previewOf(int jobs, {List<String> flavors = const ['prod']}) =>
-    DispatchPreview(
-      flavors: flavors,
-      platforms: const ['android', 'ios'],
-      currentVersion: '5.4.1+3283',
-      version: '5.4.1',
-      stages: [
-        if (jobs > 0)
-          PreviewStage(
-            name: 'build',
-            jobs: [
-              for (var i = 0; i < jobs; i++)
-                PreviewJob(
-                  name: 'job $i',
-                  capabilities: const [],
-                  engineOnly: true,
-                ),
-            ],
-          ),
-      ],
-    );
+DispatchPlan previewOf(
+  int jobs, {
+  List<String> flavors = const ['prod'],
+  bool bumps = true,
+  bool blocked = false,
+}) => DispatchPlan(
+  flavors: flavors,
+  platforms: const ['android', 'ios'],
+  currentVersion: '5.4.1+3283',
+  version: bumps ? '5.4.1' : null,
+  stages: [
+    if (jobs > 0)
+      PlannedStage(
+        name: 'build',
+        jobs: [
+          for (var i = 0; i < jobs; i++)
+            PlannedJob(name: 'job $i', engineOnly: true, local: true),
+        ],
+      ),
+  ],
+  skipped: [
+    if (blocked)
+      const SkippedJob(
+        name: 'upload',
+        stage: 'upload',
+        reason: 'No credential.',
+        blocks: true,
+      ),
+  ],
+);
 
 void main() {
   late MockWorkflowsRepository workflows;
@@ -82,21 +91,17 @@ void main() {
     releases = quietReleases();
     when(() => workflows.lastInputs(any(), any()))
         .thenAnswer((_) async => const {});
-    when(() => workflows.rememberInputs(any(), any(), any()))
+    when(() => workflows.rememberDispatch(any(), any(), any()))
         .thenAnswer((_) async {});
+    when(() => workflows.lastWorkflow(any())).thenAnswer((_) async => null);
     when(() => workflows.listWorkflows('prj_1'))
         .thenAnswer((_) async => [prodSummary, devBuild]);
     when(() => workflows.getWorkflow('prj_1', 'wf_prod'))
         .thenAnswer((_) async => workflowWith('wf_prod', bumping));
     when(() => workflows.getWorkflow('prj_1', 'wf_dev'))
         .thenAnswer((_) async => workflowWith('wf_dev', '- broken'));
-    when(
-      () => workflows.preview(
-        project: any(named: 'project'),
-        workflow: any(named: 'workflow'),
-        request: any(named: 'request'),
-      ),
-    ).thenAnswer((_) async => previewOf(2));
+    when(() => workflows.plan(any(), any(), any()))
+        .thenAnswer((_) async => previewOf(2));
   });
 
   DispatchBloc build() =>
@@ -136,7 +141,8 @@ void main() {
   });
 
   test('events compare by value', () {
-    expect(const DispatchStarted().props, isEmpty);
+    expect(const DispatchStarted().props, [null]);
+    expect(const DispatchStarted(workflowId: 'w').props, ['w']);
     expect(const DispatchWorkflowChanged('w').props, ['w']);
     expect(const DispatchAppChanged('.').props, ['.']);
     expect(const DispatchFlavorToggled('dev').props, ['dev']);
@@ -176,6 +182,71 @@ void main() {
     );
 
     blocTest<DispatchBloc, DispatchState>(
+      'opens on the workflow asked for, by id or name, else the last one',
+      setUp: () {
+        when(() => workflows.listWorkflows('prj_1')).thenAnswer(
+          (_) async => [
+            prodSummary,
+            devBuild,
+            WorkflowSummary(
+              id: 'wf_merge',
+              projectId: 'prj_1',
+              name: 'release-merge',
+              builtin: true,
+              version: prodWorkflow.version,
+            ),
+          ],
+        );
+        when(() => workflows.lastWorkflow('prj_1'))
+            .thenAnswer((_) async => 'wf_dev');
+      },
+      build: build,
+      act: (bloc) => bloc.add(const DispatchStarted()),
+      wait: const Duration(milliseconds: 20),
+      verify: (bloc) {
+        expect(bloc.state.workflow?.id, 'wf_dev');
+        expect(bloc.state.workflows.map((w) => w.name), [
+          'Prod release',
+          'Dev build',
+        ]);
+      },
+    );
+
+    blocTest<DispatchBloc, DispatchState>(
+      'opens on a workflow named by its name',
+      setUp: () => when(() => workflows.listWorkflows('prj_1')).thenAnswer(
+        (_) async => [
+          prodSummary,
+          WorkflowSummary(
+            id: 'wf_dev',
+            projectId: 'prj_1',
+            name: 'dev-build',
+            builtin: true,
+            version: prodWorkflow.version,
+          ),
+        ],
+      ),
+      build: build,
+      act: (bloc) => bloc.add(const DispatchStarted(workflowId: 'dev-build')),
+      wait: const Duration(milliseconds: 20),
+      verify: (bloc) => expect(bloc.state.workflow?.id, 'wf_dev'),
+    );
+
+    blocTest<DispatchBloc, DispatchState>(
+      'cannot dispatch what the engine would refuse',
+      setUp: () =>
+          when(() => workflows.plan(any(), any(), any()))
+              .thenAnswer((_) async => previewOf(2, blocked: true)),
+      build: build,
+      act: (bloc) => bloc.add(const DispatchStarted()),
+      wait: const Duration(milliseconds: 20),
+      verify: (bloc) {
+        expect(bloc.state.preview?.blocked, isTrue);
+        expect(bloc.state.canDispatch, isFalse);
+      },
+    );
+
+    blocTest<DispatchBloc, DispatchState>(
       'says when the project has no workflow',
       setUp: () =>
           when(() => workflows.listWorkflows('prj_1'))
@@ -203,6 +274,9 @@ void main() {
 
     blocTest<DispatchBloc, DispatchState>(
       'changes what it previews as the sheet changes',
+      setUp: () =>
+          when(() => workflows.plan('prj_1', 'wf_dev', any()))
+              .thenAnswer((_) async => previewOf(2, bumps: false)),
       build: build,
       act: (bloc) async {
         bloc.add(const DispatchStarted());
@@ -223,7 +297,6 @@ void main() {
       verify: (bloc) {
         final state = bloc.state;
         expect(state.workflow?.id, 'wf_dev');
-        expect(state.outline, const WorkflowOutline());
         expect(state.bumps, isFalse);
         expect(state.flavors, isNull);
         expect(state.refKind, RefKind.tag);
@@ -232,10 +305,10 @@ void main() {
           const DispatchRequest(app: '.', ref: 'release/5.4.1'),
         );
         verify(
-          () => workflows.preview(
-            project: mataa,
-            workflow: any(named: 'workflow'),
-            request: const DispatchRequest(
+          () => workflows.plan(
+            'prj_1',
+            'wf_prod',
+            const DispatchRequest(
               app: '.',
               ref: 'release/5.4.1',
               flavors: ['dev'],
@@ -263,13 +336,9 @@ void main() {
 
     blocTest<DispatchBloc, DispatchState>(
       'says why the preview cannot be worked out',
-      setUp: () => when(
-        () => workflows.preview(
-          project: any(named: 'project'),
-          workflow: any(named: 'workflow'),
-          request: any(named: 'request'),
-        ),
-      ).thenThrow(const ConnectionException('down')),
+      setUp: () =>
+          when(() => workflows.plan(any(), any(), any()))
+              .thenThrow(const ConnectionException('down')),
       build: build,
       act: (bloc) => bloc.add(const DispatchStarted()),
       wait: const Duration(milliseconds: 20),
@@ -284,13 +353,7 @@ void main() {
       build: build,
       act: (bloc) => bloc.add(const DispatchRefChanged('x')),
       wait: const Duration(milliseconds: 20),
-      verify: (_) => verifyNever(
-        () => workflows.preview(
-          project: any(named: 'project'),
-          workflow: any(named: 'workflow'),
-          request: any(named: 'request'),
-        ),
-      ),
+      verify: (_) => verifyNever(() => workflows.plan(any(), any(), any())),
     );
 
     blocTest<DispatchBloc, DispatchState>(
@@ -331,13 +394,9 @@ void main() {
 
     blocTest<DispatchBloc, DispatchState>(
       'dispatches nothing that would start no job',
-      setUp: () => when(
-        () => workflows.preview(
-          project: any(named: 'project'),
-          workflow: any(named: 'workflow'),
-          request: any(named: 'request'),
-        ),
-      ).thenAnswer((_) async => previewOf(0)),
+      setUp: () =>
+          when(() => workflows.plan(any(), any(), any()))
+              .thenAnswer((_) async => previewOf(0)),
       build: build,
       act: (bloc) async {
         bloc.add(const DispatchStarted());
@@ -430,8 +489,9 @@ void main() {
         );
         expect(state.request, sent);
         verify(() => workflows.dispatch('prj_1', 'wf_typed', sent)).called(1);
-        verify(() => workflows.rememberInputs('prj_1', 'wf_typed', sent.inputs))
-            .called(1);
+        verify(
+          () => workflows.rememberDispatch('prj_1', 'wf_typed', sent.inputs),
+        ).called(1);
       },
     );
 

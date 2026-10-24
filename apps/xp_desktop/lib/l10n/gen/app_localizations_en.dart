@@ -1310,7 +1310,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String dispatchFromPubspec(String version) {
-    return 'from $version in the pubspec at the last scan';
+    return 'from $version in the pubspec of the commit';
   }
 
   @override

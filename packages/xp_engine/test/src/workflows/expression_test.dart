@@ -278,4 +278,47 @@ void main() {
       );
     });
   });
+
+  group('falseParts and source', () {
+    List<String> falseParts(String source, Map<String, Object?> scope) => [
+      for (final part in Expression.parse(source).falseParts(scope))
+        part.source,
+    ];
+
+    test('name the false operands, both of a false ||', () {
+      const scope = {
+        'platform': 'android',
+        'inputs': {'ids': <String, Object?>{}},
+        'flavor': {'name': 'dev', 'prod': false},
+      };
+
+      expect(falseParts("platform == 'android'", scope), isEmpty);
+      expect(
+        falseParts(
+          "(platform == 'android' && inputs.ids[flavor.name].android) || "
+          "(platform == 'ios' && flavor.prod)",
+          scope,
+        ),
+        ['inputs.ids[flavor.name].android', "platform == 'ios'"],
+      );
+      expect(falseParts('!flavor.name', scope), ['!flavor.name']);
+      expect(falseParts("platform != 'android'", scope), [
+        "platform != 'android'",
+      ]);
+    });
+
+    test('read back the way they are written', () {
+      for (final source in [
+        "a['b c'][0] == 'it''s'",
+        '(a && b)',
+        '(a || !b)',
+        'a.b == null',
+        'x == 3',
+        'flag == true',
+      ]) {
+        expect(Expression.parse(source).source, source);
+      }
+      expect(Expression.parse('a').toString(), 'a');
+    });
+  });
 }

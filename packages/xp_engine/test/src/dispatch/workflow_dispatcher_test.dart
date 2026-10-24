@@ -1283,4 +1283,87 @@ stages:
       );
     });
   });
+
+  group('a dry run (UX-01)', () {
+    test('plans a dev build without starting it or taking a number', () async {
+      final plan = await harness.planBuiltin('dev-build');
+
+      expect(plan.flavors, ['dev']);
+      expect(plan.platforms, ['android', 'ios']);
+      expect(plan.currentVersion, '1.2.3+45');
+      expect(plan.version, '1.2.3');
+      expect(plan.build, 1);
+      expect(plan.stages.map((stage) => stage.name), ['check', 'build']);
+      expect(plan.jobCount, 4);
+      final check = plan.stages.first.jobs.first;
+      expect(check.name, 'Check dev for android');
+      expect(check.engineOnly, isTrue);
+      final build = plan.stages.last.jobs.first;
+      expect(build.engineOnly, isFalse);
+      expect(build.capabilities, ['android', 'flutter']);
+      expect(build.waitReason, 'No runner can do android, flutter.');
+      expect(plan.skipped.map((job) => (job.name, job.reason, job.blocks)), [
+        ('Upload dev for android', 'no Firebase app id for dev', false),
+        ('Upload dev for ios', 'no App Store app id for dev', false),
+      ]);
+      expect(plan.blocked, isFalse);
+      expect(
+        harness.counters.counterOf('prj_1', '.'),
+        0,
+        reason: 'a dry run takes no build number',
+      );
+      expect(
+        await harness.jobs.jobs.list(states: JobState.values.toSet()),
+        isEmpty,
+      );
+    });
+
+    test('lists a job it cannot plan as one that blocks', () async {
+      final plan = await harness.planBuiltin(
+        'dev-build',
+        const DispatchRequest(
+          platforms: ['android'],
+          inputs: {
+            'firebaseAppIds': {
+              'dev': {'android': '1:1:android:a'},
+            },
+          },
+        ),
+      );
+
+      final upload = plan.skipped.single;
+      expect(upload.name, 'Upload dev for android');
+      expect(upload.stage, 'upload');
+      expect(upload.flavor, 'dev');
+      expect(upload.platform, 'android');
+      expect(upload.blocks, isTrue);
+      expect(upload.reason, contains('has no firebase_sa credential'));
+      expect(plan.blocked, isTrue);
+    });
+
+    test('names the gates that are on', () async {
+      final gates = InMemoryGateConfigRepository();
+      harness = await DispatchHarness.create(gates: gates);
+      await gates.set('prj_1', const GateConfig({GateAction.push: false}));
+
+      final plan = await harness.planBuiltin(
+        'shorebird-patch',
+        const DispatchRequest(releaseVersion: '1.2.0+30'),
+      );
+
+      expect(plan.releaseVersion, '1.2.0+30');
+      expect(plan.gates, ['prod_patch']);
+    });
+
+    test('fetches only when the mirror does not know the ref', () async {
+      await harness.planBuiltin('dev-build');
+      expect(harness.git.calls, isNot(contains('fetch')));
+
+      await expectLater(
+        harness.planBuiltin('dev-build', const DispatchRequest(ref: 'nope')),
+        _dispatchError(isA<String>()),
+      );
+      expect(harness.git.calls, contains('fetch'));
+    });
+  });
 }

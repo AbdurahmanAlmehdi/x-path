@@ -80,7 +80,9 @@ MCP: `list_projects`, `get_project`, `list_workflows`, `get_workflow`. Every CLI
 answered; an error is then `{"code", "message", "hint"}` on standard error.
 
 Every project has the built-ins `dev-build`, `prod-release`, `release-merge`, `shorebird-patch`
-and `test`. Read a workflow's `inputs` before dispatching it.
+and `test`. Read a workflow's `inputs` before dispatching it. `plan_dispatch` (or
+`xp dispatch ... --dry-run`) says what a dispatch would start and which jobs it leaves out and
+why, without starting anything; check it before a release.
 
 ## Dispatch
 

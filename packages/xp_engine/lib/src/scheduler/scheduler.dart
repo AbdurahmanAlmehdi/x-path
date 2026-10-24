@@ -379,6 +379,7 @@ class Scheduler implements JobControl {
     final capable = _targets
         .where((runner) => runner.capabilities.containsAll(needs))
         .toList();
+    if (capable.isEmpty && needs.isEmpty) return 'No runner is connected.';
     if (capable.isEmpty) {
       final wires = needs.map((c) => c.wire).join(', ');
       final offline = [

@@ -7,6 +7,7 @@ import 'package:mocktail/mocktail.dart';
 import 'package:xp_api/xp_api.dart';
 import 'package:xp_client/xp_client.dart';
 import 'package:xp_desktop/app/app_services.dart';
+import 'package:xp_desktop/dispatch/dispatch.dart';
 import 'package:xp_desktop/projects/bloc/projects_bloc.dart';
 import 'package:xp_desktop/shell/cubit/shell_cubit.dart';
 import 'package:xp_desktop/widgets/widgets.dart';
@@ -60,6 +61,7 @@ Future<void> acceptRemoval(WidgetTester tester) async {
 void main() {
   late MockWorkflowsRepository repository;
 
+  setUpAll(() => registerFallbackValue(const DispatchRequest()));
   setUp(() => repository = workflowsRepository());
 
   testWidgets('shows the open workflow in the pipeline and as YAML', (
@@ -560,6 +562,22 @@ void main() {
       copyName('dev-build', const {'dev-build-copy', 'dev-build-copy-2'}),
       'dev-build-copy-3',
     );
+  });
+
+  testWidgets('runs the open workflow from the builder', (tester) async {
+    when(() => repository.lastInputs(any(), any()))
+        .thenAnswer((_) async => const {});
+    when(() => repository.lastWorkflow(any())).thenAnswer((_) async => null);
+    when(
+      () => repository.plan(any(), any(), any()),
+    ).thenAnswer((_) async => const DispatchPlan(flavors: [], platforms: []));
+    await pumpBuilder(tester, repository: repository);
+
+    await tester.tap(find.text('Run…'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(DispatchSheet), findsOneWidget);
+    verify(() => repository.getWorkflow('prj_1', 'wf_mine')).called(2);
   });
 
   testWidgets('imports and exports YAML files', (tester) async {

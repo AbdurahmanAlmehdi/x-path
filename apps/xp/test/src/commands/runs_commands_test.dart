@@ -246,6 +246,83 @@ void main() {
       });
     });
 
+    test('with --dry-run prints the plan and starts nothing', () async {
+      const plan = DispatchPlan(
+        flavors: ['dev'],
+        platforms: ['android', 'ios'],
+        version: '1.2.3',
+        build: 46,
+        releaseVersion: '1.2.0+30',
+        stages: [
+          PlannedStage(
+            name: 'build',
+            gates: ['push'],
+            jobs: [
+              PlannedJob(name: 'Check', engineOnly: true, local: true),
+              PlannedJob(
+                name: 'Build android',
+                engineOnly: false,
+                local: true,
+                runner: 'linux-01',
+              ),
+              PlannedJob(
+                name: 'Remote',
+                engineOnly: false,
+                local: false,
+                runner: 'mini',
+              ),
+              PlannedJob(name: 'Here', engineOnly: false, local: true),
+              PlannedJob(
+                name: 'Build ios',
+                engineOnly: false,
+                local: false,
+                waitReason: 'No runner can do ios-sign.',
+              ),
+            ],
+          ),
+        ],
+        skipped: [
+          SkippedJob(
+            name: 'Upload dev for ios',
+            stage: 'upload',
+            reason: 'no App Store app id for dev',
+          ),
+        ],
+      );
+      when(() => env.client.planDispatch('prj_1', 'wf_1', any()))
+          .thenAnswer((_) async => plan);
+
+      expect(await env.run(['dispatch', 'prj_1', 'wf_1', '--dry-run']), 0);
+
+      final out = env.logger.out;
+      expect(out, contains('flavors: dev  platforms: android, ios'));
+      expect(out, contains('version: 1.2.3+46  patches: 1.2.0+30'));
+      expect(out, contains('Check          engine'));
+      expect(out, contains('engine, else linux-01'));
+      expect(out, contains('Remote         mini'));
+      expect(out, contains('Here           engine'));
+      expect(out, contains('waits: No runner can do ios-sign.'));
+      expect(out, contains('build waits for approval: push'));
+      expect(
+        out,
+        contains('skipped  Upload dev for ios: no App Store app id for dev'),
+      );
+      verifyNever(() => env.client.dispatchWorkflow(any(), any(), any()));
+
+      when(() => env.client.planDispatch('prj_1', 'wf_1', any())).thenAnswer(
+        (_) async => const DispatchPlan(
+          flavors: [],
+          platforms: [],
+          skipped: [
+            SkippedJob(name: 'x', stage: 's', reason: 'No key.', blocks: true),
+          ],
+        ),
+      );
+      env.logger.infos.clear();
+      expect(await env.run(['dispatch', 'prj_1', 'wf_1', '--dry-run']), 65);
+      expect(env.logger.out, contains('cannot run  x: No key.'));
+    });
+
     test('refuses an input without a key', () async {
       expect(await env.run(['dispatch', 'prj_1', 'wf_1', '--input', '=x']), 64);
       expect(

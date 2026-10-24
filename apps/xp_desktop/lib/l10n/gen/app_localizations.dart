@@ -2233,7 +2233,7 @@ abstract class AppLocalizations {
   /// Beside the version a dispatch releases.
   ///
   /// In en, this message translates to:
-  /// **'from {version} in the pubspec at the last scan'**
+  /// **'from {version} in the pubspec of the commit'**
   String dispatchFromPubspec(String version);
 
   /// Placeholder of the explicit version field next to the bump.
