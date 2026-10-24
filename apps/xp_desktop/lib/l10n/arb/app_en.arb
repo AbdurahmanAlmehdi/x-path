@@ -282,8 +282,6 @@
   "@scanInfo": {"description": "Finding severity."},
   "projectSubtitle": "{branch} · {apps}",
   "@projectSubtitle": {"placeholders": {"branch": {"type": "String"}, "apps": {"type": "String"}}},
-  "projectSubtitleOnHost": "{host} · {branch} · {apps}",
-  "@projectSubtitleOnHost": {"description": "The overview of a project that is not on GitHub: its git host first.", "placeholders": {"host": {"type": "String"}, "branch": {"type": "String"}, "apps": {"type": "String"}}},
   "projectHostLocal": "local repository",
   "@projectHostLocal": {"description": "The host of a project whose origin is a file:// repository."},
   "projectEmptyTitle": "No projects yet",

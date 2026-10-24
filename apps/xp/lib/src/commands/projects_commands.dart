@@ -8,7 +8,6 @@ import 'package:xp/src/output/format.dart';
 import 'package:xp/src/resolve.dart';
 import 'package:xp_api/xp_api.dart';
 import 'package:xp_client/xp_client.dart';
-import 'package:xp_engine/xp_engine.dart' show GitRemote;
 
 /// `xp projects`: the repositories XPath releases.
 XpGroup projectsCommand(XpContext context) =>
@@ -164,16 +163,20 @@ class ProjectsAddCommand extends XpCommand {
     try {
       project = await client.addProject(request);
     } on ApiException catch (error) {
-      final offered = error.sshUrl;
-      if (offered == null) rethrow;
-      logger
-        ..err(error.message)
-        ..info(
-          isFolder
-              ? 'Run: xp projects add ${request.path} --ssh-url $offered'
-              : 'Run: xp projects add $offered',
-        );
-      return XpExit.forApi(error);
+      if (error case ApiException(
+        code: ApiErrorCode.sshUrlRequired,
+        sshUrl: final offered?,
+      )) {
+        logger
+          ..err(error.message)
+          ..info(
+            isFolder
+                ? 'Run: xp projects add ${request.path} --ssh-url $offered'
+                : 'Run: xp projects add $offered',
+          );
+        return XpExit.forApi(error);
+      }
+      rethrow;
     }
     emit(
       project.toJson(),

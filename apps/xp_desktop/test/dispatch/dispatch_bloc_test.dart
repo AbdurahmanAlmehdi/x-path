@@ -99,6 +99,22 @@ void main() {
       expect(state.canDispatch, isFalse);
     });
 
+    test('catches a workflow whose only GitHub step opens a pull request', () {
+      const pullRequest = '''
+stages:
+  - name: finalize
+    jobs:
+      pr:
+        steps:
+          - kind: git.checkout
+          - kind: github.createPr
+''';
+      final state = stateOf(shop, pullRequest);
+
+      expect(state.gitHubStep, 'github.createPr');
+      expect(state.canDispatch, isFalse);
+    });
+
     test('is null on GitHub, and for a workflow without GitHub steps', () {
       for (final state in [stateOf(mataa, _pushing), stateOf(shop, bumping)]) {
         expect(state.gitHubStep, isNull);

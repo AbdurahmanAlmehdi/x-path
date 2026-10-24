@@ -139,24 +139,27 @@ void main() {
 
       expect(await repository.findBySourceKey('h0123456789abcdef'), record);
       expect((await repository.get('prj_bb'))!.githubRepoId, isNull);
-      expect(
-        () => repository.add(
-          ProjectRecord(
-            id: 'prj_gh',
-            host: 'bitbucket.org',
-            sourceKey: 'h1123456789abcdef',
-            githubRepoId: 7,
-            fullName: 'ws/repo',
-            remote: 'r',
-            githubDefaultBranch: 'main',
-            scan: const ProjectProfile(),
-            findings: const [],
-            scannedAt: DateTime.utc(2026),
-          ),
-        ),
-        throwsA(isA<SqliteException>()),
-        reason: 'only a project on GitHub has a GitHub repository id',
+    });
+
+    test('refuses a second project with the same source key', () async {
+      ProjectRecord at(String id) => ProjectRecord(
+        id: id,
+        host: 'bitbucket.org',
+        sourceKey: 'h0123456789abcdef',
+        fullName: 'ws/repo',
+        remote: 'git@bitbucket.org:ws/repo.git',
+        githubDefaultBranch: 'main',
+        scan: const ProjectProfile(),
+        findings: const [],
+        scannedAt: DateTime.utc(2026),
       );
+      await repository.add(at('prj_a'));
+
+      expect(
+        () => repository.add(at('prj_b')),
+        throwsA(isA<SqliteException>()),
+      );
+      expect(await repository.list(), hasLength(1));
     });
 
     test('lists projects in the order they were added', () async {

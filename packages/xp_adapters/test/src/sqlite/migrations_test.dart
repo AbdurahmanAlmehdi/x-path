@@ -356,7 +356,7 @@ INSERT INTO approval (id, project_id, action, state, run_id, job_id)
       expect(record.isOnGitHub, isTrue);
     });
 
-    test('keeps a GitHub repository id to projects on GitHub', () {
+    test('refuses a GitHub id off github.com, none on it, and no host', () {
       final database = SqliteDatabase.openInMemory();
       addTearDown(database.close);
       final db = database.connection

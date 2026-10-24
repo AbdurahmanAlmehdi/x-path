@@ -59,9 +59,13 @@ class ProjectsRepository {
             client.addProject(AddProjectRequest(path: path, sshUrl: sshUrl)),
       );
     } on ApiException catch (error) {
-      final offered = error.sshUrl;
-      if (offered == null) rethrow;
-      throw SshUrlRequired(error.message, sshUrl: offered);
+      if (error case ApiException(
+        code: ApiErrorCode.sshUrlRequired,
+        :final sshUrl?,
+      )) {
+        throw SshUrlRequired(error.message, sshUrl: sshUrl);
+      }
+      rethrow;
     }
   }
 

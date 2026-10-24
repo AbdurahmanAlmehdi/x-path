@@ -19,7 +19,10 @@ class ProjectRecord extends Equatable {
     this.githubRepoId,
     this.localPath,
     this.edits = const ProfileEdits(),
-  });
+  }) : assert(
+         (host == Project.githubHost) == (githubRepoId != null),
+         'Only a project on GitHub has a GitHub repository id (ADR 0015).',
+       );
 
   /// The engine's id.
   final String id;

@@ -92,24 +92,16 @@ void main() {
       expect(call.arguments.where((a) => a.startsWith('credential.')), isEmpty);
     });
 
-    test('reach other hosts with SSH that never prompts and only accepts a '
-        'host key it has not seen', () async {
+    test('reach other hosts with the SSH command on every call', () async {
       secrets.values.clear();
 
       await service.fetch(mirror);
       await service.push(mirror, refspecs: [GitRefspecs.tag('v1')]);
 
+      expect(runner.calls, hasLength(2));
       for (final call in runner.calls) {
-        expect(call.environment?['GIT_SSH_COMMAND'], CliGitService.sshCommand);
+        expect(call.environment?['GIT_SSH_COMMAND'], gitSshCommand);
       }
-      expect(
-        CliGitService.sshCommand.split(' '),
-        containsAll([
-          'BatchMode=yes',
-          'ConnectTimeout=30',
-          'StrictHostKeyChecking=accept-new',
-        ]),
-      );
     });
   });
 

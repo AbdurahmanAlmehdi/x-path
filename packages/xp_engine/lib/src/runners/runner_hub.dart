@@ -419,7 +419,6 @@ class RunnerHub
     return LeaseRepository(
       cacheKey: project.sourceKey,
       sshUrl: github?.sshUrl ?? _withoutUserInfo(project.remote),
-      githubRepoId: project.githubRepoId,
     );
   }
 

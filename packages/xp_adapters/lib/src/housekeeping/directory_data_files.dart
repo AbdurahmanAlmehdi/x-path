@@ -24,8 +24,6 @@ class DirectoryDataFiles implements DataFiles {
   String get _mirrors => p.join(dataDir, 'mirrors');
   String get _flutter => p.join(dataDir, 'toolchains', 'flutter');
 
-  static final _mirrorName = RegExp(r'^(\d+|h[0-9a-f]{16})\.git$');
-
   @override
   Future<Map<String, int>> logSizes() async => {
     for (final directory in _directories(_logs))
@@ -67,9 +65,11 @@ class DirectoryDataFiles implements DataFiles {
   @override
   Future<List<MirrorDirectory>> mirrors() async => [
     for (final directory in _directories(_mirrors))
-      if (_mirrorName.firstMatch(p.basename(directory.path)) case final match?)
+      if (p.basename(directory.path) case final name
+          when name.endsWith('.git') &&
+              GitMirror.keyPattern.hasMatch(p.withoutExtension(name)))
         MirrorDirectory(
-          key: match.group(1)!,
+          key: p.withoutExtension(name),
           path: directory.path,
           bytes: await _sizeOf(directory),
         ),

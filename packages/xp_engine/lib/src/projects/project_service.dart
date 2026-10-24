@@ -97,13 +97,8 @@ class ProjectService {
         'Give exactly one of "path" and "remote".',
       );
     }
-    if (path == null && request.sshUrl != null) {
-      throw const ProjectInvalidException(
-        '"sshUrl" goes with "path"; give the SSH URL as "remote" instead.',
-      );
-    }
     if (path != null) return await _addFolder(path, request.sshUrl);
-    return await _addRemote(remote!, localPath: null, sshUrl: null);
+    return await _addRemote(remote!, localPath: null, sshUrl: request.sshUrl);
   });
 
   /// Scans the project [id] again and keeps the owner's edits.
@@ -192,37 +187,38 @@ class ProjectService {
 
   /// Adds the repository at [url]: a GitHub one through GitHub, any other
   /// over SSH or `file://`. An HTTPS [url] on another host is read at
-  /// [sshUrl], the SSH URL the owner confirmed.
+  /// [sshUrl], the SSH URL the owner confirmed for the folder [localPath].
   Future<Project> _addRemote(
     String url, {
     required String? localPath,
     required String? sshUrl,
   }) async {
-    if (GitHubRemote.parse(url) case final github?) {
-      if (sshUrl != null) {
-        throw const ProjectInvalidException(
-          'The repository is on GitHub, which XPath reaches with its GitHub '
-          'token: leave out "sshUrl".',
-        );
-      }
-      return await _register(github, localPath: localPath);
+    final github = GitHubRemote.parse(url);
+    final remote = github == null ? GitRemote.parse(url) : null;
+    final derived = github == null && remote == null
+        ? GitRemote.sshUrlFor(url)
+        : null;
+    if (sshUrl != null && (localPath == null || derived == null)) {
+      throw const ProjectInvalidException(
+        '"sshUrl" only goes with a "path" whose origin is an HTTPS URL on a '
+        'host other than GitHub; leave it out.',
+      );
     }
-    if (GitRemote.parse(url) case final remote?) {
-      if (sshUrl != null) {
-        throw const ProjectInvalidException(
-          '"sshUrl" is only for an HTTPS origin: leave it out.',
-        );
-      }
-      return await _registerOther(remote, url.trim(), localPath: localPath);
+    if (github != null) return await _register(github, localPath: localPath);
+    if (remote != null) {
+      return await _registerOther(
+        _notOnGitHub(remote, url),
+        url.trim(),
+        localPath: localPath,
+      );
     }
-    final derived = GitRemote.sshUrlFor(url);
     if (derived == null) {
       throw ProjectInvalidException(
         '"$url" is not a repository XPath can reach. Give a GitHub '
         'repository, an SSH URL (git@host:path or ssh://) or a file:// URL.',
       );
     }
-    final offered = GitRemote.parse(derived)!;
+    final offered = _notOnGitHub(GitRemote.parse(derived)!, url);
     if (sshUrl == null) {
       throw ProjectSshUrlRequiredException(host: offered.host, sshUrl: derived);
     }
@@ -233,6 +229,17 @@ class ProjectService {
       );
     }
     return await _registerOther(confirmed, sshUrl.trim(), localPath: localPath);
+  }
+
+  /// [remote], unless it is on GitHub: a GitHub repository is read with the
+  /// GitHub token and keyed by its id, so it must be named in a form
+  /// [GitHubRemote.parse] reads, never by an SSH or derived URL.
+  GitRemote _notOnGitHub(GitRemote remote, String url) {
+    if (remote.host != Project.githubHost) return remote;
+    throw ProjectInvalidException(
+      '"$url" is on GitHub, but not in a form XPath reads. Give the '
+      'repository as owner/name.',
+    );
   }
 
   /// The URL of `origin` in the clone at [path]. Only reads its config.
@@ -262,49 +269,28 @@ class ProjectService {
     required String? localPath,
   }) async {
     final repo = await _github.getRepo(remote.owner, remote.name);
-    final existing = await _repository.findBySourceKey('${repo.id}');
-    if (existing != null) {
-      throw ProjectExistsException(existing.id, existing.fullName);
-    }
-    final id = 'prj_${_hex(8)}';
-    final mirror = await _git.ensureMirror(
-      key: '${repo.id}',
-      remoteUrl: repo.cloneUrl,
-    );
-    final result = localPath != null
-        ? await _scanner.scan(_sources(localPath))
-        : await _scanMirror(mirror, repo.defaultBranch, id);
-    final record = ProjectRecord(
-      id: id,
+    await _refuseExisting('${repo.id}');
+    return await _finishAdding(
       host: Project.githubHost,
       sourceKey: '${repo.id}',
       githubRepoId: repo.id,
       fullName: repo.fullName,
-      remote: repo.cloneUrl,
-      githubDefaultBranch: repo.defaultBranch,
+      url: repo.cloneUrl,
+      branch: repo.defaultBranch,
       localPath: localPath,
-      scan: _withDefaultBranch(result.profile, repo.defaultBranch),
-      findings: result.findings,
-      scannedAt: _clock.now(),
     );
-    await _repository.add(record);
-    _events.append(ProjectAdded(projectId: id, fullName: repo.fullName));
-    _scanned(record);
-    return record.toProject();
   }
 
   /// Registers the repository [remote] on a host other than GitHub, fetched
-  /// from [url] with the engine's own SSH access (ADR 0015).
+  /// from [url] with the engine's own SSH access (ADR 0015). `git ls-remote`
+  /// proves the access and reads the default branch.
   Future<Project> _registerOther(
     GitRemote remote,
     String url, {
     required String? localPath,
   }) async {
     final key = remote.sourceKey;
-    final existing = await _repository.findBySourceKey(key);
-    if (existing != null) {
-      throw ProjectExistsException(existing.id, existing.fullName);
-    }
+    await _refuseExisting(key);
     final String branch;
     try {
       branch = await _git.lsRemote(url);
@@ -318,16 +304,46 @@ class ProjectService {
             'XPath cannot read $url: ${error.message}',
       );
     }
+    return await _finishAdding(
+      host: remote.host,
+      sourceKey: key,
+      fullName: remote.path,
+      url: url,
+      branch: branch,
+      localPath: localPath,
+    );
+  }
+
+  Future<void> _refuseExisting(String sourceKey) async {
+    final existing = await _repository.findBySourceKey(sourceKey);
+    if (existing != null) {
+      throw ProjectExistsException(existing.id, existing.fullName);
+    }
+  }
+
+  /// Sets up the mirror of a repository whose identity is resolved, scans it
+  /// (the folder [localPath], else the [branch] of the mirror) and stores
+  /// the project.
+  Future<Project> _finishAdding({
+    required String host,
+    required String sourceKey,
+    required String fullName,
+    required String url,
+    required String branch,
+    required String? localPath,
+    int? githubRepoId,
+  }) async {
     final id = 'prj_${_hex(8)}';
-    final mirror = await _git.ensureMirror(key: key, remoteUrl: url);
+    final mirror = await _git.ensureMirror(key: sourceKey, remoteUrl: url);
     final result = localPath != null
         ? await _scanner.scan(_sources(localPath))
         : await _scanMirror(mirror, branch, id);
     final record = ProjectRecord(
       id: id,
-      host: remote.host,
-      sourceKey: key,
-      fullName: remote.fullName,
+      host: host,
+      sourceKey: sourceKey,
+      githubRepoId: githubRepoId,
+      fullName: fullName,
       remote: url,
       githubDefaultBranch: branch,
       localPath: localPath,
@@ -336,7 +352,7 @@ class ProjectService {
       scannedAt: _clock.now(),
     );
     await _repository.add(record);
-    _events.append(ProjectAdded(projectId: id, fullName: remote.fullName));
+    _events.append(ProjectAdded(projectId: id, fullName: fullName));
     _scanned(record);
     return record.toProject();
   }

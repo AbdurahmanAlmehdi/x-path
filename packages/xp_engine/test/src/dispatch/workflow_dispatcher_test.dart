@@ -857,16 +857,26 @@ stages:
       );
     });
 
-    test('refuses prod-release, naming the host and the step', () async {
+    test('refuses a workflow with a GitHub step, naming the host and the '
+        'step', () async {
       await moveTo('bitbucket.org', 'git@bitbucket.org:ws/demo.git');
 
       await expectLater(
-        harness.dispatchBuiltin('prod-release'),
+        harness.dispatchCustom('''
+schema: 1
+stages:
+  - name: finalize
+    jobs:
+      pr:
+        steps:
+          - kind: git.checkout
+          - kind: github.createPr
+'''),
         _dispatchError(
           allOf(
             startsWith('ws/demo is on bitbucket.org, not on GitHub'),
-            contains('"prod-release" cannot run'),
-            contains('its "git.push" step works only on GitHub'),
+            contains('"custom-1" cannot run'),
+            contains('its "github.createPr" step works only on GitHub'),
             contains('such as dev-build or test'),
             contains('a private mirror of the repository on GitHub'),
           ),
@@ -876,7 +886,7 @@ stages:
     });
 
     test('refuses a GitHub step of any workflow', () async {
-      await moveTo(GitRemote.localHost, 'file:///srv/git/demo.git');
+      await moveTo(Project.localHost, 'file:///srv/git/demo.git');
 
       await expectLater(
         harness.dispatchBuiltin('release-merge'),

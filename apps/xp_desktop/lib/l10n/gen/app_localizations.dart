@@ -922,12 +922,6 @@ abstract class AppLocalizations {
   /// **'{branch} · {apps}'**
   String projectSubtitle(String branch, String apps);
 
-  /// The overview of a project that is not on GitHub: its git host first.
-  ///
-  /// In en, this message translates to:
-  /// **'{host} · {branch} · {apps}'**
-  String projectSubtitleOnHost(String host, String branch, String apps);
-
   /// The host of a project whose origin is a file:// repository.
   ///
   /// In en, this message translates to:

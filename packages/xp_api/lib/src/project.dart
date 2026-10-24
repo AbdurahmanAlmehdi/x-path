@@ -33,6 +33,9 @@ class Project extends Equatable {
   /// The [host] of a project on GitHub.
   static const githubHost = 'github.com';
 
+  /// The [host] of a project whose origin is a `file://` repository.
+  static const localHost = 'local';
+
   /// The engine's id for the project, for example `prj_1a2b3c4d5e6f7a8b`.
   final String id;
 
@@ -78,6 +81,9 @@ class Project extends Equatable {
   /// Whether the repository is on GitHub, so GitHub steps can run for it.
   bool get isOnGitHub => host == githubHost;
 
+  /// Whether the repository is a local `file://` one.
+  bool get isLocal => host == localHost;
+
   /// The JSON form.
   Map<String, dynamic> toJson() => _$ProjectToJson(this);
 
@@ -99,6 +105,12 @@ class Project extends Equatable {
     scannedAt,
   ];
 }
+
+/// Whether a step of [kind] works only for a project on GitHub: a `github.*`
+/// step calls the GitHub API, and `git.push` pushes with the GitHub token.
+/// The engine refuses such a step on any other project (Q3, ADR 0015).
+bool stepNeedsGitHub(String kind) =>
+    kind.startsWith('github.') || kind == 'git.push';
 
 /// The body of `GET /projects`.
 @JsonSerializable(explicitToJson: true)

@@ -29,18 +29,11 @@ void main() {
       }
     });
 
-    test('names no host for the host key of a local repository', () {
+    test('speaks of no host key for a local repository, which has none', () {
       for (final url in ['file:///srv/git/app.git', '/srv/git/app.git']) {
         expect(
-          explain(
-            'Host key verification failed.',
-            url,
-            reader: GitAccessReader.engine,
-          ),
-          'The host key of the repository server is not the one SSH on this '
-          'machine recorded for it. If the server changed its key, remove the '
-          'old one with ssh-keygen -R as the user the engine runs as, then '
-          'add the project again.',
+          explain('Host key verification failed.', url),
+          isNull,
           reason: url,
         );
       }

@@ -10,7 +10,6 @@ import 'package:xp_engine/src/git/git_models.dart';
 import 'package:xp_engine/src/git/git_service.dart';
 import 'package:xp_engine/src/jobs/job_repository.dart';
 import 'package:xp_engine/src/jobs/job_runner.dart';
-import 'package:xp_engine/src/projects/git_remote.dart';
 import 'package:xp_engine/src/projects/project_record.dart';
 import 'package:xp_engine/src/projects/project_repository.dart';
 import 'package:xp_engine/src/releases/release_exceptions.dart';
@@ -264,11 +263,9 @@ class WorkflowDispatcher {
     Set<String> kinds,
   ) {
     if (project.isOnGitHub) return;
-    final step = kinds
-        .where((kind) => kind.startsWith('github.') || kind == 'git.push')
-        .firstOrNull;
+    final step = kinds.where(stepNeedsGitHub).firstOrNull;
     if (step == null) return;
-    final where = project.host == GitRemote.localHost
+    final where = project.host == Project.localHost
         ? 'a local repository'
         : 'on ${project.host}';
     throw DispatchException(

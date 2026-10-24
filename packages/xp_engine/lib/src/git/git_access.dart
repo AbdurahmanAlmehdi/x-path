@@ -1,12 +1,20 @@
-import 'package:xp_engine/src/projects/git_remote.dart';
+import 'package:xp_api/xp_api.dart';
 import 'package:xp_engine/src/projects/github_remote.dart';
+
+/// The `GIT_SSH_COMMAND` of every git command that reaches a repository: no
+/// prompt for a password or passphrase, a bounded connect, and a host key
+/// that is recorded the first time and must not change after (Q6, ADR 0015).
+/// The engine and the runners use the same command.
+const gitSshCommand =
+    'ssh -o BatchMode=yes -o ConnectTimeout=30 '
+    '-o StrictHostKeyChecking=accept-new';
 
 /// Who reached for a repository over SSH, for the words of
 /// [explainGitAccess].
 enum GitAccessReader {
   /// A runner fetching the commit of a job (ADR 0009).
   runner(
-    name: 'this runner',
+    subject: 'This runner',
     key: "this runner's SSH key",
     user: 'the user of this runner',
     retry: 'run the job again',
@@ -15,7 +23,7 @@ enum GitAccessReader {
   /// The engine adding a project (ADR 0015). The LaunchAgent and the Docker
   /// image have no terminal, so its key must need no passphrase.
   engine(
-    name: 'the engine',
+    subject: 'The engine',
     key:
         "the engine's SSH key (~/.ssh/id_ed25519.pub of the user the engine "
         'runs as, with no passphrase)',
@@ -24,14 +32,14 @@ enum GitAccessReader {
   );
 
   new({
-    required this.name,
+    required this.subject,
     required this.key,
     required this.user,
     required this.retry,
   });
 
-  /// Who reads, in a sentence: `this runner`.
-  final String name;
+  /// Who reads, at the start of a sentence: `This runner`.
+  final String subject;
 
   /// The key it reads with.
   final String key;
@@ -59,19 +67,15 @@ String? explainGitAccess(
   final text = output.toLowerCase();
   final github = GitHubRemote.parse(url);
   final remote = GitRemote.parse(url);
-  final host = github != null ? 'github.com' : remote?.host;
-  // The SSH host, if there is one: not for a local repository.
-  final sshHost = host == GitRemote.localHost ? null : host;
-  final repo = github?.fullName ?? remote?.fullName ?? url;
+  final host = github != null ? Project.githubHost : remote?.host;
+  // The SSH host, if there is one: a local repository has none, so no host
+  // key either.
+  final sshHost = host == Project.localHost ? null : host;
+  final repo = github?.fullName ?? remote?.path ?? url;
   final retry = reader.retry;
-  if (text.contains('host key verification failed') ||
-      text.contains('remote host identification has changed')) {
-    if (sshHost == null) {
-      return 'The host key of the repository server is not the one SSH on '
-          'this machine recorded for it. If the server changed its key, '
-          'remove the old one with ssh-keygen -R as ${reader.user}, then '
-          '$retry.';
-    }
+  if (sshHost != null &&
+      (text.contains('host key verification failed') ||
+          text.contains('remote host identification has changed'))) {
     return 'The host key of $sshHost is not the one SSH on this machine '
         'recorded for it. If $sshHost changed its key, remove the old one '
         '(ssh-keygen -R $sshHost) as ${reader.user} and run '
@@ -83,8 +87,8 @@ String? explainGitAccess(
           text.contains('unadvertised object') ||
           text.contains('no such remote ref'))) {
     final server = switch (host) {
-      'github.com' => 'GitHub',
-      null || GitRemote.localHost => 'The repository',
+      Project.githubHost => 'GitHub',
+      null || Project.localHost => 'The repository',
       final host => host,
     };
     return '$server has no commit ${sha.substring(0, 12)} to give '
@@ -105,11 +109,10 @@ String? explainGitAccess(
       'bitbucket.org' =>
         'add $key as an access key of $repo '
             '(Bitbucket: Repository settings, Access keys)',
-      null || GitRemote.localHost => 'let ${reader.user} read the repository',
+      null || Project.localHost => 'let ${reader.user} read the repository',
       final host => 'add $key to $host with read access to $repo',
     };
-    final name = reader.name;
-    return '${name[0].toUpperCase()}${name.substring(1)} cannot read $repo'
+    return '${reader.subject} cannot read $repo'
         '${sshHost == null ? '' : ' over SSH'}. Fix: $fix, then $retry.';
   }
   return null;

@@ -12,7 +12,6 @@ final String _sha = 'a' * 40;
 
 const _repository = LeaseRepository(
   cacheKey: '42',
-  githubRepoId: 42,
   sshUrl: 'git@github.com:owner/app.git',
 );
 
@@ -361,12 +360,6 @@ void main() {
       expect(
         await failureOn('file:///srv/git/app.git'),
         contains('The repository has no commit'),
-      );
-
-      printed = ['err:Host key verification failed.'];
-      expect(
-        await failureOn('file:///srv/git/app.git'),
-        contains('host key of the repository server is not the one'),
       );
     });
 

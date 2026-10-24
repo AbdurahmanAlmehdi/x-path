@@ -5009,9 +5009,6 @@ components:
           description: The project's source key; it keys the runner's cache.
         sshUrl:
           type: string
-        githubRepoId:
-          type: integer
-          description: For a project on GitHub only.
     LeaseOfferFrame:
       type: object
       required:

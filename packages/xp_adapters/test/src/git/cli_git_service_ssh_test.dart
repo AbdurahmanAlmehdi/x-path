@@ -6,6 +6,7 @@ import 'dart:io';
 import 'package:path/path.dart' as p;
 import 'package:test/test.dart';
 import 'package:xp_adapters/xp_adapters.dart';
+import 'package:xp_api/xp_api.dart';
 import 'package:xp_engine/xp_engine.dart';
 
 import '../../helpers/git_fixture.dart';
@@ -38,11 +39,13 @@ exec sh -c "$(echo "$command" | sed 's/^git-upload-pack/git upload-pack/')"
 ''';
 
 void main() {
+  // One repository and one fake ssh for every test, as git setup is slow;
+  // each test starts with an empty ssh log.
   late GitFixture fixture;
   late Directory bin;
   late String log;
 
-  setUp(() {
+  setUpAll(() {
     fixture = GitFixture.create();
     fixture
       ..commit('a.txt', 'one')
@@ -60,7 +63,10 @@ void main() {
     Process.runSync('chmod', ['+x', ssh.path]);
     log = p.join(fixture.root.path, 'ssh.log');
   });
-  tearDown(() => fixture.dispose());
+  tearDownAll(() => fixture.dispose());
+  setUp(() {
+    if (File(log).existsSync()) File(log).deleteSync();
+  });
 
   CliGitService serviceIn(String mode, {String userHost = 'git@host'}) =>
       CliGitService(
@@ -111,50 +117,31 @@ void main() {
     }
   });
 
-  test('fails on a host key that changed and says what to do', () async {
-    final message = await failureOf(serviceIn('changed'), sshUrl());
-
-    expect(message, contains('Host key verification failed.'));
+  test("fails with ssh's words on a host key that changed", () async {
     expect(
-      explainGitAccess(message, url: sshUrl(), reader: GitAccessReader.engine),
+      await failureOf(serviceIn('changed'), sshUrl()),
       allOf(
-        contains('The host key of git.example.com is not the one'),
-        contains('ssh-keygen -R git.example.com'),
+        contains('REMOTE HOST IDENTIFICATION HAS CHANGED'),
+        contains('Host key verification failed.'),
       ),
     );
   });
 
-  test('says where GitHub and Bitbucket take the key they refused', () async {
-    final github = await failureOf(
-      serviceIn('denied', userHost: 'git@github.com'),
-      'git@github.com:octo/app.git',
-    );
-    final bitbucket = await failureOf(
-      serviceIn('denied', userHost: 'git@bitbucket.org'),
-      'git@bitbucket.org:ws/app.git',
-    );
-
-    expect(github, contains('git@github.com: Permission denied (publickey).'));
-    expect(
-      explainGitAccess(
-        github,
-        url: 'git@github.com:octo/app.git',
-        reader: GitAccessReader.engine,
-      ),
-      contains('as a deploy key on octo/app (GitHub: Settings, Deploy keys)'),
-    );
-    expect(
-      explainGitAccess(
-        bitbucket,
-        url: 'git@bitbucket.org:ws/app.git',
-        reader: GitAccessReader.engine,
-      ),
-      contains(
-        'as an access key of ws/app (Bitbucket: Repository settings, '
-        'Access keys)',
-      ),
-    );
-  });
+  test(
+    'fails with the words of GitHub and Bitbucket for a key they refuse',
+    () async {
+      for (final host in ['github.com', 'bitbucket.org']) {
+        expect(
+          await failureOf(
+            serviceIn('denied', userHost: 'git@$host'),
+            'git@$host:ws/app.git',
+          ),
+          contains('git@$host: Permission denied (publickey).'),
+          reason: host,
+        );
+      }
+    },
+  );
 
   test('reads a file:// repository without SSH', () async {
     final service = serviceIn('denied');

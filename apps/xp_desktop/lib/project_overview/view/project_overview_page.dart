@@ -119,16 +119,13 @@ class _ProjectOverviewViewState extends State<ProjectOverviewView> {
         child: ShellPage(
           title: project.fullName.split('/').last,
           // A GitHub project needs no word about its host (ADR 0015).
-          subtitle: project.isOnGitHub
-              ? l10n.projectSubtitle(
-                  project.defaultBaseBranch,
-                  l10n.projectApps(apps.length),
-                )
-              : l10n.projectSubtitleOnHost(
-                  project.hostLabel(l10n),
-                  project.defaultBaseBranch,
-                  l10n.projectApps(apps.length),
-                ),
+          subtitle: [
+            if (!project.isOnGitHub) project.hostLabel(l10n),
+            l10n.projectSubtitle(
+              project.defaultBaseBranch,
+              l10n.projectApps(apps.length),
+            ),
+          ].join(' · '),
           actions: [
             if (flavors.length > 1)
               XpSegmented<String?>(

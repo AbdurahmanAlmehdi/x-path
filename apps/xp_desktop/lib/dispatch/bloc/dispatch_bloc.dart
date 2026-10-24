@@ -166,7 +166,7 @@ class DispatchState extends Equatable {
             .expand((stage) => stage.jobs)
             .expand((job) => job.steps)
             .map((step) => step.kind)
-            .where((kind) => kind.startsWith('github.') || kind == 'git.push')
+            .where(stepNeedsGitHub)
             .firstOrNull;
 
   /// The flavors the run is for: the ones picked, else the default.

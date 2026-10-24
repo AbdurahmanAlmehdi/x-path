@@ -82,6 +82,30 @@ void main() {
     });
   });
 
+  test('a file:// project is local', () {
+    const local = Project(
+      id: 'prj_4',
+      host: Project.localHost,
+      sourceKey: 'h0123456789abcdef',
+      fullName: 'srv/git/app',
+      remote: 'file:///srv/git/app.git',
+      defaultBaseBranch: 'main',
+    );
+
+    expect(local.isLocal, isTrue);
+    expect(local.isOnGitHub, isFalse);
+    expect(project.isLocal, isFalse);
+  });
+
+  test('only GitHub and push steps need GitHub', () {
+    for (final kind in ['github.createPr', 'github.mergePr', 'git.push']) {
+      expect(stepNeedsGitHub(kind), isTrue, reason: kind);
+    }
+    for (final kind in ['git.checkout', 'git.tag', 'build.android', 'test']) {
+      expect(stepNeedsGitHub(kind), isFalse, reason: kind);
+    }
+  });
+
   test('ProjectsResponse round-trips through JSON', () {
     final response = ProjectsResponse([project]);
 

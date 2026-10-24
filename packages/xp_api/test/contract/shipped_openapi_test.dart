@@ -74,6 +74,29 @@ void main() {
       }
     });
 
+    test('documents the lease of a repository on any git host', () {
+      const bitbucket = LeaseRepository(
+        cacheKey: 'h0123456789abcdef',
+        sshUrl: 'git@bitbucket.org:ws/app.git',
+      );
+
+      expect(
+        shipped.validateSchema('LeaseRepository', bitbucket.toJson()),
+        isEmpty,
+      );
+      expect(bitbucket.toJson().containsKey('githubRepoId'), isFalse);
+      for (final cacheKey in ['', 'h0123', '../7', 'H0123456789ABCDEF']) {
+        expect(
+          shipped.validateSchema('LeaseRepository', {
+            'cacheKey': cacheKey,
+            'sshUrl': 'git@bitbucket.org:ws/app.git',
+          }),
+          isNotEmpty,
+          reason: cacheKey,
+        );
+      }
+    });
+
     test('documents projects on GitHub and on any other host', () {
       const projects = ProjectsResponse([
         Project(
@@ -1220,7 +1243,6 @@ void main() {
           name: 'Build',
           repository: const LeaseRepository(
             cacheKey: '7',
-            githubRepoId: 7,
             sshUrl: 'git@github.com:owner/app.git',
           ),
           stage: 0,

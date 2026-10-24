@@ -6,5 +6,5 @@ extension ProjectHost on Project {
   /// The git host, such as `bitbucket.org`, or "local repository" for a
   /// `file://` origin.
   String hostLabel(AppLocalizations l10n) =>
-      host == 'local' ? l10n.projectHostLocal : host;
+      isLocal ? l10n.projectHostLocal : host;
 }

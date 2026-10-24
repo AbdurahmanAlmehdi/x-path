@@ -1,7 +1,6 @@
 import 'dart:io';
 
 import 'package:path/path.dart' as p;
-import 'package:xp_adapters/xp_adapters.dart';
 import 'package:xp_api/xp_api.dart';
 import 'package:xp_engine/xp_engine.dart';
 
@@ -29,7 +28,7 @@ class LeaseSource {
 ///
 /// The runner keeps a bare cache per repository, keyed by the project's
 /// source key (ADR 0015). The step fetches the exact commit of the offer into
-/// it (with `GIT_SSH_COMMAND` set to [CliGitService.sshCommand], so that git
+/// it (with `GIT_SSH_COMMAND` set to [gitSshCommand], so that git
 /// never asks for a password or a passphrase and records a host key it has
 /// not seen yet), cuts a fresh worktree at that commit and verifies that its
 /// `HEAD` is the commit before the job goes on. When the runner cannot read
@@ -205,7 +204,7 @@ class RemoteCheckoutStep extends Step<GitCheckoutInput, GitCheckoutResult> {
         workingDirectory: directory,
         environment: {
           ..._environment,
-          if (network) 'GIT_SSH_COMMAND': CliGitService.sshCommand,
+          if (network) 'GIT_SSH_COMMAND': gitSshCommand,
         },
         passThroughEnvironment: const ['SSH_AUTH_SOCK'],
       ),
@@ -233,7 +232,7 @@ class RemoteCheckoutStep extends Step<GitCheckoutInput, GitCheckoutResult> {
     );
     if (explained != null) return explained;
     final repo =
-        GitHubRemote.parse(url)?.fullName ?? GitRemote.parse(url)?.fullName;
+        GitHubRemote.parse(url)?.fullName ?? GitRemote.parse(url)?.path;
     return 'git fetch failed (exit code ${run.exit.exitCode})'
         '${run.lines.isEmpty ? '' : ': ${run.lines.last}'}. Check that this '
         'runner can reach ${repo ?? url} over SSH.';

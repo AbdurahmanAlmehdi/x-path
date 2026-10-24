@@ -22,7 +22,7 @@ import 'package:xp_engine/xp_engine.dart';
 /// helper is a shell snippet that reads `XPATH_GIT_TOKEN`, so the token is in
 /// no argument, no URL and no config file. Any other host is reached over SSH
 /// with the engine user's own key: commands that use the network run with
-/// [sshCommand], so SSH never prompts and accepts a host key it has not seen
+/// [gitSshCommand], so SSH never prompts and accepts a host key it has not seen
 /// yet, but not a changed one (ADR 0015).
 class CliGitService implements GitService {
   /// Creates the service.
@@ -51,14 +51,6 @@ class CliGitService implements GitService {
   final String _dataDir;
 
   static const _tokenVariable = 'XPATH_GIT_TOKEN';
-
-  /// The `GIT_SSH_COMMAND` of every git command that uses the network: no
-  /// prompt for a password or passphrase, a bounded connect, and a host key
-  /// that is recorded the first time and must not change after (Q6 of the
-  /// runner plan). The runner's checkout uses the same command.
-  static const sshCommand =
-      'ssh -o BatchMode=yes -o ConnectTimeout=30 '
-      '-o StrictHostKeyChecking=accept-new';
 
   // Answers git's `get` request for credentials with the token in the
   // environment; ignores `store` and `erase`.
@@ -555,7 +547,7 @@ class CliGitService implements GitService {
       'user.email=${identity.email}',
     ];
     if (network) {
-      environment['GIT_SSH_COMMAND'] = sshCommand;
+      environment['GIT_SSH_COMMAND'] = gitSshCommand;
       final token = await _secrets.read(githubTokenSecretKey);
       if (token != null) {
         environment[_tokenVariable] = token;

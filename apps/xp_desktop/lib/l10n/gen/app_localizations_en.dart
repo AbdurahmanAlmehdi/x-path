@@ -519,11 +519,6 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String projectSubtitleOnHost(String host, String branch, String apps) {
-    return '$host · $branch · $apps';
-  }
-
-  @override
   String get projectHostLocal => 'local repository';
 
   @override

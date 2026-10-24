@@ -314,7 +314,7 @@ void main() {
       );
       final key = project.sourceKey;
 
-      expect(project.host, GitRemote.localHost);
+      expect(project.host, Project.localHost);
       expect(project.fullName, 'srv/git/app');
       expect(project.remote, 'file:///srv/git/app.git');
       expect(project.localPath, isNull);
@@ -335,7 +335,7 @@ void main() {
       final project = await service.add(byPath);
 
       expect(project.remote, 'file:///srv/git/app.git');
-      expect(project.host, GitRemote.localHost);
+      expect(project.host, Project.localHost);
     });
 
     test('keys every spelling of one repository alike', () async {
@@ -441,12 +441,15 @@ void main() {
       'takes an SSH URL only with a folder whose origin needs one',
       () async {
         const sshUrl = 'git@bitbucket.org:ws/app.git';
+        const refusal =
+            '"sshUrl" only goes with a "path" whose origin is an HTTPS URL on '
+            'a host other than GitHub; leave it out.';
 
         await expectLater(
           service.add(
             const AddProjectRequest(path: '/work/app', sshUrl: sshUrl),
           ),
-          _invalid('leave out "sshUrl"'),
+          _invalid(refusal),
           reason: 'the origin is on GitHub',
         );
         origin = sshUrl;
@@ -454,14 +457,50 @@ void main() {
           service.add(
             const AddProjectRequest(path: '/work/app', sshUrl: sshUrl),
           ),
-          _invalid('only for an HTTPS origin'),
+          _invalid(refusal),
+          reason: 'the origin is an SSH URL',
         );
         await expectLater(
-          service.add(const AddProjectRequest(remote: sshUrl, sshUrl: sshUrl)),
-          _invalid('"sshUrl" goes with "path"'),
+          service.add(
+            const AddProjectRequest(
+              remote: 'https://bitbucket.org/ws/app.git',
+              sshUrl: sshUrl,
+            ),
+          ),
+          _invalid(refusal),
+          reason: 'there is no folder',
         );
+        expect(git.calls, isEmpty);
       },
     );
+
+    test('refuses a GitHub URL that only reads as another host', () async {
+      for (final url in [
+        'ssh://git@github.com:22/octo/app',
+        'org@github.com:octo/app.git',
+        'https://github.com/octo/app/tree/main',
+      ]) {
+        await expectLater(
+          service.add(AddProjectRequest(remote: url)),
+          _invalid(
+            '"$url" is on GitHub, but not in a form XPath reads. Give the '
+            'repository as owner/name.',
+          ),
+          reason: url,
+        );
+      }
+      expect(git.calls, isEmpty, reason: 'nothing was fetched');
+      expect(await service.list(), isEmpty);
+    });
+
+    test('names a GitLab subgroup repository by its whole path', () async {
+      final project = await service.add(
+        const AddProjectRequest(remote: 'git@gitlab.com:group/sub/app.git'),
+      );
+
+      expect(project.host, 'gitlab.com');
+      expect(project.fullName, 'group/sub/app');
+    });
 
     test('refuses an origin it cannot reach at all', () async {
       origin = 'svn://host/app';

@@ -141,6 +141,33 @@ void main() {
       expect(result.categories.single.items, 1);
     });
 
+    test('of a project on another host stay, by its source key', () async {
+      const kept = 'h0123456789abcdef';
+      const orphan = 'h1123456789abcdef';
+      await h.projects.add(
+        ProjectRecord(
+          id: 'prj_bb',
+          host: 'bitbucket.org',
+          sourceKey: kept,
+          fullName: 'ws/app',
+          remote: 'git@bitbucket.org:ws/app.git',
+          githubDefaultBranch: 'main',
+          scan: const ProjectProfile(),
+          findings: const [],
+          scannedAt: DateTime.utc(2026),
+        ),
+      );
+      h.files.mirrorList.addAll([
+        for (final key in [kept, orphan])
+          MirrorDirectory(key: key, path: '/data/mirrors/$key.git', bytes: 9),
+      ]);
+
+      final result = await free(StorageCategory.mirrors);
+
+      expect(h.files.mirrorList.map((m) => m.key), [kept]);
+      expect(result.categories.single.items, 1);
+    });
+
     test('that cannot be removed are reported', () async {
       h.files.mirrorList.add(mirror(7));
       h.files.failOn = 'mirror 7';
