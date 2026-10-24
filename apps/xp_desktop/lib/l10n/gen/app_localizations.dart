@@ -4798,6 +4798,180 @@ abstract class AppLocalizations {
   /// **'None'**
   String get workflowsInputNoDefault;
 
+  /// Menu of the open workflow.
+  ///
+  /// In en, this message translates to:
+  /// **'More'**
+  String get workflowsMore;
+
+  /// Opens the versions of the workflow.
+  ///
+  /// In en, this message translates to:
+  /// **'Versions…'**
+  String get workflowsVersions;
+
+  /// Renames the workflow.
+  ///
+  /// In en, this message translates to:
+  /// **'Rename…'**
+  String get workflowsRename;
+
+  /// Title of the name dialog when renaming.
+  ///
+  /// In en, this message translates to:
+  /// **'Rename the workflow'**
+  String get workflowsRenameTitle;
+
+  /// Archives the workflow (UX-06).
+  ///
+  /// In en, this message translates to:
+  /// **'Archive'**
+  String get workflowsArchive;
+
+  /// Unarchives the workflow.
+  ///
+  /// In en, this message translates to:
+  /// **'Unarchive'**
+  String get workflowsUnarchive;
+
+  /// No description provided for @workflowsArchivedToast.
+  ///
+  /// In en, this message translates to:
+  /// **'Archived {name}'**
+  String workflowsArchivedToast(String name);
+
+  /// Banner of an archived workflow.
+  ///
+  /// In en, this message translates to:
+  /// **'Archived: kept with its versions and runs, and not offered to dispatch.'**
+  String get workflowsArchivedNote;
+
+  /// No description provided for @workflowsArchivedName.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} (archived)'**
+  String workflowsArchivedName(String name);
+
+  /// Deletes the workflow.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete…'**
+  String get workflowsDelete;
+
+  /// No description provided for @workflowsDeleteTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete {name}?'**
+  String workflowsDeleteTitle(String name);
+
+  /// Delete confirmation.
+  ///
+  /// In en, this message translates to:
+  /// **'Its versions go with it.'**
+  String get workflowsDeleteVersions;
+
+  /// Delete confirmation.
+  ///
+  /// In en, this message translates to:
+  /// **'A workflow that ran cannot be deleted; archive it instead.'**
+  String get workflowsDeleteRan;
+
+  /// Confirms deleting a workflow.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get workflowsDeleteConfirm;
+
+  /// No description provided for @workflowsDeleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Deleted {name}.'**
+  String workflowsDeleted(String name);
+
+  /// No description provided for @workflowsRestored.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved version {from} again as version {version} of {name}.'**
+  String workflowsRestored(int from, int version, String name);
+
+  /// No description provided for @workflowsVersionsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Versions of {name}'**
+  String workflowsVersionsTitle(String name);
+
+  /// No description provided for @workflowsVersionLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Version {version} · {time}'**
+  String workflowsVersionLabel(int version, String time);
+
+  /// The older version of a compare.
+  ///
+  /// In en, this message translates to:
+  /// **'From'**
+  String get workflowsVersionFrom;
+
+  /// The newer version of a compare.
+  ///
+  /// In en, this message translates to:
+  /// **'to'**
+  String get workflowsVersionTo;
+
+  /// No description provided for @workflowsRestoreVersion.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore version {version}'**
+  String workflowsRestoreVersion(int version);
+
+  /// Two versions with the same lines.
+  ///
+  /// In en, this message translates to:
+  /// **'No changes.'**
+  String get workflowsNoChanges;
+
+  /// Closes a dialog of the builder.
+  ///
+  /// In en, this message translates to:
+  /// **'Close'**
+  String get workflowsClose;
+
+  /// No description provided for @workflowsBuiltinUpdated.
+  ///
+  /// In en, this message translates to:
+  /// **'The built-in {builtin} has a newer version ({latest}); this copy is based on version {base}.'**
+  String workflowsBuiltinUpdated(String builtin, int latest, int base);
+
+  /// Compares a copy with its built-in.
+  ///
+  /// In en, this message translates to:
+  /// **'Compare'**
+  String get workflowsCompare;
+
+  /// No description provided for @workflowsCompareTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Compare with {builtin}'**
+  String workflowsCompareTitle(String builtin);
+
+  /// No description provided for @workflowsBuiltinChanged.
+  ///
+  /// In en, this message translates to:
+  /// **'What {builtin} changed, version {base} to {latest}'**
+  String workflowsBuiltinChanged(String builtin, int base, int latest);
+
+  /// No description provided for @workflowsYouChanged.
+  ///
+  /// In en, this message translates to:
+  /// **'What this copy changed since version {base}'**
+  String workflowsYouChanged(int base);
+
+  /// The copy has taken what the built-in changed.
+  ///
+  /// In en, this message translates to:
+  /// **'Mark as up to date'**
+  String get workflowsMarkUpToDate;
+
   /// Title of the template picker.
   ///
   /// In en, this message translates to:

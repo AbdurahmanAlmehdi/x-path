@@ -261,6 +261,25 @@ void main() {
       );
     });
 
+    test('PATCH 200, 400, 404 and 409', () async {
+      final id = await client.create('mine', echoWorkflow);
+      final builtin = await client.builtin('test');
+
+      for (final (path, body, status) in [
+        ('${client.base}/$id', {'name': 'nightly', 'archived': true}, 200),
+        ('${client.base}/$id', {'archived': 'yes'}, 400),
+        ('${client.base}/wf_nope', {'archived': true}, 404),
+        ('${client.base}/$builtin', {'archived': true}, 409),
+      ]) {
+        expectContract(
+          await client.send('PATCH', path, body),
+          path: path,
+          method: 'PATCH',
+          status: status,
+        );
+      }
+    });
+
     test('DELETE 204, 404 and 409', () async {
       final id = await client.create('mine', echoWorkflow);
       final builtin = await client.builtin('test');

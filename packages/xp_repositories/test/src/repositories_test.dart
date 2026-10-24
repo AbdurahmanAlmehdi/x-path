@@ -711,6 +711,42 @@ void main() {
       );
     });
 
+    test('copies, updates and deletes workflows', () async {
+      final client = harness.client;
+      const basedOn = WorkflowBasedOn(builtin: 'dev-build', version: 2);
+      const archive = UpdateWorkflowRequest(archived: true);
+      when(
+        () => client.createWorkflow(
+          'prj_1',
+          const CreateWorkflowRequest(
+            name: 'mine',
+            yaml: 'y',
+            basedOn: basedOn,
+          ),
+        ),
+      ).thenAnswer((_) async => workflow(version1));
+      when(() => client.updateWorkflow('prj_1', 'wf_1', archive))
+          .thenAnswer((_) async => workflow(version2));
+      when(() => client.deleteWorkflow('prj_1', 'wf_1'))
+          .thenAnswer((_) async {});
+
+      expect(
+        await repository.createWorkflow(
+          'prj_1',
+          name: 'mine',
+          yaml: 'y',
+          basedOn: basedOn,
+        ),
+        workflow(version1),
+      );
+      expect(
+        await repository.updateWorkflow('prj_1', 'wf_1', archive),
+        workflow(version2),
+      );
+      await repository.deleteWorkflow('prj_1', 'wf_1');
+      verify(() => client.deleteWorkflow('prj_1', 'wf_1')).called(1);
+    });
+
     test('reads the templates of new workflows', () async {
       const template = WorkflowTemplate(
         id: 'blank',

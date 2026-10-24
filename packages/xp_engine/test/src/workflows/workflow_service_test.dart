@@ -302,6 +302,178 @@ void main() {
     });
   });
 
+  group('copies of built-ins', () {
+    test('remember the built-in and its version', () async {
+      final copy = await service.create(
+        'prj_1',
+        name: 'my-dev',
+        yaml: _simple,
+        basedOn: const WorkflowBasedOn(builtin: 'dev-build', version: 1),
+      );
+
+      const basedOn = WorkflowBasedOn(builtin: 'dev-build', version: 1);
+      expect(copy.basedOn, basedOn);
+      expect(
+        (await service.list('prj_1'))
+            .firstWhere((w) => w.id == copy.id)
+            .basedOn,
+        basedOn,
+      );
+    });
+
+    test('refuse a built-in that does not exist', () async {
+      await expectLater(
+        service.create(
+          'prj_1',
+          name: 'mine',
+          yaml: _simple,
+          basedOn: const WorkflowBasedOn(builtin: 'nope', version: 1),
+        ),
+        throwsA(
+          isA<WorkflowEditException>().having(
+            (e) => e.toString(),
+            'toString',
+            'WorkflowEditException: "nope" is not a built-in workflow.',
+          ),
+        ),
+      );
+    });
+  });
+
+  group('update', () {
+    late Workflow mine;
+
+    setUp(() async {
+      mine = await service.create('prj_1', name: 'mine', yaml: _simple);
+    });
+
+    test('renames, without a new version, and announces it', () async {
+      final renamed = await service.update(
+        'prj_1',
+        mine.id,
+        const UpdateWorkflowRequest(name: 'nightly'),
+      );
+
+      expect(renamed.name, 'nightly');
+      expect(renamed.versions, hasLength(1));
+      expect(
+        await logged(),
+        contains(
+          WorkflowUpdated(
+            workflowId: mine.id,
+            projectId: 'prj_1',
+            name: 'nightly',
+            archived: false,
+          ),
+        ),
+      );
+    });
+
+    test('refuses a name that is not allowed or used', () async {
+      await expectLater(
+        service.update(
+          'prj_1',
+          mine.id,
+          const UpdateWorkflowRequest(name: 'a b'),
+        ),
+        throwsA(isA<WorkflowNameException>()),
+      );
+      await expectLater(
+        service.update(
+          'prj_1',
+          mine.id,
+          const UpdateWorkflowRequest(name: 'dev-build'),
+        ),
+        throwsA(isA<WorkflowExistsException>()),
+      );
+      expect(
+        (await service.update(
+          'prj_1',
+          mine.id,
+          const UpdateWorkflowRequest(name: 'mine'),
+        )).name,
+        'mine',
+      );
+    });
+
+    test('archives and unarchives (UX-06)', () async {
+      final archived = await service.update(
+        'prj_1',
+        mine.id,
+        const UpdateWorkflowRequest(archived: true),
+      );
+      expect(archived.archivedAt, DateTime.utc(2026, 10, 13, 9));
+
+      clock.advance(const Duration(hours: 1));
+      final again = await service.update(
+        'prj_1',
+        mine.id,
+        const UpdateWorkflowRequest(archived: true),
+      );
+      expect(again.archivedAt, archived.archivedAt, reason: 'first time kept');
+      expect(
+        (await service.list('prj_1'))
+            .firstWhere((w) => w.id == mine.id)
+            .archived,
+        isTrue,
+      );
+
+      final back = await service.update(
+        'prj_1',
+        mine.id,
+        const UpdateWorkflowRequest(archived: false),
+      );
+      expect(back.archivedAt, isNull);
+    });
+
+    test('catches a copy up with its built-in, and only a copy', () async {
+      final copy = await service.create(
+        'prj_1',
+        name: 'my-dev',
+        yaml: _simple,
+        basedOn: const WorkflowBasedOn(builtin: 'dev-build', version: 1),
+      );
+
+      final caught = await service.update(
+        'prj_1',
+        copy.id,
+        const UpdateWorkflowRequest(basedOnVersion: 2),
+      );
+      expect(
+        caught.basedOn,
+        const WorkflowBasedOn(builtin: 'dev-build', version: 2),
+      );
+      await expectLater(
+        service.update(
+          'prj_1',
+          mine.id,
+          const UpdateWorkflowRequest(basedOnVersion: 2),
+        ),
+        throwsA(isA<WorkflowEditException>()),
+      );
+    });
+
+    test(
+      'changes no built-in, and says nothing when nothing changes',
+      () async {
+        final builtin = (await service.list('prj_1'))
+            .firstWhere((w) => w.builtin);
+        await expectLater(
+          service.update(
+            'prj_1',
+            builtin.id,
+            const UpdateWorkflowRequest(archived: true),
+          ),
+          throwsA(isA<WorkflowBuiltinException>()),
+        );
+
+        final before = (await logged()).length;
+        await service.update('prj_1', mine.id, const UpdateWorkflowRequest());
+        expect(await logged(), hasLength(before));
+      },
+    );
+  });
+
   group('save', () {
     test('adds a version and announces it', () async {
       final created = await service.create(

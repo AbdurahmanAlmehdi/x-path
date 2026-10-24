@@ -112,6 +112,63 @@ final class WorkflowSaveRequested extends WorkflowBuilderEvent {
   List<Object?> get props => [name];
 }
 
+/// Renames the open workflow of the owner.
+final class WorkflowRenameRequested extends WorkflowBuilderEvent {
+  const new(this.name);
+
+  final String name;
+
+  @override
+  List<Object?> get props => [name];
+}
+
+/// Archives the open workflow of the owner, or unarchives it (UX-06).
+final class WorkflowArchiveRequested extends WorkflowBuilderEvent {
+  const new({required this.archived});
+
+  final bool archived;
+
+  @override
+  List<Object?> get props => [archived];
+}
+
+/// Deletes the open workflow of the owner; the engine refuses one that ran.
+final class WorkflowDeleteRequested extends WorkflowBuilderEvent {
+  const new();
+}
+
+/// Reads versions [from] and [to] of the open workflow, to compare them.
+final class WorkflowVersionsCompared extends WorkflowBuilderEvent {
+  const new(this.from, this.to);
+
+  final int from;
+  final int to;
+
+  @override
+  List<Object?> get props => [from, to];
+}
+
+/// Saves version [version] of the open workflow again, as its newest.
+final class WorkflowVersionRestored extends WorkflowBuilderEvent {
+  const new(this.version);
+
+  final int version;
+
+  @override
+  List<Object?> get props => [version];
+}
+
+/// Reads the built-in the open copy is based on, then and now, to compare.
+final class WorkflowBuiltinCompared extends WorkflowBuilderEvent {
+  const new();
+}
+
+/// Marks the open copy as caught up with the newest version of its
+/// built-in.
+final class WorkflowCaughtUp extends WorkflowBuilderEvent {
+  const new();
+}
+
 final class _WorkflowValidationRequested extends WorkflowBuilderEvent {
   const new();
 }
@@ -163,6 +220,69 @@ final class WorkflowExportedNotice extends WorkflowNotice {
   List<Object?> get props => [path];
 }
 
+/// The workflow [name] was deleted.
+final class WorkflowDeletedNotice extends WorkflowNotice {
+  const new(this.name);
+
+  final String name;
+
+  @override
+  List<Object?> get props => [name];
+}
+
+/// Version [from] was saved again as [version] of [name].
+final class WorkflowRestoredNotice extends WorkflowNotice {
+  const new(this.name, this.from, this.version);
+
+  final String name;
+  final int from;
+  final int version;
+
+  @override
+  List<Object?> get props => [name, from, version];
+}
+
+/// Two versions of the open workflow, to compare: [before] is version
+/// [from], [after] version [to].
+class VersionDiff extends Equatable {
+  const new({
+    required this.from,
+    required this.to,
+    required this.before,
+    required this.after,
+  });
+
+  final int from;
+  final int to;
+  final String before;
+  final String after;
+
+  @override
+  List<Object?> get props => [from, to, before, after];
+}
+
+/// The built-in an open copy is based on, at the version the copy started
+/// from ([base]) and at its newest ([latest]): a three-way compare with the
+/// copy's own YAML.
+class BuiltinCompare extends Equatable {
+  const new({
+    required this.builtin,
+    required this.base,
+    required this.latest,
+    required this.baseYaml,
+    required this.latestYaml,
+  });
+
+  final String builtin;
+  final int base;
+  final int latest;
+  final String baseYaml;
+  final String latestYaml;
+
+  @override
+  List<Object?> get props => [builtin, base, latest, baseYaml, latestYaml];
+}
+
 class WorkflowBuilderState extends Equatable {
   const new({
     this.loaded = false,
@@ -183,6 +303,8 @@ class WorkflowBuilderState extends Equatable {
     this.error,
     this.undoStack = const [],
     this.redoStack = const [],
+    this.versionDiff,
+    this.builtinCompare,
   });
 
   /// Whether the list of workflows arrived.
@@ -237,6 +359,30 @@ class WorkflowBuilderState extends Equatable {
   bool get canUndo => undoStack.isNotEmpty;
   bool get canRedo => redoStack.isNotEmpty;
 
+  /// The two versions being compared, once read.
+  final VersionDiff? versionDiff;
+
+  /// The built-in of the open copy then and now, once read.
+  final BuiltinCompare? builtinCompare;
+
+  /// When the open workflow is a copy of a built-in that has a newer
+  /// version: its name, the version the copy is based on, and the newest.
+  ({String builtin, int base, int latest})? get builtinUpdate {
+    final basedOn = workflow?.basedOn;
+    if (basedOn == null) return null;
+    final builtin = workflows
+        .where((w) => w.builtin && w.name == basedOn.builtin)
+        .firstOrNull;
+    if (builtin == null || builtin.version.version <= basedOn.version) {
+      return null;
+    }
+    return (
+      builtin: basedOn.builtin,
+      base: basedOn.version,
+      latest: builtin.version.version,
+    );
+  }
+
   /// Whether [yaml] differs from what is saved.
   bool get dirty => yaml != savedYaml;
 
@@ -276,6 +422,8 @@ class WorkflowBuilderState extends Equatable {
     String? Function()? error,
     List<String>? undoStack,
     List<String>? redoStack,
+    VersionDiff? Function()? versionDiff,
+    BuiltinCompare? Function()? builtinCompare,
   }) => WorkflowBuilderState(
     loaded: loaded ?? this.loaded,
     workflows: workflows ?? this.workflows,
@@ -295,6 +443,10 @@ class WorkflowBuilderState extends Equatable {
     error: error == null ? this.error : error(),
     undoStack: undoStack ?? this.undoStack,
     redoStack: redoStack ?? this.redoStack,
+    versionDiff: versionDiff == null ? this.versionDiff : versionDiff(),
+    builtinCompare: builtinCompare == null
+        ? this.builtinCompare
+        : builtinCompare(),
   );
 
   @override
@@ -317,6 +469,8 @@ class WorkflowBuilderState extends Equatable {
     error,
     undoStack,
     redoStack,
+    versionDiff,
+    builtinCompare,
   ];
 }
 
@@ -362,6 +516,20 @@ class WorkflowBuilderBloc
     on<WorkflowDocumentEdited>(_onEdited);
     on<WorkflowUndoRequested>(_onUndo);
     on<WorkflowRedoRequested>(_onRedo);
+    on<WorkflowRenameRequested>(
+      (event, emit) => _update(emit, UpdateWorkflowRequest(name: event.name)),
+      transformer: droppable(),
+    );
+    on<WorkflowArchiveRequested>(
+      (event, emit) =>
+          _update(emit, UpdateWorkflowRequest(archived: event.archived)),
+      transformer: droppable(),
+    );
+    on<WorkflowCaughtUp>(_onCaughtUp, transformer: droppable());
+    on<WorkflowDeleteRequested>(_onDelete, transformer: droppable());
+    on<WorkflowVersionsCompared>(_onVersions, transformer: restartable());
+    on<WorkflowVersionRestored>(_onRestore, transformer: droppable());
+    on<WorkflowBuiltinCompared>(_onBuiltin, transformer: restartable());
     on<WorkflowSelectionChanged>(
       (event, emit) => emit(
         state.copyWith(
@@ -750,7 +918,17 @@ class WorkflowBuilderBloc
     try {
       final saved = name == null
           ? await _workflows.saveWorkflow(_projectId, workflow!.id, yaml)
-          : await _workflows.createWorkflow(_projectId, name: name, yaml: yaml);
+          : await _workflows.createWorkflow(
+              _projectId,
+              name: name,
+              yaml: yaml,
+              basedOn: workflow != null && workflow.builtin
+                  ? WorkflowBasedOn(
+                      builtin: workflow.name,
+                      version: workflow.version.version,
+                    )
+                  : workflow?.basedOn,
+            );
       final workflows = await _workflows.listWorkflows(_projectId);
       emit(
         state.copyWith(
@@ -769,6 +947,195 @@ class WorkflowBuilderBloc
           error: () => errorMessage(error),
         ),
       );
+    }
+  }
+
+  /// Runs [action] as a command of the builder: busy while it runs, and
+  /// what went wrong in [WorkflowBuilderState.error].
+  Future<void> _command(
+    Emitter<WorkflowBuilderState> emit,
+    Future<void> Function() action,
+  ) async {
+    emit(
+      state.copyWith(
+        command: WorkflowCommand.saving,
+        notice: () => null,
+        error: () => null,
+      ),
+    );
+    try {
+      await action();
+    } on Exception catch (error) {
+      emit(
+        state.copyWith(
+          command: WorkflowCommand.none,
+          error: () => errorMessage(error),
+        ),
+      );
+    }
+  }
+
+  /// Changes the open workflow as [request] says, and reads the list
+  /// again: it shows the new name, or that it is archived.
+  Future<void> _update(
+    Emitter<WorkflowBuilderState> emit,
+    UpdateWorkflowRequest request,
+  ) async {
+    final workflow = state.workflow;
+    if (workflow == null || workflow.builtin) return;
+    await _command(emit, () async {
+      final updated = await _workflows.updateWorkflow(
+        _projectId,
+        workflow.id,
+        request,
+      );
+      final workflows = await _workflows.listWorkflows(_projectId);
+      emit(
+        state.copyWith(
+          workflow: () => updated,
+          workflows: workflows,
+          command: WorkflowCommand.none,
+        ),
+      );
+    });
+  }
+
+  Future<void> _onCaughtUp(
+    WorkflowCaughtUp event,
+    Emitter<WorkflowBuilderState> emit,
+  ) async {
+    final update = state.builtinUpdate;
+    if (update == null) return;
+    await _update(emit, UpdateWorkflowRequest(basedOnVersion: update.latest));
+    emit(state.copyWith(builtinCompare: () => null));
+  }
+
+  Future<void> _onDelete(
+    WorkflowDeleteRequested event,
+    Emitter<WorkflowBuilderState> emit,
+  ) async {
+    final workflow = state.workflow;
+    if (workflow == null || workflow.builtin) return;
+    await _command(emit, () async {
+      await _workflows.deleteWorkflow(_projectId, workflow.id);
+      final workflows = await _workflows.listWorkflows(_projectId);
+      emit(state.copyWith(workflows: workflows));
+      final next =
+          workflows.where((w) => !w.builtin).firstOrNull ??
+          workflows.firstOrNull;
+      if (next == null) {
+        emit(state.copyWith(command: WorkflowCommand.none));
+        _draft(emit, draftTemplate.toYaml());
+      } else {
+        await _open(next.id, emit);
+      }
+      emit(state.copyWith(notice: () => WorkflowDeletedNotice(workflow.name)));
+    });
+  }
+
+  Future<void> _onVersions(
+    WorkflowVersionsCompared event,
+    Emitter<WorkflowBuilderState> emit,
+  ) async {
+    final workflow = state.workflow;
+    if (workflow == null) return;
+    emit(state.copyWith(versionDiff: () => null, error: () => null));
+    try {
+      final before = await _workflows.getWorkflow(
+        _projectId,
+        workflow.id,
+        version: event.from,
+      );
+      final after = await _workflows.getWorkflow(
+        _projectId,
+        workflow.id,
+        version: event.to,
+      );
+      emit(
+        state.copyWith(
+          versionDiff: () => VersionDiff(
+            from: event.from,
+            to: event.to,
+            before: before.yaml,
+            after: after.yaml,
+          ),
+        ),
+      );
+    } on Exception catch (error) {
+      emit(state.copyWith(error: () => errorMessage(error)));
+    }
+  }
+
+  Future<void> _onRestore(
+    WorkflowVersionRestored event,
+    Emitter<WorkflowBuilderState> emit,
+  ) async {
+    final workflow = state.workflow;
+    if (workflow == null || workflow.builtin) return;
+    await _command(emit, () async {
+      final old = await _workflows.getWorkflow(
+        _projectId,
+        workflow.id,
+        version: event.version,
+      );
+      final saved = await _workflows.saveWorkflow(
+        _projectId,
+        workflow.id,
+        old.yaml,
+      );
+      final workflows = await _workflows.listWorkflows(_projectId);
+      emit(
+        _read(
+          state.copyWith(
+            workflows: workflows,
+            workflow: () => saved,
+            savedYaml: saved.yaml,
+            command: WorkflowCommand.none,
+            undoStack: _undoFor(null),
+            redoStack: const [],
+            notice: () => WorkflowRestoredNotice(
+              saved.name,
+              event.version,
+              saved.version.version,
+            ),
+          ),
+          saved.yaml,
+        ),
+      );
+      add(const _WorkflowValidationRequested());
+    });
+  }
+
+  Future<void> _onBuiltin(
+    WorkflowBuiltinCompared event,
+    Emitter<WorkflowBuilderState> emit,
+  ) async {
+    final update = state.builtinUpdate;
+    if (update == null) return;
+    final builtin = state.workflows.firstWhere(
+      (w) => w.builtin && w.name == update.builtin,
+    );
+    emit(state.copyWith(builtinCompare: () => null, error: () => null));
+    try {
+      final base = await _workflows.getWorkflow(
+        _projectId,
+        builtin.id,
+        version: update.base,
+      );
+      final latest = await _workflows.getWorkflow(_projectId, builtin.id);
+      emit(
+        state.copyWith(
+          builtinCompare: () => BuiltinCompare(
+            builtin: update.builtin,
+            base: update.base,
+            latest: latest.version.version,
+            baseYaml: base.yaml,
+            latestYaml: latest.yaml,
+          ),
+        ),
+      );
+    } on Exception catch (error) {
+      emit(state.copyWith(error: () => errorMessage(error)));
     }
   }
 }

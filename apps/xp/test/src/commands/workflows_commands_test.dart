@@ -337,4 +337,167 @@ void main() {
       expect(env.logger.errors.single, 'Line 2: unknown key.');
     });
   });
+
+  group('lifecycle (UX-06)', () {
+    Workflow builtin() => Workflow(
+      id: 'wf_1',
+      projectId: 'prj_1',
+      name: 'dev-build',
+      builtin: true,
+      version: sample.workflow.version,
+      versions: sample.workflow.versions,
+      yaml: 'name: dev-build\n',
+    );
+
+    test('copy saves a built-in as a workflow that remembers it', () async {
+      when(() => env.client.getWorkflow('prj_1', 'wf_1'))
+          .thenAnswer((_) async => builtin());
+      when(() => env.client.createWorkflow('prj_1', any()))
+          .thenAnswer((_) async => sample.workflow);
+
+      await env.runOk(['workflows', 'copy', 'prj_1', 'dev-build', 'mine']);
+
+      final request =
+          verify(() => env.client.createWorkflow('prj_1', captureAny()))
+                  .captured
+                  .single
+              as CreateWorkflowRequest;
+      expect(request.name, 'mine');
+      expect(request.yaml, 'name: dev-build\n');
+      expect(
+        request.basedOn,
+        WorkflowBasedOn(
+          builtin: 'dev-build',
+          version: sample.workflow.version.version,
+        ),
+      );
+      expect(env.logger.out, 'Copied dev-build to dev-build (wf_1).');
+    });
+
+    test('copy of a copy keeps what it is based on', () async {
+      when(() => env.client.getWorkflow('prj_1', 'wf_1'))
+          .thenAnswer((_) async => sample.workflow);
+      when(() => env.client.createWorkflow('prj_1', any()))
+          .thenAnswer((_) async => sample.workflow);
+
+      await env.runOk(['workflows', 'copy', 'prj_1', 'wf_1', 'mine']);
+
+      final request =
+          verify(() => env.client.createWorkflow('prj_1', captureAny()))
+                  .captured
+                  .single
+              as CreateWorkflowRequest;
+      expect(request.basedOn, isNull);
+    });
+
+    test('rename, archive and unarchive', () async {
+      when(() => env.client.updateWorkflow('prj_1', 'wf_1', any()))
+          .thenAnswer((_) async => sample.workflow);
+
+      await env.runOk(['workflows', 'rename', 'prj_1', 'wf_1', 'nightly']);
+      await env.runOk(['workflows', 'archive', 'prj_1', 'wf_1']);
+      await env.runOk(['workflows', 'archive', 'prj_1', 'wf_1', '--undo']);
+
+      expect(
+        verify(() => env.client.updateWorkflow('prj_1', 'wf_1', captureAny()))
+            .captured,
+        const [
+          UpdateWorkflowRequest(name: 'nightly'),
+          UpdateWorkflowRequest(archived: true),
+          UpdateWorkflowRequest(archived: false),
+        ],
+      );
+      const archived =
+          'Archived dev-build. Undo with: xp workflows archive prj_1 '
+          'dev-build --undo';
+      expect(env.logger.infos, [
+        'Renamed to dev-build.',
+        archived,
+        'Unarchived dev-build.',
+      ]);
+    });
+
+    test('delete, and archive instead of one that ran', () async {
+      when(() => env.client.deleteWorkflow('prj_1', 'wf_1'))
+          .thenAnswer((_) async {});
+
+      await env.runOk(['workflows', 'delete', 'prj_1', 'wf_1']);
+      expect(env.logger.out, 'Deleted wf_1.');
+
+      when(() => env.client.deleteWorkflow('prj_1', 'wf_1')).thenThrow(
+        const ApiException(
+          'Workflow wf_1 has been run, and the jobs keep the version they '
+          'ran, so it cannot be deleted.',
+          statusCode: 409,
+          code: ApiErrorCode.conflict,
+        ),
+      );
+      expect(await env.run(['workflows', 'delete', 'prj_1', 'wf_1']), 73);
+      expect(
+        env.logger.errors.single,
+        endsWith(
+          'Archive it instead: xp workflows archive <project> <workflow>',
+        ),
+      );
+    });
+
+    test('versions lists them, oldest first', () async {
+      when(() => env.client.getWorkflow('prj_1', 'wf_1'))
+          .thenAnswer((_) async => sample.workflow);
+
+      await env.runOk(['workflows', 'versions', 'prj_1', 'wf_1']);
+
+      expect(env.logger.out, startsWith('VERSION'));
+      expect(env.logger.out, contains(sample.workflow.version.id));
+    });
+
+    group('diff', () {
+      Workflow at(int version, String yaml) => Workflow(
+        id: 'wf_1',
+        projectId: 'prj_1',
+        name: 'mine',
+        builtin: false,
+        version: WorkflowVersionInfo(
+          id: 'wfv_$version',
+          version: version,
+          createdAt: DateTime.utc(2026),
+        ),
+        versions: const [],
+        yaml: yaml,
+      );
+
+      test('prints what changed between two versions', () async {
+        when(() => env.client.getWorkflow('prj_1', 'wf_1', version: 1))
+            .thenAnswer((_) async => at(1, 'a\nb\n'));
+        when(() => env.client.getWorkflow('prj_1', 'wf_1'))
+            .thenAnswer((_) async => at(3, 'a\nc\n'));
+
+        await env.runOk(['workflows', 'diff', 'prj_1', 'wf_1', '1']);
+
+        expect(
+          env.logger.out,
+          '--- version 1\n+++ version 3\n@@ -1,2 +1,2 @@\n a\n-b\n+c',
+        );
+      });
+
+      test('says when two versions are the same', () async {
+        when(() => env.client.getWorkflow('prj_1', 'wf_1', version: 1))
+            .thenAnswer((_) async => at(1, 'a\n'));
+        when(() => env.client.getWorkflow('prj_1', 'wf_1', version: 2))
+            .thenAnswer((_) async => at(2, 'a\n'));
+
+        await env.runOk(['workflows', 'diff', 'prj_1', 'wf_1', '1', '2']);
+
+        expect(env.logger.out, 'Versions 1 and 2 are the same.');
+      });
+
+      test('needs a version number', () async {
+        expect(await env.run(['workflows', 'diff', 'prj_1', 'wf_1']), 64);
+        expect(
+          await env.run(['workflows', 'diff', 'prj_1', 'wf_1', 'one']),
+          64,
+        );
+      });
+    });
+  });
 }

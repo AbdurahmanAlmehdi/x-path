@@ -157,6 +157,7 @@ void registerFallbacks() {
   registerFallbackValue(const AddProjectRequest());
   registerFallbackValue(const DispatchRequest());
   registerFallbackValue(const CreateWorkflowRequest(name: 'n', yaml: 'y'));
+  registerFallbackValue(const UpdateWorkflowRequest());
   registerFallbackValue(const FreeSpaceRequest());
   registerFallbackValue(const RetentionSettings());
   registerFallbackValue(const ProjectGates({}));

@@ -39,12 +39,27 @@ class WorkflowsRepository {
     String projectId, {
     required String name,
     required String yaml,
+    WorkflowBasedOn? basedOn,
   }) => _session.call(
     (client) => client.createWorkflow(
       projectId,
-      CreateWorkflowRequest(name: name, yaml: yaml),
+      CreateWorkflowRequest(name: name, yaml: yaml, basedOn: basedOn),
     ),
   );
+
+  /// Renames, archives or unarchives [workflowId] of [projectId], or marks a
+  /// copy as caught up with its built-in, as [request] says.
+  Future<Workflow> updateWorkflow(
+    String projectId,
+    String workflowId,
+    UpdateWorkflowRequest request,
+  ) => _session.call(
+    (client) => client.updateWorkflow(projectId, workflowId, request),
+  );
+
+  /// Deletes [workflowId] of [projectId]; the engine refuses one that ran.
+  Future<void> deleteWorkflow(String projectId, String workflowId) =>
+      _session.call((client) => client.deleteWorkflow(projectId, workflowId));
 
   /// Saves [yaml] as the next version of [workflowId] of [projectId].
   Future<Workflow> saveWorkflow(

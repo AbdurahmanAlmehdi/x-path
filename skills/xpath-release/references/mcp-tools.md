@@ -42,6 +42,8 @@ server tells the agent so when it connects.
 | `validate_workflow` | **`yaml`**, `project` | `{valid, saved: false, issues: [{line, column, message, hint}]}`. Saves nothing. The check is the same for every project. |
 | `create_workflow` | **`project`**, **`name`** (letters, digits, `.`, `_`, `-`), **`yaml`** | Validates first; with issues nothing is saved and the issues come back (`isError`). |
 | `update_workflow` | **`project`**, **`workflow`**, **`yaml`** | A new version of a workflow of the project's own; built-ins cannot be edited. Validates first. |
+| `archive_workflow` | **`project`**, **`workflow`**, `archived` (default `true`) | Archives a workflow of the project's own: it keeps its versions and runs and is no longer dispatched. `archived: false` brings it back. |
+| `get_workflow_schema` | `kind` | The step types (title, description, group, the runner capabilities each needs, typed `with` keys), gate labels and variables; with `kind`, one step type. Also the resource `xpath://workflows/schema`. |
 
 ## Run
 

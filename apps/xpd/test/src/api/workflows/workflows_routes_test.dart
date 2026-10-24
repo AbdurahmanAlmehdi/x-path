@@ -326,6 +326,80 @@ void main() {
     );
   });
 
+  group('PATCH /projects/{id}/workflows/{workflowId}', () {
+    test('renames and archives a workflow of the owner', () async {
+      final id = await client.create('mine', echoWorkflow);
+
+      final renamed = await client.send('PATCH', '${client.base}/$id', {
+        'name': 'nightly',
+        'archived': true,
+      });
+
+      expect(renamed.statusCode, 200);
+      final workflow = Workflow.fromJson(renamed.json);
+      expect(workflow.name, 'nightly');
+      expect(workflow.archivedAt, isNotNull);
+      final list = WorkflowsResponse.fromJson(
+        (await client.send('GET', client.base)).json,
+      ).workflows;
+      expect(list.firstWhere((w) => w.id == id).archived, isTrue);
+    });
+
+    test('keeps what a copy of a built-in is based on', () async {
+      final response = await client.send('POST', client.base, {
+        'name': 'my-dev',
+        'yaml': echoWorkflow,
+        'basedOn': {'builtin': 'dev-build', 'version': 1},
+      });
+      final id = response.json['id']! as String;
+
+      final caught = await client.send('PATCH', '${client.base}/$id', {
+        'basedOnVersion': 2,
+      });
+
+      expect(
+        Workflow.fromJson(caught.json).basedOn,
+        const WorkflowBasedOn(builtin: 'dev-build', version: 2),
+      );
+    });
+
+    test('answers 400, 404 and 409 for what it cannot change', () async {
+      final builtin = await client.builtin('test');
+      final id = await client.create('mine', echoWorkflow);
+
+      expect(
+        (await client.send('PATCH', '${client.base}/$id', {
+          'basedOnVersion': 2,
+        })).statusCode,
+        400,
+      );
+      expect(
+        (await client.send('PATCH', '${client.base}/$id', {
+          'archived': 'yes',
+        })).statusCode,
+        400,
+      );
+      expect(
+        (await client.send('PATCH', '${client.base}/$builtin', {
+          'archived': true,
+        })).statusCode,
+        409,
+      );
+      expect(
+        (await client.send('PATCH', '${client.base}/$id', {
+          'name': 'dev-build',
+        })).statusCode,
+        409,
+      );
+      expect(
+        (await client.send('PATCH', '${client.base}/wf_nope', {
+          'archived': true,
+        })).statusCode,
+        404,
+      );
+    });
+  });
+
   group('DELETE /projects/{id}/workflows/{workflowId}', () {
     test('deletes a workflow of the owner', () async {
       final id = await client.create('mine', echoWorkflow);

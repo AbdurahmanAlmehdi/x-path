@@ -300,6 +300,31 @@ List<McpTool> buildXpTools(
       failed: _isInvalid,
     ),
     tool(
+      'archive_workflow',
+      "Archive a workflow of the project's own (UX-06): it keeps its versions "
+          'and runs and is no longer dispatched. "archived": false brings it '
+          'back. Built-ins cannot be archived.',
+      {
+        'project': project,
+        'workflow': workflow,
+        'archived': {
+          'type': 'boolean',
+          'description': 'false to unarchive; true by default.',
+        },
+      },
+      (args) async {
+        final id = await projectId(args);
+        return (await client.updateWorkflow(
+          id,
+          await resolveWorkflow(client, id, args.string('workflow')),
+          UpdateWorkflowRequest(
+            archived: args.optionalBool('archived') ?? true,
+          ),
+        )).toJson();
+      },
+      required: ['project', 'workflow'],
+    ),
+    tool(
       'dispatch_workflow',
       'Run a workflow. Returns the run. A workflow that reaches a gated '
           'action (a production release, for one) stops there: the run '

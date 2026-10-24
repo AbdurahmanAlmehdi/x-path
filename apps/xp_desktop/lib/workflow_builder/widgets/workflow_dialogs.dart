@@ -7,15 +7,18 @@ import 'package:xp_desktop/widgets/widgets.dart';
 
 /// Asks for the name of a new workflow, offering [initial]; `null` when the
 /// owner cancels. Save waits until the name is one the engine takes and not
-/// one of [taken].
+/// one of [taken]. [title] says what the name is for, saving as a new
+/// workflow by default.
 Future<String?> askWorkflowName(
   BuildContext context, {
   String? initial,
   Set<String> taken = const {},
+  String? title,
 }) => showDialog<String>(
   context: context,
   barrierColor: context.xpColors.scrimDefault,
-  builder: (_) => WorkflowNameDialog(initial: initial ?? '', taken: taken),
+  builder: (_) =>
+      WorkflowNameDialog(initial: initial ?? '', taken: taken, title: title),
 );
 
 /// What the engine takes as a workflow name (`workflow_service.dart`).
@@ -277,9 +280,17 @@ class _BuilderDialog extends StatelessWidget {
 }
 
 class WorkflowNameDialog extends StatefulWidget {
-  const new({required this.initial, this.taken = const {}, super.key});
+  const new({
+    required this.initial,
+    this.taken = const {},
+    this.title,
+    super.key,
+  });
 
   final String initial;
+
+  /// What the name is for; saving as a new workflow by default.
+  final String? title;
 
   /// The names of the project's workflows, built-ins included.
   final Set<String> taken;
@@ -319,7 +330,7 @@ class _WorkflowNameDialogState extends State<WorkflowNameDialog> {
     final name = _name.text.trim();
     final problem = _problem(name);
     return _BuilderDialog(
-      title: l10n.workflowsNameTitle,
+      title: widget.title ?? l10n.workflowsNameTitle,
       children: [
         XpTextField(
           label: l10n.workflowsName,

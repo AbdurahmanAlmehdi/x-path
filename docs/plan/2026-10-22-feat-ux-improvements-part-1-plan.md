@@ -358,7 +358,7 @@ Details:
 
 ### Phase U3d: Workflow lifecycle and fork tracking
 
-- **Status:** Not started
+- **Status:** Done
 - **Scope:** Version history, archive, rename, and forks that know when their built-in changed.
 - **Files touched:** `packages/xp_api/lib/src/workflow.dart`, `packages/xp_api/openapi.yaml`,
   `packages/xp_adapters/lib/src/sqlite/migrations.dart` and a new snapshot golden

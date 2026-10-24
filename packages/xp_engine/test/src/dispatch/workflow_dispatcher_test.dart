@@ -1272,6 +1272,34 @@ stages:
       );
     });
 
+    test('refuses an archived workflow, in a dry run too (UX-06)', () async {
+      final id = await harness.custom('''
+schema: 1
+stages:
+  - name: a
+    jobs:
+      j:
+        steps:
+          - kind: git.checkout
+''', name: 'old-flow');
+      await harness.workflows.update(
+        'prj_1',
+        id,
+        const UpdateWorkflowRequest(archived: true),
+      );
+
+      const refusal =
+          'The workflow "old-flow" is archived. Unarchive it to run it.';
+      await expectLater(
+        harness.dispatcher.dispatch('prj_1', id, const DispatchRequest()),
+        _dispatchError(refusal),
+      );
+      await expectLater(
+        harness.dispatcher.plan('prj_1', id, const DispatchRequest()),
+        _dispatchError(refusal),
+      );
+    });
+
     test('says when the workflow is not there', () async {
       await expectLater(
         harness.dispatcher.dispatch(

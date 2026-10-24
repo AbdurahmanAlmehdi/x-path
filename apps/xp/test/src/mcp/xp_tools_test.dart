@@ -72,6 +72,7 @@ void main() {
           'validate_workflow',
           'create_workflow',
           'update_workflow',
+          'archive_workflow',
           'dispatch_workflow',
           'get_run',
           'get_job',
@@ -288,6 +289,34 @@ void main() {
           {'line': 4, 'column': 2, 'message': 'Unknown step.'},
         ],
       });
+    });
+
+    test('archive_workflow archives, and unarchives', () async {
+      when(() => client.updateWorkflow('prj_1', 'wf_1', any()))
+          .thenAnswer((_) async => sample.workflow);
+
+      await call('archive_workflow', {'project': 'prj_1', 'workflow': 'wf_1'});
+      final back = await call('archive_workflow', {
+        'project': 'prj_1',
+        'workflow': 'wf_1',
+        'archived': false,
+      });
+      final bad = await call('archive_workflow', {
+        'project': 'prj_1',
+        'workflow': 'wf_1',
+        'archived': 'no',
+      });
+
+      expect(back.isError, isFalse);
+      expect(bad.isError, isTrue);
+      expect(
+        verify(() => client.updateWorkflow('prj_1', 'wf_1', captureAny()))
+            .captured,
+        const [
+          UpdateWorkflowRequest(archived: true),
+          UpdateWorkflowRequest(archived: false),
+        ],
+      );
     });
 
     test('get_workflow_schema gives the schema, or one step type', () async {

@@ -5,9 +5,9 @@ import 'package:xp_engine/xp_engine.dart';
 import 'package:xpd/src/api/request_body.dart';
 import 'package:xpd/src/api/responses.dart';
 
-/// The workflow endpoints: the schema documents follow and a check of a
-/// document, and per project list, create, save a new version, validate,
-/// delete, and dispatch.
+/// The workflow endpoints: the schema documents follow, the templates and a
+/// check of a document, and per project list, create, save a new version,
+/// rename or archive, validate, delete, and dispatch.
 class WorkflowsRoutes {
   /// Creates the routes over the workflows and the dispatcher.
   const new(this._workflows, this._dispatcher);
@@ -27,6 +27,7 @@ class WorkflowsRoutes {
       ..post('/projects/<id>/workflows/validate', _validate)
       ..get('/projects/<id>/workflows/<workflowId>', _get)
       ..put('/projects/<id>/workflows/<workflowId>', _save)
+      ..patch('/projects/<id>/workflows/<workflowId>', _update)
       ..delete('/projects/<id>/workflows/<workflowId>', _remove)
       ..post('/projects/<id>/workflows/<workflowId>/dispatch', _dispatch);
   }
@@ -51,6 +52,7 @@ class WorkflowsRoutes {
         id,
         name: body.name,
         yaml: body.yaml,
+        basedOn: body.basedOn,
       );
       return jsonResponse(
         workflow.toJson(),
@@ -89,6 +91,17 @@ class WorkflowsRoutes {
         final body = await readJsonBody(request, WorkflowYamlRequest.fromJson);
         return jsonResponse(
           (await _workflows.save(id, workflowId, body.yaml)).toJson(),
+        );
+      });
+
+  Future<Response> _update(Request request, String id, String workflowId) =>
+      guardWorkflows(() async {
+        final body = await readJsonBody(
+          request,
+          UpdateWorkflowRequest.fromJson,
+        );
+        return jsonResponse(
+          (await _workflows.update(id, workflowId, body)).toJson(),
         );
       });
 
@@ -142,6 +155,8 @@ Future<Response> guardWorkflows(Future<Response> Function() action) async {
   } on WorkflowInUseException catch (error) {
     return errorResponse(ApiErrorCode.conflict, error.message);
   } on WorkflowNameException catch (error) {
+    return errorResponse(ApiErrorCode.invalidRequest, error.message);
+  } on WorkflowEditException catch (error) {
     return errorResponse(ApiErrorCode.invalidRequest, error.message);
   } on WorkflowInvalidException catch (error) {
     return errorResponse(

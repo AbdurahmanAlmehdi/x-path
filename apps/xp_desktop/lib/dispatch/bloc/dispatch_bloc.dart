@@ -324,10 +324,10 @@ const _reachedAStore = <ReleaseState>{
   ReleaseState.merged,
 };
 
-/// Whether the sheet leaves [workflow] out: the merge of a release pull
-/// request, which starts from the release.
+/// Whether the sheet leaves [workflow] out: an archived one (UX-06), and the
+/// merge of a release pull request, which starts from the release.
 bool _hidden(WorkflowSummary workflow) =>
-    workflow.builtin && workflow.name == 'release-merge';
+    workflow.archived || (workflow.builtin && workflow.name == 'release-merge');
 
 /// [release] as a release input takes it: `x.y.z+build`.
 String releaseValue(Release release) => '${release.version}+${release.build}';

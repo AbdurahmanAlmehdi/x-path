@@ -68,6 +68,12 @@ Workflow _$WorkflowFromJson(Map<String, dynamic> json) => Workflow(
           ?.map((e) => WorkflowInput.fromJson(e as Map<String, dynamic>))
           .toList() ??
       const [],
+  basedOn: json['basedOn'] == null
+      ? null
+      : WorkflowBasedOn.fromJson(json['basedOn'] as Map<String, dynamic>),
+  archivedAt: json['archivedAt'] == null
+      ? null
+      : DateTime.parse(json['archivedAt'] as String),
 );
 
 Map<String, dynamic> _$WorkflowToJson(Workflow instance) => <String, dynamic>{
@@ -79,7 +85,18 @@ Map<String, dynamic> _$WorkflowToJson(Workflow instance) => <String, dynamic>{
   'versions': instance.versions.map((e) => e.toJson()).toList(),
   'yaml': instance.yaml,
   'inputs': instance.inputs.map((e) => e.toJson()).toList(),
+  'basedOn': ?instance.basedOn?.toJson(),
+  'archivedAt': ?instance.archivedAt?.toIso8601String(),
 };
+
+WorkflowBasedOn _$WorkflowBasedOnFromJson(Map<String, dynamic> json) =>
+    WorkflowBasedOn(
+      builtin: json['builtin'] as String,
+      version: (json['version'] as num).toInt(),
+    );
+
+Map<String, dynamic> _$WorkflowBasedOnToJson(WorkflowBasedOn instance) =>
+    <String, dynamic>{'builtin': instance.builtin, 'version': instance.version};
 
 WorkflowSummary _$WorkflowSummaryFromJson(Map<String, dynamic> json) =>
     WorkflowSummary(
@@ -92,6 +109,12 @@ WorkflowSummary _$WorkflowSummaryFromJson(Map<String, dynamic> json) =>
       ),
       title: json['title'] as String?,
       description: json['description'] as String?,
+      basedOn: json['basedOn'] == null
+          ? null
+          : WorkflowBasedOn.fromJson(json['basedOn'] as Map<String, dynamic>),
+      archivedAt: json['archivedAt'] == null
+          ? null
+          : DateTime.parse(json['archivedAt'] as String),
     );
 
 Map<String, dynamic> _$WorkflowSummaryToJson(WorkflowSummary instance) =>
@@ -103,6 +126,8 @@ Map<String, dynamic> _$WorkflowSummaryToJson(WorkflowSummary instance) =>
       'version': instance.version.toJson(),
       'title': ?instance.title,
       'description': ?instance.description,
+      'basedOn': ?instance.basedOn?.toJson(),
+      'archivedAt': ?instance.archivedAt?.toIso8601String(),
     };
 
 WorkflowsResponse _$WorkflowsResponseFromJson(Map<String, dynamic> json) =>
@@ -153,13 +178,45 @@ CreateWorkflowRequest _$CreateWorkflowRequestFromJson(
   final val = CreateWorkflowRequest(
     name: $checkedConvert('name', (v) => v as String),
     yaml: $checkedConvert('yaml', (v) => v as String),
+    basedOn: $checkedConvert(
+      'basedOn',
+      (v) => v == null
+          ? null
+          : WorkflowBasedOn.fromJson(v as Map<String, dynamic>),
+    ),
   );
   return val;
 });
 
 Map<String, dynamic> _$CreateWorkflowRequestToJson(
   CreateWorkflowRequest instance,
-) => <String, dynamic>{'name': instance.name, 'yaml': instance.yaml};
+) => <String, dynamic>{
+  'name': instance.name,
+  'yaml': instance.yaml,
+  'basedOn': ?instance.basedOn,
+};
+
+UpdateWorkflowRequest _$UpdateWorkflowRequestFromJson(
+  Map<String, dynamic> json,
+) => $checkedCreate('UpdateWorkflowRequest', json, ($checkedConvert) {
+  final val = UpdateWorkflowRequest(
+    name: $checkedConvert('name', (v) => v as String?),
+    archived: $checkedConvert('archived', (v) => v as bool?),
+    basedOnVersion: $checkedConvert(
+      'basedOnVersion',
+      (v) => (v as num?)?.toInt(),
+    ),
+  );
+  return val;
+});
+
+Map<String, dynamic> _$UpdateWorkflowRequestToJson(
+  UpdateWorkflowRequest instance,
+) => <String, dynamic>{
+  'name': ?instance.name,
+  'archived': ?instance.archived,
+  'basedOnVersion': ?instance.basedOnVersion,
+};
 
 WorkflowYamlRequest _$WorkflowYamlRequestFromJson(Map<String, dynamic> json) =>
     $checkedCreate('WorkflowYamlRequest', json, ($checkedConvert) {

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:xp_api/xp_api.dart';
 import 'package:xp_desktop/app/app_services.dart';
 import 'package:xp_desktop/dispatch/view/dispatch_sheet.dart';
 import 'package:xp_desktop/l10n/l10n.dart';
@@ -17,6 +18,7 @@ import 'package:xp_desktop/workflow_builder/bloc/workflow_edits.dart';
 import 'package:xp_desktop/workflow_builder/widgets/builder_controls.dart';
 import 'package:xp_desktop/workflow_builder/widgets/workflow_dialogs.dart';
 import 'package:xp_desktop/workflow_builder/widgets/workflow_graph.dart';
+import 'package:xp_desktop/workflow_builder/widgets/workflow_history.dart';
 import 'package:xp_desktop/workflow_builder/widgets/workflow_inspector.dart';
 import 'package:xp_desktop/workflow_builder/widgets/yaml_pane.dart';
 import 'package:xp_repositories/xp_repositories.dart';
@@ -185,10 +187,17 @@ class WorkflowBuilderView extends StatelessWidget {
                     workflow.id,
                   ...state.workflows.map((w) => w.id),
                 ],
-                labelOf: (id) => switch (id) {
-                  null => state.name ?? l10n.workflowsDraft,
-                  _ when id == workflow?.id => workflow!.name,
-                  _ => state.workflows.firstWhere((w) => w.id == id).name,
+                labelOf: (id) {
+                  if (id == null) return state.name ?? l10n.workflowsDraft;
+                  final summary = state.workflows
+                      .where((w) => w.id == id)
+                      .firstOrNull;
+                  final name = id == workflow?.id
+                      ? workflow!.name
+                      : summary!.name;
+                  return summary?.archived ?? false
+                      ? l10n.workflowsArchivedName(name)
+                      : name;
                 },
                 code: true,
                 onChanged: busy
@@ -215,6 +224,55 @@ class WorkflowBuilderView extends StatelessWidget {
             icon: PhosphorIconsRegular.plus,
             onPressed: busy ? null : () => leave(() => unawaited(startNew())),
           ),
+          if (workflow != null)
+            _MoreMenu(
+              workflow: workflow,
+              enabled: !busy,
+              canCommand: canCommand,
+              onVersions: () =>
+                  leave(() => unawaited(showWorkflowVersions(context))),
+              onRename: () async {
+                final taken = {
+                  for (final summary in state.workflows)
+                    if (summary.id != workflow.id) summary.name,
+                };
+                final name = await askWorkflowName(
+                  context,
+                  initial: workflow.name,
+                  taken: taken,
+                  title: l10n.workflowsRenameTitle,
+                );
+                if (name != null && name != workflow.name) {
+                  bloc.add(WorkflowRenameRequested(name));
+                }
+              },
+              onArchive: (archived) {
+                bloc.add(WorkflowArchiveRequested(archived: archived));
+                if (archived) {
+                  context.read<ToastCubit>().show(
+                    l10n.workflowsArchivedToast(workflow.name),
+                    action: l10n.toastUndo,
+                    onAction: () => bloc.add(
+                      const WorkflowArchiveRequested(archived: false),
+                    ),
+                  );
+                }
+              },
+              onDelete: () async {
+                if (await confirmAction(
+                  context,
+                  title: l10n.workflowsDeleteTitle(workflow.name),
+                  points: [
+                    l10n.workflowsDeleteVersions,
+                    l10n.workflowsDeleteRan,
+                  ],
+                  keep: l10n.confirmKeep,
+                  confirm: l10n.workflowsDeleteConfirm,
+                )) {
+                  bloc.add(const WorkflowDeleteRequested());
+                }
+              },
+            ),
           XpButton(
             label: l10n.workflowsImport,
             icon: PhosphorIconsRegular.downloadSimple,
@@ -297,9 +355,34 @@ class WorkflowBuilderView extends StatelessWidget {
           WorkflowSavedNotice(:final name, :final version) =>
             l10n.workflowsSaved(name, version),
           WorkflowExportedNotice(:final path) => l10n.workflowsExported(path),
+          WorkflowDeletedNotice(:final name) => l10n.workflowsDeleted(name),
+          WorkflowRestoredNotice(:final name, :final from, :final version) =>
+            l10n.workflowsRestored(from, version, name),
         }),
       if (state.workflow?.builtin ?? false)
         XpMessage(XpStatus.scanInfo, l10n.workflowsBuiltinHint),
+      if (state.workflow?.archivedAt != null)
+        XpMessage(XpStatus.scanInfo, l10n.workflowsArchivedNote),
+      if (state.builtinUpdate case final update?)
+        Row(
+          children: [
+            Expanded(
+              child: XpMessage(
+                XpStatus.scanInfo,
+                l10n.workflowsBuiltinUpdated(
+                  update.builtin,
+                  update.latest,
+                  update.base,
+                ),
+              ),
+            ),
+            XpButton(
+              label: l10n.workflowsCompare,
+              size: XpButtonSize.small,
+              onPressed: () => showBuiltinCompare(context),
+            ),
+          ],
+        ),
     ];
     if (messages.isEmpty) return const [];
     return [
@@ -373,6 +456,70 @@ class _Visual extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// The "More" menu of the open workflow: its versions, and for a workflow
+/// of the owner rename, archive or unarchive, and delete.
+class _MoreMenu extends StatelessWidget {
+  const new({
+    required this.workflow,
+    required this.enabled,
+    required this.canCommand,
+    required this.onVersions,
+    required this.onRename,
+    required this.onArchive,
+    required this.onDelete,
+  });
+
+  final Workflow workflow;
+  final bool enabled;
+  final bool canCommand;
+  final VoidCallback onVersions;
+  final VoidCallback onRename;
+  final ValueChanged<bool> onArchive;
+  final VoidCallback onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    final archived = workflow.archivedAt != null;
+    final mine = !workflow.builtin && canCommand;
+    PopupMenuItem<VoidCallback> item(String label, VoidCallback action) =>
+        PopupMenuItem<VoidCallback>(
+          value: action,
+          height: context.xpSizes.rowDefault,
+          child: Text(
+            label,
+            style: context.xpType.body.copyWith(
+              color: context.xpColors.textPrimary,
+            ),
+          ),
+        );
+    return PopupMenuButton<VoidCallback>(
+      enabled: enabled,
+      tooltip: '',
+      position: PopupMenuPosition.under,
+      onSelected: (action) => action(),
+      itemBuilder: (context) => [
+        item(l10n.workflowsVersions, onVersions),
+        if (mine) ...[
+          item(l10n.workflowsRename, onRename),
+          if (archived)
+            item(l10n.workflowsUnarchive, () => onArchive(false))
+          else
+            item(l10n.workflowsArchive, () => onArchive(true)),
+          item(l10n.workflowsDelete, onDelete),
+        ],
+      ],
+      child: IgnorePointer(
+        child: XpButton(
+          label: l10n.workflowsMore,
+          icon: PhosphorIconsRegular.dotsThree,
+          onPressed: enabled ? () {} : null,
+        ),
+      ),
     );
   }
 }

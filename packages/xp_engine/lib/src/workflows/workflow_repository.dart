@@ -9,6 +9,9 @@ class WorkflowRecord extends Equatable {
     required this.projectId,
     required this.name,
     required this.builtin,
+    this.basedOnBuiltin,
+    this.basedOnVersion,
+    this.archivedAt,
   });
 
   /// The engine's id.
@@ -23,8 +26,42 @@ class WorkflowRecord extends Equatable {
   /// Whether the engine made it.
   final bool builtin;
 
+  /// The built-in it is a copy of, when it is one.
+  final String? basedOnBuiltin;
+
+  /// The version of [basedOnBuiltin] the copy started from or caught up
+  /// with.
+  final int? basedOnVersion;
+
+  /// When it was archived (UX-06), or `null`.
+  final DateTime? archivedAt;
+
+  /// This record with [name], [archivedAt] or [basedOnVersion] changed; a
+  /// `null` function keeps one.
+  WorkflowRecord copyWith({
+    String? name,
+    DateTime? Function()? archivedAt,
+    int? basedOnVersion,
+  }) => WorkflowRecord(
+    id: id,
+    projectId: projectId,
+    name: name ?? this.name,
+    builtin: builtin,
+    basedOnBuiltin: basedOnBuiltin,
+    basedOnVersion: basedOnVersion ?? this.basedOnVersion,
+    archivedAt: archivedAt == null ? this.archivedAt : archivedAt(),
+  );
+
   @override
-  List<Object?> get props => [id, projectId, name, builtin];
+  List<Object?> get props => [
+    id,
+    projectId,
+    name,
+    builtin,
+    basedOnBuiltin,
+    basedOnVersion,
+    archivedAt,
+  ];
 }
 
 /// One saved version of a workflow.
@@ -74,6 +111,10 @@ abstract interface class WorkflowRepository {
 
   /// Stores a new workflow with its first version.
   Future<void> create(WorkflowRecord workflow, WorkflowVersionRecord first);
+
+  /// Stores the name, the archive time and the built-in version of
+  /// [workflow], which exists.
+  Future<void> update(WorkflowRecord workflow);
 
   /// Stores [yaml] as the next version of [workflowId], with the id
   /// [versionId], and returns it. The number is one more than the newest.
@@ -128,6 +169,10 @@ class InMemoryWorkflowRepository implements WorkflowRepository {
     _workflows[workflow.id] = workflow;
     _versions[workflow.id] = [first];
   }
+
+  @override
+  Future<void> update(WorkflowRecord workflow) async =>
+      _workflows[workflow.id] = workflow;
 
   @override
   Future<WorkflowVersionRecord> addVersion({

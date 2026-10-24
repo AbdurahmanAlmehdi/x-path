@@ -195,6 +195,14 @@ void main() {
               builtin: true,
               version: prodWorkflow.version,
             ),
+            WorkflowSummary(
+              id: 'wf_old',
+              projectId: 'prj_1',
+              name: 'old',
+              builtin: false,
+              version: prodWorkflow.version,
+              archivedAt: DateTime.utc(2026),
+            ),
           ],
         );
         when(() => workflows.lastWorkflow('prj_1'))

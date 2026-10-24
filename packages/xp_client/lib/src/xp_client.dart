@@ -197,6 +197,23 @@ class XpClient {
     ),
   );
 
+  /// `PATCH /projects/{id}/workflows/{workflowId}`: renames, archives or
+  /// unarchives a workflow, or catches a copy up with its built-in.
+  Future<Workflow> updateWorkflow(
+    String projectId,
+    String workflowId,
+    UpdateWorkflowRequest request,
+  ) async => Workflow.fromJson(
+    await _json(
+      await _send('PATCH', [
+        'projects',
+        projectId,
+        'workflows',
+        workflowId,
+      ], body: request.toJson()),
+    ),
+  );
+
   /// `DELETE /projects/{id}/workflows/{workflowId}`.
   Future<void> deleteWorkflow(String projectId, String workflowId) async {
     await _send('DELETE', ['projects', projectId, 'workflows', workflowId]);

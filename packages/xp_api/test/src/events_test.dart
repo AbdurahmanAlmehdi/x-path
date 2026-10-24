@@ -138,6 +138,12 @@ void main() {
           projectId: 'prj_1',
           name: 'dev-build',
         ),
+        const WorkflowUpdated(
+          workflowId: 'wf_1',
+          projectId: 'prj_1',
+          name: 'nightly',
+          archived: true,
+        ),
         const RunDispatched(
           runId: 'run_1',
           projectId: 'prj_1',
@@ -293,6 +299,7 @@ void main() {
         CredentialUnassigned() => 'unassigned credential',
         WorkflowSaved() => 'workflow saved',
         WorkflowRemoved() => 'workflow removed',
+        WorkflowUpdated() => 'workflow updated',
         RunDispatched() => 'run',
         ApprovalRequested() => 'requested',
         ApprovalDecided() => 'decided',
@@ -449,6 +456,17 @@ void main() {
           const WorkflowRemoved(workflowId: 'w', projectId: 'p', name: 'n'),
         ),
         'workflow removed',
+      );
+      expect(
+        describe(
+          const WorkflowUpdated(
+            workflowId: 'w',
+            projectId: 'p',
+            name: 'n',
+            archived: false,
+          ),
+        ),
+        'workflow updated',
       );
       expect(
         describe(

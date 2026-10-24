@@ -97,6 +97,10 @@ abstract class XpCommand extends Command<int> {
 /// fix: the command that fixes it. The engine names no command (UX-09).
 String? cliHint(ApiException error) => switch (error.code) {
   ApiErrorCode.unauthorized => 'Run: xp connect <url> --token <token>',
+  ApiErrorCode.conflict when error.message.contains('has been run') =>
+    'Archive it instead: xp workflows archive <project> <workflow>',
+  ApiErrorCode.workflowInvalid when error.message.contains('is archived') =>
+    'Unarchive it with: xp workflows archive <project> <workflow> --undo',
   ApiErrorCode.workflowInvalid when error.message.contains(' assigned') =>
     'Assign one with: xp credentials assign',
   ApiErrorCode.workflowInvalid

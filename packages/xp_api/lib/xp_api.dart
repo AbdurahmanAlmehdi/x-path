@@ -26,5 +26,6 @@ export 'src/runner.dart';
 export 'src/runner_protocol.dart';
 export 'src/storage.dart';
 export 'src/test_run.dart';
+export 'src/text_diff.dart';
 export 'src/version_response.dart';
 export 'src/workflow.dart';

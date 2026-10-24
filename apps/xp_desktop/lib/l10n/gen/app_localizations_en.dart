@@ -2942,6 +2942,119 @@ class AppLocalizationsEn extends AppLocalizations {
   String get workflowsInputNoDefault => 'None';
 
   @override
+  String get workflowsMore => 'More';
+
+  @override
+  String get workflowsVersions => 'Versions…';
+
+  @override
+  String get workflowsRename => 'Rename…';
+
+  @override
+  String get workflowsRenameTitle => 'Rename the workflow';
+
+  @override
+  String get workflowsArchive => 'Archive';
+
+  @override
+  String get workflowsUnarchive => 'Unarchive';
+
+  @override
+  String workflowsArchivedToast(String name) {
+    return 'Archived $name';
+  }
+
+  @override
+  String get workflowsArchivedNote =>
+      'Archived: kept with its versions and runs, and not offered to dispatch.';
+
+  @override
+  String workflowsArchivedName(String name) {
+    return '$name (archived)';
+  }
+
+  @override
+  String get workflowsDelete => 'Delete…';
+
+  @override
+  String workflowsDeleteTitle(String name) {
+    return 'Delete $name?';
+  }
+
+  @override
+  String get workflowsDeleteVersions => 'Its versions go with it.';
+
+  @override
+  String get workflowsDeleteRan =>
+      'A workflow that ran cannot be deleted; archive it instead.';
+
+  @override
+  String get workflowsDeleteConfirm => 'Delete';
+
+  @override
+  String workflowsDeleted(String name) {
+    return 'Deleted $name.';
+  }
+
+  @override
+  String workflowsRestored(int from, int version, String name) {
+    return 'Saved version $from again as version $version of $name.';
+  }
+
+  @override
+  String workflowsVersionsTitle(String name) {
+    return 'Versions of $name';
+  }
+
+  @override
+  String workflowsVersionLabel(int version, String time) {
+    return 'Version $version · $time';
+  }
+
+  @override
+  String get workflowsVersionFrom => 'From';
+
+  @override
+  String get workflowsVersionTo => 'to';
+
+  @override
+  String workflowsRestoreVersion(int version) {
+    return 'Restore version $version';
+  }
+
+  @override
+  String get workflowsNoChanges => 'No changes.';
+
+  @override
+  String get workflowsClose => 'Close';
+
+  @override
+  String workflowsBuiltinUpdated(String builtin, int latest, int base) {
+    return 'The built-in $builtin has a newer version ($latest); this copy is based on version $base.';
+  }
+
+  @override
+  String get workflowsCompare => 'Compare';
+
+  @override
+  String workflowsCompareTitle(String builtin) {
+    return 'Compare with $builtin';
+  }
+
+  @override
+  String workflowsBuiltinChanged(String builtin, int base, int latest) {
+    return 'What $builtin changed, version $base to $latest';
+  }
+
+  @override
+  String workflowsYouChanged(int base) {
+    return 'What this copy changed since version $base';
+  }
+
+  @override
+  String get workflowsMarkUpToDate => 'Mark as up to date';
+
+  @override
   String get workflowsTemplateTitle => 'Start a new workflow';
 
   @override

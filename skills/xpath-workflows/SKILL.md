@@ -153,8 +153,15 @@ xp workflows show acme/app dev-build > dev-firebase.yaml   # prints the YAML onl
 xp --json workflows show acme/app dev-build                # id, versions and "yaml" as JSON
 ```
 
-In the app: Workflows, pick the built-in, Save as. Every save is a new version; a job records
-the exact version it ran (`xp workflows show <p> <w> --version n`).
+In the app: Workflows, pick the built-in, Save as. Or `xp workflows copy acme/app dev-build
+dev-firebase`. A copy of a built-in remembers it: when the engine ships a newer version of the
+built-in, the app offers to compare (what the built-in changed, and what the copy changed).
+
+Every save is a new version; a job records the exact version it ran (`xp workflows show <p> <w>
+--version n`). `xp workflows versions <p> <w>` lists them and `xp workflows diff <p> <w> <from>
+[<to>]` shows what changed. `xp workflows rename <p> <w> <name>` renames; `xp workflows archive
+<p> <w>` keeps a workflow with its runs and stops it being dispatched (`--undo` brings it back);
+`xp workflows delete <p> <w>` deletes one only if it never ran.
 
 ## Validate and save
 

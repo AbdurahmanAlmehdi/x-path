@@ -1069,7 +1069,9 @@ paths:
         The document must be valid (`POST .../workflows/validate` lists its
         issues with their lines): otherwise `422 workflow_invalid`, and the
         message lists the issues. The name is unique in the project. To change
-        a built-in workflow, create a workflow of your own with its YAML.
+        a built-in workflow, create a workflow of your own with its YAML and
+        `basedOn` naming the built-in and its version: the app then offers to
+        compare when the built-in changes.
       requestBody:
         required: true
         content:
@@ -1257,12 +1259,43 @@ paths:
           $ref: "#/components/responses/WorkflowInvalid"
         "500":
           $ref: "#/components/responses/InternalError"
+    patch:
+      operationId: updateWorkflow
+      summary: Rename, archive or unarchive a workflow of your own.
+      description: |
+        No new version is made. An archived workflow keeps its versions and
+        runs and is not dispatched. `basedOnVersion` marks a copy of a
+        built-in as caught up with that version of it. A built-in workflow
+        answers `409 conflict`, a name in use `409 conflict`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateWorkflowRequest"
+      responses:
+        "200":
+          description: The workflow at its newest version.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Workflow"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "500":
+          $ref: "#/components/responses/InternalError"
     delete:
       operationId: deleteWorkflow
       summary: Delete a workflow of your own.
       description: |
         A built-in workflow, and a workflow that jobs ran, answer `409
-        conflict`: the jobs keep the version they ran.
+        conflict`: the jobs keep the version they ran. Archive it instead.
       responses:
         "204":
           description: The workflow is gone.
@@ -2695,7 +2728,8 @@ components:
             `job.step_changed`, `test_run.completed`, `credential.saved`,
             `credential.verified`, `credential.expired`, `credential.removed`,
             `credential.renamed`, `credential.assigned`,
-            `credential.unassigned`, `workflow.saved`, `workflow.removed`, `run.dispatched`,
+            `credential.unassigned`, `workflow.saved`, `workflow.removed`,
+            `workflow.updated`, `run.dispatched`,
             `approval.requested`, `approval.decided`, `approval.expired`,
             `project.gates_changed`, `release.created`,
             `release.state_changed`, `release.store_changed`,
@@ -3217,6 +3251,27 @@ components:
             it declares none or no longer reads as a workflow.
           items:
             $ref: "#/components/schemas/WorkflowInput"
+        basedOn:
+          $ref: "#/components/schemas/WorkflowBasedOn"
+        archivedAt:
+          type: string
+          format: date-time
+          description: |
+            When it was archived (UX-06): it keeps its runs and versions and
+            is not offered to dispatch. Absent while it is not archived.
+    WorkflowBasedOn:
+      type: object
+      required: [builtin, version]
+      additionalProperties: false
+      description: |
+        The built-in a workflow was copied from, and the version of it the
+        copy started from or last caught up with.
+      properties:
+        builtin:
+          type: string
+        version:
+          type: integer
+          minimum: 1
     DispatchPlan:
       type: object
       required: [flavors, platforms, stages, skipped]
@@ -3358,6 +3413,14 @@ components:
         description:
           type: string
           description: What the newest version says it is for.
+        basedOn:
+          $ref: "#/components/schemas/WorkflowBasedOn"
+        archivedAt:
+          type: string
+          format: date-time
+          description: |
+            When it was archived (UX-06): it keeps its runs and versions and
+            is not offered to dispatch. Absent while it is not archived.
     WorkflowsResponse:
       type: object
       required: [workflows]
@@ -3377,6 +3440,24 @@ components:
           pattern: "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$"
         yaml:
           type: string
+        basedOn:
+          $ref: "#/components/schemas/WorkflowBasedOn"
+    UpdateWorkflowRequest:
+      type: object
+      additionalProperties: false
+      description: What changes; each field only when it is given.
+      properties:
+        name:
+          type: string
+          pattern: "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$"
+        archived:
+          type: boolean
+        basedOnVersion:
+          type: integer
+          minimum: 1
+          description: |
+            The version of its built-in a copy has caught up with, after a
+            compare.
     WorkflowTemplate:
       type: object
       required: [id, title, description, yaml]

@@ -122,6 +122,8 @@ class Workflow extends Equatable {
     required this.versions,
     required this.yaml,
     this.inputs = const [],
+    this.basedOn,
+    this.archivedAt,
   });
 
   /// Reads a workflow from its JSON form.
@@ -154,6 +156,13 @@ class Workflow extends Equatable {
   /// declares none or no longer reads as a workflow.
   final List<WorkflowInput> inputs;
 
+  /// The built-in this workflow was copied from, and its version then.
+  final WorkflowBasedOn? basedOn;
+
+  /// When it was archived (UX-06): it keeps its runs and versions, and is
+  /// not offered to dispatch. `null` while it is not archived.
+  final DateTime? archivedAt;
+
   /// The JSON form.
   Map<String, dynamic> toJson() => _$WorkflowToJson(this);
 
@@ -167,7 +176,35 @@ class Workflow extends Equatable {
     versions,
     yaml,
     inputs,
+    basedOn,
+    archivedAt,
   ];
+}
+
+/// The built-in a workflow was copied from ("Save as"), and the version of
+/// it the copy started from. When the built-in has a newer version, the
+/// owner can compare.
+@JsonSerializable()
+class WorkflowBasedOn extends Equatable {
+  /// Creates the link.
+  const new({required this.builtin, required this.version});
+
+  /// Reads the link from its JSON form.
+  factory WorkflowBasedOn.fromJson(Map<String, dynamic> json) =>
+      _$WorkflowBasedOnFromJson(json);
+
+  /// The name of the built-in, such as `dev-build`.
+  final String builtin;
+
+  /// The version of the built-in the copy started from, or last caught up
+  /// with.
+  final int version;
+
+  /// The JSON form.
+  Map<String, dynamic> toJson() => _$WorkflowBasedOnToJson(this);
+
+  @override
+  List<Object?> get props => [builtin, version];
 }
 
 /// A workflow without its YAML, for lists.
@@ -182,6 +219,8 @@ class WorkflowSummary extends Equatable {
     required this.version,
     this.title,
     this.description,
+    this.basedOn,
+    this.archivedAt,
   });
 
   /// Reads a summary from its JSON form.
@@ -210,6 +249,15 @@ class WorkflowSummary extends Equatable {
   /// What the newest version says the workflow is for.
   final String? description;
 
+  /// The built-in this workflow was copied from, and its version then.
+  final WorkflowBasedOn? basedOn;
+
+  /// When it was archived; `null` while it is not.
+  final DateTime? archivedAt;
+
+  /// Whether it is archived: kept, and not offered to dispatch.
+  bool get archived => archivedAt != null;
+
   /// The JSON form.
   Map<String, dynamic> toJson() => _$WorkflowSummaryToJson(this);
 
@@ -222,6 +270,8 @@ class WorkflowSummary extends Equatable {
     version,
     title,
     description,
+    basedOn,
+    archivedAt,
   ];
 }
 
@@ -303,7 +353,7 @@ class WorkflowTemplatesResponse extends Equatable {
 @JsonSerializable(includeIfNull: false, checked: true)
 class CreateWorkflowRequest extends Equatable {
   /// Creates a request.
-  const new({required this.name, required this.yaml});
+  const new({required this.name, required this.yaml, this.basedOn});
 
   /// Reads a request from its JSON form.
   factory CreateWorkflowRequest.fromJson(Map<String, dynamic> json) =>
@@ -315,11 +365,42 @@ class CreateWorkflowRequest extends Equatable {
   /// The workflow document.
   final String yaml;
 
+  /// The built-in the document is a copy of, when it is one.
+  final WorkflowBasedOn? basedOn;
+
   /// The JSON form.
   Map<String, dynamic> toJson() => _$CreateWorkflowRequestToJson(this);
 
   @override
-  List<Object?> get props => [name, yaml];
+  List<Object?> get props => [name, yaml, basedOn];
+}
+
+/// The body of `PATCH /projects/{id}/workflows/{workflowId}`: what changes,
+/// each field only when it is given.
+@JsonSerializable(includeIfNull: false, checked: true)
+class UpdateWorkflowRequest extends Equatable {
+  /// Creates a request.
+  const new({this.name, this.archived, this.basedOnVersion});
+
+  /// Reads a request from its JSON form.
+  factory UpdateWorkflowRequest.fromJson(Map<String, dynamic> json) =>
+      _$UpdateWorkflowRequestFromJson(json);
+
+  /// A new name.
+  final String? name;
+
+  /// Whether the workflow is archived (UX-06).
+  final bool? archived;
+
+  /// The version of its built-in the copy has caught up with, after a
+  /// compare.
+  final int? basedOnVersion;
+
+  /// The JSON form.
+  Map<String, dynamic> toJson() => _$UpdateWorkflowRequestToJson(this);
+
+  @override
+  List<Object?> get props => [name, archived, basedOnVersion];
 }
 
 /// The body of `PUT /projects/{id}/workflows/{workflowId}` and of

@@ -119,6 +119,13 @@ class McpArgs {
     _ => throw McpArgumentError('"$name" must be an integer.'),
   };
 
+  /// The boolean argument [name], or `null`.
+  bool? optionalBool(String name) => switch (values[name]) {
+    null => null,
+    final bool value => value,
+    _ => throw McpArgumentError('"$name" must be true or false.'),
+  };
+
   /// The list of strings [name], or `null`.
   List<String>? optionalStrings(String name) => switch (values[name]) {
     null => null,

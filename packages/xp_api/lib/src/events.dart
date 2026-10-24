@@ -120,6 +120,12 @@ sealed class EngineEvent extends Equatable {
       projectId: payload['projectId'] as String,
       name: payload['name'] as String,
     ),
+    WorkflowUpdated.eventType => WorkflowUpdated(
+      workflowId: payload['workflowId'] as String,
+      projectId: payload['projectId'] as String,
+      name: payload['name'] as String,
+      archived: payload['archived'] as bool,
+    ),
     RunDispatched.eventType => RunDispatched(
       runId: payload['runId'] as String,
       projectId: payload['projectId'] as String,
@@ -927,6 +933,47 @@ final class WorkflowRemoved extends EngineEvent {
 
   @override
   List<Object?> get props => [workflowId, projectId, name];
+}
+
+/// A workflow was renamed, archived or unarchived, or caught up with its
+/// built-in, without a new version.
+final class WorkflowUpdated extends EngineEvent {
+  /// Creates the event.
+  const new({
+    required this.workflowId,
+    required this.projectId,
+    required this.name,
+    required this.archived,
+  });
+
+  /// The wire name of this event.
+  static const eventType = 'workflow.updated';
+
+  /// The workflow.
+  final String workflowId;
+
+  /// The project it belongs to.
+  final String projectId;
+
+  /// Its name now.
+  final String name;
+
+  /// Whether it is archived now.
+  final bool archived;
+
+  @override
+  String get type => eventType;
+
+  @override
+  Map<String, dynamic> get payload => {
+    'workflowId': workflowId,
+    'projectId': projectId,
+    'name': name,
+    'archived': archived,
+  };
+
+  @override
+  List<Object?> get props => [workflowId, projectId, name, archived];
 }
 
 /// A workflow was dispatched: its jobs exist and wait for the scheduler.

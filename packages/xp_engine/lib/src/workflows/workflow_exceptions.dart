@@ -94,6 +94,16 @@ class WorkflowNameException extends WorkflowException {
   String toString() => 'WorkflowNameException: $message';
 }
 
+/// A change of a workflow does not apply to it, for example catching up
+/// with a built-in that it is not a copy of.
+class WorkflowEditException extends WorkflowException {
+  /// Creates the exception.
+  const new(super.message);
+
+  @override
+  String toString() => 'WorkflowEditException: $message';
+}
+
 /// The workflow document has issues.
 class WorkflowInvalidException extends WorkflowException {
   /// Creates the exception from the [issues] found.

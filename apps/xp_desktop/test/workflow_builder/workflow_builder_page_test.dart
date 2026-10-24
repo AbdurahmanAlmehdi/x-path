@@ -661,6 +661,216 @@ void main() {
     expect(inputs().map((input) => input.name), ['notes']);
   });
 
+  group('lifecycle (UX-06)', () {
+    Workflow mine({DateTime? archivedAt, WorkflowBasedOn? basedOn}) => Workflow(
+      id: 'wf_mine',
+      projectId: 'prj_1',
+      name: 'store-release',
+      builtin: false,
+      version: releaseWorkflow.version,
+      versions: releaseWorkflow.versions,
+      yaml: releaseYaml,
+      archivedAt: archivedAt,
+      basedOn: basedOn,
+    );
+
+    setUpAll(() => registerFallbackValue(const UpdateWorkflowRequest()));
+
+    testWidgets('archives from the menu, with an undo', (tester) async {
+      when(() => repository.updateWorkflow('prj_1', 'wf_mine', any()))
+          .thenAnswer(
+            (invocation) async =>
+                (invocation.positionalArguments[2] as UpdateWorkflowRequest)
+                        .archived ??
+                    false
+                ? mine(archivedAt: DateTime.utc(2026))
+                : mine(),
+          );
+      await pumpBuilder(tester, repository: repository);
+
+      await press(tester, find.text('More'));
+      await press(tester, find.text('Archive'));
+
+      expect(find.text('Archived store-release'), findsOneWidget);
+      expect(
+        find.text(
+          'Archived: kept with its versions and runs, and not offered to '
+          'dispatch.',
+        ),
+        findsOneWidget,
+      );
+      await press(tester, find.widgetWithText(XpButton, 'Undo').last);
+      expect(
+        verify(
+          () => repository.updateWorkflow('prj_1', 'wf_mine', captureAny()),
+        ).captured,
+        const [
+          UpdateWorkflowRequest(archived: true),
+          UpdateWorkflowRequest(archived: false),
+        ],
+      );
+    });
+
+    testWidgets('renames from the menu', (tester) async {
+      when(() => repository.updateWorkflow('prj_1', 'wf_mine', any()))
+          .thenAnswer((_) async => mine());
+      await pumpBuilder(tester, repository: repository);
+
+      await press(tester, find.text('More'));
+      await press(tester, find.text('Rename…'));
+      expect(find.text('Rename the workflow'), findsOneWidget);
+      await tester.enterText(
+        find.descendant(
+          of: find.byType(WorkflowNameDialog),
+          matching: find.byType(TextField),
+        ),
+        'nightly',
+      );
+      await tester.pump();
+      await press(
+        tester,
+        find.descendant(
+          of: find.byType(WorkflowNameDialog),
+          matching: find.text('Save'),
+        ),
+      );
+
+      verify(
+        () => repository.updateWorkflow(
+          'prj_1',
+          'wf_mine',
+          const UpdateWorkflowRequest(name: 'nightly'),
+        ),
+      ).called(1);
+    });
+
+    testWidgets('deletes after asking', (tester) async {
+      when(() => repository.deleteWorkflow('prj_1', 'wf_mine'))
+          .thenAnswer((_) async {});
+      await pumpBuilder(tester, repository: repository);
+
+      await press(tester, find.text('More'));
+      await press(tester, find.text('Delete…'));
+      expect(find.text('Delete store-release?'), findsOneWidget);
+      await press(
+        tester,
+        find.descendant(
+          of: find.byType(XpConfirmDialog),
+          matching: find.text('Delete'),
+        ),
+      );
+
+      verify(() => repository.deleteWorkflow('prj_1', 'wf_mine')).called(1);
+      expect(find.text('Deleted store-release.'), findsOneWidget);
+    });
+
+    testWidgets('offers only the versions of a built-in', (tester) async {
+      await pumpBuilder(tester, repository: repository, workflowId: 'wf_dev');
+
+      await press(tester, find.text('More'));
+
+      expect(find.text('Versions…'), findsOneWidget);
+      expect(find.text('Rename…'), findsNothing);
+      expect(find.text('Delete…'), findsNothing);
+    });
+
+    testWidgets('compares versions and restores one', (tester) async {
+      Workflow at(int version, String yaml) => Workflow(
+        id: 'wf_mine',
+        projectId: 'prj_1',
+        name: 'store-release',
+        builtin: false,
+        version: versionInfo(version),
+        versions: releaseWorkflow.versions,
+        yaml: yaml,
+      );
+      when(() => repository.getWorkflow('prj_1', 'wf_mine', version: 1))
+          .thenAnswer((_) async => at(1, 'schema: 1\nname: First\n'));
+      when(() => repository.getWorkflow('prj_1', 'wf_mine', version: 2))
+          .thenAnswer((_) async => at(2, 'schema: 1\nname: Second\n'));
+      when(
+        () => repository.saveWorkflow(
+          'prj_1',
+          'wf_mine',
+          'schema: 1\nname: First\n',
+        ),
+      ).thenAnswer((_) async => at(3, 'schema: 1\nname: First\n'));
+      await pumpBuilder(tester, repository: repository);
+
+      await press(tester, find.text('More'));
+      await press(tester, find.text('Versions…'));
+
+      expect(find.text('Versions of store-release'), findsOneWidget);
+      expect(find.text('-name: First'), findsOneWidget);
+      expect(find.text('+name: Second'), findsOneWidget);
+      await press(tester, find.text('Restore version 1'));
+
+      expect(find.byType(WorkflowVersionsDialog), findsNothing);
+      expect(
+        find.text('Saved version 1 again as version 3 of store-release.'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets(
+      'a copy of dev-build offers to compare once dev-build has a newer '
+      'version',
+      (tester) async {
+        const basedOn = WorkflowBasedOn(builtin: 'dev-build', version: 1);
+        final newer = Workflow(
+          id: 'wf_dev',
+          projectId: 'prj_1',
+          name: 'dev-build',
+          builtin: true,
+          version: versionInfo(2),
+          versions: [versionInfo(1), versionInfo(2)],
+          yaml: '${devBuild.yaml}          - kind: version.bump\n',
+        );
+        when(() => repository.listWorkflows('prj_1')).thenAnswer(
+          (_) async => [summaryOf(newer), summaryOf(mine(basedOn: basedOn))],
+        );
+        when(() => repository.getWorkflow('prj_1', 'wf_mine'))
+            .thenAnswer((_) async => mine(basedOn: basedOn));
+        when(() => repository.getWorkflow('prj_1', 'wf_dev', version: 1))
+            .thenAnswer((_) async => devBuild);
+        when(() => repository.getWorkflow('prj_1', 'wf_dev'))
+            .thenAnswer((_) async => newer);
+        when(
+          () => repository.updateWorkflow('prj_1', 'wf_mine', any()),
+        ).thenAnswer(
+          (_) async => mine(
+            basedOn: const WorkflowBasedOn(builtin: 'dev-build', version: 2),
+          ),
+        );
+        await pumpBuilder(tester, repository: repository);
+
+        expect(
+          find.text(
+            'The built-in dev-build has a newer version (2); this copy is '
+            'based on version 1.',
+          ),
+          findsOneWidget,
+        );
+        await press(tester, find.text('Compare'));
+        expect(find.text('Compare with dev-build'), findsOneWidget);
+        expect(
+          find.text('WHAT DEV-BUILD CHANGED, VERSION 1 TO 2'),
+          findsOneWidget,
+        );
+        expect(find.text('+          - kind: version.bump'), findsOneWidget);
+
+        await press(tester, find.text('Mark as up to date'));
+        verify(
+          () => repository.updateWorkflow(
+            'prj_1',
+            'wf_mine',
+            const UpdateWorkflowRequest(basedOnVersion: 2),
+          ),
+        ).called(1);
+      },
+    );
+  });
+
   testWidgets('asks before dropping unsaved changes', (tester) async {
     await pumpBuilder(tester, repository: repository);
     await type(tester, field('Name').first, 'Changed');
@@ -740,6 +950,7 @@ void main() {
         'prj_1',
         name: 'dev-build-copy',
         yaml: any(named: 'yaml'),
+        basedOn: const WorkflowBasedOn(builtin: 'dev-build', version: 1),
       ),
     ).thenAnswer(
       (invocation) async => Workflow(

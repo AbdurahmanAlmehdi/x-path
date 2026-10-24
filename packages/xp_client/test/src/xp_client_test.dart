@@ -223,6 +223,19 @@ void main() {
       body: {'yaml': 'name: y\n'},
     ),
     _Endpoint(
+      'updateWorkflow',
+      method: 'PATCH',
+      path: '/projects/prj_1/workflows/wf_1',
+      response: sample.workflow.toJson(),
+      call: (client) => client.updateWorkflow(
+        'prj_1',
+        'wf_1',
+        const UpdateWorkflowRequest(archived: true),
+      ),
+      expected: sample.workflow,
+      body: {'archived': true},
+    ),
+    _Endpoint(
       'deleteWorkflow',
       method: 'DELETE',
       path: '/projects/prj_1/workflows/wf_1',

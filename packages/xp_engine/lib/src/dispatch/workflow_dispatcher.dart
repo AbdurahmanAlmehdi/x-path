@@ -286,6 +286,12 @@ class WorkflowDispatcher {
     required bool dryRun,
   }) async {
     final stored = await _workflows.latest(projectId, workflowId);
+    if (stored.workflow.archivedAt != null) {
+      throw DispatchException(
+        'The workflow "${stored.workflow.name}" is archived. Unarchive it to '
+        'run it.',
+      );
+    }
     final parsed = WorkflowParser(_planners).parse(stored.version.yaml);
     final definition = parsed.definition;
     if (definition == null) throw WorkflowInvalidException(parsed.issues);
