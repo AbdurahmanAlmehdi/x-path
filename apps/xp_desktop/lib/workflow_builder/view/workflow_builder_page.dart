@@ -10,9 +10,11 @@ import 'package:xp_desktop/projects/bloc/projects_bloc.dart';
 import 'package:xp_desktop/shell/cubit/shell_cubit.dart';
 import 'package:xp_desktop/shell/widgets/shell_page.dart';
 import 'package:xp_desktop/theme/theme.dart';
+import 'package:xp_desktop/toast/cubit/toast_cubit.dart';
 import 'package:xp_desktop/widgets/widgets.dart';
 import 'package:xp_desktop/workflow_builder/bloc/workflow_builder_bloc.dart';
 import 'package:xp_desktop/workflow_builder/bloc/workflow_edits.dart';
+import 'package:xp_desktop/workflow_builder/widgets/builder_controls.dart';
 import 'package:xp_desktop/workflow_builder/widgets/workflow_dialogs.dart';
 import 'package:xp_desktop/workflow_builder/widgets/workflow_graph.dart';
 import 'package:xp_desktop/workflow_builder/widgets/workflow_inspector.dart';
@@ -138,6 +140,23 @@ class WorkflowBuilderView extends StatelessWidget {
       if (name != null) bloc.add(WorkflowSaveRequested(name: name));
     }
 
+    Future<void> startNew() async {
+      final templates = state.templates;
+      final template = templates.isEmpty
+          ? null
+          : await pickTemplate(context, templates);
+      if (templates.isNotEmpty && template == null) return;
+      bloc.add(WorkflowDraftStarted(template: template));
+    }
+
+    void undo() {
+      if (state.canUndo && !busy) bloc.add(const WorkflowUndoRequested());
+    }
+
+    void redo() {
+      if (state.canRedo && !busy) bloc.add(const WorkflowRedoRequested());
+    }
+
     final canSave = canCommand && !busy && state.loaded && state.dirty;
     return CallbackShortcuts(
       bindings: {
@@ -146,6 +165,9 @@ class WorkflowBuilderView extends StatelessWidget {
             unawaited(save());
           }
         },
+        const SingleActivator(LogicalKeyboardKey.keyZ, meta: true): undo,
+        const SingleActivator(LogicalKeyboardKey.keyZ, meta: true, shift: true):
+            redo,
       },
       child: ShellPage(
         title: l10n.workflowsTitle,
@@ -178,12 +200,20 @@ class WorkflowBuilderView extends StatelessWidget {
                       },
               ),
             ),
+          RowAction(
+            icon: PhosphorIconsRegular.arrowCounterClockwise,
+            tooltip: '${l10n.workflowsUndo} ⌘Z',
+            onPressed: state.canUndo && !busy ? undo : null,
+          ),
+          RowAction(
+            icon: PhosphorIconsRegular.arrowClockwise,
+            tooltip: '${l10n.workflowsRedo} ⇧⌘Z',
+            onPressed: state.canRedo && !busy ? redo : null,
+          ),
           XpButton(
             label: l10n.workflowsNew,
             icon: PhosphorIconsRegular.plus,
-            onPressed: busy
-                ? null
-                : () => leave(() => bloc.add(const WorkflowDraftStarted())),
+            onPressed: busy ? null : () => leave(() => unawaited(startNew())),
           ),
           XpButton(
             label: l10n.workflowsImport,
@@ -336,6 +366,11 @@ class _Visual extends StatelessWidget {
           schema: state.schema,
           enabled: enabled,
           onEdit: edit,
+          onRemoved: (message) => context.read<ToastCubit>().show(
+            message,
+            action: context.l10n.toastUndo,
+            onAction: () => bloc.add(const WorkflowUndoRequested()),
+          ),
         ),
       ],
     );

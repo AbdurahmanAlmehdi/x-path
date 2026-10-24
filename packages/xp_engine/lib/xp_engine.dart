@@ -222,3 +222,4 @@ export 'src/workflows/workflow_matrix.dart';
 export 'src/workflows/workflow_parser.dart';
 export 'src/workflows/workflow_repository.dart';
 export 'src/workflows/workflow_service.dart';
+export 'src/workflows/workflow_templates.dart';

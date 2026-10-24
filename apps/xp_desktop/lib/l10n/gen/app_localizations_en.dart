@@ -2777,7 +2777,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get workflowsInputs => 'Inputs';
 
   @override
-  String get workflowsInputsHint => 'Inputs are edited in the YAML.';
+  String get workflowsInputsHint =>
+      'A dispatch sets them; the steps read them as inputs.<name>.';
 
   @override
   String get workflowsNoInputs => 'No inputs';
@@ -2804,49 +2805,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get workflowsRemoveStep => 'Remove step';
-
-  @override
-  String workflowsRemoveStageTitle(String name) {
-    return 'Remove stage $name?';
-  }
-
-  @override
-  String workflowsRemoveStageJobs(int count) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other: 'Its $count jobs go with it.',
-      one: 'Its job goes with it.',
-      zero: 'It has no jobs.',
-    );
-    return '$_temp0';
-  }
-
-  @override
-  String workflowsRemoveJobTitle(String id) {
-    return 'Remove job $id?';
-  }
-
-  @override
-  String workflowsRemoveJobSteps(int count) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other: 'Its $count steps go with it.',
-      one: 'Its step goes with it.',
-      zero: 'It has no steps.',
-    );
-    return '$_temp0';
-  }
-
-  @override
-  String workflowsRemoveStepTitle(String name) {
-    return 'Remove step $name?';
-  }
-
-  @override
-  String get workflowsRemoveUnsaved =>
-      'Nothing changes on the engine until you save.';
 
   @override
   String get workflowsJob => 'Job';
@@ -2904,6 +2862,93 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get workflowsWithHint => 'YAML value';
+
+  @override
+  String get toastDismiss => 'Dismiss';
+
+  @override
+  String get toastUndo => 'Undo';
+
+  @override
+  String workflowsRemovedStage(String name) {
+    return 'Removed stage $name';
+  }
+
+  @override
+  String workflowsRemovedJob(String id) {
+    return 'Removed job $id';
+  }
+
+  @override
+  String workflowsRemovedStep(String kind) {
+    return 'Removed step $kind';
+  }
+
+  @override
+  String get workflowsAddInput => 'Add input';
+
+  @override
+  String get workflowsRemoveInput => 'Remove input';
+
+  @override
+  String workflowsRemovedInput(String name) {
+    return 'Removed input $name';
+  }
+
+  @override
+  String get workflowsInputName => 'Name';
+
+  @override
+  String get workflowsInputNameInvalid =>
+      'Letters, digits and _, starting with a letter or _.';
+
+  @override
+  String get workflowsInputType => 'Type';
+
+  @override
+  String get workflowsInputTypeAny => 'Any';
+
+  @override
+  String get workflowsInputTypeString => 'Text';
+
+  @override
+  String get workflowsInputTypeBoolean => 'On or off';
+
+  @override
+  String get workflowsInputTypeChoice => 'Choice';
+
+  @override
+  String get workflowsInputTypeJson => 'JSON';
+
+  @override
+  String get workflowsInputTypeRelease => 'Release';
+
+  @override
+  String get workflowsInputRequired => 'Required';
+
+  @override
+  String get workflowsInputDescription => 'Description';
+
+  @override
+  String get workflowsInputOptions => 'Options';
+
+  @override
+  String get workflowsInputOptionsHint => 'internal, beta, production';
+
+  @override
+  String get workflowsInputDefault => 'Default';
+
+  @override
+  String get workflowsInputNoDefault => 'None';
+
+  @override
+  String get workflowsTemplateTitle => 'Start a new workflow';
+
+  @override
+  String get workflowsUndo => 'Undo';
+
+  @override
+  String get workflowsRedo => 'Redo';
 
   @override
   String get workflowsAddStepUnavailable =>

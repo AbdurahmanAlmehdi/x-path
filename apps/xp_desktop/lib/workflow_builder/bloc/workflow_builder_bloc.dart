@@ -37,8 +37,23 @@ final class WorkflowOpened extends WorkflowBuilderEvent {
   List<Object?> get props => [workflowId];
 }
 
-/// Starts a new, unsaved workflow from a small template.
+/// Starts a new, unsaved workflow from [template], or from a blank one.
 final class WorkflowDraftStarted extends WorkflowBuilderEvent {
+  const new({this.template});
+
+  final WorkflowTemplate? template;
+
+  @override
+  List<Object?> get props => [template];
+}
+
+/// Goes back to the YAML before the last change (⌘Z).
+final class WorkflowUndoRequested extends WorkflowBuilderEvent {
+  const new();
+}
+
+/// Makes the change undone last again (⇧⌘Z).
+final class WorkflowRedoRequested extends WorkflowBuilderEvent {
   const new();
 }
 
@@ -153,6 +168,7 @@ class WorkflowBuilderState extends Equatable {
     this.loaded = false,
     this.workflows = const [],
     this.schema,
+    this.templates = const [],
     this.workflow,
     this.draftName,
     this.yaml = '',
@@ -165,6 +181,8 @@ class WorkflowBuilderState extends Equatable {
     this.command = WorkflowCommand.none,
     this.notice,
     this.error,
+    this.undoStack = const [],
+    this.redoStack = const [],
   });
 
   /// Whether the list of workflows arrived.
@@ -176,6 +194,10 @@ class WorkflowBuilderState extends Equatable {
   /// What a document may name, for the pickers; `null` until the engine
   /// answers.
   final WorkflowSchema? schema;
+
+  /// The documents a new workflow can start from; empty while the engine
+  /// cannot give them (a blank one then).
+  final List<WorkflowTemplate> templates;
 
   /// The saved workflow the builder edits; `null` for a draft.
   final Workflow? workflow;
@@ -206,6 +228,15 @@ class WorkflowBuilderState extends Equatable {
   final WorkflowNotice? notice;
   final String? error;
 
+  /// The YAML before each change, the last one last: what ⌘Z goes back to.
+  final List<String> undoStack;
+
+  /// The YAML of each change undone, the last one last: what ⇧⌘Z redoes.
+  final List<String> redoStack;
+
+  bool get canUndo => undoStack.isNotEmpty;
+  bool get canRedo => redoStack.isNotEmpty;
+
   /// Whether [yaml] differs from what is saved.
   bool get dirty => yaml != savedYaml;
 
@@ -230,6 +261,7 @@ class WorkflowBuilderState extends Equatable {
     bool? loaded,
     List<WorkflowSummary>? workflows,
     WorkflowSchema? schema,
+    List<WorkflowTemplate>? templates,
     Workflow? Function()? workflow,
     String? Function()? draftName,
     String? yaml,
@@ -242,10 +274,13 @@ class WorkflowBuilderState extends Equatable {
     WorkflowCommand? command,
     WorkflowNotice? Function()? notice,
     String? Function()? error,
+    List<String>? undoStack,
+    List<String>? redoStack,
   }) => WorkflowBuilderState(
     loaded: loaded ?? this.loaded,
     workflows: workflows ?? this.workflows,
     schema: schema ?? this.schema,
+    templates: templates ?? this.templates,
     workflow: workflow == null ? this.workflow : workflow(),
     draftName: draftName == null ? this.draftName : draftName(),
     yaml: yaml ?? this.yaml,
@@ -258,6 +293,8 @@ class WorkflowBuilderState extends Equatable {
     command: command ?? this.command,
     notice: notice == null ? this.notice : notice(),
     error: error == null ? this.error : error(),
+    undoStack: undoStack ?? this.undoStack,
+    redoStack: redoStack ?? this.redoStack,
   );
 
   @override
@@ -265,6 +302,7 @@ class WorkflowBuilderState extends Equatable {
     loaded,
     workflows,
     schema,
+    templates,
     workflow,
     draftName,
     yaml,
@@ -277,6 +315,8 @@ class WorkflowBuilderState extends Equatable {
     command,
     notice,
     error,
+    undoStack,
+    redoStack,
   ];
 }
 
@@ -310,7 +350,9 @@ class WorkflowBuilderBloc
     required this._pickFile,
     required this._saveFile,
     this._debounce = const Duration(milliseconds: 400),
-  }) : super(const WorkflowBuilderState()) {
+    DateTime Function()? now,
+  }) : _now = now ?? DateTime.now,
+       super(const WorkflowBuilderState()) {
     on<WorkflowBuilderStarted>(_onStarted, transformer: restartable());
     on<WorkflowOpened>(_onOpened, transformer: restartable());
     on<WorkflowDraftStarted>(_onDraft);
@@ -318,6 +360,8 @@ class WorkflowBuilderBloc
     on<WorkflowExportRequested>(_onExport, transformer: droppable());
     on<WorkflowYamlChanged>(_onYaml);
     on<WorkflowDocumentEdited>(_onEdited);
+    on<WorkflowUndoRequested>(_onUndo);
+    on<WorkflowRedoRequested>(_onRedo);
     on<WorkflowSelectionChanged>(
       (event, emit) => emit(
         state.copyWith(
@@ -339,6 +383,38 @@ class WorkflowBuilderBloc
   /// How long the YAML must stay still before the engine checks it.
   final Duration _debounce;
 
+  final DateTime Function() _now;
+
+  /// Where the last change came from (typing in the YAML, or a value of
+  /// the visual editor) and when: such changes in a row are one step of
+  /// undo, not one per key.
+  ({String source, DateTime at})? _last;
+
+  /// How long changes of one source in a row stay one step of undo.
+  static const _coalesce = Duration(seconds: 1);
+
+  /// The most steps of undo the builder keeps.
+  static const undoLimit = 100;
+
+  /// The undo stack once the YAML is changed by [source]: the YAML
+  /// before the change pushed, unless the change goes on the one before.
+  List<String> _undoFor(String? source) {
+    final now = _now();
+    final last = _last;
+    _last = source == null ? null : (source: source, at: now);
+    if (source != null &&
+        last != null &&
+        last.source == source &&
+        now.difference(last.at) < _coalesce &&
+        state.undoStack.isNotEmpty) {
+      return state.undoStack;
+    }
+    final stack = [...state.undoStack, state.yaml];
+    return stack.length > undoLimit
+        ? stack.sublist(stack.length - undoLimit)
+        : stack;
+  }
+
   Future<void> _onStarted(
     WorkflowBuilderStarted event,
     Emitter<WorkflowBuilderState> emit,
@@ -349,6 +425,8 @@ class WorkflowBuilderBloc
       emit(state.copyWith(loaded: true, workflows: workflows));
       final schema = await _schema();
       if (schema != null) emit(state.copyWith(schema: schema));
+      final templates = await _templates();
+      if (templates.isNotEmpty) emit(state.copyWith(templates: templates));
       final first =
           event.workflowId ??
           workflows.where((w) => !w.builtin).firstOrNull?.id ??
@@ -377,6 +455,15 @@ class WorkflowBuilderBloc
       return await _workflows.schema();
     } on Exception {
       return null;
+    }
+  }
+
+  /// The templates, or none while the engine cannot give them.
+  Future<List<WorkflowTemplate>> _templates() async {
+    try {
+      return await _workflows.templates();
+    } on Exception {
+      return const [];
     }
   }
 
@@ -413,17 +500,26 @@ class WorkflowBuilderBloc
           savedYaml: workflow.yaml,
           command: WorkflowCommand.none,
           selection: WorkflowSelection.workflow,
+          undoStack: const [],
+          redoStack: const [],
         ),
         workflow.yaml,
       ),
     );
+    _last = null;
     add(const _WorkflowValidationRequested());
   }
 
   void _onDraft(
     WorkflowDraftStarted event,
     Emitter<WorkflowBuilderState> emit,
-  ) => _draft(emit, draftTemplate.toYaml());
+  ) {
+    final template = event.template;
+    if (template == null || template.id == 'blank') {
+      return _draft(emit, template?.yaml ?? draftTemplate.toYaml());
+    }
+    _draft(emit, template.yaml, name: template.id);
+  }
 
   void _draft(Emitter<WorkflowBuilderState> emit, String yaml, {String? name}) {
     emit(
@@ -435,10 +531,13 @@ class WorkflowBuilderBloc
           selection: WorkflowSelection.workflow,
           notice: () => null,
           error: () => null,
+          undoStack: const [],
+          redoStack: const [],
         ),
         yaml,
       ),
     );
+    _last = null;
     add(const _WorkflowValidationRequested());
   }
 
@@ -500,7 +599,16 @@ class WorkflowBuilderBloc
 
   void _onYaml(WorkflowYamlChanged event, Emitter<WorkflowBuilderState> emit) {
     if (event.yaml == state.yaml) return;
-    emit(_read(state.copyWith(notice: () => null), event.yaml));
+    emit(
+      _read(
+        state.copyWith(
+          notice: () => null,
+          undoStack: _undoFor('yaml'),
+          redoStack: const [],
+        ),
+        event.yaml,
+      ),
+    );
     add(const _WorkflowValidationRequested());
   }
 
@@ -509,14 +617,73 @@ class WorkflowBuilderBloc
     Emitter<WorkflowBuilderState> emit,
   ) {
     final document = event.document;
+    final yaml = document.toYaml();
+    final before = state.document;
+    // A value typed in a field goes on the step of undo before it; adding,
+    // removing or moving something is a step of its own.
+    final source = before != null && _shapeOf(before) == _shapeOf(document)
+        ? 'value'
+        : null;
     emit(
       state.copyWith(
-        yaml: document.toYaml(),
+        yaml: yaml,
         document: () => document,
         shapeIssues: const [],
         validation: WorkflowValidation.checking,
         selection: (event.selection ?? state.selection).within(document),
         notice: () => null,
+        undoStack: yaml == state.yaml ? null : _undoFor(source),
+        redoStack: yaml == state.yaml ? null : const [],
+      ),
+    );
+    add(const _WorkflowValidationRequested());
+  }
+
+  /// What [document] is made of, without its values: its inputs, and the
+  /// kinds of the steps of each job of each stage.
+  static String _shapeOf(WorkflowDocument document) => [
+    document.inputs.length,
+    for (final stage in document.stages)
+      [
+        for (final job in stage.jobs) [for (final step in job.steps) step.kind],
+      ],
+  ].toString();
+
+  void _onUndo(
+    WorkflowUndoRequested event,
+    Emitter<WorkflowBuilderState> emit,
+  ) {
+    final undo = state.undoStack;
+    if (undo.isEmpty) return;
+    _last = null;
+    emit(
+      _read(
+        state.copyWith(
+          undoStack: undo.sublist(0, undo.length - 1),
+          redoStack: [...state.redoStack, state.yaml],
+          notice: () => null,
+        ),
+        undo.last,
+      ),
+    );
+    add(const _WorkflowValidationRequested());
+  }
+
+  void _onRedo(
+    WorkflowRedoRequested event,
+    Emitter<WorkflowBuilderState> emit,
+  ) {
+    final redo = state.redoStack;
+    if (redo.isEmpty) return;
+    _last = null;
+    emit(
+      _read(
+        state.copyWith(
+          undoStack: [...state.undoStack, state.yaml],
+          redoStack: redo.sublist(0, redo.length - 1),
+          notice: () => null,
+        ),
+        redo.last,
       ),
     );
     add(const _WorkflowValidationRequested());

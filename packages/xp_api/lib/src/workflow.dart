@@ -245,6 +245,60 @@ class WorkflowsResponse extends Equatable {
   List<Object?> get props => [workflows];
 }
 
+/// A document a new workflow can start from (`GET /workflows/templates`).
+@JsonSerializable()
+class WorkflowTemplate extends Equatable {
+  /// Creates a template.
+  const new({
+    required this.id,
+    required this.title,
+    required this.description,
+    required this.yaml,
+  });
+
+  /// Reads a template from its JSON form.
+  factory WorkflowTemplate.fromJson(Map<String, dynamic> json) =>
+      _$WorkflowTemplateFromJson(json);
+
+  /// Its id, such as `android-firebase`.
+  final String id;
+
+  /// Its name for people, such as "Android to Firebase".
+  final String title;
+
+  /// What a workflow made from it does.
+  final String description;
+
+  /// The document, valid as it is.
+  final String yaml;
+
+  /// The JSON form.
+  Map<String, dynamic> toJson() => _$WorkflowTemplateToJson(this);
+
+  @override
+  List<Object?> get props => [id, title, description, yaml];
+}
+
+/// The body of `GET /workflows/templates`.
+@JsonSerializable(explicitToJson: true)
+class WorkflowTemplatesResponse extends Equatable {
+  /// Creates a response.
+  const new(this.templates);
+
+  /// Reads a response from its JSON form.
+  factory WorkflowTemplatesResponse.fromJson(Map<String, dynamic> json) =>
+      _$WorkflowTemplatesResponseFromJson(json);
+
+  /// The templates, in the order to offer them.
+  final List<WorkflowTemplate> templates;
+
+  /// The JSON form.
+  Map<String, dynamic> toJson() => _$WorkflowTemplatesResponseToJson(this);
+
+  @override
+  List<Object?> get props => [templates];
+}
+
 /// The body of `POST /projects/{id}/workflows`.
 @JsonSerializable(includeIfNull: false, checked: true)
 class CreateWorkflowRequest extends Equatable {

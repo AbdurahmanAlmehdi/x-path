@@ -108,6 +108,28 @@ void main() {
       expected: 'removed',
     ),
     _Endpoint(
+      'listWorkflowTemplates',
+      method: 'GET',
+      path: '/workflows/templates',
+      response: const WorkflowTemplatesResponse([
+        WorkflowTemplate(
+          id: 'blank',
+          title: 'Blank',
+          description: 'One job.',
+          yaml: 'schema: 1\n',
+        ),
+      ]).toJson(),
+      call: (client) => client.listWorkflowTemplates(),
+      expected: const [
+        WorkflowTemplate(
+          id: 'blank',
+          title: 'Blank',
+          description: 'One job.',
+          yaml: 'schema: 1\n',
+        ),
+      ],
+    ),
+    _Endpoint(
       'getWorkflowSchema',
       method: 'GET',
       path: '/workflows/schema',

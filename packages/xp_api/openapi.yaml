@@ -1120,6 +1120,25 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "500":
           $ref: "#/components/responses/InternalError"
+  /workflows/templates:
+    get:
+      operationId: listWorkflowTemplates
+      summary: The documents a new workflow can start from.
+      description: |
+        Blank, Android to Firebase, iOS to TestFlight, tests only and a
+        Shorebird patch, each valid as it is. Save one under a name with
+        `POST /projects/{id}/workflows`.
+      responses:
+        "200":
+          description: The templates, in the order to offer them.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkflowTemplatesResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
   /workflows/validate:
     post:
       operationId: validateWorkflowDocument
@@ -3358,6 +3377,28 @@ components:
           pattern: "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$"
         yaml:
           type: string
+    WorkflowTemplate:
+      type: object
+      required: [id, title, description, yaml]
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        yaml:
+          type: string
+    WorkflowTemplatesResponse:
+      type: object
+      required: [templates]
+      additionalProperties: false
+      properties:
+        templates:
+          type: array
+          items:
+            $ref: "#/components/schemas/WorkflowTemplate"
     WorkflowYamlRequest:
       type: object
       required: [yaml]

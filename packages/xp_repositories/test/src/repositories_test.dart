@@ -711,6 +711,19 @@ void main() {
       );
     });
 
+    test('reads the templates of new workflows', () async {
+      const template = WorkflowTemplate(
+        id: 'blank',
+        title: 'Blank',
+        description: 'One job.',
+        yaml: 'schema: 1\n',
+      );
+      when(harness.client.listWorkflowTemplates)
+          .thenAnswer((_) async => [template]);
+
+      expect(await repository.templates(), [template]);
+    });
+
     test('reads the version of the workflow a run runs', () async {
       final client = harness.client;
       when(() => client.getWorkflow('prj_1', 'wf_1'))

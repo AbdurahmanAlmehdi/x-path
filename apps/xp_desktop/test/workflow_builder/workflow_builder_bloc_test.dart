@@ -50,7 +50,9 @@ void main() {
   test('events and notices compare by value', () {
     expect(const WorkflowBuilderStarted(workflowId: 'a').props, ['a']);
     expect(const WorkflowOpened('a').props, ['a']);
-    expect(const WorkflowDraftStarted().props, isEmpty);
+    expect(const WorkflowDraftStarted().props, [null]);
+    expect(const WorkflowUndoRequested().props, isEmpty);
+    expect(const WorkflowRedoRequested().props, isEmpty);
     expect(const WorkflowImportRequested().props, isEmpty);
     expect(const WorkflowExportRequested().props, isEmpty);
     expect(const WorkflowYamlChanged('y').props, ['y']);
@@ -170,6 +172,150 @@ void main() {
         WorkflowBuilderState(loaded: true, error: 'No such project.'),
       ],
     );
+  });
+
+  group('templates', () {
+    test(
+      'reads them at the start, and none while the engine is away',
+      () async {
+        final bloc = await opened();
+        expect(bloc.state.templates, templates);
+        await bloc.close();
+
+        when(workflows.templates).thenThrow(const ConnectionException('away'));
+        final away = await opened();
+        expect(away.state.templates, isEmpty);
+        await away.close();
+      },
+    );
+
+    blocTest<WorkflowBuilderBloc, WorkflowBuilderState>(
+      'starts a draft from a template, named after it',
+      build: build,
+      act: (bloc) => bloc
+        ..add(WorkflowDraftStarted(template: templates.last))
+        ..add(WorkflowDraftStarted(template: templates.first)),
+      wait: const Duration(milliseconds: 10),
+      verify: (bloc) {
+        expect(bloc.state.yaml, templates.first.yaml);
+        expect(bloc.state.draftName, isNull, reason: 'blank has no name');
+        expect(bloc.state.workflow, isNull);
+      },
+    );
+
+    blocTest<WorkflowBuilderBloc, WorkflowBuilderState>(
+      'a template other than blank names the draft',
+      build: build,
+      act: (bloc) => bloc.add(WorkflowDraftStarted(template: templates.last)),
+      wait: const Duration(milliseconds: 10),
+      verify: (bloc) {
+        expect(bloc.state.yaml, templates.last.yaml);
+        expect(bloc.state.draftName, 'tests');
+      },
+    );
+  });
+
+  group('undo', () {
+    test(
+      'removing a step and undoing it gives the YAML back exactly',
+      () async {
+        final bloc = await opened();
+        final document = bloc.state.document!;
+
+        bloc.add(
+          WorkflowDocumentEdited(
+            document.editJob(1, 0, (j) => j.removeStep(0)),
+          ),
+        );
+        await bloc.stream.firstWhere((s) => s.yaml != releaseYaml);
+        expect(bloc.state.canUndo, isTrue);
+        expect(bloc.state.canRedo, isFalse);
+
+        bloc.add(const WorkflowUndoRequested());
+        await bloc.stream.firstWhere((s) => s.yaml == releaseYaml);
+        expect(bloc.state.document, document);
+        expect(bloc.state.canUndo, isFalse);
+        expect(bloc.state.canRedo, isTrue);
+        expect(bloc.state.dirty, isFalse);
+
+        bloc.add(const WorkflowRedoRequested());
+        await bloc.stream.firstWhere((s) => s.yaml != releaseYaml);
+        expect(bloc.state.document!.stages[1].jobs.single.steps, hasLength(2));
+        expect(bloc.state.canRedo, isFalse);
+        await bloc.close();
+      },
+    );
+
+    test('nothing to undo or redo does nothing', () async {
+      final bloc = await opened();
+      final before = bloc.state;
+
+      bloc
+        ..add(const WorkflowUndoRequested())
+        ..add(const WorkflowRedoRequested());
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+
+      expect(bloc.state, before);
+      await bloc.close();
+    });
+
+    test('typing in a row is one step, a structural edit its own', () async {
+      var now = DateTime(2026, 10, 24, 9);
+      final bloc = WorkflowBuilderBloc(
+        workflows: workflows,
+        projectId: 'prj_1',
+        pickFile: () async => null,
+        saveFile: (_, _) async => null,
+        debounce: Duration.zero,
+        now: () => now,
+      )..add(const WorkflowBuilderStarted());
+      await bloc.stream.firstWhere((s) => s.yaml == releaseYaml);
+
+      bloc
+        ..add(const WorkflowYamlChanged('${releaseYaml}a'))
+        ..add(const WorkflowYamlChanged('${releaseYaml}ab'));
+      await bloc.stream.firstWhere((s) => s.yaml == '${releaseYaml}ab');
+      expect(bloc.state.undoStack, [releaseYaml]);
+
+      now = now.add(const Duration(seconds: 2));
+      bloc.add(const WorkflowYamlChanged(releaseYaml));
+      await bloc.stream.firstWhere((s) => s.yaml == releaseYaml);
+      expect(bloc.state.undoStack, [releaseYaml, '${releaseYaml}ab']);
+
+      final document = bloc.state.document!;
+      bloc
+        ..add(WorkflowDocumentEdited(document.copyWith(name: () => 'S')))
+        ..add(WorkflowDocumentEdited(document.copyWith(name: () => 'Sh')));
+      await bloc.stream.firstWhere((s) => s.document?.name == 'Sh');
+      expect(bloc.state.undoStack, hasLength(3));
+
+      bloc.add(WorkflowDocumentEdited(bloc.state.document!.addStage('more')));
+      await bloc.stream.firstWhere((s) => s.document!.stages.length == 3);
+      expect(bloc.state.undoStack, hasLength(4));
+
+      bloc.add(WorkflowDocumentEdited(bloc.state.document!));
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+      expect(bloc.state.undoStack, hasLength(4), reason: 'no change');
+      await bloc.close();
+    });
+
+    test('keeps the last steps only, and forgets them on open', () async {
+      final bloc = await opened();
+
+      for (var i = 0; i <= WorkflowBuilderBloc.undoLimit; i++) {
+        bloc.add(WorkflowDocumentEdited(bloc.state.document!.addStage('s$i')));
+        await bloc.stream.firstWhere(
+          (s) => s.document!.stages.any((stage) => stage.name == 's$i'),
+        );
+      }
+      expect(bloc.state.undoStack, hasLength(WorkflowBuilderBloc.undoLimit));
+
+      bloc.add(const WorkflowOpened('wf_dev'));
+      await bloc.stream.firstWhere((s) => s.workflow == devBuild);
+      expect(bloc.state.undoStack, isEmpty);
+      expect(bloc.state.redoStack, isEmpty);
+      await bloc.close();
+    });
   });
 
   group('opening', () {

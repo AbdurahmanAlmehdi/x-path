@@ -140,6 +140,28 @@ const schema = WorkflowSchema(
   variables: ['flavor', 'flavor.name', 'flavor.prod', 'platform'],
 );
 
+/// The templates the engine offers in these tests.
+const templates = [
+  WorkflowTemplate(
+    id: 'blank',
+    title: 'Blank',
+    description: 'One job.',
+    yaml:
+        'schema: 1\nname: New workflow\nstages:\n  - name: build\n'
+        '    jobs:\n      build:\n        steps:\n'
+        '          - kind: git.checkout\n',
+  ),
+  WorkflowTemplate(
+    id: 'tests',
+    title: 'Tests only',
+    description: 'Runs the tests.',
+    yaml:
+        'schema: 1\nname: Test\nstages:\n  - name: test\n'
+        '    jobs:\n      test:\n        steps:\n'
+        '          - kind: git.checkout\n',
+  ),
+];
+
 /// A workflows repository over [releaseWorkflow] and [devBuild], whose
 /// engine finds no issue.
 MockWorkflowsRepository workflowsRepository() {
@@ -148,6 +170,7 @@ MockWorkflowsRepository workflowsRepository() {
     () => repository.listWorkflows('prj_1'),
   ).thenAnswer((_) async => [summaryOf(devBuild), summaryOf(releaseWorkflow)]);
   when(repository.schema).thenAnswer((_) async => schema);
+  when(repository.templates).thenAnswer((_) async => templates);
   when(() => repository.getWorkflow('prj_1', 'wf_mine'))
       .thenAnswer((_) async => releaseWorkflow);
   when(() => repository.getWorkflow('prj_1', 'wf_dev'))

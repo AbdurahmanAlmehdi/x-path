@@ -42,23 +42,6 @@ Future<bool> confirmDiscard(BuildContext context, String name) async =>
     ) ??
     false;
 
-/// Asks before removing a stage, job or step from the document (UX-08):
-/// [title] names it and [detail] says what goes with it.
-Future<bool> confirmRemove(
-  BuildContext context, {
-  required String title,
-  String? detail,
-}) {
-  final l10n = context.l10n;
-  return confirmAction(
-    context,
-    title: title,
-    points: [?detail, l10n.workflowsRemoveUnsaved],
-    keep: l10n.confirmKeep,
-    confirm: l10n.confirmRemove,
-  );
-}
-
 /// Asks which of [steps] to add: grouped as the engine groups them,
 /// searchable by kind, title and description; `null` when the owner
 /// closes it.
@@ -68,6 +51,58 @@ Future<String?> pickStepType(BuildContext context, List<StepType> steps) =>
       barrierColor: context.xpColors.scrimDefault,
       builder: (_) => StepPickerDialog(steps: steps),
     );
+
+/// Asks which of [templates] a new workflow starts from; `null` when the
+/// owner closes it.
+Future<WorkflowTemplate?> pickTemplate(
+  BuildContext context,
+  List<WorkflowTemplate> templates,
+) => showDialog<WorkflowTemplate>(
+  context: context,
+  barrierColor: context.xpColors.scrimDefault,
+  builder: (context) {
+    final colors = context.xpColors;
+    final type = context.xpType;
+    return _BuilderDialog(
+      title: context.l10n.workflowsTemplateTitle,
+      children: [
+        for (final template in templates)
+          InkWell(
+            key: ValueKey(('template', template.id)),
+            onTap: () => Navigator.of(context).pop(template),
+            borderRadius: BorderRadius.circular(context.xpRadii.md),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    template.title,
+                    style: type.body.copyWith(color: colors.textPrimary),
+                  ),
+                  Text(
+                    template.description,
+                    style: type.caption.copyWith(color: colors.textSecondary),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        const SizedBox(height: 16),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            XpButton(
+              label: context.l10n.workflowsCancel,
+              size: XpButtonSize.large,
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+          ],
+        ),
+      ],
+    );
+  },
+);
 
 /// The groups of the engine's step types, in the order of a pipeline.
 const _stepGroups = ['Source', 'Checks', 'Build', 'Upload', 'GitHub', 'Other'];

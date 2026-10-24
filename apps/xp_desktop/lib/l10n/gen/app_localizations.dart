@@ -4495,7 +4495,7 @@ abstract class AppLocalizations {
   /// Under the list of inputs.
   ///
   /// In en, this message translates to:
-  /// **'Inputs are edited in the YAML.'**
+  /// **'A dispatch sets them; the steps read them as inputs.<name>.'**
   String get workflowsInputsHint;
 
   /// The workflow declares no input.
@@ -4545,42 +4545,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Remove step'**
   String get workflowsRemoveStep;
-
-  /// No description provided for @workflowsRemoveStageTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Remove stage {name}?'**
-  String workflowsRemoveStageTitle(String name);
-
-  /// No description provided for @workflowsRemoveStageJobs.
-  ///
-  /// In en, this message translates to:
-  /// **'{count, plural, =0{It has no jobs.} =1{Its job goes with it.} other{Its {count} jobs go with it.}}'**
-  String workflowsRemoveStageJobs(int count);
-
-  /// No description provided for @workflowsRemoveJobTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Remove job {id}?'**
-  String workflowsRemoveJobTitle(String id);
-
-  /// No description provided for @workflowsRemoveJobSteps.
-  ///
-  /// In en, this message translates to:
-  /// **'{count, plural, =0{It has no steps.} =1{Its step goes with it.} other{Its {count} steps go with it.}}'**
-  String workflowsRemoveJobSteps(int count);
-
-  /// No description provided for @workflowsRemoveStepTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Remove step {name}?'**
-  String workflowsRemoveStepTitle(String name);
-
-  /// Remove stage, job or step confirmation.
-  ///
-  /// In en, this message translates to:
-  /// **'Nothing changes on the engine until you save.'**
-  String get workflowsRemoveUnsaved;
 
   /// Inspector label of a job.
   ///
@@ -4695,6 +4659,162 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'YAML value'**
   String get workflowsWithHint;
+
+  /// Closes a toast.
+  ///
+  /// In en, this message translates to:
+  /// **'Dismiss'**
+  String get toastDismiss;
+
+  /// Undoes what a toast reports.
+  ///
+  /// In en, this message translates to:
+  /// **'Undo'**
+  String get toastUndo;
+
+  /// No description provided for @workflowsRemovedStage.
+  ///
+  /// In en, this message translates to:
+  /// **'Removed stage {name}'**
+  String workflowsRemovedStage(String name);
+
+  /// No description provided for @workflowsRemovedJob.
+  ///
+  /// In en, this message translates to:
+  /// **'Removed job {id}'**
+  String workflowsRemovedJob(String id);
+
+  /// No description provided for @workflowsRemovedStep.
+  ///
+  /// In en, this message translates to:
+  /// **'Removed step {kind}'**
+  String workflowsRemovedStep(String kind);
+
+  /// Adds an input to the workflow.
+  ///
+  /// In en, this message translates to:
+  /// **'Add input'**
+  String get workflowsAddInput;
+
+  /// Tooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove input'**
+  String get workflowsRemoveInput;
+
+  /// No description provided for @workflowsRemovedInput.
+  ///
+  /// In en, this message translates to:
+  /// **'Removed input {name}'**
+  String workflowsRemovedInput(String name);
+
+  /// Field label of an input.
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get workflowsInputName;
+
+  /// An input name the engine does not take.
+  ///
+  /// In en, this message translates to:
+  /// **'Letters, digits and _, starting with a letter or _.'**
+  String get workflowsInputNameInvalid;
+
+  /// Field label of an input.
+  ///
+  /// In en, this message translates to:
+  /// **'Type'**
+  String get workflowsInputType;
+
+  /// An input without a type.
+  ///
+  /// In en, this message translates to:
+  /// **'Any'**
+  String get workflowsInputTypeAny;
+
+  /// Input type.
+  ///
+  /// In en, this message translates to:
+  /// **'Text'**
+  String get workflowsInputTypeString;
+
+  /// Input type.
+  ///
+  /// In en, this message translates to:
+  /// **'On or off'**
+  String get workflowsInputTypeBoolean;
+
+  /// Input type.
+  ///
+  /// In en, this message translates to:
+  /// **'Choice'**
+  String get workflowsInputTypeChoice;
+
+  /// Input type.
+  ///
+  /// In en, this message translates to:
+  /// **'JSON'**
+  String get workflowsInputTypeJson;
+
+  /// Input type: a release of the project.
+  ///
+  /// In en, this message translates to:
+  /// **'Release'**
+  String get workflowsInputTypeRelease;
+
+  /// A dispatch must give the input.
+  ///
+  /// In en, this message translates to:
+  /// **'Required'**
+  String get workflowsInputRequired;
+
+  /// Field label of an input.
+  ///
+  /// In en, this message translates to:
+  /// **'Description'**
+  String get workflowsInputDescription;
+
+  /// Field label: the values of a choice.
+  ///
+  /// In en, this message translates to:
+  /// **'Options'**
+  String get workflowsInputOptions;
+
+  /// Placeholder: options apart with commas.
+  ///
+  /// In en, this message translates to:
+  /// **'internal, beta, production'**
+  String get workflowsInputOptionsHint;
+
+  /// Field label of an input.
+  ///
+  /// In en, this message translates to:
+  /// **'Default'**
+  String get workflowsInputDefault;
+
+  /// An input without a default.
+  ///
+  /// In en, this message translates to:
+  /// **'None'**
+  String get workflowsInputNoDefault;
+
+  /// Title of the template picker.
+  ///
+  /// In en, this message translates to:
+  /// **'Start a new workflow'**
+  String get workflowsTemplateTitle;
+
+  /// Tooltip: undoes the last edit (⌘Z).
+  ///
+  /// In en, this message translates to:
+  /// **'Undo'**
+  String get workflowsUndo;
+
+  /// Tooltip: redoes the edit undone (⇧⌘Z).
+  ///
+  /// In en, this message translates to:
+  /// **'Redo'**
+  String get workflowsRedo;
 
   /// Why Add step is disabled.
   ///

@@ -160,6 +160,17 @@ void main() {
       );
     });
 
+    test('GET templates 200 and 401', () async {
+      final response = await client.send('GET', '/workflows/templates');
+      final unauthorized = await engine.request(
+        '/workflows/templates',
+        token: '',
+      );
+
+      expectContract(response, path: '/workflows/templates', status: 200);
+      expectContract(unauthorized, path: '/workflows/templates', status: 401);
+    });
+
     test('POST validate without a project 200, 400 and 401', () async {
       const path = '/workflows/validate';
 

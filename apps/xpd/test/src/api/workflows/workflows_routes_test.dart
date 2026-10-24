@@ -49,6 +49,18 @@ void main() {
     });
   });
 
+  group('GET /workflows/templates', () {
+    test('lists the templates of new workflows', () async {
+      final response = await client.send('GET', '/workflows/templates');
+
+      expect(response.statusCode, 200);
+      final templates = WorkflowTemplatesResponse.fromJson(response.json)
+          .templates;
+      expect(templates.first.id, 'blank');
+      expect(templates.map((t) => t.id), contains('ios-testflight'));
+    });
+  });
+
   group('GET /projects/{id}/workflows', () {
     test('lists the built-in workflows of the project', () async {
       final response = await client.send('GET', client.base);

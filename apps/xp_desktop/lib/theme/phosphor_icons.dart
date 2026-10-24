@@ -55,6 +55,12 @@ abstract final class PhosphorIconsRegular {
     fontPackage: _package,
     matchTextDirection: true,
   );
+  static const arrowCounterClockwise = IconData(
+    0xe038,
+    fontFamily: 'PhosphorRegular',
+    fontPackage: _package,
+    matchTextDirection: true,
+  );
   static const arrowDown = IconData(
     0xe03e,
     fontFamily: 'PhosphorRegular',

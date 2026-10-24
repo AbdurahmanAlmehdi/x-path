@@ -14,12 +14,14 @@ import 'package:xp_desktop/shell/cubit/shell_cubit.dart';
 import 'package:xp_desktop/shell/view/app_shell.dart';
 import 'package:xp_desktop/storage/bloc/storage_bloc.dart';
 import 'package:xp_desktop/theme/theme.dart';
+import 'package:xp_desktop/toast/cubit/toast_cubit.dart';
 import 'package:xp_desktop/widgets/widgets.dart';
 import 'package:xp_repositories/xp_repositories.dart';
 
 /// The app: the [services] it reaches outside Flutter, the
-/// `EngineConnectionBloc` that owns the active engine, and the
-/// `LocalEngineBloc` that keeps the engine on this Mac running.
+/// `EngineConnectionBloc` that owns the active engine, the
+/// `LocalEngineBloc` that keeps the engine on this Mac running, and the
+/// `ToastCubit` whose toasts outlive a change of engine.
 class App extends StatelessWidget {
   const new({required this.services, super.key});
 
@@ -43,6 +45,7 @@ class App extends StatelessWidget {
             engines: services.engines,
           ),
         ),
+        BlocProvider(create: (_) => ToastCubit()),
       ],
       child: const XpClock(child: AppView()),
     ),
@@ -63,6 +66,7 @@ class AppView extends StatelessWidget {
       ...GlobalMaterialLocalizations.delegates,
     ],
     supportedLocales: AppLocalizations.supportedLocales,
+    builder: (context, child) => XpToastHost(child: child!),
     home: const LocalEngineListener(child: AppHome()),
   );
 }

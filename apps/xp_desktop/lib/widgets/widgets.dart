@@ -10,3 +10,4 @@ export 'xp_spinner.dart';
 export 'xp_status.dart';
 export 'xp_text_field.dart';
 export 'xp_time.dart';
+export 'xp_toast.dart';

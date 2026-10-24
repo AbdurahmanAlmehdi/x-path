@@ -19,6 +19,7 @@ class WorkflowsRoutes {
   void addTo(Router router) {
     router
       ..get('/workflows/schema', _schema)
+      ..get('/workflows/templates', _templates)
       ..post('/workflows/validate', _validateDocument)
       ..get('/projects/<id>/workflows', _list)
       ..post('/projects/<id>/workflows', _create)
@@ -32,6 +33,9 @@ class WorkflowsRoutes {
 
   Response _schema(Request request) =>
       jsonResponse(_workflows.schema().toJson());
+
+  Response _templates(Request request) =>
+      jsonResponse(WorkflowTemplatesResponse(_workflows.templates()).toJson());
 
   Future<Response> _list(Request request, String id) =>
       guardWorkflows(() async {

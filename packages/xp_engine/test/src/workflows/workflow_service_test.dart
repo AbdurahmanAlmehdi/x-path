@@ -439,6 +439,29 @@ void main() {
     });
   });
 
+  group('templates', () {
+    test('offers each template, valid as it is (UX-02)', () {
+      final templates = service.templates();
+
+      expect(templates.map((t) => t.id), [
+        'blank',
+        'android-firebase',
+        'ios-testflight',
+        'tests',
+        'shorebird-patch',
+      ]);
+      for (final template in templates) {
+        expect(template.title, isNotEmpty, reason: template.id);
+        expect(template.description, isNotEmpty, reason: template.id);
+        expect(
+          service.validate(template.yaml).issues,
+          isEmpty,
+          reason: template.id,
+        );
+      }
+    });
+  });
+
   group('validate', () {
     test('says valid for a good document', () {
       final response = service.validate(_simple);

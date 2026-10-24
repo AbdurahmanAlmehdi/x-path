@@ -47,17 +47,6 @@ Future<void> type(WidgetTester tester, Finder finder, String text) async {
   await settle(tester);
 }
 
-/// Presses Remove in the open confirmation and lets the check run.
-Future<void> acceptRemoval(WidgetTester tester) async {
-  await tester.tap(
-    find.descendant(
-      of: find.byType(XpConfirmDialog),
-      matching: find.text('Remove'),
-    ),
-  );
-  await settle(tester);
-}
-
 void main() {
   late MockWorkflowsRepository repository;
 
@@ -76,10 +65,13 @@ void main() {
     expect(find.text('Valid'), findsOneWidget);
     expect(yamlOf(tester), releaseYaml);
     expect(
-      tester.widget<TextField>(field('Name')).controller!.text,
+      tester.widget<TextField>(field('Name').first).controller!.text,
       'Store release',
     );
-    expect(find.text('inputs.notes'), findsOneWidget);
+    expect(
+      tester.widget<TextField>(field('Name').last).controller!.text,
+      'notes',
+    );
     expect(
       find.text(
         'It also makes the production flavors the default when a dispatch '
@@ -110,8 +102,8 @@ void main() {
         });
     await pumpBuilder(tester, repository: repository);
 
-    await type(tester, field('Name'), 'Nightly');
-    await type(tester, field('Description'), '');
+    await type(tester, field('Name').first, 'Nightly');
+    await type(tester, field('Description').first, '');
     await press(tester, find.text('One run at a time per project'));
 
     expect(yamlOf(tester), startsWith('schema: 1\nname: Nightly\ninputs:'));
@@ -152,17 +144,15 @@ void main() {
       WorkflowDocument.parse(yamlOf(tester)).stages[0].jobs.map((j) => j.id),
       ['check-2', 'check'],
     );
+    final beforeRemoval = yamlOf(tester);
     await press(tester, find.byTooltip('Remove job'));
-    expect(find.text('Remove job check-2?'), findsOneWidget);
-    expect(
-      find.text('•  Nothing changes on the engine until you save.'),
-      findsOneWidget,
-    );
-    await tester.tap(find.text('Keep'));
-    await settle(tester);
-    expect(find.text('check-2'), findsWidgets);
+    expect(find.text('check-2'), findsNothing);
+    expect(find.text('Removed job check-2'), findsOneWidget);
+    await press(tester, find.widgetWithText(XpButton, 'Undo').last);
+    expect(yamlOf(tester), beforeRemoval);
+    expect(find.text('Removed job check-2'), findsNothing);
+    await press(tester, find.text('check-2').first);
     await press(tester, find.byTooltip('Remove job'));
-    await acceptRemoval(tester);
     expect(find.text('check-2'), findsNothing);
 
     await press(tester, find.text('CHECK'));
@@ -175,9 +165,7 @@ void main() {
       'stage-3',
     ]);
     await press(tester, find.byTooltip('Remove stage'));
-    expect(find.text('Remove stage verify?'), findsOneWidget);
-    expect(find.text('•  Its job goes with it.'), findsOneWidget);
-    await acceptRemoval(tester);
+    expect(find.text('Removed stage verify'), findsOneWidget);
     expect(WorkflowDocument.parse(yamlOf(tester)).stages.map((s) => s.name), [
       'build',
       'stage-3',
@@ -285,9 +273,25 @@ void main() {
 
     await press(tester, find.byTooltip('Move earlier').last);
     await press(tester, find.byTooltip('Move later').at(1));
+    final beforeRemoval = yamlOf(tester);
     await press(tester, find.byTooltip('Remove step').first);
-    expect(find.byType(XpConfirmDialog), findsOneWidget);
-    await acceptRemoval(tester);
+    expect(find.text('Removed step build.android'), findsOneWidget);
+    steps = WorkflowDocument.parse(yamlOf(tester)).stages[1].jobs.single.steps;
+    expect(steps.map((s) => s.kind), ['git.checkout', 'guard', 'upload.play']);
+
+    // ⌘Z puts the YAML back exactly as it was; ⇧⌘Z removes the step again.
+    await tester.tap(yamlField);
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.metaLeft);
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyZ);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.metaLeft);
+    await settle(tester);
+    expect(yamlOf(tester), beforeRemoval);
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.metaLeft);
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyZ);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.metaLeft);
+    await settle(tester);
     steps = WorkflowDocument.parse(yamlOf(tester)).stages[1].jobs.single.steps;
     expect(steps.map((s) => s.kind), ['git.checkout', 'guard', 'upload.play']);
   });
@@ -549,8 +553,10 @@ void main() {
     await pumpBuilder(tester, repository: repository);
 
     await press(tester, find.text('New'));
+    expect(find.text('Start a new workflow'), findsOneWidget);
+    await press(tester, find.byKey(const ValueKey(('template', 'blank'))));
     expect(find.text('Not saved yet'), findsWidgets);
-    expect(yamlOf(tester), draftTemplate.toYaml());
+    expect(yamlOf(tester), templates.first.yaml);
 
     await tester.tap(find.text('Save as…'));
     await tester.pumpAndSettle();
@@ -587,9 +593,77 @@ void main() {
     expect(find.text('nightly · Version 1'), findsOneWidget);
   });
 
+  testWidgets('starts a new workflow from a template, or not', (tester) async {
+    await pumpBuilder(tester, repository: repository);
+
+    await press(tester, find.text('New'));
+    expect(find.text('Tests only'), findsOneWidget);
+    expect(find.text('Runs the tests.'), findsOneWidget);
+    await press(tester, find.text('Cancel'));
+    expect(yamlOf(tester), releaseYaml);
+
+    await press(tester, find.text('New'));
+    await press(tester, find.byKey(const ValueKey(('template', 'tests'))));
+    expect(yamlOf(tester), templates.last.yaml);
+    expect(find.textContaining('tests · '), findsOneWidget);
+  });
+
+  testWidgets('starts a blank workflow when the engine has no templates', (
+    tester,
+  ) async {
+    when(repository.templates).thenThrow(const ConnectionException('away'));
+    await pumpBuilder(tester, repository: repository);
+
+    await press(tester, find.text('New'));
+
+    expect(find.text('Start a new workflow'), findsNothing);
+    expect(yamlOf(tester), draftTemplate.toYaml());
+  });
+
+  testWidgets('edits the inputs of the workflow (UX-04)', (tester) async {
+    await pumpBuilder(tester, repository: repository);
+    List<WorkflowInput> inputs() =>
+        WorkflowDocument.parse(yamlOf(tester)).inputs;
+    expect(inputs().single.name, 'notes');
+
+    await press(tester, find.text('Add input'));
+    expect(inputs().map((input) => input.name), ['notes', 'input']);
+    await type(tester, field('Name').last, 'track');
+    await press(tester, find.text('Any').last);
+    await press(tester, find.text('Choice').last);
+    await type(tester, field('Options').last, 'internal, beta');
+    await type(tester, field('Description').last, 'The Play track.');
+    await press(tester, find.text('None').last);
+    await press(tester, find.text('beta').last);
+    expect(
+      inputs().last,
+      const WorkflowInput(
+        name: 'track',
+        type: InputType.choice,
+        description: 'The Play track.',
+        options: ['internal', 'beta'],
+        defaultValue: 'beta',
+      ),
+    );
+
+    await press(tester, find.text('Required').last);
+    expect(inputs().last.required, isTrue);
+    expect(inputs().last.defaultValue, isNull);
+    expect(find.text('DEFAULT'), findsOneWidget, reason: 'notes only');
+
+    await type(tester, field('Name').last, 'bad-name');
+    expect(
+      find.text('Letters, digits and _, starting with a letter or _.'),
+      findsOneWidget,
+    );
+    await press(tester, find.byTooltip('Remove input').last);
+    expect(find.text('Removed input bad-name'), findsOneWidget);
+    expect(inputs().map((input) => input.name), ['notes']);
+  });
+
   testWidgets('asks before dropping unsaved changes', (tester) async {
     await pumpBuilder(tester, repository: repository);
-    await type(tester, field('Name'), 'Changed');
+    await type(tester, field('Name').first, 'Changed');
 
     await tester.tap(find.text('store-release').first);
     await tester.pumpAndSettle();
@@ -605,7 +679,10 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Keep editing'));
     await tester.pumpAndSettle();
-    expect(tester.widget<TextField>(field('Name')).controller!.text, 'Changed');
+    expect(
+      tester.widget<TextField>(field('Name').first).controller!.text,
+      'Changed',
+    );
 
     await tester.tap(find.text('store-release').first);
     await tester.pumpAndSettle();
@@ -636,14 +713,17 @@ void main() {
     expect(find.text('Discard unsaved changes?'), findsNothing);
     expect(shell.state, const ReleasesDestination('prj_1'));
 
-    await type(tester, field('Name'), 'Changed');
+    await type(tester, field('Name').first, 'Changed');
     shell.show(const TestsDestination('prj_1'));
     await tester.pumpAndSettle();
     expect(find.text('Discard unsaved changes?'), findsOneWidget);
     await tester.tap(find.text('Keep editing'));
     await tester.pumpAndSettle();
     expect(shell.state, const ReleasesDestination('prj_1'));
-    expect(tester.widget<TextField>(field('Name')).controller!.text, 'Changed');
+    expect(
+      tester.widget<TextField>(field('Name').first).controller!.text,
+      'Changed',
+    );
 
     shell.show(const TestsDestination('prj_1'));
     await tester.pumpAndSettle();

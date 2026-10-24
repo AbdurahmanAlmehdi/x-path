@@ -25,6 +25,10 @@ class WorkflowsRepository {
   Future<WorkflowSchema> schema() =>
       _session.call((client) => client.getWorkflowSchema());
 
+  /// The documents a new workflow can start from.
+  Future<List<WorkflowTemplate>> templates() =>
+      _session.call((client) => client.listWorkflowTemplates());
+
   /// The issues the engine finds in [yaml], with their lines. Nothing is
   /// saved.
   Future<ValidateWorkflowResponse> validate(String projectId, String yaml) =>

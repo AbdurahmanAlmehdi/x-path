@@ -117,6 +117,36 @@ Map<String, dynamic> _$WorkflowsResponseToJson(WorkflowsResponse instance) =>
       'workflows': instance.workflows.map((e) => e.toJson()).toList(),
     };
 
+WorkflowTemplate _$WorkflowTemplateFromJson(Map<String, dynamic> json) =>
+    WorkflowTemplate(
+      id: json['id'] as String,
+      title: json['title'] as String,
+      description: json['description'] as String,
+      yaml: json['yaml'] as String,
+    );
+
+Map<String, dynamic> _$WorkflowTemplateToJson(WorkflowTemplate instance) =>
+    <String, dynamic>{
+      'id': instance.id,
+      'title': instance.title,
+      'description': instance.description,
+      'yaml': instance.yaml,
+    };
+
+WorkflowTemplatesResponse _$WorkflowTemplatesResponseFromJson(
+  Map<String, dynamic> json,
+) => WorkflowTemplatesResponse(
+  (json['templates'] as List<dynamic>)
+      .map((e) => WorkflowTemplate.fromJson(e as Map<String, dynamic>))
+      .toList(),
+);
+
+Map<String, dynamic> _$WorkflowTemplatesResponseToJson(
+  WorkflowTemplatesResponse instance,
+) => <String, dynamic>{
+  'templates': instance.templates.map((e) => e.toJson()).toList(),
+};
+
 CreateWorkflowRequest _$CreateWorkflowRequestFromJson(
   Map<String, dynamic> json,
 ) => $checkedCreate('CreateWorkflowRequest', json, ($checkedConvert) {

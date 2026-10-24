@@ -28,6 +28,7 @@ class WorkflowInspector extends StatelessWidget {
     required this.document,
     required this.selection,
     required this.onEdit,
+    required this.onRemoved,
     this.schema,
     this.enabled = true,
     super.key,
@@ -36,6 +37,9 @@ class WorkflowInspector extends StatelessWidget {
   final WorkflowDocument document;
   final WorkflowSelection selection;
   final DocumentEdit onEdit;
+
+  /// Called with what a removal took out, to offer its undo (UX-08).
+  final ValueChanged<String> onRemoved;
 
   /// The step types, gates and capabilities to offer; free text without.
   final WorkflowSchema? schema;
@@ -56,6 +60,7 @@ class WorkflowInspector extends StatelessWidget {
           schema: schema,
           enabled: enabled,
           onEdit: onEdit,
+          onRemoved: onRemoved,
         ),
         (final int stage, null) => _StageFields(
           key: ValueKey(('stage', stage)),
@@ -63,11 +68,13 @@ class WorkflowInspector extends StatelessWidget {
           stage: stage,
           enabled: enabled,
           onEdit: onEdit,
+          onRemoved: onRemoved,
         ),
         _ => _WorkflowFields(
           document: document,
           enabled: enabled,
           onEdit: onEdit,
+          onRemoved: onRemoved,
         ),
       },
     );
@@ -79,11 +86,13 @@ class _WorkflowFields extends StatelessWidget {
     required this.document,
     required this.enabled,
     required this.onEdit,
+    required this.onRemoved,
   });
 
   final WorkflowDocument document;
   final bool enabled;
   final DocumentEdit onEdit;
+  final ValueChanged<String> onRemoved;
 
   @override
   Widget build(BuildContext context) {
@@ -127,21 +136,36 @@ class _WorkflowFields extends StatelessWidget {
           style: context.xpType.caption.copyWith(color: colors.textTertiary),
         ),
         const SizedBox(height: 16),
-        XpSectionLabel(l10n.workflowsInputs),
+        Row(
+          children: [
+            XpSectionLabel(l10n.workflowsInputs),
+            const Spacer(),
+            XpButton(
+              label: l10n.workflowsAddInput,
+              icon: PhosphorIconsRegular.plus,
+              kind: XpButtonKind.tertiary,
+              size: XpButtonSize.small,
+              onPressed: enabled ? () => onEdit(document.addInput()) : null,
+            ),
+          ],
+        ),
         const SizedBox(height: 6),
         if (document.inputs.isEmpty)
           Text(
             l10n.workflowsNoInputs,
             style: context.xpType.body.copyWith(color: colors.textSecondary),
-          )
-        else
-          Wrap(
-            spacing: 8,
-            runSpacing: 4,
-            children: [
-              for (final input in document.inputs)
-                XpCode('inputs.${input.name}', color: colors.textSecondary),
-            ],
+          ),
+        for (final (index, input) in document.inputs.indexed)
+          InputEditor(
+            key: ValueKey(('input', index)),
+            input: input,
+            enabled: enabled,
+            onChanged: (value) =>
+                onEdit(document.editInput(index, (_) => value)),
+            onRemove: () {
+              onEdit(document.removeInput(index));
+              onRemoved(l10n.workflowsRemovedInput(input.name));
+            },
           ),
         const SizedBox(height: 4),
         Text(
@@ -159,6 +183,7 @@ class _StageFields extends StatelessWidget {
     required this.stage,
     required this.enabled,
     required this.onEdit,
+    required this.onRemoved,
     super.key,
   });
 
@@ -166,6 +191,7 @@ class _StageFields extends StatelessWidget {
   final int stage;
   final bool enabled;
   final DocumentEdit onEdit;
+  final ValueChanged<String> onRemoved;
 
   @override
   Widget build(BuildContext context) {
@@ -188,18 +214,10 @@ class _StageFields extends StatelessWidget {
                 document.moveStage(stage, delta),
                 WorkflowSelection(stage: stage + delta),
               ),
-              onRemove: () async {
+              onRemove: () {
                 final removed = document.stages[stage];
-                if (await confirmRemove(
-                  context,
-                  title: l10n.workflowsRemoveStageTitle(removed.name),
-                  detail: l10n.workflowsRemoveStageJobs(removed.jobs.length),
-                )) {
-                  onEdit(
-                    document.removeStage(stage),
-                    WorkflowSelection.workflow,
-                  );
-                }
+                onEdit(document.removeStage(stage), WorkflowSelection.workflow);
+                onRemoved(l10n.workflowsRemovedStage(removed.name));
               },
             ),
           ],
@@ -232,6 +250,7 @@ class _JobFields extends StatelessWidget {
     required this.schema,
     required this.enabled,
     required this.onEdit,
+    required this.onRemoved,
     super.key,
   });
 
@@ -241,6 +260,7 @@ class _JobFields extends StatelessWidget {
   final WorkflowSchema? schema;
   final bool enabled;
   final DocumentEdit onEdit;
+  final ValueChanged<String> onRemoved;
 
   WorkflowJob get _job => document.stages[stage].jobs[job];
 
@@ -273,17 +293,12 @@ class _JobFields extends StatelessWidget {
                 document.moveJob(stage, job, delta),
                 WorkflowSelection(stage: stage, job: job + delta),
               ),
-              onRemove: () async {
-                if (await confirmRemove(
-                  context,
-                  title: l10n.workflowsRemoveJobTitle(current.id),
-                  detail: l10n.workflowsRemoveJobSteps(current.steps.length),
-                )) {
-                  onEdit(
-                    document.removeJob(stage, job),
-                    WorkflowSelection(stage: stage),
-                  );
-                }
+              onRemove: () {
+                onEdit(
+                  document.removeJob(stage, job),
+                  WorkflowSelection(stage: stage),
+                );
+                onRemoved(l10n.workflowsRemovedJob(current.id));
               },
             ),
           ],
@@ -392,13 +407,9 @@ class _JobFields extends StatelessWidget {
             enabled: enabled,
             onChanged: (value) => _edit((j) => j.editStep(index, (_) => value)),
             onMove: (delta) => _edit((j) => j.moveStep(index, delta)),
-            onRemove: () async {
-              if (await confirmRemove(
-                context,
-                title: l10n.workflowsRemoveStepTitle(step.kind),
-              )) {
-                _edit((j) => j.removeStep(index));
-              }
+            onRemove: () {
+              _edit((j) => j.removeStep(index));
+              onRemoved(l10n.workflowsRemovedStep(step.kind));
             },
           ),
       ],
@@ -960,3 +971,189 @@ Map<String, Object?> _withTyped(
     if (k != key) k: v else k: ?value,
   if (value != null && !values.containsKey(key)) key: value,
 };
+
+final _inputNamePattern = RegExp(r'^[A-Za-z_][A-Za-z0-9_]*$');
+
+/// One input of the workflow: its name, type and whether a dispatch must
+/// give it, what it is for, the options of a choice, and its default.
+class InputEditor extends StatelessWidget {
+  const new({
+    required this.input,
+    required this.onChanged,
+    required this.onRemove,
+    this.enabled = true,
+    super.key,
+  });
+
+  final WorkflowInput input;
+  final bool enabled;
+  final ValueChanged<WorkflowInput> onChanged;
+  final VoidCallback onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    final colors = context.xpColors;
+    final input = this.input;
+    final defaultValue = input.defaultValue;
+    final options = input.options ?? const <String>[];
+    String? orNull(String text) => text.trim().isEmpty ? null : text;
+    final badName = !_inputNamePattern.hasMatch(input.name);
+    final defaultField = switch (input.type) {
+      InputType.boolean when defaultValue == null || defaultValue is bool =>
+        XpSegmented<bool?>(
+          value: defaultValue is bool ? defaultValue : null,
+          values: const [null, true, false],
+          labelOf: (on) => switch (on) {
+            null => l10n.workflowsInputNoDefault,
+            true => l10n.workflowsOn,
+            false => l10n.workflowsOff,
+          },
+          onChanged: enabled
+              ? (on) => onChanged(input.copyWith(defaultValue: () => on))
+              : null,
+        ),
+      InputType.choice when options.isNotEmpty => XpSelect<String?>(
+        value: defaultValue is String && options.contains(defaultValue)
+            ? defaultValue
+            : null,
+        values: [null, ...options],
+        labelOf: (option) => option ?? l10n.workflowsInputNoDefault,
+        code: true,
+        onChanged: enabled
+            ? (option) => onChanged(input.copyWith(defaultValue: () => option))
+            : null,
+      ),
+      _ => BoundTextField(
+        value: defaultValue == null ? '' : formatYamlValue(defaultValue),
+        hint: l10n.workflowsWithHint,
+        code: true,
+        enabled: enabled,
+        onChanged: (text) => onChanged(
+          input.copyWith(
+            defaultValue: () =>
+                text.trim().isEmpty ? null : parseYamlValue(text),
+          ),
+        ),
+      ),
+    };
+    return Container(
+      margin: const EdgeInsets.only(bottom: 6),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(context.xpRadii.md),
+        border: Border.all(color: colors.borderDefault),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Expanded(
+                child: BoundTextField(
+                  label: l10n.workflowsInputName,
+                  value: input.name,
+                  code: true,
+                  enabled: enabled,
+                  onChanged: (text) =>
+                      onChanged(input.copyWith(name: text.trim())),
+                ),
+              ),
+              const SizedBox(width: 12),
+              _Labelled(
+                label: l10n.workflowsInputType,
+                child: XpSelect<InputType?>(
+                  value: input.type,
+                  values: const [null, ...InputType.values],
+                  labelOf: (type) => _typeLabel(l10n, type),
+                  onChanged: enabled
+                      ? (type) => onChanged(
+                          input.copyWith(
+                            type: () => type,
+                            options: () => type == InputType.choice
+                                ? input.options ?? const []
+                                : null,
+                          ),
+                        )
+                      : null,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: XpChip(
+                  label: l10n.workflowsInputRequired,
+                  selected: input.required,
+                  onChanged: enabled
+                      ? (on) => onChanged(
+                          input.copyWith(
+                            required: on,
+                            defaultValue: on ? () => null : null,
+                          ),
+                        )
+                      : null,
+                ),
+              ),
+              RowAction(
+                icon: PhosphorIconsRegular.trash,
+                tooltip: l10n.workflowsRemoveInput,
+                onPressed: enabled ? onRemove : null,
+              ),
+            ],
+          ),
+          if (badName)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                l10n.workflowsInputNameInvalid,
+                style: context.xpType.caption.copyWith(
+                  color: colors.negativeDefault,
+                ),
+              ),
+            ),
+          const SizedBox(height: 12),
+          BoundTextField(
+            label: l10n.workflowsInputDescription,
+            value: input.description ?? '',
+            enabled: enabled,
+            onChanged: (text) =>
+                onChanged(input.copyWith(description: () => orNull(text))),
+          ),
+          if (input.type == InputType.choice) ...[
+            const SizedBox(height: 12),
+            BoundTextField(
+              label: l10n.workflowsInputOptions,
+              value: options.join(', '),
+              hint: l10n.workflowsInputOptionsHint,
+              code: true,
+              enabled: enabled,
+              onChanged: (text) => onChanged(
+                input.copyWith(
+                  options: () => [
+                    for (final option in text.split(','))
+                      if (option.trim().isNotEmpty) option.trim(),
+                  ],
+                ),
+              ),
+            ),
+          ],
+          if (!input.required) ...[
+            const SizedBox(height: 12),
+            _Labelled(label: l10n.workflowsInputDefault, child: defaultField),
+          ],
+        ],
+      ),
+    );
+  }
+
+  static String _typeLabel(AppLocalizations l10n, InputType? type) =>
+      switch (type) {
+        null => l10n.workflowsInputTypeAny,
+        InputType.string => l10n.workflowsInputTypeString,
+        InputType.boolean => l10n.workflowsInputTypeBoolean,
+        InputType.choice => l10n.workflowsInputTypeChoice,
+        InputType.json => l10n.workflowsInputTypeJson,
+        InputType.release => l10n.workflowsInputTypeRelease,
+      };
+}

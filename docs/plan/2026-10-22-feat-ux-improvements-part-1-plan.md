@@ -336,7 +336,7 @@ Details:
 
 ### Phase U3c: Builder editing: undo, inputs, templates
 
-- **Status:** Not started
+- **Status:** Done
 - **Scope:** Undo in the builder, a visual input editor, and templates for new workflows.
 - **Files touched:** `apps/xp_desktop/lib/workflow_builder/**`,
   `packages/xp_engine/lib/src/workflows/builtin_workflows.dart` (templates live beside

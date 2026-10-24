@@ -123,6 +123,13 @@ class XpClient {
     await _json(await _send('GET', ['workflows', 'schema'])),
   );
 
+  /// `GET /workflows/templates`: the documents a new workflow can start
+  /// from.
+  Future<List<WorkflowTemplate>> listWorkflowTemplates() async =>
+      WorkflowTemplatesResponse.fromJson(
+        await _json(await _send('GET', ['workflows', 'templates'])),
+      ).templates;
+
   /// `GET /projects/{id}/workflows`.
   Future<List<WorkflowSummary>> listWorkflows(String projectId) async =>
       WorkflowsResponse.fromJson(

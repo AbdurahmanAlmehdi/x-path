@@ -13,6 +13,7 @@ import 'package:xp_engine/src/workflows/workflow_definition.dart';
 import 'package:xp_engine/src/workflows/workflow_exceptions.dart';
 import 'package:xp_engine/src/workflows/workflow_parser.dart';
 import 'package:xp_engine/src/workflows/workflow_repository.dart';
+import 'package:xp_engine/src/workflows/workflow_templates.dart';
 
 final _workflowName = RegExp(r'^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$');
 
@@ -72,6 +73,18 @@ class WorkflowService {
     platforms: platformNames,
     variables: variablePaths,
   );
+
+  /// The documents a new workflow can start from, in the order to offer
+  /// them.
+  List<WorkflowTemplate> templates() => [
+    for (final MapEntry(key: id, value: template) in workflowTemplates.entries)
+      WorkflowTemplate(
+        id: id,
+        title: template.title,
+        description: template.description,
+        yaml: template.yaml,
+      ),
+  ];
 
   /// Checks [yaml] against schema 1 and the step types of the engine.
   ValidateWorkflowResponse validate(String yaml) {
