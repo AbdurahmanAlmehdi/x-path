@@ -229,6 +229,35 @@ void main() {
       expect(find.text('Release branch merged'), findsNothing);
     });
 
+    testWidgets('says the release branch merged', (tester) async {
+      final harness = ReleasesHarness(
+        releases: [
+          reviewRelease(
+            state: ReleaseState.live,
+            mergeEnabled: true,
+            stores: [
+              lane(
+                ReleaseStore.apple,
+                StoreState.live,
+                changedAt: oct12(20, 0),
+              ),
+              lane(ReleaseStore.play, StoreState.live, changedAt: oct12(20, 0)),
+            ],
+          ),
+        ],
+      );
+      when(() => harness.releasesRepository.merge('rel_2'))
+          .thenAnswer((_) async => runningRun().run);
+      await harness.pump(tester);
+
+      await tester.tap(find.text('Merge into main'));
+      await tester.pump();
+      await tester.pump();
+
+      verify(() => harness.releasesRepository.merge('rel_2')).called(1);
+      expect(find.text('Release branch merged'), findsOneWidget);
+    });
+
     testWidgets('builds a rejected version again after asking', (tester) async {
       final shell = ShellCubit();
       final harness = ReleasesHarness(

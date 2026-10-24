@@ -107,13 +107,20 @@ void main() {
   });
 
   group('rerunFailed', () {
-    test('runs the failed jobs again, from the step that failed', () async {
-      var attempts = 0;
+    test('resumes a failed job at the step that failed, and keeps what the '
+        'jobs before made', () async {
+      final ran = <String>[];
+      var sendFails = true;
       final flaky = JobHarness.create(
         scripted: ScriptedStep(
           onRun: (input, context) async {
-            if (attempts++ == 0) return const StepFailed('flaky');
-            return const StepSucceeded({'ran': true});
+            final name = input['name'] as String;
+            ran.add(name);
+            if (name == 'send' && sendFails) {
+              sendFails = false;
+              return const StepFailed('the store was down');
+            }
+            return StepSucceeded({'made': '$name.out'});
           },
         ),
       );
@@ -122,35 +129,47 @@ void main() {
         jobs: flaky.jobs,
         control: flaky.runner,
       );
-      final done = await flaky.runner.create(
+      StepPlan step(String name) => flaky.script(input: {'name': name});
+      final build = await flaky.runner.create(
         workflowVersionId: 'wfv_1',
         projectId: 'prj_1',
         runId: 'run_1',
         name: 'build',
-        steps: [flaky.script()],
+        steps: [step('compile')],
       );
-      final failed = await flaky.runner.create(
+      final upload = await flaky.runner.create(
         workflowVersionId: 'wfv_1',
         projectId: 'prj_1',
         runId: 'run_1',
+        stage: 1,
         name: 'upload',
-        steps: [flaky.script(), flaky.script()],
+        steps: [step('prepare'), step('send')],
       );
-      // The build succeeds; the upload fails at its first step.
-      attempts = 1;
-      await flaky.runner.start(done.id);
-      await flaky.runner.whenFinished(done.id);
-      attempts = 0;
-      await flaky.runner.start(failed.id);
-      await flaky.runner.whenFinished(failed.id);
+      await flaky.runner.start(build.id);
+      await flaky.runner.whenFinished(build.id);
+      await flaky.runner.start(upload.id);
+      await flaky.runner.whenFinished(upload.id);
       expect((await again.get('run_1')).state, RunState.failed);
+      expect(ran, ['compile', 'prepare', 'send']);
 
       await again.rerunFailed('run_1');
-      await flaky.runner.whenFinished(failed.id);
+      await flaky.runner.whenFinished(upload.id);
 
-      final run = await again.get('run_1');
-      expect(run.state, RunState.succeeded);
-      expect(attempts, 3, reason: 'the build did not run again');
+      expect((await again.get('run_1')).state, RunState.succeeded);
+      expect(ran, [
+        'compile',
+        'prepare',
+        'send',
+        'send',
+      ], reason: 'the upload resumed at send; the build and prepare ran once');
+      final built = (await flaky.jobs.steps(build.id)).single;
+      expect(built.attempts, 1);
+      expect(built.result, {
+        'made': 'compile.out',
+      }, reason: 'kept, not rebuilt');
+      final prepared = (await flaky.jobs.steps(upload.id)).first;
+      expect(prepared.attempts, 1);
+      expect(prepared.result, {'made': 'prepare.out'});
     });
 
     test('refuses a run without a failed job, and no run', () async {

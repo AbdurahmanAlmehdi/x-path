@@ -102,11 +102,19 @@ void main() {
 
         context.read<EngineConnectionBloc>().add(EngineSelected(macMini.id));
         await tester.pumpAndSettle();
-        // The old blocs finish closing on the real event loop.
-        await tester.pump(const Duration(seconds: 1));
-        await tester.runAsync(
-          () => Future<void>.delayed(const Duration(milliseconds: 50)),
-        );
+        // The old blocs finish closing on the real event loop: wait for
+        // them there, a turn at a time, up to a bound.
+        await tester.runAsync(() async {
+          for (var turn = 0; turn < 100; turn++) {
+            if (oldProjects.isClosed &&
+                oldShell.isClosed &&
+                old.session.isClosed &&
+                !old.events.hasListener) {
+              return;
+            }
+            await Future<void>.delayed(Duration.zero);
+          }
+        });
         await tester.pumpAndSettle();
 
         // The old engine's streams are gone.
