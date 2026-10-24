@@ -193,6 +193,15 @@ void main() {
         findsNWidgets(4),
       );
       expect(find.bySemanticsLabel('Loading'), findsOneWidget);
+
+      await tester.pumpApp(const XpLoading());
+      expect(
+        find.descendant(
+          of: find.byType(XpLoading),
+          matching: find.byType(FractionallySizedBox),
+        ),
+        findsNWidgets(6),
+      );
     });
 
     testWidgets('a text field with a trailing control', (tester) async {

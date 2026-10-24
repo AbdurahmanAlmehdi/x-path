@@ -132,7 +132,10 @@ class _List extends StatelessWidget {
               ),
             )
           else if (!state.loaded)
-            const Padding(padding: EdgeInsets.all(4), child: XpLoading()),
+            const Padding(
+              padding: EdgeInsets.all(4),
+              child: XpLoading(rows: 3),
+            ),
           for (final approval in visible)
             _Row(
               approval: approval,

@@ -74,7 +74,7 @@ class StoragePage extends StatelessWidget {
               const SizedBox(height: 6),
             ],
           if (report == null && state.error == null)
-            const XpLoading(rows: 6)
+            const XpLoading()
           else if (report != null) ...[
             _Hero(report),
             const SizedBox(height: 24),

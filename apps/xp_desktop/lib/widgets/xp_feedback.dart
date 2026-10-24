@@ -36,7 +36,7 @@ class XpErrorState extends StatelessWidget {
 /// `surface.sunken`, as wide as a list's lines. They stand still, so
 /// nothing moves under Reduce Motion.
 class XpLoading extends StatelessWidget {
-  const new({this.rows = 3, super.key});
+  const new({this.rows = 6, super.key});
 
   final int rows;
 

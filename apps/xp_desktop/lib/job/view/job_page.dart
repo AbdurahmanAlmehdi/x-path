@@ -86,7 +86,7 @@ class JobView extends StatelessWidget {
         child: Padding(
           padding: const EdgeInsets.all(20),
           child: switch (state.error) {
-            null => const XpLoading(rows: 6),
+            null => const XpLoading(),
             final error => XpErrorState(
               error,
               onRetry: () => context.read<JobViewBloc>().add(

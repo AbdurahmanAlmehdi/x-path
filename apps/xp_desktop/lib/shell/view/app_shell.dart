@@ -191,10 +191,7 @@ class _Home extends StatelessWidget {
     if (!state.loaded) {
       return ShellPage(
         title: context.l10n.appTitle,
-        child: const Padding(
-          padding: EdgeInsets.all(20),
-          child: XpLoading(rows: 6),
-        ),
+        child: const Padding(padding: EdgeInsets.all(20), child: XpLoading()),
       );
     }
     if (state.projects.isEmpty) return const NoProjectsPage();

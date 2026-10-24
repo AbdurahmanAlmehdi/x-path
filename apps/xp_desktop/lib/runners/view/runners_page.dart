@@ -54,7 +54,7 @@ class RunnersPage extends StatelessWidget {
             const SizedBox(height: 12),
           ],
           if (!state.loaded)
-            const XpLoading()
+            const XpLoading(rows: 3)
           else if (active.isNotEmpty)
             RunnersTable(runners: active)
           else if (state.error == null)

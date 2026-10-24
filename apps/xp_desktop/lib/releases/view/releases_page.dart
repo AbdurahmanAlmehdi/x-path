@@ -158,7 +158,7 @@ class ReleasesView extends StatelessWidget {
                   if (release != null)
                     _Board(release: release, state: state)
                   else if (!state.loaded)
-                    const XpLoading(rows: 6)
+                    const XpLoading()
                   else if (state.error == null)
                     _NoRelease(project: project),
                 ],

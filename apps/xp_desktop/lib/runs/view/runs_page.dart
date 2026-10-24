@@ -98,7 +98,10 @@ class RunList extends StatelessWidget {
       );
     }
     if (!state.loaded) {
-      return const Padding(padding: EdgeInsets.all(12), child: XpLoading());
+      return const Padding(
+        padding: EdgeInsets.all(12),
+        child: XpLoading(rows: 3),
+      );
     }
     if (state.runs.isEmpty) {
       return Padding(

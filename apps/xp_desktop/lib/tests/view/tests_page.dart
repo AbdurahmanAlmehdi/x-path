@@ -130,7 +130,7 @@ class TestsView extends StatelessWidget {
             TestLists(response: response),
           ] else if (state.error == null &&
               (!state.loaded || (shown != null && state.runError == null)))
-            const XpLoading(rows: 6)
+            const XpLoading()
           else if (state.loaded && runs.isEmpty)
             _NoRuns(project: project),
           if (state.baselines.isNotEmpty) ...[
