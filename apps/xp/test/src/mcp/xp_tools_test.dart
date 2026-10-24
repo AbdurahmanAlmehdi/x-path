@@ -289,6 +289,63 @@ void main() {
       });
     });
 
+    test('validate_workflow needs no project', () async {
+      when(() => client.validateWorkflow(null, 'ok')).thenAnswer(
+        (_) async => const ValidateWorkflowResponse(
+          valid: false,
+          issues: [
+            WorkflowIssue(
+              line: 4,
+              column: 2,
+              message: 'The workflow has no input "notez".',
+              hint: 'Did you mean "inputs.notes"?',
+            ),
+          ],
+        ),
+      );
+
+      final result = await call('validate_workflow', {'yaml': 'ok'});
+
+      expect(decoded(result), {
+        'valid': false,
+        'saved': false,
+        'issues': [
+          {
+            'line': 4,
+            'column': 2,
+            'message': 'The workflow has no input "notez".',
+            'hint': 'Did you mean "inputs.notes"?',
+          },
+        ],
+      });
+    });
+
+    test('a workflow_invalid error carries the issues', () async {
+      when(() => client.validateWorkflow('prj_1', 'ok')).thenThrow(
+        const ApiException(
+          'The workflow has 1 issue.',
+          statusCode: 422,
+          code: ApiErrorCode.workflowInvalid,
+          issues: [WorkflowIssue(line: 2, column: 1, message: 'Bad.')],
+        ),
+      );
+
+      final result = await call('validate_workflow', {
+        'project': 'prj_1',
+        'yaml': 'ok',
+      });
+
+      expect(result.isError, isTrue);
+      expect(decoded(result), {
+        'code': 'workflow_invalid',
+        'message': 'The workflow has 1 issue.',
+        'hint': '',
+        'issues': [
+          {'line': 2, 'column': 1, 'message': 'Bad.'},
+        ],
+      });
+    });
+
     group('create_workflow', () {
       test('saves a valid document', () async {
         when(

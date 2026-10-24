@@ -145,6 +145,23 @@ void main() {
 
       expect(issue.toString(), '3:5: Unknown key.');
       expect(WorkflowIssue.fromJson(issue.toJson()), issue);
+      expect(issue.toJson().containsKey('hint'), isFalse);
+    });
+
+    test('an issue can carry a hint (UX-02)', () {
+      const issue = WorkflowIssue(
+        line: 3,
+        column: 5,
+        message: 'Unknown key "stage".',
+        hint: 'Did you mean "stages"?',
+      );
+
+      expect(
+        issue.toString(),
+        '3:5: Unknown key "stage". Did you mean "stages"?',
+      );
+      expect(issue.toJson()['hint'], 'Did you mean "stages"?');
+      expect(WorkflowIssue.fromJson(issue.toJson()), issue);
     });
 
     test('a response round-trips through JSON', () {

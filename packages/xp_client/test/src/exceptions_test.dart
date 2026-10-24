@@ -44,6 +44,31 @@ void main() {
       );
     });
 
+    test('reads the issues of a workflow document', () {
+      final error = ApiException.fromResponse(
+        422,
+        '{"error": {"code": "workflow_invalid", "message": "Issues.", '
+        '"issues": [{"line": 3, "column": 5, "message": "Unknown input.", '
+        r'"hint": "Did you mean \"inputs.ids\"?"}]}}',
+      );
+
+      expect(error.issues, const [
+        WorkflowIssue(
+          line: 3,
+          column: 5,
+          message: 'Unknown input.',
+          hint: 'Did you mean "inputs.ids"?',
+        ),
+      ]);
+      expect(
+        ApiException.fromResponse(
+          403,
+          '{"error": {"code": "forbidden", "message": "No."}}',
+        ).issues,
+        isEmpty,
+      );
+    });
+
     test('a code it does not know is no envelope', () {
       final error = ApiException.fromResponse(
         400,

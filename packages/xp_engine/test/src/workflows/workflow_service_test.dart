@@ -482,6 +482,18 @@ void main() {
         WorkflowInvalidException(const []).toString(),
         startsWith('WorkflowInvalidException: The workflow has 0 issues'),
       );
+      expect(
+        WorkflowInvalidException(const [
+          WorkflowIssue(
+            line: 3,
+            column: 5,
+            message: 'The workflow has no input "notez".',
+            hint: 'Did you mean "inputs.notes"?',
+          ),
+        ]).message,
+        'The workflow has 1 issue: line 3, column 5: The workflow has no '
+        'input "notez". Did you mean "inputs.notes"?',
+      );
       expect(const DispatchException('m').toString(), 'DispatchException: m');
     });
   });

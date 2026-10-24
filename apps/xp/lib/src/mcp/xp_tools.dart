@@ -217,16 +217,17 @@ List<McpTool> buildXpTools(
     tool(
       'validate_workflow',
       'Check a workflow document without saving it. Returns the issues with '
-          'their line and column.',
+          'their line, column and a hint such as "Did you mean ...". The '
+          'check is the same for every project, so "project" is optional.',
       {'project': project, 'yaml': text('The workflow document.')},
       (args) async => _validation(
         await client.validateWorkflow(
-          await projectId(args),
+          args.optionalString('project') == null ? null : await projectId(args),
           args.string('yaml'),
         ),
         saved: false,
       ),
-      required: ['project', 'yaml'],
+      required: ['yaml'],
       readOnly: true,
     ),
     tool(
@@ -637,7 +638,10 @@ Future<McpToolResult> _guard(Future<McpToolResult> Function() body) async {
             'Ask the owner to create one with `xpd token create --kind mcp` '
                 'and save it with `xp connect --mcp-token <token>`.',
           )
-        : fail(apiCodeOf(error), error.message);
+        : McpToolResult.json(
+            errorJson(apiCodeOf(error), error.message, null, error.issues),
+            isError: true,
+          );
   } on ConnectionException catch (error) {
     return fail('unreachable', error.message);
   } on ReferenceException catch (error) {

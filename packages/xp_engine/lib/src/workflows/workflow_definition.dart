@@ -28,6 +28,44 @@ const dispatchVariables = {
   'version',
 };
 
+/// The fields of the variables that are mappings, by the path that reads
+/// them: what `RunContext.scope` and `flavorScope` fill in. `inputs` has the
+/// inputs the workflow declares.
+final variableFields = <String, Set<String>>{
+  'app': const {'name', 'path', 'hasIos', 'hasAndroid', 'version'},
+  'project': const {'id', 'fullName', 'baseBranch'},
+  'flavor': const {
+    'name',
+    'implicit',
+    'prod',
+    'shorebird',
+    'entrypoint',
+    'iosBundleId',
+    'androidAppId',
+    'shorebirdAppId',
+    'firebaseAppId',
+    'appleAppId',
+    'credentials',
+  },
+  'flavor.firebaseAppId': platformNames.toSet(),
+  'flavor.credentials': {for (final kind in CredentialKind.values) kind.wire},
+};
+
+/// What the variables that have no fields hold, as in "`build` is a number".
+const scalarVariables = {
+  'platform': 'a string',
+  'ref': 'a string',
+  'sha': 'a string',
+  'release': 'a string',
+  'version': 'a string',
+  'releaseVersion': 'a string',
+  'build': 'a number',
+  'patch': 'a number',
+  'bump': 'true or false',
+  'platforms': 'a list',
+  'flavors': 'a list',
+};
+
 /// The dimensions a job can multiply itself over, and the values `platform`
 /// can take.
 const matrixAxes = ['platform', 'flavor'];

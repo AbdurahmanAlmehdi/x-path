@@ -177,6 +177,28 @@ void main() {
         containsPair('firebaseAppId', {'android': '1:1:android:a'}),
       );
     });
+
+    test('has the fields the parser knows of (UX-02)', () {
+      final run = _run(
+        version: AppVersion.parse('1.2.4+9'),
+        release: AppVersion.parse('1.2.3+8'),
+        releaseId: 'rel_1',
+      ).scope;
+      final flavor = flavorScope(demoApp.flavors.last, const []);
+
+      for (final name in ['app', 'project']) {
+        expect(
+          (run[name]! as Map).keys.toSet(),
+          variableFields[name],
+          reason: name,
+        );
+      }
+      expect(flavor.keys.toSet(), variableFields['flavor']);
+      expect(run.keys.toSet(), {...dispatchVariables});
+      for (final name in scalarVariables.keys) {
+        expect(run[name] ?? 'the matrix', isNot(isA<Map<Object?, Object?>>()));
+      }
+    });
   });
 
   group('StepPlanning', () {

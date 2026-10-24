@@ -83,8 +83,17 @@ void main() {
   });
 
   group('validate', () {
-    test('says a document is valid', () async {
-      when(() => env.client.validateWorkflow('prj_1', 'name: dev-build\n'))
+    test('says a document is valid, without a project', () async {
+      when(() => env.client.validateWorkflow(null, 'name: dev-build\n'))
+          .thenAnswer((_) async => const ValidateWorkflowResponse(valid: true));
+
+      await env.runOk(['workflows', 'validate', document.path]);
+
+      expect(env.logger.out, 'The workflow is valid.');
+    });
+
+    test('still takes a project and --file', () async {
+      when(() => env.client.validateWorkflow(null, 'name: dev-build\n'))
           .thenAnswer((_) async => const ValidateWorkflowResponse(valid: true));
 
       await env.runOk([
@@ -98,12 +107,17 @@ void main() {
       expect(env.logger.out, 'The workflow is valid.');
     });
 
-    test('lists the issues with their lines and exits 65', () async {
-      when(() => env.client.validateWorkflow('prj_1', any())).thenAnswer(
+    test('lists the issues one per line with hints and exits 65', () async {
+      when(() => env.client.validateWorkflow(null, any())).thenAnswer(
         (_) async => const ValidateWorkflowResponse(
           valid: false,
           issues: [
-            WorkflowIssue(line: 3, column: 5, message: 'Unknown step.'),
+            WorkflowIssue(
+              line: 3,
+              column: 5,
+              message: 'Unknown step type "build.andriod".',
+              hint: 'Did you mean "build.android"?',
+            ),
             WorkflowIssue(line: 9, column: 1, message: 'No jobs.'),
           ],
         ),
@@ -112,19 +126,24 @@ void main() {
       final code = await env.run([
         'workflows',
         'validate',
-        'prj_1',
         '-f',
         document.path,
       ]);
 
       expect(code, 65);
-      expect(env.logger.out, contains('  3:5: Unknown step.'));
+      expect(
+        env.logger.out,
+        contains(
+          '  3:5: Unknown step type "build.andriod". Did you mean '
+          '"build.android"?',
+        ),
+      );
       expect(env.logger.out, contains('  9:1: No jobs.'));
     });
 
-    test('without --file is a usage error', () async {
-      expect(await env.run(['workflows', 'validate', 'prj_1']), 64);
-      expect(env.logger.errors.single, contains('--file'));
+    test('without a file is a usage error', () async {
+      expect(await env.run(['workflows', 'validate']), 64);
+      expect(env.logger.errors.single, contains('<file>'));
     });
 
     test('with a file that does not exist is a usage error', () async {
@@ -132,13 +151,48 @@ void main() {
         await env.run([
           'workflows',
           'validate',
-          'prj_1',
-          '--file',
           '${directory.path}/missing.yaml',
         ]),
         64,
       );
     });
+  });
+
+  test('create prints the issues of a document one per line', () async {
+    when(() => env.client.createWorkflow('prj_1', any())).thenThrow(
+      const ApiException(
+        'The workflow has 2 issues: ...',
+        statusCode: 422,
+        code: ApiErrorCode.workflowInvalid,
+        issues: [
+          WorkflowIssue(
+            line: 4,
+            column: 9,
+            message: 'The workflow has no input "notez".',
+            hint: 'Did you mean "inputs.notes"?',
+          ),
+          WorkflowIssue(line: 7, column: 3, message: 'No jobs.'),
+        ],
+      ),
+    );
+
+    final code = await env.run([
+      'workflows',
+      'create',
+      'prj_1',
+      'my-flow',
+      '--file',
+      document.path,
+    ]);
+
+    expect(code, isNot(0));
+    expect(
+      env.logger.errors.single,
+      'The workflow has issues:\n'
+      '  4:9: The workflow has no input "notez". Did you mean '
+      '"inputs.notes"?\n'
+      '  7:3: No jobs.',
+    );
   });
 
   test('create saves a file as a new workflow', () async {

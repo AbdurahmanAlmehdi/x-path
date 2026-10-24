@@ -102,7 +102,7 @@ class WorkflowInvalidException extends WorkflowException {
         'The workflow has ${issues.length} issue'
         '${issues.length == 1 ? '' : 's'}: '
         '${issues.map((issue) => 'line ${issue.line}, column ${issue.column}: '
-            '${issue.message}').join(' ')}',
+            '${[issue.message, ?issue.hint].join(' ')}').join(' ')}',
       );
 
   /// The issues, in the order of the document.

@@ -106,23 +106,24 @@ class WorkflowsShowCommand extends XpCommand {
 String readWorkflowFile(XpCommand command) {
   final path = command.argResults!.option('file');
   if (path == null) command.usageException('--file is required.');
+  return readWorkflowAt(command, path);
+}
+
+/// Reads the workflow document at [path].
+String readWorkflowAt(XpCommand command, String path) {
   final file = File(path);
   if (!file.existsSync()) command.usageException('No such file: $path');
   return file.readAsStringSync();
 }
 
-/// The lines for the issues of a workflow document, `line:column: message`.
-String describeIssues(List<WorkflowIssue> issues) =>
-    issues.map((issue) => '  $issue').join('\n');
-
-/// `xp workflows validate <project> --file <file>`.
+/// `xp workflows validate <file>`.
 class WorkflowsValidateCommand extends XpCommand {
   /// Creates the command.
   new(super.context) {
     argParser.addOption(
       'file',
       abbr: 'f',
-      help: 'The workflow document.',
+      help: 'The workflow document, instead of <file>.',
       valueHelp: 'path',
     );
   }
@@ -132,19 +133,25 @@ class WorkflowsValidateCommand extends XpCommand {
 
   @override
   String get description =>
-      'Check a workflow document against the engine, line by line.';
+      'Check a workflow document against the engine, line by line. A '
+      'document is valid or not for every project alike.';
 
   @override
-  String get invocation => 'xp workflows validate <project> --file <file>';
+  String get invocation => 'xp workflows validate <file>';
 
   @override
   Future<int> execute(XpClient client) async {
-    final [reference] = positionals(['project']);
-    final yaml = readWorkflowFile(this);
-    final result = await client.validateWorkflow(
-      await resolveProject(client, reference),
-      yaml,
-    );
+    final String yaml;
+    if (argResults!.option('file') != null) {
+      // `xp workflows validate <project> --file <file>` still works: the
+      // project changes nothing.
+      if (argResults!.rest.length > 1) positionals(['project']);
+      yaml = readWorkflowFile(this);
+    } else {
+      final [path] = positionals(['file']);
+      yaml = readWorkflowAt(this, path);
+    }
+    final result = await client.validateWorkflow(null, yaml);
     emit(result.toJson(), () {
       return result.valid
           ? 'The workflow is valid.'

@@ -362,6 +362,29 @@ void main() {
     expect(find.text('LINT'), findsOneWidget);
   });
 
+  testWidgets('an issue shows its hint under it', (tester) async {
+    await pumpBuilder(tester, repository: repository);
+    final yaml = releaseYaml.replaceFirst('name: check', 'name: lint');
+    when(() => repository.validate('prj_1', yaml)).thenAnswer(
+      (_) async => const ValidateWorkflowResponse(
+        valid: false,
+        issues: [
+          WorkflowIssue(
+            line: 4,
+            column: 3,
+            message: 'The workflow has no input "notez".',
+            hint: 'Did you mean "inputs.notes"?',
+          ),
+        ],
+      ),
+    );
+
+    await type(tester, yamlField, yaml);
+
+    expect(find.text('The workflow has no input "notez".'), findsOneWidget);
+    expect(find.text('Did you mean "inputs.notes"?'), findsOneWidget);
+  });
+
   testWidgets('starts a new workflow and saves it under a name', (
     tester,
   ) async {

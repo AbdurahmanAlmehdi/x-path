@@ -320,6 +320,30 @@ void main() {
       expect(env.logger.infos, isEmpty);
     });
 
+    test('prints the issues of a workflow document as JSON', () async {
+      when(() => env.client.getRun('bad_id')).thenThrow(
+        const ApiException(
+          'The workflow has 1 issue.',
+          statusCode: 422,
+          code: ApiErrorCode.workflowInvalid,
+          issues: [
+            WorkflowIssue(line: 2, column: 1, message: 'Bad.', hint: 'Fix.'),
+          ],
+        ),
+      );
+
+      await env.run(['--json', 'runs', 'show', 'bad_id']);
+
+      expect(jsonDecode(env.logger.errors.single), {
+        'code': 'workflow_invalid',
+        'message': 'The workflow has 1 issue.',
+        'hint': '',
+        'issues': [
+          {'line': 2, 'column': 1, 'message': 'Bad.', 'hint': 'Fix.'},
+        ],
+      });
+    });
+
     test('says what the CLI adds, and the other failures, as JSON', () async {
       Future<Map<String, Object?>> failure(Object error) async {
         when(() => env.client.listProjects()).thenThrow(error);

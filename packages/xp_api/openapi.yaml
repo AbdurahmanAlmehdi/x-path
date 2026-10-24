@@ -1119,6 +1119,32 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "500":
           $ref: "#/components/responses/InternalError"
+  /workflows/validate:
+    post:
+      operationId: validateWorkflowDocument
+      summary: Check a workflow document without a project.
+      description: |
+        The same check as `POST /projects/{id}/workflows/validate`: a document
+        is valid or not whatever project it is for. Nothing is stored.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WorkflowYamlRequest"
+      responses:
+        "200":
+          description: The result of the check.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidateWorkflowResponse"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
   /projects/{id}/workflows/validate:
     parameters:
       - $ref: "#/components/parameters/ProjectId"
@@ -2444,7 +2470,8 @@ components:
     WorkflowInvalid:
       description: |
         The workflow document has issues, or the dispatch asks for something
-        the project cannot do. The message lists them.
+        the project cannot do. The message lists them; for a document,
+        `issues` has each with its line, column and hint.
       content:
         application/json:
           schema:
@@ -2568,6 +2595,13 @@ components:
               $ref: "#/components/schemas/ErrorCode"
             message:
               type: string
+            issues:
+              description: |
+                For `workflow_invalid` about a document, its issues, each at
+                its line and column.
+              type: array
+              items:
+                $ref: "#/components/schemas/WorkflowIssue"
     AlreadyDecidedResponse:
       type: object
       required: [error, approval]
@@ -3343,6 +3377,11 @@ components:
           minimum: 1
         message:
           type: string
+        hint:
+          type: string
+          description: |
+            What to write instead (`Did you mean "inputs.appIds"?`), or what
+            is allowed there.
     ValidateWorkflowResponse:
       type: object
       required: [valid, issues]

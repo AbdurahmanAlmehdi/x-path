@@ -129,6 +129,13 @@ void main() {
           'The workflow has 1 issue: line 2, column 9: "stages" is a list with '
           'at least one stage.',
         );
+        expect(ErrorResponse.fromJson(response.json).error.issues, const [
+          WorkflowIssue(
+            line: 2,
+            column: 9,
+            message: '"stages" is a list with at least one stage.',
+          ),
+        ]);
       },
     );
 
@@ -185,6 +192,29 @@ void main() {
       final response = await client.send('POST', '${client.base}/validate', {});
 
       expect(response.statusCode, 400);
+    });
+  });
+
+  group('POST /workflows/validate', () {
+    test('checks a document without a project, with hints', () async {
+      final response = await client.send('POST', '/workflows/validate', {
+        'yaml': 'schema: 1\nstage: []\n',
+      });
+
+      expect(response.statusCode, 200);
+      final result = ValidateWorkflowResponse.fromJson(response.json);
+      expect(result.valid, isFalse);
+      expect(result.issues.first.hint, 'Did you mean "stages"?');
+    });
+
+    test('answers 401 without a token', () async {
+      final response = await engine.request(
+        '/workflows/validate',
+        method: 'POST',
+        token: '',
+      );
+
+      expect(response.statusCode, 401);
     });
   });
 

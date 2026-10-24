@@ -183,6 +183,15 @@ void main() {
       body: {'yaml': 'name: x\n'},
     ),
     _Endpoint(
+      'validateWorkflow without a project',
+      method: 'POST',
+      path: '/workflows/validate',
+      response: const ValidateWorkflowResponse(valid: true).toJson(),
+      call: (client) => client.validateWorkflow(null, 'name: x\n'),
+      expected: const ValidateWorkflowResponse(valid: true),
+      body: {'yaml': 'name: x\n'},
+    ),
+    _Endpoint(
       'saveWorkflow',
       method: 'PUT',
       path: '/projects/prj_1/workflows/wf_1',

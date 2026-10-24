@@ -5,8 +5,9 @@ import 'package:xp_engine/xp_engine.dart';
 import 'package:xpd/src/api/request_body.dart';
 import 'package:xpd/src/api/responses.dart';
 
-/// The workflow endpoints: the schema documents follow, and per project
-/// list, create, save a new version, validate, delete, and dispatch.
+/// The workflow endpoints: the schema documents follow and a check of a
+/// document, and per project list, create, save a new version, validate,
+/// delete, and dispatch.
 class WorkflowsRoutes {
   /// Creates the routes over the workflows and the dispatcher.
   const new(this._workflows, this._dispatcher);
@@ -18,6 +19,7 @@ class WorkflowsRoutes {
   void addTo(Router router) {
     router
       ..get('/workflows/schema', _schema)
+      ..post('/workflows/validate', _validateDocument)
       ..get('/projects/<id>/workflows', _list)
       ..post('/projects/<id>/workflows', _create)
       // Before `<workflowId>`: `validate` is not a workflow id.
@@ -55,6 +57,9 @@ class WorkflowsRoutes {
   );
 
   Future<Response> _validate(Request request, String id) =>
+      _validateDocument(request);
+
+  Future<Response> _validateDocument(Request request) =>
       guardWorkflows(() async {
         final body = await readJsonBody(request, WorkflowYamlRequest.fromJson);
         return jsonResponse(_workflows.validate(body.yaml).toJson());
@@ -135,7 +140,11 @@ Future<Response> guardWorkflows(Future<Response> Function() action) async {
   } on WorkflowNameException catch (error) {
     return errorResponse(ApiErrorCode.invalidRequest, error.message);
   } on WorkflowInvalidException catch (error) {
-    return errorResponse(ApiErrorCode.workflowInvalid, error.message);
+    return errorResponse(
+      ApiErrorCode.workflowInvalid,
+      error.message,
+      issues: error.issues,
+    );
   } on DispatchException catch (error) {
     return errorResponse(ApiErrorCode.workflowInvalid, error.message);
   } on GitException catch (error) {

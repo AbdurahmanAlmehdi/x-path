@@ -277,7 +277,7 @@ Details:
 
 ### Phase U3a: Deeper validation and structured issues
 
-- **Status:** Not started
+- **Status:** Done
 - **Scope:** Validation catches typos and missing keys before dispatch and reports them with a
   line and a suggestion.
 - **Files touched:** `packages/xp_engine/lib/src/workflows/**`,

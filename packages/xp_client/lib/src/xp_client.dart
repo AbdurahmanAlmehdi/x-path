@@ -159,14 +159,15 @@ class XpClient {
   );
 
   /// `POST /projects/{id}/workflows/validate`: checks [yaml] without saving.
+  /// Without a [projectId], `POST /workflows/validate`: the check is the
+  /// same for every project.
   Future<ValidateWorkflowResponse> validateWorkflow(
-    String projectId,
+    String? projectId,
     String yaml,
   ) async => ValidateWorkflowResponse.fromJson(
     await _json(
       await _send('POST', [
-        'projects',
-        projectId,
+        if (projectId != null) ...['projects', projectId],
         'workflows',
         'validate',
       ], body: WorkflowYamlRequest(yaml: yaml).toJson()),

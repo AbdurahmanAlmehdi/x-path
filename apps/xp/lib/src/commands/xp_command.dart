@@ -106,14 +106,22 @@ String? cliHint(ApiException error) => switch (error.code) {
 };
 
 /// A message for an error of the engine: what it said, and for the cases a
-/// person can fix, what to do.
-String describeApiError(ApiException error) => [
-  if (error.code == ApiErrorCode.forbidden)
-    'Not allowed with this token: ${error.message}'
-  else
-    error.message,
-  ?cliHint(error),
-].join(' ');
+/// person can fix, what to do. The issues of a workflow document come one
+/// per line.
+String describeApiError(ApiException error) => error.issues.isNotEmpty
+    ? 'The workflow has issues:\n${describeIssues(error.issues)}'
+    : [
+        if (error.code == ApiErrorCode.forbidden)
+          'Not allowed with this token: ${error.message}'
+        else
+          error.message,
+        ?cliHint(error),
+      ].join(' ');
+
+/// The lines for the issues of a workflow document, `line:column: message`
+/// and the hint.
+String describeIssues(List<WorkflowIssue> issues) =>
+    issues.map((issue) => '  $issue').join('\n');
 
 /// Runs [body] and turns the failures every command can meet into a message
 /// on [logger] and an exit code (see [XpExit]). With [json] the message is
@@ -142,7 +150,16 @@ Future<int> guarded(
     return error.notFound ? XpExit.notFound : XpExit.usage;
   } on ApiException catch (error) {
     if (json) {
-      fail(apiCodeOf(error), error.message, cliHint(error));
+      logger.err(
+        jsonEncode(
+          errorJson(
+            apiCodeOf(error),
+            error.message,
+            cliHint(error),
+            error.issues,
+          ),
+        ),
+      );
     } else {
       logger.err(describeApiError(error));
     }

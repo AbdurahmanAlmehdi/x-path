@@ -51,6 +51,15 @@ sealed class Expression {
   /// The variables the expression reads: the first name of each reference.
   Set<String> get variables;
 
+  /// What the expression reads, each as the variable and the keys written
+  /// out after it: `inputs.ids[flavor.name].android` reads `inputs.ids` and
+  /// `flavor.name`.
+  Set<String> get paths;
+
+  /// The path of a reference whose keys are all written out, as in
+  /// `flavor.credentials.play_sa`; `null` for anything else.
+  String? get _chain => null;
+
   /// The expression as it reads, for example `flavor.credentials.play_sa`
   /// or `platform == 'ios'`.
   String get source;
@@ -84,6 +93,9 @@ final class _Literal extends Expression {
   Set<String> get variables => const {};
 
   @override
+  Set<String> get paths => const {};
+
+  @override
   String get source => value is String
       ? "'${(value! as String).replaceAll("'", "''")}'"
       : '$value';
@@ -99,6 +111,12 @@ final class _Reference extends Expression {
 
   @override
   Set<String> get variables => {name};
+
+  @override
+  Set<String> get paths => {name};
+
+  @override
+  String get _chain => name;
 
   @override
   String get source => name;
@@ -123,6 +141,18 @@ final class _Member extends Expression {
 
   @override
   Set<String> get variables => {...target.variables, ...key.variables};
+
+  @override
+  Set<String> get paths => switch (_chain) {
+    final chain? => {chain},
+    null => {...target.paths, ...key.paths},
+  };
+
+  @override
+  String? get _chain => switch ((target._chain, key)) {
+    (final chain?, _Literal(:final String value)) => '$chain.$value',
+    _ => null,
+  };
 
   @override
   String get source => switch (key) {
@@ -150,6 +180,9 @@ final class _Not extends Expression {
   Set<String> get variables => operand.variables;
 
   @override
+  Set<String> get paths => operand.paths;
+
+  @override
   String get source => '!${operand.source}';
 }
 
@@ -171,6 +204,9 @@ final class _Equals extends Expression {
 
   @override
   Set<String> get variables => {...left.variables, ...right.variables};
+
+  @override
+  Set<String> get paths => {...left.paths, ...right.paths};
 
   @override
   String get source =>
@@ -199,6 +235,9 @@ final class _Logical extends Expression {
 
   @override
   Set<String> get variables => {...left.variables, ...right.variables};
+
+  @override
+  Set<String> get paths => {...left.paths, ...right.paths};
 
   @override
   String get source =>

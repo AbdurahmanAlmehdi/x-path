@@ -160,6 +160,21 @@ void main() {
       );
     });
 
+    test('POST validate without a project 200, 400 and 401', () async {
+      const path = '/workflows/validate';
+
+      for (final (response, status) in [
+        (
+          await client.send('POST', path, {'yaml': 'schema: 1\nstage: []'}),
+          200,
+        ),
+        (await client.send('POST', path, {}), 400),
+        (await engine.request(path, method: 'POST', token: ''), 401),
+      ]) {
+        expectContract(response, path: path, method: 'POST', status: status);
+      }
+    });
+
     test('GET one 200 and 404', () async {
       final id = await client.create('mine', echoWorkflow);
       final path = '${client.base}/$id';

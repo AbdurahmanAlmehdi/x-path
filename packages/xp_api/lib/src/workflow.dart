@@ -290,10 +290,15 @@ class WorkflowYamlRequest extends Equatable {
 }
 
 /// A problem in a workflow document, at the place it was found.
-@JsonSerializable()
+@JsonSerializable(includeIfNull: false)
 class WorkflowIssue extends Equatable {
   /// Creates an issue.
-  const new({required this.line, required this.column, required this.message});
+  const new({
+    required this.line,
+    required this.column,
+    required this.message,
+    this.hint,
+  });
 
   /// Reads an issue from its JSON form.
   factory WorkflowIssue.fromJson(Map<String, dynamic> json) =>
@@ -305,17 +310,21 @@ class WorkflowIssue extends Equatable {
   /// The column, from 1.
   final int column;
 
-  /// What is wrong and, where it helps, what is allowed instead.
+  /// What is wrong.
   final String message;
+
+  /// What to write instead, for example `Did you mean "inputs.appIds"?`, or
+  /// what is allowed there.
+  final String? hint;
 
   /// The JSON form.
   Map<String, dynamic> toJson() => _$WorkflowIssueToJson(this);
 
   @override
-  String toString() => '$line:$column: $message';
+  String toString() => '$line:$column: ${[message, ?hint].join(' ')}';
 
   @override
-  List<Object?> get props => [line, column, message];
+  List<Object?> get props => [line, column, message, hint];
 }
 
 /// The body of `POST /projects/{id}/workflows/validate`.

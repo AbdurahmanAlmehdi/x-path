@@ -9,11 +9,15 @@ part of 'api_error.dart';
 ApiError _$ApiErrorFromJson(Map<String, dynamic> json) => ApiError(
   code: $enumDecode(_$ApiErrorCodeEnumMap, json['code']),
   message: json['message'] as String,
+  issues: (json['issues'] as List<dynamic>?)
+      ?.map((e) => WorkflowIssue.fromJson(e as Map<String, dynamic>))
+      .toList(),
 );
 
 Map<String, dynamic> _$ApiErrorToJson(ApiError instance) => <String, dynamic>{
   'code': _$ApiErrorCodeEnumMap[instance.code]!,
   'message': instance.message,
+  'issues': ?instance.issues?.map((e) => e.toJson()).toList(),
 };
 
 const _$ApiErrorCodeEnumMap = {

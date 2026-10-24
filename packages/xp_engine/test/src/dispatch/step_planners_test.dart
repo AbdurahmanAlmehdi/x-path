@@ -31,6 +31,15 @@ Matcher _fails(Object message) => throwsA(
   isA<DispatchException>().having((e) => e.message, 'message', message),
 );
 
+/// Saving the workflow fails: validation finds the issue before a dispatch.
+Matcher _invalid(Object message) => throwsA(
+  isA<WorkflowInvalidException>().having(
+    (e) => e.issues.single.message,
+    'issue',
+    message,
+  ),
+);
+
 void main() {
   late DispatchHarness harness;
 
@@ -78,6 +87,34 @@ void main() {
       expect(planners.withKeys('version.bump'), isEmpty);
       expect(planners.withKeys('gate'), isNull, reason: 'gate: is not a step');
       expect(planners.withKeys('nope'), isNull);
+    });
+
+    test('says which keys a step type needs and what each holds', () {
+      final planners = StepPlanners(allSteps());
+
+      final ios = planners.keysOf('build.ios')!;
+      expect(ios['exportOptionsPlist']!.required, isTrue);
+      expect(ios['obfuscate']!.value, StepValue.flag);
+      expect(planners.keysOf('build.android')!['artifact']!.options, [
+        'apk',
+        'aab',
+      ]);
+      expect(
+        planners.keysOf('guard')!['checks']!.options,
+        contains('versionSync'),
+      );
+      expect(
+        planners.keysOf('guard')!['credentialKinds']!.options,
+        contains('play_sa'),
+      );
+      expect(planners.keysOf('nope'), isNull);
+      for (final kind in planners.kinds) {
+        expect(
+          planners.keysOf(kind)!.keys.toSet(),
+          planners.withKeys(kind),
+          reason: kind,
+        );
+      }
     });
 
     test('says when the engine cannot run a step type', () async {
@@ -151,9 +188,7 @@ void main() {
         dispatch('''
           - kind: command
 '''),
-        _fails(
-          'Line 9, command: "executable" is needed: give it under "with".',
-        ),
+        _invalid('"command" needs "executable" under "with".'),
       );
       for (final directory in ['/etc', '../x']) {
         await expectLater(
@@ -200,7 +235,7 @@ void main() {
             with:
               $with_
 '''),
-          _fails(endsWith(message)),
+          _invalid(message),
           reason: with_,
         );
       }
@@ -384,9 +419,7 @@ stages:
         dispatch('''
           - kind: build.ios
 '''),
-        _fails(
-          endsWith('"exportOptionsPlist" is needed: give it under "with".'),
-        ),
+        _invalid('"build.ios" needs "exportOptionsPlist" under "with".'),
       );
     });
 
@@ -504,7 +537,7 @@ stages:
             with:
               platform: windows
 ''', request: const DispatchRequest(releaseVersion: '1.2.0+30')),
-        _fails(contains('"platform" must be android or ios')),
+        _invalid('"platform" takes android, ios.'),
       );
     });
 
@@ -798,7 +831,7 @@ stages:
             flavors: ['dev'],
           ),
         ),
-        _fails(endsWith('"userFraction" must be a number.')),
+        _invalid('"userFraction" must be a number.'),
       );
       await expectLater(
         dispatch(

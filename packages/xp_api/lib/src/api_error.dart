@@ -3,6 +3,7 @@
 
 import 'package:equatable/equatable.dart';
 import 'package:json_annotation/json_annotation.dart';
+import 'package:xp_api/src/workflow.dart';
 
 part 'api_error.g.dart';
 
@@ -86,10 +87,10 @@ enum ApiErrorCode {
 }
 
 /// The body of an error: a code and a human-readable message.
-@JsonSerializable()
+@JsonSerializable(explicitToJson: true, includeIfNull: false)
 class ApiError extends Equatable {
   /// Creates an error.
-  const new({required this.code, required this.message});
+  const new({required this.code, required this.message, this.issues});
 
   /// Reads an error from its JSON form.
   factory ApiError.fromJson(Map<String, dynamic> json) =>
@@ -101,11 +102,14 @@ class ApiError extends Equatable {
   /// Human-readable explanation. Never contains secrets.
   final String message;
 
+  /// For `workflow_invalid`, the issues of the document, each at its line.
+  final List<WorkflowIssue>? issues;
+
   /// The JSON form.
   Map<String, dynamic> toJson() => _$ApiErrorToJson(this);
 
   @override
-  List<Object?> get props => [code, message];
+  List<Object?> get props => [code, message, issues];
 }
 
 /// The envelope of every non-2xx JSON response: `{"error": {...}}`.
@@ -114,9 +118,13 @@ class ErrorResponse extends Equatable {
   /// Creates an envelope around [error].
   const new(this.error);
 
-  /// Creates an envelope from a [code] and a [message].
-  ErrorResponse.of(ApiErrorCode code, String message)
-    : error = ApiError(code: code, message: message);
+  /// Creates an envelope from a [code], a [message] and the [issues] of a
+  /// workflow document.
+  ErrorResponse.of(
+    ApiErrorCode code,
+    String message, {
+    List<WorkflowIssue>? issues,
+  }) : error = ApiError(code: code, message: message, issues: issues);
 
   /// Reads an envelope from its JSON form.
   factory ErrorResponse.fromJson(Map<String, dynamic> json) =>

@@ -148,6 +148,7 @@ WorkflowIssue _$WorkflowIssueFromJson(Map<String, dynamic> json) =>
       line: (json['line'] as num).toInt(),
       column: (json['column'] as num).toInt(),
       message: json['message'] as String,
+      hint: json['hint'] as String?,
     );
 
 Map<String, dynamic> _$WorkflowIssueToJson(WorkflowIssue instance) =>
@@ -155,6 +156,7 @@ Map<String, dynamic> _$WorkflowIssueToJson(WorkflowIssue instance) =>
       'line': instance.line,
       'column': instance.column,
       'message': instance.message,
+      'hint': ?instance.hint,
     };
 
 ValidateWorkflowResponse _$ValidateWorkflowResponseFromJson(

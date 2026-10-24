@@ -145,6 +145,24 @@ void main() {
     });
   });
 
+  group('paths', () {
+    test('lists what an expression reads, with the keys written out', () {
+      expect(
+        Expression.parse(
+          "inputs.ids[flavor.name].android == 'a' || "
+          '!flavor.credentials.play_sa',
+        ).paths,
+        {'inputs.ids', 'flavor.name', 'flavor.credentials.play_sa'},
+      );
+      expect(Expression.parse("app['name'] && list[0]").paths, {
+        'app.name',
+        'list',
+      });
+      expect(Expression.parse("'a' != 1").paths, isEmpty);
+      expect(Expression.parse('platform').paths, {'platform'});
+    });
+  });
+
   group('errors', () {
     test('name the problem and where it is', () {
       expect(failure('').message, contains('empty'));

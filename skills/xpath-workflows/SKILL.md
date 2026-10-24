@@ -149,19 +149,26 @@ the exact version it ran (`xp workflows show <p> <w> --version n`).
 ## Validate and save
 
 ```sh
-xp workflows validate acme/app -f workflow.yaml       # exit 65 and line:column: message on issues
+xp workflows validate workflow.yaml                   # exit 65 and line:column: message hint on issues
 xp workflows create acme/app dev-firebase -f workflow.yaml
 xp workflows edit acme/app dev-firebase -f workflow.yaml   # a new version
 ```
 
-MCP: `validate_workflow`, `create_workflow`, `update_workflow` (each validates first and saves
-nothing with issues). API: `POST /projects/{id}/workflows/validate` with `{"yaml": "..."}`
-always answers `200` with `valid` and `issues` (`line`, `column`, `message`).
+A document is valid or not for every project alike, so validating needs no project. MCP:
+`validate_workflow` (`project` optional), `create_workflow`, `update_workflow` (each validates
+first and saves nothing with issues). API: `POST /workflows/validate` with `{"yaml": "..."}`
+always answers `200` with `valid` and `issues` (`line`, `column`, `message`, and a `hint` such
+as `Did you mean "inputs.firebaseAppIds"?`). A `422 workflow_invalid` on create or save carries
+the same `issues` in its error.
 
-Validation catches: unknown keys, wrong types, unknown step types or `with` keys, unknown
-capabilities or gates, a matrix axis other than `platform` or `flavor`, a platform other than
-`android` or `ios`, a job id used twice, `commitFrom` or `artifactsFrom` naming a job not in an
-earlier stage, an expression that does not parse, and a variable that does not exist there.
+Validation catches: unknown keys, wrong types, unknown step types or `with` keys, a `with` key
+a step type needs (`exportOptionsPlist` of `build.ios`, `appId` of `upload.firebase`, ...), a
+`with` value of the wrong shape or not one of its options, unknown capabilities or gates, a
+matrix axis other than `platform` or `flavor`, a platform other than `android` or `ios`, a job
+id used twice, `commitFrom` or `artifactsFrom` naming a job not in an earlier stage, an
+expression that does not parse, a variable that does not exist there, an input the workflow does
+not declare (`inputs.x`), and a field `flavor`, `app` or `project` does not have. A typo comes
+back with the name it most likely meant.
 Some problems only show at dispatch (`422 workflow_invalid`): an unknown flavor, a missing
 credential, a value a step refuses. Validate, then dispatch once with the smallest matrix.
 
@@ -250,7 +257,7 @@ Why it is shaped this way:
 Save and run it:
 
 ```sh
-xp workflows validate acme/app -f dev-firebase.yaml
+xp workflows validate dev-firebase.yaml
 xp workflows create acme/app dev-firebase -f dev-firebase.yaml
 xp dispatch acme/app dev-firebase --flavor dev
 xp dispatch acme/app dev-firebase --flavor dev --input 'notes=Try the new checkout'
