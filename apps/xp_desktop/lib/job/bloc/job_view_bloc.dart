@@ -299,6 +299,8 @@ class JobViewBloc extends Bloc<JobViewEvent, JobViewState> {
     JobViewSubscriptionRequested event,
     Emitter<JobViewState> emit,
   ) async {
+    // Read again (Retry): what failed before no longer stands.
+    if (state.error != null) emit(state.copyWith(error: () => null));
     var askedWorkflow = false;
     final runners = emit.forEach<Snapshot<List<Runner>>>(
       _runners.watchRunners(),

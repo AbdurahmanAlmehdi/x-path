@@ -229,6 +229,28 @@ void main() {
       expect(find.text('Release branch merged'), findsNothing);
     });
 
+    testWidgets('says why the releases cannot be read, and reads again', (
+      tester,
+    ) async {
+      final harness = ReleasesHarness(releases: [liveRelease]);
+      when(() => harness.releasesRepository.watchReleases(projectId: 'prj_1'))
+          .thenAnswer(
+            (_) => Stream.error(const ApiException('Boom.', statusCode: 500)),
+          );
+      await harness.pump(tester);
+      expect(find.text('Boom.'), findsOneWidget);
+
+      when(() => harness.releasesRepository.watchReleases(projectId: 'prj_1'))
+          .thenAnswer((_) => Stream.value(Snapshot([liveRelease])));
+      await tester.tap(find.text('Retry'));
+      await tester.pump();
+      await tester.pump();
+
+      expect(find.text('Boom.'), findsNothing);
+      verify(() => harness.releasesRepository.watchReleases(projectId: 'prj_1'))
+          .called(2);
+    });
+
     testWidgets('says the release branch merged', (tester) async {
       final harness = ReleasesHarness(
         releases: [
