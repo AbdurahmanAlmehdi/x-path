@@ -28,6 +28,14 @@ enum Capability {
   /// The name in workflows, on the wire and in the database.
   final String wire;
 
+  /// What a workflow may name in `capabilities`: all but [iosLinux], which no
+  /// step accepts until Linux iOS builds exist, so that no job is placed on a
+  /// Linux runner for it.
+  static List<Capability> get named => [
+    for (final capability in values)
+      if (capability != iosLinux) capability,
+  ];
+
   /// The capability called [wire], or `null`.
   static Capability? fromWire(String wire) {
     for (final capability in values) {

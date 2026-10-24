@@ -403,7 +403,7 @@ stages:
     test('have capabilities from the known ones', () {
       const unknown =
           '6:33 Unknown capability. Allowed: ios-sign, android, flutter, '
-          'swift-linux, ios-linux.';
+          'swift-linux.';
 
       expect(
         issues(
@@ -424,6 +424,23 @@ stages:
           ),
         ),
         ['6:23 "capabilities" is a list.'],
+      );
+    });
+
+    test('cannot name ios-linux until a step accepts it', () {
+      const unknown =
+          '6:33 Unknown capability. Allowed: ios-sign, android, flutter, '
+          'swift-linux.';
+
+      expect(
+        issues(
+          stages(
+            '  - name: a\n    jobs:\n      j:\n'
+            '        capabilities: [flutter, ios-linux]\n'
+            '        steps: [{kind: guard}]',
+          ),
+        ),
+        [unknown],
       );
     });
 
