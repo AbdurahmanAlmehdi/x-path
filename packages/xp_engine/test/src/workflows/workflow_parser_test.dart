@@ -403,7 +403,7 @@ stages:
     test('have capabilities from the known ones', () {
       const unknown =
           '6:33 Unknown capability. Allowed: ios-sign, android, flutter, '
-          'swift-linux.';
+          'swift-linux, ios-linux.';
 
       expect(
         issues(

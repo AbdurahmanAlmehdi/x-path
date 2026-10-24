@@ -150,6 +150,10 @@ void main() {
       AscApp(id: '1', bundleId: 'a', name: 'A'),
     );
     expect(
+      AscUploadIssue(code: '1', description: 'd'),
+      AscUploadIssue(code: '1', description: 'd'),
+    );
+    expect(
       AscBuildUpload(
         id: 'u',
         state: AscBuildUploadState.failed,

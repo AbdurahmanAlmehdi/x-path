@@ -98,7 +98,7 @@ void main() {
     });
 
     test('leaves out what a frame lacks', () {
-      expect(frames[0].toJson().keys, {
+      expect(frames.whereType<HelloFrame>().first.toJson().keys, {
         'type',
         'version',
         'os',
@@ -107,7 +107,7 @@ void main() {
         'draining',
         'leases',
       });
-      expect(frames[8].toJson().keys, {
+      expect(frames.whereType<StepStateFrame>().first.toJson().keys, {
         'type',
         'jobId',
         'leaseId',

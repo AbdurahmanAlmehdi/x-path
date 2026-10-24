@@ -26,6 +26,14 @@ $steps
               exportOptionsPlist: ios/Export.plist
 ''';
 
+/// The one flavor of an app without flavors.
+const _main = FlavorProfile(
+  name: 'main',
+  implicit: true,
+  entrypoint: 'lib/main.dart',
+  iosBundleId: 'ly.demo',
+);
+
 /// The demo app without flavors.
 const _plain = AppProfile(
   name: 'demo',
@@ -33,6 +41,7 @@ const _plain = AppProfile(
   version: '1.2.3+45',
   flutterVersion: '3.47.6',
   hasIos: true,
+  flavors: [_main],
 );
 
 /// A Mac that is paired and offline.
@@ -184,6 +193,7 @@ void main() {
             flutterVersion: '3.47.6',
             hasIos: true,
             iosAppExtensions: ['Widgets'],
+            flavors: [_main],
           ),
           '',
           false,
