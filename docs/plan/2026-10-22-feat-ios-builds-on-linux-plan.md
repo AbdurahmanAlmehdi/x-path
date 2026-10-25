@@ -285,6 +285,9 @@ narrows an iOS target to `ios-sign` like the other cases in Phase 3a.
 
 ## Upstream work
 
+> Flavors, entry points and their icons and launch screens are planned in
+> [iOS flavors on Linux](2026-10-25-feat-ios-linux-flavors-and-shorebird-plan.md).
+
 Delegated to omarchy-apple-dev (one feature per PR, as its CONTRIBUTING.md asks). Until each
 lands, XPath's scan reports the app as needing a Mac for iOS, and the planner narrows the job
 to `ios-sign` with the reason. Each item is done when it is merged upstream, pinned by XPath,
@@ -312,6 +315,9 @@ and the matching narrowing case is removed.
 - [ ] #73 and #77 pinned (both merged).
 
 ### Shorebird iOS on Linux (to decide)
+
+> Decided in [iOS flavors on Linux](2026-10-25-feat-ios-linux-flavors-and-shorebird-plan.md#shorebird-ios):
+> a feature request to Shorebird; a fork is not viable (Shorebird's Dart fork is private).
 
 `shorebird release ios` and `shorebird patch ios` need macOS today: the Shorebird CLI refuses
 iOS elsewhere, and a release and its patches are built with Shorebird's own engine and Dart
