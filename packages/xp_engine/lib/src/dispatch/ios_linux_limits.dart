@@ -2,7 +2,8 @@ import 'package:xp_api/xp_api.dart';
 import 'package:xp_engine/src/steps/step.dart';
 
 /// Why omarchy-apple-dev cannot build the iOS app of a job on Linux (ADR
-/// 0014), from the planned [steps] of the job and its [app]: one reason for
+/// 0014), from the planned [steps] of the job and its [app] (what the scan
+/// found, `AppProfile.iosLinuxLimits`, and its extensions): one reason for
 /// each thing the job uses that Linux iOS builds lack, with the work that
 /// would lift it. Empty when nothing rules Linux out.
 ///
@@ -49,6 +50,7 @@ List<String> iosLinuxLimits(List<StepPlan> steps, AppProfile app) {
         reasons.addAll(_commandLimits(input));
     }
   }
+  reasons.addAll(app.iosLinuxLimits);
   final extensions = app.iosAppExtensions;
   if (extensions.isNotEmpty) {
     reasons.add(

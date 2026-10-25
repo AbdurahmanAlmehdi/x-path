@@ -285,6 +285,7 @@ class WorkflowDispatcher {
       local: placement.local,
       runner: placement.runner,
       waitReason: placement.waitReason,
+      narrowing: job.narrowing,
     );
   }
 

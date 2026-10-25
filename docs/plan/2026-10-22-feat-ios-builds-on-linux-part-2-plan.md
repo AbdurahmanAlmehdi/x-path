@@ -223,7 +223,7 @@ once and opens one pull request.
 
 ### Phase 5: Scan, dry run and docs
 
-- **Status:** Not started
+- **Status:** Done
 - **Scope:** Owners learn before any job whether an app can build iOS on Linux, and the docs
   cover the setup.
 - **Files touched:** `packages/xp_engine/lib/src/scan/**` (`app_scanner.dart`,
@@ -235,10 +235,16 @@ once and opens one pull request.
   reports "needs a Mac for iOS" with the reason; the dry run shows the same narrowing reasons.
 - **Validation:** `melos run test:coverage`
 
-- [ ] **Project level (scan and the UX plan's U2c dry run):** plugins without a
+- [x] **Project level (scan and the UX plan's U2c dry run):** plugins without a
       `Package.swift`, Flutter flavors, non-template storyboards, extensions, and whether the
       project's Flutter version is 3.47 or later. These depend on the project, not the machine.
-- [ ] Docs: a "Linux iOS" section in `docs/guide/runners.md`, `skills/xpath-setup`,
+      The scan adds the info finding `ios_needs_mac` with every reason and keeps those only the
+      project shows in `AppProfile.iosLinuxLimits` (CocoaPods: a Podfile without SwiftPM, or the
+      plugins `ios/Podfile.lock` installs from `.symlinks/plugins`; storyboards in
+      `ios/Runner/Base.lproj` besides `Main` and `LaunchScreen`; a pin older than 3.47), which
+      the planner narrows on too. `PlannedJob.narrowing` carries the reasons to the dry run (the
+      app's dispatch sheet and `xp dispatch --dry-run`).
+- [x] Docs: a "Linux iOS" section in `docs/guide/runners.md`, `skills/xpath-setup`,
       `skills/xpath-workflows`, `docs/design/PRODUCT.md` and the capability table. They say
       XPath never downloads `Xcode.xip`; the user supplies it, and Apple SDK licensing
       questions are the user's. They also say that iOS device tests and screenshots are not

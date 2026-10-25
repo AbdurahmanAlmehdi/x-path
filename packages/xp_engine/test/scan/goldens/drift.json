@@ -14,6 +14,7 @@
         "hasAndroid": true,
         "iosPackageManager": "none",
         "iosAppExtensions": [],
+        "iosLinuxLimits": [],
         "flavors": [
           {
             "name": "staging",
@@ -176,6 +177,14 @@
       "message": ".fvmrc pins \"stable\", which is not an exact Flutter version, so builds change when the channel moves.",
       "fix": "Pin an exact version such as 3.47.4.",
       "path": ".fvmrc"
+    },
+    {
+      "severity": "info",
+      "code": "ios_needs_mac",
+      "message": "Needs a Mac for iOS: Linux runners cannot build it because the app has the flavors staging, prod, which Linux iOS builds do not support yet (omarchy-apple-dev: flavors).",
+      "fix": "Nothing to do to build on a Mac. To build on Linux (ADR 0014), lift each reason; until then its iOS jobs wait for a Mac (ios-sign).",
+      "path": "ios",
+      "app": "."
     },
     {
       "severity": "info",

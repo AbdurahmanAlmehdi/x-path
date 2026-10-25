@@ -3209,6 +3209,14 @@ components:
             builds cannot make yet (ADR 0014).
           items:
             type: string
+        iosLinuxLimits:
+          type: array
+          description: >-
+            Why Linux runners cannot build the iOS app, from the project alone
+            (ADR 0014): plugins that build with CocoaPods, storyboards beyond
+            Flutter's template, a Flutter older than 3.47.
+          items:
+            type: string
         flavors:
           type: array
           items:
@@ -3674,6 +3682,13 @@ components:
         waitReason:
           type: string
           description: Why it would wait to start.
+        narrowing:
+          type: array
+          description: |
+            Why it needs a Mac for iOS where a Linux runner could have built
+            it (ADR 0014).
+          items:
+            type: string
     SkippedJob:
       type: object
       required: [name, stage, reason, blocks]

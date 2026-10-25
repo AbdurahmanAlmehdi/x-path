@@ -818,6 +818,8 @@
   "@dispatchOnEngine": {"description": "A stage that runs on the engine only.", "placeholders": {"count": {"type": "int"}, "engine": {"type": "String"}}},
   "dispatchOnRunner": "{engine} first, else {runner}",
   "@dispatchOnRunner": {"description": "Where a job that can run anywhere lands.", "placeholders": {"engine": {"type": "String"}, "runner": {"type": "String"}}},
+  "dispatchNeedsMac": "{where} · needs a Mac for iOS: {reasons}",
+  "@dispatchNeedsMac": {"description": "Where a job runs, and why it needs a Mac where a Linux runner could have built iOS (the engine's words).", "placeholders": {"where": {"type": "String"}, "reasons": {"type": "String"}}},
   "dispatchSkipped": "skipped, {reason}",
   "@dispatchSkipped": {"description": "A job the run leaves out, and why (the engine's words).", "placeholders": {"reason": {"type": "String"}}},
   "dispatchBlocked": "cannot run: {reason}",

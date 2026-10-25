@@ -71,6 +71,9 @@ PlannedJob _$PlannedJobFromJson(Map<String, dynamic> json) => PlannedJob(
   platform: json['platform'] as String?,
   runner: json['runner'] as String?,
   waitReason: json['waitReason'] as String?,
+  narrowing:
+      (json['narrowing'] as List<dynamic>?)?.map((e) => e as String).toList() ??
+      const [],
 );
 
 Map<String, dynamic> _$PlannedJobToJson(PlannedJob instance) =>
@@ -83,6 +86,7 @@ Map<String, dynamic> _$PlannedJobToJson(PlannedJob instance) =>
       'local': instance.local,
       'runner': ?instance.runner,
       'waitReason': ?instance.waitReason,
+      'narrowing': instance.narrowing,
     };
 
 SkippedJob _$SkippedJobFromJson(Map<String, dynamic> json) => SkippedJob(

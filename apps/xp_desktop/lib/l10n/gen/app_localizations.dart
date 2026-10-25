@@ -2524,6 +2524,12 @@ abstract class AppLocalizations {
   /// **'{engine} first, else {runner}'**
   String dispatchOnRunner(String engine, String runner);
 
+  /// Where a job runs, and why it needs a Mac where a Linux runner could have built iOS (the engine's words).
+  ///
+  /// In en, this message translates to:
+  /// **'{where} · needs a Mac for iOS: {reasons}'**
+  String dispatchNeedsMac(String where, String reasons);
+
   /// A job the run leaves out, and why (the engine's words).
   ///
   /// In en, this message translates to:

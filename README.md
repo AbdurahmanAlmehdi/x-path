@@ -632,7 +632,19 @@ job made through `JobRunner` alone.
   step input names secrets (`secretEnvironment`: variable to secret key; `secretFiles`: variable to the
   path of a 0600 file that is deleted when the job ends), which the job runner reads from the secret store.
   Which credential maps to which variable is decided when a workflow is dispatched (the keystore reaches a build as `XPATH_KEYSTORE_*`; see Workflows and the scheduler). `build.ios` fails
-  with "needs macOS (ios-sign)" on any machine that is not a Mac.
+  with "needs macOS (ios-sign), or a Linux runner set up for iOS builds (ios-linux)" on any other machine.
+- **`build.ios` on Linux** (ADR 0014). On a runner with `XP_IOS_LINUX_DIR`, `build.ios` runs
+  omarchy-apple-dev instead of Xcode: `flutter/setup.sh` once per Flutter version in an install of its own
+  (`toolchains/flutter-ios-linux/<version>` of the runner, resolved without fvm; the script replaces the
+  iOS `gen_snapshot` of the install it runs on, so it is never the SDK other builds use, and installs no job
+  used for 30 days are deleted), then `flutter/build.sh <app> KEY=VALUE...` (`BUILD_NAME`, `BUILD_NUMBER`,
+  `SPLIT_DEBUG_INFO` and `DART_OBFUSCATION` for an obfuscated build, the dart defines as arguments) and
+  `flutter/ship.sh <app>` without `--upload` (`ASC_EXPORT_OPTIONS`, `ASC_ENTITLEMENTS_PATH` when
+  `ios/Runner/Runner.entitlements` exists). It signs with the flavor's Apple Distribution identity and the
+  App Store profile the engine made with the flavor's ASC key (`linuxSigning`: `ASC_SIGNING_KEY`,
+  `ASC_SIGNING_CERT`, `ASC_PROFILE`); the ASC key never reaches the runner. The IPA is
+  `build/ios-linux/Runner-store.ipa`, the dSYMs `build/ios-linux/dSYMs`, and the job's tools record "Linux,
+  omarchy-apple-dev `<commit>`".
 - **Freshness marker** (`BuildFiles.markBuildStart`, `BuildOutputs`). `build/` is not cleaned between
   runs, so a failed build can leave the artifact of an earlier one. Right before the build the step asks
   the file system for the current time (it writes and stats a temporary file, so the time is in the same
@@ -1173,11 +1185,13 @@ stages:                        # required; run in order
   `build.android`, `ios-sign` and `flutter` for `build.ios`, `ios-sign` for `upload.appStore` with an Apple
   ID (nothing with an API key), the platform's for Shorebird steps, `flutter` for `test` and `analyze`. A
   need can be any of several capabilities, written `ios-sign|ios-linux` in the job's `capabilities`, the
-  first preferred. Once Linux iOS builds exist (part 2 of ADR 0014), `build.ios` needs any of `ios-sign`
-  and `ios-linux`, and the planner narrows a job Linux cannot build (a flavor, Shorebird iOS, a debug or
-  profile build, an app extension, the iOS Simulator) to `ios-sign` with the reasons (`iosLinuxLimits`),
-  which its queue message repeats; with no paired runner that offers `ios-sign` the dispatch fails. A
-  workflow cannot name `ios-linux` yet.
+  first preferred. `build.ios` and `ios.stripAndReexport` need any of `ios-sign` and `ios-linux` (ADR 0014),
+  and the planner narrows a job Linux cannot build to `ios-sign` with the reasons (`iosLinuxLimits`): a
+  flavor, an entry point other than `lib/main.dart`, Shorebird iOS, a debug or profile build, an app
+  extension, the iOS Simulator, the strip step, a flavor without an Apple Distribution identity and an ASC
+  key, and what the scan found (`AppProfile.iosLinuxLimits`: plugins that build with CocoaPods, storyboards
+  beyond Flutter's template, a Flutter older than 3.47). The queue message and the dry run repeat them;
+  with no paired runner that offers `ios-sign` the dispatch fails. A workflow cannot name `ios-linux`.
 
 ### Built-in workflows and versions
 

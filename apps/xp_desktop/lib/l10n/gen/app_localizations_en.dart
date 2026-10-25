@@ -1509,6 +1509,11 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String dispatchNeedsMac(String where, String reasons) {
+    return '$where · needs a Mac for iOS: $reasons';
+  }
+
+  @override
   String dispatchSkipped(String reason) {
     return 'skipped, $reason';
   }

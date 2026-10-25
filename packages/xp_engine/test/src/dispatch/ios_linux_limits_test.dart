@@ -73,6 +73,20 @@ void main() {
     );
   });
 
+  test('what the scan found about the project', () {
+    expect(
+      iosLinuxLimits(
+        [_step('build.ios', _signing)],
+        const AppProfile(
+          name: 'demo',
+          path: '.',
+          iosLinuxLimits: ['the app pins Flutter 3.44.2'],
+        ),
+      ),
+      ['the app pins Flutter 3.44.2'],
+    );
+  });
+
   test('a build the flavor cannot sign on Linux, with a flavor too', () {
     expect(iosLinuxLimits([_step('build.ios')], _app), [_unsigned]);
     expect(

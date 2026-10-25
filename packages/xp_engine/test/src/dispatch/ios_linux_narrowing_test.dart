@@ -131,6 +131,31 @@ void main() {
     ]);
   });
 
+  test('the dry run shows why a job needs a Mac, from the job and the '
+      'scan', () async {
+    final h = await harness(
+      app: AppProfile(
+        name: 'demo',
+        path: '.',
+        version: '1.2.3+45',
+        flutterVersion: '3.47.6',
+        hasIos: true,
+        flavors: const [_main],
+        iosLinuxLimits: const ['the app builds its iOS plugins with CocoaPods'],
+      ),
+    );
+
+    final plan = await h.dispatcher.plan(
+      'prj_1',
+      await h.custom(_workflow('', flavors: true)),
+      const DispatchRequest(),
+    );
+
+    final job = plan.stages.single.jobs.single;
+    expect(job.capabilities, ['flutter', 'ios-sign']);
+    expect(job.narrowing, ['the app builds its iOS plugins with CocoaPods']);
+  });
+
   test('the strip step narrows the job to ios-sign, once, with the '
       'reason', () async {
     final h = await harness(mac: false);

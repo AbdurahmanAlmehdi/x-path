@@ -768,6 +768,13 @@ class _WillRun extends StatelessWidget {
         );
       } else {
         for (final job in stage.jobs) {
+          final where = switch (job) {
+            PlannedJob(:final waitReason?) => waitReason,
+            PlannedJob(:final runner?, local: true, engineOnly: false) =>
+              l10n.dispatchOnRunner(engine, runner),
+            PlannedJob(:final runner?, engineOnly: false) => runner,
+            _ => engine,
+          };
           rows.add(
             _Row(
               status: job.waitReason != null
@@ -776,13 +783,9 @@ class _WillRun extends StatelessWidget {
                   ? XpStatus.jobQueued
                   : XpStatus.runnerBusy,
               title: job.name,
-              meta: switch (job) {
-                PlannedJob(:final waitReason?) => waitReason,
-                PlannedJob(:final runner?, local: true, engineOnly: false) =>
-                  l10n.dispatchOnRunner(engine, runner),
-                PlannedJob(:final runner?, engineOnly: false) => runner,
-                _ => engine,
-              },
+              meta: job.narrowing.isEmpty
+                  ? where
+                  : l10n.dispatchNeedsMac(where, job.narrowing.join('; ')),
             ),
           );
         }
