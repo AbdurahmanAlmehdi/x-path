@@ -4,6 +4,7 @@ import 'package:xp_api/xp_api.dart';
 import 'package:xp_engine/src/approvals/gate_config.dart';
 import 'package:xp_engine/src/clock/clock.dart';
 import 'package:xp_engine/src/credentials/credential_repository.dart';
+import 'package:xp_engine/src/dispatch/ios_linux_limits.dart';
 import 'package:xp_engine/src/dispatch/plan_context.dart';
 import 'package:xp_engine/src/dispatch/skip_reason.dart';
 import 'package:xp_engine/src/dispatch/step_planners.dart';
@@ -19,6 +20,7 @@ import 'package:xp_engine/src/releases/release_opener.dart';
 import 'package:xp_engine/src/repositories/event_log.dart';
 import 'package:xp_engine/src/runners/remote_step_policy.dart';
 import 'package:xp_engine/src/scan/scan_source.dart';
+import 'package:xp_engine/src/scheduler/capability.dart';
 import 'package:xp_engine/src/scheduler/run_record.dart';
 import 'package:xp_engine/src/scheduler/scheduler.dart';
 import 'package:xp_engine/src/steps/step.dart';
@@ -127,7 +129,8 @@ class WorkflowDispatcher {
   /// Throws a `ProjectNotFoundException`, a [WorkflowNotFoundException], a
   /// [WorkflowInvalidException] when the document no longer is valid, a
   /// [DispatchException] when the request asks for something the project
-  /// cannot do, and a `GitException` or `GitHub` failure when the mirror
+  /// cannot do (a GitHub step on a project that is not on GitHub, ADR 0015),
+  /// and a `GitException` or `GitHub` failure when the mirror
   /// cannot be fetched.
   ///
   /// With [versionId] it runs that version of the workflow, not the newest.
@@ -159,6 +162,14 @@ class WorkflowDispatcher {
         'platforms (${platforms.join(', ')}) of this dispatch.',
       );
     }
+    for (final job in jobs) {
+      if (job.narrowed.isNotEmpty && !await _scheduler.couldRun(job.narrowed)) {
+        throw DispatchException(
+          '${job.name} needs ${job.narrowed.map((n) => n.described).join(', ')}'
+          ', which no paired runner offers: ${job.narrowing.join('; ')}.',
+        );
+      }
+    }
 
     final releaseOf = await _linkReleases(request, kinds, context, jobs);
 
@@ -189,6 +200,7 @@ class WorkflowDispatcher {
           stage: job.stage,
           name: job.name,
           capabilities: job.capabilities,
+          narrowing: job.narrowing,
           steps: job.steps,
         );
         created.add(job.id);
@@ -338,9 +350,10 @@ class WorkflowDispatcher {
     final inputs = _inputs(definition, request);
     final steps = definition.jobs.expand((job) => job.steps).toList();
     final kinds = {for (final step in steps) step.kind};
+    _refuseGitHubSteps(project, stored.workflow.name, kinds);
 
     final mirror = await _git.ensureMirror(
-      githubRepoId: project.githubRepoId,
+      key: project.sourceKey,
       remoteUrl: project.remote,
     );
     final ref = request.ref ?? project.defaultBaseBranch;
@@ -427,6 +440,29 @@ class WorkflowDispatcher {
   }
 
   // -------------------------------------------------------------- releases
+
+  /// Refuses a workflow with a step that needs GitHub on a [project] that is
+  /// not on GitHub (Q3 of the runner plan, ADR 0015): `github.*` steps call
+  /// the GitHub API, and `git.push` pushes with the GitHub token only.
+  static void _refuseGitHubSteps(
+    ProjectRecord project,
+    String workflow,
+    Set<String> kinds,
+  ) {
+    if (project.isOnGitHub) return;
+    final step = kinds.where(stepNeedsGitHub).firstOrNull;
+    if (step == null) return;
+    final where = project.host == Project.localHost
+        ? 'a local repository'
+        : 'on ${project.host}';
+    throw DispatchException(
+      '${project.fullName} is $where, not on GitHub, so "$workflow" cannot '
+      'run: its "$step" step works only on GitHub, where XPath pushes and '
+      'opens pull requests with its GitHub token. Run a workflow without '
+      'GitHub steps, such as dev-build or test, or keep a private mirror of '
+      'the repository on GitHub and add that as the project.',
+    );
+  }
 
   /// The release of each job, by job id: the releases a workflow that cuts a
   /// release branch makes (one per flavor), or the release the request names.
@@ -853,7 +889,10 @@ class WorkflowDispatcher {
   ) async {
     final scope = context.scope;
     final steps = <StepPlan>[];
-    final capabilities = {...definition.capabilities};
+    final needs = [
+      for (final capability in definition.capabilities)
+        CapabilityNeed([capability]),
+    ];
     for (final step in definition.steps) {
       final condition = step.condition;
       if (condition != null &&
@@ -880,15 +919,22 @@ class WorkflowDispatcher {
         );
       }
       steps.add(await _planners.plan(planning));
-      capabilities.addAll(_planners.capabilitiesOf(planning));
+      needs.addAll(_planners.needsOf(planning));
     }
+    final (:placed, :narrowed, :narrowing) = _narrow(
+      needs,
+      steps,
+      context.run.app,
+    );
     return _PlannedJob(
       id: context.jobId,
       definitionId: definition.id,
       cell: cell,
       stage: stage,
       name: _jobName(definition, cell, scope),
-      capabilities: (capabilities.map((c) => c.wire).toList()..sort()),
+      capabilities: [for (final need in placed) need.wire]..sort(),
+      narrowed: narrowed,
+      narrowing: narrowing,
       steps: steps,
     );
   }
@@ -904,6 +950,63 @@ class WorkflowDispatcher {
     if (name is String && name.isNotEmpty) return name;
     return '${definition.id}'
         '${cell.isEmpty ? '' : ' (${cell.values.join(', ')})'}';
+  }
+
+  /// [needs] without repeats, and without an any-of need that a need of one
+  /// of its capabilities already meets.
+  static List<CapabilityNeed> _simplified(List<CapabilityNeed> needs) {
+    final single = {
+      for (final need in needs)
+        if (need.anyOf.length == 1) need.anyOf.single,
+    };
+    final kept = <CapabilityNeed>[];
+    for (final need in needs) {
+      if (kept.contains(need) ||
+          (need.anyOf.length > 1 && need.anyOf.any(single.contains))) {
+        continue;
+      }
+      kept.add(need);
+    }
+    return kept;
+  }
+
+  /// [needs], simplified, narrowed to `ios-sign` where Linux could build the
+  /// iOS app but the job uses something Linux iOS builds lack (ADR 0014),
+  /// with the needs it narrowed and why. A step that needs `ios-sign` itself
+  /// (Shorebird iOS) still gives its reason.
+  static ({
+    List<CapabilityNeed> placed,
+    List<CapabilityNeed> narrowed,
+    List<String> narrowing,
+  })
+  _narrow(List<CapabilityNeed> needs, List<StepPlan> steps, AppProfile app) {
+    bool linux(CapabilityNeed need) =>
+        need.anyOf.length > 1 && need.anyOf.contains(Capability.iosLinux);
+    final reasons = needs.any(linux)
+        ? iosLinuxLimits(steps, app)
+        : const <String>[];
+    if (reasons.isEmpty) {
+      return (
+        placed: _simplified(needs),
+        narrowed: const [],
+        narrowing: const [],
+      );
+    }
+    final narrowed = [
+      for (final need in needs.where(linux))
+        CapabilityNeed([
+          for (final capability in need.anyOf)
+            if (capability != Capability.iosLinux) capability,
+        ]),
+    ];
+    return (
+      placed: _simplified([
+        ...needs.where((need) => !linux(need)),
+        ...narrowed,
+      ]),
+      narrowed: narrowed,
+      narrowing: reasons,
+    );
   }
 
   /// What a gate binds an approval to besides the project, action and
@@ -948,6 +1051,8 @@ class _PlannedJob {
     required this.stage,
     required this.name,
     required this.capabilities,
+    required this.narrowed,
+    required this.narrowing,
     required this.steps,
   });
 
@@ -957,5 +1062,7 @@ class _PlannedJob {
   final int stage;
   final String name;
   final List<String> capabilities;
+  final List<CapabilityNeed> narrowed;
+  final List<String> narrowing;
   final List<StepPlan> steps;
 }

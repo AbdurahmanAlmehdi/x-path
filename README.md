@@ -435,13 +435,24 @@ cannot name the home folder). The jobs, the tool probes and every program the en
 
 ## Projects and scans
 
-A project is a GitHub repository, keyed by its GitHub repository id (D-05). The folder you pick only
-identifies the repository and seeds the first scan; builds run from the engine's own bare mirror.
+A project is a repository, keyed by its source key (D-05, ADR 0015): the GitHub repository id for a GitHub
+project, `h` and 16 hex digits of the SHA-256 of the normalised remote for any other host. The folder you pick
+only identifies the repository and seeds the first scan; builds run from the engine's own bare mirror.
+
+**Other git hosts** (Bitbucket, GitLab, any SSH server, a `file://` repository) are added by an SSH URL
+(`git@host:path` or `ssh://`) or a `file://` URL. The engine reads them with its own SSH key
+(`~/.ssh/id_ed25519.pub` of the user it runs as, with no passphrase: the LaunchAgent has no terminal) and
+`GIT_SSH_COMMAND='ssh -o BatchMode=yes -o ConnectTimeout=30 -o StrictHostKeyChecking=accept-new'`, so the first
+connection records the host key and a changed one fails. Adding proves access with `git ls-remote` and, when it
+fails, says where to add the key (an access key on Bitbucket). An HTTPS origin on another host answers `422
+ssh_url_required` with the SSH URL of the same repository; add it again with that URL (`sshUrl` with a folder).
+Only workflows without a `github.*` or `git.push` step run on such a project (`dev-build`, `test`, or custom ones
+like them); the others are refused at dispatch with the reason. Pull requests on other hosts are later work.
 All routes need a device token.
 
 | Route | What it does |
 |---|---|
-| `POST /projects` | Adds a project from `{"path": "/abs/clone"}` (reads its `origin`) or `{"remote": "owner/name"}` (or a GitHub URL), asks GitHub for the repository, sets up the mirror and scans. `409` if it is a project already. |
+| `POST /projects` | Adds a project from `{"path": "/abs/clone"}` (reads its `origin`) or `{"remote": "owner/name"}` (or a GitHub URL, or the SSH or `file://` URL of another host), asks GitHub for a GitHub repository or runs `git ls-remote` for another one, sets up the mirror and scans. `409` if it is a project already; `422 ssh_url_required` (with `sshUrl`) for an HTTPS origin on another host. |
 | `GET /projects`, `GET /projects/{id}` | The projects, each with its profile and the findings of the last scan. |
 | `POST /projects/{id}/scan` | Scans again: the folder it was added from if it still exists, else a fresh worktree of the mirror. Follows a GitHub rename or a new default branch. |
 | `PATCH /projects/{id}` | Edits the profile (production flavor, store country, base branch, Shorebird, ids, version files). Edits are kept apart from the scan and applied on top of every scan, so a rescan never undoes them. |
@@ -792,15 +803,19 @@ only ever faked or read from captured output.
   `SqliteAscCredentialSource` finds the key through the `asc_key` credential assigned to the flavor with the bundle id.
   `xpd serve` wires all of it in `apps/xpd/lib/src/stores/apple_stores.dart`; the `appStoreTrain` check and the
   step are registered there, and `buildNumberReuse` over both stores' numbers in `store_guard_checks.dart`.
-- **`upload.appStore`** (side effect, macOS only, always on the engine, D-09) runs `xcrun altool --upload-package
-  <ipa> --type ios --apple-id <id> --bundle-id <id> --bundle-version <build> --bundle-short-version-string
-  <version>` on the IPA of the job (it must still have the SHA-256 recorded for it). With an API key it adds
-  `--apiKey --apiIssuer` and writes the `.p8` as `AuthKey_<id>.p8` (`ApiKey_<id>.p8` for an individual key,
-  which is how altool tells them apart) into the job's private secret folder, pointing `API_PRIVATE_KEYS_DIR`
-  at it: never `~/.appstoreconnect`. The folder is deleted when the job ends and when the engine starts. With an
-  Apple ID it adds `-u <apple id> -p @env:XPATH_ASC_APP_PASSWORD`, so the app-specific password is in the
-  environment of altool only, masked in the log, never in `ps`.
-- **altool's output decides, not its exit code** (`AltoolOutput`). altool can exit 0 after Apple rejected the
+- **`upload.appStore`** (side effect, always on the engine, D-09; ADR 0014). With an API key (`asc_key`) it
+  uploads through the App Store Connect build-upload API on any engine, a Linux or Docker one included:
+  `POST /v1/buildUploads`, `POST /v1/buildUploadFiles`, a `PUT` of each part of the IPA to the address Apple
+  names (without the token, and never quoted in an error, since the address is signed), `PATCH` the file
+  uploaded with its MD5, then it polls the upload until App Store Connect accepts or refuses it, for at most
+  30 minutes. A refusal is told the way altool's are (`AltoolOutput.ofUploadErrors`, with the same fixes);
+  an upload still undecided fails with "resume the step later", and the resumed step finds the build if Apple
+  made one. The IPA must still have the SHA-256 recorded for it. With an Apple ID it runs, on macOS only,
+  `xcrun altool --upload-package <ipa> --type ios --apple-id <id> --bundle-id <id> --bundle-version <build>
+  --bundle-short-version-string <version> -u <apple id> -p @env:XPATH_ASC_APP_PASSWORD`, so the app-specific
+  password is in the environment of altool only, masked in the log, never in `ps`. Only that case needs
+  `ios-sign`.
+- **altool's output decides, not its exit code** (`AltoolOutput`, Apple ID uploads). altool can exit 0 after Apple rejected the
   build (a closed version train, for example). The step fails on any line with `ERROR:`, `ERROR ITMS-`, `*** Error:`,
   `validation failed`, `upload failed`, `VALIDATION_ERROR`, `failed to upload|validate package` or `unable to
   authenticate`, and tells the first three. Known codes get a fix: 90186 and 90062 (bump the version), 90189
@@ -1155,8 +1170,14 @@ stages:                        # required; run in order
   true. The default platforms are what the app has; the default flavors are the production flavors for a
   workflow with `lock: project` and the others otherwise (an app with one flavor always uses it).
 - **Capabilities.** A job needs what it declares plus what its steps imply: `android` and `flutter` for
-  `build.android`, `ios-sign` and `flutter` for `build.ios` and `upload.appStore`, the platform's for
-  Shorebird steps, `flutter` for `test` and `analyze`.
+  `build.android`, `ios-sign` and `flutter` for `build.ios`, `ios-sign` for `upload.appStore` with an Apple
+  ID (nothing with an API key), the platform's for Shorebird steps, `flutter` for `test` and `analyze`. A
+  need can be any of several capabilities, written `ios-sign|ios-linux` in the job's `capabilities`, the
+  first preferred. Once Linux iOS builds exist (part 2 of ADR 0014), `build.ios` needs any of `ios-sign`
+  and `ios-linux`, and the planner narrows a job Linux cannot build (a flavor, Shorebird iOS, a debug or
+  profile build, an app extension, the iOS Simulator) to `ios-sign` with the reasons (`iosLinuxLimits`),
+  which its queue message repeats; with no paired runner that offers `ios-sign` the dispatch fails. A
+  workflow cannot name `ios-linux` yet.
 
 ### Built-in workflows and versions
 
@@ -1226,8 +1247,9 @@ nothing, and the same state always gives the same pass.
 - **Capabilities.** The engine probes this machine (`LocalCapabilities`): `flutter` when `git` runs (the
   pinned SDK is fetched on demand), `android` when an Android SDK is found (`ANDROID_HOME`,
   `ANDROID_SDK_ROOT`, the default places of Android Studio), `ios-sign` when `xcode-select` and
-  `xcodebuild` find an Xcode, `swift-linux` when Linux has `swift`. A job goes to a runner that has all
-  it needs; if none does the job says "No runner can do ios-sign." and waits. `xpd serve` prints what it
+  `xcodebuild` find an Xcode, `swift-linux` when Linux has `swift`. A job goes to a runner that meets
+  every need, preferring the runner that meets an any-of need with its first capability (a Mac before a
+  Linux runner); if none does the job says "No runner can do ios-sign." and waits. `xpd serve` prints what it
   found. The `SchedulerRunner` interface (`id`, `capabilities`, `slots`, `accepts`, `launch`, `whenFinished`) is
   what the engine (`LocalRunner`) and the remote runners (`RemoteRunner`, see Runners) implement.
 - **Placement.** The engine is preferred: a job that fits it and finds a free slot there runs there. A remote
@@ -1290,6 +1312,11 @@ Android SDK or Xcode and takes about four minutes, most of it the production lea
 `tool/e2e/runner_build_e2e.sh` runs it with `--mode runner-build`: an engine that cannot build Android and a runner that
 can. The build job of `dev-build` goes to the runner (its own checkout, a real APK), the check and the upload (to a
 local fake Firebase) stay on the engine, and the APK in the engine store is the one the runner built.
+
+`tool/e2e/runner_any_host_e2e.sh` (ADR 0015) runs it with `--mode runner-any-host`: the same build for a project whose
+origin is a `file://` bare repository, on an engine with no GitHub token. The engine adds it without GitHub, the
+runner fetches the commit from the URL of the lease into a cache named by the source key, and `prod-release` is
+refused at dispatch with the host and its `git.push` step.
 
 ## Runners
 
@@ -1365,10 +1392,15 @@ sends fixed commands (`RunnerProbe`) and derives the capabilities from what they
 `LocalCapabilities` for the engine's own machine: `flutter` when `git --version` runs, `android` when a folder with
 `platform-tools`, `cmdline-tools` or `build-tools` is `ANDROID_HOME`, `ANDROID_SDK_ROOT` or a default place of Android
 Studio, `ios-sign` on macOS (`uname -s`) when `xcode-select -p` and `xcodebuild -version` find an Xcode, `swift-linux` on
-Linux when `swift --version` runs. Nothing touches a keychain, and `xcodebuild` and `swift` are not even started where
+Linux when `swift --version` runs, and `ios-linux` on a Linux runner started with `XP_IOS_LINUX_DIR`: the runner adds
+the commands of that omarchy-apple-dev checkout and sends the folder (`iosLinuxDir`), and the engine checks its
+commit against the pin of this release, Swift, the darwin SDK bundle, `rcodesign`, the llvm tools and
+the pymobile3 python, each missing piece with its fix (`xp runner doctor` runs the same checks, and
+`install-service` writes the variable into the service). A runner without the variable never lists `ios-linux` as
+missing. Nothing touches a keychain, and `xcodebuild` and `swift` are not even started where
 macOS would answer with a dialog (`requires` and `onlyOn` in the command). A runner gets jobs only after it answered; a
 change of capabilities since the last connection is recorded as a `runner.capabilities_changed` event. The slots are
-`maxJobs` of the `hello`, else a quarter of the cores, at least one; `ios-sign` jobs run one at a time per runner.
+`maxJobs` of the `hello`, else a quarter of the cores, at least one; iOS jobs (`ios-sign` or `ios-linux`) run one at a time per runner.
 
 ### Leases and the 90 second rule (D-08)
 
@@ -1448,7 +1480,8 @@ xp runner install-service [--slots 4]                                # keeps it 
   (engine, id, name) and no secret. `--name` only warns when the engine named the runner otherwise: the pairing
   token fixes the name. Pairing again in a paired data directory needs `--force`.
 - **Data directory** (`--data-dir`, else `$XP_RUNNER_DATA_DIR`, else `~/.local/share/xpath/runner`):
-  `source/mirrors/<repo id>.git` (the bare cache), `source/worktrees/<repo id>/<job id>` (fresh worktrees),
+  `source/mirrors/<key>.git` (the bare cache), `source/worktrees/<key>/<job id>` (fresh worktrees), where the key is
+  the project's source key (the GitHub repository id, or `h` and 16 hex digits for another host, ADR 0015),
   `jobs/<job id>` (what a job leaves before it is uploaded), `toolchains/flutter`, `secrets/` (where no tmpfs is
   available), `keychains/`, `state/pgids.json`, and for updates and services `versions/<version>/` (the installed
   `xp` bundles), `current` (a symlink to the version that starts), `update.json`, `service-logs/` (see Runner updates
@@ -1472,12 +1505,15 @@ xp runner install-service [--slots 4]                                # keeps it 
   directory below it) are translated to the runner's (`LeasePaths`). Every step of the offer starts again, since
   the work of an earlier lease is not on this machine, but the attempts are kept, so that a step with side effects
   asks first whether its work exists (`alreadyDone`). `step_state` frames report each new state of a step.
-- **Source (ADR 0009).** `git.checkout` is `RemoteCheckoutStep`: it fetches the exact commit of the offer into the
-  runner's own bare cache (`git fetch origin <sha>` with `GIT_SSH_COMMAND='ssh -o BatchMode=yes'`, no global git
-  configuration, no prompt), cuts a fresh worktree and verifies `HEAD == sha` before anything runs. A key that
-  cannot read the repository fails the job with "add this runner's SSH key as a deploy key on `<owner/repo>`", an
-  unknown host key with "run `ssh -T git@github.com` once", a commit that was never pushed with "push it". The
-  machine needs `git`, `ssh` and its own access to GitHub (a deploy key or the key of a user). **Test only:**
+- **Source (ADR 0009, ADR 0015).** `git.checkout` is `RemoteCheckoutStep`: it fetches the exact commit of the offer
+  into the runner's own bare cache (`git fetch origin <sha>` with
+  `GIT_SSH_COMMAND='ssh -o BatchMode=yes -o ConnectTimeout=30 -o StrictHostKeyChecking=accept-new'`, no global git
+  configuration, no prompt), cuts a fresh worktree and verifies `HEAD == sha` before anything runs. SSH records the
+  host key of a server it has not seen; a key that changed still fails. A key that cannot read the repository fails
+  the job with what to do on its host ("add this runner's SSH key as a deploy key on `<owner/repo>`" on GitHub, "as
+  an access key of `<workspace/repo>`" on Bitbucket), a changed host key with "remove the old one (`ssh-keygen -R
+  <host>`)", a commit that was never pushed with "push it". The machine needs `git`, `ssh` and its own access to the
+  git host (a deploy or access key, or the key of a user). **Test only:**
   `XP_RUNNER_TEST_SOURCE_URL` replaces the URL of every lease (the end-to-end test points it at a local bare
   repository); a real runner never sets it.
 - **Logs and reports.** The output of the processes goes to the engine as `log_chunk` frames numbered from 1 per
@@ -1719,7 +1755,7 @@ escaped) and WhatsApp text (`*bold*`, the link as plain text). `409` while the r
 xpd token create --name "My Mac" --kind cli                     # on the engine machine; printed once
 xpd token create --name "Claude" --kind mcp                     # a second token, for `xp mcp`
 xp connect http://127.0.0.1:7480 --token <cli token> --mcp-token <mcp token>
-xp projects add acme/app            # or a folder on the engine machine
+xp projects add acme/app            # or a folder on the engine machine, or git@bitbucket.org:ws/app.git
 xp workflows list acme/app
 xp dispatch acme/app dev-build --flavor dev --platform android
 xp logs -f <job id>

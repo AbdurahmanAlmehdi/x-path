@@ -6,6 +6,7 @@ import 'package:xp_desktop/dispatch/view/dispatch_sheet.dart';
 import 'package:xp_desktop/l10n/l10n.dart';
 import 'package:xp_desktop/project_overview/widgets/release_status.dart';
 import 'package:xp_desktop/projects/bloc/projects_bloc.dart';
+import 'package:xp_desktop/projects/widgets/project_host.dart';
 import 'package:xp_desktop/releases/bloc/release_board_bloc.dart';
 import 'package:xp_desktop/releases/widgets/release_hero.dart';
 import 'package:xp_desktop/releases/widgets/release_panels.dart';
@@ -160,7 +161,7 @@ class ReleasesView extends StatelessWidget {
                   else if (!state.loaded)
                     const XpLoading()
                   else if (state.error == null)
-                    _NoRelease(project: project),
+                    _NoRelease(project),
                 ],
               ),
             ),
@@ -228,7 +229,7 @@ class _Board extends StatelessWidget {
 }
 
 class _NoRelease extends StatelessWidget {
-  const new({required this.project});
+  const new(this.project);
 
   final Project project;
 
@@ -252,21 +253,29 @@ class _NoRelease extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            l10n.releasesEmpty,
+            project.isOnGitHub
+                ? l10n.releasesEmpty
+                : l10n.releasesEmptyNoGitHub(project.hostLabel(l10n)),
             style: context.xpType.body.copyWith(color: colors.textSecondary),
           ),
-          const SizedBox(height: 16),
-          XpButton(
-            label: l10n.releasesDispatchProd,
-            icon: PhosphorIconsRegular.paperPlaneTilt,
-            kind: XpButtonKind.primary,
-            hint: '⌘N',
-            tooltip: context.canCommand ? null : l10n.readOnlyHint,
-            onPressed: context.canCommand
-                ? () =>
-                      dispatchFor(context, project, workflowId: 'prod-release')
-                : null,
-          ),
+          // A production release runs on GitHub only (ADR 0015).
+          if (project.isOnGitHub) ...[
+            const SizedBox(height: 16),
+            XpButton(
+              label: l10n.releasesDispatchProd,
+              icon: PhosphorIconsRegular.paperPlaneTilt,
+              kind: XpButtonKind.primary,
+              hint: '⌘N',
+              tooltip: context.canCommand ? null : l10n.readOnlyHint,
+              onPressed: context.canCommand
+                  ? () => dispatchFor(
+                      context,
+                      project,
+                      workflowId: 'prod-release',
+                    )
+                  : null,
+            ),
+          ],
         ],
       ),
     );

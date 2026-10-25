@@ -417,13 +417,13 @@ class _Reader {
       final capability = item is YamlScalar && item.value is String
           ? Capability.fromWire(item.value as String)
           : null;
-      if (capability == null) {
+      if (capability == null || !Capability.named.contains(capability)) {
         final name = item is YamlScalar ? '${item.value}' : '';
         _issueAt(
           item,
           'Unknown capability "$name".',
           hint: suggestion(name, [
-            for (final capability in Capability.values) capability.wire,
+            for (final capability in Capability.named) capability.wire,
           ]),
         );
       } else {

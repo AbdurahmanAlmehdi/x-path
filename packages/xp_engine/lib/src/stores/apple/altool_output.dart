@@ -28,6 +28,7 @@ final _successMarkers = [
 ];
 
 final _itmsCode = RegExp(r'ITMS-(\d{5})');
+final _leadingCode = RegExp(r'^(\d{5}):');
 final _parenthesizedCode = RegExp(r'\((\d{5})\)');
 final _deliveryId = RegExp(
   r'Delivery (?:UUID|ID):\s*([0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12})',
@@ -73,6 +74,24 @@ class AltoolOutput extends Equatable {
       confirmed: confirmed,
       deliveryId: deliveryId,
     );
+  }
+
+  /// Reads the errors App Store Connect reported about a build upload, or
+  /// its refusal of one, so that they are told and cured the way altool's
+  /// are. A code may lead an error (`90189: ...`), be `ITMS-90189` or be in
+  /// parentheses.
+  factory ofUploadErrors(Iterable<String> errors) {
+    final codes = <String>[];
+    for (final error in errors) {
+      for (final match in [
+        ..._leadingCode.allMatches(error),
+        ..._itmsCode.allMatches(error),
+        ..._parenthesizedCode.allMatches(error),
+      ]) {
+        if (!codes.contains(match[1])) codes.add(match[1]!);
+      }
+    }
+    return AltoolOutput(errors: [...errors], codes: codes);
   }
 
   /// The lines that report an error, in order.

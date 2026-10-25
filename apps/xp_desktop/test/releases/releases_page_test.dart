@@ -20,6 +20,7 @@ import '../helpers/approval_fixtures.dart';
 import '../helpers/job_fixtures.dart';
 import '../helpers/pump_app.dart';
 import '../helpers/release_fixtures.dart';
+import '../project_overview/overview_harness.dart';
 import 'releases_harness.dart';
 
 Release _noKey({StoreState apple = StoreState.uploaded}) => reviewRelease(
@@ -355,6 +356,26 @@ void main() {
       await tester.tap(find.text('Refresh'));
       await tester.pump();
       expect(find.text('Read-only while the engine is away'), findsNothing);
+    });
+
+    testWidgets('does not offer a production release off GitHub', (
+      tester,
+    ) async {
+      await ReleasesHarness(releases: const [])
+          .pump(tester, project: mataaOnBitbucket);
+
+      expect(
+        find.text(
+          'Production releases push and open a pull request on GitHub, so '
+          'they do not run for a project on bitbucket.org. Dev builds and '
+          'tests do.',
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.textContaining('A production release dispatched'),
+        findsNothing,
+      );
     });
 
     testWidgets('says when there is no release, or no project', (tester) async {

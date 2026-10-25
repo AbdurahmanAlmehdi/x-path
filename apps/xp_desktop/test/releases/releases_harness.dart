@@ -47,6 +47,7 @@ class ReleasesHarness {
     String? releaseId,
     List<Approval> pending = const [],
     WorkflowsRepository? workflows,
+    Project? project,
   }) async {
     await tester.pumpApp(
       ReleasesPage(projectId: 'prj_1', releaseId: releaseId),
@@ -61,7 +62,7 @@ class ReleasesHarness {
         PendingApprovalsState(loaded: true, approvals: pending),
       ),
       projects: projectsIn(
-        ProjectsState(loaded: true, projects: [mataaWithVersion]),
+        ProjectsState(loaded: true, projects: [project ?? mataaWithVersion]),
       ),
     );
     for (var i = 0; i < 4; i++) {

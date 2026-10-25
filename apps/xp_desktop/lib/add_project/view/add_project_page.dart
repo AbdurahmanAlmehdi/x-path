@@ -1,5 +1,6 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:xp_api/xp_api.dart';
 import 'package:xp_desktop/add_project/bloc/add_project_bloc.dart';
 import 'package:xp_desktop/app/app_services.dart';
 import 'package:xp_desktop/app/bloc/engine_connection_bloc.dart';
@@ -14,8 +15,10 @@ import 'package:xp_desktop/widgets/widgets.dart';
 import 'package:xp_repositories/xp_repositories.dart';
 
 /// Add project by folder, then review what the scan found. The engine
-/// needs its GitHub token to add a project; without one the form says so
-/// and connects GitHub in place, so the folder stays.
+/// needs its GitHub token to add a project from GitHub; without one the form
+/// says so and connects GitHub in place, so the folder stays. A folder whose
+/// origin is an HTTPS URL on another git host is offered its SSH URL
+/// (ADR 0015).
 class AddProjectPage extends StatelessWidget {
   const new({super.key});
 
@@ -113,8 +116,14 @@ class _FormState extends State<_Form> {
                     l10n.addProjectRemoteNote(engine?.name ?? ''),
                   ),
                 ],
-                // The section says what is wrong with the token itself.
                 if (github.needsToken) ...[
+                  const SizedBox(height: 12),
+                  XpMessage(
+                    XpStatus.credentialMissing,
+                    github.status?.status == CredentialStatus.rejected
+                        ? l10n.addProjectGitHubRejected
+                        : l10n.addProjectNoGitHub,
+                  ),
                   const SizedBox(height: 12),
                   const XpPanel(
                     key: Key('addProject.github'),
@@ -137,7 +146,34 @@ class _FormState extends State<_Form> {
                         )
                       : null,
                 ),
-                if (widget.state.error case final error?) ...[
+                if (widget.state.sshUrl case final sshUrl?) ...[
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: XpMessage(
+                          XpStatus.scanInfo,
+                          l10n.addProjectSshOffer(sshUrl),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      XpButton(
+                        key: const Key('addProject.useSsh'),
+                        label: l10n.addProjectUseSsh,
+                        kind: XpButtonKind.primary,
+                        busy: adding,
+                        onPressed: canCommand && !adding
+                            ? () => context.read<AddProjectBloc>().add(
+                                AddProjectSubmitted(
+                                  _folder.text,
+                                  sshUrl: sshUrl,
+                                ),
+                              )
+                            : null,
+                      ),
+                    ],
+                  ),
+                ] else if (widget.state.error case final error?) ...[
                   const SizedBox(height: 12),
                   XpMessage.error(l10n.addProjectFailed(error)),
                 ],

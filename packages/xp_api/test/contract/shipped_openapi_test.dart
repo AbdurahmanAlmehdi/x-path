@@ -74,6 +74,62 @@ void main() {
       }
     });
 
+    test('documents the lease of a repository on any git host', () {
+      const bitbucket = LeaseRepository(
+        cacheKey: 'h0123456789abcdef',
+        sshUrl: 'git@bitbucket.org:ws/app.git',
+      );
+
+      expect(
+        shipped.validateSchema('LeaseRepository', bitbucket.toJson()),
+        isEmpty,
+      );
+      expect(bitbucket.toJson().containsKey('githubRepoId'), isFalse);
+      for (final cacheKey in ['', 'h0123', '../7', 'H0123456789ABCDEF']) {
+        expect(
+          shipped.validateSchema('LeaseRepository', {
+            'cacheKey': cacheKey,
+            'sshUrl': 'git@bitbucket.org:ws/app.git',
+          }),
+          isNotEmpty,
+          reason: cacheKey,
+        );
+      }
+    });
+
+    test('documents projects on GitHub and on any other host', () {
+      const projects = ProjectsResponse([
+        Project(
+          id: 'prj_1',
+          host: Project.githubHost,
+          sourceKey: '42',
+          githubRepoId: 42,
+          fullName: 'acme/shop',
+          remote: 'https://github.com/acme/shop.git',
+          defaultBaseBranch: 'main',
+        ),
+        Project(
+          id: 'prj_2',
+          host: 'bitbucket.org',
+          sourceKey: 'h0123456789abcdef',
+          fullName: 'ws/group/app',
+          remote: 'git@bitbucket.org:ws/group/app.git',
+          defaultBaseBranch: 'main',
+        ),
+      ]);
+
+      expect(
+        shipped.validateResponse(
+          method: 'GET',
+          path: '/projects',
+          statusCode: 200,
+          body: jsonEncode(projects.toJson()),
+          contentType: 'application/json',
+        ),
+        isEmpty,
+      );
+    });
+
     test('documents the job endpoints and their error responses', () {
       final unauthorized = jsonEncode(
         ErrorResponse.of(ApiErrorCode.unauthorized, 'm').toJson(),
@@ -1141,6 +1197,18 @@ void main() {
             ProbeResult(id: 'swift', status: ProbeStatus.notStarted),
           ],
         ),
+        const ProbeResultFrame(
+          probeId: 'prb_2',
+          results: [
+            ProbeResult(
+              id: 'ios_linux_commit',
+              status: ProbeStatus.exited,
+              exitCode: 0,
+              stdout: 'abc\n',
+            ),
+          ],
+          iosLinuxDir: '/home/me/omarchy-apple-dev',
+        ),
         const LeaseAcceptFrame(jobId: 'job_1', leaseId: 'lse_1'),
         const LeaseRejectFrame(
           jobId: 'job_1',
@@ -1200,6 +1268,16 @@ void main() {
             ),
           ],
         ),
+        const ProbedFrame(
+          capabilities: ['flutter', 'ios-linux'],
+          missing: [
+            MissingCapability(
+              capability: 'ios-linux',
+              reason: 'no darwin SDK bundle',
+              fix: 'run install-toolchain.sh',
+            ),
+          ],
+        ),
         LeaseOfferFrame(
           leaseId: 'lse_1',
           jobId: 'job_1',
@@ -1207,7 +1285,7 @@ void main() {
           sha: 'a' * 40,
           name: 'Build',
           repository: const LeaseRepository(
-            githubRepoId: 7,
+            cacheKey: '7',
             sshUrl: 'git@github.com:owner/app.git',
           ),
           stage: 0,

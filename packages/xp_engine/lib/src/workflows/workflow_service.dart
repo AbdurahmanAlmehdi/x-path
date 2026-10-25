@@ -68,7 +68,7 @@ class WorkflowService {
     gateLabels: {
       for (final action in GateAction.values) action.wire: action.label,
     },
-    capabilities: [for (final capability in Capability.values) capability.wire],
+    capabilities: [for (final capability in Capability.named) capability.wire],
     matrixAxes: matrixAxes,
     platforms: platformNames,
     variables: variablePaths,

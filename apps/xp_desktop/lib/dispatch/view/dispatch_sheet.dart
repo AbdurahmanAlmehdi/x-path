@@ -8,6 +8,7 @@ import 'package:xp_desktop/app/bloc/engine_connection_bloc.dart';
 import 'package:xp_desktop/dispatch/bloc/dispatch_bloc.dart';
 import 'package:xp_desktop/job/widgets/job_status.dart';
 import 'package:xp_desktop/l10n/l10n.dart';
+import 'package:xp_desktop/projects/widgets/project_host.dart';
 import 'package:xp_desktop/shell/cubit/shell_cubit.dart';
 import 'package:xp_desktop/shell/widgets/shell_page.dart';
 import 'package:xp_desktop/theme/theme.dart';
@@ -138,9 +139,12 @@ class DispatchSheet extends StatelessWidget {
                           ),
                           const SizedBox(width: 8),
                           XpButton(
-                            // A ref the engine fetches first has no plan.
+                            // Without a plan (a ref the engine fetches first,
+                            // a step that needs GitHub) there is no count.
                             label:
-                                state.preview == null && state.refNotice != null
+                                state.preview == null &&
+                                    (state.refNotice != null ||
+                                        state.gitHubStep != null)
                                 ? l10n.dispatchUnplanned
                                 : l10n.dispatchButton(count),
                             hint: '⌘↩',
@@ -280,6 +284,13 @@ class _Form extends StatelessWidget {
             style: context.xpType.caption.copyWith(
               color: context.xpColors.textSecondary,
             ),
+          ),
+        ],
+        if (state.gitHubStep case final step?) ...[
+          const SizedBox(height: 8),
+          XpMessage(
+            XpStatus.scanInfo,
+            l10n.dispatchNeedsGitHub(step, state.project.hostLabel(l10n)),
           ),
         ],
         if (apps.length > 1) ...[

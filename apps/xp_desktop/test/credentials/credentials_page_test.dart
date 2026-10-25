@@ -411,6 +411,8 @@ void main() {
         projectList: const [
           Project(
             id: 'prj_3',
+            host: 'github.com',
+            sourceKey: '3',
             githubRepoId: 3,
             fullName: 'acme/empty',
             remote: 'r',

@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:xp_client/xp_client.dart';
 import 'package:xp_repositories/src/approvals_repository.dart';
 import 'package:xp_repositories/src/credentials_repository.dart';
+import 'package:xp_repositories/src/projects_repository.dart';
 
 /// What to tell the user about an error nobody expected: its own text is
 /// for the log, not for a person.
@@ -19,6 +20,7 @@ String errorMessage(Object error) => switch (error) {
   XpClientException(:final message) => message,
   ApprovalAlreadyDecided(:final message) => message,
   CredentialInUse(:final message) => message,
+  SshUrlRequired(:final message) => message,
   FileSystemException(:final message, :final osError, :final path) => [
     message,
     if (osError?.message case final reason? when reason.isNotEmpty) reason,

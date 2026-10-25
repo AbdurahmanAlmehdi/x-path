@@ -50,15 +50,13 @@ void main() {
         ..logs['job_1'] = 5
         ..worktreeList.add(
           const WorktreeDirectory(
-            githubRepoId: 1,
+            key: '1',
             name: 'job_1',
             path: '/w',
             bytes: 1,
           ),
         )
-        ..mirrorList.add(
-          const MirrorDirectory(githubRepoId: 1, path: '/m', bytes: 1),
-        )
+        ..mirrorList.add(const MirrorDirectory(key: '1', path: '/m', bytes: 1))
         ..sdks.add(const FlutterDirectory(version: '3', path: '/f', bytes: 1));
 
       expect(await files.logSizes(), {'job_1': 5});

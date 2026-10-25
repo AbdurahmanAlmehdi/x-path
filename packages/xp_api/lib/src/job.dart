@@ -201,8 +201,10 @@ class Job extends Equatable {
   /// every job of the stages before it succeeded.
   final int? stage;
 
-  /// What a runner must be able to do to run the job: `flutter`, `android`,
-  /// `ios-sign` or `swift-linux` (D-19).
+  /// What a runner must be able to do to run the job (D-19): each entry a
+  /// capability (`flutter`, `android`, `ios-sign`, `swift-linux`,
+  /// `ios-linux`), or several joined by `|` of which any will do, the first
+  /// preferred (`ios-sign|ios-linux`).
   final List<String> capabilities;
 
   /// Why it failed or was cancelled, or why it still waits.

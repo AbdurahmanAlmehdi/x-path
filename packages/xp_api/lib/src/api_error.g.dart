@@ -35,6 +35,7 @@ const _$ApiErrorCodeEnumMap = {
   ApiErrorCode.resyncRequired: 'resync_required',
   ApiErrorCode.credentialRejected: 'credential_rejected',
   ApiErrorCode.workflowInvalid: 'workflow_invalid',
+  ApiErrorCode.sshUrlRequired: 'ssh_url_required',
   ApiErrorCode.upgradeRequired: 'upgrade_required',
   ApiErrorCode.internal: 'internal',
   ApiErrorCode.upstreamError: 'upstream_error',

@@ -15,11 +15,15 @@ class _Spec {
     this.stage = 0,
     this.needs = const [],
     this.kinds = const [],
+    this.narrowing = const [],
   });
 
   final String name;
   final int stage;
   final List<String> needs;
+
+  /// Why the planner ruled out Linux for it.
+  final List<String> narrowing;
 
   /// Kinds of steps the job has besides its scripted one.
   final List<String> kinds;
@@ -105,6 +109,7 @@ class _Fixture {
         stage: spec.stage,
         name: spec.name,
         capabilities: spec.needs,
+        narrowing: spec.narrowing,
         steps: [
           harness.script(),
           for (final kind in spec.kinds)
@@ -568,6 +573,157 @@ void main() {
         )).waitReason,
         'Only the engine runs upload.appStore, and the engine cannot do '
         'ios-sign.',
+      );
+    });
+  });
+
+  group('any-of needs (ADR 0014)', () {
+    const both = 'ios-sign|ios-linux';
+
+    _Spy spy(String id, Capability ios, {int slots = 2}) =>
+        _Spy(id, f.local(slots: slots), f.harness.jobs)..extra.add(ios);
+
+    test('place an iOS build on a Mac or on a Linux runner', () async {
+      for (final ios in [Capability.iosSign, Capability.iosLinux]) {
+        final runner = spy('rnr_${ios.wire}', ios);
+        f.build([f.local(), runner]);
+        final ids = await f.run([
+          const _Spec('ios', needs: ['flutter', both]),
+        ]);
+
+        await f.scheduler.pump();
+
+        expect(runner.launched, [ids['ios']], reason: ios.wire);
+      }
+    });
+
+    test('prefer a Mac when both are free, whatever the order', () async {
+      final linux = spy('rnr_linux', Capability.iosLinux);
+      final mac = spy('rnr_mac', Capability.iosSign);
+      f.build([linux, mac]);
+      final ids = await f.run([
+        const _Spec('ios', needs: [both]),
+      ]);
+
+      await f.scheduler.pump();
+
+      expect(mac.launched, [ids['ios']]);
+      expect(linux.launched, isEmpty);
+    });
+
+    test('take the Linux runner while the Mac runs an iOS job', () async {
+      final linux = spy('rnr_linux', Capability.iosLinux);
+      final mac = spy('rnr_mac', Capability.iosSign);
+      f.build([linux, mac]);
+      final ids = await f.run([
+        const _Spec('signing', needs: ['ios-sign']),
+        const _Spec('either', needs: [both]),
+      ]);
+
+      await f.scheduler.pump();
+
+      expect(mac.launched, [ids['signing']]);
+      expect(linux.launched, [ids['either']]);
+    });
+
+    test('keep one iOS job per machine on Linux too', () async {
+      final linux = spy('rnr_linux', Capability.iosLinux, slots: 4);
+      f.build([linux]);
+      final ids = await f.run([
+        const _Spec('ios 1', needs: [both]),
+        const _Spec('ios 2', needs: [both]),
+        const _Spec('plain'),
+      ]);
+
+      await f.scheduler.pump();
+
+      expect(linux.launched, [ids['ios 1'], ids['plain']]);
+      expect(
+        await f.message(ids['ios 2']!),
+        'Waiting for the iOS job that runs now: one at a time.',
+      );
+    });
+
+    test('say which capabilities would do when no runner has one', () async {
+      f.build([f.local()]);
+      final ids = await f.run([
+        const _Spec('ios', needs: ['flutter', both]),
+      ]);
+
+      await f.scheduler.pump();
+
+      expect(
+        await f.message(ids['ios']!),
+        'No runner can do flutter, ios-sign or ios-linux.',
+      );
+    });
+
+    test('say why Linux was ruled out while a narrowed job waits', () async {
+      const flavor =
+          'the app uses the flavor prod, which Linux iOS builds do not '
+          'support yet (omarchy-apple-dev: flavors)';
+      final linux = spy('rnr_linux', Capability.iosLinux);
+      f.build([f.local(), linux]);
+      final ids = await f.run([
+        const _Spec('ios', needs: ['flutter', 'ios-sign'], narrowing: [flavor]),
+      ]);
+
+      await f.scheduler.pump();
+
+      expect(linux.launched, isEmpty);
+      expect(
+        await f.message(ids['ios']!),
+        'No runner can do flutter, ios-sign. It needs ios-sign: the app uses '
+        'the flavor prod, which Linux iOS builds do not support yet '
+        '(omarchy-apple-dev: flavors).',
+      );
+    });
+
+    test('say why Linux was ruled out while a busy Mac is awaited', () async {
+      const flavor =
+          'the app uses the flavor prod, which Linux iOS builds do not '
+          'support yet (omarchy-apple-dev: flavors)';
+      final mac = spy('rnr_mac', Capability.iosSign);
+      final linux = spy('rnr_linux', Capability.iosLinux);
+      f.build([mac, linux]);
+      final ids = await f.run([
+        const _Spec('signing', needs: ['ios-sign']),
+        const _Spec('narrowed', needs: ['ios-sign'], narrowing: [flavor]),
+      ]);
+
+      await f.scheduler.pump();
+
+      expect(mac.launched, [ids['signing']]);
+      expect(linux.launched, isEmpty);
+      final message = await f.message(ids['narrowed']!);
+      expect(message, startsWith('Waiting for the ios-sign job that runs now'));
+      expect(message, endsWith('It needs ios-sign: $flavor.'));
+    });
+
+    test('know whether any runner could ever take a job', () async {
+      final mac = [
+        const CapabilityNeed([Capability.iosSign]),
+      ];
+      f.build([f.local()]);
+      expect(await f.scheduler.couldRun(mac), isFalse);
+
+      f.scheduler.pairedRunners = _PairedRunners([
+        const PairedRunner(
+          id: 'rnr_away',
+          name: 'away',
+          capabilities: {Capability.iosSign},
+          connected: false,
+        ),
+      ]);
+      expect(await f.scheduler.couldRun(mac), isTrue);
+
+      f.build([spy('rnr_mac', Capability.iosSign)]);
+      expect(await f.scheduler.couldRun(mac), isTrue);
+      expect(
+        await f.scheduler.couldRun([
+          const CapabilityNeed([Capability.swiftLinux]),
+        ]),
+        isFalse,
       );
     });
   });

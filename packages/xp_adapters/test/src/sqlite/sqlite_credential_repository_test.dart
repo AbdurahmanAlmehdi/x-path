@@ -50,9 +50,10 @@ void main() {
     repository = SqliteCredentialRepository(database);
     database.connection
       ..execute(
-        'INSERT INTO project (id, github_repo_id, remote, default_base_branch, '
-        'full_name) VALUES '
-        "('prj_1', 1, 'a', 'main', 'acme/shop'), ('prj_2', 2, 'b', 'main', '')",
+        'INSERT INTO project (id, host, source_key, github_repo_id, remote, '
+        'default_base_branch, full_name) VALUES '
+        "('prj_1', 'github.com', '1', 1, 'a', 'main', 'acme/shop'), "
+        "('prj_2', 'github.com', '2', 2, 'b', 'main', '')",
       )
       ..execute(
         'INSERT INTO app (id, project_id, path, framework, store_country) '

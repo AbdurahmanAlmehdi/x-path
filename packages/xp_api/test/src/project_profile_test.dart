@@ -93,6 +93,7 @@ void main() {
       hasIos: true,
       hasAndroid: true,
       iosPackageManager: IosPackageManager.cocoapods,
+      iosAppExtensions: ['Widgets'],
       flavors: [flavor],
       plists: [
         PlistVersion(
@@ -120,6 +121,7 @@ void main() {
       expect(read.framework, 'flutter');
       expect(read.storeCountry, 'us');
       expect(read.iosPackageManager, IosPackageManager.none);
+      expect(read.iosAppExtensions, isEmpty);
       expect(read.flavors, isEmpty);
       expect(read.hasIos, isFalse);
     });
@@ -133,6 +135,7 @@ void main() {
       expect(changed.flavors, isEmpty);
       expect(changed.name, 'my_app');
       expect(changed.keystore, app.keystore);
+      expect(changed.iosAppExtensions, ['Widgets']);
     });
 
     test('names the package managers', () {

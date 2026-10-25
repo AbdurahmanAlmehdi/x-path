@@ -142,7 +142,7 @@ Map<String, Object?> workflowJsonSchema(StepCatalog catalog) {
             'type': 'array',
             'items': {
               'enum': [
-                for (final capability in Capability.values) capability.wire,
+                for (final capability in Capability.named) capability.wire,
               ],
             },
           },

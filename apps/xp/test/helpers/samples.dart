@@ -4,6 +4,8 @@ final at = DateTime.utc(2026, 10, 14, 9, 30);
 
 final project = Project(
   id: 'prj_1',
+  host: 'github.com',
+  sourceKey: '7',
   githubRepoId: 7,
   fullName: 'acme/app',
   remote: 'https://github.com/acme/app.git',
@@ -42,6 +44,8 @@ final project = Project(
 
 const bareProject = Project(
   id: 'prj_2',
+  host: 'github.com',
+  sourceKey: '8',
   githubRepoId: 8,
   fullName: 'acme/other',
   remote: 'https://github.com/acme/other.git',

@@ -1,6 +1,7 @@
 import 'package:xp_api/xp_api.dart';
 import 'package:xp_engine/src/credentials/credential_material.dart';
 import 'package:xp_engine/src/dispatch/plan_context.dart';
+import 'package:xp_engine/src/projects/project_record.dart';
 import 'package:xp_engine/src/scheduler/capability.dart';
 import 'package:xp_engine/src/steps/guard/guard_check.dart';
 import 'package:xp_engine/src/steps/step.dart';
@@ -20,7 +21,8 @@ class StepPlanSpec {
     List<StepKey> keys,
     this.input, {
     this.needs = const [],
-    this.pick,
+    this.capabilities,
+    this.anyOf,
   }) : keys = {for (final key in keys) key.name: key};
 
   /// The step type.
@@ -32,12 +34,18 @@ class StepPlanSpec {
   /// The stored input of the step, in the JSON its `decodeInput` reads.
   final Future<Map<String, dynamic>> Function(StepPlanning planning) input;
 
-  /// What a runner needs to run the step: any one of these sets will do.
-  /// Empty when the engine runs it.
+  /// What a runner needs to run the step, as the schema shows it: any one
+  /// of these sets will do. Empty when the engine runs it.
   final List<Set<Capability>> needs;
 
-  /// Which of [needs] a step needs, when that depends on the step.
-  final Set<Capability> Function(StepPlanning planning)? pick;
+  /// The capabilities a step needs, when that depends on the step; else the
+  /// one set of [needs], when it has one.
+  final Set<Capability> Function(StepPlanning planning)? capabilities;
+
+  /// What else the step needs where any of several capabilities will do,
+  /// the first preferred: `[ios-sign, ios-linux]` for an iOS build that a Mac
+  /// or a Linux runner can make (ADR 0014).
+  final List<List<Capability>> Function(StepPlanning planning)? anyOf;
 }
 
 /// What a step type is for people: its title, what it does, and the group
@@ -54,7 +62,13 @@ typedef StepAbout = ({String title, String description, String group});
 /// of a step of `JobRunner`, checked by the step type itself.
 class StepPlanners implements StepCatalog {
   /// Creates the planners over `registry`, whose steps check the inputs.
-  new(this._registry) {
+  ///
+  /// With [linuxIosBuilds], `build.ios` and `ios.stripAndReexport` need any
+  /// of `ios-sign` and `ios-linux`, and the dispatcher narrows a job Linux
+  /// cannot build to `ios-sign` (ADR 0014). It stays off until the Linux
+  /// backend of those steps exists, so that no runner gets an iOS job it
+  /// cannot build.
+  new(this._registry, {this.linuxIosBuilds = false}) {
     for (final spec in _specs) {
       _bySpec[spec.kind] = spec;
     }
@@ -62,6 +76,9 @@ class StepPlanners implements StepCatalog {
 
   final StepRegistry _registry;
   final _bySpec = <String, StepPlanSpec>{};
+
+  /// Whether iOS builds may run on a Linux runner.
+  final bool linuxIosBuilds;
 
   @override
   Iterable<String> get kinds => _bySpec.keys.toList()..sort();
@@ -91,11 +108,19 @@ class StepPlanners implements StepCatalog {
     );
   }
 
-  /// The capabilities the step needs.
-  Set<Capability> capabilitiesOf(StepPlanning planning) {
+  /// What the step needs of a runner: one need per capability it needs, then
+  /// its any-of needs.
+  List<CapabilityNeed> needsOf(StepPlanning planning) {
     final spec = _bySpec[planning.kind];
-    if (spec == null) return const {};
-    return spec.pick?.call(planning) ?? spec.needs.firstOrNull ?? const {};
+    if (spec == null) return const [];
+    final all =
+        spec.capabilities?.call(planning) ??
+        (spec.needs.length == 1 ? spec.needs.single : const <Capability>{});
+    final anyOf = spec.anyOf?.call(planning) ?? const <List<Capability>>[];
+    return [
+      for (final capability in all) CapabilityNeed([capability]),
+      for (final capabilities in anyOf) CapabilityNeed(capabilities),
+    ];
   }
 
   /// The plan of the step [planning].
@@ -320,9 +345,18 @@ class StepPlanners implements StepCatalog {
         ..._settings(p),
         'exportOptionsPlist': p.requireText('exportOptionsPlist'),
       },
-      needs: const [
-        {Capability.iosSign, Capability.flutter},
-      ],
+      needs: linuxIosBuilds
+          ? const [
+              {Capability.iosSign, Capability.flutter},
+              {Capability.iosLinux, Capability.flutter},
+            ]
+          : const [
+              {Capability.iosSign, Capability.flutter},
+            ],
+      capabilities: (_) => linuxIosBuilds
+          ? const {Capability.flutter}
+          : const {Capability.iosSign, Capability.flutter},
+      anyOf: (_) => _iosBuild,
     ),
     StepPlanSpec(
       'build.verifyCompiledConfig',
@@ -380,9 +414,17 @@ class StepPlanners implements StepCatalog {
         'exportOptionsPlist': p.requireText('exportOptionsPlist'),
         'frameworks': p.list('frameworks'),
       },
-      needs: const [
-        {Capability.iosSign},
-      ],
+      needs: linuxIosBuilds
+          ? const [
+              {Capability.iosSign},
+              {Capability.iosLinux},
+            ]
+          : const [
+              {Capability.iosSign},
+            ],
+      capabilities: (_) =>
+          linuxIosBuilds ? const {} : const {Capability.iosSign},
+      anyOf: (_) => _iosBuild,
     ),
     StepPlanSpec(
       'shorebird.release',
@@ -445,7 +487,7 @@ class StepPlanners implements StepCatalog {
         };
       },
       needs: _shorebirdNeeds,
-      pick: (p) => _shorebirdCapabilities(_platformOf(p)),
+      capabilities: (p) => _shorebirdCapabilities(_platformOf(p)),
     ),
     StepPlanSpec(
       'shorebird.patch',
@@ -498,7 +540,7 @@ class StepPlanners implements StepCatalog {
         };
       },
       needs: _shorebirdNeeds,
-      pick: (p) => _shorebirdCapabilities(_platformOf(p)),
+      capabilities: (p) => _shorebirdCapabilities(_platformOf(p)),
     ),
     StepPlanSpec(
       'symbols.archive',
@@ -767,6 +809,11 @@ class StepPlanners implements StepCatalog {
       needs: const [
         {Capability.iosSign},
       ],
+      // An API key uploads through the REST API on any engine; altool, for an
+      // Apple ID, needs a Mac (ADR 0014).
+      capabilities: (p) => p.job.credential(CredentialKind.ascKey) != null
+          ? const {}
+          : const {Capability.iosSign},
     ),
     StepPlanSpec('git.releaseBranch', const [], (p) async {
       final version = p.job.run.version;
@@ -855,7 +902,7 @@ class StepPlanners implements StepCatalog {
         }
         final flavor = p.job.flavor;
         return {
-          'githubRepoId': run.project.githubRepoId,
+          'githubRepoId': _githubRepoIdOf(run.project, p.fail),
           'head': run.model.branchName(
             version.name,
             scope: p.job.worktree.scope,
@@ -881,12 +928,22 @@ class StepPlanners implements StepCatalog {
               'There is no release to merge: dispatch this workflow with '
               '"release", or with POST /releases/{id}/merge.',
             ),
-        'githubRepoId': p.job.run.project.githubRepoId,
+        'githubRepoId': _githubRepoIdOf(p.job.run.project, p.fail),
       },
     ),
   ];
 
   // --------------------------------------------------------------- helpers
+
+  /// The GitHub id of [project] for a GitHub step. The dispatcher refuses
+  /// these steps on any other project (ADR 0015); [fail] says so if one gets
+  /// here all the same.
+  static int _githubRepoIdOf(
+    ProjectRecord project,
+    Never Function(String message) fail,
+  ) =>
+      project.githubRepoId ??
+      fail('${project.fullName} is not on GitHub, so it has no pull request.');
 
   static String _flavorSuffix(FlavorProfile? flavor) =>
       flavor == null || flavor.implicit ? '' : ' (${flavor.name})';
@@ -934,6 +991,14 @@ class StepPlanners implements StepCatalog {
 
   static Set<Capability> _shorebirdCapabilities(String platform) =>
       _shorebirdNeeds[platform == 'ios' ? 1 : 0];
+
+  /// Where an iOS build can be made: a Mac, preferred, or a Linux runner,
+  /// once [linuxIosBuilds] allows it.
+  List<List<Capability>> get _iosBuild => linuxIosBuilds
+      ? const [
+          [Capability.iosSign, Capability.iosLinux],
+        ]
+      : const [];
 
   static String? _shorebirdAppId(StepPlanning p) {
     final flavor = p.job.flavor;

@@ -5,6 +5,8 @@ import 'package:xp_engine/xp_engine.dart';
 void main() {
   ProjectRecord record(String id, int repoId) => ProjectRecord(
     id: id,
+    host: 'github.com',
+    sourceKey: '$repoId',
     githubRepoId: repoId,
     fullName: 'octo/$id',
     remote: 'https://github.com/octo/$id.git',
@@ -25,13 +27,13 @@ void main() {
     expect((await repository.list()).map((r) => r.id), ['b', 'a']);
   });
 
-  test('finds a project by id and by GitHub repository id', () async {
+  test('finds a project by id and by source key', () async {
     await repository.add(record('a', 1));
 
     expect((await repository.get('a'))!.githubRepoId, 1);
     expect(await repository.get('nope'), isNull);
-    expect((await repository.findByGithubRepoId(1))!.id, 'a');
-    expect(await repository.findByGithubRepoId(2), isNull);
+    expect((await repository.findBySourceKey('1'))!.id, 'a');
+    expect(await repository.findBySourceKey('2'), isNull);
   });
 
   test('refuses a second project for a repository', () async {

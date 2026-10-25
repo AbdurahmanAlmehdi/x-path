@@ -143,6 +143,11 @@ void main() {
       for (final (schema, body) in <(String, Object)>[
         ('AddProjectRequest', {'path': '/work/app'}),
         ('AddProjectRequest', {'remote': 'octo/app'}),
+        ('AddProjectRequest', {'remote': 'git@bitbucket.org:ws/app.git'}),
+        (
+          'AddProjectRequest',
+          {'path': '/work/app', 'sshUrl': 'git@bitbucket.org:ws/app.git'},
+        ),
         (
           'ProfileEdits',
           {
@@ -181,6 +186,14 @@ void main() {
         }),
         isNotEmpty,
       );
+      expect(
+        contract.validateSchema('AddProjectRequest', {
+          'remote': 'b/c',
+          'sshUrl': 'git@h:b/c.git',
+        }),
+        isNotEmpty,
+        reason: 'sshUrl goes with path only',
+      );
     });
 
     test('POST /projects by path', () async {
@@ -197,6 +210,26 @@ void main() {
 
       expect(response.statusCode, 201);
       expectContract(response, path: '/projects', method: 'POST');
+    });
+
+    test('POST /projects from another host, by its SSH URL', () async {
+      final response = await send('POST', '/projects', {
+        'remote': 'git@bitbucket.org:ws/app.git',
+      });
+
+      expect(response.statusCode, 201);
+      expectContract(response, path: '/projects', method: 'POST');
+      expect(response.json.containsKey('githubRepoId'), isFalse);
+    });
+
+    test('POST /projects 422 offers the SSH URL of an HTTPS origin', () async {
+      final response = await send('POST', '/projects', {
+        'remote': 'https://bitbucket.org/ws/app.git',
+      });
+
+      expect(response.statusCode, 422);
+      expectContract(response, path: '/projects', method: 'POST');
+      expect(response.json['sshUrl'], 'git@bitbucket.org:ws/app.git');
     });
 
     test('POST /projects 400 for a body that is not a request', () async {
@@ -1065,6 +1098,32 @@ void main() {
 
       expectContract(response, path: '/jobs/${job.id}');
     });
+
+    test(
+      'GET /jobs/{id} for a job that needs any of two capabilities',
+      () async {
+        final job = await engine.jobs.create(
+          workflowVersionId: 'wfv_1',
+          projectId: 'prj_1',
+          capabilities: const ['flutter', 'ios-sign|ios-linux'],
+          steps: [
+            StepPlan.of(
+              const CommandStep(),
+              const CommandInput(ProcessCommand('x')),
+            ),
+          ],
+        );
+
+        final response = await send('GET', '/jobs/${job.id}');
+
+        expect(response.body, contains('"ios-sign|ios-linux"'));
+        expectContract(response, path: '/jobs/${job.id}');
+        expect(
+          contract.validateSchema('CapabilityNeed', 'ios-sign|warp'),
+          isNotEmpty,
+        );
+      },
+    );
 
     test('GET /jobs/{id} 401 and 404', () async {
       final unauthorized = await engine.request('/jobs/job_x', token: '');

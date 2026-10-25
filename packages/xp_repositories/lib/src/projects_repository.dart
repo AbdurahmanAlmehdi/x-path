@@ -1,7 +1,25 @@
 import 'package:xp_api/xp_api.dart';
+import 'package:xp_client/xp_client.dart';
 import 'package:xp_repositories/src/credentials_repository.dart';
 import 'package:xp_repositories/src/session/engine_session.dart';
 import 'package:xp_repositories/src/snapshot.dart';
+
+/// The folder's origin is an HTTPS URL on a host other than GitHub, which
+/// the engine has no credentials for. It offers the SSH URL of the same
+/// repository, [sshUrl], for the owner to confirm (ADR 0015).
+class SshUrlRequired implements Exception {
+  /// Creates the exception with the engine's [message].
+  const new(this.message, {required this.sshUrl});
+
+  /// What the engine said.
+  final String message;
+
+  /// The SSH URL the engine offers.
+  final String sshUrl;
+
+  @override
+  String toString() => 'SshUrlRequired: $message';
+}
 
 /// The projects of the engine of an [EngineSession] and their credentials.
 class ProjectsRepository {
@@ -31,9 +49,26 @@ class ProjectsRepository {
       _session.call((client) => client.getProject(id));
 
   /// Adds the repository at [path] on the engine machine and scans it.
-  Future<Project> addProject(String path) => _session.call(
-    (client) => client.addProject(AddProjectRequest(path: path)),
-  );
+  ///
+  /// [sshUrl] is the SSH URL the owner confirmed for a folder whose origin
+  /// is an HTTPS URL on a host other than GitHub. Without it such a folder
+  /// throws a [SshUrlRequired] that offers the URL (ADR 0015).
+  Future<Project> addProject(String path, {String? sshUrl}) async {
+    try {
+      return await _session.call(
+        (client) =>
+            client.addProject(AddProjectRequest(path: path, sshUrl: sshUrl)),
+      );
+    } on ApiException catch (error) {
+      if (error case ApiException(
+        code: ApiErrorCode.sshUrlRequired,
+        :final sshUrl?,
+      )) {
+        throw SshUrlRequired(error.message, sshUrl: sshUrl);
+      }
+      rethrow;
+    }
+  }
 
   /// Scans [id] again.
   Future<Project> scanProject(String id) =>

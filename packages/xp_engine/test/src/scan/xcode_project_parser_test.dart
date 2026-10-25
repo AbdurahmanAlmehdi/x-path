@@ -116,6 +116,11 @@ void main() {
         false,
         false,
       ]);
+      expect(project.targets.map((target) => target.isAppExtension), [
+        false,
+        false,
+        true,
+      ]);
       expect(project.targets.first.configurations.map((c) => c.name), [
         'Release',
         'Release-dev',

@@ -12,6 +12,8 @@ import '../helpers/pump_app.dart';
 Project _withFindings(List<Finding> findings) => Project(
   id: mataa.id,
   githubRepoId: mataa.githubRepoId,
+  host: mataa.host,
+  sourceKey: mataa.sourceKey,
   fullName: mataa.fullName,
   remote: mataa.remote,
   defaultBaseBranch: mataa.defaultBaseBranch,

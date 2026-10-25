@@ -115,7 +115,7 @@ void main() {
         const AnalyzeInput(
           worktree: ReleaseWorktree(
             path: '/work/job_1',
-            mirror: GitMirror(githubRepoId: 42, path: '/m.git'),
+            mirror: GitMirror(key: '42', path: '/m.git'),
             sha: buildSha,
           ),
         ).appDirectory,

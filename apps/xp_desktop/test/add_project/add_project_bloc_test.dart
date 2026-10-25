@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:xp_client/xp_client.dart';
 import 'package:xp_desktop/add_project/bloc/add_project_bloc.dart';
+import 'package:xp_repositories/xp_repositories.dart';
 
 import '../helpers/fakes.dart';
 
@@ -38,6 +39,49 @@ void main() {
           status: AddProjectStatus.failed,
           error: 'Not a git repository.',
         ),
+      ],
+    );
+
+    blocTest<AddProjectBloc, AddProjectState>(
+      'offers the SSH URL of an HTTPS origin on another host',
+      build: () => AddProjectBloc(projects: projects),
+      setUp: () => when(() => projects.addProject('/src/shop')).thenThrow(
+        const SshUrlRequired('Use SSH.', sshUrl: 'git@bitbucket.org:ws/a.git'),
+      ),
+      act: (bloc) => bloc.add(const AddProjectSubmitted('/src/shop')),
+      skip: 1,
+      expect: () => [
+        const AddProjectState(
+          status: AddProjectStatus.failed,
+          error: 'Use SSH.',
+          sshUrl: 'git@bitbucket.org:ws/a.git',
+        ),
+      ],
+    );
+
+    blocTest<AddProjectBloc, AddProjectState>(
+      'adds the folder from the SSH URL the owner confirmed',
+      build: () => AddProjectBloc(projects: projects),
+      seed: () => const AddProjectState(
+        status: AddProjectStatus.failed,
+        error: 'Use SSH.',
+        sshUrl: 'git@bitbucket.org:ws/a.git',
+      ),
+      setUp: () => when(
+        () => projects.addProject(
+          '/src/shop',
+          sshUrl: 'git@bitbucket.org:ws/a.git',
+        ),
+      ).thenAnswer((_) async => shop),
+      act: (bloc) => bloc.add(
+        const AddProjectSubmitted(
+          '/src/shop',
+          sshUrl: 'git@bitbucket.org:ws/a.git',
+        ),
+      ),
+      expect: () => [
+        const AddProjectState(status: AddProjectStatus.adding),
+        const AddProjectState(status: AddProjectStatus.review, project: shop),
       ],
     );
 
@@ -124,7 +168,11 @@ void main() {
     );
 
     test('events compare by value', () {
-      expect(const AddProjectSubmitted('a').props, ['a']);
+      expect(const AddProjectSubmitted('a').props, ['a', null]);
+      expect(
+        const AddProjectSubmitted('a', sshUrl: 'git@h:a.git'),
+        isNot(const AddProjectSubmitted('a')),
+      );
       expect(const AddProjectRescanned(), const AddProjectRescanned());
       expect(const AddProjectDiscarded().props, isEmpty);
     });

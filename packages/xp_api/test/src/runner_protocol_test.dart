@@ -37,6 +37,11 @@ void main() {
           ProbeResult(id: 'slow', status: ProbeStatus.timedOut, stderr: 'x'),
         ],
       ),
+      const ProbeResultFrame(
+        probeId: 'prb_2',
+        results: [],
+        iosLinuxDir: '/home/me/omarchy-apple-dev',
+      ),
       const LeaseAcceptFrame(jobId: 'job_1', leaseId: 'lse_1'),
       const LeaseRejectFrame(jobId: 'job_1', leaseId: 'lse_1', reason: 'busy'),
       const HeartbeatFrame(),
@@ -93,7 +98,7 @@ void main() {
     });
 
     test('leaves out what a frame lacks', () {
-      expect(frames[0].toJson().keys, {
+      expect(frames.whereType<HelloFrame>().first.toJson().keys, {
         'type',
         'version',
         'os',
@@ -102,7 +107,7 @@ void main() {
         'draining',
         'leases',
       });
-      expect(frames[8].toJson().keys, {
+      expect(frames.whereType<StepStateFrame>().first.toJson().keys, {
         'type',
         'jobId',
         'leaseId',
@@ -235,7 +240,7 @@ void main() {
         sha: 'a' * 40,
         name: 'Build prod for android',
         repository: const LeaseRepository(
-          githubRepoId: 7,
+          cacheKey: '7',
           sshUrl: 'git@github.com:owner/app.git',
         ),
         stage: 1,
@@ -336,6 +341,19 @@ void main() {
         'secrets',
       });
       expect(frames[10].toJson().keys, {'type', 'jobId', 'reason'});
+    });
+
+    test('a repository on another host has a cache key and no GitHub id', () {
+      const bitbucket = LeaseRepository(
+        cacheKey: 'h0123456789abcdef',
+        sshUrl: 'git@bitbucket.org:ws/app.git',
+      );
+
+      expect(LeaseRepository.fromJson(wire(bitbucket.toJson())), bitbucket);
+      expect(bitbucket.toJson(), {
+        'cacheKey': 'h0123456789abcdef',
+        'sshUrl': 'git@bitbucket.org:ws/app.git',
+      });
     });
 
     test('the welcome frame carries the 30 s and 90 s rules', () {

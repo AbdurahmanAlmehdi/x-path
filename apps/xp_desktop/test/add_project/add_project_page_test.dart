@@ -54,7 +54,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(
-        find.textContaining('The engine has no GitHub token'),
+        find.textContaining('so it cannot add a project from GitHub'),
         findsOneWidget,
       );
       await tester.enterText(folder, '/src/app');
@@ -192,6 +192,54 @@ void main() {
         find.text(
           'The engine could not add this folder: Not a git repository.',
         ),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('offers the SSH URL of an HTTPS origin and uses it', (
+      tester,
+    ) async {
+      const sshUrl = 'git@bitbucket.org:ws/mobile/shop_app.git';
+      when(() => projects.addProject('/src/shop')).thenThrow(
+        const SshUrlRequired(
+          'XPath has no credentials for bitbucket.org over HTTPS; use the SSH '
+          'URL $sshUrl.',
+          sshUrl: sshUrl,
+        ),
+      );
+      when(() => projects.addProject('/src/shop', sshUrl: sshUrl))
+          .thenAnswer((_) async => shop);
+      await pump(tester);
+      await tester.enterText(folder, '/src/shop');
+      await tester.pump();
+      await tester.tap(find.text('Add and scan'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.textContaining('Add the folder from $sshUrl instead?'),
+        findsOneWidget,
+      );
+      await tester.tap(find.byKey(const Key('addProject.useSsh')));
+      await tester.pumpAndSettle();
+
+      verify(() => projects.addProject('/src/shop', sshUrl: sshUrl)).called(1);
+      expect(
+        find.text('Review the scan of ws/mobile/shop_app'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('says the GitHub token is for GitHub projects only', (
+      tester,
+    ) async {
+      await pump(
+        tester,
+        settings: quietSettings(token: const GitHubTokenStatus(stored: false)),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.textContaining('a project on another git host needs none'),
         findsOneWidget,
       );
     });

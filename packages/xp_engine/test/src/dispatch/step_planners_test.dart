@@ -55,6 +55,65 @@ void main() {
     request,
   );
 
+  test('refuses a GitHub step for a project that is not on GitHub', () async {
+    // The dispatcher refuses these first (ADR 0015); the planners say so too.
+    const mirror = GitMirror(key: 'h0123456789abcdef', path: '/m');
+    final run = RunContext(
+      runId: 'run_1',
+      project: ProjectRecord(
+        id: 'prj_1',
+        host: 'bitbucket.org',
+        sourceKey: 'h0123456789abcdef',
+        fullName: 'ws/demo',
+        remote: 'git@bitbucket.org:ws/demo.git',
+        githubDefaultBranch: 'main',
+        scan: const ProjectProfile(apps: [demoApp]),
+        findings: const [],
+        scannedAt: DateTime.utc(2026),
+      ),
+      app: demoApp,
+      flavors: demoApp.flavors,
+      platforms: const ['android'],
+      ref: 'main',
+      sha: 'a' * 40,
+      mirror: mirror,
+      model: const ReleaseModel(),
+      worktreeAt: (_, name) => '/w/$name',
+      inputs: const {},
+      bump: 'keep',
+      version: AppVersion.parse('1.2.4+9'),
+      build: 9,
+      release: 'rel_1',
+    );
+
+    for (final kind in ['github.createPr', 'github.mergePr']) {
+      await expectLater(
+        StepPlanners(allSteps()).plan(
+          StepPlanning(
+            kind: kind,
+            job: JobContext(
+              run: run,
+              jobId: 'job_1',
+              worktree: const ReleaseWorktree(
+                path: '/w',
+                mirror: mirror,
+                sha: 'a',
+              ),
+              flavorValue: null,
+            ),
+            values: const {},
+            position: const SourcePosition(7, 3),
+          ),
+        ),
+        _fails(
+          'Line 7, $kind: ws/demo is not on GitHub, so it has no pull '
+          'request.',
+        ),
+        reason: kind,
+      );
+    }
+  });
+
   group('the catalog', () {
     test('lists the step types a workflow can use, and what each takes', () {
       final planners = StepPlanners(allSteps());
@@ -728,6 +787,38 @@ stages:
         'releaseNotes': {'en-US': 'Hello', 'ar': 'Marhaba'},
       });
     });
+
+    test(
+      'to App Store Connect need a Mac only for an Apple ID (altool)',
+      () async {
+        await harness.saveCredential('prod', CredentialKind.ascKey);
+        await harness.saveCredential(
+          'dev',
+          CredentialKind.appleId,
+          account: 'dev@example.com',
+        );
+        const steps = '''
+          - kind: version.bump
+          - kind: upload.appStore
+            with:
+              appleAppId: "1"
+''';
+
+        final apiKey = await dispatch(
+          steps,
+          matrix: _flavorMatrix,
+          request: const DispatchRequest(platforms: ['ios'], flavors: ['prod']),
+        );
+        final appleId = await dispatch(
+          steps,
+          matrix: _flavorMatrix,
+          request: const DispatchRequest(platforms: ['ios'], flavors: ['dev']),
+        );
+
+        expect(apiKey.jobs.single.capabilities, isEmpty);
+        expect(appleId.jobs.single.capabilities, ['ios-sign']);
+      },
+    );
 
     test('take their file from the build job of the same cell', () async {
       await harness.saveCredential('dev', CredentialKind.playSa);

@@ -624,6 +624,8 @@ void main() {
           Project(
             id: 'prj_1',
             githubRepoId: 7,
+            host: 'github.com',
+            sourceKey: '7',
             fullName: '',
             remote: sample.project.remote,
             defaultBaseBranch: 'main',

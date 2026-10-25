@@ -32,17 +32,21 @@ typedef JobPlacement = ({bool local, String? runner, String? waitReason});
 ///   project is under way. It waits in line: runs are served in the order they
 ///   were dispatched, and a later run never overtakes an earlier one that
 ///   waits for the lock. Dev builds have no lock.
-/// - **Slots.** A runner runs at most `slots` jobs at once, and only one job
-///   that needs `ios-sign` (the keychain and Xcode cannot share).
-/// - **Capabilities.** A job goes to a runner that can do everything it needs.
+/// - **Slots.** A runner runs at most `slots` jobs at once, and only one iOS
+///   job: one that needs `ios-sign` or `ios-linux` (the keychain and Xcode,
+///   or omarchy-apple-dev's toolchain, cannot share).
+/// - **Capabilities.** A job goes to a runner that meets every need of it: a
+///   capability, or any of several (`ios-sign|ios-linux`, ADR 0014).
 /// - **Engine-only steps.** A runner may refuse a job by its steps: a remote
 ///   runner never gets a job with an upload or another step that needs what
 ///   only the engine has (D-09, `RemoteStepPolicy`).
-/// - **Placement.** The local runner is preferred: a job that fits the engine
-///   and has a free slot there runs on the engine, and a remote runner takes
-///   what the engine cannot do or has no slot for. Among remote runners the
-///   least loaded one (its running jobs per slot) goes first, then the one
-///   that connected first.
+/// - **Placement.** A runner that meets an any-of need with the capability
+///   it prefers goes first: a Mac before a Linux runner for an iOS build when
+///   both are free. Then the local runner is preferred: a job that fits the
+///   engine and has a free slot there runs on the engine, and a remote runner
+///   takes what the engine cannot do or has no slot for. Among remote runners
+///   the least loaded one (its running jobs per slot) goes first, then the
+///   one that connected first.
 /// - **Order.** Runs are served oldest first, their jobs in stage and creation
 ///   order. A job that cannot start (no free slot, a locked project) does not
 ///   hold up the jobs behind it that can. Nothing depends on the clock or on
@@ -50,7 +54,8 @@ typedef JobPlacement = ({bool local, String? runner, String? waitReason});
 ///
 /// A queued job that waits says why in its `message`; when no connected
 /// runner can do it, the message names the paired runners that could and are
-/// offline. A job that reaches a
+/// offline, and a job the planner narrowed to `ios-sign` says why Linux was
+/// ruled out. A job that reaches a
 /// gate stops in `waiting_for_approval` and holds no slot; whoever decides the
 /// gate calls [resumeWaiting] and the job takes its turn again.
 class Scheduler implements JobControl {
@@ -98,6 +103,17 @@ class Scheduler implements JobControl {
 
   /// Stops starting jobs: the engine is shutting down.
   void stop() => _stopped = true;
+
+  /// Whether the engine or a paired runner, online or not, meets every one
+  /// of [needs]: a job that none does fails when it is dispatched instead of
+  /// waiting for good.
+  Future<bool> couldRun(List<CapabilityNeed> needs) async {
+    bool meets(Set<Capability> offered) =>
+        needs.every((need) => need.rankFor(offered) != null);
+    if (_targets.any((runner) => meets(runner.capabilities))) return true;
+    final paired = await pairedRunners?.pairedRunners() ?? const [];
+    return paired.any((runner) => meets(runner.capabilities));
+  }
 
   // ------------------------------------------------------------- JobControl
 
@@ -215,9 +231,7 @@ class Scheduler implements JobControl {
       if (job.state != JobState.running) continue;
       final runnerId = job.runnerId ?? localRunnerId;
       used[runnerId] = (used[runnerId] ?? 0) + 1;
-      if (job.capabilities.contains(Capability.iosSign.wire)) {
-        signing.add(runnerId);
-      }
+      if (_isIos(job)) signing.add(runnerId);
     }
     // A run that held the project and failed, was cancelled or finished lets
     // go of it. One whose failed job is resumed asks for it again.
@@ -276,9 +290,7 @@ class Scheduler implements JobControl {
         }
         if (await _launch(runner, job)) {
           used[runner.id] = (used[runner.id] ?? 0) + 1;
-          if (job.capabilities.contains(Capability.iosSign.wire)) {
-            signing.add(runner.id);
-          }
+          if (_isIos(job)) signing.add(runner.id);
           if (run.locksProject && !holders.containsKey(run.projectId)) {
             holders[run.projectId] = run.id;
             await _runs.setLockHeld(run.id, held: true);
@@ -309,24 +321,27 @@ class Scheduler implements JobControl {
     Set<String> signing,
   ) {
     final needs = _needs(job);
+    final ios = _isIos(job);
     SchedulerRunner? best;
-    var bestLoad = 0.0;
+    (int, double)? bestScore;
     for (final runner in _targets) {
-      if (!runner.capabilities.containsAll(needs) || !runner.accepts(kinds)) {
-        continue;
-      }
+      final rank = _rank(needs, runner.capabilities);
+      if (rank == null || !runner.accepts(kinds)) continue;
       final running = used[runner.id] ?? 0;
       if (running >= runner.slots) continue;
-      if (needs.contains(Capability.iosSign) && signing.contains(runner.id)) {
-        continue;
-      }
-      // The engine first: it has the job's worktree, the secrets and the
-      // stores at hand.
-      if (runner.id == localRunnerId) return runner;
-      final load = running / runner.slots;
-      if (best == null || load < bestLoad) {
+      if (ios && signing.contains(runner.id)) continue;
+      // The preferred capability first (a Mac for an iOS build), then the
+      // engine: it has the job's worktree, the secrets and the stores at
+      // hand. Then the least loaded runner.
+      final score = (
+        rank,
+        runner.id == localRunnerId ? -1.0 : running / runner.slots,
+      );
+      if (bestScore == null ||
+          score.$1 < bestScore.$1 ||
+          (score.$1 == bestScore.$1 && score.$2 < bestScore.$2)) {
         best = runner;
-        bestLoad = load;
+        bestScore = score;
       }
     }
     return best;
@@ -341,10 +356,10 @@ class Scheduler implements JobControl {
     List<String> capabilities,
     List<String> kinds,
   ) async {
-    final needs = {for (final wire in capabilities) ?Capability.fromWire(wire)};
+    final needs = CapabilityNeed.parseAll(capabilities);
     final able = [
       for (final runner in _targets)
-        if (runner.capabilities.containsAll(needs) && runner.accepts(kinds))
+        if (_rank(needs, runner.capabilities) != null && runner.accepts(kinds))
           runner,
     ];
     final paired =
@@ -369,22 +384,35 @@ class Scheduler implements JobControl {
     );
   }
 
+  /// How well [offered] meets [needs]: the sum of the ranks of the
+  /// capabilities it meets them with (0 when it offers every preferred one),
+  /// or `null` when it misses one.
+  static int? _rank(List<CapabilityNeed> needs, Set<Capability> offered) {
+    var sum = 0;
+    for (final need in needs) {
+      final rank = need.rankFor(offered);
+      if (rank == null) return null;
+      sum += rank;
+    }
+    return sum;
+  }
+
   /// Why no connected runner can ever take a job that needs [needs] and is
   /// made of steps of [kinds]; `null` when one can.
   Future<String?> _cannotRun(
-    Set<Capability> needs,
+    List<CapabilityNeed> needs,
     List<String> kinds,
     Future<List<PairedRunner>> Function() paired,
   ) async {
+    final wires = needs.map((need) => need.described).join(', ');
     final capable = _targets
-        .where((runner) => runner.capabilities.containsAll(needs))
+        .where((runner) => _rank(needs, runner.capabilities) != null)
         .toList();
     if (capable.isEmpty && needs.isEmpty) return 'No runner is connected.';
     if (capable.isEmpty) {
-      final wires = needs.map((c) => c.wire).join(', ');
       final offline = [
         for (final runner in await paired())
-          if (!runner.connected && runner.capabilities.containsAll(needs))
+          if (!runner.connected && _rank(needs, runner.capabilities) != null)
             _offline(runner, wires),
       ];
       if (offline.isEmpty) return 'No runner can do $wires.';
@@ -396,7 +424,7 @@ class Scheduler implements JobControl {
           if (!capable.any((runner) => runner.accepts([kind]))) kind,
       }.toList()..sort();
       return 'Only the engine runs ${engineOnly.join(', ')}, and the engine '
-          'cannot do ${needs.map((c) => c.wire).join(', ')}.';
+          'cannot do $wires.';
     }
     return null;
   }
@@ -408,6 +436,19 @@ class Scheduler implements JobControl {
     Set<String> signing,
     Future<List<PairedRunner>> Function() paired,
   ) async {
+    final why = await _whyNot(job, kinds, signing, paired);
+    final narrowing = job.narrowing;
+    return narrowing.isEmpty
+        ? why
+        : '$why It needs ios-sign: ${narrowing.join('; ')}.';
+  }
+
+  Future<String> _whyNot(
+    JobRecord job,
+    List<String> kinds,
+    Set<String> signing,
+    Future<List<PairedRunner>> Function() paired,
+  ) async {
     final needs = _needs(job);
     if (await _cannotRun(needs, kinds, paired) case final reason?) {
       return reason;
@@ -415,12 +456,15 @@ class Scheduler implements JobControl {
     final accepting = _targets
         .where(
           (runner) =>
-              runner.capabilities.containsAll(needs) && runner.accepts(kinds),
+              _rank(needs, runner.capabilities) != null &&
+              runner.accepts(kinds),
         )
         .toList();
-    if (needs.contains(Capability.iosSign) &&
+    if (_isIos(job) &&
         accepting.every((runner) => signing.contains(runner.id))) {
-      return 'Waiting for the ios-sign job that runs now: one at a time.';
+      final signs = needs.contains(const CapabilityNeed([Capability.iosSign]));
+      return 'Waiting for the ${signs ? 'ios-sign' : 'iOS'} job that runs '
+          'now: one at a time.';
     }
     return 'Waiting for a free slot on '
         '${accepting.map((runner) => runner.id).join(', ')}.';
@@ -440,9 +484,11 @@ class Scheduler implements JobControl {
         '${two(utc.hour)}:${two(utc.minute)} UTC';
   }
 
-  Set<Capability> _needs(JobRecord job) => {
-    for (final wire in job.capabilities) ?Capability.fromWire(wire),
-  };
+  List<CapabilityNeed> _needs(JobRecord job) =>
+      CapabilityNeed.parseAll(job.capabilities);
+
+  /// Whether [job] takes the one iOS place of a machine.
+  bool _isIos(JobRecord job) => _needs(job).any((need) => need.isIos);
 
   Future<bool> _launch(SchedulerRunner runner, JobRecord job) async {
     try {

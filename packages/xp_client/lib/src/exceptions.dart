@@ -25,6 +25,7 @@ final class ApiException extends XpClientException {
     this.issues = const [],
     this.hint,
     this.details = const {},
+    this.sshUrl,
   });
 
   /// Reads the error out of the [body] of a response with [statusCode].
@@ -37,6 +38,7 @@ final class ApiException extends XpClientException {
       final envelope = ErrorResponse.fromJson(json as Map<String, dynamic>);
       final approval = json['approval'];
       final usedBy = json['usedBy'];
+      final sshUrl = json['sshUrl'];
       return ApiException(
         envelope.error.message,
         statusCode: statusCode,
@@ -53,6 +55,7 @@ final class ApiException extends XpClientException {
         issues: envelope.error.issues ?? const [],
         hint: envelope.error.hint,
         details: envelope.error.details ?? const {},
+        sshUrl: sshUrl is String ? sshUrl : null,
       );
     } on Object {
       return ApiException(
@@ -86,6 +89,11 @@ final class ApiException extends XpClientException {
 
   /// Facts of the error, such as the `kind` of a missing credential.
   final Map<String, Object?> details;
+
+  /// The SSH URL the engine offers instead of an HTTPS origin on a host
+  /// other than GitHub, when the error is [ApiErrorCode.sshUrlRequired]
+  /// (ADR 0015).
+  final String? sshUrl;
 
   /// Whether the credential was not deleted because flavors use it.
   bool get isCredentialInUse => code == ApiErrorCode.credentialInUse;

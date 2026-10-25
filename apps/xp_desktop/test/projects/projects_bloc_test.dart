@@ -95,6 +95,12 @@ void main() {
       expect(state.byId(null), isNull);
       expect(const ProjectScanRequested('a').props, ['a']);
     });
+
+    test('finds a project on another git host with a three-part name', () {
+      const state = ProjectsState(projects: [mataa, shop]);
+      expect(state.byId('prj_3')?.fullName, 'ws/mobile/shop_app');
+      expect(state.byId('prj_3')?.isOnGitHub, isFalse);
+    });
   });
 
   group('ShellCubit', () {
@@ -126,6 +132,8 @@ void main() {
 
 const _rescanned = Project(
   id: 'prj_1',
+  host: 'github.com',
+  sourceKey: '1',
   githubRepoId: 1,
   fullName: 'acme/mataa_new_app',
   remote: 'git@github.com:acme/mataa_new_app.git',

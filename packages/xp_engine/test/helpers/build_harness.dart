@@ -15,7 +15,7 @@ String _machine(String flutter) =>
 /// The worktree of a job that builds the app at `apps/mobile`.
 const buildWorktree = ReleaseWorktree(
   path: '/work/job_1',
-  mirror: GitMirror(githubRepoId: 42, path: '/mirrors/42.git'),
+  mirror: GitMirror(key: '42', path: '/mirrors/42.git'),
   sha: buildSha,
   appPath: 'apps/mobile',
 );

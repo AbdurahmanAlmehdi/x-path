@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:shelf/shelf.dart';
 import 'package:shelf_router/shelf_router.dart';
 import 'package:xp_api/xp_api.dart';
@@ -70,6 +72,18 @@ Future<Response> _guard(Future<Response> Function() action) async {
     return errorResponse(ApiErrorCode.conflict, error.message);
   } on ProjectInUseException catch (error) {
     return errorResponse(ApiErrorCode.conflict, error.message);
+  } on ProjectSshUrlRequiredException catch (error) {
+    return Response(
+      ApiErrorCode.sshUrlRequired.statusCode,
+      body: jsonEncode({
+        ...ErrorResponse.of(
+          ApiErrorCode.sshUrlRequired,
+          error.message,
+        ).toJson(),
+        'sshUrl': error.sshUrl,
+      }),
+      headers: const {'content-type': 'application/json'},
+    );
   } on ProjectInvalidException catch (error) {
     return errorResponse(ApiErrorCode.invalidRequest, error.message);
   } on GitHubNotFoundException {

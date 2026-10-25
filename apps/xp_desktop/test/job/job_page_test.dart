@@ -589,6 +589,8 @@ void main() {
         final withAppleId = Project(
           id: mataa.id,
           githubRepoId: mataa.githubRepoId,
+          host: mataa.host,
+          sourceKey: mataa.sourceKey,
           fullName: mataa.fullName,
           remote: mataa.remote,
           defaultBaseBranch: mataa.defaultBaseBranch,
@@ -660,6 +662,8 @@ void main() {
       final withIds = Project(
         id: mataa.id,
         githubRepoId: mataa.githubRepoId,
+        host: mataa.host,
+        sourceKey: mataa.sourceKey,
         fullName: mataa.fullName,
         remote: mataa.remote,
         defaultBaseBranch: mataa.defaultBaseBranch,

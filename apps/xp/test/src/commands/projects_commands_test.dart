@@ -129,6 +129,8 @@ void main() {
           sample.project,
           const Project(
             id: 'prj_3',
+            host: 'github.com',
+            sourceKey: '3',
             githubRepoId: 3,
             fullName: 'beta/app',
             remote: 'r',
@@ -201,6 +203,89 @@ void main() {
           .captured
           .cast<AddProjectRequest>();
       expect([for (final request in requests) request.remote], remotes);
+    });
+
+    test('adds an SSH or file:// URL as a remote, not a folder', () async {
+      when(() => env.client.addProject(any()))
+          .thenAnswer((_) async => sample.project);
+
+      for (final url in [
+        'git@bitbucket.org:ws/app.git',
+        'ssh://git@gitlab.com/group/sub/app.git',
+        'file:///srv/git/app.git',
+      ]) {
+        await env.runOk(['projects', 'add', url]);
+
+        final request =
+            verify(() => env.client.addProject(captureAny())).captured.single
+                as AddProjectRequest;
+        expect(request.remote, url);
+        expect(request.path, isNull);
+      }
+    });
+
+    test('sends the SSH URL the owner confirmed with a folder', () async {
+      when(() => env.client.addProject(any()))
+          .thenAnswer((_) async => sample.project);
+      final clone = Directory.systemTemp.createTempSync('xp_clone');
+      addTearDown(() => clone.deleteSync(recursive: true));
+
+      await env.runOk([
+        'projects',
+        'add',
+        clone.path,
+        '--ssh-url',
+        'git@bitbucket.org:ws/app.git',
+      ]);
+
+      final request =
+          verify(() => env.client.addProject(captureAny())).captured.single
+              as AddProjectRequest;
+      expect(request.path, startsWith('/'));
+      expect(request.sshUrl, 'git@bitbucket.org:ws/app.git');
+    });
+
+    test('takes --ssh-url only with a folder', () async {
+      expect(
+        await env.run([
+          'projects',
+          'add',
+          'git@bitbucket.org:ws/app.git',
+          '--ssh-url',
+          'git@bitbucket.org:ws/app.git',
+        ]),
+        64,
+      );
+      verifyNever(() => env.client.addProject(any()));
+    });
+
+    test('says how to add an HTTPS origin on another host by SSH', () async {
+      const offered = ApiException(
+        'XPath has no credentials for bitbucket.org over HTTPS; use the SSH '
+        'URL git@bitbucket.org:ws/app.git.',
+        statusCode: 422,
+        code: ApiErrorCode.sshUrlRequired,
+        sshUrl: 'git@bitbucket.org:ws/app.git',
+      );
+      when(() => env.client.addProject(any())).thenThrow(offered);
+      final clone = Directory.systemTemp.createTempSync('xp_clone');
+      addTearDown(() => clone.deleteSync(recursive: true));
+
+      expect(await env.run(['projects', 'add', clone.path]), 65);
+      expect(env.logger.errors.single, offered.message);
+      expect(
+        env.logger.out,
+        contains('--ssh-url git@bitbucket.org:ws/app.git'),
+      );
+
+      expect(
+        await env.run(['projects', 'add', 'https://bitbucket.org/ws/app.git']),
+        65,
+      );
+      expect(
+        env.logger.out,
+        contains('Run: xp projects add git@bitbucket.org:ws/app.git'),
+      );
     });
 
     test('says when the project exists already', () async {
@@ -322,6 +407,8 @@ void main() {
         (_) async => const Project(
           id: 'prj_1',
           githubRepoId: 7,
+          host: 'github.com',
+          sourceKey: '7',
           fullName: 'acme/app',
           remote: 'r',
           defaultBaseBranch: 'main',
@@ -427,6 +514,8 @@ void main() {
         (_) async => const Project(
           id: 'prj_1',
           githubRepoId: 7,
+          host: 'github.com',
+          sourceKey: '7',
           fullName: 'acme/app',
           remote: 'r',
           defaultBaseBranch: 'main',

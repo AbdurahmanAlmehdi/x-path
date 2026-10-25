@@ -212,6 +212,27 @@ class DispatchState extends Equatable {
   /// engine's plan says which version it would release.
   bool get bumps => preview?.version != null;
 
+  /// The first step of the workflow that needs GitHub (a `github.*` step or
+  /// `git.push`) when the project is not on GitHub, or `null`. The engine
+  /// refuses such a dispatch (ADR 0015), so the sheet does not offer it.
+  String? get gitHubStep {
+    final yaml = workflow?.yaml;
+    if (project.isOnGitHub || yaml == null) return null;
+    final WorkflowDocument document;
+    try {
+      document = WorkflowDocument.parse(yaml);
+    } on WorkflowDocumentException {
+      // The engine's plan says what is wrong with the document.
+      return null;
+    }
+    return document.stages
+        .expand((stage) => stage.jobs)
+        .expand((job) => job.steps)
+        .map((step) => step.kind)
+        .where(stepNeedsGitHub)
+        .firstOrNull;
+  }
+
   /// The flavors the run is for: the ones picked, else the default.
   List<String> get chosenFlavors => flavors ?? preview?.flavors ?? const [];
 
@@ -263,6 +284,7 @@ class DispatchState extends Equatable {
       workflow != null &&
       invalidInputs.isEmpty &&
       !noReleases &&
+      gitHubStep == null &&
       (refNotice != null ||
           (!(preview?.blocked ?? false) && (preview?.jobCount ?? 0) > 0));
 
@@ -555,6 +577,17 @@ class DispatchBloc extends Bloc<DispatchEvent, DispatchState> {
     if (emit.isDone) return;
     final workflow = state.workflow;
     if (workflow == null) return;
+    if (state.gitHubStep != null) {
+      // The engine would refuse it; the sheet says why.
+      emit(
+        state.copyWith(
+          status: DispatchStatus.ready,
+          preview: () => null,
+          previewing: false,
+        ),
+      );
+      return;
+    }
     try {
       final preview = await _workflows.plan(
         state.project.id,

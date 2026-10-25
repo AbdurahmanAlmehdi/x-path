@@ -18,6 +18,8 @@ import '../helpers/release_fixtures.dart';
 /// `mataa` with the pubspec version of `Main.dc.html`.
 final mataaWithVersion = Project(
   id: mataa.id,
+  host: 'github.com',
+  sourceKey: '${mataa.githubRepoId}',
   githubRepoId: mataa.githubRepoId,
   fullName: mataa.fullName,
   remote: mataa.remote,
@@ -38,6 +40,18 @@ final mataaWithVersion = Project(
         ),
     ],
   ),
+);
+
+/// `mataaWithVersion` on Bitbucket, under a path of three segments
+/// (ADR 0015).
+final mataaOnBitbucket = Project(
+  id: mataa.id,
+  host: 'bitbucket.org',
+  sourceKey: 'h0123456789abcdef',
+  fullName: 'ws/mobile/mataa_new_app',
+  remote: 'git@bitbucket.org:ws/mobile/mataa_new_app.git',
+  defaultBaseBranch: mataa.defaultBaseBranch,
+  profile: mataaWithVersion.profile,
 );
 
 /// The repositories behind an overview, with the releases the test gives.

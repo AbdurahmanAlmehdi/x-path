@@ -40,8 +40,9 @@ class StreamingContext implements StepContext {
   @override
   int get ordinal => 0;
 
+  /// Whether the job is stopping; a test sets it.
   @override
-  bool get isStopping => false;
+  bool isStopping = false;
 
   @override
   Future<ProcessExit> run(

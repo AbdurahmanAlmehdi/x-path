@@ -23,7 +23,8 @@ const _notFound = ProcessOutput(exitCode: 127, stderr: 'sh: java: not found');
 
 /// A machine that answers the probe and the doctor's own commands. [has]
 /// names what is installed: `git`, `tools` (curl, unzip, xz), `sdk`, `java`,
-/// `perl`, `ssh`.
+/// `perl`, `ssh`, `swift`, and for Linux iOS builds `omarchy` (a checkout at
+/// the pin), `darwin-sdk` and `ios-tools`.
 class _Machine {
   new(this.has);
 
@@ -58,6 +59,24 @@ class _Machine {
             : const ProcessOutput(exitCode: 1, stdout: 'xz\n');
       case 'sh' when script == RunnerProbe.androidSdkScript:
         return has.contains('sdk') ? _ok : const ProcessOutput(exitCode: 1);
+      case 'git' when call.arguments.contains('rev-parse'):
+        return has.contains('omarchy')
+            ? const ProcessOutput(
+                exitCode: 0,
+                stdout: '${RunnerProbe.iosLinuxPin}\n',
+              )
+            : const ProcessOutput(
+                exitCode: 128,
+                stderr: 'fatal: not a git repository\n',
+              );
+      case 'sh' when script == RunnerProbe.darwinSdkScript:
+        return has.contains('darwin-sdk')
+            ? _ok
+            : const ProcessOutput(exitCode: 1);
+      case 'sh' when script == RunnerProbe.iosLinuxToolsScript:
+        return has.contains('ios-tools')
+            ? _ok
+            : const ProcessOutput(exitCode: 1, stdout: 'rcodesign\n');
       case 'sh' when script == RunnerProbe.javaScript:
         return has.contains('java')
             ? const ProcessOutput(
@@ -98,8 +117,9 @@ void main() {
   RunnerDoctor doctor({
     Future<ServiceStatus> Function()? service,
     List<String> gitHosts = const ['github.com'],
+    Map<String, String>? environment,
   }) => RunnerDoctor(
-    host: host(),
+    host: host(environment: environment),
     paths: paths,
     clientFactory: env.context.clientFactory,
     serviceStatus:
@@ -165,6 +185,61 @@ void main() {
       expect(android.detail, contains('no Android SDK'));
       expect(android.detail, contains('; no JDK: java not found'));
       expect(android.fix, contains('; install JDK 17'));
+    });
+
+    test('lists ios-linux only on a runner configured for it', () async {
+      machine.has.addAll({'swift', 'omarchy', 'darwin-sdk', 'ios-tools'});
+
+      final unconfigured = await doctor().examine();
+      final configured = await doctor(
+        environment: {
+          'HOME': directory.path,
+          iosLinuxDirectoryVariable: '/srv/omarchy',
+        },
+      ).examine();
+
+      expect(
+        unconfigured.checks.map((c) => c.name),
+        isNot(contains('ios-linux')),
+      );
+      final iosLinux = configured.checks.firstWhere(
+        (c) => c.name == 'ios-linux',
+      );
+      expect(iosLinux.state, DoctorState.ok);
+    });
+
+    test('says what a configured runner lacks for ios-linux, with the '
+        'fixes', () async {
+      machine.has.add('swift');
+
+      final iosLinux = await check(
+        'ios-linux',
+        doctor(
+          environment: {
+            'HOME': directory.path,
+            iosLinuxDirectoryVariable: '/srv/omarchy',
+          },
+        ),
+      );
+
+      expect(iosLinux.state, DoctorState.missing);
+      expect(
+        iosLinux.detail,
+        '/srv/omarchy is not an omarchy-apple-dev checkout: fatal: not a git '
+        'repository; no darwin SDK bundle (swift-sdks/darwin.artifactbundle '
+        r'under $XDG_CONFIG_HOME/swiftpm or ~/.swiftpm); no rcodesign: '
+        'omarchy-apple-dev needs it',
+      );
+      expect(iosLinux.fix, startsWith('git clone https://github.com/'));
+      expect(iosLinux.fix, contains('; download Xcode.xip in a browser'));
+    });
+
+    test('an empty XP_IOS_LINUX_DIR is no configuration', () async {
+      final report = await doctor(
+        environment: {'HOME': directory.path, iosLinuxDirectoryVariable: ''},
+      ).examine();
+
+      expect(report.checks.map((c) => c.name), isNot(contains('ios-linux')));
     });
 
     test('a box with nothing is not ready', () async {
@@ -442,6 +517,50 @@ void main() {
         tight.detail,
         '2 GB free in ${directory.path}; what this runner offers needs '
         'about 3 GB',
+      );
+    });
+
+    test('counts about 7 GB for ios-linux', () async {
+      machine
+        ..has.addAll({'swift', 'omarchy', 'darwin-sdk', 'ios-tools'})
+        ..df = const ProcessOutput(
+          exitCode: 0,
+          stdout:
+              'Filesystem 1024-blocks Used Available Capacity Mounted on\n'
+              '/dev/sda1 104857600 0 10485760 90% /\n',
+        );
+
+      final disk = await check(
+        'disk',
+        doctor(
+          environment: {
+            'HOME': directory.path,
+            iosLinuxDirectoryVariable: '/srv/omarchy',
+          },
+        ),
+      );
+
+      expect(disk.state, DoctorState.missing);
+      expect(disk.detail, endsWith('needs about 12 GB'));
+    });
+
+    test('adds up what Android and Swift on Linux need', () async {
+      machine =
+          _Machine({'git', 'tools', 'sdk', 'java', 'perl', 'ssh', 'swift'})
+            ..df = const ProcessOutput(
+              exitCode: 0,
+              stdout:
+                  'Filesystem 1024-blocks Used Available Capacity Mounted on\n'
+                  '/dev/sda1 104857600 0 6291456 94% /\n',
+            );
+
+      final tight = await check('disk');
+
+      expect(tight.state, DoctorState.missing);
+      expect(
+        tight.detail,
+        '6 GB free in ${directory.path}; what this runner offers needs '
+        'about 10 GB',
       );
     });
 

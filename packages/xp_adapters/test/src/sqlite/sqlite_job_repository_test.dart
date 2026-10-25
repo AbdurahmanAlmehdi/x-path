@@ -43,8 +43,9 @@ void main() {
     // A job refers to a project and a workflow version.
     database.connection
       ..execute(
-        'INSERT INTO project (id, github_repo_id, remote, '
-        "default_base_branch) VALUES ('prj_1', 1, 'r', 'main')",
+        'INSERT INTO project (id, host, source_key, github_repo_id, remote, '
+        'default_base_branch) '
+        "VALUES ('prj_1', 'github.com', '1', 1, 'r', 'main')",
       )
       ..execute(
         'INSERT INTO workflow (id, project_id, name) '
@@ -181,6 +182,31 @@ void main() {
     expect(steps.first.input, {'executable': 'step0'});
     expect(await repository.get('job_x'), isNull);
     expect(await repository.steps('job_x'), isEmpty);
+  });
+
+  test('keeps the needs of a job and why Linux was ruled out', () async {
+    final job = JobRecord(
+      id: 'job_ios',
+      workflowVersionId: 'wfv_1',
+      projectId: 'prj_1',
+      state: JobState.queued,
+      createdAt: _created,
+      capabilities: const ['flutter', 'ios-sign|ios-linux'],
+      narrowing: const ['the app uses the flavor prod'],
+    );
+
+    await repository.create(job, const []);
+    await repository.updateJob(job.copyWith(message: 'Waiting.'));
+
+    final stored = (await repository.get('job_ios'))!;
+    expect(stored.capabilities, ['flutter', 'ios-sign|ios-linux']);
+    expect(stored.narrowing, ['the app uses the flavor prod']);
+  });
+
+  test('keeps no reason for a job that was not narrowed', () async {
+    await repository.create(_job('job_1'), const []);
+
+    expect((await repository.get('job_1'))!.narrowing, isEmpty);
   });
 
   test('keeps the times to the microsecond, in UTC', () async {

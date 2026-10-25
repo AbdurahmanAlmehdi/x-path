@@ -939,6 +939,95 @@ stages:
     });
   });
 
+  group('a project that is not on GitHub (ADR 0015)', () {
+    const key = 'h0123456789abcdef';
+
+    Future<void> moveTo(String host, String remote) async {
+      final project = demoProject();
+      await harness.projects.update(
+        ProjectRecord(
+          id: project.id,
+          host: host,
+          sourceKey: key,
+          fullName: 'ws/demo',
+          remote: remote,
+          githubDefaultBranch: 'main',
+          scan: project.scan,
+          findings: const [],
+          scannedAt: project.scannedAt,
+        ),
+      );
+    }
+
+    test('runs dev-build and test from the mirror of its source key', () async {
+      await moveTo('bitbucket.org', 'git@bitbucket.org:ws/demo.git');
+
+      final build = await harness.dispatchBuiltin(
+        'dev-build',
+        const DispatchRequest(platforms: ['android']),
+      );
+      final test = await harness.dispatchBuiltin('test');
+
+      expect(build.jobs.map((job) => job.name), [
+        'Check dev for android',
+        'Build dev for android',
+      ]);
+      expect(test.jobs.single.name, 'Test demo');
+      expect(
+        harness.git.calls.first,
+        'ensureMirror $key git@bitbucket.org:ws/demo.git',
+      );
+      final job = await jobNamed(build, 'Build dev for android');
+      final checkout = await harness.input(job, 'git.checkout');
+      expect(
+        (checkout['worktree'] as Map)['path'],
+        '/data/worktrees/$key/${job.id}',
+      );
+    });
+
+    test('refuses a workflow with a GitHub step, naming the host and the '
+        'step', () async {
+      await moveTo('bitbucket.org', 'git@bitbucket.org:ws/demo.git');
+
+      await expectLater(
+        harness.dispatchCustom('''
+schema: 1
+stages:
+  - name: finalize
+    jobs:
+      pr:
+        steps:
+          - kind: git.checkout
+          - kind: github.createPr
+'''),
+        _dispatchError(
+          allOf(
+            startsWith('ws/demo is on bitbucket.org, not on GitHub'),
+            contains('"custom-1" cannot run'),
+            contains('its "github.createPr" step works only on GitHub'),
+            contains('such as dev-build or test'),
+            contains('a private mirror of the repository on GitHub'),
+          ),
+        ),
+      );
+      expect(harness.git.calls, isEmpty, reason: 'nothing was fetched');
+    });
+
+    test('refuses a GitHub step of any workflow', () async {
+      await moveTo(Project.localHost, 'file:///srv/git/demo.git');
+
+      await expectLater(
+        harness.dispatchBuiltin('release-merge'),
+        _dispatchError(
+          allOf(
+            startsWith('ws/demo is a local repository, not on GitHub'),
+            contains('"github.mergePr"'),
+          ),
+        ),
+      );
+    });
+  });
+
   group('the request', () {
     test('resolves the ref and fetches first', () async {
       harness.git.refs['release/1.2'] = 'b' * 40;

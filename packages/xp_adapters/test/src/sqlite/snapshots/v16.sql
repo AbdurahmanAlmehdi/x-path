@@ -95,7 +95,7 @@ CREATE TABLE flavor (
   android_app_id TEXT,
   shorebird INTEGER NOT NULL DEFAULT 0 CHECK (shorebird IN (0, 1)),
   prod INTEGER NOT NULL DEFAULT 0 CHECK (prod IN (0, 1)),
-  version_files TEXT NOT NULL DEFAULT '[]' CHECK (json_valid(version_files)), firebase_app_id_android TEXT, firebase_app_id_ios TEXT, apple_app_id TEXT,
+  version_files TEXT NOT NULL DEFAULT '[]' CHECK (json_valid(version_files)),
   UNIQUE (app_id, name)
 ) STRICT;
 
@@ -141,17 +141,24 @@ CREATE TABLE pairing_token (
   used_at INTEGER
 ) STRICT;
 
-CREATE TABLE project (
+CREATE TABLE "project" (
   id TEXT PRIMARY KEY,
-  github_repo_id INTEGER NOT NULL UNIQUE,
+  host TEXT NOT NULL CHECK (length(host) > 0),
+  source_key TEXT NOT NULL UNIQUE CHECK (length(source_key) > 0),
+  github_repo_id INTEGER UNIQUE,
   remote TEXT NOT NULL,
   default_base_branch TEXT NOT NULL,
   release_model TEXT NOT NULL DEFAULT '{}' CHECK (json_valid(release_model)),
-  gates TEXT NOT NULL DEFAULT '{}' CHECK (json_valid(gates))
-, full_name TEXT NOT NULL DEFAULT '', local_path TEXT, github_default_branch TEXT NOT NULL DEFAULT '', scan TEXT NOT NULL DEFAULT '{}'
-  CHECK (json_valid(scan)), findings TEXT NOT NULL DEFAULT '[]'
-  CHECK (json_valid(findings)), scanned_at INTEGER NOT NULL DEFAULT 0, edits TEXT NOT NULL DEFAULT '{}'
-  CHECK (json_valid(edits))) STRICT;
+  gates TEXT NOT NULL DEFAULT '{}' CHECK (json_valid(gates)),
+  full_name TEXT NOT NULL DEFAULT '',
+  local_path TEXT,
+  github_default_branch TEXT NOT NULL DEFAULT '',
+  scan TEXT NOT NULL DEFAULT '{}' CHECK (json_valid(scan)),
+  findings TEXT NOT NULL DEFAULT '[]' CHECK (json_valid(findings)),
+  scanned_at INTEGER NOT NULL DEFAULT 0,
+  edits TEXT NOT NULL DEFAULT '{}' CHECK (json_valid(edits)),
+  CHECK ((host = 'github.com') = (github_repo_id IS NOT NULL))
+) STRICT;
 
 CREATE TABLE release (
   id TEXT PRIMARY KEY,

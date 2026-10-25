@@ -78,9 +78,61 @@ DispatchPlan previewOf(
   ],
 );
 
+const _pushing = '''
+stages:
+  - name: finalize
+    jobs:
+      tag:
+        steps:
+          - kind: git.tag
+          - kind: git.push
+          - kind: github.createPr
+''';
+
 void main() {
   late MockWorkflowsRepository workflows;
   late MockReleasesRepository releases;
+
+  group('DispatchState.gitHubStep (ADR 0015)', () {
+    DispatchState stateOf(Project project, String yaml) => DispatchState(
+      project: project,
+      app: '.',
+      ref: project.defaultBaseBranch,
+      status: DispatchStatus.ready,
+      workflow: workflowWith('wf', yaml),
+      preview: previewOf(1),
+    );
+
+    test('names the first GitHub step for a project on another host', () {
+      final state = stateOf(shop, _pushing);
+
+      expect(state.gitHubStep, 'git.push');
+      expect(state.canDispatch, isFalse);
+    });
+
+    test('catches a workflow whose only GitHub step opens a pull request', () {
+      const pullRequest = '''
+stages:
+  - name: finalize
+    jobs:
+      pr:
+        steps:
+          - kind: git.checkout
+          - kind: github.createPr
+''';
+      final state = stateOf(shop, pullRequest);
+
+      expect(state.gitHubStep, 'github.createPr');
+      expect(state.canDispatch, isFalse);
+    });
+
+    test('is null on GitHub, and for a workflow without GitHub steps', () {
+      for (final state in [stateOf(mataa, _pushing), stateOf(shop, bumping)]) {
+        expect(state.gitHubStep, isNull);
+        expect(state.canDispatch, isTrue);
+      }
+    });
+  });
 
   setUpAll(() {
     registerFallbackValue(mataa);
@@ -148,6 +200,8 @@ void main() {
     test('a project without an app runs at the root', () {
       const empty = Project(
         id: 'prj_9',
+        host: 'github.com',
+        sourceKey: '9',
         githubRepoId: 9,
         fullName: 'a/b',
         remote: 'r',

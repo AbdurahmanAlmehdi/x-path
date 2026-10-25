@@ -1,19 +1,23 @@
 import 'package:equatable/equatable.dart';
 
-/// The engine's bare repository for one GitHub repository (D-05).
+/// The engine's bare repository for one project (D-05, ADR 0015).
 class GitMirror extends Equatable {
   /// Creates a mirror record.
-  const new({required this.githubRepoId, required this.path});
+  const new({required this.key, required this.path});
 
-  /// The id GitHub gave the repository. It survives renames, so it keys the
-  /// mirror.
-  final int githubRepoId;
+  /// What a mirror key looks like: a GitHub repository id in decimal, or `h`
+  /// and 16 hex digits for a repository on another host.
+  static final keyPattern = RegExp(r'^(\d+|h[0-9a-f]{16})$');
+
+  /// The project's source key. A GitHub repository id survives renames, so
+  /// it keys the mirror of a GitHub project.
+  final String key;
 
   /// The directory of the bare repository.
   final String path;
 
   @override
-  List<Object?> get props => [githubRepoId, path];
+  List<Object?> get props => [key, path];
 }
 
 /// A checkout of one commit for one job, apart from the mirror and from every

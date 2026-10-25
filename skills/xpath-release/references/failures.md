@@ -74,13 +74,16 @@ A guard failure needs a change in the repository or in the credentials; re-runni
 
 - **Google Play review in progress**: "Play has a review in progress; the release was not
   committed and the review was not cancelled". XPath never cancels a review; wait for it to end.
-- **altool**: `ITMS-90186` or `ITMS-90062` (bump the version), `ITMS-90189` (the build number was
-  used: dispatch again for a new one), authentication errors (the App Store Connect key or the
-  app-specific password; the owner replaces the credential).
+- **App Store Connect** (the API with an `asc_key`, altool with an `apple_id`): `ITMS-90186` or
+  `ITMS-90062` (bump the version), `ITMS-90189` (the build number was used: dispatch again for a
+  new one), authentication errors (the App Store Connect key or the app-specific password; the
+  owner replaces the credential). An upload App Store Connect neither accepts nor refuses within
+  30 minutes fails; resume it later: it finds the build if Apple made one.
 - **Firebase**: the version in the binary is not the job's version; the step names the release it
   made.
 - **`build.ios` needs macOS (ios-sign)**: the job landed where there is no Xcode.
 - **`test` on a branch with no baseline** fails on every failure and says to run the base branch
   first.
-- **A runner's checkout**: "add this runner's SSH key as a deploy key on `<owner/repo>`", "run
-  `ssh -T git@github.com` once", or a commit that was never pushed ("push it").
+- **A runner's checkout**: "add this runner's SSH key as a deploy key on `<owner/repo>`" (an
+  access key on Bitbucket), a host key that changed ("ssh-keygen -R <host>"), or a commit that was
+  never pushed ("push it").

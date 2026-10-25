@@ -11,6 +11,7 @@ export 'src/device_token_kind.dart';
 export 'src/dispatch_plan.dart';
 export 'src/events.dart';
 export 'src/finding.dart';
+export 'src/git_remote.dart';
 export 'src/github_token.dart';
 export 'src/health_response.dart';
 export 'src/job.dart';
