@@ -14,9 +14,10 @@ void main() {
   });
 
   void insertProject([String id = 'p1', int repoId = 1]) => db.execute(
-    'INSERT INTO project (id, github_repo_id, remote, default_base_branch) '
-    "VALUES (?, ?, 'git@github.com:o/r.git', 'main')",
-    [id, repoId],
+    'INSERT INTO project '
+    '(id, host, source_key, github_repo_id, remote, default_base_branch) '
+    "VALUES (?, 'github.com', ?, ?, 'git@github.com:o/r.git', 'main')",
+    [id, '$repoId', repoId],
   );
 
   void insertApp([String id = 'a1', String project = 'p1']) => db.execute(
@@ -172,9 +173,9 @@ void main() {
   test('JSON columns must hold valid JSON', () {
     expect(
       () => db.execute(
-        'INSERT INTO project '
-        '(id, github_repo_id, remote, default_base_branch, gates) '
-        "VALUES ('p', 1, 'r', 'main', '{nope')",
+        'INSERT INTO project (id, host, source_key, github_repo_id, remote, '
+        'default_base_branch, gates) '
+        "VALUES ('p', 'github.com', '1', 1, 'r', 'main', '{nope')",
       ),
       throwsA(isA<SqliteException>()),
     );

@@ -244,6 +244,8 @@ void main() {
           projects: [
             Project(
               id: 'prj_3',
+              host: 'github.com',
+              sourceKey: '3',
               githubRepoId: 3,
               fullName: 'acme/guest',
               remote: 'r',

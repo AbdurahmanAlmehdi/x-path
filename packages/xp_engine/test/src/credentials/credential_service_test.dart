@@ -119,6 +119,8 @@ void main() {
     await projects.add(
       ProjectRecord(
         id: 'prj_1',
+        host: 'github.com',
+        sourceKey: '1',
         githubRepoId: 1,
         fullName: 'acme/shop',
         remote: 'https://github.com/acme/shop.git',
@@ -1163,6 +1165,8 @@ void main() {
       await projects.add(
         ProjectRecord(
           id: 'prj_1',
+          host: 'github.com',
+          sourceKey: '1',
           githubRepoId: 1,
           fullName: '',
           remote: 'x',
@@ -1209,6 +1213,8 @@ void main() {
       await projects.add(
         ProjectRecord(
           id: 'prj_1',
+          host: 'github.com',
+          sourceKey: '1',
           githubRepoId: 1,
           fullName: 'a-very-long-organisation-name/a-very-long-repository',
           remote: 'x',
@@ -1405,6 +1411,8 @@ void main() {
       await projects.add(
         ProjectRecord(
           id: 'prj_2',
+          host: 'github.com',
+          sourceKey: '2',
           githubRepoId: 2,
           fullName: 'acme/other',
           remote: 'x',

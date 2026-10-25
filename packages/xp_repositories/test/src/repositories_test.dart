@@ -264,6 +264,34 @@ void main() {
       );
     });
 
+    test('offers the SSH URL of an HTTPS origin on another host', () async {
+      const request = AddProjectRequest(path: '/src/app');
+      when(() => harness.client.addProject(request)).thenThrow(
+        const ApiException(
+          'Use the SSH URL.',
+          statusCode: 422,
+          code: ApiErrorCode.sshUrlRequired,
+          sshUrl: 'git@bitbucket.org:ws/app.git',
+        ),
+      );
+
+      await expectLater(
+        repository.addProject('/src/app'),
+        throwsA(
+          isA<SshUrlRequired>()
+              .having((error) => error.message, 'message', 'Use the SSH URL.')
+              .having(
+                (error) => error.sshUrl,
+                'sshUrl',
+                'git@bitbucket.org:ws/app.git',
+              ),
+        ),
+      );
+
+      when(() => harness.client.addProject(request)).thenThrow(notFound);
+      await expectLater(repository.addProject('/src/app'), throwsA(notFound));
+    });
+
     test('passes the commands to the engine', () async {
       final client = harness.client;
       const response = AssignCredentialResponse(
@@ -273,6 +301,14 @@ void main() {
       when(() => client.getProject('prj_1')).thenAnswer((_) async => project);
       when(() => client.addProject(const AddProjectRequest(path: '/src/app')))
           .thenAnswer((_) async => project);
+      when(
+        () => client.addProject(
+          const AddProjectRequest(
+            path: '/src/app',
+            sshUrl: 'git@bitbucket.org:ws/app.git',
+          ),
+        ),
+      ).thenAnswer((_) async => project);
       when(() => client.scanProject('prj_1')).thenAnswer((_) async => project);
       when(() => client.removeProject('prj_1')).thenAnswer((_) async {});
       when(
@@ -298,6 +334,13 @@ void main() {
 
       expect(await repository.getProject('prj_1'), project);
       expect(await repository.addProject('/src/app'), project);
+      expect(
+        await repository.addProject(
+          '/src/app',
+          sshUrl: 'git@bitbucket.org:ws/app.git',
+        ),
+        project,
+      );
       expect(await repository.scanProject('prj_1'), project);
       await repository.removeProject('prj_1');
       expect(

@@ -18,6 +18,8 @@ import '../helpers/release_fixtures.dart';
 /// `orbit` with the pubspec version of `Main.dc.html`.
 final orbitWithVersion = Project(
   id: orbit.id,
+  host: 'github.com',
+  sourceKey: '${orbit.githubRepoId}',
   githubRepoId: orbit.githubRepoId,
   fullName: orbit.fullName,
   remote: orbit.remote,
@@ -38,6 +40,18 @@ final orbitWithVersion = Project(
         ),
     ],
   ),
+);
+
+/// `orbitWithVersion` on Bitbucket, under a path of three segments
+/// (ADR 0015).
+final orbitOnBitbucket = Project(
+  id: orbit.id,
+  host: 'bitbucket.org',
+  sourceKey: 'h0123456789abcdef',
+  fullName: 'ws/mobile/orbit_new_app',
+  remote: 'git@bitbucket.org:ws/mobile/orbit_new_app.git',
+  defaultBaseBranch: orbit.defaultBaseBranch,
+  profile: orbitWithVersion.profile,
 );
 
 /// The repositories behind an overview, with the releases the test gives.

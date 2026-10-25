@@ -3,14 +3,14 @@
 class WorktreeDirectory {
   /// Creates the description.
   const new({
-    required this.githubRepoId,
+    required this.key,
     required this.name,
     required this.path,
     required this.bytes,
   });
 
-  /// The GitHub repository of the mirror it belongs to.
-  final int githubRepoId;
+  /// The key of the mirror it belongs to (`GitMirror.key`).
+  final String key;
 
   /// The folder name: the job's id.
   final String name;
@@ -25,14 +25,10 @@ class WorktreeDirectory {
 /// A mirror under the data directory.
 class MirrorDirectory {
   /// Creates the description.
-  const new({
-    required this.githubRepoId,
-    required this.path,
-    required this.bytes,
-  });
+  const new({required this.key, required this.path, required this.bytes});
 
-  /// The GitHub repository it mirrors.
-  final int githubRepoId;
+  /// Its key (`GitMirror.key`): the source key of the project it mirrors.
+  final String key;
 
   /// The absolute path.
   final String path;
@@ -136,9 +132,9 @@ class InMemoryDataFiles implements DataFiles {
 
   @override
   Future<void> deleteMirror(MirrorDirectory mirror) async {
-    _check('mirror ${mirror.githubRepoId}');
+    _check('mirror ${mirror.key}');
     mirrorList.remove(mirror);
-    deleted.add('mirror ${mirror.githubRepoId}');
+    deleted.add('mirror ${mirror.key}');
   }
 
   @override

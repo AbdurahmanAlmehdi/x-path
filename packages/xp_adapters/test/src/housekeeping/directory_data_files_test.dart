@@ -62,20 +62,23 @@ void main() {
   });
 
   group('worktrees', () {
-    test('are listed by repository and job, with their size', () async {
+    test('are listed by mirror key and job, with their size', () async {
       write('worktrees/42/job_1/a.dart', 10);
       write('worktrees/42/job_1/lib/b.dart', 5);
       write('worktrees/42/job_2/a.dart', 1);
       write('worktrees/7/job_3/a.dart', 2);
+      write('worktrees/h0123456789abcdef/job_5/a.dart', 4);
       write('worktrees/not-a-repository/job_4/a.dart', 3);
+      write('worktrees/h0123/job_6/a.dart', 3);
       write('worktrees/42/stray.txt', 3);
 
       final worktrees = await files.worktrees();
 
-      expect(worktrees.map((w) => (w.githubRepoId, w.name, w.bytes)), [
-        (42, 'job_1', 15),
-        (42, 'job_2', 1),
-        (7, 'job_3', 2),
+      expect(worktrees.map((w) => (w.key, w.name, w.bytes)), [
+        ('42', 'job_1', 15),
+        ('42', 'job_2', 1),
+        ('7', 'job_3', 2),
+        ('h0123456789abcdef', 'job_5', 4),
       ]);
       expect(worktrees.first.path, p.join(dataDir.path, 'worktrees/42/job_1'));
     });
@@ -90,10 +93,7 @@ void main() {
       expect(git.removed.single.path, worktrees.first.path);
       expect(
         git.removed.single.mirror,
-        GitMirror(
-          githubRepoId: 42,
-          path: p.join(dataDir.path, 'mirrors', '42.git'),
-        ),
+        GitMirror(key: '42', path: p.join(dataDir.path, 'mirrors', '42.git')),
       );
       // The fake git removed nothing; the folder is still there.
       expect(exists('worktrees/42/job_1'), isTrue);
@@ -122,18 +122,21 @@ void main() {
   });
 
   group('mirrors', () {
-    test('are the folders named for a repository id', () async {
+    test('are the folders named for a source key', () async {
       write('mirrors/42.git/HEAD', 20);
       write('mirrors/42.git/objects/pack/x.pack', 100);
       write('mirrors/7.git/HEAD', 3);
+      write('mirrors/h0123456789abcdef.git/HEAD', 5);
       write('mirrors/readme.txt', 1);
       Directory(p.join(dataDir.path, 'mirrors', 'x.git')).createSync();
+      Directory(p.join(dataDir.path, 'mirrors', 'hABC.git')).createSync();
 
       final mirrors = await files.mirrors();
 
-      expect(mirrors.map((m) => (m.githubRepoId, m.bytes)), [
-        (42, 120),
-        (7, 3),
+      expect(mirrors.map((m) => (m.key, m.bytes)), [
+        ('42', 120),
+        ('7', 3),
+        ('h0123456789abcdef', 5),
       ]);
     });
 
@@ -153,7 +156,7 @@ void main() {
 
     test('deleting one that is gone does nothing', () async {
       await files.deleteMirror(
-        const MirrorDirectory(githubRepoId: 9, path: '/nowhere', bytes: 0),
+        const MirrorDirectory(key: '9', path: '/nowhere', bytes: 0),
       );
     });
   });

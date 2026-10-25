@@ -70,8 +70,9 @@ docker run -d --name xpath-runner --restart on-failure -v xpath-runner:/data \
 - Everything the runner keeps is in the volume, its home folder (`/data/home`) included, so its
   SSH key and its Gradle caches survive a new container.
 - The runner fetches the source with its own SSH key. Make one in the volume and add the public
-  key (`doctor` prints its path) as a deploy key of the repository:
-  `docker exec xpath-runner ssh-keygen -t ed25519`. Or mount a key read-only.
+  key (`doctor` prints its path) as a deploy key of the repository (an access key on Bitbucket):
+  `docker exec xpath-runner ssh-keygen -t ed25519`. Or mount a key read-only. SSH records the host
+  key of the git server the first time; a key that changes later fails the job.
 - When the runner updates itself to its engine's version, the update survives a restart of the
   container. A runner the engine revoked, that another connection replaced, or that is not paired
   exits with 0 and says why, so `--restart on-failure` does not start it again.

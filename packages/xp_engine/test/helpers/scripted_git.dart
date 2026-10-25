@@ -34,19 +34,19 @@ class ScriptedGit implements GitService {
 
   /// Where the worktree [name] of [mirror] is.
   static String pathOf(GitMirror mirror, String name) =>
-      '/data/worktrees/${mirror.githubRepoId}/$name';
+      '/data/worktrees/${mirror.key}/$name';
 
   @override
   Future<GitMirror> ensureMirror({
-    required int githubRepoId,
+    required String key,
     required String remoteUrl,
   }) async {
-    calls.add('ensureMirror $githubRepoId $remoteUrl');
-    return GitMirror(
-      githubRepoId: githubRepoId,
-      path: '/mirrors/$githubRepoId.git',
-    );
+    calls.add('ensureMirror $key $remoteUrl');
+    return GitMirror(key: key, path: '/mirrors/$key.git');
   }
+
+  @override
+  Future<String> lsRemote(String url) => throw UnimplementedError();
 
   @override
   Future<void> fetch(GitMirror mirror) async {

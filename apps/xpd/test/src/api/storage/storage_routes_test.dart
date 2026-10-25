@@ -68,7 +68,7 @@ void main() {
     test('reports what the engine keeps and what could be freed', () async {
       await addBuilds();
       engine.dataFiles.mirrorList.add(
-        const MirrorDirectory(githubRepoId: 9, path: '/m/9.git', bytes: 500),
+        const MirrorDirectory(key: '9', path: '/m/9.git', bytes: 500),
       );
 
       final response = await send('GET', '/storage');

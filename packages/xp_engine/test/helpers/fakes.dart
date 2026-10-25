@@ -81,8 +81,8 @@ class FakeGitService implements GitService {
   /// Every call as `method argument`, oldest first.
   final calls = <String>[];
 
-  /// The mirror remotes by repository id, as last set.
-  final remotes = <int, String>{};
+  /// The mirror remotes by mirror key, as last set.
+  final remotes = <String, String>{};
 
   /// Set to make [fetch] fail with it.
   Exception? fetchFailure;
@@ -93,23 +93,34 @@ class FakeGitService implements GitService {
   /// If set, [ensureMirror] waits for it.
   Future<void>? gate;
 
+  /// The default branch [lsRemote] reads.
+  String defaultBranch = 'main';
+
+  /// Set to make [lsRemote] fail with it.
+  Exception? lsRemoteFailure;
+
+  @override
+  Future<String> lsRemote(String url) async {
+    calls.add('lsRemote $url');
+    final failure = lsRemoteFailure;
+    if (failure != null) throw failure;
+    return defaultBranch;
+  }
+
   @override
   Future<GitMirror> ensureMirror({
-    required int githubRepoId,
+    required String key,
     required String remoteUrl,
   }) async {
     await gate;
-    calls.add('ensureMirror $githubRepoId');
-    remotes[githubRepoId] = remoteUrl;
-    return GitMirror(
-      githubRepoId: githubRepoId,
-      path: '/mirrors/$githubRepoId.git',
-    );
+    calls.add('ensureMirror $key');
+    remotes[key] = remoteUrl;
+    return GitMirror(key: key, path: '/mirrors/$key.git');
   }
 
   @override
   Future<void> fetch(GitMirror mirror) async {
-    calls.add('fetch ${mirror.githubRepoId}');
+    calls.add('fetch ${mirror.key}');
     final failure = fetchFailure;
     if (failure != null) throw failure;
   }

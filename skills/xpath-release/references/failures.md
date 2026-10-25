@@ -81,5 +81,6 @@ A guard failure needs a change in the repository or in the credentials; re-runni
 - **`build.ios` needs macOS (ios-sign)**: the job landed where there is no Xcode.
 - **`test` on a branch with no baseline** fails on every failure and says to run the base branch
   first.
-- **A runner's checkout**: "add this runner's SSH key as a deploy key on `<owner/repo>`", "run
-  `ssh -T git@github.com` once", or a commit that was never pushed ("push it").
+- **A runner's checkout**: "add this runner's SSH key as a deploy key on `<owner/repo>`" (an
+  access key on Bitbucket), a host key that changed ("ssh-keygen -R <host>"), or a commit that was
+  never pushed ("push it").

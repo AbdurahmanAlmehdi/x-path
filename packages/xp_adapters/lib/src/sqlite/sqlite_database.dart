@@ -140,19 +140,41 @@ class SqliteDatabase {
       connection.execute('VACUUM INTO ?', [backup.path]);
     }
     for (final migration in migrations) {
-      _inTransaction(connection, () {
-        // Another process may have migrated since we looked.
-        if (connection.userVersion >= migration.version) return;
-        if (migration.notes case final notes?) {
-          for (final row in connection.select(notes)) {
-            onNote?.call(row.columnAt(0) as String);
+      // The pragma is a no-op inside a transaction, so it is set around it.
+      if (migration.foreignKeysOff) {
+        connection.execute('PRAGMA foreign_keys = OFF');
+      }
+      try {
+        _inTransaction(connection, () {
+          // Another process may have migrated since we looked.
+          if (connection.userVersion >= migration.version) return;
+          if (migration.notes case final notes?) {
+            for (final row in connection.select(notes)) {
+              onNote?.call(row.columnAt(0) as String);
+            }
           }
+          connection.execute(migration.sql);
+          if (migration.foreignKeysOff) {
+            _checkForeignKeys(connection, migration);
+          }
+          connection.userVersion = migration.version;
+        });
+      } finally {
+        if (migration.foreignKeysOff) {
+          connection.execute('PRAGMA foreign_keys = ON');
         }
-        connection
-          ..execute(migration.sql)
-          ..userVersion = migration.version;
-      });
+      }
     }
+  }
+
+  static void _checkForeignKeys(Database connection, Migration migration) {
+    final broken = connection.select('PRAGMA foreign_key_check');
+    if (broken.isEmpty) return;
+    final tables = {for (final row in broken) row['table'] as String};
+    throw DatabaseOpenException(
+      'Migration ${migration.version} left ${broken.length} row(s) that refer '
+      'to nothing in ${(tables.toList()..sort()).join(', ')}.',
+    );
   }
 
   static bool _hasSchema(Database connection) {

@@ -15,6 +15,30 @@ const _v2 = Migration(
   sql: 'ALTER TABLE note ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0;',
 );
 
+const _owners = Migration(
+  version: 1,
+  sql: '''
+CREATE TABLE owner (id INTEGER PRIMARY KEY, name TEXT NOT NULL);
+CREATE TABLE pet (
+  id INTEGER PRIMARY KEY,
+  owner_id INTEGER NOT NULL REFERENCES owner (id) ON DELETE CASCADE
+);
+''',
+);
+
+/// Rebuilds `owner` with a nullable `name`, as SQLite's 12-step procedure
+/// does. With foreign keys on, dropping the old table would delete every pet.
+const _rebuildOwners = Migration(
+  version: 2,
+  foreignKeysOff: true,
+  sql: '''
+CREATE TABLE new_owner (id INTEGER PRIMARY KEY, name TEXT);
+INSERT INTO new_owner (id, name) SELECT id, name FROM owner;
+DROP TABLE owner;
+ALTER TABLE new_owner RENAME TO owner;
+''',
+);
+
 Object? _pragma(SqliteDatabase database, String name) =>
     database.connection.select('PRAGMA $name').single.columnAt(0);
 
@@ -238,6 +262,72 @@ void main() {
         reason: 'the half-applied migration was rolled back',
       );
       expect(File('$path.bak-v1').existsSync(), isTrue);
+    });
+
+    test('runs a migration with foreign keys off and turns them on', () {
+      SqliteDatabase.open(path, migrations: [_owners])
+        ..connection.execute(
+          "INSERT INTO owner (id, name) VALUES (1, 'ada'); "
+          'INSERT INTO pet (id, owner_id) VALUES (1, 1), (2, 1);',
+        )
+        ..close();
+
+      final database = SqliteDatabase.open(
+        path,
+        migrations: [_owners, _rebuildOwners],
+      );
+      addTearDown(database.close);
+
+      expect(database.connection.userVersion, 2);
+      expect(
+        database.connection.select('SELECT owner_id FROM pet ORDER BY id'),
+        [
+          {'owner_id': 1},
+          {'owner_id': 1},
+        ],
+        reason: 'the rebuild kept the rows that refer to the table',
+      );
+      expect(_pragma(database, 'foreign_keys'), 1);
+      expect(
+        () => database.connection.execute(
+          'INSERT INTO pet (id, owner_id) VALUES (3, 9)',
+        ),
+        throwsA(isA<SqliteException>()),
+      );
+    });
+
+    test('fails a migration that leaves a row referring to nothing', () {
+      const orphan = Migration(
+        version: 2,
+        foreignKeysOff: true,
+        sql: 'DELETE FROM owner WHERE id = 1;',
+      );
+      SqliteDatabase.open(path, migrations: [_owners])
+        ..connection.execute(
+          "INSERT INTO owner (id, name) VALUES (1, 'ada'); "
+          'INSERT INTO pet (id, owner_id) VALUES (1, 1);',
+        )
+        ..close();
+
+      expect(
+        () => SqliteDatabase.open(path, migrations: [_owners, orphan]),
+        throwsA(
+          isA<DatabaseOpenException>().having(
+            (error) => error.message,
+            'message',
+            'Migration 2 left 1 row(s) that refer to nothing in pet.',
+          ),
+        ),
+      );
+
+      final database = SqliteDatabase.open(path, migrations: [_owners]);
+      addTearDown(database.close);
+      expect(database.connection.userVersion, 1);
+      expect(
+        database.connection.select('SELECT name FROM owner').single['name'],
+        'ada',
+        reason: 'the migration was rolled back',
+      );
     });
 
     test('a snapshot of an old version migrates to the fresh schema', () {

@@ -14,5 +14,8 @@ void main() {
     );
     expect(errorMessage(const CredentialInUse('In use.')), 'In use.');
     expect('${const CredentialInUse('In use.')}', 'CredentialInUse: In use.');
+    const ssh = SshUrlRequired('Use SSH.', sshUrl: 'git@h:a.git');
+    expect(errorMessage(ssh), 'Use SSH.');
+    expect('$ssh', 'SshUrlRequired: Use SSH.');
   });
 }

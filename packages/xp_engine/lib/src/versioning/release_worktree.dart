@@ -30,16 +30,12 @@ class ReleaseWorktree extends Equatable {
     final mirror = requiredObject(json, 'mirror');
     final scope = optionalObject(json, 'scope');
     final model = optionalObject(json, 'releaseModel');
-    final githubRepoId = mirror['githubRepoId'];
-    if (githubRepoId is! int) {
-      throw const FormatException('"mirror.githubRepoId" must be a number.');
-    }
+    final key =
+        mirrorKeyOf(mirror) ??
+        (throw const FormatException('"mirror.key" must be a string.'));
     return ReleaseWorktree(
       path: requiredString(json, 'path'),
-      mirror: GitMirror(
-        githubRepoId: githubRepoId,
-        path: requiredString(mirror, 'path'),
-      ),
+      mirror: GitMirror(key: key, path: requiredString(mirror, 'path')),
       sha: requiredString(json, 'sha'),
       appPath: optionalString(json, 'appPath') ?? '.',
       versionFiles: stringList(json, 'versionFiles'),
@@ -52,6 +48,14 @@ class ReleaseWorktree extends Equatable {
       ),
     );
   }
+
+  /// The key of the stored form [mirror] of a mirror, or `null` if it has
+  /// none. Jobs stored before ADR 0015 name it by its GitHub repository id.
+  static String? mirrorKeyOf(Map<String, dynamic> mirror) => switch (mirror) {
+    {'key': final String key} => key,
+    {'githubRepoId': final int githubRepoId} => '$githubRepoId',
+    _ => null,
+  };
 
   /// The directory of the worktree.
   final String path;
@@ -91,7 +95,7 @@ class ReleaseWorktree extends Equatable {
   /// The stored form.
   Map<String, dynamic> toJson() => {
     'path': path,
-    'mirror': {'githubRepoId': mirror.githubRepoId, 'path': mirror.path},
+    'mirror': {'key': mirror.key, 'path': mirror.path},
     'sha': sha,
     'appPath': appPath,
     'versionFiles': versionFiles,

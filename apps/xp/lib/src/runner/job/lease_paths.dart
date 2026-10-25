@@ -6,8 +6,9 @@ import 'package:xp_engine/xp_engine.dart';
 /// the runner's.
 ///
 /// The engine plans each step with the worktree it will make for the job:
-/// `<engine data>/worktrees/<repo id>/<job id>`, cut from the mirror
-/// `<engine data>/mirrors/<repo id>.git`. A runner has its own bare cache and
+/// `<engine data>/worktrees/<key>/<job id>`, cut from the mirror
+/// `<engine data>/mirrors/<key>.git`, where the key is the project's source
+/// key (ADR 0015). A runner has its own bare cache and
 /// makes its own worktree (ADR 0009), so it names the same worktree and mirror
 /// in its own data directory and replaces the engine's paths with them in
 /// every step input. A path below the worktree (the working directory of a
@@ -33,11 +34,15 @@ class LeasePaths {
       final mirror = worktree['mirror'];
       if (path is! String || mirror is! Map<String, dynamic>) continue;
       final mirrorPath = mirror['path'];
-      final repoId = mirror['githubRepoId'];
-      if (mirrorPath is! String || repoId is! int) continue;
+      final key = ReleaseWorktree.mirrorKeyOf(mirror);
+      if (mirrorPath is! String ||
+          key == null ||
+          !GitMirror.keyPattern.hasMatch(key)) {
+        continue;
+      }
       final gitMirror = GitMirror(
-        githubRepoId: repoId,
-        path: mirrorLocation(sourceDirectory, repoId),
+        key: key,
+        path: mirrorLocation(sourceDirectory, key),
       );
       final worktreePath = CliGitService.worktreePath(
         sourceDirectory,
@@ -52,10 +57,10 @@ class LeasePaths {
     return const LeasePaths({});
   }
 
-  /// Where the runner keeps the bare cache of the repository [githubRepoId]
-  /// under [sourceDirectory].
-  static String mirrorLocation(String sourceDirectory, int githubRepoId) =>
-      p.join(sourceDirectory, 'mirrors', '$githubRepoId.git');
+  /// Where the runner keeps the bare cache of the repository whose source
+  /// key is [key] under [sourceDirectory].
+  static String mirrorLocation(String sourceDirectory, String key) =>
+      p.join(sourceDirectory, 'mirrors', '$key.git');
 
   final Map<String, String> _replacements;
 

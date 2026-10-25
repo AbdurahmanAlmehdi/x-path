@@ -445,6 +445,26 @@ void main() {
       );
     });
 
+    test('adds up what Android and Swift on Linux need', () async {
+      machine =
+          _Machine({'git', 'tools', 'sdk', 'java', 'perl', 'ssh', 'swift'})
+            ..df = const ProcessOutput(
+              exitCode: 0,
+              stdout:
+                  'Filesystem 1024-blocks Used Available Capacity Mounted on\n'
+                  '/dev/sda1 104857600 0 6291456 94% /\n',
+            );
+
+      final tight = await check('disk');
+
+      expect(tight.state, DoctorState.missing);
+      expect(
+        tight.detail,
+        '6 GB free in ${directory.path}; what this runner offers needs '
+        'about 10 GB',
+      );
+    });
+
     test('skips what df does not say', () async {
       machine.df = const ProcessOutput(exitCode: 1, stderr: 'df: no');
       expect((await check('disk')).state, DoctorState.skipped);

@@ -142,37 +142,35 @@ final class LeaseGrant extends Equatable {
 }
 
 /// The repository a leased job builds, as the runner reaches it with its own
-/// access to GitHub (ADR 0009).
+/// access to the git host (ADR 0009, ADR 0015).
 ///
 /// The offer names the repository and the commit and nothing else: it never
 /// carries a credential. The runner keeps a bare cache per repository, keyed
-/// by [githubRepoId], fetches the commit over SSH and checks it out in a
+/// by [cacheKey], fetches the commit over SSH and checks it out in a
 /// worktree of its own.
 final class LeaseRepository extends Equatable {
   /// Creates the repository.
-  const new({required this.githubRepoId, required this.sshUrl});
+  const new({required this.cacheKey, required this.sshUrl});
 
   /// Reads the repository from its JSON form.
   factory fromJson(Map<String, dynamic> json) => LeaseRepository(
-    githubRepoId: _required<int>(json, 'githubRepoId'),
+    cacheKey: _required<String>(json, 'cacheKey'),
     sshUrl: _required<String>(json, 'sshUrl'),
   );
 
-  /// The id GitHub gave the repository. It survives renames, so it keys the
-  /// runner's cache.
-  final int githubRepoId;
+  /// The project's source key (ADR 0015): it keys the runner's cache. For a
+  /// GitHub project it is the repository id, which survives renames.
+  final String cacheKey;
 
-  /// The SSH URL to fetch from, for example `git@github.com:owner/app.git`.
+  /// The SSH URL to fetch from, for example `git@github.com:owner/app.git`
+  /// or `git@bitbucket.org:ws/app.git`.
   final String sshUrl;
 
   /// The JSON form.
-  Map<String, dynamic> toJson() => {
-    'githubRepoId': githubRepoId,
-    'sshUrl': sshUrl,
-  };
+  Map<String, dynamic> toJson() => {'cacheKey': cacheKey, 'sshUrl': sshUrl};
 
   @override
-  List<Object?> get props => [githubRepoId, sshUrl];
+  List<Object?> get props => [cacheKey, sshUrl];
 }
 
 /// A step of a job the engine leases to a runner.

@@ -88,10 +88,7 @@ void main() {
       secrets: MemorySecretStore(),
       dataDir: dataDir.path,
     );
-    mirror = await git.ensureMirror(
-      githubRepoId: 42,
-      remoteUrl: fixture.originUrl,
-    );
+    mirror = await git.ensureMirror(key: '42', remoteUrl: fixture.originUrl);
     await git.fetch(mirror);
     worktree = await git.createWorktree(mirror, name: 'job_1', sha: sha);
     guard = GuardStep(

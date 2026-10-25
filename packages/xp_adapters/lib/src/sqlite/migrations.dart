@@ -20,6 +20,7 @@ const engineMigrations = <Migration>[
   Migration(version: 13, sql: _v13),
   Migration(version: 14, sql: _v14, notes: _v14Notes),
   Migration(version: 15, sql: _v15),
+  Migration(version: 16, sql: _v16, foreignKeysOff: true),
 ];
 
 // Timestamps are integer microseconds since the Unix epoch (UTC), so that
@@ -515,4 +516,43 @@ CREATE TABLE engine_setting (
   key TEXT PRIMARY KEY,
   value TEXT NOT NULL
 ) STRICT;
+''';
+
+// Projects on any git host (ADR 0015). A project has a `host` and a
+// `source_key` that keys its mirror, the runner cache and its worktrees;
+// `github_repo_id` is only there for GitHub projects. SQLite cannot drop a NOT
+// NULL constraint, so `project` is rebuilt (SQLite's 12-step procedure) with
+// foreign keys off: the rows that refer to it keep their ids. Every existing
+// project is on GitHub, and its key is its repository id, so its mirror stays
+// where it is.
+const _v16 = '''
+CREATE TABLE new_project (
+  id TEXT PRIMARY KEY,
+  host TEXT NOT NULL CHECK (length(host) > 0),
+  source_key TEXT NOT NULL UNIQUE CHECK (length(source_key) > 0),
+  github_repo_id INTEGER UNIQUE,
+  remote TEXT NOT NULL,
+  default_base_branch TEXT NOT NULL,
+  release_model TEXT NOT NULL DEFAULT '{}' CHECK (json_valid(release_model)),
+  gates TEXT NOT NULL DEFAULT '{}' CHECK (json_valid(gates)),
+  full_name TEXT NOT NULL DEFAULT '',
+  local_path TEXT,
+  github_default_branch TEXT NOT NULL DEFAULT '',
+  scan TEXT NOT NULL DEFAULT '{}' CHECK (json_valid(scan)),
+  findings TEXT NOT NULL DEFAULT '[]' CHECK (json_valid(findings)),
+  scanned_at INTEGER NOT NULL DEFAULT 0,
+  edits TEXT NOT NULL DEFAULT '{}' CHECK (json_valid(edits)),
+  CHECK ((host = 'github.com') = (github_repo_id IS NOT NULL))
+) STRICT;
+
+INSERT INTO new_project (id, host, source_key, github_repo_id, remote,
+  default_base_branch, release_model, gates, full_name, local_path,
+  github_default_branch, scan, findings, scanned_at, edits)
+SELECT id, 'github.com', CAST(github_repo_id AS TEXT), github_repo_id, remote,
+  default_base_branch, release_model, gates, full_name, local_path,
+  github_default_branch, scan, findings, scanned_at, edits
+FROM project ORDER BY rowid;
+
+DROP TABLE project;
+ALTER TABLE new_project RENAME TO project;
 ''';

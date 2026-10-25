@@ -15,6 +15,10 @@ there is more than one piece.
 - **The app, the CLI and `xp mcp` need an engine with the same API version.** Every 1.x release
   serves API 1 (`xpd --version` prints it), so they need not be upgraded together: an app of 1.4
   works with an engine of 1.2, and the other way round.
+- **One exception: projects that are not on GitHub** (ADR 0015). They have no GitHub repository
+  id, and an app, CLI or `xp mcp` from before they were added cannot read them: the projects list
+  fails to load while such a project exists. Upgrade those along with the engine before you add a
+  project from Bitbucket, another SSH host or a `file://` remote.
 - **Upgrade the engine first.** Runners follow by themselves.
 - **Tools a runner uses but XPath does not install** (the Android SDK and the JDK today) are
   checked again whenever the runner starts, after a self-update too. A capability lost that way is

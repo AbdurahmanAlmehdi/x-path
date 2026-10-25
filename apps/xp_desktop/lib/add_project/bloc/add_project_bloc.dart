@@ -13,12 +13,16 @@ sealed class AddProjectEvent extends Equatable {
 
 /// Adds the repository at [path] and scans it.
 final class AddProjectSubmitted extends AddProjectEvent {
-  const new(this.path);
+  const new(this.path, {this.sshUrl});
 
   final String path;
 
+  /// The SSH URL the owner confirmed for an HTTPS origin on a host other
+  /// than GitHub (ADR 0015).
+  final String? sshUrl;
+
   @override
-  List<Object?> get props => [path];
+  List<Object?> get props => [path, sshUrl];
 }
 
 /// Scans the added project again.
@@ -34,7 +38,12 @@ final class AddProjectDiscarded extends AddProjectEvent {
 enum AddProjectStatus { idle, adding, review, scanning, discarded, failed }
 
 class AddProjectState extends Equatable {
-  const new({this.status = AddProjectStatus.idle, this.project, this.error});
+  const new({
+    this.status = AddProjectStatus.idle,
+    this.project,
+    this.error,
+    this.sshUrl,
+  });
 
   final AddProjectStatus status;
 
@@ -44,8 +53,12 @@ class AddProjectState extends Equatable {
   /// What the engine said when the last step failed.
   final String? error;
 
+  /// The SSH URL the engine offers for a folder whose origin is an HTTPS URL
+  /// on a host other than GitHub, for the owner to confirm (ADR 0015).
+  final String? sshUrl;
+
   @override
-  List<Object?> get props => [status, project, error];
+  List<Object?> get props => [status, project, error, sshUrl];
 }
 
 /// Add project by folder, then the review of its scan: keep it, scan it
@@ -65,8 +78,19 @@ class AddProjectBloc extends Bloc<AddProjectEvent, AddProjectState> {
   ) async {
     emit(const AddProjectState(status: AddProjectStatus.adding));
     try {
-      final project = await _projects.addProject(event.path.trim());
+      final project = await _projects.addProject(
+        event.path.trim(),
+        sshUrl: event.sshUrl,
+      );
       emit(AddProjectState(status: AddProjectStatus.review, project: project));
+    } on SshUrlRequired catch (error) {
+      emit(
+        AddProjectState(
+          status: AddProjectStatus.failed,
+          error: error.message,
+          sshUrl: error.sshUrl,
+        ),
+      );
     } on Exception catch (error) {
       emit(
         AddProjectState(

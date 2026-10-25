@@ -44,6 +44,25 @@ void main() {
       );
     });
 
+    test('reads the SSH URL the engine offers for an HTTPS origin', () {
+      final error = ApiException.fromResponse(
+        422,
+        '{"error": {"code": "ssh_url_required", "message": "Use SSH."}, '
+        '"sshUrl": "git@bitbucket.org:ws/app.git"}',
+      );
+
+      expect(error.code, ApiErrorCode.sshUrlRequired);
+      expect(error.sshUrl, 'git@bitbucket.org:ws/app.git');
+      expect(
+        ApiException.fromResponse(
+          422,
+          '{"error": {"code": "ssh_url_required", "message": "m"}, '
+          '"sshUrl": 3}',
+        ).sshUrl,
+        isNull,
+      );
+    });
+
     test('a code it does not know is no envelope', () {
       final error = ApiException.fromResponse(
         400,

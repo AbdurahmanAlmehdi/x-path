@@ -17,6 +17,7 @@ void main() {
           ApiErrorCode.resyncRequired: 409,
           ApiErrorCode.credentialRejected: 422,
           ApiErrorCode.workflowInvalid: 422,
+          ApiErrorCode.sshUrlRequired: 422,
           ApiErrorCode.upgradeRequired: 426,
           ApiErrorCode.internal: 500,
           ApiErrorCode.upstreamError: 502,

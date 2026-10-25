@@ -88,20 +88,32 @@ List<McpTool> buildXpTools(
     ),
     tool(
       'add_project',
-      'Add a GitHub repository as a project and scan it. Give a folder on the '
-          "engine's machine, or a repository as owner/name or URL.",
+      'Add a repository as a project and scan it. Give a folder on the '
+          "engine's machine, or a repository: a GitHub one as owner/name or "
+          'URL, any other host by its SSH URL (git@host:path or ssh://) or a '
+          'file:// URL. Only workflows without GitHub steps (dev-build, test) '
+          'run on a project that is not on GitHub.',
       {
         'path': text('An absolute folder on the engine machine with a clone.'),
-        'remote': text('owner/name, or an https or ssh URL.'),
+        'remote': text(
+          'owner/name, a GitHub https or ssh URL, or the SSH or file:// URL '
+          'of a repository on another host.',
+        ),
+        'sshUrl': text(
+          'With path: the SSH URL the engine offered for a folder whose '
+          'origin is HTTPS on a host other than GitHub, once the owner '
+          'confirmed it.',
+        ),
       },
       (args) async {
         final path = args.optionalString('path');
         final remote = args.optionalString('remote');
+        final sshUrl = args.optionalString('sshUrl');
         if ((path == null) == (remote == null)) {
           throw const McpArgumentError('Give exactly one of "path", "remote".');
         }
         return (await client.addProject(
-          AddProjectRequest(path: path, remote: remote),
+          AddProjectRequest(path: path, remote: remote, sshUrl: sshUrl),
         )).toJson();
       },
     ),

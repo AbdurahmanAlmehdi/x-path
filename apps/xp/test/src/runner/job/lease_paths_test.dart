@@ -4,10 +4,10 @@ import 'package:xp/src/runner/job/lease_paths.dart';
 Map<String, dynamic> _worktree({
   String path = '/engine/worktrees/42/job_1',
   String mirror = '/engine/mirrors/42.git',
-  Object repoId = 42,
+  Object key = '42',
 }) => {
   'path': path,
-  'mirror': {'githubRepoId': repoId, 'path': mirror},
+  'mirror': {'key': key, 'path': mirror},
   'sha': 'a' * 40,
 };
 
@@ -21,7 +21,7 @@ void main() {
 
       expect(paths.worktree!.path, '/runner/source/worktrees/42/job_1');
       expect(paths.worktree!.mirror.path, '/runner/source/mirrors/42.git');
-      expect(paths.worktree!.mirror.githubRepoId, 42);
+      expect(paths.worktree!.mirror.key, '42');
       expect(
         paths.path('/engine/worktrees/42/job_1'),
         '/runner/source/worktrees/42/job_1',
@@ -32,6 +32,42 @@ void main() {
       );
     },
   );
+
+  test('keys the cache of a project on another host by its source key', () {
+    final paths = LeasePaths.of([
+      {
+        'worktree': _worktree(
+          path: '/engine/worktrees/h0123456789abcdef/job_1',
+          mirror: '/engine/mirrors/h0123456789abcdef.git',
+          key: 'h0123456789abcdef',
+        ),
+      },
+    ], sourceDirectory: '/runner/source');
+
+    expect(
+      paths.worktree!.mirror.path,
+      '/runner/source/mirrors/h0123456789abcdef.git',
+    );
+    expect(
+      paths.worktree!.path,
+      '/runner/source/worktrees/h0123456789abcdef/job_1',
+    );
+  });
+
+  test('reads the GitHub id of a job planned before ADR 0015', () {
+    final paths = LeasePaths.of([
+      {
+        'worktree': {
+          'path': '/engine/worktrees/42/job_1',
+          'mirror': {'githubRepoId': 42, 'path': '/engine/mirrors/42.git'},
+          'sha': 'a' * 40,
+        },
+      },
+    ], sourceDirectory: '/runner/source');
+
+    expect(paths.worktree!.mirror.key, '42');
+    expect(paths.worktree!.mirror.path, '/runner/source/mirrors/42.git');
+  });
 
   test('keeps the rest of a path below the worktree', () {
     final paths = LeasePaths.of([
@@ -105,6 +141,12 @@ void main() {
       {
         'worktree': {
           'path': '/engine/w',
+          'mirror': {'path': '/engine/m', 'key': '../../etc'},
+        },
+      },
+      {
+        'worktree': {
+          'path': '/engine/w',
           'mirror': {'githubRepoId': 1},
         },
       },
@@ -121,7 +163,7 @@ void main() {
         'worktree': _worktree(
           path: '/e/w/7/job_9',
           mirror: '/e/m/7.git',
-          repoId: 7,
+          key: '7',
         ),
       },
     ], sourceDirectory: '/r/source');

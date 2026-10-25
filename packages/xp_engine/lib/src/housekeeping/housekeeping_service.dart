@@ -232,7 +232,7 @@ class HousekeepingService {
         bytes += mirror.bytes;
         items++;
       } on Object catch (error) {
-        failures.add('Cannot delete mirror ${mirror.githubRepoId}: $error');
+        failures.add('Cannot delete mirror ${mirror.key}: $error');
       }
     }
     return FreedCategory(

@@ -104,8 +104,9 @@ launchd's short `PATH` (`~/.shorebird/bin`, `~/.pub-cache/bin`, `~/fvm/default/b
 - Exit codes of `xp runner start`: 0 drained or done, 77 revoked or credential refused, 73
   replaced by another connection of the same runner, 78 not paired, 69 `perl` missing, 75
   switched to another version (its service manager starts it again).
-- Checkout failures say what to do: add the runner's SSH key as a deploy key on the repository,
-  run `ssh -T git@github.com` once for the host key, or push the commit.
+- Checkout failures say what to do: add the runner's SSH key as a deploy key on the repository
+  (an access key on Bitbucket), remove a host key that changed (`ssh-keygen -R <host>`), or push
+  the commit. A host key the runner has not seen is recorded on the first fetch.
 - A runner updates itself to the engine's version between jobs. "This engine has no runner bundle
   for linux-arm64" means the engine has no `xp.tar.gz` for that machine; put it in
   `<data dir>/bundles/<engine version>/<os>-<arch>/xp.tar.gz`.
