@@ -58,6 +58,14 @@ only for Shorebird flavors (`if: flavor.shorebird`).
 
 Inputs: `exportOptionsPlist`, `dartDefineFile`, `allowNativeDiffs` (default `false`).
 
+## `smoke-build`
+
+One stage `build`, one job per flavor (runner-eligible): `git.checkout`; `build.android`
+(`artifact: apk`, `keystore: false`). An APK signed with the debug key, from the version in the
+pubspec: no credential, no store id, no upload, no build number. The app offers it after the
+first scan ("Try an unsigned build"), so a new project sees a green build before signing is set
+up. No inputs.
+
 ## `test`
 
 One stage `test`, one job `test` (engine, since `test` is engine-only): `git.checkout`; `test`

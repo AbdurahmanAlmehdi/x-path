@@ -1537,7 +1537,7 @@ abstract class AppLocalizations {
   /// On a finding of a missing Firebase app id: opens the flavor's store ids.
   ///
   /// In en, this message translates to:
-  /// **'Set the id…'**
+  /// **'Set Firebase app id…'**
   String get scanSetStoreId;
 
   /// The flavor has no credential of a kind.
@@ -5769,6 +5769,162 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'GitHub refuses the engine\'s token, so it cannot add a project from GitHub. Save a new one below.'**
   String get addProjectGitHubRejected;
+
+  /// Onboarding: what a first release needs, up front (U5a).
+  ///
+  /// In en, this message translates to:
+  /// **'A first release needs four things: this engine, a GitHub token for projects on GitHub, the project\'s folder, and the store credentials of each flavor. After these three steps, the app shows what is left.'**
+  String get onboardingFirstRelease;
+
+  /// Title of the setup checklist (U5a).
+  ///
+  /// In en, this message translates to:
+  /// **'Get to a first build'**
+  String get setupTitle;
+
+  /// No description provided for @setupProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'{done} of {total} done'**
+  String setupProgress(int done, int total);
+
+  /// Setup step: always done in the shell.
+  ///
+  /// In en, this message translates to:
+  /// **'The engine runs'**
+  String get setupEngine;
+
+  /// Setup step.
+  ///
+  /// In en, this message translates to:
+  /// **'Connect GitHub'**
+  String get setupGitHub;
+
+  /// Setup step body.
+  ///
+  /// In en, this message translates to:
+  /// **'The engine reads and releases projects on GitHub with a token. A project on another git host needs none.'**
+  String get setupGitHubBody;
+
+  /// Setup step.
+  ///
+  /// In en, this message translates to:
+  /// **'Add a project'**
+  String get setupProject;
+
+  /// Setup step body.
+  ///
+  /// In en, this message translates to:
+  /// **'The folder of a Flutter app\'s repository. The engine scans it for apps and flavors.'**
+  String get setupProjectBody;
+
+  /// Setup step.
+  ///
+  /// In en, this message translates to:
+  /// **'Add credentials'**
+  String get setupCredentials;
+
+  /// No description provided for @setupCredentialsBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Every flavor needs the keys that sign and upload it. {flavor} has none yet.'**
+  String setupCredentialsBody(String flavor);
+
+  /// Setup step.
+  ///
+  /// In en, this message translates to:
+  /// **'Set the store ids'**
+  String get setupStoreIds;
+
+  /// No description provided for @setupStoreIdsBody.
+  ///
+  /// In en, this message translates to:
+  /// **'A build is uploaded to the app id its flavor has in Firebase or App Store Connect. {flavor} is missing one.'**
+  String setupStoreIdsBody(String flavor);
+
+  /// Setup step, shown when no runner can run a build.
+  ///
+  /// In en, this message translates to:
+  /// **'Find a machine for the builds'**
+  String get setupRunners;
+
+  /// Opens docs/guide/runners.md.
+  ///
+  /// In en, this message translates to:
+  /// **'Runners guide'**
+  String get setupRunnersGuide;
+
+  /// Opens the runners page.
+  ///
+  /// In en, this message translates to:
+  /// **'Runners'**
+  String get setupRunnersOpen;
+
+  /// Setup step.
+  ///
+  /// In en, this message translates to:
+  /// **'Run a first build'**
+  String get setupFirstBuild;
+
+  /// Setup step body.
+  ///
+  /// In en, this message translates to:
+  /// **'An unsigned build needs no credential or store id: it shows the project builds before signing is set up.'**
+  String get setupFirstBuildBody;
+
+  /// Dispatches the built-in smoke-build.
+  ///
+  /// In en, this message translates to:
+  /// **'Try an unsigned build'**
+  String get setupTrySmoke;
+
+  /// Opens the dispatch sheet.
+  ///
+  /// In en, this message translates to:
+  /// **'Dispatch…'**
+  String get setupDispatch;
+
+  /// Opens the GitHub token in Settings.
+  ///
+  /// In en, this message translates to:
+  /// **'Connect…'**
+  String get setupConnect;
+
+  /// Opens Add project.
+  ///
+  /// In en, this message translates to:
+  /// **'Add…'**
+  String get setupAdd;
+
+  /// Opens the credentials of a flavor.
+  ///
+  /// In en, this message translates to:
+  /// **'Assign…'**
+  String get setupAssign;
+
+  /// Opens the store ids of a flavor.
+  ///
+  /// In en, this message translates to:
+  /// **'Set ids…'**
+  String get setupSetIds;
+
+  /// On a finding a credential fixes: opens the flavor's credentials.
+  ///
+  /// In en, this message translates to:
+  /// **'Add credential…'**
+  String get scanAddCredential;
+
+  /// On a finding with a file: copies its path.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy path'**
+  String get scanCopyPath;
+
+  /// Toast after Copy path.
+  ///
+  /// In en, this message translates to:
+  /// **'Path copied'**
+  String get scanPathCopied;
 }
 
 class _AppLocalizationsDelegate

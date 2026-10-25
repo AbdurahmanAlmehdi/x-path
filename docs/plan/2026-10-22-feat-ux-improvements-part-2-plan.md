@@ -80,7 +80,7 @@ once and opens one pull request.
 
 ### Phase U5a: First run in the app
 
-- **Status:** Not started
+- **Status:** Done
 - **Scope:** A new owner reaches a first green build from the app alone.
 - **Files touched:** `apps/xp_desktop/lib/{onboarding,projects,project_overview}/**`,
   `packages/xp_engine/lib/src/workflows/builtin_workflows.dart` (debug smoke build), the

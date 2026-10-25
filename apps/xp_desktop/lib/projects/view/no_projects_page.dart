@@ -1,6 +1,7 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:xp_desktop/l10n/l10n.dart';
+import 'package:xp_desktop/project_overview/widgets/setup_checklist.dart';
 import 'package:xp_desktop/shell/cubit/shell_cubit.dart';
 import 'package:xp_desktop/shell/widgets/shell_page.dart';
 import 'package:xp_desktop/theme/theme.dart';
@@ -17,35 +18,45 @@ class NoProjectsPage extends StatelessWidget {
     return ShellPage(
       title: l10n.appTitle,
       child: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              PhosphorIconsRegular.package,
-              size: context.xpSizes.iconXl,
-              color: colors.textTertiary,
-            ),
-            const SizedBox(height: 16),
-            Text(
-              l10n.projectEmptyTitle,
-              style: context.xpType.headline.copyWith(
-                color: colors.textPrimary,
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                PhosphorIconsRegular.package,
+                size: context.xpSizes.iconXl,
+                color: colors.textTertiary,
               ),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              l10n.projectEmptyBody,
-              style: context.xpType.body.copyWith(color: colors.textSecondary),
-            ),
-            const SizedBox(height: 20),
-            XpButton(
-              label: l10n.sidebarAddProject,
-              kind: XpButtonKind.primary,
-              onPressed: () => context.read<ShellCubit>().show(
-                const AddProjectDestination(),
+              const SizedBox(height: 16),
+              Text(
+                l10n.projectEmptyTitle,
+                style: context.xpType.headline.copyWith(
+                  color: colors.textPrimary,
+                ),
               ),
-            ),
-          ],
+              const SizedBox(height: 6),
+              Text(
+                l10n.projectEmptyBody,
+                style: context.xpType.body.copyWith(
+                  color: colors.textSecondary,
+                ),
+              ),
+              const SizedBox(height: 20),
+              XpButton(
+                label: l10n.sidebarAddProject,
+                kind: XpButtonKind.primary,
+                onPressed: () => context.read<ShellCubit>().show(
+                  const AddProjectDestination(),
+                ),
+              ),
+              const SizedBox(height: 32),
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 640),
+                child: const SetupChecklist(),
+              ),
+            ],
+          ),
         ),
       ),
     );

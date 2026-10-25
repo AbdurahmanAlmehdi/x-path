@@ -906,6 +906,27 @@ stages:
     });
   });
 
+  group('the smoke-build workflow', () {
+    test('builds an APK per flavor without a keystore or a bump', () async {
+      await harness.saveCredential('dev', CredentialKind.keystore);
+
+      final run = await harness.dispatchBuiltin('smoke-build');
+
+      expect(run.build, isNull, reason: 'it allocates no build number');
+      expect(run.jobs.single.name, 'Build dev');
+      expect(run.jobs.single.capabilities, ['android', 'flutter']);
+      final job = await harness.job(run.jobs.single.id);
+      expect(harness.kinds(job), ['git.checkout', 'build.android']);
+      final build = await harness.input(job, 'build.android');
+      expect(build['artifact'], 'apk');
+      expect(build['version'], '1.2.3+45', reason: 'the pubspec version');
+      expect(
+        build['secretFiles'] as Map? ?? const {},
+        isNot(contains(keystoreFileVariable)),
+      );
+    });
+  });
+
   group('the test workflow', () {
     test('runs the tests and the analyzer in one job', () async {
       final run = await harness.dispatchBuiltin(

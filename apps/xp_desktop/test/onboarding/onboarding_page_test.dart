@@ -50,6 +50,11 @@ void main() {
       await pump(tester);
       await tester.pumpAndSettle();
       expect(find.text('Set up XPath on this Mac'), findsOneWidget);
+      expect(
+        find.textContaining('A first release needs four things'),
+        findsOneWidget,
+        reason: 'what a first release needs is said up front (U5a)',
+      );
       expect(find.text('Xcode'), findsOneWidget);
       expect(find.text('/bin/xcode'), findsOneWidget);
 

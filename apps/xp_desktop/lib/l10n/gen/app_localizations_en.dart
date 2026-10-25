@@ -883,7 +883,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'Saved. The next dispatch uploads to these apps.';
 
   @override
-  String get scanSetStoreId => 'Set the id…';
+  String get scanSetStoreId => 'Set Firebase app id…';
 
   @override
   String get flavorCredentialsNotAssigned => 'Not assigned';
@@ -3532,4 +3532,92 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get addProjectGitHubRejected =>
       'GitHub refuses the engine\'s token, so it cannot add a project from GitHub. Save a new one below.';
+
+  @override
+  String get onboardingFirstRelease =>
+      'A first release needs four things: this engine, a GitHub token for projects on GitHub, the project\'s folder, and the store credentials of each flavor. After these three steps, the app shows what is left.';
+
+  @override
+  String get setupTitle => 'Get to a first build';
+
+  @override
+  String setupProgress(int done, int total) {
+    return '$done of $total done';
+  }
+
+  @override
+  String get setupEngine => 'The engine runs';
+
+  @override
+  String get setupGitHub => 'Connect GitHub';
+
+  @override
+  String get setupGitHubBody =>
+      'The engine reads and releases projects on GitHub with a token. A project on another git host needs none.';
+
+  @override
+  String get setupProject => 'Add a project';
+
+  @override
+  String get setupProjectBody =>
+      'The folder of a Flutter app\'s repository. The engine scans it for apps and flavors.';
+
+  @override
+  String get setupCredentials => 'Add credentials';
+
+  @override
+  String setupCredentialsBody(String flavor) {
+    return 'Every flavor needs the keys that sign and upload it. $flavor has none yet.';
+  }
+
+  @override
+  String get setupStoreIds => 'Set the store ids';
+
+  @override
+  String setupStoreIdsBody(String flavor) {
+    return 'A build is uploaded to the app id its flavor has in Firebase or App Store Connect. $flavor is missing one.';
+  }
+
+  @override
+  String get setupRunners => 'Find a machine for the builds';
+
+  @override
+  String get setupRunnersGuide => 'Runners guide';
+
+  @override
+  String get setupRunnersOpen => 'Runners';
+
+  @override
+  String get setupFirstBuild => 'Run a first build';
+
+  @override
+  String get setupFirstBuildBody =>
+      'An unsigned build needs no credential or store id: it shows the project builds before signing is set up.';
+
+  @override
+  String get setupTrySmoke => 'Try an unsigned build';
+
+  @override
+  String get setupDispatch => 'Dispatch…';
+
+  @override
+  String get setupConnect => 'Connect…';
+
+  @override
+  String get setupAdd => 'Add…';
+
+  @override
+  String get setupAssign => 'Assign…';
+
+  @override
+  String get setupSetIds => 'Set ids…';
+
+  @override
+  String get scanAddCredential => 'Add credential…';
+
+  @override
+  String get scanCopyPath => 'Copy path';
+
+  @override
+  String get scanPathCopied => 'Path copied';
 }

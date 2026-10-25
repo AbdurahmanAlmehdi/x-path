@@ -10,6 +10,7 @@ import 'package:xp_desktop/project_overview/bloc/project_overview_bloc.dart';
 import 'package:xp_desktop/project_overview/widgets/docked_console.dart';
 import 'package:xp_desktop/project_overview/widgets/flavor_ledger.dart';
 import 'package:xp_desktop/project_overview/widgets/release_rail.dart';
+import 'package:xp_desktop/project_overview/widgets/setup_checklist.dart';
 import 'package:xp_desktop/projects/bloc/projects_bloc.dart';
 import 'package:xp_desktop/projects/widgets/project_host.dart';
 import 'package:xp_desktop/projects/widgets/scan_summary.dart';
@@ -161,6 +162,7 @@ class _ProjectOverviewViewState extends State<ProjectOverviewView> {
                 child: ListView(
                   padding: const EdgeInsets.all(20),
                   children: [
+                    SetupChecklist(project: project),
                     if (state.error case final error?) ...[
                       XpErrorState(
                         error,

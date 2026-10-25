@@ -8,6 +8,7 @@ const builtinWorkflows = <String, String>{
   'prod-release': _prodRelease,
   'release-merge': _releaseMerge,
   'shorebird-patch': _shorebirdPatch,
+  'smoke-build': _smokeBuild,
   'test': _test,
 };
 
@@ -411,6 +412,31 @@ stages:
           - kind: git.tag
           - kind: git.push
             gate: push
+''';
+
+// A smoke build is the first green build of a new project: an APK of each
+// flavor, signed with the debug key instead of the flavor's keystore, so it
+// needs no credential, no store id and no version bump. It uploads nothing
+// and runs on any runner with Android (U5a).
+const _smokeBuild = r'''
+schema: 1
+name: Smoke build
+description: >-
+  Builds an Android APK of each flavor without its keystore, to see a green
+  build before signing and the stores are set up. Nothing is uploaded.
+stages:
+  - name: build
+    jobs:
+      build:
+        name: Build ${{ flavor.name }}
+        matrix:
+          flavor: ${{ flavors }}
+        steps:
+          - kind: git.checkout
+          - kind: build.android
+            with:
+              artifact: apk
+              keystore: false
 ''';
 
 // The tests: flutter test --machine against the baseline, then the analyzer.

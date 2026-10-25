@@ -13,6 +13,18 @@ import 'package:flutter/widgets.dart';
 const _package = 'phosphor_flutter';
 
 abstract final class PhosphorIconsRegular {
+  static const circle = IconData(
+    0xe18a,
+    fontFamily: 'PhosphorRegular',
+    fontPackage: _package,
+    matchTextDirection: true,
+  );
+  static const arrowSquareOut = IconData(
+    0xe5de,
+    fontFamily: 'PhosphorRegular',
+    fontPackage: _package,
+    matchTextDirection: true,
+  );
   static const playCircle = IconData(
     0xe3d2,
     fontFamily: 'PhosphorRegular',

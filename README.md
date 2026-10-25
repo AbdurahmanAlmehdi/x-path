@@ -1181,7 +1181,7 @@ stages:                        # required; run in order
 
 ### Built-in workflows and versions
 
-Every project gets `dev-build`, `prod-release`, `release-merge`, `shorebird-patch` and `test` the first time its workflows
+Every project gets `dev-build`, `prod-release`, `release-merge`, `shorebird-patch`, `smoke-build` and `test` the first time its workflows
 are listed (and a new version of one when the engine ships another document). They compose the steps in the
 order of `ship.sh`. **The job that builds has no step only the engine may run** (ADR 0010), so that it can be
 leased to a runner: the guards, the gates, the uploads, the tag and the pushes are in engine jobs of an earlier
@@ -1193,6 +1193,7 @@ or later stage, and the uploads take what the runner built from the engine's art
 | `prod-release` | `prepare`, `check`, `build`, `upload`, `finalize` | `lock: project`. `prepare` (engine) bumps the version once, cuts the release branch after `gate: prod_release` and pushes the branch after `gate: push`, so that a runner can fetch the version commit (ADR 0009). `check` (engine): `versionSync`, `buildNumberReuse`, `credentials`, and the store checks, from that commit. `build` (runner-eligible): `git.checkout` from that commit, `shorebird.release` (a Shorebird flavor) or `build.android` / `build.ios`, `symbols.archive`, `record.manifest`. `upload` (engine): `upload.play`, `upload.firebase`, `upload.appStore`, the ones the flavor has credentials for. `finalize` (engine) tags, pushes the tag and opens the release pull request (`github.createPr`). The approval of the push covers the tag push too (it binds to the same project, commit, version and run). A run of it is a release (see Releases). |
 | `release-merge` | `merge` | Merges the pull request of a release: `gate: merge`, then `github.mergePr`. Started by `POST /releases/{id}/merge`, no project lock. |
 | `shorebird-patch` | `check`, `patch` (platform x flavor), `finalize` | `lock: project`. Dispatch it with `releaseVersion` (`x.y.z+build`, never `latest`). `check` (engine): the guards, and `gate: prod_patch` in front of the last of them (so that the owner is asked only about a patch that passed the others). `patch` (runner-eligible): `git.checkout`, `shorebird.patch`. `finalize` (engine): the patch tag `v<x.y.z>+<build>-p<n>` and `gate: push`. |
+| `smoke-build` | `build` (each flavor) | `git.checkout`, then `build.android` with `keystore: false`: an APK signed with the debug key, from the pubspec version. No credential, no store id, no upload, no build number. The app offers it after the first scan, for a green build before signing is set up. |
 | `test` | `test` | `test` and `analyze`; allocates no build number. |
 
 Built-ins cannot be edited or deleted (`409`); copy the YAML into a workflow of your own. **Every save is a

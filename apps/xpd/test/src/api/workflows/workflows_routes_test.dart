@@ -72,6 +72,7 @@ void main() {
         'prod-release',
         'release-merge',
         'shorebird-patch',
+        'smoke-build',
         'test',
       ]);
       expect(
