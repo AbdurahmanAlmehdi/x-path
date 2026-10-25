@@ -184,6 +184,31 @@ void main() {
     expect(await repository.steps('job_x'), isEmpty);
   });
 
+  test('keeps the needs of a job and why Linux was ruled out', () async {
+    final job = JobRecord(
+      id: 'job_ios',
+      workflowVersionId: 'wfv_1',
+      projectId: 'prj_1',
+      state: JobState.queued,
+      createdAt: _created,
+      capabilities: const ['flutter', 'ios-sign|ios-linux'],
+      narrowing: const ['the app uses the flavor prod'],
+    );
+
+    await repository.create(job, const []);
+    await repository.updateJob(job.copyWith(message: 'Waiting.'));
+
+    final stored = (await repository.get('job_ios'))!;
+    expect(stored.capabilities, ['flutter', 'ios-sign|ios-linux']);
+    expect(stored.narrowing, ['the app uses the flavor prod']);
+  });
+
+  test('keeps no reason for a job that was not narrowed', () async {
+    await repository.create(_job('job_1'), const []);
+
+    expect((await repository.get('job_1'))!.narrowing, isEmpty);
+  });
+
   test('keeps the times to the microsecond, in UTC', () async {
     await repository.create(_job('job_1'), const []);
 

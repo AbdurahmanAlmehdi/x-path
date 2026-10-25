@@ -220,6 +220,36 @@ void main() {
       ]);
     });
 
+    test('an App Store upload with an API key needs no Mac', () {
+      const ascKey = Credential(
+        id: 'crd_3',
+        projectId: 'prj_1',
+        app: '.',
+        flavor: 'prod',
+        kind: CredentialKind.ascKey,
+        status: CredentialStatus.verified,
+      );
+
+      final preview = DispatchPreview.plan(
+        project: mataa,
+        workflow: WorkflowOutline.parse(releaseYaml),
+        request: const DispatchRequest(
+          inputs: {
+            'appleAppIds': {'prod': '123'},
+          },
+        ),
+        runners: const [],
+        gates: const ProjectGates({}),
+        credentials: const [playKey, ascKey],
+      );
+
+      final upload = preview.stages
+          .firstWhere((stage) => stage.name == 'upload')
+          .jobs
+          .firstWhere((job) => job.platform == 'ios');
+      expect(upload.capabilities, isEmpty);
+    });
+
     test('takes what the request asks and reads leniently', () {
       final full = runner('full', slots: 1, jobIds: ['a']);
       final preview = DispatchPreview.plan(

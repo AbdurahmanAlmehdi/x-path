@@ -69,7 +69,7 @@ class WorkflowService {
         ),
     ],
     gates: [for (final action in GateAction.values) action.wire],
-    capabilities: [for (final capability in Capability.values) capability.wire],
+    capabilities: [for (final capability in Capability.named) capability.wire],
     matrixAxes: matrixAxes,
     platforms: platformNames,
   );

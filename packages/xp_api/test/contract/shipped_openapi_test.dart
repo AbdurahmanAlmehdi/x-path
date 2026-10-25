@@ -1176,6 +1176,18 @@ void main() {
             ProbeResult(id: 'swift', status: ProbeStatus.notStarted),
           ],
         ),
+        const ProbeResultFrame(
+          probeId: 'prb_2',
+          results: [
+            ProbeResult(
+              id: 'ios_linux_commit',
+              status: ProbeStatus.exited,
+              exitCode: 0,
+              stdout: 'abc\n',
+            ),
+          ],
+          iosLinuxDir: '/home/me/omarchy-apple-dev',
+        ),
         const LeaseAcceptFrame(jobId: 'job_1', leaseId: 'lse_1'),
         const LeaseRejectFrame(
           jobId: 'job_1',
@@ -1232,6 +1244,16 @@ void main() {
               arguments: ['-version'],
               requires: 'xcode_select',
               onlyOn: 'macos',
+            ),
+          ],
+        ),
+        const ProbedFrame(
+          capabilities: ['flutter', 'ios-linux'],
+          missing: [
+            MissingCapability(
+              capability: 'ios-linux',
+              reason: 'no darwin SDK bundle',
+              fix: 'run install-toolchain.sh',
             ),
           ],
         ),

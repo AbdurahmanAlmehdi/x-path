@@ -93,7 +93,7 @@ once and opens one pull request.
 
 ### Phase 1: App Store upload through the App Store Connect API (no Linux needed)
 
-- **Status:** Not started
+- **Status:** Done
 - **Scope:** `upload.appStore` uploads through the build-upload API when the credential is an
   `asc_key`, on any engine, and no longer needs `ios-sign`. Amends D-14.
 - **Files touched:**
@@ -121,7 +121,7 @@ once and opens one pull request.
 
 ### Phase 2: Report the `ios-linux` capability
 
-- **Status:** Not started
+- **Status:** Done
 - **Scope:** A configured runner reports `ios-linux` with reasons when it is missing. No step
   accepts it yet. Amends D-19.
 - **Files touched:** `packages/xp_engine/lib/src/scheduler/capability.dart`,
@@ -147,7 +147,7 @@ once and opens one pull request.
 
 ### Phase 3a: Any-of placement and narrowing (no behaviour change)
 
-- **Status:** Not started
+- **Status:** Done
 - **Scope:** The scheduler and planner learn any-of requirements and the narrowing rule, while
   `build.ios` still requires only `ios-sign`, so nothing changes for users yet.
 - **Files touched:** `packages/xp_engine/lib/src/scheduler/{scheduler,capability}.dart`,

@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:xp_api/xp_api.dart';
 import 'package:xp_engine/src/clock/clock.dart';
 import 'package:xp_engine/src/credentials/credential_repository.dart';
+import 'package:xp_engine/src/dispatch/ios_linux_limits.dart';
 import 'package:xp_engine/src/dispatch/plan_context.dart';
 import 'package:xp_engine/src/dispatch/step_planners.dart';
 import 'package:xp_engine/src/git/git_exceptions.dart';
@@ -16,6 +17,7 @@ import 'package:xp_engine/src/releases/release_exceptions.dart';
 import 'package:xp_engine/src/releases/release_opener.dart';
 import 'package:xp_engine/src/repositories/event_log.dart';
 import 'package:xp_engine/src/scan/scan_source.dart';
+import 'package:xp_engine/src/scheduler/capability.dart';
 import 'package:xp_engine/src/scheduler/run_record.dart';
 import 'package:xp_engine/src/scheduler/scheduler.dart';
 import 'package:xp_engine/src/steps/step.dart';
@@ -200,6 +202,14 @@ class WorkflowDispatcher {
         'platforms (${platforms.join(', ')}) of this dispatch.',
       );
     }
+    for (final job in jobs) {
+      if (job.narrowed.isNotEmpty && !await _scheduler.couldRun(job.narrowed)) {
+        throw DispatchException(
+          '${job.name} needs ${job.narrowed.map((n) => n.described).join(', ')}'
+          ', which no paired runner offers: ${job.narrowing.join('; ')}.',
+        );
+      }
+    }
 
     final releaseOf = await _linkReleases(request, kinds, context, jobs);
 
@@ -230,6 +240,7 @@ class WorkflowDispatcher {
           stage: job.stage,
           name: job.name,
           capabilities: job.capabilities,
+          narrowing: job.narrowing,
           steps: job.steps,
         );
         created.add(job.id);
@@ -643,7 +654,10 @@ class WorkflowDispatcher {
   ) async {
     final scope = context.scope;
     final steps = <StepPlan>[];
-    final capabilities = {...definition.capabilities};
+    final needs = [
+      for (final capability in definition.capabilities)
+        CapabilityNeed([capability]),
+    ];
     for (final step in definition.steps) {
       final condition = step.condition;
       if (condition != null &&
@@ -670,8 +684,13 @@ class WorkflowDispatcher {
         );
       }
       steps.add(await _planners.plan(planning));
-      capabilities.addAll(_planners.capabilitiesOf(planning));
+      needs.addAll(_planners.needsOf(planning));
     }
+    final (:placed, :narrowed, :narrowing) = _narrow(
+      needs,
+      steps,
+      context.run.app,
+    );
     final fallback =
         '${definition.id}'
         '${cell.isEmpty ? '' : ' (${cell.values.join(', ')})'}';
@@ -682,8 +701,67 @@ class WorkflowDispatcher {
       cell: cell,
       stage: stage,
       name: name is String && name.isNotEmpty ? name : fallback,
-      capabilities: (capabilities.map((c) => c.wire).toList()..sort()),
+      capabilities: [for (final need in placed) need.wire]..sort(),
+      narrowed: narrowed,
+      narrowing: narrowing,
       steps: steps,
+    );
+  }
+
+  /// [needs] without repeats, and without an any-of need that a need of one
+  /// of its capabilities already meets.
+  static List<CapabilityNeed> _simplified(List<CapabilityNeed> needs) {
+    final single = {
+      for (final need in needs)
+        if (need.anyOf.length == 1) need.anyOf.single,
+    };
+    final kept = <CapabilityNeed>[];
+    for (final need in needs) {
+      if (kept.contains(need) ||
+          (need.anyOf.length > 1 && need.anyOf.any(single.contains))) {
+        continue;
+      }
+      kept.add(need);
+    }
+    return kept;
+  }
+
+  /// [needs], simplified, narrowed to `ios-sign` where Linux could build the
+  /// iOS app but the job uses something Linux iOS builds lack (ADR 0014),
+  /// with the needs it narrowed and why. A step that needs `ios-sign` itself
+  /// (Shorebird iOS) still gives its reason.
+  static ({
+    List<CapabilityNeed> placed,
+    List<CapabilityNeed> narrowed,
+    List<String> narrowing,
+  })
+  _narrow(List<CapabilityNeed> needs, List<StepPlan> steps, AppProfile app) {
+    bool linux(CapabilityNeed need) =>
+        need.anyOf.length > 1 && need.anyOf.contains(Capability.iosLinux);
+    final reasons = needs.any(linux)
+        ? iosLinuxLimits(steps, app)
+        : const <String>[];
+    if (reasons.isEmpty) {
+      return (
+        placed: _simplified(needs),
+        narrowed: const [],
+        narrowing: const [],
+      );
+    }
+    final narrowed = [
+      for (final need in needs.where(linux))
+        CapabilityNeed([
+          for (final capability in need.anyOf)
+            if (capability != Capability.iosLinux) capability,
+        ]),
+    ];
+    return (
+      placed: _simplified([
+        ...needs.where((need) => !linux(need)),
+        ...narrowed,
+      ]),
+      narrowed: narrowed,
+      narrowing: reasons,
     );
   }
 
@@ -729,6 +807,8 @@ class _PlannedJob {
     required this.stage,
     required this.name,
     required this.capabilities,
+    required this.narrowed,
+    required this.narrowing,
     required this.steps,
   });
 
@@ -738,5 +818,7 @@ class _PlannedJob {
   final int stage;
   final String name;
   final List<String> capabilities;
+  final List<CapabilityNeed> narrowed;
+  final List<String> narrowing;
   final List<StepPlan> steps;
 }

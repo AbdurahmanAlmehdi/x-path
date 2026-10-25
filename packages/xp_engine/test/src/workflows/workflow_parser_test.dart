@@ -427,6 +427,23 @@ stages:
       );
     });
 
+    test('cannot name ios-linux until a step accepts it', () {
+      const unknown =
+          '6:33 Unknown capability. Allowed: ios-sign, android, flutter, '
+          'swift-linux.';
+
+      expect(
+        issues(
+          stages(
+            '  - name: a\n    jobs:\n      j:\n'
+            '        capabilities: [flutter, ios-linux]\n'
+            '        steps: [{kind: guard}]',
+          ),
+        ),
+        [unknown],
+      );
+    });
+
     test('say so when an expression starting with ! was not quoted', () {
       expect(
         issues(

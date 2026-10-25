@@ -55,6 +55,7 @@ void main() {
       'android',
       'flutter',
       'swift-linux',
+      'ios-linux',
     ]);
   });
 }

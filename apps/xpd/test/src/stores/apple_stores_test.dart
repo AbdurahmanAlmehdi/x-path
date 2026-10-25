@@ -154,12 +154,26 @@ void main() {
       repository: InMemoryArtifactRepository(),
       store: _Store(),
       secrets: secrets,
-      secretFiles: InMemorySecretFileStore(),
       isMacOS: true,
     );
 
     expect(step.kind, 'upload.appStore');
     expect(step.connect, apple.connect);
+    expect(step.pollInterval, const Duration(seconds: 15));
+    expect(step.processingTimeout, const Duration(minutes: 30));
+  });
+
+  test('wires a shorter wait for a build upload, polled as often', () {
+    final step = apple.uploadStep(
+      repository: InMemoryArtifactRepository(),
+      store: _Store(),
+      secrets: secrets,
+      isMacOS: false,
+      uploadWait: const Duration(seconds: 6),
+    );
+
+    expect(step.pollInterval, const Duration(milliseconds: 50));
+    expect(step.processingTimeout, const Duration(seconds: 6));
   });
 }
 

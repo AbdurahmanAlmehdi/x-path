@@ -2162,11 +2162,13 @@ paths:
         2. The runner sends `hello` (version, os, cores, `maxJobs`, the leases
            it still holds).
         3. The engine sends `probe`; the runner runs the commands and answers
-           `probe_result`. The engine derives the capabilities from the
-           results (`ios-sign`, `android`, `flutter`, `swift-linux`) and
-           ignores anything the runner claims, then sends `probed`: the
-           capabilities it stored and, for each one it did not find, the
-           reason and the fix. Until then the runner gets no job. It probes
+           `probe_result`. A runner configured for Linux iOS builds runs the
+           commands of its omarchy-apple-dev checkout after them and names
+           the folder (`iosLinuxDir`). The engine derives the capabilities
+           from the results (`ios-sign`, `android`, `flutter`, `swift-linux`,
+           `ios-linux`) and ignores anything the runner claims, then sends
+           `probed`: the capabilities it stored and, for each one it did not
+           find, the reason and the fix. Until then the runner gets no job. It probes
            again at every connection.
         4. The engine sends `lease_offer` for a queued job that fits. The
            runner answers `lease_accept` or `lease_reject`. The lease lasts
@@ -2831,6 +2833,13 @@ components:
           type: boolean
         iosPackageManager:
           $ref: "#/components/schemas/IosPackageManager"
+        iosAppExtensions:
+          type: array
+          description: >-
+            The app extension targets of the Xcode project, which Linux iOS
+            builds cannot make yet (ADR 0014).
+          items:
+            type: string
         flavors:
           type: array
           items:
@@ -3102,7 +3111,7 @@ components:
         capabilities:
           type: array
           items:
-            $ref: "#/components/schemas/Capability"
+            $ref: "#/components/schemas/CapabilityNeed"
         message:
           type: string
           description: Why the job failed or was cancelled, or why it still waits.
@@ -3129,6 +3138,14 @@ components:
         - android
         - flutter
         - swift-linux
+        - ios-linux
+    CapabilityNeed:
+      type: string
+      description: |
+        One thing a job needs of a runner: a capability, or several joined by
+        `|` of which any will do, the first preferred (`ios-sign|ios-linux`,
+        ADR 0014).
+      pattern: "^(ios-sign|android|flutter|swift-linux|ios-linux)(\\|(ios-sign|android|flutter|swift-linux|ios-linux))*$"
     WorkflowVersionInfo:
       type: object
       required: [id, version, createdAt]
@@ -3348,7 +3365,7 @@ components:
         capabilities:
           type: array
           items:
-            $ref: "#/components/schemas/Capability"
+            $ref: "#/components/schemas/CapabilityNeed"
         message:
           type: string
     Run:
@@ -4554,7 +4571,7 @@ components:
           description: What the engine's probe found, by wire name.
           items:
             type: string
-            enum: [ios-sign, android, flutter, swift-linux]
+            enum: [ios-sign, android, flutter, swift-linux, ios-linux]
         slots:
           type: integer
           minimum: 1
@@ -4594,7 +4611,7 @@ components:
       properties:
         capability:
           type: string
-          enum: [ios-sign, android, flutter, swift-linux]
+          enum: [ios-sign, android, flutter, swift-linux, ios-linux]
         reason:
           type: string
           description: One sentence without its full stop.
@@ -4804,8 +4821,17 @@ components:
           type: string
         results:
           type: array
+          description: >-
+            One result per command of the probe, in order, then one per
+            command of the omarchy-apple-dev checkout when iosLinuxDir is set.
           items:
             $ref: "#/components/schemas/ProbeResult"
+        iosLinuxDir:
+          type: string
+          description: >-
+            The omarchy-apple-dev checkout of a runner configured to build iOS
+            apps on Linux (XP_IOS_LINUX_DIR, ADR 0014). The runner adds the
+            probe commands of the folder after the engine's.
     LeaseAcceptFrame:
       type: object
       required: [type, jobId, leaseId]
@@ -4989,7 +5015,7 @@ components:
           type: array
           items:
             type: string
-            enum: [ios-sign, android, flutter, swift-linux]
+            enum: [ios-sign, android, flutter, swift-linux, ios-linux]
         missing:
           type: array
           items:

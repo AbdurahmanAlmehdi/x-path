@@ -11,6 +11,7 @@ void main() {
     expect(endpoints.playUrl, isNull);
     expect(endpoints.fileSecrets, isFalse);
     expect(endpoints.leaseSeconds, isNull);
+    expect(endpoints.ascUploadWait, isNull);
     expect(endpoints.isActive, isFalse);
     expect(endpoints.secretStoreSystem('macos'), 'macos');
   });
@@ -41,6 +42,7 @@ void main() {
       {TestEndpoints.playVariable: 'http://x'},
       {TestEndpoints.fileSecretsVariable: '1'},
       {TestEndpoints.leaseSecondsVariable: '6'},
+      {TestEndpoints.ascUploadSecondsVariable: '5'},
     ]) {
       expect(TestEndpoints.fromEnvironment(environment).isActive, isTrue);
     }
@@ -51,6 +53,15 @@ void main() {
       TestEndpoints.fromEnvironment({TestEndpoints.leaseSecondsVariable: '6'})
           .leaseSeconds,
       6,
+    );
+  });
+
+  test('reads a shorter wait for a build upload', () {
+    expect(
+      TestEndpoints.fromEnvironment({
+        TestEndpoints.ascUploadSecondsVariable: '5',
+      }).ascUploadWait,
+      const Duration(seconds: 5),
     );
   });
 
