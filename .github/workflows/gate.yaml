@@ -1,8 +1,10 @@
 # The check branch protection requires is the job `gate`: it waits for every
 # other job and fails unless all of them passed. The workflow runs on every
 # pull request and every push to main, with no path filters, so it always
-# reports. It runs what CONTRIBUTING.md asks before a push, split into jobs
-# that run in parallel:
+# reports. The job `changes` first looks for a change outside the docs
+# (`docs/`, `site/`, `skills/` and Markdown files); when there is none, every
+# other job is skipped and `gate` passes. Otherwise it runs what
+# CONTRIBUTING.md asks before a push, split into jobs that run in parallel:
 #
 #   - analyze: analyze, format, the layer check and the CI matrix check,
 #   - coverage: one job per package, each running the `test:coverage:*`
@@ -36,8 +38,37 @@ permissions:
   contents: read
 
 jobs:
+  changes:
+    name: changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      code: ${{ steps.diff.outputs.code }}
+    steps:
+      - name: Git Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      # Keep the paths in step with `paths-ignore` in macos.yaml.
+      - name: Look for Changes Outside the Docs
+        id: diff
+        env:
+          BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          # A push that creates a branch has no `before`: run everything.
+          if ! git cat-file -e "$BASE^{commit}" 2>/dev/null; then
+            echo "code=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          changed=$(git diff --name-only "$BASE" HEAD -- \
+            ':!docs' ':!site' ':!skills' ':!*.md')
+          echo "code=$([ -n "$changed" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+
   analyze:
     name: analyze
+    needs: changes
+    if: ${{ needs.changes.outputs.code == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -70,6 +101,8 @@ jobs:
 
   coverage:
     name: coverage (${{ matrix.package }})
+    needs: changes
+    if: ${{ needs.changes.outputs.code == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
@@ -110,6 +143,8 @@ jobs:
 
   contract:
     name: contract
+    needs: changes
+    if: ${{ needs.changes.outputs.code == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -123,6 +158,8 @@ jobs:
 
   smoke:
     name: smoke
+    needs: changes
+    if: ${{ needs.changes.outputs.code == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -135,6 +172,8 @@ jobs:
 
   runner-offline:
     name: runner-offline
+    needs: changes
+    if: ${{ needs.changes.outputs.code == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     # The e2e commits the fixture app and at once clones it bare. Background
@@ -158,13 +197,17 @@ jobs:
   gate:
     name: gate
     if: ${{ always() }}
-    needs: [analyze, coverage, contract, smoke, runner-offline]
+    needs: [changes, analyze, coverage, contract, smoke, runner-offline]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
+      # A job may be skipped only when `changes` passed and found docs alone.
       - name: Require Every Job to Pass
         env:
           NEEDS: ${{ toJSON(needs) }}
+          CODE: ${{ needs.changes.outputs.code }}
         run: |
           jq -r 'to_entries[] | "\(.key): \(.value.result)"' <<< "$NEEDS"
-          jq -e 'all(.[]; .result == "success")' <<< "$NEEDS" > /dev/null
+          jq -e --arg code "$CODE" 'all(to_entries[]; .value.result == "success"
+            or (.value.result == "skipped" and .key != "changes" and $code == "false"))' \
+            <<< "$NEEDS" > /dev/null

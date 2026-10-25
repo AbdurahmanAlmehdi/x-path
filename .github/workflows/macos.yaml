@@ -14,6 +14,10 @@
 # `macos` check keeps its name. `dart run tool/check_ci_matrix.dart` (in
 # `gate`) fails when a package with macOS-only tests is missing below.
 #
+# A change to the docs alone (`docs/`, `site/`, `skills/` and Markdown files,
+# the paths the `changes` job of `gate` ignores) does not run this workflow;
+# `macos` is not a required check.
+#
 # GitHub-hosted macOS runners are free only for public repositories, so the
 # jobs run only when the repository is public. On a private one they are
 # skipped, and a skipped job counts as passed for a required check.
@@ -28,9 +32,15 @@ concurrency:
 
 on:
   pull_request:
+    paths-ignore: &docs
+      - "docs/**"
+      - "site/**"
+      - "skills/**"
+      - "**/*.md"
   push:
     branches:
       - main
+    paths-ignore: *docs
 
 permissions:
   contents: read
