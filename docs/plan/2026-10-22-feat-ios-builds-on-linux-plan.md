@@ -68,11 +68,13 @@ The pieces this plan relies on were contributed upstream for it:
 | Upstream PR | What it adds | State |
 |---|---|---|
 | #72 | `flutter/ship.sh [--upload] <app>`: stamp, sign, validate and upload a `flutter/build.sh` build | Merged |
-| #73 | `SPLIT_DEBUG_INFO` and `DART_OBFUSCATION` for `flutter/build.sh` | Open |
+| #73 | `SPLIT_DEBUG_INFO` and `DART_OBFUSCATION` for `flutter/build.sh` | Merged |
 | #74 | `build/ios-linux/dSYMs`, one dSYM per image | Merged |
 | #75 | `STRIP_FRAMEWORKS` for `flutter/build.sh` | Merged |
 | #76 | `ASC_EXPORT_OPTIONS`: an Xcode `ExportOptions.plist` for `asc.py identity` | Merged |
-| #77 | Strip refuses frameworks loaded through `@executable_path` / `@loader_path` (owner's fix to #75) | Open |
+| #77 | Strip refuses frameworks loaded through `@executable_path` / `@loader_path` (owner's fix to #75) | Merged |
+| #81 | `gen-info-plist.py` expands `$(...)` settings from `Flutter/Release.xcconfig` and its includes (found in Phase 0) | Open |
+| #82 | `install-toolchain.sh` no longer copies `libXADI.so`, which xtool 1.23.0 does not build, and repairs a half-done install (found in Phase 0) | Open |
 
 The interface XPath calls (all scripts exit non-zero on failure; none prints JSON):
 
@@ -99,10 +101,10 @@ These stay on a Mac, or narrow the job to a Mac with a clear reason:
   Apple ID password uploads; Flutter older than 3.47 (3.47.6 is the verified version). Flavors,
   extensions, storyboards and icons are delegated upstream; Shorebird iOS has its own track
   (see [Upstream work](#upstream-work)).
-- **Built but not yet run on a real build:** full-mode Flutter upload through
-  `flutter/ship.sh`, obfuscation with the Linux `gen_snapshot`, dSYMs from a real SwiftBuild,
+- **Built but not yet run on a real build:** obfuscation with the Linux `gen_snapshot`,
   strip-frameworks on a real app, export options against App Store Connect. Full Xcode-SDK mode
-  is tested on Arch/Omarchy only.
+  is tested on Arch/Omarchy only. A full-mode Flutter upload through `flutter/ship.sh` and dSYMs
+  from a real SwiftBuild ran in Phase 0.
 
 ## Proposed Solution
 
@@ -185,7 +187,7 @@ Every phase that changes the API updates `openapi.yaml` and adds a contract test
 
 ### Phase 0: ADR and a spike on real hardware (no product code)
 
-- **Status:** Not started
+- **Status:** Done (2026-10-25)
 - **Scope:** Prove the toolchain on a real app before XPath depends on it.
 - **Files touched:** `docs/adr/0014-ios-builds-on-linux.md`, a spike workflow kept outside the
   repo, the receipt recorded in this plan
@@ -194,12 +196,62 @@ Every phase that changes the API updates `openapi.yaml` and adds a contract test
   installs from TestFlight. Record which of the "not built yet" items the app hit.
 - **Validation:** `manual 1. On an Omarchy machine with install-toolchain.sh done, run a workflow of command steps calling setup.sh, build.sh and ship.sh --upload on a real app. 2. Wait for VALID in App Store Connect. 3. Install from TestFlight. 4. Record the build number, the omarchy-apple-dev commit and the items hit in this plan.`
 
-- [ ] ADR 0014 accepted (the profile decision, (b), is already recorded in it).
-- [ ] Blocker audit of each app that is to move: flavors, plugins without a `Package.swift`,
+- [x] ADR 0014 accepted (the profile decision, (b), is already recorded in it).
+- [x] Blocker audit of each app that is to move: flavors, plugins without a `Package.swift`,
       app extensions, entitlements, storyboards, app icons, Shorebird use. The result orders
       the [Upstream work](#upstream-work) list; an app moves only when its list is empty.
-- [ ] The spike above, on an app with no Flutter flavors, no Shorebird and no extensions.
-- [ ] **Gate:** do not start Phase 3b before this passes on at least one app.
+- [x] The spike above, on an app with no Flutter flavors, no Shorebird and no extensions.
+- [x] **Gate:** do not start Phase 3b before this passes on at least one app. Passed on
+      2026-10-25; the receipt is below.
+
+#### Receipt (2026-10-25)
+
+Shell commands, not an XPath workflow; the scripts and their output are the same.
+
+| | |
+|---|---|
+| Machine | EC2 c7i.4xlarge (16 vCPU, 32 GB), x86_64 Arch Linux (Uplink Labs AMI 2026.10.15), `yay` from the AUR |
+| Toolchain | Swift 6.4.1 (AUR `swift-bin`; the README table says 6.4.0), xtool `f300489`, rcodesign 0.29.0, Xcode 27.0 (27A266a) `.xip`, Flutter 3.47.6 |
+| omarchy-apple-dev | `955127b` plus #81 at `b73b48a` and #82's one-line fix (fork `AbdurahmanAlmehdi/omarchy-apple-dev`) |
+| App | a real app with an App Store Connect record: 17 plugins over SwiftPM, push, Sign in with Apple, Associated Domains, Firebase, Google Sign-In; no flavors, no extensions |
+| `flutter/setup.sh` | 2 min 44 s |
+| `flutter/build.sh` | 2 min 15 s, `BUILD_NAME=1.0.3 BUILD_NUMBER=10` and two dart defines; 7 dSYMs |
+| `flutter/ship.sh --upload` | `ASC_ENTITLEMENTS_PATH=ios/Runner/Runner.entitlements`; 52/52 offline checks; `buildUpload 23a656bd-be08-4a2c-be7e-0982ffd9d55f` `COMPLETE` |
+| Result | build 1.0.3 (10) `VALID` within minutes; installed from TestFlight on an iPhone; Google and Apple sign-in work |
+
+"Not built yet" items the app hit, and what else came up:
+
+- **Multi-size app icon.** The app had 25 legacy sizes; it moved to Xcode's single 1024 px
+  icon in the app's own repository. No upstream change was needed.
+- **Entitlements are not read by default.** `ASC_ENTITLEMENTS_PATH` had to be passed by hand;
+  `asc.py` then signed push (as `production`, as Xcode does), Sign in with Apple and Associated
+  Domains. Still an open item in [Upstream work](#upstream-work).
+- **Info.plist settings from the app's own xcconfig.** `$(GOOGLE_IOS_CLIENT_ID)` and the
+  reversed id came from `Flutter/Google.xcconfig` and were written as empty strings, so Google
+  sign-in would have failed at run time. Fixed upstream in #81.
+- **Fresh install failed at the xtool step** (`libXADI.so`, gone since xtool 1.23.0). Fixed
+  upstream in #82.
+- **A storyboard beyond Flutter's template compiled.** The launch screen made by
+  flutter_native_splash (a background image and edge constraints) needed no change.
+- **One Apple Distribution certificate per machine.** `asc.py identity` creates a certificate
+  on first use and keeps its key on that machine; the team was at its limit of three
+  distribution certificates, and one had to be revoked. This supports the profile decision (b):
+  runners must not each create their own certificate.
+
+#### Blocker audit (2026-10-25)
+
+Five apps that could move, checked by reading each iOS project (names left out):
+
+| App | Flavors | Plugins without `Package.swift` | Extensions | Entitlements | Storyboards | App icon | Shorebird | Moves when |
+|---|---|---|---|---|---|---|---|---|
+| A (the Phase 0 app) | none | none (SwiftPM) | none | push, Sign in with Apple, Associated Domains | template `Main`, flutter_native_splash launch screen | single 1024 px | `shorebird.yaml`, plain release builds | now |
+| B | 2 (schemes and bundle ids) | none (SwiftPM) | none | none | a launch screen per flavor | no `AppIcon` set in Runner | no | flavors |
+| C | 4 | none (SwiftPM) | none | none | 6 (a launch screen per flavor) | 16 files | yes | flavors, storyboards, icons, Shorebird iOS |
+| D | Dart entry points only (no iOS flavors) | CocoaPods; not checked per plugin | none | push, Sign in with Apple, Associated Domains | `Main` and `LaunchScreen`, not compared with the template | 22 files | yes | SwiftPM, single icon, Shorebird iOS |
+| E | Dart entry points only | CocoaPods | none | push, Sign in with Apple, Associated Domains | `LaunchScreen` only | 2 files | no | out of scope: a Dart SDK dev build |
+
+This orders [Upstream work](#upstream-work): flavors first (B and C), then Shorebird iOS (C and
+D). The icons are app-side fixes, as in A.
 
 ### Pull requests
 
@@ -253,9 +305,11 @@ and the matching narrowing case is removed.
 - [ ] Reading `ios/Runner/Runner.entitlements` by default, and more entitlements than
       Associated Domains, push, Sign in with Apple and app groups.
 - [ ] A checker that lists plugins without a `Package.swift`, for the scan.
-- [ ] A receipt for a full-mode Flutter TestFlight upload with `flutter/ship.sh`.
+- [x] A receipt for a full-mode Flutter TestFlight upload with `flutter/ship.sh` (Phase 0;
+      posted on #81).
+- [ ] #81 (Info.plist settings from the app's xcconfig) and #82 (installer) merged, then pinned.
 - [ ] `asc.py identity` or `flutter/ship.sh` takes a given profile (profile decision (b)).
-- [ ] #73 and #77 merged, then pinned.
+- [ ] #73 and #77 pinned (both merged).
 
 ### Shorebird iOS on Linux (to decide)
 

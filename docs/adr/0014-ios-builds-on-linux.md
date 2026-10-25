@@ -1,6 +1,6 @@
 # ADR 0014: iOS builds on Linux runners via omarchy-apple-dev
 
-- **Status:** Proposed
+- **Status:** Accepted (2026-10-25, after the Phase 0 receipt below)
 - **Date:** 2026-10-22
 - **Phase:** Follow-up to D-09, D-14, D-19 and D-20
 - **Plan:** [iOS builds on Linux runners](../plan/2026-10-22-feat-ios-builds-on-linux-plan.md)
@@ -84,3 +84,7 @@ manages the whole App Store team on remote runners, the machines most likely to 
 
 Phase 0 of the plan: a real app built, signed and uploaded on Linux reaches `VALID` and installs
 from TestFlight.
+
+Passed on 2026-10-25: build 1.0.3 (10) of a real app, made, signed and uploaded on x86_64 Arch,
+reached `VALID` and installed from TestFlight, where Google and Apple sign-in work. The receipt is in
+[Phase 0 of the plan](../plan/2026-10-22-feat-ios-builds-on-linux-plan.md#phase-0-adr-and-a-spike-on-real-hardware-no-product-code).
