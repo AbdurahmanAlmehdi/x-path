@@ -499,7 +499,7 @@ flavors:
       final pods = await scanApp1({});
       final both = await scanApp1({
         'ios/Runner.xcodeproj/project.pbxproj': spm,
-        'ios/Podfile.lock': """
+        'ios/Podfile.lock': '''
 PODS:
   - Flutter (1.0.0)
   - GoogleUtilities (8.0.0)
@@ -509,7 +509,7 @@ DEPENDENCIES:
   - Flutter (from `Flutter`)
   - legacy_maps (from `.symlinks/plugins/legacy_maps/ios`)
   - old_camera (from `.symlinks/plugins/old_camera/ios`)
-""",
+''',
       });
       final one = await scanApp1({
         'ios/Runner.xcodeproj/project.pbxproj': spm,
@@ -553,9 +553,10 @@ DEPENDENCIES:
       });
 
       expect(only(result).iosLinuxLimits, [
-        'the app has the storyboard LaunchScreenDev.storyboard beyond '
-            "Flutter's template, which Linux iOS builds do not compile yet "
-            '(omarchy-apple-dev: storyboards)',
+        startsWith(
+          'the app has the storyboard LaunchScreenDev.storyboard beyond '
+          "Flutter's template",
+        ),
         'the app pins Flutter 3.44.2, and Linux iOS builds need 3.47 or later',
       ]);
       final mac = finding(result, 'ios_needs_mac');

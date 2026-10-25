@@ -134,14 +134,14 @@ void main() {
   test('the dry run shows why a job needs a Mac, from the job and the '
       'scan', () async {
     final h = await harness(
-      app: AppProfile(
+      app: const AppProfile(
         name: 'demo',
         path: '.',
         version: '1.2.3+45',
         flutterVersion: '3.47.6',
         hasIos: true,
-        flavors: const [_main],
-        iosLinuxLimits: const ['the app builds its iOS plugins with CocoaPods'],
+        flavors: [_main],
+        iosLinuxLimits: ['the app builds its iOS plugins with CocoaPods'],
       ),
     );
 
