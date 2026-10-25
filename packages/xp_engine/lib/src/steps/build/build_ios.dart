@@ -1,5 +1,6 @@
 import 'package:equatable/equatable.dart';
 import 'package:xp_api/xp_api.dart';
+import 'package:xp_engine/src/json_fields.dart';
 import 'package:xp_engine/src/steps/build/build_outputs.dart';
 import 'package:xp_engine/src/steps/build/build_settings.dart';
 import 'package:xp_engine/src/steps/build/flutter_build_step.dart';
@@ -7,7 +8,11 @@ import 'package:xp_engine/src/steps/build/flutter_build_step.dart';
 /// What to build for iOS.
 class BuildIosInput extends Equatable {
   /// Creates the input.
-  const new({required this.settings, required this.exportOptionsPlist});
+  const new({
+    required this.settings,
+    required this.exportOptionsPlist,
+    this.linuxSigning = const {},
+  });
 
   /// Reads the input from its stored form.
   ///
@@ -15,6 +20,7 @@ class BuildIosInput extends Equatable {
   factory fromJson(Map<String, dynamic> json) => BuildIosInput(
     settings: BuildSettings.fromJson(json),
     exportOptionsPlist: requiredRelative(json, 'exportOptionsPlist'),
+    linuxSigning: stringMap(json, 'linuxSigning'),
   );
 
   /// Where and what to build.
@@ -24,14 +30,21 @@ class BuildIosInput extends Equatable {
   /// names the signing team and the provisioning profiles of the flavor.
   final String exportOptionsPlist;
 
+  /// What a Linux runner signs with, by the variable omarchy-apple-dev reads:
+  /// the secret keys of the Apple Distribution identity, its certificate and
+  /// the App Store profile the engine makes (ADR 0014). Empty when the
+  /// flavor cannot sign on Linux; a Mac signs with its keychain either way.
+  final Map<String, String> linuxSigning;
+
   /// The stored form.
   Map<String, dynamic> toJson() => {
     ...settings.toJson(),
     'exportOptionsPlist': exportOptionsPlist,
+    if (linuxSigning.isNotEmpty) 'linuxSigning': linuxSigning,
   };
 
   @override
-  List<Object?> get props => [settings, exportOptionsPlist];
+  List<Object?> get props => [settings, exportOptionsPlist, linuxSigning];
 }
 
 /// Builds the release IPA of a flavor (`build.ios`, C:670-712, O:500-540).

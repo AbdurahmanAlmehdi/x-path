@@ -210,6 +210,54 @@ void main() {
       expect(printed(), isNot(contains('BEGIN PRIVATE KEY')));
     });
 
+    test('adds an Apple Distribution identity from a .cer or a PEM '
+        'certificate', () async {
+      when(() => env.client.createCredential(any()))
+          .thenAnswer((_) async => sample.ascCredential);
+      final key = file('identity.pem', '-----BEGIN PRIVATE KEY-----\nk\n');
+      final der = file('identity.cer', [0x30, 0x82, 0x01]);
+      final pem = file(
+        'identity.crt',
+        '-----BEGIN CERTIFICATE-----\nMIIB\n-----END CERTIFICATE-----\n',
+      );
+
+      for (final certificate in [der, pem]) {
+        await env.runOk([
+          'credentials',
+          'add',
+          '--kind',
+          'apple-distribution',
+          '--name',
+          'Linux signing',
+          '--private-key',
+          key,
+          '--certificate',
+          certificate,
+        ]);
+      }
+
+      final requests = verify(() => env.client.createCredential(captureAny()))
+          .captured
+          .cast<CreateCredentialRequest>();
+      expect(requests.first.kind, CredentialKind.appleDistribution);
+      expect(
+        [for (final request in requests) request.material],
+        [
+          {
+            'privateKey': '-----BEGIN PRIVATE KEY-----\nk\n',
+            'certificate': base64Encode([0x30, 0x82, 0x01]),
+          },
+          {
+            'privateKey': '-----BEGIN PRIVATE KEY-----\nk\n',
+            'certificate':
+                '-----BEGIN CERTIFICATE-----\nMIIB\n'
+                '-----END CERTIFICATE-----\n',
+          },
+        ],
+      );
+      expect(printed(), isNot(contains('BEGIN PRIVATE KEY')));
+    });
+
     test('leaves the key kind to the engine when not given', () async {
       answerCreate();
       final p8 = file('AuthKey.p8', 'key');

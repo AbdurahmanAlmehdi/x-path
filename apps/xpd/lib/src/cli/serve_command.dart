@@ -571,6 +571,7 @@ class ServeCommand extends XpdCommand {
         secrets: secrets,
         masker: masker,
         grants: RunnerSecretGrants(credentialChecks.repository),
+        profiles: credentialChecks.profiles,
         engineVersion: packageVersion,
         onError: (error, stackTrace) =>
             context.err.writeln('error: runner hub: $error\n$stackTrace'),

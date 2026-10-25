@@ -45,6 +45,12 @@ class CredentialChecks {
       secrets: secrets,
       verifiers: [
         AscKeyVerifier(apple.connect),
+        AppleDistributionVerifier(
+          credentials: repository,
+          secrets: secrets,
+          connect: apple.connect,
+          clock: clock,
+        ),
         AppleIdVerifier(runner: runner, isMacOS: isMacOS),
         PlayServiceAccountVerifier(play.connect),
         FirebaseServiceAccountVerifier(firebase.connect),
@@ -55,6 +61,12 @@ class CredentialChecks {
       ],
       masker: masker,
       events: events,
+      clock: clock,
+    );
+    profiles = AppStoreProfiles(
+      credentials: repository,
+      secrets: secrets,
+      connect: apple.connect,
       clock: clock,
     );
     health = CredentialHealthCheck(
@@ -83,6 +95,9 @@ class CredentialChecks {
 
   /// Checks every credential once a day.
   late final CredentialHealthCheck health;
+
+  /// The App Store profiles the engine makes for Linux iOS builds.
+  late final AppStoreProfiles profiles;
 
   /// The `credentials` guard check.
   GuardCheck get guardCheck => CredentialsCheck(repository);

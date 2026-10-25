@@ -13,11 +13,20 @@ List<String> iosLinuxLimits(List<StepPlan> steps, AppProfile app) {
   final reasons = <String>{};
   for (final StepPlan(:kind, :input) in steps) {
     switch (kind) {
-      case 'build.ios' || 'ios.stripAndReexport' when input['flavor'] is String:
-        reasons.add(
-          'the app uses the flavor ${input['flavor']}, which Linux iOS '
-          'builds do not support yet (omarchy-apple-dev: flavors)',
-        );
+      case 'build.ios' || 'ios.stripAndReexport':
+        if (input['flavor'] case final String flavor) {
+          reasons.add(
+            'the app uses the flavor $flavor, which Linux iOS builds do not '
+            'support yet (omarchy-apple-dev: flavors)',
+          );
+        }
+        if (kind == 'build.ios' && input['linuxSigning'] == null) {
+          reasons.add(
+            'the flavor has no Apple Distribution identity with an App Store '
+            'Connect API key assigned, which Linux runners sign with (xp '
+            'credentials add --kind apple_distribution)',
+          );
+        }
       case 'shorebird.release' || 'shorebird.patch'
           when input['platform'] == 'ios':
         reasons.add(

@@ -98,7 +98,7 @@ once and opens one pull request.
 
 ### Phase 4a: Signing identity and profile on a Linux runner
 
-- **Status:** Not started
+- **Status:** Done
 - **Scope:** A Linux runner signs with an Apple Distribution identity, and a profile made per
   the engine (decision (b)), that it receives for the job only.
 - **Files touched:** `packages/xp_api/lib/src/credential.dart`, `packages/xp_api/openapi.yaml`,
@@ -117,14 +117,29 @@ once and opens one pull request.
   assigned.
 - **Validation:** `melos run test:coverage && melos run test:contract`
 
-- [ ] A new credential kind for the Apple Distribution identity (`.p12`, or `key.pem` +
+- [x] A new credential kind for the Apple Distribution identity (`.p12`, or `key.pem` +
       `cert.der`), named and assigned per flavor (ADR 0013), imported with
       `xp credentials add` or in the app, checked against App Store Connect's certificate list.
-- [ ] Grant it to an `ios-linux` job in its tmpfs secret area, wiped at job end and at runner
-      start (D-09).
-- [ ] The engine creates the App Store profile with its App Store Connect client and grants it
+      Built as `apple_distribution`: `privateKey` (PEM) and `certificate` (DER or PEM); a
+      `.p12` is converted with `openssl pkcs12` (the field help says how), since parsing every
+      Keychain export cipher in the engine is not worth it. Migration v20 rebuilds `credential`
+      (foreign keys off). The assignment check lists the team's distribution certificates with
+      the flavor's ASC key and refuses a serial number it does not find.
+- [x] Grant it to an `ios-linux` job in its tmpfs secret area, wiped at job end and at runner
+      start (D-09). `build.ios` carries `linuxSigning` (`ASC_SIGNING_KEY`, `ASC_SIGNING_CERT`,
+      `ASC_PROFILE` to secret keys), which `RunnerSecretGrants` grants; the runner keeps them
+      in its existing secret area.
+- [x] The engine creates the App Store profile with its App Store Connect client and grants it
       with the identity; the ASC key never reaches the runner (decision (b)).
-- [ ] Until this lands, a job without an assigned identity narrows to `ios-sign` (a 3a rule).
+      `AppStoreProfiles` makes (or reuses) `XPath <bundle id> <serial>` when the runner asks
+      for the profile key.
+- [x] Until this lands, a job without an assigned identity narrows to `ios-sign` (a 3a rule).
+      The reason names `xp credentials add --kind apple_distribution`.
+- [x] Upstream: `flutter/ship.sh` signs with a given identity and profile (`ASC_PROFILE`,
+      `asc.py given-identity`, no API call, no certificate made). It is on the fork branch
+      `AbdurahmanAlmehdi/omarchy-apple-dev` `xpath/pin` (upstream `955127b` + #81 + #82 + this
+      change), which XPath pins until upstream #81 and #82 (and this change) merge; the pin then
+      moves to an upstream commit.
 
 ### Phase 3b: The Linux build backend and toolchain preparation
 

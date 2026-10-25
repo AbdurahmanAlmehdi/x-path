@@ -58,16 +58,35 @@ class _AwayMac implements PairedRunners {
 }
 
 void main() {
+  /// A harness whose flavor `main` can sign on Linux unless not [signing]:
+  /// it has an Apple Distribution identity and an App Store Connect key.
   Future<DispatchHarness> harness({
     AppProfile app = _plain,
     bool linux = true,
     bool mac = true,
+    bool signing = true,
   }) async {
     final created = await DispatchHarness.create(
       apps: [app],
       linuxIosBuilds: linux,
     );
     if (mac) created.scheduler.pairedRunners = _AwayMac();
+    const main = CredentialFlavor(
+      id: 'flv_main',
+      projectId: 'prj_1',
+      appPath: '.',
+      name: 'main',
+      iosBundleId: 'ly.demo',
+    );
+    created.credentials.flavors.add(main);
+    if (signing) {
+      for (final kind in [
+        CredentialKind.appleDistribution,
+        CredentialKind.ascKey,
+      ]) {
+        await created.credentials.put(demoCredential(main, kind));
+      }
+    }
     return created;
   }
 
@@ -78,11 +97,38 @@ void main() {
       'out', () async {
     final h = await harness(mac: false);
 
-    final run = await h.dispatchCustom(_workflow(''));
+    final run = await h.dispatchCustom(_workflow('', flavors: true));
 
     final job = await only(h, run);
     expect(job.capabilities, ['flutter', 'ios-sign|ios-linux']);
     expect(job.narrowing, isEmpty);
+  });
+
+  test('the build is planned with the identity and the profile the engine '
+      'makes, never the ASC key', () async {
+    final h = await harness(mac: false);
+
+    final run = await h.dispatchCustom(_workflow('', flavors: true));
+
+    final build = (await h.jobs.jobs.steps(run.jobs.single.id)).last;
+    expect(build.input['linuxSigning'], {
+      'ASC_SIGNING_KEY': 'credential.main.apple_distribution',
+      'ASC_SIGNING_CERT': 'credential.main.apple_distribution.certificate',
+      'ASC_PROFILE': 'credential.main.apple_distribution.profile:ly.demo',
+    });
+  });
+
+  test('a flavor without an identity and a key narrows to ios-sign, with '
+      'the reason', () async {
+    final h = await harness(signing: false);
+
+    final run = await h.dispatchCustom(_workflow('', flavors: true));
+
+    final job = await only(h, run);
+    expect(job.capabilities, ['flutter', 'ios-sign']);
+    expect(job.narrowing, [
+      contains('the flavor has no Apple Distribution identity'),
+    ]);
   });
 
   test('the strip step needs the same, once', () async {
@@ -94,7 +140,7 @@ void main() {
             with:
               exportOptionsPlist: ios/Export.plist
               frameworks: [Agora]
-'''),
+''', flavors: true),
     );
 
     expect((await only(h, run)).capabilities, [
@@ -109,7 +155,7 @@ void main() {
       final h = await harness(mac: false);
 
       final run = await h.dispatchCustom(
-        _workflow('').replaceFirst(
+        _workflow('', flavors: true).replaceFirst(
           '      job:\n',
           '      job:\n        capabilities: [ios-sign]\n',
         ),

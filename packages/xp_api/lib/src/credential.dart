@@ -16,6 +16,10 @@ enum CredentialKind {
   /// An Apple ID with an app-specific password, for `altool`.
   appleId('apple_id', 'Apple ID'),
 
+  /// An Apple Distribution identity (a private key and its certificate),
+  /// with which Linux runners sign iOS builds (ADR 0014).
+  appleDistribution('apple_distribution', 'Apple Distribution identity'),
+
   /// A Google Play service account.
   playSa('play_sa', 'Google Play service account'),
 
@@ -410,6 +414,8 @@ class NamedCredentialsResponse extends Equatable {
 /// - `asc_key`: `keyId`, `issuerId`, `privateKey` (the `.p8` text) and
 ///   `keyKind` (`team` or `individual`, default `team`);
 /// - `apple_id`: `appleId` and `password` (an app-specific password);
+/// - `apple_distribution`: `privateKey` (PEM) and `certificate` (base64 DER,
+///   or PEM);
 /// - `play_sa` and `firebase_sa`: `serviceAccount` (the text of the JSON key
 ///   file);
 /// - `keystore`: `keystore` (base64), `storePassword`, `keyAlias` and

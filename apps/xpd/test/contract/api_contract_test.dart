@@ -7,6 +7,7 @@ import 'package:test/test.dart';
 import 'package:xp_api/testing.dart';
 import 'package:xp_api/xp_api.dart';
 import 'package:xp_engine/xp_engine.dart';
+import 'package:xp_fake_asc/xp_fake_asc.dart';
 
 import '../helpers/test_engine.dart';
 import '../helpers/test_run_fakes.dart';
@@ -793,6 +794,40 @@ void main() {
         )).statusCode,
         503,
       );
+    });
+
+    test('POST /credentials takes an Apple Distribution identity, 201 and '
+        '422', () async {
+      const template = '/credentials';
+      Map<String, Object?> identity(String name, String certificate) => {
+        'name': name,
+        'kind': 'apple_distribution',
+        'privateKey':
+            '-----BEGIN PRIVATE KEY-----\nMIIE\n-----END PRIVATE KEY-----\n',
+        'certificate': certificate,
+      };
+
+      final created = await check(
+        'POST',
+        template,
+        template,
+        body: identity('Linux signing', fakeDistributionCertificate),
+      );
+      final refused = await check(
+        'POST',
+        template,
+        template,
+        body: identity('Broken', 'bm90IGEgY2VydGlmaWNhdGU='),
+      );
+
+      expect(created.statusCode, 201);
+      expect(created.json['kind'], 'apple_distribution');
+      expect(
+        created.json['account'],
+        'Apple Distribution: XPath Test (TEAM123456)',
+      );
+      expect(created.body, isNot(contains('PRIVATE KEY')));
+      expect(refused.statusCode, 422);
     });
 
     test('GET /credentials and /credentials/{id} 200 and 404', () async {

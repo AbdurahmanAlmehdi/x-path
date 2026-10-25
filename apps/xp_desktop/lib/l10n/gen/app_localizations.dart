@@ -1222,6 +1222,12 @@ abstract class AppLocalizations {
   /// **'Apple ID'**
   String get kindAppleId;
 
+  /// Credential kind: a private key and its certificate, for Linux runners.
+  ///
+  /// In en, this message translates to:
+  /// **'Apple Distribution identity'**
+  String get kindAppleDistribution;
+
   /// Credential kind.
   ///
   /// In en, this message translates to:
@@ -1335,6 +1341,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Private key (.p8)'**
   String get fieldPrivateKey;
+
+  /// Field label: the private key of an Apple Distribution identity.
+  ///
+  /// In en, this message translates to:
+  /// **'Private key (PEM)'**
+  String get fieldSigningKey;
+
+  /// Field label: an Apple Distribution certificate file.
+  ///
+  /// In en, this message translates to:
+  /// **'Certificate (.cer)'**
+  String get fieldCertificate;
 
   /// Field label.
   ///

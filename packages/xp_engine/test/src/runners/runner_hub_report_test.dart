@@ -4,6 +4,7 @@ import 'package:test/test.dart';
 import 'package:xp_api/xp_api.dart';
 import 'package:xp_engine/xp_engine.dart';
 
+import '../../helpers/credential_harness.dart';
 import '../../helpers/runner_harness.dart';
 
 void main() {
@@ -586,6 +587,83 @@ void main() {
         RunnerSecretDelivered(runnerId: runner.id, jobId: jobId, key: 'sb'),
       ]);
       expect(h.jobs.masker.secrets, ['sb_api_secret']);
+    });
+
+    test('gives a Linux build the identity and the profile the engine makes '
+        '(ADR 0014)', () async {
+      const flavor = CredentialFlavor(
+        id: 'flv_1',
+        projectId: 'prj_1',
+        appPath: '.',
+        name: 'prod',
+        iosBundleId: 'com.mataa.app',
+      );
+      for (final kind in [
+        CredentialKind.appleDistribution,
+        CredentialKind.ascKey,
+      ]) {
+        await h.credentials.put(
+          AssignedCredential(
+            flavor: flavor,
+            credential: CredentialRecord(
+              id: 'crd_${kind.wire}',
+              name: kind.wire,
+              kind: kind,
+              secretKey: kind.wire,
+            ),
+          ),
+        );
+        await CredentialMaterial.fromFields(
+          kind,
+          credentialFields(kind),
+        ).write(h.secrets, kind.wire);
+      }
+      h.asc
+        ..certificates.add(
+          const AscCertificate(id: 'cert-1', serialNumber: 'A1B2C3D4E5F'),
+        )
+        ..bundleIds['com.mataa.app'] = 'bundle-1';
+      final profile = AppStoreProfiles.keyFor(
+        'apple_distribution',
+        'com.mataa.app',
+      );
+      final (runner, _) = await leased(
+        steps: [
+          StepPlan(
+            kind: 'build.ios',
+            input: {
+              'linuxSigning': {
+                'ASC_SIGNING_KEY': 'apple_distribution',
+                'ASC_SIGNING_CERT': 'apple_distribution.certificate',
+                'ASC_PROFILE': profile,
+              },
+            },
+            sideEffect: false,
+          ),
+        ],
+      );
+
+      expect(runner.offer.secrets, [
+        'apple_distribution',
+        'apple_distribution.certificate',
+        profile,
+      ]);
+      h.asc.failure = const AscServerException(503, 'down');
+      await runner.secret(profile);
+      await runner.secret(profile);
+      await runner.secret('apple_distribution');
+
+      expect(
+        runner.link.sentOf<SecretDeniedFrame>().single.reason,
+        'App Store Connect could not make the profile of com.mataa.app: down',
+      );
+      final values = runner.link.sentOf<SecretValueFrame>();
+      expect(values.map((v) => v.key), [profile, 'apple_distribution']);
+      expect(
+        utf8.decode(base64Decode(values.first.value)),
+        startsWith('profile XPath com.mataa.app A1B2C3D4E5F'),
+      );
+      expect(h.jobs.masker.secrets, contains(testSigningKey));
     });
 
     test('is never given for anything else', () async {

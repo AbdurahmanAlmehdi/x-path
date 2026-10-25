@@ -4,6 +4,8 @@ import 'dart:typed_data';
 import 'package:xp_api/xp_api.dart';
 import 'package:xp_engine/xp_engine.dart';
 
+import 'apple_identity_fixtures.dart';
+
 /// A [SecretStore] in memory that keeps bytes as bytes, so that a binary
 /// keystore survives. Text is UTF-8.
 class BytesSecretStore implements SecretStore {
@@ -90,6 +92,10 @@ const testServiceAccount = PlayServiceAccount(
   privateKeyId: 'key1',
 );
 
+/// A private key in the shape of one, for tests: not a real key.
+const testSigningKey =
+    '-----BEGIN PRIVATE KEY-----\nMIIE\n-----END PRIVATE KEY-----\n';
+
 /// The fields of a request for a credential of [kind], for tests.
 Map<String, dynamic> credentialFields(CredentialKind kind) => switch (kind) {
   CredentialKind.ascKey => {
@@ -101,6 +107,10 @@ Map<String, dynamic> credentialFields(CredentialKind kind) => switch (kind) {
   CredentialKind.appleId => {
     'appleId': 'dev@example.com',
     'password': 'abcd-efgh-ijkl-mnop',
+  },
+  CredentialKind.appleDistribution => {
+    'privateKey': testSigningKey,
+    'certificate': testDistributionCertificate,
   },
   CredentialKind.playSa || CredentialKind.firebaseSa => {
     'serviceAccount': testServiceAccount.toSecret(),

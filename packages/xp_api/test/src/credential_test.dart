@@ -9,6 +9,7 @@ void main() {
         [
           'asc_key',
           'apple_id',
+          'apple_distribution',
           'play_sa',
           'firebase_sa',
           'keystore',

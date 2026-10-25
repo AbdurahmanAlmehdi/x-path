@@ -159,7 +159,8 @@ class CredentialsAddCommand extends XpCommand {
         'Missing --kind (${_namedKinds.map((k) => k.wire).join(', ')}).',
       );
     }
-    final kind = CredentialKind.fromWire(wire);
+    // `apple-distribution` reads as well as `apple_distribution`.
+    final kind = CredentialKind.fromWire(wire.replaceAll('-', '_'));
     if (kind == CredentialKind.github) usageException(_githubHint);
     if (kind == null) {
       usageException(
@@ -684,6 +685,7 @@ const _secrets = <CredentialKind, List<_Secret>>{
 const _kindOptions = <CredentialKind, List<String>>{
   CredentialKind.ascKey: ['key-id', 'issuer-id', 'p8', 'key-kind'],
   CredentialKind.appleId: ['apple-id', 'password-stdin'],
+  CredentialKind.appleDistribution: ['private-key', 'certificate'],
   CredentialKind.playSa: ['service-account'],
   CredentialKind.firebaseSa: ['service-account'],
   CredentialKind.keystore: [
@@ -700,6 +702,7 @@ const _kindOptions = <CredentialKind, List<String>>{
 const _requiredOptions = <CredentialKind, List<String>>{
   CredentialKind.ascKey: ['key-id', 'issuer-id', 'p8'],
   CredentialKind.appleId: ['apple-id'],
+  CredentialKind.appleDistribution: ['private-key', 'certificate'],
   CredentialKind.playSa: ['service-account'],
   CredentialKind.firebaseSa: ['service-account'],
   CredentialKind.keystore: ['keystore', 'key-alias'],
@@ -742,6 +745,21 @@ void _addMaterialOptions(ArgParser parser) {
     'Read the app-specific password from standard input.',
   );
   parser
+    ..addSeparator(
+      'apple_distribution (Apple Distribution identity, for Linux runners):',
+    )
+    ..addOption(
+      'private-key',
+      help:
+          'The PEM private key of the identity (from a .p12: openssl pkcs12 '
+          '-in identity.p12 -nodes -nocerts).',
+      valueHelp: 'path',
+    )
+    ..addOption(
+      'certificate',
+      help: 'The Apple Distribution certificate, .cer (DER) or PEM.',
+      valueHelp: 'path',
+    )
     ..addSeparator('play_sa, firebase_sa (service account):')
     ..addOption(
       'service-account',
@@ -822,6 +840,10 @@ Future<Map<String, dynamic>> _material(
         'keyKind': ?args.option('key-kind'),
       },
       CredentialKind.appleId => {'appleId': required('apple-id')},
+      CredentialKind.appleDistribution => {
+        'privateKey': _readText(required('private-key')),
+        'certificate': _certificateText(required('certificate')),
+      },
       CredentialKind.playSa || CredentialKind.firebaseSa => {
         'serviceAccount': _readText(required('service-account')),
       },
@@ -857,6 +879,13 @@ Future<Map<String, dynamic>> _material(
 }
 
 String _readText(String path) => _read(path, File(path).readAsStringSync);
+
+/// A certificate file as the engine takes it: PEM as it is, DER as base64.
+String _certificateText(String path) {
+  final bytes = _readBytes(path);
+  final text = latin1.decode(bytes);
+  return text.startsWith('-----BEGIN') ? text : base64Encode(bytes);
+}
 
 List<int> _readBytes(String path) => _read(path, File(path).readAsBytesSync);
 

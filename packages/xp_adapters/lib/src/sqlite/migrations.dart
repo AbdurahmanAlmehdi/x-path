@@ -24,6 +24,7 @@ const engineMigrations = <Migration>[
   Migration(version: 17, sql: _v17),
   Migration(version: 18, sql: _v18),
   Migration(version: 19, sql: _v19),
+  Migration(version: 20, sql: _v20, foreignKeysOff: true),
 ];
 
 // Timestamps are integer microseconds since the Unix epoch (UTC), so that
@@ -587,4 +588,38 @@ ALTER TABLE workflow ADD COLUMN based_on_builtin TEXT;
 ALTER TABLE workflow ADD COLUMN based_on_version INTEGER
   CHECK (based_on_version IS NULL OR based_on_version > 0);
 ALTER TABLE workflow ADD COLUMN archived_at INTEGER;
+''';
+
+// iOS on Linux 4a (ADR 0014): an Apple Distribution identity is a credential
+// kind, for the Linux runners that sign iOS builds. SQLite cannot change a
+// CHECK, so credential is rebuilt (foreign keys off: credential_assignment
+// refers to it) and its name index made again.
+const _v20 = '''
+CREATE TABLE new_credential (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL CHECK (length(name) BETWEEN 1 AND 80),
+  kind TEXT NOT NULL CHECK (kind IN (
+    'asc_key', 'apple_id', 'apple_distribution', 'play_sa', 'firebase_sa',
+    'keystore', 'shorebird', 'slack'
+  )),
+  secret_key TEXT NOT NULL,
+  account TEXT,
+  status TEXT NOT NULL DEFAULT 'unverified'
+    CHECK (status IN ('unverified', 'verified', 'rejected', 'unreachable')),
+  verified_at INTEGER,
+  checked_at INTEGER,
+  message TEXT,
+  fix TEXT,
+  UNIQUE (id, kind)
+) STRICT;
+
+INSERT INTO new_credential (id, name, kind, secret_key, account, status,
+  verified_at, checked_at, message, fix)
+SELECT id, name, kind, secret_key, account, status, verified_at, checked_at,
+  message, fix
+FROM credential ORDER BY rowid;
+
+DROP TABLE credential;
+ALTER TABLE new_credential RENAME TO credential;
+CREATE UNIQUE INDEX idx_credential_name ON credential (name COLLATE NOCASE);
 ''';

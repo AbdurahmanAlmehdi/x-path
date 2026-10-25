@@ -20,6 +20,13 @@ const _profile =
 const _simulator =
     'the job uses the iOS Simulator, which needs macOS (Linux workflows test '
     'on an Android emulator)';
+const _unsigned =
+    'the flavor has no Apple Distribution identity with an App Store Connect '
+    'API key assigned, which Linux runners sign with (xp credentials add '
+    '--kind apple_distribution)';
+const _signing = {
+  'linuxSigning': {'ASC_PROFILE': 'identity.profile:ly.demo'},
+};
 const _widgets =
     'the app has the app extension Widgets, which Linux iOS builds do not '
     'support yet (omarchy-apple-dev: app extensions)';
@@ -35,7 +42,7 @@ void main() {
     expect(
       iosLinuxLimits([
         _step('git.checkout'),
-        _step('build.ios', {'version': '1.0.0+1'}),
+        _step('build.ios', {'version': '1.0.0+1', ..._signing}),
         _step('ios.stripAndReexport'),
         _step('shorebird.release', {'platform': 'android'}),
         _command('flutter', ['build', 'ios', '--release']),
@@ -47,10 +54,20 @@ void main() {
   test('a flavor of the build or the strip step, once', () {
     expect(
       iosLinuxLimits([
-        _step('build.ios', {'flavor': 'prod'}),
+        _step('build.ios', {'flavor': 'prod', ..._signing}),
         _step('ios.stripAndReexport', {'flavor': 'prod'}),
       ], _app),
       [_flavor],
+    );
+  });
+
+  test('a build the flavor cannot sign on Linux, with a flavor too', () {
+    expect(iosLinuxLimits([_step('build.ios')], _app), [_unsigned]);
+    expect(
+      iosLinuxLimits([
+        _step('build.ios', {'flavor': 'prod'}),
+      ], _app),
+      [_flavor, _unsigned],
     );
   });
 

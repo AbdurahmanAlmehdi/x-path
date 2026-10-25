@@ -149,7 +149,7 @@ void main() {
         ),
         findsOneWidget,
       );
-      expect(find.text('Not assigned'), findsNWidgets(6));
+      expect(find.text('Not assigned'), findsNWidgets(namedKinds.length - 1));
       await tap(tester, find.text('Close'));
       expect(find.text('Credentials of dev'), findsNothing);
     });

@@ -5,6 +5,7 @@ import 'package:xp_api/xp_api.dart';
 import 'package:xp_engine/src/credentials/credential_exceptions.dart';
 import 'package:xp_engine/src/secrets/secret_store.dart';
 import 'package:xp_engine/src/stores/apple/asc_key.dart';
+import 'package:xp_engine/src/stores/apple/distribution_certificate.dart';
 import 'package:xp_engine/src/stores/play/play_service_account.dart';
 
 /// The secret part of a credential, as the owner hands it over and as the
@@ -18,6 +19,7 @@ import 'package:xp_engine/src/stores/play/play_service_account.dart';
 /// |---|---|
 /// | `asc_key` | `<key>`: JSON `{keyId, issuerId, keyKind, privateKey}` |
 /// | `apple_id` | `<key>`: the password; the Apple ID is the `account` |
+/// | `apple_distribution` | `<key>`: the PEM key; `<key>.certificate`: DER |
 /// | `play_sa`, `firebase_sa` | `<key>`: the JSON key file, as it is |
 /// | `keystore` | `<key>`: bytes; `<key>.storePassword`, `<key>.keyPassword` |
 /// | `shorebird`, `github` | `<key>`: the token |
@@ -68,6 +70,11 @@ sealed class CredentialMaterial {
         return AppleIdMaterial(
           appleId: text('appleId').trim(),
           password: text('password').trim(),
+        );
+      case CredentialKind.appleDistribution:
+        return AppleDistributionMaterial.fromText(
+          privateKey: text('privateKey'),
+          certificate: text('certificate'),
         );
       case CredentialKind.playSa:
       case CredentialKind.firebaseSa:
@@ -139,6 +146,17 @@ sealed class CredentialMaterial {
         return password == null || account == null
             ? null
             : AppleIdMaterial(appleId: account, password: password);
+      case CredentialKind.appleDistribution:
+        final privateKey = await secrets.read(secretKey);
+        final certificate = await secrets.readBytes(
+          AppleDistributionMaterial.certificateKey(secretKey),
+        );
+        return privateKey == null || certificate == null
+            ? null
+            : AppleDistributionMaterial(
+                privateKey: privateKey,
+                certificate: DistributionCertificate.fromDer(certificate),
+              );
       case CredentialKind.playSa:
       case CredentialKind.firebaseSa:
         final json = await secrets.read(secretKey);
@@ -185,9 +203,15 @@ sealed class CredentialMaterial {
     SecretStore secrets,
   ) async {
     await secrets.delete(secretKey);
-    if (kind == CredentialKind.keystore) {
-      await secrets.delete(KeystoreMaterial.storePasswordKey(secretKey));
-      await secrets.delete(KeystoreMaterial.keyPasswordKey(secretKey));
+    switch (kind) {
+      case CredentialKind.keystore:
+        await secrets.delete(KeystoreMaterial.storePasswordKey(secretKey));
+        await secrets.delete(KeystoreMaterial.keyPasswordKey(secretKey));
+      case CredentialKind.appleDistribution:
+        await secrets.delete(
+          AppleDistributionMaterial.certificateKey(secretKey),
+        );
+      case _:
     }
   }
 
@@ -249,6 +273,70 @@ final class AppleIdMaterial extends CredentialMaterial {
   @override
   Future<void> write(SecretStore secrets, String secretKey) =>
       secrets.write(secretKey, password);
+}
+
+/// An Apple Distribution identity: an RSA private key and its certificate.
+/// Linux runners sign iOS builds with it, with a profile the engine makes
+/// (ADR 0014); the key is the secret, the certificate is not.
+final class AppleDistributionMaterial extends CredentialMaterial {
+  /// Creates the material.
+  const new({required this.privateKey, required this.certificate});
+
+  /// Reads the identity as an owner sends it: [privateKey] a PEM private key
+  /// (PKCS#8 or PKCS#1, unencrypted), [certificate] base64 DER or PEM.
+  ///
+  /// Throws a [CredentialRejectedException] if either cannot be used.
+  factory fromText({required String privateKey, required String certificate}) {
+    final pem = privateKey.trim();
+    final unencrypted = RegExp(
+      r'^-----BEGIN (RSA )?PRIVATE KEY-----[\s\S]+-----END (RSA )?PRIVATE KEY-----$',
+    );
+    if (!unencrypted.hasMatch(pem)) {
+      throw const CredentialRejectedException(
+        'The private key is not an unencrypted PEM key.',
+        fix:
+            'Send the key as -----BEGIN PRIVATE KEY----- PEM (from a .p12: '
+            'openssl pkcs12 -in identity.p12 -nodes -nocerts).',
+      );
+    }
+    try {
+      return AppleDistributionMaterial(
+        privateKey: '$pem\n',
+        certificate: DistributionCertificate.fromText(certificate),
+      );
+    } on FormatException catch (error) {
+      throw CredentialRejectedException(
+        error.message,
+        fix:
+            'Send the Apple Distribution certificate as base64 DER or PEM '
+            '(from a .p12: openssl pkcs12 -in identity.p12 -clcerts -nokeys).',
+      );
+    }
+  }
+
+  /// The secret key of the certificate of an identity under [secretKey].
+  static String certificateKey(String secretKey) => '$secretKey.certificate';
+
+  /// The private key, PEM.
+  final String privateKey;
+
+  /// The certificate.
+  final DistributionCertificate certificate;
+
+  @override
+  CredentialKind get kind => CredentialKind.appleDistribution;
+
+  @override
+  String? get account => certificate.commonName;
+
+  @override
+  List<String> get secretValues => [privateKey, privateKey.trim()];
+
+  @override
+  Future<void> write(SecretStore secrets, String secretKey) async {
+    await secrets.write(secretKey, privateKey);
+    await secrets.writeBytes(certificateKey(secretKey), certificate.der);
+  }
 }
 
 /// A Google service account key file, for Google Play or Firebase.

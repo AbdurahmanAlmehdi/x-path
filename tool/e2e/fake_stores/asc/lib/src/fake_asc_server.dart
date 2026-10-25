@@ -87,6 +87,15 @@ class FakeAscServer {
   /// first read is the one right after its file is marked uploaded.
   int uploadPollsBeforeDone = 2;
 
+  /// The certificates of the team, by id.
+  final certificates = <String, FakeAscCertificate>{};
+
+  /// The registered bundle ids: resource id by identifier.
+  final bundleIds = <String, String>{};
+
+  /// The provisioning profiles, by id.
+  final profiles = <String, FakeAscProfile>{};
+
   /// Every request received, oldest first.
   final requests = <FakeAscRequest>[];
 
@@ -387,6 +396,36 @@ class FakeAscServer {
         return _createFile(body);
       case ('PATCH', ['buildUploadFiles', final id]):
         return _commitFile(id, body);
+      case ('GET', ['certificates']):
+        final type = query['filter[certificateType]'];
+        return _ok(uri, [
+          for (final certificate in certificates.values)
+            if (type == null || certificate.certificateType == type)
+              _certificate(certificate),
+        ]);
+      case ('GET', ['bundleIds']):
+        final identifier = query['filter[identifier]'];
+        return _ok(uri, [
+          for (final MapEntry(key: name, value: id) in bundleIds.entries)
+            if (identifier == null || name.startsWith(identifier))
+              {
+                'type': 'bundleIds',
+                'id': id,
+                'attributes': {'identifier': name, 'platform': 'IOS'},
+              },
+        ]);
+      case ('GET', ['profiles']):
+        return _ok(uri, [
+          for (final profile in profiles.values)
+            if ((query['filter[name]'] ?? profile.name) == profile.name &&
+                (query['filter[profileType]'] ?? profile.profileType) ==
+                    profile.profileType &&
+                (query['filter[profileState]'] ?? profile.state) ==
+                    profile.state)
+              _profile(profile),
+        ]);
+      case ('POST', ['profiles']):
+        return _createProfile(body);
     }
     throw _notFound(uri);
   }
@@ -530,6 +569,85 @@ class FakeAscServer {
     }
     release.state = state! as String;
     return (200, {'data': _phased(release)});
+  }
+
+  Map<String, Object?> _certificate(FakeAscCertificate certificate) => {
+    'type': 'certificates',
+    'id': certificate.id,
+    'attributes': {
+      'serialNumber': certificate.serialNumber,
+      'certificateType': certificate.certificateType,
+      'name': certificate.name,
+      'displayName': certificate.name,
+      'expirationDate': certificate.expirationDate.toIso8601String(),
+      'certificateContent': base64.encode(certificate.content),
+    },
+  };
+
+  Map<String, Object?> _profile(FakeAscProfile profile) => {
+    'type': 'profiles',
+    'id': profile.id,
+    'attributes': {
+      'name': profile.name,
+      'profileType': profile.profileType,
+      'profileState': profile.state,
+      'expirationDate': profile.expirationDate.toIso8601String(),
+      'profileContent': base64.encode(profile.content),
+    },
+  };
+
+  (int, Object?) _createProfile(Object? body) {
+    final data = _data(body);
+    final attributes = data['attributes'] as Map<String, dynamic>?;
+    final name = attributes?['name'];
+    final type = attributes?['profileType'];
+    if (name is! String || type is! String) {
+      throw const _AscError(
+        409,
+        'ENTITY_ERROR.ATTRIBUTE.REQUIRED',
+        'A required attribute is missing.',
+        'name and profileType are required.',
+      );
+    }
+    if (profiles.values.any((profile) => profile.name == name)) {
+      throw _AscError(
+        409,
+        'ENTITY_ERROR.ATTRIBUTE.INVALID',
+        'An attribute value is invalid.',
+        'There is already a profile named $name.',
+      );
+    }
+    final bundleIdId = _relationship(data, 'bundleId');
+    if (!bundleIds.containsValue(bundleIdId)) {
+      throw _AscError(
+        404,
+        'NOT_FOUND',
+        'Not found.',
+        'No bundle id $bundleIdId.',
+      );
+    }
+    final relationships = data['relationships'] as Map<String, dynamic>;
+    final certificateIds = [
+      for (final item
+          in (relationships['certificates'] as Map<String, dynamic>)['data']
+              as List<dynamic>)
+        (item as Map<String, dynamic>)['id'] as String,
+    ];
+    for (final id in certificateIds) {
+      if (!certificates.containsKey(id)) {
+        throw _AscError(404, 'NOT_FOUND', 'Not found.', 'No certificate $id.');
+      }
+    }
+    final profile = FakeAscProfile(
+      id: 'profile-${++_ids}',
+      name: name,
+      profileType: type,
+      bundleIdId: bundleIdId,
+      certificateIds: certificateIds,
+      expirationDate: _now().add(const Duration(days: 365)),
+    );
+    profiles[profile.id] = profile;
+    return (201, {'data': _profile(profile)});
   }
 
   (int, Object?) _createUpload(Object? body) {

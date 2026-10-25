@@ -4285,6 +4285,7 @@ components:
       enum:
         - asc_key
         - apple_id
+        - apple_distribution
         - play_sa
         - firebase_sa
         - keystore
@@ -4534,6 +4535,20 @@ components:
           description: |
             An app-specific password (`abcd-efgh-ijkl-mnop`), not the password
             of the Apple ID.
+    AppleDistributionFields:
+      type: object
+      required: [privateKey, certificate]
+      description: |
+        An Apple Distribution identity, for Linux runners that sign iOS
+        builds (ADR 0014). From a `.p12`: `openssl pkcs12 -in identity.p12
+        -nodes -nocerts` gives the key, `-clcerts -nokeys` the certificate.
+      properties:
+        privateKey:
+          type: string
+          description: The RSA private key, PEM (PKCS#8 or PKCS#1), unencrypted.
+        certificate:
+          type: string
+          description: The Apple Distribution certificate, DER as base64, or PEM.
     ServiceAccountFields:
       type: object
       required: [serviceAccount]
@@ -4594,6 +4609,16 @@ components:
                   const: apple_id
           unevaluatedProperties: false
         - allOf:
+            - $ref: "#/components/schemas/AppleDistributionFields"
+            - type: object
+              required: [name, kind]
+              properties:
+                name:
+                  type: string
+                kind:
+                  const: apple_distribution
+          unevaluatedProperties: false
+        - allOf:
             - $ref: "#/components/schemas/ServiceAccountFields"
             - type: object
               required: [name, kind]
@@ -4647,6 +4672,10 @@ components:
             - $ref: "#/components/schemas/OptionalKind"
           unevaluatedProperties: false
         - allOf:
+            - $ref: "#/components/schemas/AppleDistributionFields"
+            - $ref: "#/components/schemas/OptionalKind"
+          unevaluatedProperties: false
+        - allOf:
             - $ref: "#/components/schemas/ServiceAccountFields"
             - $ref: "#/components/schemas/OptionalKind"
           unevaluatedProperties: false
@@ -4688,6 +4717,14 @@ components:
               properties:
                 kind:
                   const: apple_id
+          unevaluatedProperties: false
+        - allOf:
+            - $ref: "#/components/schemas/AppleDistributionFields"
+            - $ref: "#/components/schemas/FlavorSelector"
+            - type: object
+              properties:
+                kind:
+                  const: apple_distribution
           unevaluatedProperties: false
         - allOf:
             - $ref: "#/components/schemas/ServiceAccountFields"

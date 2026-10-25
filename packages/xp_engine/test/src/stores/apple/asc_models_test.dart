@@ -209,5 +209,13 @@ void main() {
       AscPhasedRelease(id: 'p', state: PhasedReleaseState.active),
       AscPhasedRelease(id: 'p', state: PhasedReleaseState.active),
     );
+    expect(
+      AscCertificate(id: 'c', serialNumber: '0A'),
+      AscCertificate(id: 'c', serialNumber: '0A'),
+    );
+    expect(
+      AscProfile(id: 'p', name: 'n', content: [1]),
+      AscProfile(id: 'p', name: 'n', content: [1]),
+    );
   });
 }

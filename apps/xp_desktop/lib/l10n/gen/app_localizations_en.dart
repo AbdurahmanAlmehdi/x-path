@@ -699,6 +699,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get kindAppleId => 'Apple ID';
 
   @override
+  String get kindAppleDistribution => 'Apple Distribution identity';
+
+  @override
   String get kindPlaySa => 'Google Play service account';
 
   @override
@@ -758,6 +761,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get fieldPrivateKey => 'Private key (.p8)';
+
+  @override
+  String get fieldSigningKey => 'Private key (PEM)';
+
+  @override
+  String get fieldCertificate => 'Certificate (.cer)';
 
   @override
   String get fieldAppleId => 'Apple ID';

@@ -293,6 +293,70 @@ class HttpAppStoreConnect implements AppStoreConnect {
     await _send('GET', _url('/v1/apps', {'limit': '1'}));
   }
 
+  @override
+  Future<List<AscCertificate>> distributionCertificates() async {
+    final documents = await _list('/v1/certificates', {
+      'filter[certificateType]': 'DISTRIBUTION',
+    });
+    return [for (final resource in documents.data) _certificate(resource)];
+  }
+
+  @override
+  Future<String?> bundleIdOf(String identifier) async {
+    // The filter also matches longer identifiers; only the exact one counts.
+    final documents = await _list('/v1/bundleIds', {
+      'filter[identifier]': identifier,
+    });
+    for (final resource in documents.data) {
+      if (_optional(_attributes(resource), 'identifier') == identifier) {
+        return _string(resource, 'id');
+      }
+    }
+    return null;
+  }
+
+  @override
+  Future<List<AscProfile>> appStoreProfiles(String name) async {
+    final documents = await _list('/v1/profiles', {
+      'filter[name]': name,
+      'filter[profileType]': 'IOS_APP_STORE',
+      'filter[profileState]': 'ACTIVE',
+    });
+    return [
+      for (final resource in documents.data)
+        if (_optional(_attributes(resource), 'name') == name)
+          _profile(resource),
+    ];
+  }
+
+  @override
+  Future<AscProfile> createAppStoreProfile({
+    required String name,
+    required String bundleId,
+    required String certificateId,
+  }) async => _profile(
+    _one(
+      await _send(
+        'POST',
+        _url('/v1/profiles'),
+        body: {
+          'data': {
+            'type': 'profiles',
+            'attributes': {'name': name, 'profileType': 'IOS_APP_STORE'},
+            'relationships': {
+              'bundleId': _link('bundleIds', bundleId),
+              'certificates': {
+                'data': [
+                  {'type': 'certificates', 'id': certificateId},
+                ],
+              },
+            },
+          },
+        },
+      ),
+    ),
+  );
+
   Uri _url(String path, [Map<String, String>? query]) => _baseUrl.replace(
     path: path,
     queryParameters: query == null || query.isEmpty ? null : query,
@@ -681,6 +745,36 @@ class HttpAppStoreConnect implements AppStoreConnect {
       state: AscBuildUploadState.fromWire(_optional(state, 'state')),
       errors: issues('errors'),
       buildId: _optional(_object(build['data']), 'id'),
+    );
+  }
+
+  AscCertificate _certificate(Map<String, dynamic> resource) {
+    final attributes = _attributes(resource);
+    return AscCertificate(
+      id: _string(resource, 'id'),
+      serialNumber: _string(attributes, 'serialNumber'),
+      name:
+          _optional(attributes, 'displayName') ?? _optional(attributes, 'name'),
+      expirationDate: _date(attributes, 'expirationDate'),
+    );
+  }
+
+  AscProfile _profile(Map<String, dynamic> resource) {
+    final attributes = _attributes(resource);
+    final List<int> content;
+    try {
+      content = base64.decode(_string(attributes, 'profileContent'));
+    } on FormatException {
+      throw const AscServerException(
+        0,
+        'App Store Connect sent a profile that is not base64.',
+      );
+    }
+    return AscProfile(
+      id: _string(resource, 'id'),
+      name: _string(attributes, 'name'),
+      content: content,
+      expirationDate: _date(attributes, 'expirationDate'),
     );
   }
 
