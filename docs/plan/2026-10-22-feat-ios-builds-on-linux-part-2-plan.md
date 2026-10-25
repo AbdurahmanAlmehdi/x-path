@@ -21,7 +21,7 @@ on Linux.
 - **Phase 0 passed** (in the parent plan): a real app built, signed and uploaded on Linux
   reached `VALID` and installed from TestFlight, and ADR 0014 is Accepted. Do not start
   Phase 3b before this.
-- **The open decision below is made** before Phase 4a.
+- **The profile decision below is made** before Phase 4a. Done: (b), in ADR 0014.
 - PR 2 (any git host): Phase 4a reuses R10a's foreign-keys-off migration support; if PR 2 has
   not landed, Phase 4a adds it.
 - PR 1 (runner core): Phase 5 adds its section to `docs/guide/runners.md`. PR 3 (UX part 1):
@@ -46,17 +46,17 @@ meet the goal. So:
   but never approve, D-13) against the Linux engine, reached remotely through TLS as for any
   remote engine (the runner plan's R4 and R6).
 
-## Open decision: who creates the App Store profile for a Linux build
+## Decision: who creates the App Store profile for a Linux build
 
-Decide before Phase 4a (signing comes before the first Linux build).
+Decided 2026-10-25, recorded in ADR 0014: **(b)**.
 
-- **(a)** The App Store Connect key goes to the runner for the job, and omarchy-apple-dev's
-  `asc.py identity` creates the certificate and profile. Least code; widens D-09, under which
-  ASC keys never leave the engine.
-- **(b) Recommended.** The engine creates the profile with its own App Store Connect client and
+- **(b) Chosen.** The engine creates the profile with its own App Store Connect client and
   sends only the identity and the profile to the runner, which signs with rcodesign. The ASC
-  key stays on the engine. Needs a small upstream change so `asc.py identity` (or
-  `flutter/ship.sh`) takes a given profile.
+  key stays on the engine (D-09 unchanged). Needs a small upstream change so `asc.py identity`
+  (or `flutter/ship.sh`) takes a given profile.
+- **(a) Rejected.** The App Store Connect key goes to the runner for the job, and
+  omarchy-apple-dev's `asc.py identity` creates the certificate and profile. Least code, but it
+  widens D-09, under which ASC keys never leave the engine.
 
 ## Architecture
 
@@ -100,7 +100,7 @@ once and opens one pull request.
 
 - **Status:** Not started
 - **Scope:** A Linux runner signs with an Apple Distribution identity, and a profile made per
-  the open decision, that it receives for the job only.
+  the engine (decision (b)), that it receives for the job only.
 - **Files touched:** `packages/xp_api/lib/src/credential.dart`, `packages/xp_api/openapi.yaml`,
   `packages/xp_adapters/lib/src/sqlite/migrations.dart` and a new snapshot golden (the
   `credential.kind` and `credential_ref.kind` `CHECK` constraints change, so both tables are
@@ -110,9 +110,9 @@ once and opens one pull request.
   `apps/xp/lib/src/runner/secrets/secret_area.dart`,
   `packages/xp_engine/lib/src/stores/apple/**` and
   `packages/xp_adapters/lib/src/stores/apple/http_app_store_connect.dart` (certificate list,
-  profile under (b)), `apps/xpd/test/contract/`, tests
-- **Acceptance criteria:** an `ios-linux` job receives the identity (and, under (b), the
-  profile) in its tmpfs secret area, and both are gone after the job and after a runner
+  profile creation), `apps/xpd/test/contract/`, tests
+- **Acceptance criteria:** an `ios-linux` job receives the identity and the engine-made
+  profile in its tmpfs secret area, and both are gone after the job and after a runner
   restart; an identity whose certificate App Store Connect does not list is refused when
   assigned.
 - **Validation:** `melos run test:coverage && melos run test:contract`
@@ -122,7 +122,8 @@ once and opens one pull request.
       `xp credentials add` or in the app, checked against App Store Connect's certificate list.
 - [ ] Grant it to an `ios-linux` job in its tmpfs secret area, wiped at job end and at runner
       start (D-09).
-- [ ] Profile creation according to the open decision.
+- [ ] The engine creates the App Store profile with its App Store Connect client and grants it
+      with the identity; the ASC key never reaches the runner (decision (b)).
 - [ ] Until this lands, a job without an assigned identity narrows to `ios-sign` (a 3a rule).
 
 ### Phase 3b: The Linux build backend and toolchain preparation
