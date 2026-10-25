@@ -1,4 +1,5 @@
 import 'package:xp_api/xp_api.dart';
+import 'package:xp_engine/src/dispatch/ios_linux_limits.dart';
 import 'package:xp_engine/src/scan/firebase_files.dart';
 import 'package:xp_engine/src/scan/gradle_parser.dart';
 import 'package:xp_engine/src/scan/ios_files.dart';
@@ -269,10 +270,10 @@ class _AppScan {
     ];
     final (major, minor) = _linuxMinimumFlutter;
     final version = RegExp(r'^(\d+)\.(\d+)').firstMatch(flutterVersion ?? '');
-    final tooOld =
-        version != null &&
-        (int.parse(version[1]!) < major ||
-            int.parse(version[1]!) == major && int.parse(version[2]!) < minor);
+    final (pinMajor, pinMinor) = version == null
+        ? (major, minor)
+        : (int.parse(version[1]!), int.parse(version[2]!));
+    final tooOld = pinMajor < major || (pinMajor == major && pinMinor < minor);
     final reasons = <String>[];
     if (packageManager == IosPackageManager.cocoapods) {
       reasons.add(
@@ -326,21 +327,11 @@ class _AppScan {
     required List<String> extensions,
     required List<String> limits,
   }) {
-    final reasons = <String>[];
-    if (flavors.isNotEmpty) {
-      reasons.add(
-        'the app has the flavors ${flavors.join(', ')}, which Linux iOS '
-        'builds do not support yet (omarchy-apple-dev: flavors)',
-      );
-    }
-    if (extensions.isNotEmpty) {
-      reasons.add(
-        'the app has the app extension${extensions.length == 1 ? '' : 's'} '
-        '${extensions.join(', ')}, which Linux iOS builds do not support yet '
-        '(omarchy-apple-dev: app extensions)',
-      );
-    }
-    reasons.addAll(limits);
+    final reasons = [
+      if (flavors.isNotEmpty) flavorsLimit(flavors),
+      if (extensions.isNotEmpty) extensionsLimit(extensions),
+      ...limits,
+    ];
     if (reasons.isEmpty) return;
     _add(
       FindingSeverity.info,

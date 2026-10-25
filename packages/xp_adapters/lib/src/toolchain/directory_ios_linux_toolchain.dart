@@ -75,13 +75,12 @@ class DirectoryIosLinuxToolchain implements IosLinuxToolchain {
       head[3] == 0x46;
 
   @override
-  Future<List<String>> markUsed(String flutterRoot) async {
+  Future<void> markUsed(String flutterRoot) async {
     final now = _clock.now();
     File(p.join(flutterRoot, _lastUsed))
         .writeAsStringSync(now.toIso8601String());
     final root = Directory(installs);
-    if (!root.existsSync()) return const [];
-    final freed = <String>[];
+    if (!root.existsSync()) return;
     for (final install in root.listSync().whereType<Directory>()) {
       final name = p.basename(install.path);
       if (name.startsWith('.') || p.equals(install.path, flutterRoot)) {
@@ -92,10 +91,8 @@ class DirectoryIosLinuxToolchain implements IosLinuxToolchain {
           ? DateTime.tryParse(marker.readAsStringSync().trim())
           : null;
       if (now.difference(used ?? install.statSync().modified) > keepFor) {
-        install.deleteSync(recursive: true);
-        freed.add(name);
+        await install.delete(recursive: true);
       }
     }
-    return freed..sort();
   }
 }

@@ -250,6 +250,21 @@ once and opens one pull request.
       questions are the user's. They also say that iOS device tests and screenshots are not
       offered on Linux (see below).
 
+## Follow-ups
+
+Left out of this pull request on purpose; each is its own change.
+
+- Move the omarchy-apple-dev pin (`RunnerProbe.iosLinuxPin`, now the fork's `xpath/pin`) back
+  to an upstream commit once #81, #82 and the given-identity signing merge upstream.
+- Run `tool/e2e/runner_ios_linux_e2e.sh` on Linux (it was written on a Mac and not run), and the
+  manual end-to-end check of the success criteria on a real app.
+- Let the engine enable the capabilities an app's entitlements need (App Groups, push, Sign in
+  with Apple) on its bundle id before it makes the profile, as `asc.py identity` does. Today the
+  bundle id must have them already; `ship.sh` stops with the missing one otherwise.
+- One profile per bundle id (app extensions), once Linux iOS builds can build extensions.
+- `ios.stripAndReexport` on Linux: `flutter/tools/strip-frameworks.py` on the payload and
+  `flutter/ship.sh` again (#77 is in the pin).
+
 ## Success Criteria
 
 ```success-criteria

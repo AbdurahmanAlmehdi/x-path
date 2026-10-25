@@ -20,7 +20,7 @@ abstract interface class IosLinuxToolchain {
   /// `gen_snapshot` (an ELF file), which is what setup.sh leaves.
   Future<bool> isPrepared(String flutterRoot);
 
-  /// Notes that a job builds with the install of [version] now, and frees the
-  /// installs no job used for a while. Returns the versions it freed.
-  Future<List<String>> markUsed(String version);
+  /// Notes that a job builds with the install at [flutterRoot] now, and
+  /// frees the installs no job used for a while.
+  Future<void> markUsed(String flutterRoot);
 }

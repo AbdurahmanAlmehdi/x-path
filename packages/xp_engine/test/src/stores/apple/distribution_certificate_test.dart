@@ -52,6 +52,11 @@ void main() {
       DistributionCertificate.fromText(' $testDistributionCertificate\n'),
       DistributionCertificate.fromDer(der),
     );
+    expect(
+      DistributionCertificate.fromText(base64.encode(utf8.encode(pem))),
+      DistributionCertificate.fromDer(der),
+      reason: 'a PEM file the app sent as base64',
+    );
   });
 
   test('refuses what is not a certificate', () {

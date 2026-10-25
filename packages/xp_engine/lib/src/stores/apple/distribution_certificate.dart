@@ -44,24 +44,32 @@ class DistributionCertificate extends Equatable {
     }
   }
 
-  /// Reads a certificate sent as base64 DER or as a PEM block.
+  /// Reads a certificate sent as base64 DER, as a PEM block, or as a PEM
+  /// file in base64 (the app sends a file it reads as base64, whatever it
+  /// holds).
   ///
-  /// Throws a [FormatException] if it is neither, or not X.509.
+  /// Throws a [FormatException] if it is none of them, or not X.509.
   factory fromText(String text) {
+    final der = _pemOrBase64(text);
+    final pem = ascii.decode(der, allowInvalid: true);
+    return DistributionCertificate.fromDer(
+      pem.startsWith('-----BEGIN') ? _pemOrBase64(pem) : der,
+    );
+  }
+
+  static List<int> _pemOrBase64(String text) {
     final pem = RegExp(
       '-----BEGIN CERTIFICATE-----(.*?)-----END CERTIFICATE-----',
       dotAll: true,
     ).firstMatch(text);
     final body = (pem?.group(1) ?? text).replaceAll(RegExp(r'\s'), '');
-    final List<int> der;
     try {
-      der = base64.decode(base64.normalize(body));
+      return base64.decode(base64.normalize(body));
     } on FormatException {
       throw const FormatException(
         'The certificate is neither base64 DER nor PEM.',
       );
     }
-    return DistributionCertificate.fromDer(der);
   }
 
   /// The certificate, DER.

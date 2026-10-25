@@ -2,9 +2,9 @@ import 'dart:convert';
 
 import 'package:xp_api/xp_api.dart';
 import 'package:xp_engine/src/credentials/credential_exceptions.dart';
-import 'package:xp_engine/src/credentials/credential_material.dart';
 import 'package:xp_engine/src/credentials/credential_repository.dart';
 import 'package:xp_engine/src/credentials/credential_service.dart';
+import 'package:xp_engine/src/credentials/flavor_asc_key.dart';
 import 'package:xp_engine/src/secrets/secret_store.dart';
 import 'package:xp_engine/src/stores/apple/app_store_connect.dart';
 import 'package:xp_engine/src/stores/apple/asc_exceptions.dart';
@@ -45,7 +45,7 @@ class CertificateLimitException extends CredentialException {
 /// credential is.
 class DistributionCertificates {
   /// Creates the service.
-  const new({
+  new({
     required this._credentials,
     required this._repository,
     required this._secrets,
@@ -61,6 +61,7 @@ class DistributionCertificates {
   final SecretStore _secrets;
   final AppStoreConnectFactory _connect;
   final DistributionKeys _keys;
+  Future<void> _tail = Future.value();
 
   /// Creates a distribution certificate with the App Store Connect key of
   /// the flavor [flavor] of the app at [app], saves the identity as [name]
@@ -79,6 +80,21 @@ class DistributionCertificates {
     required String flavor,
     required String name,
     required DeviceToken by,
+  }) {
+    // One at a time: two would both see room under Apple's limit.
+    final next = _tail.then(
+      (_) => _create(projectId, app: app, flavor: flavor, name: name, by: by),
+    );
+    _tail = next.then<void>((_) {}, onError: (_) {});
+    return next;
+  }
+
+  Future<NamedCredential> _create(
+    String projectId, {
+    required String app,
+    required String flavor,
+    required String name,
+    required DeviceToken by,
   }) async {
     CredentialService.requireOwner(by, 'create certificates');
     final target =
@@ -92,25 +108,14 @@ class DistributionCertificates {
         'A credential is called "$trimmed" already.',
       );
     }
-    final assigned = await _repository.assignment(
-      target.id,
-      CredentialKind.ascKey,
-    );
-    final key = assigned == null
-        ? null
-        : await CredentialMaterial.load(
-            CredentialKind.ascKey,
-            assigned.credential.secretKey,
-            assigned.credential.account,
-            _secrets,
-          );
-    if (key is! AscKeyMaterial) {
+    final key = await flavorAscKey(_repository, _secrets, target.id);
+    if (key == null) {
       throw CredentialRequestException(
         'The flavor $flavor has no App Store Connect API key to create the '
         'certificate with. Assign an asc_key credential to it first.',
       );
     }
-    final connect = _connect(key.key);
+    final connect = _connect(key);
     final AscCertificate created;
     final String privateKey;
     try {
@@ -119,44 +124,32 @@ class DistributionCertificates {
       final generated = await _keys.generate(trimmed);
       privateKey = generated.privateKeyPem;
       created = await connect.createDistributionCertificate(generated.csrPem);
-    } on AscAuthException catch (error) {
-      throw CredentialRejectedException(
-        'App Store Connect refused the API key ${key.key.keyId}: '
-        '${error.message}',
-        fix: 'Replace the asc_key credential of the flavor.',
-      );
-    } on AscForbiddenException catch (error) {
-      throw CredentialRejectedException(
-        'The API key ${key.key.keyId} may not create certificates: '
-        '${error.message}',
-        fix: 'Use a key with the Admin role.',
-      );
     } on AppStoreConnectException catch (error) {
-      throw CredentialUnreachableException(
-        'App Store Connect could not create the certificate: '
-        '${error.message}',
-        fix: 'Try again later.',
-      );
+      final refusal = ascRefusal(error, key, 'create a certificate');
+      throw refusal.status == CredentialStatus.rejected
+          ? CredentialRejectedException(refusal.message!, fix: refusal.fix)
+          : CredentialUnreachableException(refusal.message!, fix: refusal.fix);
     }
-    final content = created.content;
-    if (content == null || content.isEmpty) {
-      throw CredentialUnreachableException(
-        'App Store Connect created the certificate ${created.serialNumber} '
-        'but sent no content.',
-        fix: 'Revoke it in App Store Connect and create again.',
+    final NamedCredential identity;
+    try {
+      final content = created.content;
+      if (content == null || content.isEmpty) {
+        throw const FormatException('App Store Connect sent no content.');
+      }
+      identity = await _credentials.create(
+        CreateCredentialRequest(
+          name: trimmed,
+          kind: CredentialKind.appleDistribution,
+          material: {
+            'privateKey': privateKey,
+            'certificate': base64.encode(content),
+          },
+        ),
+        by: by,
       );
+    } on Object catch (error) {
+      throw await _unsaved(connect, created, error);
     }
-    final identity = await _credentials.create(
-      CreateCredentialRequest(
-        name: trimmed,
-        kind: CredentialKind.appleDistribution,
-        material: {
-          'privateKey': privateKey,
-          'certificate': base64.encode(content),
-        },
-      ),
-      by: by,
-    );
     await _credentials.assign(
       projectId,
       app: app,
@@ -166,5 +159,37 @@ class DistributionCertificates {
       by: by,
     );
     return await _credentials.get(identity.id);
+  }
+
+  /// What to say when the certificate [created] could not be saved because
+  /// of [error]: its key is gone, so it is revoked, to give the team its
+  /// slot back, or the owner is told to revoke it.
+  Future<CredentialUnreachableException> _unsaved(
+    AppStoreConnect connect,
+    AscCertificate created,
+    Object error,
+  ) async {
+    final why = switch (error) {
+      CredentialException(:final described) => described,
+      FormatException(:final message) => message,
+      _ => '$error',
+    };
+    try {
+      await connect.revokeCertificate(created.id);
+      return CredentialUnreachableException(
+        'The engine could not save the certificate it created '
+        '(${created.serialNumber}), so it revoked it: $why',
+        fix: 'Try again once that is fixed.',
+      );
+    } on AppStoreConnectException {
+      return CredentialUnreachableException(
+        'The engine could not save the certificate it created '
+        '(${created.serialNumber}): $why',
+        fix:
+            'Revoke it in App Store Connect (Certificates, Identifiers & '
+            "Profiles): its key is lost, and it holds one of the team's "
+            '$limit.',
+      );
+    }
   }
 }

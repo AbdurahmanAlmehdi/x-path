@@ -144,6 +144,6 @@ void main() {
     );
     expect(results[0].message, contains('refused the API key ABC123DEF4'));
     expect(results[1].message, contains('may not read the certificates'));
-    expect(results[2].message, contains('could not list the certificates'));
+    expect(results[2].message, contains('could not read the certificates'));
   });
 }

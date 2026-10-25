@@ -24,12 +24,21 @@ class _Keys implements DistributionKeys {
   }
 }
 
+/// An App Store Connect that cannot revoke a certificate.
+class _NoRevoke extends FakeAppStoreConnect {
+  @override
+  Future<void> revokeCertificate(String id) async =>
+      throw const AscServerException(503, 'down');
+}
+
 void main() {
   final owner = tokenOf(DeviceTokenKind.cli);
   late InMemoryCredentialRepository repository;
   late BytesSecretStore secrets;
   late FakeAppStoreConnect asc;
   late _Keys keys;
+  late Map<CredentialKind, FakeCredentialVerifier> verifiers;
+  late AscKey? connectedWith;
   late CredentialService service;
   late DistributionCertificates certificates;
 
@@ -87,13 +96,16 @@ void main() {
     asc = FakeAppStoreConnect()
       ..createdContent = base64.decode(testDistributionCertificate);
     keys = _Keys();
+    verifiers = {
+      for (final kind in CredentialKind.values)
+        kind: FakeCredentialVerifier(kind),
+    };
+    connectedWith = null;
     service = CredentialService(
       repository: repository,
       projects: projects,
       secrets: secrets,
-      verifiers: [
-        for (final kind in CredentialKind.values) FakeCredentialVerifier(kind),
-      ],
+      verifiers: verifiers.values,
       masker: ReplacingMasker(),
       events: InMemoryEventLog(clock: clock),
       clock: clock,
@@ -102,7 +114,10 @@ void main() {
       credentials: service,
       repository: repository,
       secrets: secrets,
-      connect: (_) => asc,
+      connect: (key) {
+        connectedWith = key;
+        return asc;
+      },
       keys: keys,
     );
   });
@@ -117,6 +132,7 @@ void main() {
     expect(identity.name, 'Linux signing');
     expect(identity.usedBy.single.flavor, 'prod');
     expect(keys.names, ['Linux signing']);
+    expect(connectedWith?.keyId, 'ABC123DEF4');
     expect(asc.requests.single, contains('BEGIN CERTIFICATE REQUEST'));
     expect(asc.calls, [
       'distributionCertificates',
@@ -218,5 +234,59 @@ void main() {
         ),
       ),
     );
+  });
+
+  test('revokes the certificate it could not save, as its key is '
+      'lost', () async {
+    await giveAscKey();
+    verifiers[CredentialKind.appleDistribution]!.answers.add(
+      const VerificationResult.rejected('No.'),
+    );
+
+    await expectLater(
+      create(),
+      throwsA(
+        isA<CredentialUnreachableException>().having(
+          (e) => e.message,
+          'message',
+          allOf(contains('so it revoked it'), contains('No.')),
+        ),
+      ),
+    );
+    expect(asc.calls.last, startsWith('revokeCertificate certificate-'));
+    expect(asc.certificates, isEmpty);
+  });
+
+  test('says to revoke the certificate when it cannot do it '
+      'itself', () async {
+    await giveAscKey();
+    asc = _NoRevoke()..createdContent = const [];
+
+    await expectLater(
+      create(),
+      throwsA(
+        isA<CredentialUnreachableException>()
+            .having((e) => e.message, 'message', contains('sent no content'))
+            .having((e) => e.fix, 'fix', contains('Revoke it in App Store')),
+      ),
+    );
+  });
+
+  test('creates one at a time, so two cannot both pass the limit', () async {
+    await giveAscKey();
+    asc.certificates.addAll(const [
+      AscCertificate(id: 'a', serialNumber: '0A'),
+      AscCertificate(id: 'b', serialNumber: '0B'),
+    ]);
+
+    final results = await Future.wait([
+      create(name: 'One')
+          .then<Object>((value) => value, onError: (Object e) => e),
+      create(name: 'Two')
+          .then<Object>((value) => value, onError: (Object e) => e),
+    ]);
+
+    expect(results.first, isA<NamedCredential>());
+    expect(results.last, isA<CertificateLimitException>());
   });
 }

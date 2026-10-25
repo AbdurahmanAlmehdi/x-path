@@ -649,8 +649,11 @@ void main() {
         profile,
       ]);
       h.asc.failure = const AscServerException(503, 'down');
+      // A profile is answered aside, so the frames behind it go on.
       await runner.secret(profile);
+      await pumpEventQueue();
       await runner.secret(profile);
+      await pumpEventQueue();
       await runner.secret('apple_distribution');
 
       expect(

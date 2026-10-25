@@ -693,6 +693,13 @@ class RunnerHub
         await _stepState(session, frame);
       case JobDoneFrame():
         await _done(session, frame);
+      case SecretRequestFrame(:final key)
+          when AppStoreProfiles.isProfileKey(key):
+        // App Store Connect may take a while to make a profile: it is
+        // answered aside, so the heartbeats behind it keep the lease.
+        unawaited(
+          _secretRequested(session, frame).catchError(onError ?? (Object _) {}),
+        );
       case SecretRequestFrame():
         await _secretRequested(session, frame);
       case DrainFrame():
@@ -1193,6 +1200,8 @@ class RunnerHub
       return deny(error.message);
     }
     if (bytes == null) return deny('There is no such secret.');
+    // A profile is made while other frames are handled: the lease may be gone.
+    if (!_holds(session, frame.jobId, frame.leaseId)) return;
     // The runner masks what it holds; the engine masks what comes back too.
     try {
       final text = utf8.decode(bytes);

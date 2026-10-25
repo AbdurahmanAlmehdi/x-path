@@ -350,6 +350,16 @@ class HttpAppStoreConnect implements AppStoreConnect {
   }
 
   @override
+  Future<void> deleteProfile(String id) async {
+    await _send('DELETE', _url('/v1/profiles/$id'));
+  }
+
+  @override
+  Future<void> revokeCertificate(String id) async {
+    await _send('DELETE', _url('/v1/certificates/$id'));
+  }
+
+  @override
   Future<AscProfile> createAppStoreProfile({
     required String name,
     required String bundleId,

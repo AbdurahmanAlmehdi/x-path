@@ -105,17 +105,6 @@ class BuildIosStep extends FlutterBuildStep<BuildIosInput> {
   /// How this Linux machine builds iOS apps, if it can.
   final IosLinuxBuilds? linux;
 
-  /// Variables of the runner's environment omarchy-apple-dev reads, besides
-  /// the ones every step gets.
-  static const _linuxEnvironment = [
-    'XDG_CONFIG_HOME',
-    'DARWIN_SDK_BUNDLE',
-    'FLUTTER_IOS_WORK',
-    'PUB_CACHE',
-    'PUB_HOSTED_URL',
-    'FLUTTER_STORAGE_BASE_URL',
-  ];
-
   /// The entitlements `flutter/ship.sh` requests, when the app has them.
   static const _entitlements = 'ios/Runner/Runner.entitlements';
 
@@ -196,13 +185,12 @@ class BuildIosStep extends FlutterBuildStep<BuildIosInput> {
     if (input.linuxSigning.isEmpty) {
       return const StepFailed(
         'The flavor has no Apple Distribution identity with an App Store '
-        'Connect API key, so a Linux runner cannot sign the build. Assign '
-        'both to the flavor, or build on a Mac.',
+        'Connect API key, so a Linux runner cannot sign the build.',
       );
     }
-    final scripts = '${linux.checkout.directory}/flutter';
     final commit = await linux.checkout.commit();
     final ResolvedFlutter flutter;
+    final List<String> defines;
     try {
       flutter = await linux.toolchain.prepare(
         context.jobId,
@@ -210,40 +198,18 @@ class BuildIosStep extends FlutterBuildStep<BuildIosInput> {
         iosLinux:
             'Linux, omarchy-apple-dev ${commit ?? 'at an unknown commit'}',
       );
+      defines = await _defines(settings);
     } on ToolchainException catch (error) {
       return StepFailed(error.message);
+    } on FormatException catch (error) {
+      return StepFailed(error.message);
     }
-    final environment = {'CI': 'true', 'FLUTTER': flutter.flutterExecutable};
-    Future<StepFailed?> script(
-      String name, {
-      List<String> arguments = const [],
-      Map<String, String> extra = const {},
-      Map<String, String> secretFiles = const {},
-    }) async {
-      final exit = await context.run(
-        ProcessCommand(
-          '$scripts/$name',
-          arguments: arguments,
-          workingDirectory: settings.appDirectory,
-          environment: {...environment, ...extra},
-          passThroughEnvironment: [
-            ..._linuxEnvironment,
-            ...settings.passThroughEnvironment,
-          ],
-          secretFiles: secretFiles,
-        ),
-      );
-      if (exit.cancelled) return const StepFailed('The build was cancelled.');
-      return exit.succeeded
-          ? null
-          : StepFailed(
-              "omarchy-apple-dev's flutter/$name exited with code "
-              '${exit.exitCode}. The step log has its output.',
-            );
-    }
-
+    final scripts = _Scripts(context, linux.checkout.directory, settings, {
+      'CI': 'true',
+      'FLUTTER': flutter.flutterExecutable,
+    });
     if (!await linux.checkout.isPrepared(flutter.path)) {
-      if (await script('setup.sh') case final failed?) return failed;
+      if (await scripts.run('setup.sh') case final failed?) return failed;
       if (!await linux.checkout.isPrepared(flutter.path)) {
         return StepFailed(
           'flutter/setup.sh finished, but the iOS gen_snapshot of '
@@ -254,43 +220,33 @@ class BuildIosStep extends FlutterBuildStep<BuildIosInput> {
     await linux.checkout.markUsed(flutter.path);
 
     final app = settings.appDirectory;
-    final List<String> defines;
-    try {
-      defines = await _defines(settings);
-    } on FormatException catch (error) {
-      return StepFailed(error.message);
-    }
     final debugInfo = debugInfoOf(settings);
     final since = await files.markBuildStart();
-    if (await script(
-          'build.sh',
-          arguments: [app, ...defines],
-          extra: {
-            'BUILD_NAME': '${settings.version.name}',
-            'BUILD_NUMBER': '${settings.build}',
-            if (debugInfo != null) ...{
-              'SPLIT_DEBUG_INFO': debugInfo,
-              'DART_OBFUSCATION': 'true',
-            },
-          },
-        )
-        case final failed?) {
-      return failed;
-    }
-    if (await script(
-          'ship.sh',
-          arguments: [app],
-          extra: {
-            'BUILD_NUMBER': '${settings.build}',
-            'ASC_EXPORT_OPTIONS': '$app/${input.exportOptionsPlist}',
-            if (await files.stat('$app/$_entitlements') != null)
-              'ASC_ENTITLEMENTS_PATH': '$app/$_entitlements',
-          },
-          secretFiles: input.linuxSigning,
-        )
-        case final failed?) {
-      return failed;
-    }
+    final built = await scripts.run(
+      'build.sh',
+      arguments: [app, ...defines],
+      environment: {
+        'BUILD_NAME': '${settings.version.name}',
+        'BUILD_NUMBER': '${settings.build}',
+        if (debugInfo != null) ...{
+          'SPLIT_DEBUG_INFO': debugInfo,
+          'DART_OBFUSCATION': 'true',
+        },
+      },
+    );
+    if (built != null) return built;
+    final shipped = await scripts.run(
+      'ship.sh',
+      arguments: [app],
+      environment: {
+        'BUILD_NUMBER': '${settings.build}',
+        'ASC_EXPORT_OPTIONS': '$app/${input.exportOptionsPlist}',
+        if (await files.stat('$app/$_entitlements') != null)
+          'ASC_ENTITLEMENTS_PATH': '$app/$_entitlements',
+      },
+      secretFiles: input.linuxSigning,
+    );
+    if (shipped != null) return shipped;
     return await keep(
       input,
       context,
@@ -316,5 +272,56 @@ class BuildIosStep extends FlutterBuildStep<BuildIosInput> {
       for (final MapEntry(:key, :value) in parseDartDefines(text).entries)
         '$key=$value',
     ];
+  }
+}
+
+/// omarchy-apple-dev's Flutter scripts in the checkout [directory], run in
+/// the app being built with the variables of the runner they read.
+class _Scripts {
+  const new(this._context, this.directory, this._settings, this._environment);
+
+  /// Variables of the runner's environment omarchy-apple-dev reads, besides
+  /// the ones every step gets.
+  static const _passThrough = [
+    'XDG_CONFIG_HOME',
+    'DARWIN_SDK_BUNDLE',
+    'FLUTTER_IOS_WORK',
+    'PUB_CACHE',
+    'PUB_HOSTED_URL',
+    'FLUTTER_STORAGE_BASE_URL',
+  ];
+
+  final StepContext _context;
+  final String directory;
+  final BuildSettings _settings;
+  final Map<String, String> _environment;
+
+  /// Runs `flutter/[name]`; `null` if it succeeded, else why the step fails.
+  Future<StepFailed?> run(
+    String name, {
+    List<String> arguments = const [],
+    Map<String, String> environment = const {},
+    Map<String, String> secretFiles = const {},
+  }) async {
+    final exit = await _context.run(
+      ProcessCommand(
+        '$directory/flutter/$name',
+        arguments: arguments,
+        workingDirectory: _settings.appDirectory,
+        environment: {..._environment, ...environment},
+        passThroughEnvironment: [
+          ..._passThrough,
+          ..._settings.passThroughEnvironment,
+        ],
+        secretFiles: secretFiles,
+      ),
+    );
+    if (exit.cancelled) return const StepFailed('The build was cancelled.');
+    return exit.succeeded
+        ? null
+        : StepFailed(
+            "omarchy-apple-dev's flutter/$name exited with code "
+            '${exit.exitCode}. The step log has its output.',
+          );
   }
 }

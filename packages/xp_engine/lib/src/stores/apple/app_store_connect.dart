@@ -95,6 +95,12 @@ abstract interface class AppStoreConnect {
   /// The active App Store profiles called [name].
   Future<List<AscProfile>> appStoreProfiles(String name);
 
+  /// Deletes the profile [id].
+  Future<void> deleteProfile(String id);
+
+  /// Revokes the certificate [id].
+  Future<void> revokeCertificate(String id);
+
   /// Creates the App Store profile [name] for the bundle id resource
   /// [bundleId] with the certificate [certificateId].
   Future<AscProfile> createAppStoreProfile({
@@ -328,12 +334,27 @@ class FakeAppStoreConnect implements AppStoreConnect {
   }
 
   @override
+  Future<void> deleteProfile(String id) async {
+    _call('deleteProfile $id');
+    profiles.removeWhere((profile) => profile.id == id);
+  }
+
+  @override
+  Future<void> revokeCertificate(String id) async {
+    _call('revokeCertificate $id');
+    certificates.removeWhere((certificate) => certificate.id == id);
+  }
+
+  @override
   Future<AscProfile> createAppStoreProfile({
     required String name,
     required String bundleId,
     required String certificateId,
   }) async {
     _call('createAppStoreProfile $name $bundleId $certificateId');
+    if (profiles.any((profile) => profile.name == name)) {
+      throw AscConflictException('There is a profile named $name already.');
+    }
     final profile = AscProfile(
       id: 'profile-${calls.length}',
       name: name,

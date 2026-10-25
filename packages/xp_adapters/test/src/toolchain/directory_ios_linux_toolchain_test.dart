@@ -84,9 +84,8 @@ void main() {
     await toolchain().markUsed(recent);
     clock.advance(const Duration(days: 11));
 
-    final freed = await toolchain().markUsed(current);
+    await toolchain().markUsed(current);
 
-    expect(freed, ['3.44.0']);
     expect(Directory(old).existsSync(), isFalse);
     expect(Directory(recent).existsSync(), isTrue);
     expect(
@@ -103,9 +102,10 @@ void main() {
     final current = install('3.47.6');
     final unmarked = install('3.40.0');
 
-    expect(await toolchain().markUsed(current), isEmpty);
+    await toolchain().markUsed(current);
+    expect(Directory(unmarked).existsSync(), isTrue);
     clock.advance(const Duration(days: 365 * 10));
-    expect(await toolchain().markUsed(current), ['3.40.0']);
+    await toolchain().markUsed(current);
     expect(Directory(unmarked).existsSync(), isFalse);
   });
 
@@ -113,6 +113,8 @@ void main() {
     final elsewhere = p.join(work.path, 'other');
     Directory(elsewhere).createSync();
 
-    expect(await toolchain().markUsed(elsewhere), isEmpty);
+    await toolchain().markUsed(elsewhere);
+
+    expect(File(p.join(elsewhere, '.xpath-last-used')).existsSync(), isTrue);
   });
 }

@@ -65,25 +65,27 @@ void main() {
     bool linux = true,
     bool mac = true,
     bool signing = true,
+    List<CredentialKind> kinds = const [
+      CredentialKind.appleDistribution,
+      CredentialKind.ascKey,
+    ],
+    String? bundleId = 'ly.demo',
   }) async {
     final created = await DispatchHarness.create(
       apps: [app],
       linuxIosBuilds: linux,
     );
     if (mac) created.scheduler.pairedRunners = _AwayMac();
-    const main = CredentialFlavor(
+    final main = CredentialFlavor(
       id: 'flv_main',
       projectId: 'prj_1',
       appPath: '.',
       name: 'main',
-      iosBundleId: 'ly.demo',
+      iosBundleId: bundleId,
     );
     created.credentials.flavors.add(main);
     if (signing) {
-      for (final kind in [
-        CredentialKind.appleDistribution,
-        CredentialKind.ascKey,
-      ]) {
+      for (final kind in kinds) {
         await created.credentials.put(demoCredential(main, kind));
       }
     }
@@ -155,6 +157,32 @@ void main() {
     expect(job.capabilities, ['flutter', 'ios-sign']);
     expect(job.narrowing, ['the app builds its iOS plugins with CocoaPods']);
   });
+
+  for (final (name, kinds, bundleId) in [
+    (
+      'an identity without an ASC key',
+      [CredentialKind.appleDistribution],
+      'ly.demo',
+    ),
+    ('an ASC key without an identity', [CredentialKind.ascKey], 'ly.demo'),
+    (
+      'both, on a flavor without a bundle id',
+      [CredentialKind.appleDistribution, CredentialKind.ascKey],
+      null,
+    ),
+  ]) {
+    test('$name cannot sign on Linux', () async {
+      final h = await harness(kinds: kinds, bundleId: bundleId);
+
+      final run = await h.dispatchCustom(_workflow('', flavors: true));
+
+      final job = await only(h, run);
+      expect(job.capabilities, ['flutter', 'ios-sign']);
+      expect(job.narrowing, [
+        contains('no Apple Distribution identity with an App Store Connect'),
+      ]);
+    });
+  }
 
   test('the strip step narrows the job to ios-sign, once, with the '
       'reason', () async {

@@ -35,10 +35,7 @@ class _Checkout implements IosLinuxToolchain {
       prepared.contains(flutterRoot);
 
   @override
-  Future<List<String>> markUsed(String flutterRoot) async {
-    used.add(flutterRoot);
-    return const [];
-  }
+  Future<void> markUsed(String flutterRoot) async => used.add(flutterRoot);
 }
 
 void main() {
@@ -112,6 +109,7 @@ void main() {
       'BUILD_NUMBER': '45',
     });
     expect(build.passThroughEnvironment, contains('XDG_CONFIG_HOME'));
+    expect(build.secretFiles, isEmpty, reason: 'only ship.sh signs');
     final ship = named('ship.sh');
     expect(ship.arguments, [appDirectory], reason: 'no --upload');
     expect(ship.environment, {

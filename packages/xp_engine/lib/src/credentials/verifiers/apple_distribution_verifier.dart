@@ -3,6 +3,7 @@ import 'package:xp_engine/src/clock/clock.dart';
 import 'package:xp_engine/src/credentials/credential_material.dart';
 import 'package:xp_engine/src/credentials/credential_repository.dart';
 import 'package:xp_engine/src/credentials/credential_verifier.dart';
+import 'package:xp_engine/src/credentials/flavor_asc_key.dart';
 import 'package:xp_engine/src/secrets/secret_store.dart';
 import 'package:xp_engine/src/stores/apple/app_store_connect.dart';
 import 'package:xp_engine/src/stores/apple/asc_exceptions.dart';
@@ -53,19 +54,8 @@ class AppleDistributionVerifier implements CredentialVerifier {
     if (flavorId == null) {
       return VerificationResult.verified(account: certificate.commonName);
     }
-    final assigned = await _credentials.assignment(
-      flavorId,
-      CredentialKind.ascKey,
-    );
-    final key = assigned == null
-        ? null
-        : await CredentialMaterial.load(
-            CredentialKind.ascKey,
-            assigned.credential.secretKey,
-            assigned.credential.account,
-            _secrets,
-          );
-    if (key is! AscKeyMaterial) {
+    final key = await flavorAscKey(_credentials, _secrets, flavorId);
+    if (key == null) {
       return const VerificationResult.rejected(
         'The flavor has no App Store Connect API key, so the engine can '
         'neither check the certificate nor make the App Store profile.',
@@ -75,38 +65,20 @@ class AppleDistributionVerifier implements CredentialVerifier {
       );
     }
     try {
-      final listed = await _connect(key.key).distributionCertificates();
+      final listed = await _connect(key).distributionCertificates();
       if (!listed.any((each) => certificate.hasSerial(each.serialNumber))) {
         return VerificationResult.rejected(
           'App Store Connect lists no distribution certificate with the '
           'serial number ${certificate.serialNumber} in the team of the API '
-          'key ${key.key.keyId}: it was revoked, or is of another team.',
+          'key ${key.keyId}: it was revoked, or is of another team.',
           fix:
               'Save the identity of a certificate the team has, or create a '
               'new one.',
         );
       }
       return VerificationResult.verified(account: certificate.commonName);
-    } on AscAuthException catch (error) {
-      return VerificationResult.rejected(
-        'App Store Connect refused the API key ${key.key.keyId}: '
-        '${error.message}',
-        fix: 'Replace the asc_key credential of the flavor.',
-      );
-    } on AscForbiddenException catch (error) {
-      return VerificationResult.rejected(
-        'The API key ${key.key.keyId} may not read the certificates of the '
-        'team: ${error.message}',
-        fix:
-            'Use a key with the Admin role, or App Manager with access to '
-            'certificates, identifiers and profiles.',
-      );
     } on AppStoreConnectException catch (error) {
-      return VerificationResult.unreachable(
-        'App Store Connect could not list the certificates: '
-        '${error.message}',
-        fix: 'Try again later.',
-      );
+      return ascRefusal(error, key, 'read the certificates of the team');
     }
   }
 }

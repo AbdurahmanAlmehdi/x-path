@@ -76,6 +76,7 @@ void main() {
     Project project = mataa,
     EngineStatus status = EngineStatus.connected,
     List<NamedCredential> list = const [],
+    List<Credential> assigned = const [],
     bool focusStoreIds = false,
   }) async {
     await tester.pumpApp(
@@ -101,7 +102,7 @@ void main() {
     await tester.tap(find.text('Open'));
     await tester.pump();
     named.add(Snapshot([teamKey, slackWebhook, ...list]));
-    assignments.add(Snapshot([ascKey, devAscKey]));
+    assignments.add(Snapshot([ascKey, devAscKey, ...assigned]));
     await tester.pumpAndSettle();
   }
 
@@ -149,7 +150,7 @@ void main() {
         ),
         findsOneWidget,
       );
-      expect(find.text('Not assigned'), findsNWidgets(namedKinds.length - 1));
+      expect(find.text('Not assigned'), findsNWidgets(7));
       await tap(tester, find.text('Close'));
       expect(find.text('Credentials of dev'), findsNothing);
     });
@@ -383,6 +384,31 @@ void main() {
       ).called(1);
     });
 
+    testWidgets('offers no certificate once the flavor has an identity', (
+      tester,
+    ) async {
+      await open(
+        tester,
+        assigned: const [
+          Credential(
+            id: 'crd_9',
+            name: 'Linux signing',
+            projectId: 'prj_1',
+            app: '.',
+            flavor: 'prod',
+            kind: CredentialKind.appleDistribution,
+            status: CredentialStatus.verified,
+          ),
+        ],
+      );
+
+      expect(
+        find.byKey(const Key('flavorCredentials.createCertificate')),
+        findsNothing,
+      );
+      expect(find.text('Linux signing'), findsOneWidget);
+    });
+
     testWidgets('has no scope to choose for an app with one flavor', (
       tester,
     ) async {
@@ -395,7 +421,19 @@ void main() {
       await open(tester, status: EngineStatus.unreachable);
       await tapIn(tester, CredentialKind.slack, 'Assign…');
       await tapIn(tester, CredentialKind.ascKey, 'Remove from this flavor');
+      await tap(
+        tester,
+        find.byKey(const Key('flavorCredentials.createCertificate')),
+      );
       expect(find.text('Assign'), findsNothing);
+      verifyNever(
+        () => credentials.createDistributionCertificate(
+          any(),
+          app: any(named: 'app'),
+          flavor: any(named: 'flavor'),
+          name: any(named: 'name'),
+        ),
+      );
       verifyNever(
         () => projects.unassignCredential(
           any(),

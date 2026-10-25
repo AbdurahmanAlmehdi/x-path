@@ -231,7 +231,7 @@
     {
       "severity": "info",
       "code": "ios_needs_mac",
-      "message": "Needs a Mac for iOS: Linux runners cannot build it because the app has the flavors dev, iniala, oneavant, which Linux iOS builds do not support yet (omarchy-apple-dev: flavors); the app builds its iOS plugins with CocoaPods, and Linux iOS builds need Swift Package Manager (flutter config --enable-swift-package-manager).",
+      "message": "Needs a Mac for iOS: Linux runners cannot build it because the app uses the flavors dev, iniala, oneavant, which Linux iOS builds do not support yet (omarchy-apple-dev: flavors); the app builds its iOS plugins with CocoaPods, and Linux iOS builds need Swift Package Manager (flutter config --enable-swift-package-manager).",
       "fix": "Nothing to do to build on a Mac. To build on Linux (ADR 0014), lift each reason; until then its iOS jobs wait for a Mac (ios-sign).",
       "path": "apps/mobile_app/ios",
       "app": "apps/mobile_app"
@@ -246,7 +246,7 @@
     {
       "severity": "info",
       "code": "ios_needs_mac",
-      "message": "Needs a Mac for iOS: Linux runners cannot build it because the app has the flavors dev, oneavant, which Linux iOS builds do not support yet (omarchy-apple-dev: flavors); the app builds its iOS plugins with CocoaPods, and Linux iOS builds need Swift Package Manager (flutter config --enable-swift-package-manager); the app pins Flutter 3.38.3, and Linux iOS builds need 3.47 or later.",
+      "message": "Needs a Mac for iOS: Linux runners cannot build it because the app uses the flavors dev, oneavant, which Linux iOS builds do not support yet (omarchy-apple-dev: flavors); the app builds its iOS plugins with CocoaPods, and Linux iOS builds need Swift Package Manager (flutter config --enable-swift-package-manager); the app pins Flutter 3.38.3, and Linux iOS builds need 3.47 or later.",
       "fix": "Nothing to do to build on a Mac. To build on Linux (ADR 0014), lift each reason; until then its iOS jobs wait for a Mac (ios-sign).",
       "path": "apps/tablet_app/ios",
       "app": "apps/tablet_app"

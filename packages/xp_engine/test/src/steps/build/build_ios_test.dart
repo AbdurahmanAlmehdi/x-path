@@ -46,6 +46,13 @@ void main() {
 
     test('stores its input as JSON', () {
       expect(step.decodeInput(step.encodeInput(input())), input());
+      final linux = BuildIosInput(
+        settings: input().settings,
+        exportOptionsPlist: 'ios/ExportOptions-prod.plist',
+        linuxSigning: const {'ASC_PROFILE': 'identity.profile:ly.mataa'},
+      );
+      expect(step.decodeInput(step.encodeInput(linux)), linux);
+      expect(step.encodeInput(input()), isNot(contains('linuxSigning')));
       expect(
         step.encodeInput(input())['exportOptionsPlist'],
         'ios/ExportOptions-prod.plist',

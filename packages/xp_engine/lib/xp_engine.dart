@@ -24,6 +24,7 @@ export 'src/credentials/credential_repository.dart';
 export 'src/credentials/credential_service.dart';
 export 'src/credentials/credential_verifier.dart';
 export 'src/credentials/distribution_certificates.dart';
+export 'src/credentials/flavor_asc_key.dart';
 export 'src/credentials/verifiers/apple_distribution_verifier.dart';
 export 'src/credentials/verifiers/apple_id_verifier.dart';
 export 'src/credentials/verifiers/asc_key_verifier.dart';

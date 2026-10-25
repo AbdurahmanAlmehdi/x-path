@@ -2,18 +2,9 @@ import 'dart:convert';
 import 'dart:math';
 import 'dart:typed_data';
 
+import 'package:pointycastle/asn1.dart';
 import 'package:pointycastle/export.dart';
-import 'package:xp_adapters/src/stores/play/rs256_signer.dart';
 import 'package:xp_engine/xp_engine.dart';
-
-/// `rsaEncryption`.
-const _rsaEncryption = [0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x01, 0x01];
-
-/// `sha256WithRSAEncryption`.
-const _sha256WithRsa = [0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x01, 0x0b];
-
-/// `commonName` (2.5.4.3).
-const _commonName = [0x55, 0x04, 0x03];
 
 /// [DistributionKeys] with pointycastle: an RSA key of [bits] bits (2048, as
 /// Apple asks), PKCS#8, and a PKCS#10 request signed with SHA-256, which is
@@ -24,6 +15,9 @@ class RsaDistributionKeys implements DistributionKeys {
 
   /// The size of the keys.
   final int bits;
+
+  /// The DER prefix of the SHA-256 `DigestInfo` that PKCS#1 v1.5 signs.
+  static const _sha256DigestInfo = '0609608648016503040201';
 
   @override
   Future<DistributionKey> generate(String commonName) async {
@@ -44,93 +38,93 @@ class RsaDistributionKeys implements DistributionKeys {
             .generateKeyPair();
     final public = pair.publicKey;
     final private = pair.privateKey;
-    final algorithm = _sequence([
-      _tlv(0x06, _rsaEncryption),
-      _tlv(0x05, const []),
-    ]);
+    ASN1Sequence rsaAlgorithm() => ASN1Sequence(
+      elements: [
+        ASN1ObjectIdentifier.fromIdentifierString('1.2.840.113549.1.1.1'),
+        ASN1Null(),
+      ],
+    );
     final p = private.p!;
     final q = private.q!;
     final d = private.privateExponent!;
-    final pkcs8 = _sequence([
-      _integer(BigInt.zero),
-      algorithm,
-      _tlv(
-        0x04,
-        _sequence([
-          _integer(BigInt.zero),
-          _integer(public.modulus!),
-          _integer(public.exponent!),
-          _integer(d),
-          _integer(p),
-          _integer(q),
-          _integer(d % (p - BigInt.one)),
-          _integer(d % (q - BigInt.one)),
-          _integer(q.modInverse(p)),
-        ]),
-      ),
-    ]);
-    final privateKeyPem = _pem('PRIVATE KEY', pkcs8);
-    final info = _sequence([
-      _integer(BigInt.zero),
-      _sequence([
-        _tlv(
-          0x31,
-          _sequence([
-            _tlv(0x06, _commonName),
-            _tlv(0x0c, utf8.encode(commonName)),
-          ]),
+    final pkcs8 = ASN1Sequence(
+      elements: [
+        ASN1Integer(BigInt.zero),
+        rsaAlgorithm(),
+        ASN1OctetString(
+          octets: ASN1Sequence(
+            elements: [
+              for (final value in [
+                BigInt.zero,
+                public.modulus!,
+                public.exponent!,
+                d,
+                p,
+                q,
+                d % (p - BigInt.one),
+                d % (q - BigInt.one),
+                q.modInverse(p),
+              ])
+                ASN1Integer(value),
+            ],
+          ).encode(),
         ),
-      ]),
-      _sequence([
-        algorithm,
-        _bitString(
-          _sequence([_integer(public.modulus!), _integer(public.exponent!)]),
-        ),
-      ]),
-      _tlv(0xa0, const []),
-    ]);
-    final signature = Rs256Signer.fromPem(privateKeyPem).sign(info);
-    final request = _sequence([
-      info,
-      _sequence([_tlv(0x06, _sha256WithRsa), _tlv(0x05, const [])]),
-      _bitString(signature),
-    ]);
-    return (
-      privateKeyPem: privateKeyPem,
-      csrPem: _pem('CERTIFICATE REQUEST', request),
+      ],
     );
-  }
-
-  static List<int> _sequence(List<List<int>> elements) =>
-      _tlv(0x30, [for (final element in elements) ...element]);
-
-  static List<int> _bitString(List<int> bytes) => _tlv(0x03, [0, ...bytes]);
-
-  /// A positive INTEGER: big-endian, with a leading zero when the high bit is
-  /// set.
-  static List<int> _integer(BigInt value) {
-    final bytes = <int>[];
-    var rest = value;
-    do {
-      bytes.insert(0, (rest & BigInt.from(0xff)).toInt());
-      rest >>= 8;
-    } while (rest > BigInt.zero);
-    if (bytes.first & 0x80 != 0) bytes.insert(0, 0);
-    return _tlv(0x02, bytes);
-  }
-
-  static List<int> _tlv(int tag, List<int> content) {
-    final length = content.length;
-    final header = length < 0x80
-        ? [length]
-        : () {
-            final bytes = <int>[];
-            for (var rest = length; rest > 0; rest >>= 8) {
-              bytes.insert(0, rest & 0xff);
-            }
-            return [0x80 | bytes.length, ...bytes];
-          }();
-    return [tag, ...header, ...content];
+    final info = ASN1Sequence(
+      elements: [
+        ASN1Integer(BigInt.zero),
+        ASN1Sequence(
+          elements: [
+            ASN1Set(
+              elements: [
+                ASN1Sequence(
+                  elements: [
+                    ASN1ObjectIdentifier.fromIdentifierString('2.5.4.3'),
+                    ASN1UTF8String(utf8StringValue: commonName),
+                  ],
+                ),
+              ],
+            ),
+          ],
+        ),
+        ASN1Sequence(
+          elements: [
+            rsaAlgorithm(),
+            ASN1BitString(
+              stringValues: ASN1Sequence(
+                elements: [
+                  ASN1Integer(public.modulus),
+                  ASN1Integer(public.exponent),
+                ],
+              ).encode(),
+            ),
+          ],
+        ),
+        // No attributes: [0] IMPLICIT SET OF, empty.
+        ASN1Sequence(elements: [], tag: 0xa0),
+      ],
+    );
+    final signer = RSASigner(SHA256Digest(), _sha256DigestInfo)
+      ..init(true, PrivateKeyParameter<RSAPrivateKey>(private));
+    final request = ASN1Sequence(
+      elements: [
+        info,
+        ASN1Sequence(
+          elements: [
+            ASN1ObjectIdentifier.fromIdentifierString('1.2.840.113549.1.1.11'),
+            ASN1Null(),
+          ],
+        ),
+        ASN1BitString(
+          stringValues: signer.generateSignature(info.encode()).bytes,
+        ),
+      ],
+    );
+    return (
+      privateKeyPem: _pem('PRIVATE KEY', pkcs8.encode()),
+      csrPem: _pem('CERTIFICATE REQUEST', request.encode()),
+    );
   }
 
   static String _pem(String label, List<int> der) {

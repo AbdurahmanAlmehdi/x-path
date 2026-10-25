@@ -429,6 +429,21 @@ class FakeAscServer {
         ]);
       case ('POST', ['profiles']):
         return _createProfile(body);
+      case ('DELETE', ['profiles', final id]):
+        if (profiles.remove(id) == null) {
+          throw _AscError(404, 'NOT_FOUND', 'Not found.', 'No profile $id.');
+        }
+        return (204, null);
+      case ('DELETE', ['certificates', final id]):
+        if (certificates.remove(id) == null) {
+          throw _AscError(
+            404,
+            'NOT_FOUND',
+            'Not found.',
+            'No certificate $id.',
+          );
+        }
+        return (204, null);
     }
     throw _notFound(uri);
   }

@@ -87,21 +87,64 @@ void main() {
   test('reuses the profile it made until a day before it expires', () async {
     final first = await profiles.profile('prj_1', key);
     final again = await profiles.profile('prj_1', key);
-    asc.profiles.add(
-      AscProfile(
-        id: 'old',
-        name: 'XPath com.mataa.app A1B2C3D4E5F',
-        content: utf8.encode('expiring'),
-        expirationDate: DateTime.utc(2026, 10, 25, 12),
-      ),
-    );
-    asc.profiles.removeAt(0);
-    asc.calls.clear();
-    final renewed = await profiles.profile('prj_1', key);
 
     expect(again, first);
+    expect(asc.profiles, hasLength(1));
+    expect(
+      asc.calls.where((call) => call.startsWith('createAppStoreProfile')),
+      hasLength(1),
+    );
+  });
+
+  test('makes it again when it expires within a day, deleting the old one '
+      'first: names are unique in the team', () async {
+    asc.profileExpiry = DateTime.utc(2026, 10, 25, 12);
+    await profiles.profile('prj_1', key);
+    asc
+      ..profileExpiry = DateTime.utc(2027)
+      ..calls.clear();
+
+    final renewed = await profiles.profile('prj_1', key);
+
     expect(utf8.decode(renewed), startsWith('profile XPath'));
-    expect(asc.calls.last, startsWith('createAppStoreProfile'));
+    expect(asc.calls, [
+      'distributionCertificates',
+      'appStoreProfiles XPath com.mataa.app A1B2C3D4E5F',
+      'deleteProfile profile-4',
+      'bundleIdOf com.mataa.app',
+      'createAppStoreProfile XPath com.mataa.app A1B2C3D4E5F bundle-1 cert-1',
+    ]);
+    expect(asc.profiles.single.expirationDate, DateTime.utc(2027));
+  });
+
+  test('refuses a saved App Store Connect key that is not one', () async {
+    await secrets.write('asc', 'not json');
+
+    await expectLater(
+      profiles.profile('prj_1', key),
+      throwsA(
+        isA<AppStoreProfileException>().having(
+          (e) => e.message,
+          'message',
+          startsWith('The App Store Connect key of the flavor prod cannot be'),
+        ),
+      ),
+    );
+  });
+
+  test('refuses a saved certificate that is not one', () async {
+    await secrets.writeBytes('identity.certificate', [1, 2, 3]);
+
+    await expectLater(
+      profiles.profile('prj_1', key),
+      throwsA(
+        isA<AppStoreProfileException>().having(
+          (e) => e.message,
+          'message',
+          startsWith('The saved identity of the flavor prod cannot be used'),
+        ),
+      ),
+    );
   });
 
   test('refuses a key no flavor of the project signs with', () async {

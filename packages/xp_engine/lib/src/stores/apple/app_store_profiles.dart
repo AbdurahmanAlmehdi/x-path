@@ -3,9 +3,11 @@ import 'package:xp_api/xp_api.dart';
 import 'package:xp_engine/src/clock/clock.dart';
 import 'package:xp_engine/src/credentials/credential_material.dart';
 import 'package:xp_engine/src/credentials/credential_repository.dart';
+import 'package:xp_engine/src/credentials/flavor_asc_key.dart';
 import 'package:xp_engine/src/secrets/secret_store.dart';
 import 'package:xp_engine/src/stores/apple/app_store_connect.dart';
 import 'package:xp_engine/src/stores/apple/asc_exceptions.dart';
+import 'package:xp_engine/src/stores/apple/asc_key.dart';
 import 'package:xp_engine/src/stores/apple/distribution_certificate.dart';
 
 /// Why the engine could not give a Linux runner the App Store profile of a
@@ -29,7 +31,8 @@ class AppStoreProfileException implements Exception {
 /// A profile is asked for like a secret, by a key that names the identity
 /// and the bundle id ([keyFor]). The engine makes it with the API key of the
 /// flavor that uses the identity for that bundle id, or reuses the active
-/// one it made before that does not expire within a day.
+/// one it made before that does not expire within a day; one that does is
+/// deleted and made again.
 class AppStoreProfiles {
   /// Creates the profiles over the credentials of the projects.
   const new({
@@ -76,30 +79,34 @@ class AppStoreProfiles {
         'No flavor of the project signs $bundleId with this identity.',
       );
     }
-    final asc = assignments.firstWhereOrNull(
-      (each) =>
-          each.kind == CredentialKind.ascKey &&
-          each.flavor.id == identity.flavor.id,
-    );
-    final material = asc == null
-        ? null
-        : await CredentialMaterial.load(
-            CredentialKind.ascKey,
-            asc.credential.secretKey,
-            asc.credential.account,
-            _secrets,
-          );
+    final AscKey? ascKey;
+    try {
+      ascKey = await flavorAscKey(_credentials, _secrets, identity.flavor.id);
+    } on FormatException catch (error) {
+      throw AppStoreProfileException(
+        'The App Store Connect key of the flavor ${identity.flavor.name} '
+        'cannot be used: ${error.message}',
+      );
+    }
     final der = await _secrets.readBytes(
       AppleDistributionMaterial.certificateKey(identityKey),
     );
-    if (material is! AscKeyMaterial || der == null) {
+    if (ascKey == null || der == null) {
       throw AppStoreProfileException(
         'The flavor ${identity.flavor.name} needs an App Store Connect API '
         'key and a saved identity for the engine to make its profile.',
       );
     }
-    final certificate = DistributionCertificate.fromDer(der);
-    final connect = _connect(material.key);
+    final DistributionCertificate certificate;
+    try {
+      certificate = DistributionCertificate.fromDer(der);
+    } on FormatException catch (error) {
+      throw AppStoreProfileException(
+        'The saved identity of the flavor ${identity.flavor.name} cannot be '
+        'used: ${error.message}',
+      );
+    }
+    final connect = _connect(ascKey);
     try {
       final listed = (await connect.distributionCertificates())
           .firstWhereOrNull((each) => certificate.hasSerial(each.serialNumber));
@@ -111,10 +118,15 @@ class AppStoreProfiles {
       }
       final name = 'XPath $bundleId ${certificate.serialNumber}';
       final soon = _clock.now().add(const Duration(days: 1));
-      final reusable = (await connect.appStoreProfiles(name)).firstWhereOrNull(
+      final active = await connect.appStoreProfiles(name);
+      final reusable = active.firstWhereOrNull(
         (each) => each.expirationDate?.isAfter(soon) ?? false,
       );
       if (reusable != null) return reusable.content;
+      // Names are unique in the team: the one about to expire goes first.
+      for (final expiring in active) {
+        await connect.deleteProfile(expiring.id);
+      }
       final resource = await connect.bundleIdOf(bundleId);
       if (resource == null) {
         throw AppStoreProfileException(

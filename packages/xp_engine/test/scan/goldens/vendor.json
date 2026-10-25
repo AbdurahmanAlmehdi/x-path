@@ -100,7 +100,7 @@
     {
       "severity": "info",
       "code": "ios_needs_mac",
-      "message": "Needs a Mac for iOS: Linux runners cannot build it because the app has the flavors dev, prod, which Linux iOS builds do not support yet (omarchy-apple-dev: flavors); the app builds its iOS plugins with CocoaPods, and Linux iOS builds need Swift Package Manager (flutter config --enable-swift-package-manager).",
+      "message": "Needs a Mac for iOS: Linux runners cannot build it because the app uses the flavors dev, prod, which Linux iOS builds do not support yet (omarchy-apple-dev: flavors); the app builds its iOS plugins with CocoaPods, and Linux iOS builds need Swift Package Manager (flutter config --enable-swift-package-manager).",
       "fix": "Nothing to do to build on a Mac. To build on Linux (ADR 0014), lift each reason; until then its iOS jobs wait for a Mac (ios-sign).",
       "path": "ios",
       "app": "."

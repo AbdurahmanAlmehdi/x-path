@@ -181,7 +181,7 @@
     {
       "severity": "info",
       "code": "ios_needs_mac",
-      "message": "Needs a Mac for iOS: Linux runners cannot build it because the app has the flavors staging, prod, which Linux iOS builds do not support yet (omarchy-apple-dev: flavors).",
+      "message": "Needs a Mac for iOS: Linux runners cannot build it because the app uses the flavors staging, prod, which Linux iOS builds do not support yet (omarchy-apple-dev: flavors).",
       "fix": "Nothing to do to build on a Mac. To build on Linux (ADR 0014), lift each reason; until then its iOS jobs wait for a Mac (ios-sign).",
       "path": "ios",
       "app": "."

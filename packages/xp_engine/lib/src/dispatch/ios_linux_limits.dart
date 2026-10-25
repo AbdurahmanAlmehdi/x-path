@@ -16,10 +16,7 @@ List<String> iosLinuxLimits(List<StepPlan> steps, AppProfile app) {
     switch (kind) {
       case 'build.ios' || 'ios.stripAndReexport':
         if (input['flavor'] case final String flavor) {
-          reasons.add(
-            'the app uses the flavor $flavor, which Linux iOS builds do not '
-            'support yet (omarchy-apple-dev: flavors)',
-          );
+          reasons.add(flavorsLimit([flavor]));
         }
         if (input['target'] case final String target) {
           reasons.add(
@@ -51,16 +48,24 @@ List<String> iosLinuxLimits(List<StepPlan> steps, AppProfile app) {
     }
   }
   reasons.addAll(app.iosLinuxLimits);
-  final extensions = app.iosAppExtensions;
-  if (extensions.isNotEmpty) {
-    reasons.add(
-      'the app has the app extension${extensions.length == 1 ? '' : 's'} '
-      '${extensions.join(', ')}, which Linux iOS builds do not support yet '
-      '(omarchy-apple-dev: app extensions)',
-    );
+  if (app.iosAppExtensions.isNotEmpty) {
+    reasons.add(extensionsLimit(app.iosAppExtensions));
   }
   return reasons.toList();
 }
+
+/// Why Linux iOS builds cannot build an app with the Flutter [flavors]: one
+/// a job builds, or all a scan found.
+String flavorsLimit(List<String> flavors) =>
+    'the app uses the flavor${flavors.length == 1 ? '' : 's'} '
+    '${flavors.join(', ')}, which Linux iOS builds do not support yet '
+    '(omarchy-apple-dev: flavors)';
+
+/// Why Linux iOS builds cannot build an app with the app [extensions].
+String extensionsLimit(List<String> extensions) =>
+    'the app has the app extension${extensions.length == 1 ? '' : 's'} '
+    '${extensions.join(', ')}, which Linux iOS builds do not support yet '
+    '(omarchy-apple-dev: app extensions)';
 
 /// What a `command` step uses that Linux iOS builds lack: the iOS Simulator
 /// (`xcrun simctl`, `--simulator`, an `iphonesimulator` SDK or destination),

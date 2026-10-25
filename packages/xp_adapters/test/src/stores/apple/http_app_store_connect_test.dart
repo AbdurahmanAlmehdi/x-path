@@ -791,6 +791,29 @@ void main() {
       expect(await api.appStoreProfiles(created.name), isEmpty);
     });
 
+    test('a profile is deleted and a certificate revoked', () async {
+      final api = client();
+      final profile = await api.createAppStoreProfile(
+        name: 'XPath ly.example.app',
+        bundleId: 'bundle-1',
+        certificateId: 'cert-1',
+      );
+
+      await api.deleteProfile(profile.id);
+      await api.revokeCertificate('cert-1');
+
+      expect(server.profiles, isEmpty);
+      expect(server.certificates.keys, ['cert-2']);
+      await expectLater(
+        api.deleteProfile(profile.id),
+        throwsA(isA<AscNotFoundException>()),
+      );
+      await expectLater(
+        api.revokeCertificate('cert-1'),
+        throwsA(isA<AscNotFoundException>()),
+      );
+    });
+
     test('a second profile of the same name is a conflict', () async {
       final api = client();
       Future<AscProfile> create() => api.createAppStoreProfile(
