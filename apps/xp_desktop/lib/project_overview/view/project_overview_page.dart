@@ -1,4 +1,5 @@
-import 'package:flutter/services.dart';
+import 'dart:async';
+
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:xp_api/xp_api.dart';
@@ -97,15 +98,10 @@ class _ProjectOverviewViewState extends State<ProjectOverviewView> {
         .where((job) => job.state == JobState.waitingForApproval)
         .length;
     final canCommand = context.canCommand;
-    return CallbackShortcuts(
-      bindings: {
-        const SingleActivator(LogicalKeyboardKey.keyN, meta: true): _dispatch,
-        const SingleActivator(
-          LogicalKeyboardKey.keyC,
-          meta: true,
-          shift: true,
-        ): () =>
-            setState(() => _console = !_console),
+    return XpCommands(
+      handlers: {
+        XpCommand.dispatch: () => unawaited(_dispatch()),
+        XpCommand.console: () => setState(() => _console = !_console),
       },
       child: Focus(
         autofocus: true,

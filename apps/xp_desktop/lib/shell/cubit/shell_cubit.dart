@@ -144,27 +144,76 @@ final class SettingsDestination extends ShellDestination {
 /// chose to keep a draft).
 typedef CanLeave = Future<bool> Function();
 
-/// Where the shell is. It lives inside the engine's subtree, so switching
-/// engines starts over at [HomeDestination].
+/// Where the shell is, and where it was: ⌘[ goes back to the destination
+/// shown before, ⌘] forward again, as in Safari. It lives inside the
+/// engine's subtree, so switching engines starts over at
+/// [HomeDestination] with no history.
 class ShellCubit extends Cubit<ShellDestination> {
   new([super.initialState = const HomeDestination()]);
 
+  /// The most destinations kept to go back to.
+  static const historyLimit = 50;
+
   CanLeave? _canLeave;
+  final _back = <ShellDestination>[];
+  final _forward = <ShellDestination>[];
+
+  /// Whether ⌘[ has somewhere to go.
+  bool get canGoBack => _back.isNotEmpty;
+
+  /// Whether ⌘] has somewhere to go.
+  bool get canGoForward => _forward.isNotEmpty;
 
   /// Shows [destination], once the guard of the shown one (if any) lets it
-  /// go.
+  /// go. The shown one goes on the back stack; the forward stack empties.
   void show(ShellDestination destination) {
     if (destination == state) return;
+    _go(destination, () {
+      _back.add(state);
+      if (_back.length > historyLimit) _back.removeAt(0);
+      _forward.clear();
+    });
+  }
+
+  /// ⌘[: shows the destination shown before this one.
+  void back() {
+    if (_back.isEmpty) return;
+    _go(_back.last, () {
+      _back.removeLast();
+      _forward.add(state);
+    });
+  }
+
+  /// ⌘]: shows again the destination [back] left.
+  void forward() {
+    if (_forward.isEmpty) return;
+    _go(_forward.last, () {
+      _forward.removeLast();
+      _back.add(state);
+    });
+  }
+
+  /// Moves to [destination] and runs [record] just before, once the guard
+  /// of the shown destination (if any) lets it go.
+  void _go(ShellDestination destination, void Function() record) {
     final canLeave = _canLeave;
     if (canLeave == null) {
+      record();
       emit(destination);
       return;
     }
-    unawaited(_leave(canLeave, destination));
+    unawaited(_leave(canLeave, destination, record));
   }
 
-  Future<void> _leave(CanLeave canLeave, ShellDestination destination) async {
-    if (await canLeave() && !isClosed) emit(destination);
+  Future<void> _leave(
+    CanLeave canLeave,
+    ShellDestination destination,
+    void Function() record,
+  ) async {
+    if (await canLeave() && !isClosed) {
+      record();
+      emit(destination);
+    }
   }
 
   /// Asks [canLeave] before every later [show] that leaves the shown

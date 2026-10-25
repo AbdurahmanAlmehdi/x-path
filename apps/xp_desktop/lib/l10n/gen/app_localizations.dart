@@ -5997,6 +5997,240 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Done'**
   String get settingsTokensDone;
+
+  /// ⌘K (keyboard guide).
+  ///
+  /// In en, this message translates to:
+  /// **'Command palette'**
+  String get commandPalette;
+
+  /// ⌘N.
+  ///
+  /// In en, this message translates to:
+  /// **'Dispatch…'**
+  String get commandDispatch;
+
+  /// ⌘R.
+  ///
+  /// In en, this message translates to:
+  /// **'Re-run job'**
+  String get commandRerun;
+
+  /// ⌥⌘R.
+  ///
+  /// In en, this message translates to:
+  /// **'Resume from selected step'**
+  String get commandResume;
+
+  /// ⌘.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel job'**
+  String get commandCancel;
+
+  /// ⇧⌘A.
+  ///
+  /// In en, this message translates to:
+  /// **'Approvals'**
+  String get commandApprovals;
+
+  /// ⌘[.
+  ///
+  /// In en, this message translates to:
+  /// **'Back'**
+  String get commandBack;
+
+  /// ⌘].
+  ///
+  /// In en, this message translates to:
+  /// **'Forward'**
+  String get commandForward;
+
+  /// ⌃⌘S.
+  ///
+  /// In en, this message translates to:
+  /// **'Show or hide sidebar'**
+  String get commandSidebar;
+
+  /// ⇧⌘C.
+  ///
+  /// In en, this message translates to:
+  /// **'Show or hide console'**
+  String get commandConsole;
+
+  /// ⌘F.
+  ///
+  /// In en, this message translates to:
+  /// **'Find in log'**
+  String get commandFind;
+
+  /// ⌘G.
+  ///
+  /// In en, this message translates to:
+  /// **'Next match'**
+  String get commandFindNext;
+
+  /// ⇧⌘G.
+  ///
+  /// In en, this message translates to:
+  /// **'Previous match'**
+  String get commandFindPrevious;
+
+  /// ⌘E.
+  ///
+  /// In en, this message translates to:
+  /// **'Jump to error'**
+  String get commandJumpToError;
+
+  /// ⌘↓.
+  ///
+  /// In en, this message translates to:
+  /// **'Follow tail'**
+  String get commandFollowTail;
+
+  /// ⇧⌘T.
+  ///
+  /// In en, this message translates to:
+  /// **'Show or hide timestamps'**
+  String get commandTimestamps;
+
+  /// ⌥Z.
+  ///
+  /// In en, this message translates to:
+  /// **'Wrap lines'**
+  String get commandWrap;
+
+  /// ⌃⌘=.
+  ///
+  /// In en, this message translates to:
+  /// **'Compact rows'**
+  String get commandCompact;
+
+  /// ⌘/: the shortcut sheet.
+  ///
+  /// In en, this message translates to:
+  /// **'Keyboard shortcuts'**
+  String get commandShortcuts;
+
+  /// ⌘,.
+  ///
+  /// In en, this message translates to:
+  /// **'Settings…'**
+  String get commandSettings;
+
+  /// Menu bar.
+  ///
+  /// In en, this message translates to:
+  /// **'Go'**
+  String get menuGo;
+
+  /// Menu bar.
+  ///
+  /// In en, this message translates to:
+  /// **'Project'**
+  String get menuProject;
+
+  /// Menu bar.
+  ///
+  /// In en, this message translates to:
+  /// **'Job'**
+  String get menuJob;
+
+  /// Menu bar.
+  ///
+  /// In en, this message translates to:
+  /// **'View'**
+  String get menuView;
+
+  /// Menu bar.
+  ///
+  /// In en, this message translates to:
+  /// **'Window'**
+  String get menuWindow;
+
+  /// Menu bar: ⌘1–⌘9.
+  ///
+  /// In en, this message translates to:
+  /// **'Projects'**
+  String get menuProjects;
+
+  /// Placeholder of the palette's field.
+  ///
+  /// In en, this message translates to:
+  /// **'Go to a project, release, run or workflow, or run a command'**
+  String get paletteHint;
+
+  /// The palette found nothing.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing matches.'**
+  String get paletteEmpty;
+
+  /// No description provided for @paletteDispatch.
+  ///
+  /// In en, this message translates to:
+  /// **'Dispatch… {project}'**
+  String paletteDispatch(String project);
+
+  /// No description provided for @paletteRunAgain.
+  ///
+  /// In en, this message translates to:
+  /// **'Run again: {run}'**
+  String paletteRunAgain(String run);
+
+  /// No description provided for @paletteCancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel: {run}'**
+  String paletteCancel(String run);
+
+  /// No description provided for @paletteApprove.
+  ///
+  /// In en, this message translates to:
+  /// **'Review: {action} {version}'**
+  String paletteApprove(String action, String version);
+
+  /// No description provided for @paletteRelease.
+  ///
+  /// In en, this message translates to:
+  /// **'Release {version} · {flavor}'**
+  String paletteRelease(String version, String flavor);
+
+  /// No description provided for @paletteRun.
+  ///
+  /// In en, this message translates to:
+  /// **'Run {name}'**
+  String paletteRun(String name);
+
+  /// No description provided for @paletteWorkflow.
+  ///
+  /// In en, this message translates to:
+  /// **'Workflow {name}'**
+  String paletteWorkflow(String name);
+
+  /// No description provided for @palettePage.
+  ///
+  /// In en, this message translates to:
+  /// **'Go to {page}'**
+  String palettePage(String page);
+
+  /// Title of the shortcut sheet (⌘/).
+  ///
+  /// In en, this message translates to:
+  /// **'Keyboard shortcuts'**
+  String get shortcutsTitle;
+
+  /// ⌘1–⌘9 in the shortcut sheet.
+  ///
+  /// In en, this message translates to:
+  /// **'Projects in sidebar order'**
+  String get shortcutsProjects;
+
+  /// Closes the shortcut sheet.
+  ///
+  /// In en, this message translates to:
+  /// **'Close'**
+  String get shortcutsClose;
 }
 
 class _AppLocalizationsDelegate

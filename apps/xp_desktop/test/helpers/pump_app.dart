@@ -8,6 +8,7 @@ import 'package:xp_desktop/l10n/l10n.dart';
 import 'package:xp_desktop/local_engine/local_engine.dart';
 import 'package:xp_desktop/projects/bloc/projects_bloc.dart';
 import 'package:xp_desktop/runners/bloc/runners_bloc.dart';
+import 'package:xp_desktop/shell/bloc/command_palette_bloc.dart';
 import 'package:xp_desktop/shell/cubit/shell_cubit.dart';
 import 'package:xp_desktop/shell/widgets/engine_staleness.dart';
 import 'package:xp_desktop/storage/bloc/storage_bloc.dart';
@@ -226,6 +227,15 @@ extension PumpApp on WidgetTester {
               value: storage ?? storageIn(const StorageState()),
             ),
             BlocProvider<ToastCubit>(create: (_) => toasts ?? ToastCubit()),
+            BlocProvider<CommandPaletteBloc>(
+              create: (context) => CommandPaletteBloc(
+                projects: context.read<ProjectsRepository>(),
+                releases: context.read<ReleasesRepository>(),
+                jobs: context.read<JobsRepository>(),
+                workflows: context.read<WorkflowsRepository>(),
+                approvals: context.read<ApprovalsRepository>(),
+              ),
+            ),
           ],
           child: themed(
             Material(

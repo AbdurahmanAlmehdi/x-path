@@ -3666,4 +3666,138 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsTokensDone => 'Done';
+
+  @override
+  String get commandPalette => 'Command palette';
+
+  @override
+  String get commandDispatch => 'Dispatch…';
+
+  @override
+  String get commandRerun => 'Re-run job';
+
+  @override
+  String get commandResume => 'Resume from selected step';
+
+  @override
+  String get commandCancel => 'Cancel job';
+
+  @override
+  String get commandApprovals => 'Approvals';
+
+  @override
+  String get commandBack => 'Back';
+
+  @override
+  String get commandForward => 'Forward';
+
+  @override
+  String get commandSidebar => 'Show or hide sidebar';
+
+  @override
+  String get commandConsole => 'Show or hide console';
+
+  @override
+  String get commandFind => 'Find in log';
+
+  @override
+  String get commandFindNext => 'Next match';
+
+  @override
+  String get commandFindPrevious => 'Previous match';
+
+  @override
+  String get commandJumpToError => 'Jump to error';
+
+  @override
+  String get commandFollowTail => 'Follow tail';
+
+  @override
+  String get commandTimestamps => 'Show or hide timestamps';
+
+  @override
+  String get commandWrap => 'Wrap lines';
+
+  @override
+  String get commandCompact => 'Compact rows';
+
+  @override
+  String get commandShortcuts => 'Keyboard shortcuts';
+
+  @override
+  String get commandSettings => 'Settings…';
+
+  @override
+  String get menuGo => 'Go';
+
+  @override
+  String get menuProject => 'Project';
+
+  @override
+  String get menuJob => 'Job';
+
+  @override
+  String get menuView => 'View';
+
+  @override
+  String get menuWindow => 'Window';
+
+  @override
+  String get menuProjects => 'Projects';
+
+  @override
+  String get paletteHint =>
+      'Go to a project, release, run or workflow, or run a command';
+
+  @override
+  String get paletteEmpty => 'Nothing matches.';
+
+  @override
+  String paletteDispatch(String project) {
+    return 'Dispatch… $project';
+  }
+
+  @override
+  String paletteRunAgain(String run) {
+    return 'Run again: $run';
+  }
+
+  @override
+  String paletteCancel(String run) {
+    return 'Cancel: $run';
+  }
+
+  @override
+  String paletteApprove(String action, String version) {
+    return 'Review: $action $version';
+  }
+
+  @override
+  String paletteRelease(String version, String flavor) {
+    return 'Release $version · $flavor';
+  }
+
+  @override
+  String paletteRun(String name) {
+    return 'Run $name';
+  }
+
+  @override
+  String paletteWorkflow(String name) {
+    return 'Workflow $name';
+  }
+
+  @override
+  String palettePage(String page) {
+    return 'Go to $page';
+  }
+
+  @override
+  String get shortcutsTitle => 'Keyboard shortcuts';
+
+  @override
+  String get shortcutsProjects => 'Projects in sidebar order';
+
+  @override
+  String get shortcutsClose => 'Close';
 }

@@ -137,7 +137,7 @@ Details:
 
 ### Phase U6a: Navigation, menus and the command palette
 
-- **Status:** Not started
+- **Status:** Done
 - **Scope:** Back and forward, a command palette and a real macOS menu.
 - **Files touched:** `apps/xp_desktop/lib/shell/**`, `apps/xp_desktop/lib/app/**`,
   `apps/xp_desktop/lib/widgets/**`

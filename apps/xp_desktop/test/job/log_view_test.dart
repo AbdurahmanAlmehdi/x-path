@@ -5,6 +5,7 @@ import 'package:material_ui/material_ui.dart' hide StepState;
 import 'package:xp_api/xp_api.dart';
 import 'package:xp_desktop/job/job.dart';
 import 'package:xp_desktop/theme/theme.dart';
+import 'package:xp_desktop/widgets/widgets.dart';
 
 import '../helpers/job_fixtures.dart';
 import '../helpers/pump_app.dart';
@@ -109,6 +110,30 @@ void main() {
       expect(text('HEAD is now at 9a3bc0d'), findsOneWidget);
       expect(text('Running pod install...'), findsNothing);
       expect(find.text('Bump version'), findsNothing);
+    });
+
+    testWidgets('⌘G and ⇧⌘G go from match to match of the filter', (
+      tester,
+    ) async {
+      await pumpLog(tester);
+      expect(runCommand(XpCommand.findNext), isTrue, reason: 'no filter yet');
+
+      await tester.enterText(find.byType(TextField), 'pod');
+      await tester.pump();
+      for (final command in [
+        XpCommand.findNext,
+        XpCommand.findNext,
+        XpCommand.findPrevious,
+      ]) {
+        runCommand(command);
+        await tester.pump();
+      }
+      await tester.enterText(find.byType(TextField), 'nothing like it');
+      await tester.pump();
+      runCommand(XpCommand.findNext);
+      await tester.pump();
+
+      expect(find.text('Follow'), findsOneWidget);
     });
 
     testWidgets('toggles timestamps, wrap and follow', (tester) async {

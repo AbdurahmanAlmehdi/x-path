@@ -10,6 +10,7 @@ import 'package:xp_desktop/local_engine/local_engine.dart';
 import 'package:xp_desktop/onboarding/view/onboarding_page.dart';
 import 'package:xp_desktop/projects/bloc/projects_bloc.dart';
 import 'package:xp_desktop/runners/bloc/runners_bloc.dart';
+import 'package:xp_desktop/shell/bloc/command_palette_bloc.dart';
 import 'package:xp_desktop/shell/cubit/shell_cubit.dart';
 import 'package:xp_desktop/shell/view/app_shell.dart';
 import 'package:xp_desktop/shell/widgets/engine_staleness.dart';
@@ -130,6 +131,15 @@ class EngineScope extends StatelessWidget {
       child: MultiBlocProvider(
         providers: [
           BlocProvider(create: (_) => ShellCubit()),
+          BlocProvider(
+            create: (context) => CommandPaletteBloc(
+              projects: context.read<ProjectsRepository>(),
+              releases: context.read<ReleasesRepository>(),
+              jobs: context.read<JobsRepository>(),
+              workflows: context.read<WorkflowsRepository>(),
+              approvals: context.read<ApprovalsRepository>(),
+            ),
+          ),
           BlocProvider(
             create: (context) =>
                 ProjectsBloc(projects: context.read<ProjectsRepository>())

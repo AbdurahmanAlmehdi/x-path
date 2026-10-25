@@ -272,6 +272,58 @@ void main() {
       expect: () => [const StorageDestination()],
     );
 
+    blocTest<ShellCubit, ShellDestination>(
+      'goes back and forward through what it showed',
+      build: ShellCubit.new,
+      act: (shell) {
+        expect(shell.canGoBack, isFalse);
+        shell
+          ..show(const RunnersDestination())
+          ..show(const StorageDestination())
+          ..back();
+        expect(shell.canGoForward, isTrue);
+        shell
+          ..back()
+          ..back()
+          ..forward()
+          ..show(const EnginesDestination());
+        expect(shell.canGoForward, isFalse, reason: 'a new page clears it');
+        shell.forward();
+      },
+      expect: () => const [
+        RunnersDestination(),
+        StorageDestination(),
+        RunnersDestination(),
+        HomeDestination(),
+        RunnersDestination(),
+        EnginesDestination(),
+      ],
+    );
+
+    blocTest<ShellCubit, ShellDestination>(
+      'asks the guard before going back, and keeps at most the limit',
+      build: ShellCubit.new,
+      act: (shell) async {
+        for (var i = 0; i <= ShellCubit.historyLimit; i++) {
+          shell.show(JobDestination('run_$i'));
+        }
+        shell
+          ..guard(() async => false)
+          ..back();
+        await Future<void>.delayed(Duration.zero);
+        expect(
+          shell.state,
+          const JobDestination('run_${ShellCubit.historyLimit}'),
+        );
+        shell.guard(() async => true);
+        for (var i = 0; i < ShellCubit.historyLimit + 1; i++) {
+          shell.back();
+          await Future<void>.delayed(Duration.zero);
+        }
+        expect(shell.state, const JobDestination('run_0'));
+      },
+    );
+
     test('does not leave once closed', () async {
       final answer = Completer<bool>();
       final shell = ShellCubit()
@@ -281,6 +333,76 @@ void main() {
       answer.complete(true);
       await Future<void>.delayed(Duration.zero);
       expect(shell.state, const HomeDestination());
+    });
+  });
+
+  group('the commands of the shell', () {
+    Future<void> press(WidgetTester tester, SingleActivator activator) async {
+      final modifiers = [
+        if (activator.control) LogicalKeyboardKey.controlLeft,
+        if (activator.shift) LogicalKeyboardKey.shiftLeft,
+        if (activator.meta) LogicalKeyboardKey.metaLeft,
+      ];
+      for (final key in modifiers) {
+        await tester.sendKeyDownEvent(key);
+      }
+      await tester.sendKeyEvent(activator.trigger);
+      for (final key in modifiers.reversed) {
+        await tester.sendKeyUpEvent(key);
+      }
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('⌘[ and ⌘] go back and forward; ⌘, opens the settings', (
+      tester,
+    ) async {
+      final shell = ShellCubit(const ApprovalsDestination());
+      await pumpShell(tester, shell: shell);
+      await tester.pump();
+
+      expect(runCommand(XpCommand.settings), isTrue);
+      await tester.pumpAndSettle();
+      expect(shell.state, const SettingsDestination());
+      await press(tester, XpCommand.back.activator);
+      expect(shell.state, const ApprovalsDestination());
+      await press(tester, XpCommand.forward.activator);
+      expect(shell.state, const SettingsDestination());
+    });
+
+    testWidgets('⌃⌘S hides and shows the sidebar', (tester) async {
+      await pumpShell(tester, shell: ShellCubit(const ApprovalsDestination()));
+      await tester.pump();
+
+      runCommand(XpCommand.sidebar);
+      await tester.pump();
+      expect(find.byType(Sidebar), findsNothing);
+      runCommand(XpCommand.sidebar);
+      await tester.pump();
+      expect(find.byType(Sidebar), findsOneWidget);
+    });
+
+    testWidgets('⌘/ lists every shortcut of the keyboard guide', (
+      tester,
+    ) async {
+      await pumpShell(tester, shell: ShellCubit(const ApprovalsDestination()));
+      await tester.pump();
+
+      runCommand(XpCommand.shortcuts);
+      await tester.pumpAndSettle();
+
+      expect(find.byType(ShortcutSheet), findsOneWidget);
+      for (final command in XpCommand.values) {
+        expect(find.text(command.keys), findsWidgets, reason: command.name);
+      }
+      expect(find.text('⌘1 – ⌘9'), findsOneWidget);
+      expect(
+        runCommand(XpCommand.settings),
+        isFalse,
+        reason: 'the sheet covers the shell',
+      );
+      await tester.tap(find.text('Close'));
+      await tester.pumpAndSettle();
+      expect(find.byType(ShortcutSheet), findsNothing);
     });
   });
 

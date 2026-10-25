@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:xp_api/xp_api.dart';
@@ -44,13 +43,9 @@ class ApprovalsView extends StatelessWidget {
     final state = context.watch<ApprovalsInboxBloc>().state;
     final bloc = context.read<ApprovalsInboxBloc>();
     final selected = state.selected;
-    return CallbackShortcuts(
-      bindings: {
-        const SingleActivator(
-          LogicalKeyboardKey.keyA,
-          meta: true,
-          shift: true,
-        ): () {
+    return XpCommands(
+      handlers: {
+        XpCommand.approvals: () {
           if (selected != null && selected.state == ApprovalState.pending) {
             unawaited(showApprovalReview(context, selected.id));
           }

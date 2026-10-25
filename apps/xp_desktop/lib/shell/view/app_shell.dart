@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:xp_api/xp_api.dart';
@@ -23,7 +22,10 @@ import 'package:xp_desktop/runners/view/runners_page.dart';
 import 'package:xp_desktop/runs/view/runs_page.dart';
 import 'package:xp_desktop/settings/view/settings_page.dart';
 import 'package:xp_desktop/shell/cubit/shell_cubit.dart';
+import 'package:xp_desktop/shell/widgets/app_menu_bar.dart';
+import 'package:xp_desktop/shell/widgets/command_palette.dart';
 import 'package:xp_desktop/shell/widgets/shell_page.dart';
+import 'package:xp_desktop/shell/widgets/shortcut_sheet.dart';
 import 'package:xp_desktop/shell/widgets/sidebar.dart';
 import 'package:xp_desktop/storage/view/storage_page.dart';
 import 'package:xp_desktop/tests/view/tests_page.dart';
@@ -74,20 +76,9 @@ void showProjectAt(BuildContext context, int index) {
   }
 }
 
-const _digits = <LogicalKeyboardKey>[
-  LogicalKeyboardKey.digit1,
-  LogicalKeyboardKey.digit2,
-  LogicalKeyboardKey.digit3,
-  LogicalKeyboardKey.digit4,
-  LogicalKeyboardKey.digit5,
-  LogicalKeyboardKey.digit6,
-  LogicalKeyboardKey.digit7,
-  LogicalKeyboardKey.digit8,
-  LogicalKeyboardKey.digit9,
-];
-
-/// The window: the sidebar and the content area of the destination.
-/// XPath ▸ Settings… (⌘,) shows the settings.
+/// The window: the sidebar and the content area of the destination, under
+/// the menu bar. It does the commands of the keyboard guide that are not a
+/// page's own: ⌘K, ⌘N, ⇧⌘A, ⌘[ and ⌘], ⌃⌘S, ⌘/ and ⌘, (with ⌘1–⌘9).
 class AppShell extends StatefulWidget {
   const new({super.key});
 
@@ -97,6 +88,7 @@ class AppShell extends StatefulWidget {
 
 class _AppShellState extends State<AppShell> {
   StreamSubscription<void>? _settings;
+  var _sidebar = true;
 
   @override
   void initState() {
@@ -114,70 +106,81 @@ class _AppShellState extends State<AppShell> {
   }
 
   @override
-  Widget build(BuildContext context) => CallbackShortcuts(
-    bindings: {
-      const SingleActivator(
-        LogicalKeyboardKey.keyA,
-        meta: true,
-        shift: true,
-      ): () =>
-          reviewApprovals(context),
-      const SingleActivator(LogicalKeyboardKey.keyN, meta: true): () =>
-          unawaited(dispatchShown(context)),
-      for (final (index, digit) in _digits.indexed)
-        SingleActivator(digit, meta: true): () => showProjectAt(context, index),
-    },
-    child: Material(
-      color: context.xpColors.surfaceWindow,
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const Sidebar(),
-          const XpHairline(vertical: true),
-          Expanded(
-            child: BlocBuilder<ShellCubit, ShellDestination>(
-              builder: (context, destination) => switch (destination) {
-                HomeDestination() => const _Home(),
-                ProjectDestination(:final projectId) => ProjectOverviewPage(
-                  projectId,
-                ),
-                JobDestination(:final runId, :final jobId) => JobPage(
-                  runId: runId,
-                  jobId: jobId,
-                ),
-                ReleasesDestination(:final projectId, :final releaseId) =>
-                  ReleasesPage(projectId: projectId, releaseId: releaseId),
-                TestsDestination(:final projectId, :final jobId) => TestsPage(
-                  projectId: projectId,
-                  jobId: jobId,
-                ),
-                RunsDestination(:final projectId) => RunsPage(
-                  projectId: projectId,
-                ),
-                WorkflowsDestination(:final projectId, :final workflowId) =>
-                  WorkflowBuilderPage(
-                    projectId: projectId,
-                    workflowId: workflowId,
-                  ),
-                RunnersDestination() => const RunnersPage(),
-                StorageDestination() => const StoragePage(),
-                ApprovalsDestination(:final approvalId) => ApprovalsPage(
-                  approvalId: approvalId,
-                ),
-                AddProjectDestination() => const AddProjectPage(),
-                CredentialsDestination(:final projectId) => CredentialsPage(
-                  projectId: projectId,
-                ),
-                EnginesDestination() => const EnginesPage(),
-                OnboardingDestination() => const OnboardingPage(),
-                SettingsDestination(:final github) => SettingsPage(
-                  github: github,
-                ),
-              },
-            ),
-          ),
-        ],
+  Widget build(BuildContext context) {
+    final shell = context.read<ShellCubit>();
+    return XpCommands(
+      handlers: {
+        XpCommand.palette: () => unawaited(
+          showCommandPalette(context, projectId: shownProjectId(context)),
+        ),
+        XpCommand.dispatch: () => unawaited(dispatchShown(context)),
+        XpCommand.approvals: () => reviewApprovals(context),
+        XpCommand.back: shell.back,
+        XpCommand.forward: shell.forward,
+        XpCommand.sidebar: () => setState(() => _sidebar = !_sidebar),
+        XpCommand.shortcuts: () => unawaited(showShortcutSheet(context)),
+        XpCommand.settings: () => shell.show(const SettingsDestination()),
+      },
+      child: CallbackShortcuts(
+        bindings: {
+          for (final (index, digit) in projectDigits.indexed)
+            SingleActivator(digit, meta: true): () =>
+                showProjectAt(context, index),
+        },
+        child: AppMenuBar(child: _content(context)),
       ),
+    );
+  }
+
+  Widget _content(BuildContext context) => Material(
+    color: context.xpColors.surfaceWindow,
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (_sidebar) ...[const Sidebar(), const XpHairline(vertical: true)],
+        Expanded(
+          child: BlocBuilder<ShellCubit, ShellDestination>(
+            builder: (context, destination) => switch (destination) {
+              HomeDestination() => const _Home(),
+              ProjectDestination(:final projectId) => ProjectOverviewPage(
+                projectId,
+              ),
+              JobDestination(:final runId, :final jobId) => JobPage(
+                runId: runId,
+                jobId: jobId,
+              ),
+              ReleasesDestination(:final projectId, :final releaseId) =>
+                ReleasesPage(projectId: projectId, releaseId: releaseId),
+              TestsDestination(:final projectId, :final jobId) => TestsPage(
+                projectId: projectId,
+                jobId: jobId,
+              ),
+              RunsDestination(:final projectId) => RunsPage(
+                projectId: projectId,
+              ),
+              WorkflowsDestination(:final projectId, :final workflowId) =>
+                WorkflowBuilderPage(
+                  projectId: projectId,
+                  workflowId: workflowId,
+                ),
+              RunnersDestination() => const RunnersPage(),
+              StorageDestination() => const StoragePage(),
+              ApprovalsDestination(:final approvalId) => ApprovalsPage(
+                approvalId: approvalId,
+              ),
+              AddProjectDestination() => const AddProjectPage(),
+              CredentialsDestination(:final projectId) => CredentialsPage(
+                projectId: projectId,
+              ),
+              EnginesDestination() => const EnginesPage(),
+              OnboardingDestination() => const OnboardingPage(),
+              SettingsDestination(:final github) => SettingsPage(
+                github: github,
+              ),
+            },
+          ),
+        ),
+      ],
     ),
   );
 }
