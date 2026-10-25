@@ -121,17 +121,17 @@ These stay on a Mac, or narrow the job to a Mac with a clear reason:
 - **XPath never downloads Apple software.** The user installs omarchy-apple-dev and supplies
   `Xcode.xip`; XPath probes, pins and records the toolchain.
 
-### Open decision: who creates the App Store profile for a Linux build
+### Decision: who creates the App Store profile for a Linux build
 
-Decide before Phase 4a (signing comes before the first Linux build).
+Decided 2026-10-25, recorded in ADR 0014: **(b)**.
 
-- **(a)** The App Store Connect key goes to the runner for the job, and omarchy-apple-dev's
-  `asc.py identity` creates the certificate and profile. Least code; widens D-09, under which
-  ASC keys never leave the engine.
-- **(b) Recommended.** The engine creates the profile with its own App Store Connect client and
+- **(b) Chosen.** The engine creates the profile with its own App Store Connect client and
   sends only the identity and the profile to the runner, which signs with rcodesign. The ASC
-  key stays on the engine. Needs a small upstream change so `asc.py identity` (or
-  `flutter/ship.sh`) takes a given profile.
+  key stays on the engine (D-09 unchanged). Needs a small upstream change so `asc.py identity`
+  (or `flutter/ship.sh`) takes a given profile.
+- **(a) Rejected.** The App Store Connect key goes to the runner for the job, and
+  omarchy-apple-dev's `asc.py identity` creates the certificate and profile. Least code, but it
+  widens D-09, under which ASC keys never leave the engine.
 
 ## Technical Approach
 
@@ -175,7 +175,7 @@ Decide before Phase 4a (signing comes before the first Linux build).
 | 1. App Store upload through the API | — | now, in parallel with Phase 0 |
 | 2. Report the `ios-linux` capability | runner plan R1, R2 | after R2 |
 | 3a. Any-of placement and narrowing (no behaviour change) | Phase 2 | after Phase 2 |
-| 4a. Signing identity and profile on a Linux runner | open decision; runner plan R10a's foreign-keys-off migrations, or its own | after the decision |
+| 4a. Signing identity and profile on a Linux runner | profile decision (made: (b)); runner plan R10a's foreign-keys-off migrations, or its own | after the gate |
 | 3b. The Linux build backend and toolchain preparation | Phase 0 gate, 3a, 4a | after the gate |
 | 4b. Signing set-up without a Mac | 4a | after 4a |
 | 5. Scan, dry run and docs | 3b; UX plan U2c for the dry run; runner plan R4 for `docs/guide/runners.md` | after 3b |
@@ -194,7 +194,7 @@ Every phase that changes the API updates `openapi.yaml` and adds a contract test
   installs from TestFlight. Record which of the "not built yet" items the app hit.
 - **Validation:** `manual 1. On an Omarchy machine with install-toolchain.sh done, run a workflow of command steps calling setup.sh, build.sh and ship.sh --upload on a real app. 2. Wait for VALID in App Store Connect. 3. Install from TestFlight. 4. Record the build number, the omarchy-apple-dev commit and the items hit in this plan.`
 
-- [ ] ADR 0014 accepted, including the open decision.
+- [ ] ADR 0014 accepted (the profile decision, (b), is already recorded in it).
 - [ ] Blocker audit of each app that is to move: flavors, plugins without a `Package.swift`,
       app extensions, entitlements, storyboards, app icons, Shorebird use. The result orders
       the [Upstream work](#upstream-work) list; an app moves only when its list is empty.
@@ -254,8 +254,7 @@ and the matching narrowing case is removed.
       Associated Domains, push, Sign in with Apple and app groups.
 - [ ] A checker that lists plugins without a `Package.swift`, for the scan.
 - [ ] A receipt for a full-mode Flutter TestFlight upload with `flutter/ship.sh`.
-- [ ] If the profile decision is (b): `asc.py identity` or `flutter/ship.sh` takes a given
-      profile.
+- [ ] `asc.py identity` or `flutter/ship.sh` takes a given profile (profile decision (b)).
 - [ ] #73 and #77 merged, then pinned.
 
 ### Shorebird iOS on Linux (to decide)
