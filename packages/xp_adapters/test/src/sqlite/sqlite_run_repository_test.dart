@@ -55,8 +55,9 @@ void main() {
     () async {
       database.connection
         ..execute(
-          'INSERT INTO project (id, github_repo_id, remote, '
-          "default_base_branch) VALUES ('prj_2', 2, 'r', 'main')",
+          'INSERT INTO project (id, host, source_key, github_repo_id, remote, '
+          'default_base_branch) '
+          "VALUES ('prj_2', 'github.com', '2', 2, 'r', 'main')",
         )
         ..execute(
           'INSERT INTO workflow (id, project_id, name) '
