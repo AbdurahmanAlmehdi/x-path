@@ -61,10 +61,14 @@ separately.
 `Xcode.xip`; XPath probes, pins and records the toolchain but does not download, bundle or
 redistribute any Apple SDK.
 
-**Open: profile creation.** Either the ASC key reaches the runner for the job and
-omarchy-apple-dev creates the profile (widens D-09), or the engine creates the profile and sends
-only the distribution identity and the profile (recommended; needs a small upstream change). To be
-decided before Phase 4a of the plan, which comes before the first Linux build (Phase 3b).
+**The engine creates the App Store profile; the ASC key stays on the engine.** For an
+`ios-linux` job the engine creates the App Store provisioning profile with its own App Store
+Connect client and grants the runner only the Apple Distribution identity and that profile, in
+the job's tmpfs secret area (D-09 unchanged). The runner signs with rcodesign. This needs a small
+upstream change so `asc.py identity` (or `flutter/ship.sh`) takes a given profile instead of
+creating one. Rejected: sending the ASC key to the runner for the job so omarchy-apple-dev creates
+the certificate and profile itself. It is less code, but it would widen D-09 and put a key that
+manages the whole App Store team on remote runners, the machines most likely to be lost.
 
 ## Consequences
 
