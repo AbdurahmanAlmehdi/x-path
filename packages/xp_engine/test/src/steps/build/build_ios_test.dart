@@ -154,8 +154,8 @@ void main() {
 
       expect(
         (outcome as StepFailed).message,
-        'build.ios needs macOS (ios-sign): this machine cannot run Xcode. '
-        'Run the job on a Mac.',
+        'build.ios needs macOS (ios-sign), or a Linux runner set up for iOS '
+        'builds (ios-linux): this machine is neither. Run the job on a Mac.',
       );
       expect(context.commands, isEmpty);
     });

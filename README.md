@@ -1318,6 +1318,12 @@ origin is a `file://` bare repository, on an engine with no GitHub token. The en
 runner fetches the commit from the URL of the lease into a cache named by the source key, and `prod-release` is
 refused at dispatch with the host and its `git.push` step.
 
+`tool/e2e/runner_ios_linux_e2e.sh` (ADR 0014, Linux only) runs it with `--mode runner-ios-linux`: an iOS-only copy of
+the fixture built twice on a runner set up for Linux iOS builds, whose omarchy-apple-dev scripts and tools are stubs.
+The first job prepares the dedicated Flutter install, the second reuses it; `flutter/ship.sh` signs with the identity
+and the App Store profile the engine made with its fake App Store Connect and never sees the API key; the IPA, the
+dSYMs and the manifest reach the engine.
+
 ## Runners
 
 A runner is a machine that runs jobs for the engine (D-08, D-19): another Mac for `ios-sign`, a Linux box for

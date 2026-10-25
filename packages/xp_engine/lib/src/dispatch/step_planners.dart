@@ -66,9 +66,8 @@ class StepPlanners implements StepCatalog {
   ///
   /// With [linuxIosBuilds], `build.ios` and `ios.stripAndReexport` need any
   /// of `ios-sign` and `ios-linux`, and the dispatcher narrows a job Linux
-  /// cannot build to `ios-sign` (ADR 0014). It stays off until the Linux
-  /// backend of those steps exists, so that no runner gets an iOS job it
-  /// cannot build.
+  /// cannot build to `ios-sign` (ADR 0014). `xpd` turns it on: `build.ios`
+  /// has a Linux backend. Off, iOS builds need a Mac, as before.
   new(this._registry, {this.linuxIosBuilds = false}) {
     for (final spec in _specs) {
       _bySpec[spec.kind] = spec;

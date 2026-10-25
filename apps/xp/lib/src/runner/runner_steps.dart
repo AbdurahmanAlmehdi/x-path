@@ -21,6 +21,7 @@ class RunnerSteps {
     required this._flutterToolchains,
     required this._isMacOS,
     required this._queues,
+    this._iosLinux,
     this._testSourceUrl,
   });
 
@@ -30,6 +31,10 @@ class RunnerSteps {
   final String _flutterToolchains;
   final bool _isMacOS;
   final SerialQueues _queues;
+
+  /// The omarchy-apple-dev checkout and the folder of the Flutter installs
+  /// Linux iOS builds prepare, on a Linux runner set up for them (ADR 0014).
+  final ({String directory, String installs})? _iosLinux;
   final String? _testSourceUrl;
 
   /// The step kinds of every registry this makes.
@@ -63,6 +68,29 @@ class RunnerSteps {
       prober: ToolProber(runner: _runner, isMacOS: _isMacOS),
       jobs: services.jobs,
     );
+    final iosLinux = _isMacOS ? null : _iosLinux;
+    final linux = iosLinux == null
+        ? null
+        : IosLinuxBuilds(
+            toolchain: BuildToolchain(
+              resolver: FlutterResolver(
+                runner: _runner,
+                installer: GitFlutterInstaller(
+                  root: iosLinux.installs,
+                  runner: _runner,
+                ),
+                useFvm: false,
+              ),
+              prober: ToolProber(runner: _runner, isMacOS: _isMacOS),
+              jobs: services.jobs,
+            ),
+            checkout: DirectoryIosLinuxToolchain(
+              directory: iosLinux.directory,
+              installs: iosLinux.installs,
+              runner: _runner,
+              clock: _clock,
+            ),
+          );
     final recorder = ArtifactRecorder(
       store: services.artifactStore,
       repository: services.artifacts,
@@ -95,6 +123,7 @@ class RunnerSteps {
         repository: services.artifacts,
         store: services.artifactStore,
         isMacOS: _isMacOS,
+        linux: linux,
       ),
       ShorebirdReleaseStep(
         toolchain: toolchain,

@@ -20,6 +20,18 @@ List<String> iosLinuxLimits(List<StepPlan> steps, AppProfile app) {
             'support yet (omarchy-apple-dev: flavors)',
           );
         }
+        if (input['target'] case final String target) {
+          reasons.add(
+            'the flavor builds $target, and Linux iOS builds build '
+            'lib/main.dart only (omarchy-apple-dev: entry points)',
+          );
+        }
+        if (kind == 'ios.stripAndReexport') {
+          reasons.add(
+            'the job strips frameworks after the build, which XPath does not '
+            'do on Linux yet',
+          );
+        }
         if (kind == 'build.ios' && input['linuxSigning'] == null) {
           reasons.add(
             'the flavor has no Apple Distribution identity with an App Store '

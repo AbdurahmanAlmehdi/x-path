@@ -201,6 +201,7 @@ export 'src/tokens/token_service.dart';
 export 'src/toolchain/flutter_installer.dart';
 export 'src/toolchain/flutter_resolver.dart';
 export 'src/toolchain/flutter_version.dart';
+export 'src/toolchain/ios_linux_toolchain.dart';
 export 'src/toolchain/job_tools.dart';
 export 'src/toolchain/tool_prober.dart';
 export 'src/toolchain/tool_report.dart';

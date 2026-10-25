@@ -992,13 +992,13 @@ class WorkflowDispatcher {
         narrowing: const [],
       );
     }
-    final narrowed = [
+    final narrowed = {
       for (final need in needs.where(linux))
         CapabilityNeed([
           for (final capability in need.anyOf)
             if (capability != Capability.iosLinux) capability,
         ]),
-    ];
+    }.toList();
     return (
       placed: _simplified([
         ...needs.where((need) => !linux(need)),

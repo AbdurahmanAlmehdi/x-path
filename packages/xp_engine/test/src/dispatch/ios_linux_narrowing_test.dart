@@ -131,22 +131,29 @@ void main() {
     ]);
   });
 
-  test('the strip step needs the same, once', () async {
+  test('the strip step narrows the job to ios-sign, once, with the '
+      'reason', () async {
     final h = await harness(mac: false);
 
-    final run = await h.dispatchCustom(
-      _workflow('''
+    await expectLater(
+      h.dispatchCustom(
+        _workflow('''
           - kind: ios.stripAndReexport
             with:
               exportOptionsPlist: ios/Export.plist
               frameworks: [Agora]
 ''', flavors: true),
+      ),
+      throwsA(
+        isA<DispatchException>().having(
+          (e) => e.message,
+          'message',
+          'job (main) needs ios-sign, which no paired runner offers: the job '
+              'strips frameworks after the build, which XPath does not do on '
+              'Linux yet.',
+        ),
+      ),
     );
-
-    expect((await only(h, run)).capabilities, [
-      'flutter',
-      'ios-sign|ios-linux',
-    ]);
   });
 
   test(

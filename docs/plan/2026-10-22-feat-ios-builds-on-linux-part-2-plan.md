@@ -143,7 +143,7 @@ once and opens one pull request.
 
 ### Phase 3b: The Linux build backend and toolchain preparation
 
-- **Status:** Not started
+- **Status:** Done
 - **Scope:** `build.ios` runs on an `ios-linux` runner through omarchy-apple-dev; the runner
   prepares and cleans up a dedicated Flutter install per version. This is the PR that lets
   `build.ios` accept `ios-linux`. Amends D-20.
@@ -159,28 +159,38 @@ once and opens one pull request.
   behaviour is unchanged.
 - **Validation:** `(cd packages/xp_engine && dart test test/src/steps/build test/src/scheduler) && tool/e2e/runner_ios_linux_e2e.sh && tool/e2e/release_e2e.sh prod`
 
-- [ ] `build.ios` picks its backend by host. On Linux it runs `flutter/build.sh`, then
+- [x] `build.ios` picks its backend by host. On Linux it runs `flutter/build.sh`, then
       `flutter/ship.sh` without `--upload`:
   - `--build-name`/`--build-number` → `BUILD_NAME`/`BUILD_NUMBER`;
   - `--dart-define-from-file` → `KEY=VALUE` arguments (JSON and `.env` forms);
   - `--obfuscate --split-debug-info` → `DART_OBFUSCATION=true`, `SPLIT_DEBUG_INFO` (after
     upstream #73 is merged and pinned; until then obfuscated builds narrow to `ios-sign`);
   - `exportOptionsPlist` → `ASC_EXPORT_OPTIONS`;
-  - `ios/Runner/Runner.entitlements`, when present → `ASC_ENTITLEMENTS_PATH`.
-- [ ] Outputs: the artifact is `build/ios-linux/Runner-store.ipa`; `symbols.archive` takes
+  - `ios/Runner/Runner.entitlements`, when present → `ASC_ENTITLEMENTS_PATH`;
+  - the identity and the engine-made profile (4a's `linuxSigning`) → `ASC_SIGNING_KEY`,
+    `ASC_SIGNING_CERT`, `ASC_PROFILE` (the pinned fork's given-identity signing).
+  - `build.sh` builds `lib/main.dart` only, so a flavor with another entry point narrows
+    to `ios-sign` too (a new 3a reason).
+- [x] Outputs: the artifact is `build/ios-linux/Runner-store.ipa`; `symbols.archive` takes
       `build/ios-linux/dSYMs` and the Dart symbols directory.
-- [ ] **Toolchain preparation.** A prepare step runs `flutter/setup.sh` in a Flutter install
+- [x] **Toolchain preparation.** A prepare step runs `flutter/setup.sh` in a Flutter install
       dedicated to that version under `<data dir>/toolchains/flutter-ios-linux/<version>`
       (the script replaces `gen_snapshot_arm64` in the install it runs on), checks that
       `gen_snapshot` is ELF, and caches it. Housekeeping knows these installs and frees the
-      ones no recent job used.
-- [ ] `ios.stripAndReexport` keeps requiring `ios-sign` until upstream #77 is merged and
+      ones no recent job used. Built into `build.ios` on Linux: a `FlutterResolver` without
+      fvm over `toolchains/flutter-ios-linux`, `IosLinuxToolchain` (ELF check, commit, and
+      `markUsed`, which frees installs no job used for 30 days; the runner has no
+      housekeeping of its own, so this is it).
+- [x] `ios.stripAndReexport` keeps requiring `ios-sign` until upstream #77 is merged and
       pinned; then a small follow-up runs `flutter/tools/strip-frameworks.py` on the payload
-      and `flutter/ship.sh` again.
-- [ ] The job's toolchain record says "Linux, omarchy-apple-dev `<commit>`" next to Flutter's
+      and `flutter/ship.sh` again. #77 is in the pin now; the step narrows its job to
+      `ios-sign` with a reason until that follow-up.
+- [x] The job's toolchain record says "Linux, omarchy-apple-dev `<commit>`" next to Flutter's
       version (`build_toolchain.dart`).
-- [ ] Tests: unit tests for the argument mapping; e2e on a Linux runner with stubbed scripts
-      (as upstream's `tests/flutter-ship/run.sh` stubs its tools).
+- [x] Tests: unit tests for the argument mapping; e2e on a Linux runner with stubbed scripts
+      (as upstream's `tests/flutter-ship/run.sh` stubs its tools). `runner_ios_linux_e2e.sh`
+      is Linux only and was not run while building this (on a Mac); the pin moved to the
+      fork's `xpath/pin` (`4e170a0`).
 
 ### Phase 4b: Signing set-up without a Mac
 

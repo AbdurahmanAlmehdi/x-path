@@ -57,7 +57,15 @@
 // URL the lease names (no test hook), and `prod-release` is refused at
 // dispatch with the host and the step: see `_runnerAnyHost`.
 //
-// Usage: dart run tool/release_e2e.dart --mode dev|prod|mcp|runner-loss|runner-build|runner-offline|runner-any-host
+// `--mode runner-ios-linux` (iOS on Linux 3b, ADR 0014,
+// tool/e2e/runner_ios_linux_e2e.sh, Linux only) builds an iOS-only copy of the
+// fixture on a real `xp runner` set up for Linux iOS builds, whose
+// omarchy-apple-dev scripts and tools are stubs: the runner prepares a
+// dedicated Flutter install once, builds, signs with the identity and the
+// profile the engine made with its fake App Store Connect, and uploads the IPA
+// and the dSYMs: see `_runnerIosLinux`.
+//
+// Usage: dart run tool/release_e2e.dart --mode dev|prod|mcp|runner-loss|runner-build|runner-offline|runner-any-host|runner-ios-linux
 //          --xpd <executable> --fixture <dir> --work <dir>
 //          [--flutter-sdk <dir>] [--xp <executable>]
 //
@@ -89,6 +97,7 @@ Future<void> main(List<String> arguments) async {
         'runner-build',
         'runner-offline',
         'runner-any-host',
+        'runner-ios-linux',
       ],
       defaultsTo: 'dev',
     )
@@ -191,6 +200,7 @@ class _E2e {
       _writeShims();
       _wrapFlutter();
     } else {
+      if (mode == 'runner-ios-linux') _asc = await FakeAscServer.start();
       _linkFlutter();
     }
     await _startEngine();
@@ -203,6 +213,10 @@ class _E2e {
         for (final flavor in (app as Map)['flavors'] as List)
           (flavor as Map)['name'],
     ];
+    if (mode == 'runner-ios-linux') {
+      await _runnerIosLinux(projectId, flavors);
+      return;
+    }
     _expect(
       flavors.toSet().containsAll(['dev', 'prod']),
       'the scan found the flavors dev and prod, not $flavors',
@@ -1242,6 +1256,317 @@ class _E2e {
     );
   }
 
+  // --------------------------------------------------------- iOS on Linux
+
+  /// The bundle id of the fixture's iOS app.
+  static const _iosBundleId = 'ly.abdurahman.xpath.buildApp';
+
+  /// Makes the fixture at [clone] an iOS-only app without flavors, which
+  /// Linux iOS builds support: no Android flavors, `lib/main.dart` the entry
+  /// point.
+  void _iosOnly(String clone) {
+    Directory(p.join(clone, 'android')).deleteSync(recursive: true);
+    for (final name in ['main_dev.dart', 'main_prod.dart']) {
+      File(p.join(clone, 'lib', name)).deleteSync();
+    }
+    File(p.join(clone, 'lib', 'main.dart')).writeAsStringSync(
+      "import 'package:build_app/app.dart';\n"
+      "import 'package:flutter/widgets.dart';\n\n"
+      "void main() => runApp(const BuildApp(flavor: 'default'));\n",
+    );
+    File(p.join(clone, 'ios', 'ExportOptions.plist')).writeAsStringSync(
+      '<?xml version="1.0" encoding="UTF-8"?>\n'
+      '<plist version="1.0"><dict><key>method</key>\n'
+      '<string>app-store-connect</string></dict></plist>\n',
+    );
+  }
+
+  /// Writes [text] to an executable file at [path].
+  void _script(String path, String text) {
+    File(path)
+      ..createSync(recursive: true)
+      ..writeAsStringSync(text);
+    Process.runSync('chmod', ['+x', path]);
+  }
+
+  /// iOS on Linux 3b (ADR 0014): `build.ios` on a Linux runner set up for
+  /// iOS builds, with omarchy-apple-dev's scripts and tools as stubs.
+  ///
+  ///   1. the runner reports `ios-linux` (a stub `git` reports the pinned
+  ///      commit, stubs stand in for Swift, rcodesign, the LLVM tools, the
+  ///      pymobile3 python and the darwin SDK bundle),
+  ///   2. the flavor has an App Store Connect key and an Apple Distribution
+  ///      identity, which the engine accepts against its fake App Store
+  ///      Connect,
+  ///   3. a workflow of checkout, version bump, `build.ios`,
+  ///      `symbols.archive` and `record.manifest` runs twice on the runner.
+  ///      What it checks:
+  ///
+  ///   - the first job runs `flutter/setup.sh` in a Flutter install of its
+  ///     own, the second reuses it,
+  ///   - `flutter/build.sh` gets the build name and number, `flutter/ship.sh`
+  ///     no `--upload` and the identity and the profile the engine made (the
+  ///     fake made one), never the App Store Connect key,
+  ///   - the IPA and the dSYMs the stubs wrote are in the engine's store, the
+  ///     manifest records "Linux, omarchy-apple-dev `<pin>`",
+  ///   - the runner left no secret behind.
+  Future<void> _runnerIosLinux(String projectId, List<Object?> flavors) async {
+    final xp = this.xp;
+    if (xp == null) {
+      throw const _Failure('--xp is required for --mode runner-ios-linux');
+    }
+    if (!Platform.isLinux) {
+      throw const _Failure('--mode runner-ios-linux needs Linux');
+    }
+    _expect(
+      flavors.length == 1 && flavors.single == 'default',
+      'the iOS-only fixture has no flavors: $flavors',
+    );
+    final asc = _asc!
+      ..addApp(_iosBundleId)
+      ..bundleIds[_iosBundleId] = 'bundle-e2e'
+      ..certificates['cert-e2e'] = FakeAscCertificate(
+        id: 'cert-e2e',
+        serialNumber: fakeDistributionSerial,
+        certificateType: 'DISTRIBUTION',
+        content: base64.decode(fakeDistributionCertificate),
+      );
+    final runnerData = p.join(work, 'runner-data');
+    final pin =
+        (jsonDecode(File(p.join(fixture, '.fvmrc')).readAsStringSync())
+                as Map<String, dynamic>)['flutter']!
+            as String;
+    final log = p.join(work, 'omarchy.log');
+
+    // The omarchy-apple-dev checkout: three stub scripts.
+    final checkout = p.join(work, 'omarchy-apple-dev');
+    _script(p.join(checkout, 'flutter', 'setup.sh'), '''
+#!/bin/sh
+set -eu
+root=\$(dirname "\$(dirname "\$FLUTTER")")
+mkdir -p "\$root/bin/cache/artifacts/engine/ios-release"
+printf '\\177ELF' >"\$root/bin/cache/artifacts/engine/ios-release/gen_snapshot_arm64"
+echo "setup \$root" >>'$log'
+''');
+    _script(p.join(checkout, 'flutter', 'build.sh'), '''
+#!/bin/sh
+set -eu
+out="\$1/build/ios-linux"
+mkdir -p "\$out/Payload/Runner.app" "\$out/dSYMs/Runner.app.dSYM/Contents"
+echo "\$BUILD_NAME+\$BUILD_NUMBER" >"\$out/Payload/Runner.app/Info.plist"
+echo dwarf >"\$out/dSYMs/Runner.app.dSYM/Contents/Info.plist"
+echo "build \$BUILD_NAME \$BUILD_NUMBER \$#" >>'$log'
+''');
+    _script(p.join(checkout, 'flutter', 'ship.sh'), '''
+#!/bin/sh
+set -eu
+[ "\$#" = 1 ] || { echo "ship.sh got \$*" >&2; exit 2; }
+[ -z "\${ASC_KEY_ID:-}\${ASC_KEY_PATH:-}" ] || { echo "an ASC key reached the runner" >&2; exit 3; }
+grep -q 'BEGIN PRIVATE KEY' "\$ASC_SIGNING_KEY"
+[ -s "\$ASC_SIGNING_CERT" ] && [ -f "\$ASC_EXPORT_OPTIONS" ]
+echo "ship \$(cat "\$ASC_PROFILE")" >>'$log'
+printf 'PK\\003\\004 signed ipa' >"\$1/build/ios-linux/Runner-store.ipa"
+''');
+
+    // The tools the probe looks for, and a git that says the checkout is at
+    // the pin (a commit cannot be made up).
+    final shims = p.join(work, 'ios-linux-shims');
+    for (final tool in [
+      'rcodesign',
+      'llvm-strip',
+      'llvm-lipo',
+      'llvm-otool',
+      'llvm-install-name-tool',
+      'llvm-ar',
+    ]) {
+      _script(p.join(shims, tool), '#!/bin/sh\nexit 0\n');
+    }
+    _script(
+      p.join(shims, 'swift'),
+      '#!/bin/sh\necho "Swift version 6.4.1 (swift-6.4.1-RELEASE)"\n',
+    );
+    _script(p.join(shims, 'git'), '''
+#!/bin/sh
+if [ "\$1" = -C ] && [ "\$2" = '$checkout' ] && [ "\$3" = rev-parse ]; then
+  echo ${RunnerProbe.iosLinuxPin}
+  exit 0
+fi
+exec '${_real('git')}' "\$@"
+''');
+    final home = p.join(work, 'runner-home');
+    _script(p.join(home, 'pymobile3-venv', 'bin', 'python'), '#!/bin/sh\n');
+    final config = p.join(work, 'runner-config');
+    Directory(p.join(config, 'swiftpm', 'swift-sdks', 'darwin.artifactbundle'))
+        .createSync(recursive: true);
+    // The runner's Flutter install for Linux iOS builds: a stub that says it
+    // is the pinned version (a real one would be cloned, and setup.sh would
+    // change it).
+    _script(
+      p.join(
+        runnerData,
+        'toolchains',
+        'flutter-ios-linux',
+        pin,
+        'bin',
+        'flutter',
+      ),
+      '#!/bin/sh\n'
+      'echo \'{"frameworkVersion": "$pin", "dartSdkVersion": "3.13.5"}\'\n',
+    );
+
+    final environment = {
+      ..._runnerEnvironment(
+        path: '$shims:${_fvmShim()}:${Platform.environment['PATH']}',
+      ),
+      'HOME': home,
+      'XDG_CONFIG_HOME': config,
+      'XP_IOS_LINUX_DIR': checkout,
+    };
+    final identity = await _pairRunner(xp, runnerData, environment);
+    await _startRunner(xp, runnerData, environment, capability: 'ios-linux');
+    _log('the runner is online and builds iOS on Linux');
+
+    await _addCredential(
+      projectId,
+      flavor: 'default',
+      name: 'ASC · e2e',
+      fields: {
+        'kind': 'asc_key',
+        'keyId': fakeAscKeyId,
+        'issuerId': fakeAscIssuerId,
+        'privateKey': fakeAscPrivateKeyPem,
+      },
+    );
+    await _addCredential(
+      projectId,
+      flavor: 'default',
+      name: 'Linux signing · e2e',
+      fields: {
+        'kind': 'apple_distribution',
+        'privateKey':
+            '-----BEGIN PRIVATE KEY-----\nMIIE\n-----END PRIVATE KEY-----\n',
+        'certificate': fakeDistributionCertificate,
+      },
+    );
+    final workflow = await _post('/projects/$projectId/workflows', {
+      'name': 'ios-linux',
+      'yaml': r'''
+schema: 1
+name: ios-linux
+stages:
+  - name: build
+    jobs:
+      build:
+        name: Build
+        matrix:
+          platform: ${{ platforms }}
+          flavor: ${{ flavors }}
+        steps:
+          - kind: git.checkout
+          - kind: version.bump
+          - kind: build.ios
+            with:
+              exportOptionsPlist: ios/ExportOptions.plist
+          - kind: symbols.archive
+          - kind: record.manifest
+''',
+    }, expect: 201);
+
+    Future<Map<String, dynamic>> build() async {
+      final run = await _post(
+        '/projects/$projectId/workflows/${workflow['id']}/dispatch',
+        {
+          'platforms': ['ios'],
+          'flavors': ['default'],
+        },
+        expect: 202,
+      );
+      _lastRun = run['id'] as String?;
+      final id = _lastJob = _jobOf(run, 0);
+      final job = await _waitForJob(id, const Duration(minutes: 10), {
+        'succeeded',
+        'failed',
+        'cancelled',
+      });
+      _expect(
+        job['state'] == 'succeeded' && job['runnerId'] == identity['runnerId'],
+        'the iOS build ran on the runner ${identity['runnerId']}: '
+        '${job['state']} ${job['runnerId']} ${job['message']}',
+      );
+      return {...job, 'build': run['build']};
+    }
+
+    final first = await build();
+    final second = await build();
+
+    // --- the scripts, as the stubs logged them
+    final lines = File(log).readAsLinesSync();
+    final installs = p.join(runnerData, 'toolchains', 'flutter-ios-linux');
+    final setups = lines.where((line) => line.startsWith('setup ')).toList();
+    _expect(
+      setups.length == 1 && setups.single == 'setup ${p.join(installs, pin)}',
+      'setup.sh ran once, in the dedicated install: $lines',
+    );
+    _expect(
+      lines.contains('build 1.0.0 ${first['build']} 1') &&
+          lines.contains('build 1.0.0 ${second['build']} 1'),
+      'build.sh got the build name and number, and the app alone: $lines',
+    );
+    final shipped = lines.where((line) => line.startsWith('ship ')).toList();
+    _expect(
+      shipped.length == 2 &&
+          shipped.every(
+            (line) => line.contains(
+              'fake profile XPath $_iosBundleId A1B2C3D4E5F bundle-e2e',
+            ),
+          ),
+      'ship.sh signed with the profile the engine made: $shipped',
+    );
+    _expect(
+      asc.profiles.length == 1,
+      'the engine made the profile once and reused it: ${asc.profiles.length}',
+    );
+
+    // --- what the runner uploaded
+    final artifacts =
+        (await _get('/jobs/${first['id']}/artifacts'))['artifacts'] as List;
+    final kinds = {
+      for (final artifact in artifacts)
+        (artifact as Map)['kind']! as String: artifact,
+    };
+    _expect(
+      kinds.keys.toSet().containsAll(['ipa', 'dsym', 'manifest']),
+      'the job stored the IPA, the dSYMs and the manifest: ${kinds.keys}',
+    );
+    final ipa = await _download('/artifacts/${kinds['ipa']!['id']}/download');
+    _expect(
+      utf8.decode(ipa, allowMalformed: true).endsWith(' signed ipa'),
+      'the IPA in the engine store is the one ship.sh signed',
+    );
+    final manifest = utf8.decode(
+      await _download('/artifacts/${kinds['manifest']!['id']}/download'),
+    );
+    _expect(
+      manifest.contains(
+        '"iosLinux": "Linux, omarchy-apple-dev ${RunnerProbe.iosLinuxPin}"',
+      ),
+      'the manifest records the Linux toolchain: $manifest',
+    );
+    _expect(
+      !File(log).readAsStringSync().contains(fakeAscPrivateKeyPem.trim()) &&
+          !_runnerLog.toString().contains(fakeAscPrivateKeyPem.trim()),
+      'the App Store Connect key never reached the runner',
+    );
+    _expect(
+      _secretFiles(runnerData).isEmpty,
+      'no secret file is left on the runner',
+    );
+    _log(
+      'build.ios ran twice on the Linux runner: one setup, the profile the '
+      'engine made, the IPA and the dSYMs uploaded',
+    );
+  }
+
   // ------------------------------------------------------- any git host
 
   /// Runner onboarding R10c (ADR 0015): a project whose origin is a
@@ -1621,6 +1946,7 @@ class _E2e {
   String _makeRepositories() {
     final clone = p.join(work, 'clone');
     _copy(Directory(fixture), Directory(clone));
+    if (mode == 'runner-ios-linux') _iosOnly(clone);
     _git(['init', '--quiet', '-b', 'main'], clone);
     _git(['add', '--all'], clone);
     _git(['commit', '--quiet', '-m', 'fixture'], clone);
@@ -1678,6 +2004,8 @@ class _E2e {
       // A lease of 6 seconds: the runner fences its job 21 seconds after the
       // engine went quiet, not 105.
       if (mode == 'runner-offline') TestEndpoints.leaseSecondsVariable: '6',
+      if (mode == 'runner-ios-linux')
+        TestEndpoints.ascVariable: _asc!.baseUrl.toString(),
       if (mode == 'runner-loss')
         // `keytool` accepts the made-up keystore the script saves.
         'PATH': '${_keytoolShim()}:${Platform.environment['PATH']}',

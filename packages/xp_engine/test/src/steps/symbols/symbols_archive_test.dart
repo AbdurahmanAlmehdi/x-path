@@ -134,6 +134,22 @@ void main() {
       );
     });
 
+    test('takes the dSYMs a Linux build left (ADR 0014)', () async {
+      const linux = '$appDirectory/build/ios-linux/dSYMs';
+      directories.folders
+        ..remove(_dsyms)
+        ..[linux] = 5;
+
+      final outcome = await step.run(
+        input(android: false, debugInfo: null),
+        context,
+      );
+
+      final result = (outcome as StepSucceeded<SymbolsArchiveResult>).result;
+      expect(result.artifacts.single.name, 'prod-1.2.3+45.dSYMs.zip');
+      expect(directories.zips, [linux]);
+    });
+
     test('finds the mapping of an app without flavors', () async {
       harness.files.put(
         '$appDirectory/build/app/outputs/mapping/release/mapping.txt',
@@ -159,7 +175,10 @@ void main() {
       expect(result.artifacts, isEmpty);
       expect(result.warnings, [
         contains('No R8 mapping at build/app/outputs/mapping/prodRelease'),
-        contains('No dSYMs in build/ios/archive/Runner.xcarchive/dSYMs'),
+        contains(
+          'No dSYMs in build/ios/archive/Runner.xcarchive/dSYMs or '
+          'build/ios-linux/dSYMs',
+        ),
         contains('No debug info in build/xpath/debug-info/ios'),
       ]);
       expect(result.warnings.first, contains('1.2.3+45 may be unbuildable'));

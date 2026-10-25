@@ -9,6 +9,7 @@ import 'package:path/path.dart' as p;
 /// source/worktrees/<id>/    the fresh worktree of each job
 /// jobs/<job id>/            what a job leaves: its artifacts before upload
 /// toolchains/flutter/       the Flutter SDKs the jobs pin
+/// toolchains/flutter-ios-linux/  the Flutter installs Linux iOS builds prepare
 /// secrets/                  secret folders, where no tmpfs is available
 /// keychains/                temporary keychains (macOS)
 /// state/                    the process groups of running steps
@@ -54,6 +55,11 @@ class RunnerPaths {
 
   /// The Flutter SDK cache.
   String get flutterToolchains => p.join(root, 'toolchains', 'flutter');
+
+  /// The Flutter installs dedicated to Linux iOS builds, one per version,
+  /// that omarchy-apple-dev's `flutter/setup.sh` prepared (ADR 0014).
+  String get iosLinuxToolchains =>
+      p.join(root, 'toolchains', 'flutter-ios-linux');
 
   /// The secret folders where no tmpfs is available.
   String get fallbackSecrets => p.join(root, 'secrets');

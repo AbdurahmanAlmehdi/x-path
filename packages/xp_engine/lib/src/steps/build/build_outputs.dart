@@ -1,6 +1,14 @@
 import 'package:xp_api/xp_api.dart';
 import 'package:xp_engine/src/steps/build/build_files.dart';
 
+/// Where omarchy-apple-dev's `flutter/ship.sh` leaves the signed IPA of a
+/// Linux build, relative to the app (ADR 0014).
+const iosLinuxIpaPath = 'build/ios-linux/Runner-store.ipa';
+
+/// Where `flutter/build.sh` leaves the dSYMs of a Linux build, one per image,
+/// relative to the app.
+const iosLinuxDsymsPath = 'build/ios-linux/dSYMs';
+
 /// What the search for the file a build produced found.
 sealed class BuiltFile {
   const new();
@@ -84,6 +92,16 @@ class BuildOutputs {
         await _files.list('$appDirectory/build/ios/ipa', extension: '.ipa'),
         since,
       );
+
+  /// The IPA that omarchy-apple-dev's `flutter/ship.sh` signed for a Linux
+  /// build of the app at [appDirectory], written after [since].
+  Future<BuiltFile> iosLinux(
+    String appDirectory, {
+    required DateTime since,
+  }) async {
+    final file = await _files.stat('$appDirectory/$iosLinuxIpaPath');
+    return _freshest([?file], since);
+  }
 
   static List<String> _androidDirectories(ArtifactKind kind, String? flavor) =>
       switch (kind) {

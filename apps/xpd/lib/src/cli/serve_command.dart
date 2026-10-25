@@ -445,7 +445,8 @@ class ServeCommand extends XpdCommand {
         onError: (error, stackTrace) =>
             context.err.writeln('error: scheduler: $error\n$stackTrace'),
       );
-      final planners = StepPlanners(registry);
+      // iOS builds may run on a Linux runner set up for them (ADR 0014).
+      final planners = StepPlanners(registry, linuxIosBuilds: true);
       final workflows = WorkflowService(
         repository: SqliteWorkflowRepository(database),
         projects: projectRepository,

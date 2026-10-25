@@ -43,7 +43,6 @@ void main() {
       iosLinuxLimits([
         _step('git.checkout'),
         _step('build.ios', {'version': '1.0.0+1', ..._signing}),
-        _step('ios.stripAndReexport'),
         _step('shorebird.release', {'platform': 'android'}),
         _command('flutter', ['build', 'ios', '--release']),
       ], _app),
@@ -55,9 +54,22 @@ void main() {
     expect(
       iosLinuxLimits([
         _step('build.ios', {'flavor': 'prod', ..._signing}),
-        _step('ios.stripAndReexport', {'flavor': 'prod'}),
+        _step('build.ios', {'flavor': 'prod', ..._signing}),
       ], _app),
       [_flavor],
+    );
+  });
+
+  test('an entry point other than lib/main.dart, and the strip step', () {
+    expect(
+      iosLinuxLimits([
+        _step('build.ios', {'target': 'lib/main_prod.dart', ..._signing}),
+        _step('ios.stripAndReexport'),
+      ], _app),
+      [
+        contains('the flavor builds lib/main_prod.dart'),
+        contains('the job strips frameworks after the build'),
+      ],
     );
   });
 
