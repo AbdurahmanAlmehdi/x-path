@@ -5,6 +5,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:xp_api/xp_api.dart';
 import 'package:xp_client/xp_client.dart';
+import 'package:xp_desktop/app/app.dart';
+import 'package:xp_desktop/app/bloc/engine_notices_bloc.dart';
 import 'package:xp_desktop/settings/settings.dart';
 import 'package:xp_macos_services/testing.dart';
 import 'package:xp_macos_services/xp_macos_services.dart';
@@ -302,6 +304,31 @@ void main() {
         CliTokenState(error: 'The engine is away.'),
       ],
     );
+  });
+
+  group('NoticeSettingsCubit', () {
+    test('reads, keeps and passes on the choices', () async {
+      final preferences = AppPreferences({
+        'mutedNotices': ['jobSucceeded'],
+      });
+      final app = FakeRunningApp();
+      final cubit = NoticeSettingsCubit(preferences: preferences, app: app);
+
+      expect(cubit.state.keepRunning, isTrue);
+      expect(cubit.state.shows(NoticeKind.jobSucceeded), isFalse);
+      expect(cubit.state.shows(NoticeKind.jobFailed), isTrue);
+
+      await cubit.setKeepRunning(keep: false);
+      await cubit.show(NoticeKind.jobSucceeded, shown: true);
+      await cubit.show(NoticeKind.releaseLive, shown: false);
+
+      expect(cubit.state.keepRunning, isFalse);
+      expect(cubit.state.muted, {NoticeKind.releaseLive});
+      expect(app.keepRunning, isFalse);
+      expect(preferences.keepRunning, isFalse);
+      expect(preferences.mutedNotices, {'releaseLive'});
+      await cubit.close();
+    });
   });
 
   group('CommandLineToolBloc', () {

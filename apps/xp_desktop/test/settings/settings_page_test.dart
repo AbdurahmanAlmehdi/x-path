@@ -69,7 +69,7 @@ void main() {
       ),
     );
     // Tall enough for the whole page, so every section is built.
-    tester.view.physicalSize = const Size(1440, 1400);
+    tester.view.physicalSize = const Size(1440, 2400);
     await tester.pumpAndSettle();
   }
 
@@ -144,6 +144,23 @@ void main() {
       mcpConfig(url, 'xpt_y'),
       contains('"XP_ENGINE_URL": "https://mac.example"'),
     );
+  });
+
+  testWidgets('Notifications keeps XPath running and turns notices off', (
+    tester,
+  ) async {
+    await pump(tester);
+
+    await tester.tap(find.byKey(const Key('settings.keepRunning')));
+    await tester.tap(find.text('A production job succeeded'));
+    await tester.pump();
+
+    expect(app.keepRunning, isFalse);
+    final checks = tester.widgetList<XpCheckbox>(find.byType(XpCheckbox));
+    expect(checks.where((check) => !check.value).map((check) => check.label), [
+      'Keep XPath in the menu bar when the window closes',
+      'A production job succeeded',
+    ]);
   });
 
   group('RunnerUrlSection', () {

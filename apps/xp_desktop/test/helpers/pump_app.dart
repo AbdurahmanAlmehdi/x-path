@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:xp_desktop/app/app.dart';
+import 'package:xp_desktop/app/bloc/engine_notices_bloc.dart';
 import 'package:xp_desktop/approvals/bloc/pending_approvals_bloc.dart';
 import 'package:xp_desktop/l10n/l10n.dart';
 import 'package:xp_desktop/local_engine/local_engine.dart';
@@ -47,6 +48,21 @@ class MockRunnersBloc extends MockBloc<RunnersEvent, RunnersState>
 
 class MockStorageBloc extends MockBloc<StorageEvent, StorageState>
     implements StorageBloc;
+
+class MockEngineNoticesBloc
+    extends MockBloc<EngineNoticesEvent, EngineNoticesState>
+    implements EngineNoticesBloc;
+
+/// An engine-notices bloc that stays in [state].
+MockEngineNoticesBloc noticesIn(EngineNoticesState state) {
+  final bloc = MockEngineNoticesBloc();
+  whenListen(
+    bloc,
+    const Stream<EngineNoticesState>.empty(),
+    initialState: state,
+  );
+  return bloc;
+}
 
 /// A runners bloc that stays in [state].
 MockRunnersBloc runnersIn(RunnersState state) {
@@ -163,6 +179,7 @@ extension PumpApp on WidgetTester {
     RunnersBloc? runners,
     StorageBloc? storage,
     ToastCubit? toasts,
+    EngineNoticesBloc? notices,
     Brightness brightness = Brightness.light,
   }) async {
     desktopWindow(this);
@@ -227,6 +244,9 @@ extension PumpApp on WidgetTester {
               value: storage ?? storageIn(const StorageState()),
             ),
             BlocProvider<ToastCubit>(create: (_) => toasts ?? ToastCubit()),
+            BlocProvider<EngineNoticesBloc>.value(
+              value: notices ?? noticesIn(const EngineNoticesState()),
+            ),
             BlocProvider<CommandPaletteBloc>(
               create: (context) => CommandPaletteBloc(
                 projects: context.read<ProjectsRepository>(),

@@ -324,6 +324,36 @@ void main() {
       },
     );
 
+    test('encodes the destinations it restores, and decodes them', () {
+      for (final destination in const [
+        HomeDestination(),
+        ProjectDestination('prj_1'),
+        JobDestination('run_1'),
+        JobDestination('run_1', projectId: 'prj_1'),
+        ReleasesDestination('prj_1'),
+        TestsDestination('prj_1'),
+        RunsDestination('prj_1'),
+        WorkflowsDestination('prj_1'),
+        RunnersDestination(),
+        StorageDestination(),
+        ApprovalsDestination(),
+        CredentialsDestination(),
+        CredentialsDestination('prj_1'),
+        EnginesDestination(),
+        SettingsDestination(),
+      ]) {
+        expect(
+          decodeDestination(encodeDestination(destination)),
+          destination,
+          reason: '$destination',
+        );
+      }
+      expect(encodeDestination(const AddProjectDestination()), isNull);
+      expect(encodeDestination(const OnboardingDestination()), isNull);
+      expect(decodeDestination(null), isNull);
+      expect(decodeDestination('nonsense:1:2:3'), isNull);
+    });
+
     test('does not leave once closed', () async {
       final answer = Completer<bool>();
       final shell = ShellCubit()

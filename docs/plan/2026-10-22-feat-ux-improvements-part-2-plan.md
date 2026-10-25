@@ -156,7 +156,7 @@ Details:
 
 ### Phase U6b: Menu bar, notifications and window
 
-- **Status:** Not started
+- **Status:** Done
 - **Scope:** XPath keeps running in the menu bar and notifies on the events that matter.
 - **Files touched:** `apps/xp_desktop/macos/Runner/**`, `packages/xp_macos_services/**`,
   `apps/xp_desktop/lib/{approvals,settings,app}/**`

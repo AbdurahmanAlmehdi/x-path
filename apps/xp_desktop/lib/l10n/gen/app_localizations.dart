@@ -6231,6 +6231,138 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Close'**
   String get shortcutsClose;
+
+  /// Settings section (U6b).
+  ///
+  /// In en, this message translates to:
+  /// **'Notifications'**
+  String get settingsNotices;
+
+  /// Settings switch (UX-07).
+  ///
+  /// In en, this message translates to:
+  /// **'Keep XPath in the menu bar when the window closes'**
+  String get settingsKeepRunning;
+
+  /// Under the switch.
+  ///
+  /// In en, this message translates to:
+  /// **'Builds, approvals and notifications go on with the window closed. Quit with ⌘Q.'**
+  String get settingsKeepRunningBody;
+
+  /// Above the notice toggles.
+  ///
+  /// In en, this message translates to:
+  /// **'XPath tells you about these on macOS when the window is closed or behind. Approvals always notify.'**
+  String get settingsNoticesBody;
+
+  /// Notice kind.
+  ///
+  /// In en, this message translates to:
+  /// **'A production job failed'**
+  String get noticeJobFailed;
+
+  /// Notice kind.
+  ///
+  /// In en, this message translates to:
+  /// **'A production job succeeded'**
+  String get noticeJobSucceeded;
+
+  /// Notice kind.
+  ///
+  /// In en, this message translates to:
+  /// **'A store rejected a release'**
+  String get noticeReleaseRejected;
+
+  /// Notice kind.
+  ///
+  /// In en, this message translates to:
+  /// **'The stores approved a release'**
+  String get noticeReleaseApproved;
+
+  /// Notice kind.
+  ///
+  /// In en, this message translates to:
+  /// **'A release is live'**
+  String get noticeReleaseLive;
+
+  /// Notice kind.
+  ///
+  /// In en, this message translates to:
+  /// **'A credential stopped working'**
+  String get noticeCredentialExpired;
+
+  /// Notice kind.
+  ///
+  /// In en, this message translates to:
+  /// **'The engine cannot read its secrets'**
+  String get noticeSecretsLocked;
+
+  /// Notice kind and title.
+  ///
+  /// In en, this message translates to:
+  /// **'A runner lost a job'**
+  String get noticeRunnerLost;
+
+  /// Notice kind.
+  ///
+  /// In en, this message translates to:
+  /// **'A runner lost a capability'**
+  String get noticeCapabilityLost;
+
+  /// Notice kind and title.
+  ///
+  /// In en, this message translates to:
+  /// **'A job waits for a runner'**
+  String get noticeJobWaiting;
+
+  /// No description provided for @noticeRunnerLostBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Its lease ran out, so the job is {state} again.'**
+  String noticeRunnerLostBody(String state);
+
+  /// No description provided for @noticeCapabilityLostTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'{runner} can no longer do {capabilities}'**
+  String noticeCapabilityLostTitle(String runner, String capabilities);
+
+  /// Notice body.
+  ///
+  /// In en, this message translates to:
+  /// **'Jobs that need it wait for another runner.'**
+  String get noticeCapabilityLostBody;
+
+  /// No description provided for @noticeJobWaitingBody.
+  ///
+  /// In en, this message translates to:
+  /// **'{job} has waited 10 minutes: {reason}'**
+  String noticeJobWaitingBody(String job, String reason);
+
+  /// No description provided for @menuBarRunning.
+  ///
+  /// In en, this message translates to:
+  /// **'Running · {count}'**
+  String menuBarRunning(int count);
+
+  /// No description provided for @menuBarRunTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'{workflow} {version}'**
+  String menuBarRunTitle(String workflow, String version);
+
+  /// No description provided for @menuBarRunDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'{project} · {done} of {total} jobs'**
+  String menuBarRunDetail(String project, int done, int total);
+
+  /// Quick dispatch menu of the menu bar extra.
+  ///
+  /// In en, this message translates to:
+  /// **'Dispatch…'**
+  String get menuBarDispatch;
 }
 
 class _AppLocalizationsDelegate

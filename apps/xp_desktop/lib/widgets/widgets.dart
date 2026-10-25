@@ -1,4 +1,5 @@
 export 'xp_button.dart';
+export 'xp_checkbox.dart';
 export 'xp_clock.dart';
 export 'xp_commands.dart';
 export 'xp_confirm_dialog.dart';

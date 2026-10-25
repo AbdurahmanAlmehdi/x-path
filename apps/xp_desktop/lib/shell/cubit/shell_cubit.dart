@@ -140,6 +140,57 @@ final class SettingsDestination extends ShellDestination {
   List<Object?> get props => [github];
 }
 
+/// [destination] as the app remembers it between launches (U6b), or `null`
+/// for one it does not restore (onboarding, Add project).
+String? encodeDestination(ShellDestination destination) =>
+    switch (destination) {
+      HomeDestination() => 'home',
+      ProjectDestination(:final projectId) => 'project:$projectId',
+      JobDestination(:final runId, :final projectId) => [
+        'job',
+        runId,
+        ?projectId,
+      ].join(':'),
+      ReleasesDestination(:final projectId) => 'releases:$projectId',
+      TestsDestination(:final projectId) => 'tests:$projectId',
+      RunsDestination(:final projectId) => 'runs:$projectId',
+      WorkflowsDestination(:final projectId) => 'workflows:$projectId',
+      RunnersDestination() => 'runners',
+      StorageDestination() => 'storage',
+      ApprovalsDestination() => 'approvals',
+      CredentialsDestination(:final projectId) => [
+        'credentials',
+        ?projectId,
+      ].join(':'),
+      EnginesDestination() => 'engines',
+      SettingsDestination() => 'settings',
+      AddProjectDestination() || OnboardingDestination() => null,
+    };
+
+/// The destination [encoded] names, or `null` when it names none.
+ShellDestination? decodeDestination(String? encoded) =>
+    switch (encoded?.split(':')) {
+      ['home'] => const HomeDestination(),
+      ['project', final id] => ProjectDestination(id),
+      ['job', final runId] => JobDestination(runId),
+      ['job', final runId, final projectId] => JobDestination(
+        runId,
+        projectId: projectId,
+      ),
+      ['releases', final id] => ReleasesDestination(id),
+      ['tests', final id] => TestsDestination(id),
+      ['runs', final id] => RunsDestination(id),
+      ['workflows', final id] => WorkflowsDestination(id),
+      ['runners'] => const RunnersDestination(),
+      ['storage'] => const StorageDestination(),
+      ['approvals'] => const ApprovalsDestination(),
+      ['credentials'] => const CredentialsDestination(),
+      ['credentials', final id] => CredentialsDestination(id),
+      ['engines'] => const EnginesDestination(),
+      ['settings'] => const SettingsDestination(),
+      _ => null,
+    };
+
 /// Whether the shown destination may be left; `false` keeps it (the owner
 /// chose to keep a draft).
 typedef CanLeave = Future<bool> Function();

@@ -697,6 +697,35 @@ void main() {
       );
     });
 
+    test('watches the runs of every project that have not finished', () async {
+      final finished = Run.fromJson({..._run.toJson(), 'state': 'succeeded'});
+      when(() => harness.client.listRuns(limit: 50))
+          .thenAnswer((_) async => RunsResponse([_run, finished]));
+      final loads = await _loadsFor(
+        harness: harness,
+        stream: repository.watchActiveRuns(),
+        events: const [
+          RunDispatched(
+            runId: 'run_2',
+            projectId: 'prj_9',
+            workflowId: 'wf_1',
+            jobIds: ['job_3'],
+          ),
+          JobStateChanged(
+            jobId: 'job_9',
+            projectId: 'prj_9',
+            state: JobState.running,
+          ),
+          ProjectEdited(projectId: 'prj_1'),
+        ],
+      );
+      expect(loads, 3);
+      expect(
+        await repository.watchActiveRuns().first,
+        Snapshot([_run], cached: true),
+      );
+    });
+
     test('runs a run again', () async {
       when(() => harness.client.runAgain('run_1'))
           .thenAnswer((_) async => _run);
@@ -1322,6 +1351,42 @@ void main() {
 
       expect(await repository.freeSpace([StorageCategory.logs]), freed);
       expect(await repository.setRetention(settings), settings);
+    });
+  });
+
+  group('NoticesRepository', () {
+    test('passes on what the owner should hear about', () async {
+      final notices = <EngineEvent>[];
+      final subscription = NoticesRepository(harness.session)
+          .watchNotices()
+          .listen(notices.add);
+      const events = <EngineEvent>[
+        NotificationRaised(
+          kind: NotificationKind.jobFailed,
+          level: NotificationLevel.error,
+          title: 'Build failed',
+          body: 'prod',
+        ),
+        RunnerLeaseLost(
+          runnerId: 'rnr_1',
+          jobId: 'job_1',
+          projectId: 'prj_1',
+          reason: 'lapsed',
+          state: JobState.queued,
+        ),
+        RunnerCapabilitiesChanged(
+          runnerId: 'rnr_1',
+          name: 'mac',
+          from: ['flutter', 'ios-sign'],
+          to: ['flutter'],
+        ),
+        ProjectEdited(projectId: 'prj_1'),
+      ];
+      events.forEach(harness.send);
+      await settle();
+      await subscription.cancel();
+
+      expect(notices, events.take(3));
     });
   });
 

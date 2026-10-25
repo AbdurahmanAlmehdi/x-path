@@ -3800,4 +3800,86 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get shortcutsClose => 'Close';
+
+  @override
+  String get settingsNotices => 'Notifications';
+
+  @override
+  String get settingsKeepRunning =>
+      'Keep XPath in the menu bar when the window closes';
+
+  @override
+  String get settingsKeepRunningBody =>
+      'Builds, approvals and notifications go on with the window closed. Quit with ⌘Q.';
+
+  @override
+  String get settingsNoticesBody =>
+      'XPath tells you about these on macOS when the window is closed or behind. Approvals always notify.';
+
+  @override
+  String get noticeJobFailed => 'A production job failed';
+
+  @override
+  String get noticeJobSucceeded => 'A production job succeeded';
+
+  @override
+  String get noticeReleaseRejected => 'A store rejected a release';
+
+  @override
+  String get noticeReleaseApproved => 'The stores approved a release';
+
+  @override
+  String get noticeReleaseLive => 'A release is live';
+
+  @override
+  String get noticeCredentialExpired => 'A credential stopped working';
+
+  @override
+  String get noticeSecretsLocked => 'The engine cannot read its secrets';
+
+  @override
+  String get noticeRunnerLost => 'A runner lost a job';
+
+  @override
+  String get noticeCapabilityLost => 'A runner lost a capability';
+
+  @override
+  String get noticeJobWaiting => 'A job waits for a runner';
+
+  @override
+  String noticeRunnerLostBody(String state) {
+    return 'Its lease ran out, so the job is $state again.';
+  }
+
+  @override
+  String noticeCapabilityLostTitle(String runner, String capabilities) {
+    return '$runner can no longer do $capabilities';
+  }
+
+  @override
+  String get noticeCapabilityLostBody =>
+      'Jobs that need it wait for another runner.';
+
+  @override
+  String noticeJobWaitingBody(String job, String reason) {
+    return '$job has waited 10 minutes: $reason';
+  }
+
+  @override
+  String menuBarRunning(int count) {
+    return 'Running · $count';
+  }
+
+  @override
+  String menuBarRunTitle(String workflow, String version) {
+    return '$workflow $version';
+  }
+
+  @override
+  String menuBarRunDetail(String project, int done, int total) {
+    return '$project · $done of $total jobs';
+  }
+
+  @override
+  String get menuBarDispatch => 'Dispatch…';
 }

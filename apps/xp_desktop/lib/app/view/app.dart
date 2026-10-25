@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:xp_desktop/app/app_services.dart';
 import 'package:xp_desktop/app/bloc/engine_connection_bloc.dart';
+import 'package:xp_desktop/app/bloc/engine_notices_bloc.dart';
 import 'package:xp_desktop/approvals/bloc/pending_approvals_bloc.dart';
 import 'package:xp_desktop/approvals/widgets/needs_you_alerts_listener.dart';
 import 'package:xp_desktop/engines/view/engines_page.dart';
@@ -127,10 +130,20 @@ class EngineScope extends StatelessWidget {
         RepositoryProvider(create: (_) => TestsRepository(session)),
         RepositoryProvider(create: (_) => StorageRepository(session)),
         RepositoryProvider(create: (_) => SettingsRepository(session)),
+        RepositoryProvider(create: (_) => NoticesRepository(session)),
       ],
       child: MultiBlocProvider(
         providers: [
-          BlocProvider(create: (_) => ShellCubit()),
+          BlocProvider(
+            create: (context) => ShellCubit(
+              decodeDestination(
+                    context.read<AppServices>().preferences.lastDestination(
+                      session.profile.id,
+                    ),
+                  ) ??
+                  const HomeDestination(),
+            ),
+          ),
           BlocProvider(
             create: (context) => CommandPaletteBloc(
               projects: context.read<ProjectsRepository>(),
@@ -160,8 +173,23 @@ class EngineScope extends StatelessWidget {
                 StorageBloc(storage: context.read<StorageRepository>())
                   ..add(const StorageSubscriptionRequested()),
           ),
+          BlocProvider(
+            create: (context) => EngineNoticesBloc(
+              notices: context.read<NoticesRepository>(),
+              jobs: context.read<JobsRepository>(),
+            )..add(const EngineNoticesStarted()),
+          ),
         ],
-        child: NeedsYouAlertsListener(child: EngineStaleness(child: child)),
+        child: BlocListener<ShellCubit, ShellDestination>(
+          // The page shown comes back at the next launch (U6b).
+          listener: (context, destination) => unawaited(
+            context.read<AppServices>().preferences.setLastDestination(
+              session.profile.id,
+              encodeDestination(destination),
+            ),
+          ),
+          child: NeedsYouAlertsListener(child: EngineStaleness(child: child)),
+        ),
       ),
     ),
   );
