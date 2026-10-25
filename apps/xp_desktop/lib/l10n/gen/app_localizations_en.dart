@@ -436,6 +436,14 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String addProjectSshOffer(String sshUrl) {
+    return 'XPath reads repositories outside GitHub over SSH, with the engine\'s own key. Add the folder from $sshUrl instead? Your clone is not changed.';
+  }
+
+  @override
+  String get addProjectUseSsh => 'Use the SSH URL';
+
+  @override
   String addProjectReviewTitle(String name) {
     return 'Review the scan of $name';
   }
@@ -509,6 +517,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String projectSubtitle(String branch, String apps) {
     return '$branch · $apps';
   }
+
+  @override
+  String get projectHostLocal => 'local repository';
 
   @override
   String get projectEmptyTitle => 'No projects yet';
@@ -1191,6 +1202,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get dispatchNoWorkflows => 'The project has no workflow.';
 
   @override
+  String dispatchNeedsGitHub(String step, String host) {
+    return 'This workflow cannot run here: its $step step works only on GitHub, and this project is on $host. Run one without GitHub steps, such as dev-build or test.';
+  }
+
+  @override
   String get dispatchBuiltin => 'built-in';
 
   @override
@@ -1720,6 +1736,11 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get releasesEmpty =>
       'A production release dispatched from the overview shows up here.';
+
+  @override
+  String releasesEmptyNoGitHub(String host) {
+    return 'Production releases push and open a pull request on GitHub, so they do not run for a project on $host. Dev builds and tests do.';
+  }
 
   @override
   String releaseTitle(String version) {
@@ -2975,11 +2996,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get addProjectNoGitHub =>
-      'The engine has no GitHub token, so it cannot add a project. Connect GitHub in Settings first.';
+      'The engine has no GitHub token, so it cannot add a project from GitHub. Connect GitHub in Settings first; a project on another git host needs none.';
 
   @override
   String get addProjectGitHubRejected =>
-      'GitHub refuses the engine\'s token, so it cannot add a project. Save a new one in Settings.';
+      'GitHub refuses the engine\'s token, so it cannot add a project from GitHub. Save a new one in Settings.';
 
   @override
   String get addProjectOpenGitHub => 'Connect GitHub…';

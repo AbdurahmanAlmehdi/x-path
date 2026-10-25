@@ -44,9 +44,10 @@ void main() {
       addTearDown(database.close);
       database.connection
         ..execute(
-          'INSERT INTO project (id, github_repo_id, remote, '
+          'INSERT INTO project (id, host, source_key, github_repo_id, remote, '
           'default_base_branch) VALUES '
-          "('prj_1', 1, 'a', 'main'), ('prj_2', 2, 'b', 'main')",
+          "('prj_1', 'github.com', '1', 1, 'a', 'main'), ('prj_2', "
+          "'github.com', '2', 2, 'b', 'main')",
         )
         ..execute(
           'INSERT INTO app (id, project_id, path, framework, store_country) '

@@ -5,7 +5,7 @@ import 'package:xp_engine/xp_engine.dart';
 import '../../../helpers/scripted_git.dart';
 import '../../../helpers/step_context.dart';
 
-const _mirror = GitMirror(githubRepoId: 42, path: '/mirrors/42.git');
+const _mirror = GitMirror(key: '42', path: '/mirrors/42.git');
 const _worktree = ReleaseWorktree(
   path: '/data/worktrees/42/job_2',
   mirror: _mirror,

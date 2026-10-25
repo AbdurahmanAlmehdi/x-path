@@ -50,6 +50,37 @@ void main() {
       expect(find.text('Return does not dispatch'), findsOneWidget);
     });
 
+    testWidgets('greys out a workflow that needs GitHub, with the reason', (
+      tester,
+    ) async {
+      final harness = DispatchHarness();
+      when(() => harness.workflows.getWorkflow(any(), any())).thenAnswer(
+        (_) async => Workflow(
+          id: 'wf_prod',
+          projectId: 'prj_3',
+          name: 'Prod release',
+          builtin: true,
+          version: prodWorkflow.version,
+          versions: prodWorkflow.versions,
+          yaml: '$releaseYaml          - kind: git.push\n',
+        ),
+      );
+      await harness.open(tester, project: shop);
+
+      expect(find.text('shop_app · Shop'), findsOneWidget);
+      expect(
+        find.text(
+          'This workflow cannot run here: its git.push step works only on '
+          'GitHub, and this project is on bitbucket.org. Run one without '
+          'GitHub steps, such as dev-build or test.',
+        ),
+        findsOneWidget,
+      );
+      await tester.tap(find.text('Dispatch 4 jobs'));
+      await commandReturn(tester);
+      verifyNever(() => harness.workflows.dispatch(any(), any(), any()));
+    });
+
     testWidgets('Return does not dispatch; ⌘↩ does', (tester) async {
       final harness = DispatchHarness();
       when(() => harness.workflows.dispatch('prj_1', 'wf_prod', any()))

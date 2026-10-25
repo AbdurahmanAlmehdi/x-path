@@ -15,6 +15,8 @@ void main() {
     await SqliteProjectRepository(database, random: Random(1)).add(
       ProjectRecord(
         id: 'prj_1',
+        host: 'github.com',
+        sourceKey: '42',
         githubRepoId: 42,
         fullName: 'octo/app',
         remote: 'https://github.com/octo/app.git',

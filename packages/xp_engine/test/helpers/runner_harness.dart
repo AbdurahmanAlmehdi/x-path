@@ -312,6 +312,8 @@ class RunnerHarness {
     await projects.add(
       ProjectRecord(
         id: 'prj_1',
+        host: 'github.com',
+        sourceKey: '7',
         githubRepoId: 7,
         fullName: 'owner/app',
         remote: 'https://github.com/owner/app.git',

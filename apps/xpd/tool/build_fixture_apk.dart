@@ -67,7 +67,7 @@ Future<int> _run({
   try {
     final secrets = _NoSecrets();
     final git = CliGitService(runner: runner, secrets: secrets, dataDir: data);
-    final mirror = await git.ensureMirror(githubRepoId: 1, remoteUrl: origin);
+    final mirror = await git.ensureMirror(key: '1', remoteUrl: origin);
     await git.fetch(mirror);
     final sha = await git.resolveRef(mirror, 'main');
     final worktree = await git.createWorktree(mirror, name: 'e2e', sha: sha);
@@ -250,8 +250,9 @@ String _flutterPin(String fixture) {
 void _seedProject(SqliteDatabase database) {
   database.connection
     ..execute(
-      'INSERT INTO project (id, github_repo_id, remote, default_base_branch) '
-      "VALUES ('prj_e2e', 1, 'e2e', 'main')",
+      'INSERT INTO project (id, host, source_key, github_repo_id, remote, '
+      'default_base_branch) '
+      "VALUES ('prj_e2e', 'github.com', '1', 1, 'e2e', 'main')",
     )
     ..execute(
       "INSERT INTO workflow (id, project_id, name) VALUES ('wf_e2e', "

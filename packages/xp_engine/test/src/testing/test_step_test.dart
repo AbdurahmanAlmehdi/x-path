@@ -9,7 +9,7 @@ import '../../helpers/testing_fixtures.dart';
 /// The worktree whose app directory is the one the captured runs were made in.
 const _worktree = ReleaseWorktree(
   path: '/work',
-  mirror: GitMirror(githubRepoId: 42, path: '/mirrors/42.git'),
+  mirror: GitMirror(key: '42', path: '/mirrors/42.git'),
   sha: buildSha,
   appPath: 'app',
 );
@@ -186,7 +186,7 @@ void main() {
         const TestInput(
           worktree: ReleaseWorktree(
             path: '/work',
-            mirror: GitMirror(githubRepoId: 42, path: '/m.git'),
+            mirror: GitMirror(key: '42', path: '/m.git'),
             sha: buildSha,
           ),
           branch: 'main',

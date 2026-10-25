@@ -61,6 +61,13 @@ enum ApiErrorCode {
   @JsonValue('workflow_invalid')
   workflowInvalid(422),
 
+  /// The origin of a project is an HTTPS URL on a host other than GitHub,
+  /// which XPath has no credentials for (ADR 0015). The response carries the
+  /// SSH URL of the same repository (`sshUrl`); add the project again with
+  /// it to use it.
+  @JsonValue('ssh_url_required')
+  sshUrlRequired(422),
+
   /// The route only speaks WebSocket.
   @JsonValue('upgrade_required')
   upgradeRequired(426),

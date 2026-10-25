@@ -13,7 +13,7 @@ void main() {
   late MemorySecretStore secrets;
   late FakeProcessRunner runner;
   late CliGitService service;
-  const mirror = GitMirror(githubRepoId: 9, path: '/data/mirrors/9.git');
+  const mirror = GitMirror(key: '9', path: '/data/mirrors/9.git');
 
   CliGitService serviceOn(FakeProcessRunner runner) => CliGitService(
     runner: runner,
@@ -90,6 +90,18 @@ void main() {
       final call = runner.calls.single;
       expect(call.environment, isNot(contains('XPATH_GIT_TOKEN')));
       expect(call.arguments.where((a) => a.startsWith('credential.')), isEmpty);
+    });
+
+    test('reach other hosts with the SSH command on every call', () async {
+      secrets.values.clear();
+
+      await service.fetch(mirror);
+      await service.push(mirror, refspecs: [GitRefspecs.tag('v1')]);
+
+      expect(runner.calls, hasLength(2));
+      for (final call in runner.calls) {
+        expect(call.environment?['GIT_SSH_COMMAND'], gitSshCommand);
+      }
     });
   });
 

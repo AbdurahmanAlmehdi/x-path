@@ -17,6 +17,8 @@ final remote = EngineProfile(
 
 const project = Project(
   id: 'prj_1',
+  host: 'github.com',
+  sourceKey: '1',
   githubRepoId: 1,
   fullName: 'acme/app',
   remote: 'git@github.com:acme/app.git',

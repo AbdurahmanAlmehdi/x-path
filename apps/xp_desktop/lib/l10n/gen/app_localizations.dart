@@ -778,6 +778,18 @@ abstract class AppLocalizations {
   /// **'The engine could not add this folder: {message}'**
   String addProjectFailed(String message);
 
+  /// Offered when the folder's origin is an HTTPS URL on a host other than GitHub.
+  ///
+  /// In en, this message translates to:
+  /// **'XPath reads repositories outside GitHub over SSH, with the engine\'s own key. Add the folder from {sshUrl} instead? Your clone is not changed.'**
+  String addProjectSshOffer(String sshUrl);
+
+  /// Adds the folder from the offered SSH URL.
+  ///
+  /// In en, this message translates to:
+  /// **'Use the SSH URL'**
+  String get addProjectUseSsh;
+
   /// No description provided for @addProjectReviewTitle.
   ///
   /// In en, this message translates to:
@@ -909,6 +921,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{branch} · {apps}'**
   String projectSubtitle(String branch, String apps);
+
+  /// The host of a project whose origin is a file:// repository.
+  ///
+  /// In en, this message translates to:
+  /// **'local repository'**
+  String get projectHostLocal;
 
   /// Empty state headline.
   ///
@@ -2026,6 +2044,12 @@ abstract class AppLocalizations {
   /// **'The project has no workflow.'**
   String get dispatchNoWorkflows;
 
+  /// Dispatch sheet: a workflow with a GitHub or push step on a project that is not on GitHub.
+  ///
+  /// In en, this message translates to:
+  /// **'This workflow cannot run here: its {step} step works only on GitHub, and this project is on {host}. Run one without GitHub steps, such as dev-build or test.'**
+  String dispatchNeedsGitHub(String step, String host);
+
   /// After the workflow name.
   ///
   /// In en, this message translates to:
@@ -2835,6 +2859,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'A production release dispatched from the overview shows up here.'**
   String get releasesEmpty;
+
+  /// The releases of a project that is not on GitHub.
+  ///
+  /// In en, this message translates to:
+  /// **'Production releases push and open a pull request on GitHub, so they do not run for a project on {host}. Dev builds and tests do.'**
+  String releasesEmptyNoGitHub(String host);
 
   /// Toolbar title of a release.
   ///
@@ -4855,13 +4885,13 @@ abstract class AppLocalizations {
   /// Add project without a GitHub token.
   ///
   /// In en, this message translates to:
-  /// **'The engine has no GitHub token, so it cannot add a project. Connect GitHub in Settings first.'**
+  /// **'The engine has no GitHub token, so it cannot add a project from GitHub. Connect GitHub in Settings first; a project on another git host needs none.'**
   String get addProjectNoGitHub;
 
   /// Add project with a refused token.
   ///
   /// In en, this message translates to:
-  /// **'GitHub refuses the engine\'s token, so it cannot add a project. Save a new one in Settings.'**
+  /// **'GitHub refuses the engine\'s token, so it cannot add a project from GitHub. Save a new one in Settings.'**
   String get addProjectGitHubRejected;
 
   /// Opens the GitHub section of Settings.

@@ -49,8 +49,9 @@ void main() {
     secrets = MemorySecretStore();
     database.connection
       ..execute(
-        'INSERT INTO project (id, github_repo_id, remote, default_base_branch) '
-        "VALUES ('prj_1', 1, 'https://github.com/a/b.git', 'main')",
+        'INSERT INTO project (id, host, source_key, github_repo_id, remote, '
+        "default_base_branch) VALUES ('prj_1', 'github.com', '1', 1, "
+        "'https://github.com/a/b.git', 'main')",
       )
       ..execute(
         'INSERT INTO app (id, project_id, path, framework, store_country) '

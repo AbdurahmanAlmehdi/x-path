@@ -116,29 +116,68 @@ String _describeFlavor(FlavorProfile flavor) {
       '${ios == null ? '' : '  ios $ios'}';
 }
 
-/// `xp projects add <folder or owner/name>`.
+/// `xp projects add <folder or repository>`.
 class ProjectsAddCommand extends XpCommand {
   /// Creates the command.
-  new(super.context);
+  new(super.context) {
+    argParser.addOption(
+      'ssh-url',
+      help:
+          'For a folder whose origin is an HTTPS URL on a host other than '
+          'GitHub: the SSH URL to fetch from, as the engine offered it.',
+      valueHelp: 'url',
+    );
+  }
 
   @override
   String get name => 'add';
 
   @override
   String get description =>
-      'Add a project from a clone on the engine machine or from GitHub.';
+      'Add a project from a clone on the engine machine, from GitHub, or '
+      'from any git host over SSH (git@host:path, ssh:// or file://).';
 
   @override
-  String get invocation => 'xp projects add <folder | owner/name | URL>';
+  String get invocation =>
+      'xp projects add <folder | owner/name | URL> [--ssh-url <url>]';
 
   @override
   Future<int> execute(XpClient client) async {
     final [source] = positionals(['folder or repository']);
+    final sshUrl = argResults!.option('ssh-url');
     final directory = Directory(source);
-    final request = directory.existsSync()
-        ? AddProjectRequest(path: p.canonicalize(directory.path))
+    // An SSH or file:// URL is a repository, whatever folder has its name.
+    final isFolder = GitRemote.parse(source) == null && directory.existsSync();
+    if (!isFolder && sshUrl != null) {
+      usageException(
+        '--ssh-url goes with a folder; give the SSH URL as the repository.',
+      );
+    }
+    final request = isFolder
+        ? AddProjectRequest(
+            path: p.canonicalize(directory.path),
+            sshUrl: sshUrl,
+          )
         : AddProjectRequest(remote: source);
-    final project = await client.addProject(request);
+    final Project project;
+    try {
+      project = await client.addProject(request);
+    } on ApiException catch (error) {
+      if (error case ApiException(
+        code: ApiErrorCode.sshUrlRequired,
+        sshUrl: final offered?,
+      )) {
+        logger
+          ..err(error.message)
+          ..info(
+            isFolder
+                ? 'Run: xp projects add ${request.path} --ssh-url $offered'
+                : 'Run: xp projects add $offered',
+          );
+        return XpExit.forApi(error);
+      }
+      rethrow;
+    }
     emit(
       project.toJson(),
       () =>

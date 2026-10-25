@@ -12,6 +12,7 @@ import 'package:xp_desktop/project_overview/widgets/docked_console.dart';
 import 'package:xp_desktop/project_overview/widgets/flavor_ledger.dart';
 import 'package:xp_desktop/project_overview/widgets/release_rail.dart';
 import 'package:xp_desktop/projects/bloc/projects_bloc.dart';
+import 'package:xp_desktop/projects/widgets/project_host.dart';
 import 'package:xp_desktop/projects/widgets/scan_summary.dart';
 import 'package:xp_desktop/shell/cubit/shell_cubit.dart';
 import 'package:xp_desktop/shell/widgets/shell_page.dart';
@@ -117,10 +118,14 @@ class _ProjectOverviewViewState extends State<ProjectOverviewView> {
         autofocus: true,
         child: ShellPage(
           title: project.fullName.split('/').last,
-          subtitle: l10n.projectSubtitle(
-            project.defaultBaseBranch,
-            l10n.projectApps(apps.length),
-          ),
+          // A GitHub project needs no word about its host (ADR 0015).
+          subtitle: [
+            if (!project.isOnGitHub) project.hostLabel(l10n),
+            l10n.projectSubtitle(
+              project.defaultBaseBranch,
+              l10n.projectApps(apps.length),
+            ),
+          ].join(' · '),
           actions: [
             if (flavors.length > 1)
               XpSegmented<String?>(

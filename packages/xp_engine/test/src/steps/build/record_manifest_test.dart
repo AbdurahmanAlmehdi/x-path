@@ -169,7 +169,7 @@ void main() {
       final scoped = RecordManifestInput(
         worktree: const ReleaseWorktree(
           path: '/work/job_1',
-          mirror: GitMirror(githubRepoId: 42, path: '/mirrors/42.git'),
+          mirror: GitMirror(key: '42', path: '/mirrors/42.git'),
           sha: buildSha,
           appPath: 'apps/mobile',
           releaseModel: ReleaseModel(
