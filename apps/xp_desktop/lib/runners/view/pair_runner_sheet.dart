@@ -102,7 +102,7 @@ class _PairRunnerSheetState extends State<PairRunnerSheet> {
                 ),
                 if (state.error case final error?) ...[
                   const SizedBox(height: 10),
-                  XpMessage(XpStatus.scanError, error),
+                  XpMessage.error(error),
                 ],
               ] else
                 _Token(
@@ -168,7 +168,7 @@ class _Token extends StatelessWidget {
     final l10n = context.l10n;
     final colors = context.xpColors;
     final type = context.xpType;
-    final now = XpClock.now(context);
+    final now = XpClock.wall(context);
     final expiresAt = token.expiresAt;
     final expired = !expiresAt.isAfter(now);
     Widget well(String text, String copyLabel) => Container(

@@ -82,7 +82,7 @@ class WorkflowDocument extends Equatable {
       'description': ?description,
       if (locksProject) 'lock': 'project',
       if (inputs.isNotEmpty)
-        'inputs': {for (final input in inputs) input.name: input._plain()},
+        'inputs': {for (final input in inputs) input.name: _plainInput(input)},
       'stages': [for (final stage in stages) stage._plain()],
     }, 0);
     return out.toString();
@@ -99,37 +99,15 @@ class WorkflowDocument extends Equatable {
   ];
 }
 
-/// A variable a dispatch can set (`inputs.<name>`).
-class WorkflowInput extends Equatable {
-  /// Creates an input.
-  const new({
-    required this.name,
-    this.description,
-    this.defaultValue,
-    this.required = false,
-  });
-
-  /// The name under `inputs`.
-  final String name;
-
-  /// What it is for.
-  final String? description;
-
-  /// The value when a dispatch gives none; `null` for none.
-  final Object? defaultValue;
-
-  /// Whether a dispatch must give it.
-  final bool required;
-
-  Map<String, Object?> _plain() => {
-    'description': ?description,
-    'default': ?defaultValue,
-    if (required) 'required': true,
-  };
-
-  @override
-  List<Object?> get props => [name, description, defaultValue, required];
-}
+/// An input as the document writes it (`inputs.<name>`), in the order the
+/// built-in workflows give its keys.
+Map<String, Object?> _plainInput(WorkflowInput input) => {
+  'type': ?input.type?.wire,
+  'description': ?input.description,
+  'options': ?input.options,
+  'default': ?input.defaultValue,
+  if (input.required) 'required': true,
+};
 
 /// Jobs that run at the same time, after the stage before them.
 class WorkflowStage extends Equatable {
@@ -380,15 +358,46 @@ class _Reader {
       _issue(node, 'An input is a mapping, or empty.');
       return null;
     }
-    _keys(node, 'input "$name"', const {'description', 'default', 'required'});
+    _keys(node, 'input "$name"', const {
+      'type',
+      'description',
+      'options',
+      'default',
+      'required',
+    });
     final required = node.nodes['required'];
     if (required != null &&
         !(required is YamlScalar && required.value is bool)) {
       _issue(required, '"required" is true or false.');
     }
+    final typeNode = node.nodes['type'];
+    final type = InputType.values
+        .where((type) => typeNode?.value == type.wire)
+        .firstOrNull;
+    if (typeNode != null && type == null) {
+      _issue(
+        typeNode,
+        '"type" is one of '
+        '${InputType.values.map((type) => type.wire).join(', ')}.',
+      );
+    }
+    final optionsNode = node.nodes['options'];
+    final options = optionsNode is YamlList
+        ? [
+            for (final option in optionsNode.nodes)
+              if (option case YamlScalar(:final String value)) value,
+          ]
+        : null;
+    if (optionsNode != null &&
+        (optionsNode is! YamlList ||
+            options!.length != optionsNode.nodes.length)) {
+      _issue(optionsNode, '"options" is a list of strings.');
+    }
     return WorkflowInput(
       name: name,
+      type: type,
       description: _text(node, 'description'),
+      options: options,
       defaultValue: _plainOf(node.nodes['default']),
       required: required?.value == true,
     );

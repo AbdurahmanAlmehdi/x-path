@@ -285,9 +285,6 @@ Future<Response> _guard(Future<Response> Function() action) async {
       '${error.described} Nothing was stored.',
     );
   } on SecretsLockedException {
-    return errorResponse(
-      ApiErrorCode.secretsLocked,
-      'The engine cannot read its secrets right now. Unlock them and retry.',
-    );
+    return secretsLockedResponse();
   }
 }

@@ -39,46 +39,55 @@ stages:
             gate: prod_release
 ''';
 
-/// What the sheet previews for the production release of `Dispatch-Sheet`:
+/// What the engine plans for the production release of `Dispatch-Sheet`:
 /// two build jobs on the engine or a runner, then an upload that waits for
-/// an approval and a tag on the engine.
-final releasePreview = DispatchPreview(
-  flavors: const ['prod'],
-  platforms: const ['android', 'ios'],
+/// an approval and a tag on the engine; the iOS upload is left out.
+const releasePreview = DispatchPlan(
+  flavors: ['prod'],
+  platforms: ['android', 'ios'],
   currentVersion: '5.4.1+3283',
   version: '5.4.1',
+  build: 3284,
   stages: [
-    PreviewStage(
+    PlannedStage(
       name: 'build',
       jobs: [
-        const PreviewJob(
+        PlannedJob(
           name: 'Build prod for ios',
           flavor: 'prod',
           platform: 'ios',
           capabilities: ['flutter', 'ios-sign'],
           engineOnly: false,
+          local: true,
         ),
-        PreviewJob(
+        PlannedJob(
           name: 'Build prod for android',
           flavor: 'prod',
           platform: 'android',
-          capabilities: const ['android', 'flutter'],
+          capabilities: ['android', 'flutter'],
           engineOnly: false,
-          runner: linuxRunner,
-          slot: 2,
+          local: true,
+          runner: 'linux-builder-01',
         ),
       ],
     ),
-    const PreviewStage(
+    PlannedStage(
       name: 'upload',
       gates: ['store_submission'],
-      jobs: [
-        PreviewJob(name: 'Upload prod', capabilities: [], engineOnly: true),
-      ],
+      jobs: [PlannedJob(name: 'Upload prod', engineOnly: true, local: true)],
     ),
-    const PreviewStage(
+    PlannedStage(
       name: 'finalize',
-      jobs: [PreviewJob(name: 'Tag prod', capabilities: [], engineOnly: true)],
+      jobs: [PlannedJob(name: 'Tag prod', engineOnly: true, local: true)],
+    ),
+  ],
+  skipped: [
+    SkippedJob(
+      name: 'Upload prod for ios',
+      stage: 'upload',
+      flavor: 'prod',
+      platform: 'ios',
+      reason: 'no App Store app id for prod',
     ),
   ],
 );
@@ -87,6 +96,7 @@ final releasePreview = DispatchPreview(
 /// workflows repository.
 class DispatchHarness {
   new() {
+    registerDispatchFallbacks();
     when(() => workflows.listWorkflows(any()))
         .thenAnswer((_) async => [prodSummary, devSummary]);
     when(() => workflows.getWorkflow(any(), any())).thenAnswer(
@@ -102,13 +112,13 @@ class DispatchHarness {
     );
     when(() => workflows.workflowOf(any()))
         .thenAnswer((_) async => prodWorkflow);
-    when(
-      () => workflows.preview(
-        project: any(named: 'project'),
-        workflow: any(named: 'workflow'),
-        request: any(named: 'request'),
-      ),
-    ).thenAnswer((_) async => releasePreview);
+    when(() => workflows.plan(any(), any(), any()))
+        .thenAnswer((_) async => releasePreview);
+    when(() => workflows.lastWorkflow(any())).thenAnswer((_) async => null);
+    when(() => workflows.lastInputs(any(), any()))
+        .thenAnswer((_) async => const {});
+    when(() => workflows.rememberDispatch(any(), any(), any()))
+        .thenAnswer((_) async {});
   }
 
   final workflows = MockWorkflowsRepository();
@@ -119,6 +129,7 @@ class DispatchHarness {
     WidgetTester tester, {
     Project? project,
     EngineConnectionBloc? connection,
+    ReleasesRepository? releases,
   }) async {
     await tester.pumpApp(
       Builder(
@@ -137,6 +148,7 @@ class DispatchHarness {
       ),
       connection: connection,
       workflowsRepository: workflows,
+      releasesRepository: releases,
     );
     await tester.tap(find.text('Open'));
     await tester.pumpAndSettle();

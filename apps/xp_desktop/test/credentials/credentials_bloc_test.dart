@@ -150,7 +150,12 @@ void main() {
         bloc.add(const CredentialDeleteRequested('crd_1', force: true));
       },
       expect: () => [
-        for (var i = 0; i < 3; i++) ...[listed.copyWith(busy: 'crd_1'), listed],
+        listed.copyWith(busy: 'crd_1'),
+        listed,
+        listed.copyWith(busy: 'crd_1'),
+        listed.copyWith(checked: teamKey),
+        listed.copyWith(busy: 'crd_1'),
+        listed,
       ],
     );
 

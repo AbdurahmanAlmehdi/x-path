@@ -1,7 +1,8 @@
 # Failures and what they mean
 
 Every engine error has a code in its JSON envelope (`{"error": {"code", "message"}}`). The `xp`
-CLI maps them to exit codes; `xp mcp` returns the message with `isError`.
+CLI maps them to exit codes; with `--json` it prints `{"code", "message", "hint"}` on standard
+error. `xp mcp` returns the same object with `isError`.
 
 ## Exit codes of `xp`
 

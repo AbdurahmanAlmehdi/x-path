@@ -109,10 +109,24 @@ class _EngineRow extends StatelessWidget {
             label: l10n.enginesRemove,
             kind: XpButtonKind.tertiary,
             size: XpButtonSize.small,
-            onPressed: () => bloc.add(EngineRemoved(engine.id)),
+            onPressed: () => removeEngine(context, engine),
           ),
         ],
       ),
     );
   }
+}
+
+/// Asks, then removes [engine] from this Mac.
+Future<void> removeEngine(BuildContext context, EngineProfile engine) async {
+  final l10n = context.l10n;
+  final bloc = context.read<EngineConnectionBloc>();
+  final confirmed = await confirmAction(
+    context,
+    title: l10n.enginesRemoveTitle(engine.name),
+    points: [l10n.enginesRemoveForget(engine.name), l10n.enginesRemoveKeeps],
+    keep: l10n.confirmKeep,
+    confirm: l10n.enginesRemove,
+  );
+  if (confirmed) bloc.add(EngineRemoved(engine.id));
 }

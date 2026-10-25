@@ -6,6 +6,9 @@ import 'package:xp_desktop/widgets/widgets.dart';
 /// reports each change. While it has focus the owner's text stands (the
 /// document may write it differently, `'a'` as `a`); a new [value] shows
 /// while the field does not have focus, and when it loses it.
+///
+/// With [completions], the name being typed at the end is completed from
+/// them, as in `flavor.p` to `flavor.prod`.
 class BoundTextField extends StatefulWidget {
   const new({
     required this.value,
@@ -15,6 +18,7 @@ class BoundTextField extends StatefulWidget {
     this.code = false,
     this.maxLines = 1,
     this.enabled = true,
+    this.completions = const [],
     super.key,
   });
 
@@ -25,6 +29,7 @@ class BoundTextField extends StatefulWidget {
   final bool code;
   final int maxLines;
   final bool enabled;
+  final List<String> completions;
 
   @override
   State<BoundTextField> createState() => _BoundTextFieldState();
@@ -59,8 +64,7 @@ class _BoundTextFieldState extends State<BoundTextField> {
     super.dispose();
   }
 
-  @override
-  Widget build(BuildContext context) => XpTextField(
+  Widget _field() => XpTextField(
     label: widget.label,
     controller: _controller,
     focusNode: _focus,
@@ -70,6 +74,75 @@ class _BoundTextFieldState extends State<BoundTextField> {
     enabled: widget.enabled,
     onChanged: widget.onChanged,
   );
+
+  @override
+  Widget build(BuildContext context) {
+    if (widget.completions.isEmpty) return _field();
+    final colors = context.xpColors;
+    return RawAutocomplete<Completion>(
+      textEditingController: _controller,
+      focusNode: _focus,
+      optionsBuilder: (value) => completionsOf(value.text, widget.completions),
+      displayStringForOption: (option) => option.text,
+      onSelected: (option) => widget.onChanged(option.text),
+      fieldViewBuilder: (context, controller, focus, submit) => _field(),
+      optionsViewBuilder: (context, select, options) => Align(
+        alignment: Alignment.topLeft,
+        child: Material(
+          color: colors.surfaceOverlay,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(context.xpRadii.md),
+            side: BorderSide(color: colors.borderStrong),
+          ),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 320, maxHeight: 240),
+            child: ListView(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              shrinkWrap: true,
+              children: [
+                for (final option in options)
+                  InkWell(
+                    onTap: () => select(option),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
+                      // Not selectable text: that would take the click.
+                      child: Text(
+                        option.path,
+                        style: context.xpType.code.copyWith(
+                          color: colors.textPrimary,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// A completion of a field: the path offered, and the text the field has
+/// once it is taken.
+typedef Completion = ({String path, String text});
+
+final _nameAtEnd = RegExp(r'[A-Za-z_][A-Za-z0-9_.]*$');
+
+/// The [completions] that complete the name at the end of [text], at most
+/// eight: `flavor.p` gives `flavor.prod`; nothing once the name is whole.
+List<Completion> completionsOf(String text, List<String> completions) {
+  final match = _nameAtEnd.firstMatch(text);
+  if (match == null) return const [];
+  final name = match[0]!;
+  return [
+    for (final path in completions)
+      if (path.startsWith(name) && path != name)
+        (path: path, text: '${text.substring(0, match.start)}$path'),
+  ].take(8).toList();
 }
 
 /// A small icon-only action in a row (`size.control.sm`) with a tooltip

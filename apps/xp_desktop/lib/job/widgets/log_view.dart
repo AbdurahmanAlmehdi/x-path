@@ -1,11 +1,13 @@
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:material_ui/material_ui.dart' hide StepState;
 import 'package:xp_api/xp_api.dart';
 import 'package:xp_desktop/job/widgets/ansi.dart';
 import 'package:xp_desktop/job/widgets/job_status.dart';
 import 'package:xp_desktop/l10n/l10n.dart';
 import 'package:xp_desktop/theme/theme.dart';
+import 'package:xp_desktop/toast/cubit/toast_cubit.dart';
 import 'package:xp_desktop/widgets/widgets.dart';
 
 /// The height of a step header in the log.
@@ -22,7 +24,9 @@ bool isErrorLine(LogLineFrame line) =>
 /// The log of one job, grouped by step (2A): the log bar (what is shown,
 /// filter, jump to error, wrap, timestamps, follow), then a header per step
 /// and its lines. Finished steps start collapsed with their line count; the
-/// running, failed or interrupted step starts open.
+/// running, failed or interrupted step starts open. A failed job opens at
+/// its first error line. A line number copies the line with where it is
+/// (`job_…:42`).
 class LogView extends StatefulWidget {
   const new({
     required this.steps,
@@ -30,8 +34,12 @@ class LogView extends StatefulWidget {
     required this.title,
     this.status,
     this.live = false,
+    this.jobId,
     super.key,
   });
+
+  /// The job the log is of, for the place a copied line names.
+  final String? jobId;
 
   /// The steps of the job.
   final List<JobStep> steps;
@@ -83,6 +91,9 @@ class _LogViewState extends State<LogView> {
   var _follow = true;
   var _wrap = false;
   var _timestamps = true;
+
+  /// Whether a failed job's log was opened at its error.
+  var _openedAtError = false;
 
   @override
   void initState() {
@@ -190,6 +201,14 @@ class _LogViewState extends State<LogView> {
     }
   }
 
+  Future<void> _copy(LogLineFrame line) async {
+    final place = [?widget.jobId, '${line.seq}'].join(':');
+    await Clipboard.setData(ClipboardData(text: '$place  ${line.text}'));
+    if (mounted) {
+      context.read<ToastCubit>().show(context.l10n.logCopiedLine(line.seq));
+    }
+  }
+
   void _setFollow(bool value) {
     setState(() => _follow = value);
     if (value) _scheduleFollow();
@@ -201,6 +220,15 @@ class _LogViewState extends State<LogView> {
     final colors = context.xpColors;
     final items = _items();
     final hasError = items.any((item) => item is _Line && item.error);
+    if (hasError &&
+        !_openedAtError &&
+        !widget.live &&
+        widget.status == XpStatus.jobFailed) {
+      _openedAtError = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _scroll.hasClients) _jumpToError(_items());
+      });
+    }
     return CallbackShortcuts(
       bindings: {
         const SingleActivator(LogicalKeyboardKey.keyF, meta: true):
@@ -277,6 +305,7 @@ class _LogViewState extends State<LogView> {
                                   line,
                                   wrap: _wrap,
                                   timestamps: _timestamps,
+                                  onCopy: () => _copy(line.line),
                                 ),
                               },
                         ),
@@ -531,11 +560,19 @@ class _HeaderRow extends StatelessWidget {
 }
 
 class _LineRow extends StatelessWidget {
-  const new(this.item, {required this.wrap, required this.timestamps});
+  const new(
+    this.item, {
+    required this.wrap,
+    required this.timestamps,
+    required this.onCopy,
+  });
 
   final _Line item;
   final bool wrap;
   final bool timestamps;
+
+  /// Copies the line with where it is.
+  final VoidCallback onCopy;
 
   @override
   Widget build(BuildContext context) {
@@ -555,12 +592,21 @@ class _LineRow extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: 52,
-            color: colors.logGutter,
-            padding: const EdgeInsets.only(right: 8),
-            alignment: Alignment.topRight,
-            child: Text('${line.seq}', style: dim),
+          Tooltip(
+            message: context.l10n.logCopyLine(line.seq),
+            child: MouseRegion(
+              cursor: SystemMouseCursors.click,
+              child: GestureDetector(
+                onTap: onCopy,
+                child: Container(
+                  width: 52,
+                  color: colors.logGutter,
+                  padding: const EdgeInsets.only(right: 8),
+                  alignment: Alignment.topRight,
+                  child: Text('${line.seq}', style: dim),
+                ),
+              ),
+            ),
           ),
           const SizedBox(width: 10),
           if (timestamps) ...[

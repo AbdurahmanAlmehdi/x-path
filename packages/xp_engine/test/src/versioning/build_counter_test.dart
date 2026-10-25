@@ -56,4 +56,20 @@ void main() {
       throwsA(isA<UnknownAppException>()),
     );
   });
+
+  test('peeks at the next number without taking it (a dry run)', () async {
+    expect(
+      await counters.peek(projectId: 'prj_1', appPath: 'apps/b', seed: 10),
+      41,
+    );
+    expect(
+      await counters.peek(projectId: 'prj_1', appPath: 'apps/b', seed: 50),
+      51,
+    );
+    expect(counters.counterOf('prj_1', 'apps/b'), 40);
+    expect(
+      () => counters.peek(projectId: 'prj_1', appPath: 'apps/b', seed: -1),
+      throwsRangeError,
+    );
+  });
 }

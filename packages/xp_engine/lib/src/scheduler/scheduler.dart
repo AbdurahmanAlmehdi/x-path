@@ -12,6 +12,11 @@ import 'package:xp_engine/src/scheduler/paired_runners.dart';
 import 'package:xp_engine/src/scheduler/run_record.dart';
 import 'package:xp_engine/src/scheduler/scheduler_runner.dart';
 
+/// Where a dry run of a dispatch places a job: whether the engine can run
+/// it, the connected runner it can go to, and why it would wait when
+/// neither can.
+typedef JobPlacement = ({bool local, String? runner, String? waitReason});
+
 /// Decides which queued job starts, where, and when (D-11, D-19).
 ///
 /// The jobs of dispatched runs wait in the database in state `queued`. Each
@@ -342,6 +347,43 @@ class Scheduler implements JobControl {
     return best;
   }
 
+  /// Where a job that needs [capabilities] and is made of steps of [kinds]
+  /// could start, without queueing it (a dry run): whether the engine
+  /// can run it, the connected runner it can go to (by name), and why it
+  /// would wait when neither can. Free slots are not counted: they change
+  /// before the job's stage starts.
+  Future<JobPlacement> placement(
+    List<String> capabilities,
+    List<String> kinds,
+  ) async {
+    final needs = CapabilityNeed.parseAll(capabilities);
+    final able = [
+      for (final runner in _targets)
+        if (_rank(needs, runner.capabilities) != null && runner.accepts(kinds))
+          runner,
+    ];
+    final paired =
+        await (pairedRunners?.pairedRunners() ??
+            Future.value(const <PairedRunner>[]));
+    final local = able.any((runner) => runner.id == localRunnerId);
+    final remote = able.where((runner) => runner.id != localRunnerId);
+    if (local || remote.isNotEmpty) {
+      final id = remote.firstOrNull?.id;
+      return (
+        local: local,
+        runner: id == null
+            ? null
+            : paired.where((runner) => runner.id == id).firstOrNull?.name ?? id,
+        waitReason: null,
+      );
+    }
+    return (
+      local: false,
+      runner: null,
+      waitReason: await _cannotRun(needs, kinds, () async => paired),
+    );
+  }
+
   /// How well [offered] meets [needs]: the sum of the ranks of the
   /// capabilities it meets them with (0 when it offers every preferred one),
   /// or `null` when it misses one.
@@ -353,6 +395,38 @@ class Scheduler implements JobControl {
       sum += rank;
     }
     return sum;
+  }
+
+  /// Why no connected runner can ever take a job that needs [needs] and is
+  /// made of steps of [kinds]; `null` when one can.
+  Future<String?> _cannotRun(
+    List<CapabilityNeed> needs,
+    List<String> kinds,
+    Future<List<PairedRunner>> Function() paired,
+  ) async {
+    final wires = needs.map((need) => need.described).join(', ');
+    final capable = _targets
+        .where((runner) => _rank(needs, runner.capabilities) != null)
+        .toList();
+    if (capable.isEmpty && needs.isEmpty) return 'No runner is connected.';
+    if (capable.isEmpty) {
+      final offline = [
+        for (final runner in await paired())
+          if (!runner.connected && _rank(needs, runner.capabilities) != null)
+            _offline(runner, wires),
+      ];
+      if (offline.isEmpty) return 'No runner can do $wires.';
+      return 'No connected runner can do $wires. ${offline.join(' ')}';
+    }
+    if (!capable.any((runner) => runner.accepts(kinds))) {
+      final engineOnly = {
+        for (final kind in kinds)
+          if (!capable.any((runner) => runner.accepts([kind]))) kind,
+      }.toList()..sort();
+      return 'Only the engine runs ${engineOnly.join(', ')}, and the engine '
+          'cannot do $wires.';
+    }
+    return null;
   }
 
   Future<String> _whyNoRunner(
@@ -376,28 +450,16 @@ class Scheduler implements JobControl {
     Future<List<PairedRunner>> Function() paired,
   ) async {
     final needs = _needs(job);
-    final wires = needs.map((need) => need.described).join(', ');
-    final capable = _targets
-        .where((runner) => _rank(needs, runner.capabilities) != null)
+    if (await _cannotRun(needs, kinds, paired) case final reason?) {
+      return reason;
+    }
+    final accepting = _targets
+        .where(
+          (runner) =>
+              _rank(needs, runner.capabilities) != null &&
+              runner.accepts(kinds),
+        )
         .toList();
-    if (capable.isEmpty) {
-      final offline = [
-        for (final runner in await paired())
-          if (!runner.connected && _rank(needs, runner.capabilities) != null)
-            _offline(runner, wires),
-      ];
-      if (offline.isEmpty) return 'No runner can do $wires.';
-      return 'No connected runner can do $wires. ${offline.join(' ')}';
-    }
-    final accepting = capable.where((runner) => runner.accepts(kinds)).toList();
-    if (accepting.isEmpty) {
-      final engineOnly = {
-        for (final kind in kinds)
-          if (!capable.any((runner) => runner.accepts([kind]))) kind,
-      }.toList()..sort();
-      return 'Only the engine runs ${engineOnly.join(', ')}, and the engine '
-          'cannot do $wires.';
-    }
     if (_isIos(job) &&
         accepting.every((runner) => signing.contains(runner.id))) {
       final signs = needs.contains(const CapabilityNeed([Capability.iosSign]));

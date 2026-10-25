@@ -160,6 +160,48 @@ abstract class AppLocalizations {
   /// **'{engine} refused the token of this Mac. Add the engine again with a new token.'**
   String bannerRejected(String engine);
 
+  /// Toast: a store's state was marked by hand.
+  ///
+  /// In en, this message translates to:
+  /// **'Store status saved'**
+  String get releaseMarkedToast;
+
+  /// Toast: the release branch was merged back.
+  ///
+  /// In en, this message translates to:
+  /// **'Release branch merged'**
+  String get releaseMergedToast;
+
+  /// Toast: the jobs of the run that had not ended were cancelled.
+  ///
+  /// In en, this message translates to:
+  /// **'Run cancelled'**
+  String get jobCancelledToast;
+
+  /// Loads what could not be loaded again.
+  ///
+  /// In en, this message translates to:
+  /// **'Retry'**
+  String get retry;
+
+  /// What a screen reader says for the placeholder of a page that loads.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading'**
+  String get loading;
+
+  /// Toolbar chip: the page shows what was cached; the engine was not heard in this session.
+  ///
+  /// In en, this message translates to:
+  /// **'Cached'**
+  String get cached;
+
+  /// Toolbar chip: the page shows what was cached when the engine was last heard.
+  ///
+  /// In en, this message translates to:
+  /// **'Cached · {time}'**
+  String cachedSince(String time);
+
   /// Checks the engine now.
   ///
   /// In en, this message translates to:
@@ -183,6 +225,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Starting the engine on this Mac…'**
   String get bannerLocalStarting;
+
+  /// Banner while the engine's Keychain is locked: how to unlock it.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in to that Mac, or unlock its login keychain in Keychain Access; jobs start again by themselves.'**
+  String get bannerSecretsLockedSteps;
+
+  /// Banner: reveals the log of the engine on this Mac.
+  ///
+  /// In en, this message translates to:
+  /// **'Show log in Finder'**
+  String get bannerShowLog;
+
+  /// Banner: the engine on this Mac refused the app's token; runs the setup again.
+  ///
+  /// In en, this message translates to:
+  /// **'Set up this Mac again'**
+  String get bannerSetUpAgain;
 
   /// Starts the engine on this Mac again (banner, Settings).
   ///
@@ -346,6 +406,24 @@ abstract class AppLocalizations {
   /// **'Remove'**
   String get enginesRemove;
 
+  /// No description provided for @enginesRemoveTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove {name}?'**
+  String enginesRemoveTitle(String name);
+
+  /// No description provided for @enginesRemoveForget.
+  ///
+  /// In en, this message translates to:
+  /// **'This Mac forgets {name} and its token.'**
+  String enginesRemoveForget(String name);
+
+  /// Remove engine confirmation.
+  ///
+  /// In en, this message translates to:
+  /// **'The engine keeps running, with its projects and releases. Adding it again needs a new token.'**
+  String get enginesRemoveKeeps;
+
   /// Opens onboarding to run the engine on this Mac.
   ///
   /// In en, this message translates to:
@@ -445,8 +523,14 @@ abstract class AppLocalizations {
   /// Shown when the token of the active engine is missing.
   ///
   /// In en, this message translates to:
-  /// **'The Keychain of this Mac has no token for this engine, or it could not be read. Remove the engine and add it again.'**
+  /// **'The Keychain of this Mac has no token for this engine, or it could not be read. Try again once the Keychain is unlocked, or remove the engine and add it again.'**
   String get engineNoTokenBody;
+
+  /// Reads the engine's token from the Keychain again.
+  ///
+  /// In en, this message translates to:
+  /// **'Try again'**
+  String get engineNoTokenRetry;
 
   /// Onboarding headline.
   ///
@@ -814,6 +898,24 @@ abstract class AppLocalizations {
   /// **'Remove project'**
   String get addProjectDiscard;
 
+  /// No description provided for @addProjectRemoveTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove {name}?'**
+  String addProjectRemoveTitle(String name);
+
+  /// Remove project confirmation.
+  ///
+  /// In en, this message translates to:
+  /// **'The engine forgets the project and what its scan found.'**
+  String get addProjectRemoveForget;
+
+  /// Remove project confirmation.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing in the folder or on GitHub changes.'**
+  String get addProjectRemoveKeeps;
+
   /// Scans the project again.
   ///
   /// In en, this message translates to:
@@ -1090,6 +1192,18 @@ abstract class AppLocalizations {
   /// **'Not checked'**
   String get credentialUnchecked;
 
+  /// Toast: the engine checked a credential again.
+  ///
+  /// In en, this message translates to:
+  /// **'Checked {name}: {status}'**
+  String credentialCheckedToast(String name, String status);
+
+  /// Toast: the engine checked and stored the credential.
+  ///
+  /// In en, this message translates to:
+  /// **'Credential saved'**
+  String get credentialSavedToast;
+
   /// No description provided for @credentialFailed.
   ///
   /// In en, this message translates to:
@@ -1279,8 +1393,8 @@ abstract class AppLocalizations {
   /// No description provided for @fieldFileChosen.
   ///
   /// In en, this message translates to:
-  /// **'{name} · {bytes} bytes'**
-  String fieldFileChosen(String name, int bytes);
+  /// **'{name} · {size}'**
+  String fieldFileChosen(String name, String size);
 
   /// Saves the credential.
   ///
@@ -1365,6 +1479,66 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'The credential this flavor uses for each kind, with what the last checks found: does it work, and can it reach this flavor\'s app.'**
   String get flavorCredentialsHelp;
+
+  /// Section of the flavor sheet: the Firebase and App Store Connect app ids.
+  ///
+  /// In en, this message translates to:
+  /// **'Store ids'**
+  String get flavorStoreIds;
+
+  /// Flavor sheet, store ids.
+  ///
+  /// In en, this message translates to:
+  /// **'The built-in workflows upload this flavor\'s builds to these apps when a dispatch names none. The scan fills in the Firebase ids its files name.'**
+  String get flavorStoreIdsHelp;
+
+  /// Field label.
+  ///
+  /// In en, this message translates to:
+  /// **'Firebase app id · Android'**
+  String get flavorFirebaseAndroid;
+
+  /// Field label.
+  ///
+  /// In en, this message translates to:
+  /// **'Firebase app id · iOS'**
+  String get flavorFirebaseIos;
+
+  /// Placeholder of a Firebase app id field.
+  ///
+  /// In en, this message translates to:
+  /// **'1:123456789012:{platform}:abc123'**
+  String flavorFirebaseHint(String platform);
+
+  /// Field label.
+  ///
+  /// In en, this message translates to:
+  /// **'App Store Connect app id'**
+  String get flavorAppleAppId;
+
+  /// Placeholder of the App Store Connect app id field.
+  ///
+  /// In en, this message translates to:
+  /// **'1234567890'**
+  String get flavorAppleAppIdHint;
+
+  /// Saves the store ids of the flavor.
+  ///
+  /// In en, this message translates to:
+  /// **'Save ids'**
+  String get flavorStoreIdsSave;
+
+  /// The store ids were saved.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved. The next dispatch uploads to these apps.'**
+  String get flavorStoreIdsSaved;
+
+  /// On a finding of a missing Firebase app id: opens the flavor's store ids.
+  ///
+  /// In en, this message translates to:
+  /// **'Set the id…'**
+  String get scanSetStoreId;
 
   /// The flavor has no credential of a kind.
   ///
@@ -1852,11 +2026,11 @@ abstract class AppLocalizations {
   /// **'{count} running'**
   String jobRunningCount(int count);
 
-  /// Runs the job again from its first step.
+  /// Runs the selected job again from its first step.
   ///
   /// In en, this message translates to:
-  /// **'Re-run all'**
-  String get jobRerunAll;
+  /// **'Restart job'**
+  String get jobRestart;
 
   /// Resumes the job at a step.
   ///
@@ -1887,6 +2061,114 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'ran {duration} · started {time}'**
   String jobRan(String duration, String time);
+
+  /// Dispatches a finished run again.
+  ///
+  /// In en, this message translates to:
+  /// **'Run again'**
+  String get jobRunAgain;
+
+  /// No description provided for @jobRunAgainOlder.
+  ///
+  /// In en, this message translates to:
+  /// **'Run again runs version {ran} of the workflow, the one this run ran; it has version {newest} now.'**
+  String jobRunAgainOlder(int ran, int newest);
+
+  /// Runs the failed jobs of a run again, from the steps that failed.
+  ///
+  /// In en, this message translates to:
+  /// **'Re-run failed jobs'**
+  String get jobRerunFailed;
+
+  /// Tooltip: saves an artifact where the owner picks.
+  ///
+  /// In en, this message translates to:
+  /// **'Download…'**
+  String get jobArtifactDownload;
+
+  /// Tooltip: shows a downloaded artifact in Finder.
+  ///
+  /// In en, this message translates to:
+  /// **'Reveal in Finder'**
+  String get jobArtifactReveal;
+
+  /// Tooltip: copies where a downloaded artifact is.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy path'**
+  String get jobArtifactCopyPath;
+
+  /// Toast.
+  ///
+  /// In en, this message translates to:
+  /// **'Copied the path'**
+  String get jobArtifactCopied;
+
+  /// Run summary.
+  ///
+  /// In en, this message translates to:
+  /// **'Version'**
+  String get runSummaryVersion;
+
+  /// Run summary: the build number.
+  ///
+  /// In en, this message translates to:
+  /// **'Build'**
+  String get runSummaryBuild;
+
+  /// Run summary.
+  ///
+  /// In en, this message translates to:
+  /// **'Jobs'**
+  String get runSummaryJobs;
+
+  /// Run summary.
+  ///
+  /// In en, this message translates to:
+  /// **'Tests'**
+  String get runSummaryTests;
+
+  /// No description provided for @runSummaryTestCounts.
+  ///
+  /// In en, this message translates to:
+  /// **'{passed} passed · {failed} failed · {skipped} skipped'**
+  String runSummaryTestCounts(int passed, int failed, int skipped);
+
+  /// Run summary.
+  ///
+  /// In en, this message translates to:
+  /// **'Flavors'**
+  String get runSummaryFlavors;
+
+  /// Run summary: links to where the stores show the build.
+  ///
+  /// In en, this message translates to:
+  /// **'In the stores'**
+  String get runSummaryStores;
+
+  /// No description provided for @runSummaryAppStore.
+  ///
+  /// In en, this message translates to:
+  /// **'App Store Connect · {flavor}'**
+  String runSummaryAppStore(String flavor);
+
+  /// No description provided for @runSummaryPlay.
+  ///
+  /// In en, this message translates to:
+  /// **'Google Play · {flavor}'**
+  String runSummaryPlay(String flavor);
+
+  /// No description provided for @logCopyLine.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy line {line}'**
+  String logCopyLine(int line);
+
+  /// No description provided for @logCopiedLine.
+  ///
+  /// In en, this message translates to:
+  /// **'Copied line {line}'**
+  String logCopiedLine(int line);
 
   /// Artifacts of the shown job.
   ///
@@ -1941,6 +2223,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'The engine stopped during {step}, which changes something outside the engine, so it never runs again by itself. Check, then resume.'**
   String jobWaitingForResumeBody(String step);
+
+  /// Under the hero of a queued job: why it has not started.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting: {reason}'**
+  String jobWaitReason(String reason);
 
   /// Interrupted banner: no side-effect step succeeded.
   ///
@@ -2131,8 +2419,50 @@ abstract class AppLocalizations {
   /// Beside the version a dispatch releases.
   ///
   /// In en, this message translates to:
-  /// **'from {version} in the pubspec at the last scan'**
+  /// **'from {version} in the pubspec of the commit'**
   String dispatchFromPubspec(String version);
+
+  /// Placeholder of the explicit version field next to the bump.
+  ///
+  /// In en, this message translates to:
+  /// **'or x.y.z'**
+  String get dispatchVersionHint;
+
+  /// Section of the dispatch sheet: the inputs the workflow declares.
+  ///
+  /// In en, this message translates to:
+  /// **'Inputs'**
+  String get dispatchInputs;
+
+  /// A boolean input set to true.
+  ///
+  /// In en, this message translates to:
+  /// **'Yes'**
+  String get dispatchYes;
+
+  /// A boolean input set to false.
+  ///
+  /// In en, this message translates to:
+  /// **'No'**
+  String get dispatchNo;
+
+  /// Under a JSON input whose text does not parse.
+  ///
+  /// In en, this message translates to:
+  /// **'Not valid JSON.'**
+  String get dispatchJsonInvalid;
+
+  /// A release input when the project has no release to pick; Dispatch waits.
+  ///
+  /// In en, this message translates to:
+  /// **'No releases yet: this workflow needs a release that reached a store.'**
+  String get dispatchNoReleases;
+
+  /// A release in the release picker.
+  ///
+  /// In en, this message translates to:
+  /// **'{version} · {flavor}'**
+  String dispatchRelease(String version, String flavor);
 
   /// Label over the preview.
   ///
@@ -2155,8 +2485,26 @@ abstract class AppLocalizations {
   /// Where a job that can run anywhere lands.
   ///
   /// In en, this message translates to:
-  /// **'{engine} first, else {runner} · slot {slot} of {slots}'**
-  String dispatchOnRunner(String engine, String runner, int slot, int slots);
+  /// **'{engine} first, else {runner}'**
+  String dispatchOnRunner(String engine, String runner);
+
+  /// A job the run leaves out, and why (the engine's words).
+  ///
+  /// In en, this message translates to:
+  /// **'skipped, {reason}'**
+  String dispatchSkipped(String reason);
+
+  /// A job the engine cannot plan, so the dispatch would be refused.
+  ///
+  /// In en, this message translates to:
+  /// **'cannot run: {reason}'**
+  String dispatchBlocked(String reason);
+
+  /// The build number a dispatch would take.
+  ///
+  /// In en, this message translates to:
+  /// **'build {build}'**
+  String dispatchBuildNumber(int build);
 
   /// Row of a stage's gates.
   ///
@@ -2181,6 +2529,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Cancel'**
   String get dispatchCancel;
+
+  /// The dispatch button when there is no plan to count the jobs of: the engine fetches the ref first, or the workflow cannot run on this project.
+  ///
+  /// In en, this message translates to:
+  /// **'Dispatch'**
+  String get dispatchUnplanned;
 
   /// The dispatch button.
   ///
@@ -2860,6 +3214,12 @@ abstract class AppLocalizations {
   /// **'A production release dispatched from the overview shows up here.'**
   String get releasesEmpty;
 
+  /// Empty releases: opens the dispatch sheet on the prod release.
+  ///
+  /// In en, this message translates to:
+  /// **'Dispatch Prod release…'**
+  String get releasesDispatchProd;
+
   /// The releases of a project that is not on GitHub.
   ///
   /// In en, this message translates to:
@@ -2985,6 +3345,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Mark live'**
   String get laneMarkLive;
+
+  /// No description provided for @laneMarkTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Mark {version} {state}?'**
+  String laneMarkTitle(String version, String state);
+
+  /// Mark approved / live confirmation.
+  ///
+  /// In en, this message translates to:
+  /// **'The engine cannot read this store, so it records your mark as manual, at this time.'**
+  String get laneMarkManual;
+
+  /// Mark approved / live confirmation.
+  ///
+  /// In en, this message translates to:
+  /// **'The release moves on from it; a mark cannot be taken back.'**
+  String get laneMarkFinal;
 
   /// Opens the credentials.
   ///
@@ -3244,6 +3622,24 @@ abstract class AppLocalizations {
   /// **'Copied'**
   String get copied;
 
+  /// Cancel of a confirmation of a destructive action: keeps the object.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep'**
+  String get confirmKeep;
+
+  /// Confirms removing something.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove'**
+  String get confirmRemove;
+
+  /// Tooltip of something that copies itself when clicked.
+  ///
+  /// In en, this message translates to:
+  /// **'{text} · click to copy'**
+  String copyHint(String text);
+
   /// Label of the min_version panel.
   ///
   /// In en, this message translates to:
@@ -3411,6 +3807,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Run the Tests workflow. Its runs on the base branch become the baseline that later runs are compared with; a run\'s results also open from its job.'**
   String get testsEmptyBody;
+
+  /// Empty tests: opens the dispatch sheet on the Tests workflow.
+  ///
+  /// In en, this message translates to:
+  /// **'Run Tests…'**
+  String get testsRun;
 
   /// No description provided for @testsIsBaseline.
   ///
@@ -4087,6 +4489,54 @@ abstract class AppLocalizations {
   /// Sidebar row under the selected project.
   ///
   /// In en, this message translates to:
+  /// **'Runs'**
+  String get sidebarRuns;
+
+  /// Title of the runs page.
+  ///
+  /// In en, this message translates to:
+  /// **'Runs'**
+  String get runsTitle;
+
+  /// Runs filter: no workflow picked.
+  ///
+  /// In en, this message translates to:
+  /// **'All workflows'**
+  String get runsAllWorkflows;
+
+  /// Runs filter: no state picked.
+  ///
+  /// In en, this message translates to:
+  /// **'All states'**
+  String get runsAllStates;
+
+  /// Runs page with nothing to show.
+  ///
+  /// In en, this message translates to:
+  /// **'No run matches.'**
+  String get runsNone;
+
+  /// Recent runs of a project without runs.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing has run yet. Dispatch a workflow to see its runs here.'**
+  String get runsNoneYet;
+
+  /// Overview section.
+  ///
+  /// In en, this message translates to:
+  /// **'Recent runs'**
+  String get runsRecent;
+
+  /// Opens the runs page.
+  ///
+  /// In en, this message translates to:
+  /// **'All runs'**
+  String get runsAll;
+
+  /// Sidebar row under the selected project.
+  ///
+  /// In en, this message translates to:
   /// **'Workflows'**
   String get sidebarWorkflows;
 
@@ -4137,6 +4587,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Import…'**
   String get workflowsImport;
+
+  /// Opens the dispatch sheet on the open workflow.
+  ///
+  /// In en, this message translates to:
+  /// **'Run…'**
+  String get workflowsRun;
 
   /// Saves the YAML to a file.
   ///
@@ -4270,6 +4726,12 @@ abstract class AppLocalizations {
   /// **'One run at a time per project'**
   String get workflowsLock;
 
+  /// Under the lock chip: what lock: project changes besides one run at a time.
+  ///
+  /// In en, this message translates to:
+  /// **'It also makes the production flavors the default when a dispatch names none.'**
+  String get workflowsLockHint;
+
   /// Label of the workflow's inputs.
   ///
   /// In en, this message translates to:
@@ -4279,7 +4741,7 @@ abstract class AppLocalizations {
   /// Under the list of inputs.
   ///
   /// In en, this message translates to:
-  /// **'Inputs are edited in the YAML.'**
+  /// **'A dispatch sets them; the steps read them as inputs.<name>.'**
   String get workflowsInputsHint;
 
   /// The workflow declares no input.
@@ -4444,6 +4906,390 @@ abstract class AppLocalizations {
   /// **'YAML value'**
   String get workflowsWithHint;
 
+  /// Closes a toast.
+  ///
+  /// In en, this message translates to:
+  /// **'Dismiss'**
+  String get toastDismiss;
+
+  /// Undoes what a toast reports.
+  ///
+  /// In en, this message translates to:
+  /// **'Undo'**
+  String get toastUndo;
+
+  /// No description provided for @workflowsRemovedStage.
+  ///
+  /// In en, this message translates to:
+  /// **'Removed stage {name}'**
+  String workflowsRemovedStage(String name);
+
+  /// No description provided for @workflowsRemovedJob.
+  ///
+  /// In en, this message translates to:
+  /// **'Removed job {id}'**
+  String workflowsRemovedJob(String id);
+
+  /// No description provided for @workflowsRemovedStep.
+  ///
+  /// In en, this message translates to:
+  /// **'Removed step {kind}'**
+  String workflowsRemovedStep(String kind);
+
+  /// Adds an input to the workflow.
+  ///
+  /// In en, this message translates to:
+  /// **'Add input'**
+  String get workflowsAddInput;
+
+  /// Tooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove input'**
+  String get workflowsRemoveInput;
+
+  /// No description provided for @workflowsRemovedInput.
+  ///
+  /// In en, this message translates to:
+  /// **'Removed input {name}'**
+  String workflowsRemovedInput(String name);
+
+  /// Field label of an input.
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get workflowsInputName;
+
+  /// An input name the engine does not take.
+  ///
+  /// In en, this message translates to:
+  /// **'Letters, digits and _, starting with a letter or _.'**
+  String get workflowsInputNameInvalid;
+
+  /// Field label of an input.
+  ///
+  /// In en, this message translates to:
+  /// **'Type'**
+  String get workflowsInputType;
+
+  /// An input without a type.
+  ///
+  /// In en, this message translates to:
+  /// **'Any'**
+  String get workflowsInputTypeAny;
+
+  /// Input type.
+  ///
+  /// In en, this message translates to:
+  /// **'Text'**
+  String get workflowsInputTypeString;
+
+  /// Input type.
+  ///
+  /// In en, this message translates to:
+  /// **'On or off'**
+  String get workflowsInputTypeBoolean;
+
+  /// Input type.
+  ///
+  /// In en, this message translates to:
+  /// **'Choice'**
+  String get workflowsInputTypeChoice;
+
+  /// Input type.
+  ///
+  /// In en, this message translates to:
+  /// **'JSON'**
+  String get workflowsInputTypeJson;
+
+  /// Input type: a release of the project.
+  ///
+  /// In en, this message translates to:
+  /// **'Release'**
+  String get workflowsInputTypeRelease;
+
+  /// A dispatch must give the input.
+  ///
+  /// In en, this message translates to:
+  /// **'Required'**
+  String get workflowsInputRequired;
+
+  /// Field label of an input.
+  ///
+  /// In en, this message translates to:
+  /// **'Description'**
+  String get workflowsInputDescription;
+
+  /// Field label: the values of a choice.
+  ///
+  /// In en, this message translates to:
+  /// **'Options'**
+  String get workflowsInputOptions;
+
+  /// Placeholder: options apart with commas.
+  ///
+  /// In en, this message translates to:
+  /// **'internal, beta, production'**
+  String get workflowsInputOptionsHint;
+
+  /// Field label of an input.
+  ///
+  /// In en, this message translates to:
+  /// **'Default'**
+  String get workflowsInputDefault;
+
+  /// An input without a default.
+  ///
+  /// In en, this message translates to:
+  /// **'None'**
+  String get workflowsInputNoDefault;
+
+  /// Menu of the open workflow.
+  ///
+  /// In en, this message translates to:
+  /// **'More'**
+  String get workflowsMore;
+
+  /// Opens the versions of the workflow.
+  ///
+  /// In en, this message translates to:
+  /// **'Versions…'**
+  String get workflowsVersions;
+
+  /// Renames the workflow.
+  ///
+  /// In en, this message translates to:
+  /// **'Rename…'**
+  String get workflowsRename;
+
+  /// Title of the name dialog when renaming.
+  ///
+  /// In en, this message translates to:
+  /// **'Rename the workflow'**
+  String get workflowsRenameTitle;
+
+  /// Archives the workflow.
+  ///
+  /// In en, this message translates to:
+  /// **'Archive'**
+  String get workflowsArchive;
+
+  /// Unarchives the workflow.
+  ///
+  /// In en, this message translates to:
+  /// **'Unarchive'**
+  String get workflowsUnarchive;
+
+  /// No description provided for @workflowsArchivedToast.
+  ///
+  /// In en, this message translates to:
+  /// **'Archived {name}'**
+  String workflowsArchivedToast(String name);
+
+  /// Banner of an archived workflow.
+  ///
+  /// In en, this message translates to:
+  /// **'Archived: kept with its versions and runs, and not offered to dispatch.'**
+  String get workflowsArchivedNote;
+
+  /// No description provided for @workflowsArchivedName.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} (archived)'**
+  String workflowsArchivedName(String name);
+
+  /// Deletes the workflow.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete…'**
+  String get workflowsDelete;
+
+  /// No description provided for @workflowsDeleteTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete {name}?'**
+  String workflowsDeleteTitle(String name);
+
+  /// Delete confirmation.
+  ///
+  /// In en, this message translates to:
+  /// **'Its versions go with it.'**
+  String get workflowsDeleteVersions;
+
+  /// Delete confirmation.
+  ///
+  /// In en, this message translates to:
+  /// **'A workflow that ran cannot be deleted; archive it instead.'**
+  String get workflowsDeleteRan;
+
+  /// Confirms deleting a workflow.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get workflowsDeleteConfirm;
+
+  /// No description provided for @workflowsDeleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Deleted {name}.'**
+  String workflowsDeleted(String name);
+
+  /// No description provided for @workflowsRestored.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved version {from} again as version {version} of {name}.'**
+  String workflowsRestored(int from, int version, String name);
+
+  /// No description provided for @workflowsVersionsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Versions of {name}'**
+  String workflowsVersionsTitle(String name);
+
+  /// No description provided for @workflowsVersionLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Version {version} · {time}'**
+  String workflowsVersionLabel(int version, String time);
+
+  /// The older version of a compare.
+  ///
+  /// In en, this message translates to:
+  /// **'From'**
+  String get workflowsVersionFrom;
+
+  /// The newer version of a compare.
+  ///
+  /// In en, this message translates to:
+  /// **'to'**
+  String get workflowsVersionTo;
+
+  /// No description provided for @workflowsRestoreVersion.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore version {version}'**
+  String workflowsRestoreVersion(int version);
+
+  /// Two versions with the same lines.
+  ///
+  /// In en, this message translates to:
+  /// **'No changes.'**
+  String get workflowsNoChanges;
+
+  /// Closes a dialog of the builder.
+  ///
+  /// In en, this message translates to:
+  /// **'Close'**
+  String get workflowsClose;
+
+  /// No description provided for @workflowsBuiltinUpdated.
+  ///
+  /// In en, this message translates to:
+  /// **'The built-in {builtin} has a newer version ({latest}); this copy is based on version {base}.'**
+  String workflowsBuiltinUpdated(String builtin, int latest, int base);
+
+  /// Compares a copy with its built-in.
+  ///
+  /// In en, this message translates to:
+  /// **'Compare'**
+  String get workflowsCompare;
+
+  /// No description provided for @workflowsCompareTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Compare with {builtin}'**
+  String workflowsCompareTitle(String builtin);
+
+  /// No description provided for @workflowsBuiltinChanged.
+  ///
+  /// In en, this message translates to:
+  /// **'What {builtin} changed, version {base} to {latest}'**
+  String workflowsBuiltinChanged(String builtin, int base, int latest);
+
+  /// No description provided for @workflowsYouChanged.
+  ///
+  /// In en, this message translates to:
+  /// **'What this copy changed since version {base}'**
+  String workflowsYouChanged(int base);
+
+  /// The copy has taken what the built-in changed.
+  ///
+  /// In en, this message translates to:
+  /// **'Mark as up to date'**
+  String get workflowsMarkUpToDate;
+
+  /// Title of the template picker.
+  ///
+  /// In en, this message translates to:
+  /// **'Start a new workflow'**
+  String get workflowsTemplateTitle;
+
+  /// Tooltip: undoes the last edit (⌘Z).
+  ///
+  /// In en, this message translates to:
+  /// **'Undo'**
+  String get workflowsUndo;
+
+  /// Tooltip: redoes the edit undone (⇧⌘Z).
+  ///
+  /// In en, this message translates to:
+  /// **'Redo'**
+  String get workflowsRedo;
+
+  /// Why Add step is disabled.
+  ///
+  /// In en, this message translates to:
+  /// **'The engine cannot be reached, so its step types are not known. Edit the YAML for now, or try again once it answers.'**
+  String get workflowsAddStepUnavailable;
+
+  /// Title of the step type picker.
+  ///
+  /// In en, this message translates to:
+  /// **'Add a step'**
+  String get workflowsStepPickerTitle;
+
+  /// Placeholder of the step type search.
+  ///
+  /// In en, this message translates to:
+  /// **'Search step types'**
+  String get workflowsStepSearchHint;
+
+  /// Step type picker with no result.
+  ///
+  /// In en, this message translates to:
+  /// **'No step type matches.'**
+  String get workflowsStepNoMatch;
+
+  /// A with key the step type needs and the step does not give.
+  ///
+  /// In en, this message translates to:
+  /// **'Needed'**
+  String get workflowsKeyNeeded;
+
+  /// A with key left to the step type's default.
+  ///
+  /// In en, this message translates to:
+  /// **'Default'**
+  String get workflowsKeyDefault;
+
+  /// No description provided for @workflowsKeyDefaultValue.
+  ///
+  /// In en, this message translates to:
+  /// **'Default ({value})'**
+  String workflowsKeyDefaultValue(String value);
+
+  /// A true with value.
+  ///
+  /// In en, this message translates to:
+  /// **'On'**
+  String get workflowsOn;
+
+  /// A false with value.
+  ///
+  /// In en, this message translates to:
+  /// **'Off'**
+  String get workflowsOff;
+
   /// Inspector of a stage.
   ///
   /// In en, this message translates to:
@@ -4461,6 +5307,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Letters, digits, dots, dashes and underscores; unique in the project.'**
   String get workflowsNameBody;
+
+  /// Name dialog: the name is not one the engine takes.
+  ///
+  /// In en, this message translates to:
+  /// **'Start with a letter or digit; then letters, digits, dots, dashes and underscores, 64 at most.'**
+  String get workflowsNameInvalid;
+
+  /// Name dialog: the name is taken.
+  ///
+  /// In en, this message translates to:
+  /// **'The project already has a workflow called {name}.'**
+  String workflowsNameTaken(String name);
 
   /// Closes a dialog.
   ///
@@ -4720,6 +5578,24 @@ abstract class AppLocalizations {
   /// **'Remove token'**
   String get settingsGitHubRemove;
 
+  /// Remove GitHub token confirmation.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove the GitHub token?'**
+  String get settingsGitHubRemoveTitle;
+
+  /// Remove GitHub token confirmation.
+  ///
+  /// In en, this message translates to:
+  /// **'The engine can no longer clone, tag or open pull requests, so jobs that need GitHub fail.'**
+  String get settingsGitHubRemoveStops;
+
+  /// Remove GitHub token confirmation.
+  ///
+  /// In en, this message translates to:
+  /// **'The token stays valid on GitHub; revoke it there if it leaked.'**
+  String get settingsGitHubRemoveKeeps;
+
   /// A failed request.
   ///
   /// In en, this message translates to:
@@ -4885,20 +5761,14 @@ abstract class AppLocalizations {
   /// Add project without a GitHub token.
   ///
   /// In en, this message translates to:
-  /// **'The engine has no GitHub token, so it cannot add a project from GitHub. Connect GitHub in Settings first; a project on another git host needs none.'**
+  /// **'The engine has no GitHub token, so it cannot add a project from GitHub. Connect GitHub below; a project on another git host needs none.'**
   String get addProjectNoGitHub;
 
   /// Add project with a refused token.
   ///
   /// In en, this message translates to:
-  /// **'GitHub refuses the engine\'s token, so it cannot add a project from GitHub. Save a new one in Settings.'**
+  /// **'GitHub refuses the engine\'s token, so it cannot add a project from GitHub. Save a new one below.'**
   String get addProjectGitHubRejected;
-
-  /// Opens the GitHub section of Settings.
-  ///
-  /// In en, this message translates to:
-  /// **'Connect GitHub…'**
-  String get addProjectOpenGitHub;
 }
 
 class _AppLocalizationsDelegate

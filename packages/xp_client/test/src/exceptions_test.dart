@@ -44,6 +44,49 @@ void main() {
       );
     });
 
+    test('reads the issues of a workflow document', () {
+      final error = ApiException.fromResponse(
+        422,
+        '{"error": {"code": "workflow_invalid", "message": "Issues.", '
+        '"issues": [{"line": 3, "column": 5, "message": "Unknown input.", '
+        r'"hint": "Did you mean \"inputs.ids\"?"}]}}',
+      );
+
+      expect(error.issues, const [
+        WorkflowIssue(
+          line: 3,
+          column: 5,
+          message: 'Unknown input.',
+          hint: 'Did you mean "inputs.ids"?',
+        ),
+      ]);
+      expect(
+        ApiException.fromResponse(
+          403,
+          '{"error": {"code": "forbidden", "message": "No."}}',
+        ).issues,
+        isEmpty,
+      );
+    });
+
+    test('reads the hint and the details of the engine', () {
+      final error = ApiException.fromResponse(
+        503,
+        '{"error": {"code": "secrets_locked", "message": "Locked.", '
+        '"hint": "Unlock them.", "details": {"a": 1}}}',
+      );
+
+      expect(error.hint, 'Unlock them.');
+      expect(error.details, {'a': 1});
+      expect(
+        ApiException.fromResponse(
+          403,
+          '{"error": {"code": "forbidden", "message": "No."}}',
+        ).details,
+        isEmpty,
+      );
+    });
+
     test('reads the SSH URL the engine offers for an HTTPS origin', () {
       final error = ApiException.fromResponse(
         422,

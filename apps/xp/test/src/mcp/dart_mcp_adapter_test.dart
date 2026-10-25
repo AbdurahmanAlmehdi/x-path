@@ -46,6 +46,14 @@ void main() {
       output: harness.output,
       name: 'xpath',
       version: '1.2.3',
+      resources: [
+        McpResource(
+          uri: 'xpath://notes',
+          name: 'Notes',
+          description: 'Some notes.',
+          read: () async => '{"a": 1}',
+        ),
+      ],
       instructions: 'Be careful.',
     );
   });
@@ -133,6 +141,28 @@ void main() {
       ((result['content'] as List).single as Map)['text'],
       contains('No tool registered'),
     );
+    await harness.closeInput();
+    await served;
+  });
+
+  test('lists and reads its resources', () async {
+    await harness.initialize();
+
+    final list = await harness.request('resources/list');
+    final read = await harness.request('resources/read', {
+      'uri': 'xpath://notes',
+    });
+
+    final resource =
+        ((list['result'] as Map)['resources'] as List).single as Map;
+    expect(resource['uri'], 'xpath://notes');
+    expect(resource['name'], 'Notes');
+    expect(resource['mimeType'], 'application/json');
+    expect(((read['result'] as Map)['contents'] as List).single, {
+      'uri': 'xpath://notes',
+      'text': '{"a": 1}',
+      'mimeType': 'application/json',
+    });
     await harness.closeInput();
     await served;
   });

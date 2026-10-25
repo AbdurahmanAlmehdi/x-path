@@ -7,6 +7,7 @@ import 'package:xp_desktop/app/bloc/engine_connection_bloc.dart';
 import 'package:xp_desktop/l10n/l10n.dart';
 import 'package:xp_desktop/projects/widgets/scan_summary.dart';
 import 'package:xp_desktop/settings/bloc/github_token_bloc.dart';
+import 'package:xp_desktop/settings/widgets/github_token_section.dart';
 import 'package:xp_desktop/shell/cubit/shell_cubit.dart';
 import 'package:xp_desktop/shell/widgets/shell_page.dart';
 import 'package:xp_desktop/theme/theme.dart';
@@ -15,7 +16,7 @@ import 'package:xp_repositories/xp_repositories.dart';
 
 /// Add project by folder, then review what the scan found. The engine
 /// needs its GitHub token to add a project from GitHub; without one the form
-/// says so and opens the GitHub section of the settings. A folder whose
+/// says so and connects GitHub in place, so the folder stays. A folder whose
 /// origin is an HTTPS URL on another git host is offered its SSH URL
 /// (ADR 0015).
 class AddProjectPage extends StatelessWidget {
@@ -117,27 +118,17 @@ class _FormState extends State<_Form> {
                 ],
                 if (github.needsToken) ...[
                   const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: XpMessage(
-                          XpStatus.credentialMissing,
-                          github.status?.status == CredentialStatus.rejected
-                              ? l10n.addProjectGitHubRejected
-                              : l10n.addProjectNoGitHub,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      XpButton(
-                        key: const Key('addProject.github'),
-                        label: l10n.addProjectOpenGitHub,
-                        icon: PhosphorIconsRegular.githubLogo,
-                        kind: XpButtonKind.primary,
-                        onPressed: () => context.read<ShellCubit>().show(
-                          const SettingsDestination(github: true),
-                        ),
-                      ),
-                    ],
+                  XpMessage(
+                    XpStatus.credentialMissing,
+                    github.status?.status == CredentialStatus.rejected
+                        ? l10n.addProjectGitHubRejected
+                        : l10n.addProjectNoGitHub,
+                  ),
+                  const SizedBox(height: 12),
+                  const XpPanel(
+                    key: Key('addProject.github'),
+                    padding: EdgeInsets.all(16),
+                    child: GitHubTokenSection(),
                   ),
                 ],
                 const SizedBox(height: 16),
@@ -184,7 +175,7 @@ class _FormState extends State<_Form> {
                   ),
                 ] else if (widget.state.error case final error?) ...[
                   const SizedBox(height: 12),
-                  XpMessage(XpStatus.scanError, l10n.addProjectFailed(error)),
+                  XpMessage.error(l10n.addProjectFailed(error)),
                 ],
                 const SizedBox(height: 16),
                 Align(
@@ -233,7 +224,19 @@ class _Review extends StatelessWidget {
           label: l10n.addProjectDiscard,
           kind: XpButtonKind.tertiary,
           onPressed: canCommand
-              ? () => bloc.add(const AddProjectDiscarded())
+              ? () async {
+                  final confirmed = await confirmAction(
+                    context,
+                    title: l10n.addProjectRemoveTitle(project.fullName),
+                    points: [
+                      l10n.addProjectRemoveForget,
+                      l10n.addProjectRemoveKeeps,
+                    ],
+                    keep: l10n.confirmKeep,
+                    confirm: l10n.addProjectDiscard,
+                  );
+                  if (confirmed) bloc.add(const AddProjectDiscarded());
+                }
               : null,
         ),
         XpButton(
@@ -262,7 +265,7 @@ class _Review extends StatelessWidget {
           ),
           if (state.error case final error?) ...[
             const SizedBox(height: 12),
-            XpMessage(XpStatus.scanError, error),
+            XpMessage.error(error),
           ],
           const SizedBox(height: 16),
           ScanSummary(project),

@@ -19,6 +19,8 @@ void main() {
               iosBundleId: 'com.a',
               androidAppId: 'com.b',
               versionFiles: ['pubspec.yaml'],
+              firebaseAppId: {'android': '1:1:android:a'},
+              appleAppId: '123',
             ),
           ],
         ),
@@ -62,7 +64,33 @@ void main() {
       expect(prod.iosBundleId, 'com.a');
       expect(prod.androidAppId, 'com.b');
       expect(prod.versionFiles, ['pubspec.yaml']);
+      expect(prod.firebaseAppId, {'android': '1:1:android:a'});
+      expect(prod.appleAppId, '123');
       expect(root.flavors.map((f) => f.name), ['prod', 'dev']);
+      final dev = root.flavors.firstWhere((f) => f.name == 'dev');
+      expect(dev.firebaseAppId, isNull);
+    });
+
+    test('merge adds the Firebase ids of the newer platforms', () {
+      const older = FlavorEdit(
+        name: 'dev',
+        firebaseAppId: {'android': '1:1:android:a', 'ios': '1:1:ios:b'},
+      );
+
+      final merged = older.merge(
+        const FlavorEdit(
+          name: 'dev',
+          firebaseAppId: {'ios': ''},
+          appleAppId: '9',
+        ),
+      );
+
+      expect(merged.firebaseAppId, {'android': '1:1:android:a', 'ios': ''});
+      expect(merged.appleAppId, '9');
+      expect(
+        const FlavorEdit(name: 'x').merge(const FlavorEdit(name: 'x')),
+        const FlavorEdit(name: 'x'),
+      );
     });
 
     test('merge takes a newer base branch and store country', () {

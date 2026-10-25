@@ -1,7 +1,5 @@
 import 'package:xp_api/xp_api.dart';
 import 'package:xp_repositories/src/session/engine_session.dart';
-import 'package:xp_repositories/src/workflows/dispatch_preview.dart';
-import 'package:xp_repositories/src/workflows/workflow_outline.dart';
 
 /// The workflows of the engine of an [EngineSession], and dispatching them.
 class WorkflowsRepository {
@@ -27,6 +25,10 @@ class WorkflowsRepository {
   Future<WorkflowSchema> schema() =>
       _session.call((client) => client.getWorkflowSchema());
 
+  /// The documents a new workflow can start from.
+  Future<List<WorkflowTemplate>> templates() =>
+      _session.call((client) => client.listWorkflowTemplates());
+
   /// The issues the engine finds in [yaml], with their lines. Nothing is
   /// saved.
   Future<ValidateWorkflowResponse> validate(String projectId, String yaml) =>
@@ -37,12 +39,27 @@ class WorkflowsRepository {
     String projectId, {
     required String name,
     required String yaml,
+    WorkflowBasedOn? basedOn,
   }) => _session.call(
     (client) => client.createWorkflow(
       projectId,
-      CreateWorkflowRequest(name: name, yaml: yaml),
+      CreateWorkflowRequest(name: name, yaml: yaml, basedOn: basedOn),
     ),
   );
+
+  /// Renames, archives or unarchives [workflowId] of [projectId], or marks a
+  /// copy as caught up with its built-in, as [request] says.
+  Future<Workflow> updateWorkflow(
+    String projectId,
+    String workflowId,
+    UpdateWorkflowRequest request,
+  ) => _session.call(
+    (client) => client.updateWorkflow(projectId, workflowId, request),
+  );
+
+  /// Deletes [workflowId] of [projectId]; the engine refuses one that ran.
+  Future<void> deleteWorkflow(String projectId, String workflowId) =>
+      _session.call((client) => client.deleteWorkflow(projectId, workflowId));
 
   /// Saves [yaml] as the next version of [workflowId] of [projectId].
   Future<Workflow> saveWorkflow(
@@ -68,22 +85,48 @@ class WorkflowsRepository {
     );
   }
 
-  /// What dispatching [workflow] in [project] with [request] would start,
-  /// read from the runners, gates and credentials the engine has now.
-  Future<DispatchPreview> preview({
-    required Project project,
-    required Workflow workflow,
-    required DispatchRequest request,
-  }) async => DispatchPreview.plan(
-    project: project,
-    workflow: WorkflowOutline.parse(workflow.yaml),
-    request: request,
-    runners: await _session.call((client) => client.listRunners()),
-    gates: await _session.call((client) => client.getGates(project.id)),
-    credentials: await _session.call(
-      (client) => client.listCredentials(project.id),
-    ),
+  /// What dispatching [workflowId] of [projectId] with [request] would
+  /// start, planned by the engine without starting it.
+  Future<DispatchPlan> plan(
+    String projectId,
+    String workflowId,
+    DispatchRequest request,
+  ) => _session.call(
+    (client) => client.planDispatch(projectId, workflowId, request),
   );
+
+  /// The inputs the last dispatch of [workflowId] in [projectId] from this
+  /// app gave, kept with the engine's offline cache; empty before the first.
+  Future<Map<String, Object?>> lastInputs(
+    String projectId,
+    String workflowId,
+  ) async =>
+      switch (await _session.cache.read(_inputsKey(projectId, workflowId))) {
+        final Map<String, Object?> inputs => inputs,
+        _ => const {},
+      };
+
+  /// The workflow the last dispatch in [projectId] from this app ran, if
+  /// any: what the Dispatch sheet offers first.
+  Future<String?> lastWorkflow(String projectId) async =>
+      switch (await _session.cache.read('dispatch-workflow.$projectId')) {
+        final String id => id,
+        _ => null,
+      };
+
+  /// Keeps [workflowId] as the last workflow dispatched in [projectId] and
+  /// [inputs] as its last inputs.
+  Future<void> rememberDispatch(
+    String projectId,
+    String workflowId,
+    Map<String, Object?> inputs,
+  ) async {
+    await _session.cache.write('dispatch-workflow.$projectId', workflowId);
+    await _session.cache.write(_inputsKey(projectId, workflowId), inputs);
+  }
+
+  static String _inputsKey(String projectId, String workflowId) =>
+      'dispatch-inputs.$projectId.$workflowId';
 
   /// Dispatches [workflowId] of [projectId] with [request].
   Future<Run> dispatch(

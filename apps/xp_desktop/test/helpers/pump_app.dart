@@ -9,8 +9,10 @@ import 'package:xp_desktop/local_engine/local_engine.dart';
 import 'package:xp_desktop/projects/bloc/projects_bloc.dart';
 import 'package:xp_desktop/runners/bloc/runners_bloc.dart';
 import 'package:xp_desktop/shell/cubit/shell_cubit.dart';
+import 'package:xp_desktop/shell/widgets/engine_staleness.dart';
 import 'package:xp_desktop/storage/bloc/storage_bloc.dart';
 import 'package:xp_desktop/theme/theme.dart';
+import 'package:xp_desktop/toast/cubit/toast_cubit.dart';
 import 'package:xp_desktop/widgets/widgets.dart';
 import 'package:xp_repositories/xp_repositories.dart';
 
@@ -159,6 +161,7 @@ extension PumpApp on WidgetTester {
     PendingApprovalsBloc? pendingApprovals,
     RunnersBloc? runners,
     StorageBloc? storage,
+    ToastCubit? toasts,
     Brightness brightness = Brightness.light,
   }) async {
     desktopWindow(this);
@@ -184,7 +187,7 @@ extension PumpApp on WidgetTester {
             value: runnersRepository ?? quietRunners(),
           ),
           RepositoryProvider<WorkflowsRepository>.value(
-            value: workflowsRepository ?? MockWorkflowsRepository(),
+            value: workflowsRepository ?? quietWorkflows(),
           ),
           RepositoryProvider<ApprovalsRepository>.value(
             value: approvalsRepository ?? quietApprovals(),
@@ -222,8 +225,14 @@ extension PumpApp on WidgetTester {
             BlocProvider<StorageBloc>.value(
               value: storage ?? storageIn(const StorageState()),
             ),
+            BlocProvider<ToastCubit>(create: (_) => toasts ?? ToastCubit()),
           ],
-          child: themed(Material(child: widget), brightness: brightness),
+          child: themed(
+            Material(
+              child: EngineStaleness(child: XpToastHost(child: widget)),
+            ),
+            brightness: brightness,
+          ),
         ),
       ),
     );

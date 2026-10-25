@@ -93,8 +93,10 @@ class RunnersState extends Equatable {
 /// in the sidebar. The runner events bring every change, revokes included.
 class RunnersBloc extends Bloc<RunnersEvent, RunnersState> {
   new({required this._runners}) : super(const RunnersState()) {
-    on<RunnersSubscriptionRequested>(
-      (event, emit) => emit.forEach<Snapshot<List<Runner>>>(
+    on<RunnersSubscriptionRequested>((event, emit) {
+      // Read again (Retry): what failed before no longer stands.
+      if (state.error != null) emit(state.copyWith(error: () => null));
+      return emit.forEach<Snapshot<List<Runner>>>(
         _runners.watchRunners(),
         onData: (snapshot) => state.copyWith(
           loaded: true,
@@ -103,9 +105,8 @@ class RunnersBloc extends Bloc<RunnersEvent, RunnersState> {
         ),
         onError: (error, _) =>
             state.copyWith(loaded: true, error: () => errorMessage(error)),
-      ),
-      transformer: restartable(),
-    );
+      );
+    }, transformer: restartable());
     on<RunnerRevokeRequested>(_onRevoke, transformer: droppable());
   }
 

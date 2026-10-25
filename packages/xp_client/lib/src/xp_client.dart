@@ -123,6 +123,13 @@ class XpClient {
     await _json(await _send('GET', ['workflows', 'schema'])),
   );
 
+  /// `GET /workflows/templates`: the documents a new workflow can start
+  /// from.
+  Future<List<WorkflowTemplate>> listWorkflowTemplates() async =>
+      WorkflowTemplatesResponse.fromJson(
+        await _json(await _send('GET', ['workflows', 'templates'])),
+      ).templates;
+
   /// `GET /projects/{id}/workflows`.
   Future<List<WorkflowSummary>> listWorkflows(String projectId) async =>
       WorkflowsResponse.fromJson(
@@ -159,14 +166,15 @@ class XpClient {
   );
 
   /// `POST /projects/{id}/workflows/validate`: checks [yaml] without saving.
+  /// Without a [projectId], `POST /workflows/validate`: the check is the
+  /// same for every project.
   Future<ValidateWorkflowResponse> validateWorkflow(
-    String projectId,
+    String? projectId,
     String yaml,
   ) async => ValidateWorkflowResponse.fromJson(
     await _json(
       await _send('POST', [
-        'projects',
-        projectId,
+        if (projectId != null) ...['projects', projectId],
         'workflows',
         'validate',
       ], body: WorkflowYamlRequest(yaml: yaml).toJson()),
@@ -186,6 +194,23 @@ class XpClient {
         'workflows',
         workflowId,
       ], body: WorkflowYamlRequest(yaml: yaml).toJson()),
+    ),
+  );
+
+  /// `PATCH /projects/{id}/workflows/{workflowId}`: renames, archives or
+  /// unarchives a workflow, or catches a copy up with its built-in.
+  Future<Workflow> updateWorkflow(
+    String projectId,
+    String workflowId,
+    UpdateWorkflowRequest request,
+  ) async => Workflow.fromJson(
+    await _json(
+      await _send('PATCH', [
+        'projects',
+        projectId,
+        'workflows',
+        workflowId,
+      ], body: request.toJson()),
     ),
   );
 
@@ -211,11 +236,65 @@ class XpClient {
     ),
   );
 
+  /// `POST /projects/{id}/workflows/{workflowId}/dispatch?dryRun=true`:
+  /// what dispatching would start, planned by the engine; nothing starts and
+  /// no build number is taken.
+  Future<DispatchPlan> planDispatch(
+    String projectId,
+    String workflowId,
+    DispatchRequest request,
+  ) async => DispatchPlan.fromJson(
+    await _json(
+      await _send(
+        'POST',
+        ['projects', projectId, 'workflows', workflowId, 'dispatch'],
+        query: {'dryRun': 'true'},
+        body: request.toJson(),
+      ),
+    ),
+  );
+
   // ------------------------------------------------------------- runs, jobs
+
+  /// `GET /runs`: the runs newest first, of [projectId], of [workflowId]
+  /// and in [state] when given, dispatched before the run [before] when
+  /// given, at most [limit].
+  Future<RunsResponse> listRuns({
+    String? projectId,
+    String? workflowId,
+    RunState? state,
+    String? before,
+    int? limit,
+  }) async => RunsResponse.fromJson(
+    await _json(
+      await _send(
+        'GET',
+        ['runs'],
+        query: {
+          'project': ?projectId,
+          'workflow': ?workflowId,
+          'state': ?state?.wire,
+          'before': ?before,
+          'limit': ?limit?.toString(),
+        },
+      ),
+    ),
+  );
 
   /// `GET /runs/{id}`.
   Future<Run> getRun(String id) async =>
       Run.fromJson(await _json(await _send('GET', ['runs', id])));
+
+  /// `POST /runs/{id}/run-again`: a new run of the same version of the
+  /// workflow, at the same commit, with the same request.
+  Future<Run> runAgain(String id) async =>
+      Run.fromJson(await _json(await _send('POST', ['runs', id, 'run-again'])));
+
+  /// `POST /runs/{id}/rerun-failed`: runs the failed jobs of the run again,
+  /// each from the step that failed.
+  Future<Run> rerunFailed(String id) async => Run.fromJson(
+    await _json(await _send('POST', ['runs', id, 'rerun-failed'])),
+  );
 
   /// `POST /runs/{id}/cancel`.
   Future<Run> cancelRun(String id) async =>
@@ -910,7 +989,8 @@ class XpClient {
       );
     } on Object catch (error) {
       throw ConnectionException(
-        'Cannot reach the engine at $baseUrl: $error',
+        'Cannot reach the engine at $baseUrl. Is xpd running? Its health is '
+        'at ${_uri(const ['health'], const {})}.',
         cause: error,
       );
     }

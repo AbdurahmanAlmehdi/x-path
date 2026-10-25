@@ -125,7 +125,7 @@ class RunnersPairCommand extends XpCommand {
         'machine, within 15 minutes:';
     final expiry =
         'It works once and is shown only now. It expires at '
-        '${formatTime(token.expiresAt)} UTC (15 minutes).';
+        '${formatTime(token.expiresAt)} (15 minutes).';
     const loopback =
         'This address only works on this machine. Set the address runners '
         'use: xp runners url <url>';

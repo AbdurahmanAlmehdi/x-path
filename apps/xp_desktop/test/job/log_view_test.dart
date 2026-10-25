@@ -44,6 +44,54 @@ void main() {
       expect(find.text('14:03:09'), findsOneWidget);
     });
 
+    testWidgets('copies a line with where it is', (tester) async {
+      String? copied;
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        (call) async {
+          if (call.method == 'Clipboard.setData') {
+            copied = (call.arguments as Map)['text'] as String;
+          }
+          return null;
+        },
+      );
+      await tester.pumpApp(
+        LogView(
+          jobId: 'job_ios',
+          steps: steps,
+          lines: iosLog,
+          title: 'Build prod for ios',
+          live: true,
+        ),
+      );
+      await tester.pump();
+      final line = iosLog.last;
+
+      await tester.tap(find.text('${line.seq}'));
+      await tester.pump();
+
+      expect(copied, 'job_ios:${line.seq}  ${line.text}');
+      expect(find.text('Copied line ${line.seq}'), findsOneWidget);
+    });
+
+    testWidgets('opens a failed job at its first error', (tester) async {
+      await tester.pumpApp(
+        SizedBox(
+          height: 200,
+          child: LogView(
+            steps: failedRun().jobs[1].steps,
+            lines: failedLog,
+            title: 'Build prod for ios',
+            status: XpStatus.jobFailed,
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pump();
+
+      expect(text('*** Error: Error exporting the archive.'), findsOneWidget);
+    });
+
     testWidgets('opens and closes a step', (tester) async {
       await pumpLog(tester);
       await tester.tap(find.text('Check out'));

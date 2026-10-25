@@ -162,8 +162,42 @@ void main() {
         'iosBundleId': 'ly.demo',
         'androidAppId': 'ly.demo',
         'shorebirdAppId': 'sb-prod',
+        'firebaseAppId': <String, String>{},
+        'appleAppId': null,
         'credentials': {'play_sa': true},
       });
+      expect(
+        flavorScope(
+          prod.copyWith(
+            firebaseAppId: () => {'android': '1:1:android:a'},
+            appleAppId: () => '9',
+          ),
+          const [],
+        ),
+        containsPair('firebaseAppId', {'android': '1:1:android:a'}),
+      );
+    });
+
+    test('has the fields the parser knows of (UX-02)', () {
+      final run = _run(
+        version: AppVersion.parse('1.2.4+9'),
+        release: AppVersion.parse('1.2.3+8'),
+        releaseId: 'rel_1',
+      ).scope;
+      final flavor = flavorScope(demoApp.flavors.last, const []);
+
+      for (final name in ['app', 'project']) {
+        expect(
+          (run[name]! as Map).keys.toSet(),
+          variableFields[name],
+          reason: name,
+        );
+      }
+      expect(flavor.keys.toSet(), variableFields['flavor']);
+      expect(run.keys.toSet(), {...dispatchVariables});
+      for (final name in scalarVariables.keys) {
+        expect(run[name] ?? 'the matrix', isNot(isA<Map<Object?, Object?>>()));
+      }
     });
   });
 

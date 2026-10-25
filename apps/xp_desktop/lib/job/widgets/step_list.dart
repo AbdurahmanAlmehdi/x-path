@@ -1,10 +1,13 @@
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:material_ui/material_ui.dart' hide StepState;
 import 'package:xp_api/xp_api.dart';
+import 'package:xp_desktop/app/app_services.dart';
 import 'package:xp_desktop/job/bloc/job_view_bloc.dart';
 import 'package:xp_desktop/job/widgets/job_status.dart';
 import 'package:xp_desktop/l10n/l10n.dart';
 import 'package:xp_desktop/theme/theme.dart';
+import 'package:xp_desktop/toast/cubit/toast_cubit.dart';
 import 'package:xp_desktop/widgets/widgets.dart';
 
 /// The column beside the log: the steps of [job] (one can be picked to
@@ -53,7 +56,7 @@ class StepAside extends StatelessWidget {
           if (from != null)
             _ResumePlan(job: job, from: from, runner: runner)
           else if (state.artifacts.isNotEmpty)
-            _Artifacts(state.artifacts),
+            _Artifacts(state.artifacts, downloads: state.downloads),
         ],
       ),
     );
@@ -152,22 +155,96 @@ class _ResumePlan extends StatelessWidget {
   }
 }
 
+/// The artifacts of the job: Download saves one where the owner picks;
+/// then Reveal shows it in Finder and Copy path copies where it is.
 class _Artifacts extends StatelessWidget {
-  const new(this.artifacts);
+  const new(this.artifacts, {required this.downloads});
 
   final List<Artifact> artifacts;
 
+  /// Where each artifact was downloaded to, by id.
+  final Map<String, String> downloads;
+
   @override
-  Widget build(BuildContext context) => _Section(
-    label: context.l10n.jobArtifactsLabel,
-    rows: [
-      for (final artifact in artifacts)
-        _PlanRow(
-          icon: PhosphorIconsRegular.package,
-          text: artifact.name,
-          meta: formatSize(artifact.size),
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    final bloc = context.read<JobViewBloc>();
+    final busy = bloc.state.command == JobViewCommand.downloading;
+    return _Section(
+      label: l10n.jobArtifactsLabel,
+      rows: [
+        for (final artifact in artifacts)
+          Row(
+            key: ValueKey(('artifact', artifact.id)),
+            children: [
+              Expanded(
+                child: _PlanRow(
+                  icon: PhosphorIconsRegular.package,
+                  text: artifact.name,
+                  meta: formatSize(artifact.size),
+                ),
+              ),
+              _ArtifactAction(
+                icon: PhosphorIconsRegular.downloadSimple,
+                tooltip: l10n.jobArtifactDownload,
+                onTap: busy
+                    ? null
+                    : () =>
+                          bloc.add(JobViewArtifactDownloadRequested(artifact)),
+              ),
+              if (downloads[artifact.id] case final path?) ...[
+                _ArtifactAction(
+                  icon: PhosphorIconsRegular.folderOpen,
+                  tooltip: l10n.jobArtifactReveal,
+                  onTap: () => context.read<AppServices>().revealFile(path),
+                ),
+                _ArtifactAction(
+                  icon: PhosphorIconsRegular.copy,
+                  tooltip: l10n.jobArtifactCopyPath,
+                  onTap: () async {
+                    await Clipboard.setData(ClipboardData(text: path));
+                    if (context.mounted) {
+                      context.read<ToastCubit>().show(l10n.jobArtifactCopied);
+                    }
+                  },
+                ),
+              ],
+            ],
+          ),
+      ],
+    );
+  }
+}
+
+class _ArtifactAction extends StatelessWidget {
+  const new({required this.icon, required this.tooltip, required this.onTap});
+
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) => Tooltip(
+    message: tooltip,
+    child: Semantics(
+      button: true,
+      label: tooltip,
+      excludeSemantics: true,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(context.xpRadii.md),
+        child: SizedBox.square(
+          dimension: context.xpSizes.controlSm,
+          child: Icon(
+            icon,
+            size: context.xpSizes.iconSm,
+            color: onTap == null
+                ? context.xpColors.textDisabled
+                : context.xpColors.textSecondary,
+          ),
         ),
-    ],
+      ),
+    ),
   );
 }
 

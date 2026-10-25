@@ -51,6 +51,18 @@ void main() {
       );
     });
 
+    testWidgets('lists the recent runs of the project', (tester) async {
+      final shell = ShellCubit();
+      await OverviewHarness(recentRuns: [failedRun().run])
+          .pump(tester, shell: shell);
+
+      expect(find.text('RECENT RUNS'), findsOneWidget);
+      expect(find.text('Prod release'), findsWidgets);
+      await tester.tap(find.text('All runs'));
+      await tester.pump();
+      expect(shell.state, const RunsDestination('prj_1'));
+    });
+
     testWidgets('opens the job view of the release in flight', (tester) async {
       final shell = ShellCubit();
       await OverviewHarness().pump(tester, shell: shell);
@@ -182,7 +194,8 @@ void main() {
       await tester.sendKeyEvent(LogicalKeyboardKey.keyN);
       await tester.sendKeyUpEvent(LogicalKeyboardKey.metaLeft);
       await tester.pumpAndSettle();
-      verifyNever(() => harness.workflows.listWorkflows(any()));
+      // No dispatch sheet opened: it would read the last workflow.
+      verifyNever(() => harness.workflows.lastWorkflow(any()));
       await tester.tap(find.text('Scan'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Scan again'));

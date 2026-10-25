@@ -60,6 +60,7 @@ class OverviewHarness {
     List<Release>? releases,
     List<Credential> credentials = const [verifiedKey],
     RunJobs? run,
+    List<Run>? recentRuns,
   }) {
     when(() => releasesRepository.watchReleases(projectId: 'prj_1')).thenAnswer(
       (_) => Stream.value(Snapshot(releases ?? [buildingRelease, liveRelease])),
@@ -78,6 +79,28 @@ class OverviewHarness {
         });
     when(() => workflows.workflowOf(any()))
         .thenAnswer((_) async => prodWorkflow);
+    when(
+      () => jobs.watchRuns(
+        'prj_1',
+        workflowId: any(named: 'workflowId'),
+        state: any(named: 'state'),
+        limit: any(named: 'limit'),
+      ),
+    ).thenAnswer(
+      (_) => Stream.value(Snapshot(RunsResponse(recentRuns ?? const []))),
+    );
+    when(() => workflows.listWorkflows('prj_1')).thenAnswer(
+      (_) async => [
+        WorkflowSummary(
+          id: prodWorkflow.id,
+          projectId: 'prj_1',
+          name: 'prod-release',
+          builtin: true,
+          version: prodWorkflow.version,
+          title: prodWorkflow.name,
+        ),
+      ],
+    );
   }
 
   final releasesRepository = MockReleasesRepository();

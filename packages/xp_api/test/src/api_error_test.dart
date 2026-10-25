@@ -25,6 +25,13 @@ void main() {
         },
       );
     });
+
+    test('names each code as it is on the wire', () {
+      expect(ApiErrorCode.notFound.wire, 'not_found');
+      for (final code in ApiErrorCode.values) {
+        expect(ApiError(code: code, message: '').toJson()['code'], code.wire);
+      }
+    });
   });
 
   group('ErrorResponse', () {
@@ -34,6 +41,42 @@ void main() {
       expect(response.toJson(), {
         'error': {'code': 'resync_required', 'message': 'Reload.'},
       });
+    });
+
+    test('carries the issues of a workflow document (UX-02)', () {
+      final response = ErrorResponse.of(
+        ApiErrorCode.workflowInvalid,
+        'Issues.',
+        issues: const [WorkflowIssue(line: 2, column: 1, message: 'Bad.')],
+      );
+
+      expect(response.toJson(), {
+        'error': {
+          'code': 'workflow_invalid',
+          'message': 'Issues.',
+          'issues': [
+            {'line': 2, 'column': 1, 'message': 'Bad.'},
+          ],
+        },
+      });
+      expect(ErrorResponse.fromJson(response.toJson()), response);
+    });
+
+    test('carries a hint and details (UX-05)', () {
+      final response = ErrorResponse.of(
+        ApiErrorCode.workflowInvalid,
+        'No credential.',
+        hint: 'Assign one.',
+        details: const {'kind': 'play_sa'},
+      );
+
+      expect(response.toJson()['error'], {
+        'code': 'workflow_invalid',
+        'message': 'No credential.',
+        'hint': 'Assign one.',
+        'details': {'kind': 'play_sa'},
+      });
+      expect(ErrorResponse.fromJson(response.toJson()), response);
     });
 
     test('round-trips through JSON', () {

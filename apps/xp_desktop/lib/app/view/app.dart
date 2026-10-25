@@ -4,6 +4,7 @@ import 'package:xp_desktop/app/app_services.dart';
 import 'package:xp_desktop/app/bloc/engine_connection_bloc.dart';
 import 'package:xp_desktop/approvals/bloc/pending_approvals_bloc.dart';
 import 'package:xp_desktop/approvals/widgets/needs_you_alerts_listener.dart';
+import 'package:xp_desktop/engines/view/engines_page.dart';
 import 'package:xp_desktop/l10n/l10n.dart';
 import 'package:xp_desktop/local_engine/local_engine.dart';
 import 'package:xp_desktop/onboarding/view/onboarding_page.dart';
@@ -11,14 +12,17 @@ import 'package:xp_desktop/projects/bloc/projects_bloc.dart';
 import 'package:xp_desktop/runners/bloc/runners_bloc.dart';
 import 'package:xp_desktop/shell/cubit/shell_cubit.dart';
 import 'package:xp_desktop/shell/view/app_shell.dart';
+import 'package:xp_desktop/shell/widgets/engine_staleness.dart';
 import 'package:xp_desktop/storage/bloc/storage_bloc.dart';
 import 'package:xp_desktop/theme/theme.dart';
+import 'package:xp_desktop/toast/cubit/toast_cubit.dart';
 import 'package:xp_desktop/widgets/widgets.dart';
 import 'package:xp_repositories/xp_repositories.dart';
 
 /// The app: the [services] it reaches outside Flutter, the
-/// `EngineConnectionBloc` that owns the active engine, and the
-/// `LocalEngineBloc` that keeps the engine on this Mac running.
+/// `EngineConnectionBloc` that owns the active engine, the
+/// `LocalEngineBloc` that keeps the engine on this Mac running, and the
+/// `ToastCubit` whose toasts outlive a change of engine.
 class App extends StatelessWidget {
   const new({required this.services, super.key});
 
@@ -42,6 +46,7 @@ class App extends StatelessWidget {
             engines: services.engines,
           ),
         ),
+        BlocProvider(create: (_) => ToastCubit()),
       ],
       child: const XpClock(child: AppView()),
     ),
@@ -62,6 +67,7 @@ class AppView extends StatelessWidget {
       ...GlobalMaterialLocalizations.delegates,
     ],
     supportedLocales: AppLocalizations.supportedLocales,
+    builder: (context, child) => XpToastHost(child: child!),
     home: const LocalEngineListener(child: AppHome()),
   );
 }
@@ -145,7 +151,7 @@ class EngineScope extends StatelessWidget {
                   ..add(const StorageSubscriptionRequested()),
           ),
         ],
-        child: NeedsYouAlertsListener(child: child),
+        child: NeedsYouAlertsListener(child: EngineStaleness(child: child)),
       ),
     ),
   );
@@ -197,9 +203,13 @@ class EngineMissingTokenPage extends StatelessWidget {
                 alignment: WrapAlignment.center,
                 children: [
                   XpButton(
-                    label: l10n.enginesRemove,
+                    label: l10n.engineNoTokenRetry,
                     kind: XpButtonKind.primary,
-                    onPressed: () => bloc.add(EngineRemoved(active.id)),
+                    onPressed: () => bloc.add(const EnginesChanged()),
+                  ),
+                  XpButton(
+                    label: l10n.enginesRemove,
+                    onPressed: () => removeEngine(context, active),
                   ),
                   for (final engine in state.engines)
                     if (engine.id != active.id)

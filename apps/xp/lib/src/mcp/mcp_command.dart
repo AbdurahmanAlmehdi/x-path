@@ -41,6 +41,7 @@ class McpCommand extends Command<int> {
     try {
       await serveMcp(
         tools: buildXpTools(client),
+        resources: buildXpResources(client),
         input: _context.stdin,
         output: _context.stdout,
         name: 'xpath',

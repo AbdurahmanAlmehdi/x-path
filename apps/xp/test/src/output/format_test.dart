@@ -1,3 +1,4 @@
+import 'package:mason_logger/mason_logger.dart';
 import 'package:test/test.dart';
 import 'package:xp/src/output/format.dart';
 
@@ -23,8 +24,40 @@ void main() {
     });
   });
 
-  test('formatTime prints UTC to the minute', () {
-    expect(formatTime(DateTime.utc(2026, 1, 2, 3, 4, 5)), '2026-01-02 03:04');
+  test('paintState colours a state by what it means on a terminal', () {
+    expect(paintState('failed', ansi: false), 'failed');
+    overrideAnsiOutput(true, () {
+      for (final (state, pen) in [
+        ('succeeded', lightGreen),
+        ('failed', lightRed),
+        ('cancelled', darkGray),
+        ('running', lightCyan),
+        ('waiting_for_approval', lightYellow),
+        ('waiting_for_resume', lightYellow),
+        ('interrupted', lightYellow),
+      ]) {
+        expect(paintState(state, ansi: true), pen.wrap(state));
+        expect(paintState(state, ansi: true), isNot(state));
+      }
+      expect(paintState('queued', ansi: true), 'queued');
+    });
+  });
+
+  test('formatTime prints the local time to the minute, with its zone', () {
+    final previous = formatTimesInUtc;
+    addTearDown(() => formatTimesInUtc = previous);
+
+    formatTimesInUtc = false;
+    final local = DateTime(2026, 1, 2, 3, 4, 5);
+    expect(
+      formatTime(local),
+      '2026-01-02 03:04 ${local.isUtc ? 'UTC' : local.timeZoneName}',
+    );
+    formatTimesInUtc = true;
+    expect(
+      formatTime(DateTime.utc(2026, 1, 2, 3, 4, 5)),
+      '2026-01-02 03:04 UTC',
+    );
     expect(formatTime(null), '-');
   });
 

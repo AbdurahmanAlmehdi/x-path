@@ -124,7 +124,7 @@ void main() {
       expect(out, contains('Acme ASC (crd_1)'));
       expect(out, contains('App Store Connect API key (asc_key)'));
       expect(out, contains('account:  KEY123'));
-      expect(out, contains('verified (checked 2026-10-14 09:30)'));
+      expect(out, contains('verified (checked 2026-10-14 09:30 UTC)'));
       expect(out, contains('acme/app'));
       expect(out, contains('prj_2'));
       expect(out, contains('rejected'));

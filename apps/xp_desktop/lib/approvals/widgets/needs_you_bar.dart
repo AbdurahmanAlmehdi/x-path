@@ -25,7 +25,7 @@ class NeedsYouBar extends StatelessWidget {
     final waiting = context.watch<PendingApprovalsBloc>().state.of(projectId);
     if (waiting.isEmpty) return const SizedBox.shrink();
     final approval = waiting.first;
-    final now = XpClock.now(context);
+    final now = XpClock.wall(context);
     final ink = colors.statusAttentionOnContainer;
     final canCommand = context.canCommand;
     return Semantics(

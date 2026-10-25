@@ -163,7 +163,7 @@ class _CredentialFormState extends State<CredentialForm> {
         _files[field.name] = base64Encode(file.bytes);
         _controller(field.name).text = context.l10n.fieldFileChosen(
           file.name,
-          file.bytes.length,
+          formatSize(file.bytes.length),
         );
       } else {
         _controller(field.name).text = utf8.decode(

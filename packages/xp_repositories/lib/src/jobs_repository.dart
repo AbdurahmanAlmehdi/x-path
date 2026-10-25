@@ -1,4 +1,5 @@
 import 'package:xp_api/xp_api.dart';
+import 'package:xp_client/xp_client.dart';
 import 'package:xp_repositories/src/run_jobs.dart';
 import 'package:xp_repositories/src/session/engine_session.dart';
 import 'package:xp_repositories/src/snapshot.dart';
@@ -10,6 +11,44 @@ class JobsRepository {
   const new(this._session);
 
   final EngineSession _session;
+
+  /// The runs of [projectId], newest first, at most [limit]: of [workflowId]
+  /// and in [state] when given. Kept up to date by the runs dispatched and
+  /// the jobs that change in the project.
+  Stream<Snapshot<RunsResponse>> watchRuns(
+    String projectId, {
+    String? workflowId,
+    RunState? state,
+    int limit = 20,
+  }) => _session.watch(
+    key: 'runs.$projectId.${workflowId ?? '*'}.${state?.wire ?? '*'}.$limit',
+    fetch: (client) => client.listRuns(
+      projectId: projectId,
+      workflowId: workflowId,
+      state: state,
+      limit: limit,
+    ),
+    encode: (page) => page.toJson(),
+    decode: (json) => RunsResponse.fromJson(json! as Map<String, dynamic>),
+    refreshOn: (event) => switch (event) {
+      RunDispatched(projectId: final project) ||
+      JobStateChanged(projectId: final project) => project == projectId,
+      _ => false,
+    },
+  );
+
+  /// Dispatches the run [id] again: a new run of the same workflow version,
+  /// commit and request. The new run.
+  Future<Run> runAgain(String id) =>
+      _session.call((client) => client.runAgain(id));
+
+  /// Runs the failed jobs of the run [id] again, from the steps that failed.
+  Future<Run> rerunFailed(String id) =>
+      _session.call((client) => client.rerunFailed(id));
+
+  /// The file of the artifact [id], as it downloads.
+  Future<ArtifactDownload> downloadArtifact(String id) =>
+      _session.call((client) => client.downloadArtifact(id));
 
   /// One job with its steps, kept up to date by its job and step events.
   Stream<Snapshot<Job>> watchJob(String id) => _session.watch(

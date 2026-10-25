@@ -38,6 +38,21 @@ class XpClock extends StatefulWidget {
     return scope == null ? DateTime.now() : scope.now();
   }
 
+  /// The time of the wall, which goes on under an [XpClockPause]: for
+  /// deadlines, such as when an approval expires, that do not wait for the
+  /// engine. Rebuilds [context] on every tick.
+  static DateTime wall(BuildContext context) {
+    final scope = context.dependOnInheritedWidgetOfExactType<_ClockScope>();
+    return scope == null ? DateTime.now() : scope.wall();
+  }
+
+  /// The current time, without rebuilding [context] on every tick: for an
+  /// event handler that notes when something happened.
+  static DateTime read(BuildContext context) {
+    final scope = context.getInheritedWidgetOfExactType<_ClockScope>();
+    return scope == null ? DateTime.now() : scope.now();
+  }
+
   /// Whether the app is in front, so live motion may run; rebuilds [context]
   /// when that changes. True without an `XpClock` above.
   static bool isLive(BuildContext context) =>
@@ -96,14 +111,25 @@ class _XpClockState extends State<XpClock> {
   @override
   Widget build(BuildContext context) => _LiveScope(
     live: _live,
-    child: _ClockScope(now: widget.clock, tick: _tick, child: widget.child),
+    child: _ClockScope(
+      now: widget.clock,
+      wall: widget.clock,
+      tick: _tick,
+      child: widget.child,
+    ),
   );
 }
 
 class _ClockScope extends InheritedWidget {
-  const new({required this.now, required this.tick, required super.child});
+  const new({
+    required this.now,
+    required this.wall,
+    required this.tick,
+    required super.child,
+  });
 
   final DateTime Function() now;
+  final DateTime Function() wall;
   final int tick;
 
   @override
@@ -118,4 +144,34 @@ class _LiveScope extends InheritedWidget {
 
   @override
   bool updateShouldNotify(_LiveScope oldWidget) => live != oldWidget.live;
+}
+
+/// Holds the time still at [at] below it while [at] is set: live durations
+/// stop there and spinners stand still, as while the app is away; the wall
+/// (`XpClock.wall`) goes on ticking. The shell
+/// holds it while the engine is away, so a running job does not seem to run
+/// on (or end) while nothing is heard of it.
+class XpClockPause extends StatelessWidget {
+  const new({required this.at, required this.child, super.key});
+
+  /// When the time stopped, or `null` while it runs.
+  final DateTime? at;
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final at = this.at;
+    if (at == null) return child;
+    final outer = context.dependOnInheritedWidgetOfExactType<_ClockScope>();
+    return _LiveScope(
+      live: false,
+      child: _ClockScope(
+        now: () => at,
+        wall: outer?.wall ?? DateTime.now,
+        tick: outer?.tick ?? 0,
+        child: child,
+      ),
+    );
+  }
 }

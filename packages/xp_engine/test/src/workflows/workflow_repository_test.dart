@@ -67,6 +67,22 @@ void main() {
     expect(await repository.versions('wf_a'), isEmpty);
   });
 
+  test('updates a workflow, and a copy changes only what it is told', () async {
+    final before = (await repository.get('wf_a'))!;
+    final after = before.copyWith(
+      name: 'renamed',
+      archivedAt: () => DateTime.utc(2026, 10, 24),
+      basedOnVersion: 4,
+    );
+
+    await repository.update(after);
+
+    expect(await repository.get('wf_a'), after);
+    expect(after.copyWith(), after);
+    expect(after.copyWith(archivedAt: () => null).archivedAt, isNull);
+    expect(after.basedOnBuiltin, before.basedOnBuiltin);
+  });
+
   test('records compare by value', () {
     WorkflowRecord workflow(String id) =>
         WorkflowRecord(id: id, projectId: 'p', name: 'n', builtin: true);

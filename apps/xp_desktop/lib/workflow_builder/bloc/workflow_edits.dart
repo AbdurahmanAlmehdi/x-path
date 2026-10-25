@@ -1,4 +1,5 @@
 import 'package:equatable/equatable.dart';
+import 'package:xp_api/xp_api.dart';
 import 'package:xp_repositories/xp_repositories.dart';
 
 /// What the builder's inspector shows: the workflow itself ([stage] `null`),
@@ -81,6 +82,30 @@ extension WorkflowEdits on WorkflowDocument {
   WorkflowDocument moveJob(int stage, int job, int delta) =>
       editStage(stage, (s) => s.copyWith(jobs: _moved(s.jobs, job, delta)));
 
+  /// Adds an input with a name no other input has, without a type.
+  WorkflowDocument addInput() {
+    final used = {for (final input in inputs) input.name};
+    var name = 'input';
+    for (var n = 2; used.contains(name); n++) {
+      name = 'input$n';
+    }
+    return copyWith(
+      inputs: [
+        ...inputs,
+        WorkflowInput(name: name),
+      ],
+    );
+  }
+
+  /// Replaces input [index] with what [edit] makes of it.
+  WorkflowDocument editInput(
+    int index,
+    WorkflowInput Function(WorkflowInput input) edit,
+  ) => copyWith(inputs: _replaced(inputs, index, edit(inputs[index])));
+
+  WorkflowDocument removeInput(int index) =>
+      copyWith(inputs: [...inputs]..removeAt(index));
+
   /// [base], or `base-2`, `base-3`… whichever no job of the workflow uses.
   String uniqueJobId(String base) {
     final used = {
@@ -95,6 +120,25 @@ extension WorkflowEdits on WorkflowDocument {
     }
     return '$stem-$n';
   }
+}
+
+/// An input with some of its fields changed; a `null` function keeps one.
+extension WorkflowInputEdits on WorkflowInput {
+  WorkflowInput copyWith({
+    String? name,
+    InputType? Function()? type,
+    String? Function()? description,
+    List<String>? Function()? options,
+    Object? Function()? defaultValue,
+    bool? required,
+  }) => WorkflowInput(
+    name: name ?? this.name,
+    type: type == null ? this.type : type(),
+    description: description == null ? this.description : description(),
+    options: options == null ? this.options : options(),
+    defaultValue: defaultValue == null ? this.defaultValue : defaultValue(),
+    required: required ?? this.required,
+  );
 }
 
 /// The step edits of a job.

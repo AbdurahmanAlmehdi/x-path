@@ -20,6 +20,16 @@ abstract interface class BuildCounterRepository {
     required String appPath,
     required int seed,
   });
+
+  /// The number [allocate] would hand out now with [seed], without storing
+  /// it (a dry run).
+  ///
+  /// Throws an [UnknownAppException] if the project has no such app.
+  Future<int> peek({
+    required String projectId,
+    required String appPath,
+    required int seed,
+  });
 }
 
 /// A [BuildCounterRepository] that forgets everything on exit.
@@ -45,8 +55,21 @@ class InMemoryBuildCounterRepository implements BuildCounterRepository {
     required int seed,
   }) async {
     RangeError.checkNotNegative(seed, 'seed');
+    return _counters[(projectId, appPath)] = await peek(
+      projectId: projectId,
+      appPath: appPath,
+      seed: seed,
+    );
+  }
+
+  @override
+  Future<int> peek({
+    required String projectId,
+    required String appPath,
+    required int seed,
+  }) async {
+    RangeError.checkNotNegative(seed, 'seed');
     final current = counterOf(projectId, appPath);
-    return _counters[(projectId, appPath)] =
-        (current > seed ? current : seed) + 1;
+    return (current > seed ? current : seed) + 1;
   }
 }

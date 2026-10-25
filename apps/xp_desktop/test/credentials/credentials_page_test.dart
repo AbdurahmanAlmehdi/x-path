@@ -140,7 +140,7 @@ void main() {
           bytes: utf8.encode('-----BEGIN PRIVATE KEY-----'),
         ),
       );
-      await tester.tap(find.text('Add credential…'));
+      await tester.tap(find.text('Add credential…').first);
       await tester.pumpAndSettle();
       expect(find.text('Add a credential'), findsOneWidget);
 
@@ -169,6 +169,7 @@ void main() {
         ),
       ]);
       expect(find.text('Check and save'), findsNothing, reason: 'closed');
+      expect(find.text('Credential saved'), findsOneWidget);
     });
 
     testWidgets('adds a keystore as base64 bytes', (tester) async {
@@ -177,12 +178,12 @@ void main() {
         pickFile: () async =>
             const PickedFile(name: 'upload.jks', bytes: [1, 2, 3]),
       );
-      await tester.tap(find.text('Add credential…'));
+      await tester.tap(find.text('Add credential…').first);
       await tester.pumpAndSettle();
       await choose(tester, field('kind'), 'Android keystore');
       await tester.tap(find.text('Choose file…'));
       await tester.pumpAndSettle();
-      expect(find.text('upload.jks · 3 bytes'), findsOneWidget);
+      expect(find.text('upload.jks · 3\u00a0B'), findsOneWidget);
       await tester.enterText(field('name'), 'Upload key');
       await tester.enterText(field('storePassword'), 'fake-store-pass');
       await tester.enterText(field('keyAlias'), 'upload');
@@ -199,7 +200,7 @@ void main() {
     testWidgets('every named kind has its fields; a cancelled pick changes '
         'nothing', (tester) async {
       await pump(tester);
-      await tester.tap(find.text('Add credential…'));
+      await tester.tap(find.text('Add credential…').first);
       await tester.pumpAndSettle();
       await tester.tap(field('kind'));
       await tester.pumpAndSettle();
@@ -294,6 +295,8 @@ void main() {
       await pump(tester, list: [teamKey]);
       await tapIn(tester, 'crd_1', 'Check now');
       verify(() => credentials.verifyCredential('crd_1')).called(1);
+      await tester.pump();
+      expect(find.textContaining('Checked Team App Store key'), findsOneWidget);
     });
 
     testWidgets('deletes an unused credential after a simple confirmation', (
@@ -367,6 +370,9 @@ void main() {
         ),
         findsOneWidget,
       );
+      await tester.tap(find.text('Add credential…').last);
+      await tester.pumpAndSettle();
+      expect(find.text('Check and save'), findsOneWidget);
       await pump(tester, projectList: const []);
       expect(
         find.text('Add a project to give its flavors credentials.'),
@@ -429,7 +435,7 @@ void main() {
 
     testWidgets('is read-only while the engine is away', (tester) async {
       await pump(tester, list: [teamKey], status: EngineStatus.unreachable);
-      await tester.tap(find.text('Add credential…'));
+      await tester.tap(find.text('Add credential…').first);
       for (final label in [
         'Check now',
         'Rename…',
@@ -451,6 +457,7 @@ void main() {
       named.addError(const ConnectionException('gone'));
       await tester.pumpAndSettle();
       expect(find.text('gone'), findsNWidgets(2));
+      expect(find.text('Retry'), findsOneWidget);
     });
   });
 }

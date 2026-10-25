@@ -511,6 +511,7 @@ class ServeCommand extends XpdCommand {
         worktreeAt: (mirror, name) =>
             CliGitService.worktreePath(directory, mirror, name),
         releases: releases,
+        gates: SqliteGateConfigRepository(database),
       );
       await _recoverJobs(
         JobRecovery(

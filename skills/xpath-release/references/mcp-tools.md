@@ -1,7 +1,7 @@
 # `xp mcp` tools
 
 The tools of `xp mcp`, from `apps/xp/lib/src/mcp/xp_tools.dart`. Every tool answers with JSON
-text, or with `isError` and a message. `project` is an id (`prj_...`), `owner/name` or `name`;
+text, or with `isError` and the error as JSON: `{"code", "message", "hint"}`. `project` is an id (`prj_...`), `owner/name` or `name`;
 `workflow` is an id (`wf_...`) or a name.
 
 There is no tool to approve, deny, merge, abandon, delete, change a gate, cancel or resume, nor to
@@ -15,8 +15,11 @@ server tells the agent so when it connects.
 | `list_projects` | none | Every project with its apps, flavors and the findings of the last scan. |
 | `get_project` | **`project`** | One project with its profile and findings. |
 | `list_workflows` | **`project`** | The built-in workflows and the project's own. |
-| `get_workflow` | **`project`**, **`workflow`**, `version` (integer; newest by default) | The workflow with its YAML and versions. |
+| `get_workflow` | **`project`**, **`workflow`**, `version` (integer; newest by default) | The workflow with its YAML, versions and `inputs`: each with its `type` (`string`, `boolean`, `choice` with `options`, `json`, `release`, or none for any value), `default` and `required`. |
 | `get_run` | **`run`** (`run_...`) | `{run, pendingApprovals, note?}`: the run with its jobs, and the approvals it waits for. |
+| `list_runs` | `project`, `workflow`, `state`, `limit` (1–50, 20), `before` | `{runs, next?}`: the runs newest first, wherever they were dispatched from. Pass `next` as `before` for more. |
+| `wait_for_run` | **`run`**, `timeoutSeconds` (0–300, 60) | As `get_run`, once the run ended or waits for an approval, with `timedOut` when it did neither in time: call it again. |
+| `wait_for_approval` | **`approval`**, `timeoutSeconds` (0–300, 60) | As `get_approval`, once the owner decided or it expired, with `timedOut` while it is still pending. |
 | `get_job` | **`job`** (`job_...`) | The job with its steps and their results. |
 | `get_job_log_tail` | **`job`**, `lines` (100 by default) | `{lines, jobEnded, jobState?}`: the last lines, masked. |
 | `list_artifacts` | **`job`** | The files the job produced (builds, manifests, symbols). |
@@ -38,35 +41,44 @@ server tells the agent so when it connects.
 |---|---|---|
 | `add_project` | exactly one of `path` (an absolute folder with a clone, on the engine's machine) or `remote` (`owner/name`, or an https or ssh URL) | Adds the GitHub repository and scans it. Needs the engine's GitHub token. |
 | `scan_project` | **`project`** | Scans again. Read-only: the repository is never changed. |
-| `update_project` | **`project`**, **`edits`** | `edits` is a `ProfileEdits` object, for example `{"defaultBaseBranch": "main", "apps": [{"path": ".", "storeCountry": "us", "flavors": [{"name": "prod", "prod": true}]}]}`. Per flavor: `prod`, `shorebird`, `entrypoint`, `iosBundleId`, `androidAppId`, `versionFiles`. Edits survive rescans. |
-| `validate_workflow` | **`project`**, **`yaml`** | `{valid, saved: false, issues: [{line, column, message}]}`. Saves nothing. |
+| `update_project` | **`project`**, **`edits`** | `edits` is a `ProfileEdits` object, for example `{"defaultBaseBranch": "main", "apps": [{"path": ".", "storeCountry": "us", "flavors": [{"name": "prod", "prod": true}]}]}`. Per flavor: `prod`, `shorebird`, `entrypoint`, `iosBundleId`, `androidAppId`, `versionFiles`, `firebaseAppId` (by platform; an empty id removes it), `appleAppId`. The built-ins upload to the store ids when no input gives one. Edits survive rescans. |
+| `validate_workflow` | **`yaml`**, `project` | `{valid, saved: false, issues: [{line, column, message, hint}]}`. Saves nothing. The check is the same for every project. |
 | `create_workflow` | **`project`**, **`name`** (letters, digits, `.`, `_`, `-`), **`yaml`** | Validates first; with issues nothing is saved and the issues come back (`isError`). |
 | `update_workflow` | **`project`**, **`workflow`**, **`yaml`** | A new version of a workflow of the project's own; built-ins cannot be edited. Validates first. |
+| `archive_workflow` | **`project`**, **`workflow`**, `archived` (default `true`) | Archives a workflow of the project's own: it keeps its versions and runs and is no longer dispatched. `archived: false` brings it back. |
+| `get_workflow_schema` | `kind` | The step types (title, description, group, the runner capabilities each needs, typed `with` keys), gate labels and variables; with `kind`, one step type. Also the resource `xpath://workflows/schema`. |
 
 ## Run
 
 | Tool | Arguments (required in bold) | Notes |
 |---|---|---|
 | `dispatch_workflow` | **`project`**, **`workflow`**, `ref`, `app`, `flavors` (list), `platforms` (list of `android`, `ios`), `bump` (`major`, `minor`, `patch`, `keep`), `version` (`x.y.z`, instead of `bump`), `releaseVersion` (`x.y.z+build`, for a patch), `inputs` (object) | Returns `{run, pendingApprovals, note?}`. A gated run becomes `waiting_for_approval`. |
+| `plan_dispatch` | the arguments of `dispatch_workflow` | What it would start, planned by the engine; nothing starts and no build number is taken. `stages` (each job with `local`, `runner`, `waitReason`), `skipped` (each with its `reason`; `blocks: true` means `dispatch_workflow` would be refused), `version`, `build`. Read-only. |
 
 ## Errors the tools return
 
-- `403`: "The engine refused: ... This MCP token reads, creates and edits projects and workflows
-  and dispatches; it can never approve or loosen a gate."
-- `401`: "The engine rejected the MCP token." The owner makes a new one with
+An error is `{"code", "message", "hint"}`. `code` is the engine's (`not_found`,
+`workflow_invalid`, ...; see [failures.md](failures.md)), or one of `unreachable`, `ambiguous`,
+`invalid_request` and `internal` when the engine never answered. `hint` names the tool to call
+next, or is empty.
+
+- `forbidden`: "The engine refused: ... This MCP token reads, creates and edits projects and
+  workflows and dispatches; it can never approve or loosen a gate."
+- `unauthorized`: "The engine rejected the MCP token." The owner makes a new one with
   `xpd token create --name <name> --kind mcp` and saves it with `xp connect --mcp-token <token>`.
-- A connection error: the engine is not reachable at the saved URL (or `XP_ENGINE_URL`).
-- A name that matches no project or workflow, or a bare `name` that is more than one project
-  (use `owner/name` or the id).
-- Any other API error comes back with the engine's message; see [failures.md](failures.md).
+- `unreachable`: the engine is not reachable at the saved URL (or `XP_ENGINE_URL`).
+- `not_found` with the hint `See: list_projects` (or `list_workflows`): a name that matches no
+  project or workflow. `ambiguous`: a bare `name` that is more than one project (use
+  `owner/name` or the id).
+- Any other API error comes back with the engine's code and message.
 
 ## A typical session
 
 1. `list_projects`, then `list_workflows` for the project.
 2. `get_workflow` to read the inputs of the workflow you will run.
 3. `dispatch_workflow`; keep the run id.
-4. `get_run` until it is `succeeded`, `failed`, `cancelled` or `waiting_for_approval`;
-   `get_job_log_tail` for a job that runs or failed.
-5. On `waiting_for_approval`: report the approval to the owner (see the main skill), then poll
-   `get_approval`.
+4. `wait_for_run` (or `get_run` in a loop) until it is `succeeded`, `failed`, `cancelled` or
+   `waiting_for_approval`; `get_job_log_tail` for a job that runs or failed.
+5. On `waiting_for_approval`: report the approval to the owner (see the main skill), then
+   `wait_for_approval`.
 6. For a release: `list_releases` (state `in_review`, say) and `get_release` for the store lanes.

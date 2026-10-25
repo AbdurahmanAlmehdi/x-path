@@ -22,6 +22,8 @@ const engineMigrations = <Migration>[
   Migration(version: 15, sql: _v15),
   Migration(version: 16, sql: _v16, foreignKeysOff: true),
   Migration(version: 17, sql: _v17),
+  Migration(version: 18, sql: _v18),
+  Migration(version: 19, sql: _v19),
 ];
 
 // Timestamps are integer microseconds since the Unix epoch (UTC), so that
@@ -564,4 +566,25 @@ ALTER TABLE new_project RENAME TO project;
 const _v17 = '''
 ALTER TABLE job ADD COLUMN narrowing TEXT NOT NULL DEFAULT '[]'
   CHECK (json_valid(narrowing));
+''';
+
+// UX U2a: the store ids of a flavor, from its profile like its bundle
+// and application ids: the Firebase app id of each platform and the App Store
+// Connect app id. The built-in workflows upload to them when no input gives
+// one.
+const _v18 = '''
+ALTER TABLE flavor ADD COLUMN firebase_app_id_android TEXT;
+ALTER TABLE flavor ADD COLUMN firebase_app_id_ios TEXT;
+ALTER TABLE flavor ADD COLUMN apple_app_id TEXT;
+''';
+
+// UX U3d: a workflow copied from a built-in remembers which one and the
+// version it started from, so the app can offer to compare when the
+// built-in changes; and a workflow can be archived: kept with its
+// versions and runs, and not dispatched.
+const _v19 = '''
+ALTER TABLE workflow ADD COLUMN based_on_builtin TEXT;
+ALTER TABLE workflow ADD COLUMN based_on_version INTEGER
+  CHECK (based_on_version IS NULL OR based_on_version > 0);
+ALTER TABLE workflow ADD COLUMN archived_at INTEGER;
 ''';

@@ -77,6 +77,7 @@ class DispatchHarness {
     JobRepository? jobRepository,
     bool seeded = true,
     ReleaseOpener? releases,
+    GateConfigRepository? gates,
     bool linuxIosBuilds = false,
   }) async {
     final git = ScriptedGit()..refs['main'] = mainSha;
@@ -134,6 +135,7 @@ class DispatchHarness {
       workspaces: (_) => pubspec,
       worktreeAt: ScriptedGit.pathOf,
       releases: releases,
+      gates: gates,
       random: seeded ? Random(2) : null,
     );
     return ._(
@@ -206,6 +208,12 @@ class DispatchHarness {
     final id = await builtin(name);
     return await dispatcher.dispatch('prj_1', id, request);
   }
+
+  /// Plans dispatching the built-in workflow [name] without starting it.
+  Future<DispatchPlan> planBuiltin(
+    String name, [
+    DispatchRequest request = const DispatchRequest(),
+  ]) async => await dispatcher.plan('prj_1', await builtin(name), request);
 
   /// Dispatches [yaml] as a workflow of the owner.
   Future<Run> dispatchCustom(

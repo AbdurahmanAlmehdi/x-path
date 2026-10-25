@@ -104,6 +104,10 @@ FlavorProfile _$FlavorProfileFromJson(Map<String, dynamic> json) =>
               ?.map((e) => e as String)
               .toList() ??
           const [],
+      firebaseAppId: (json['firebaseAppId'] as Map<String, dynamic>?)?.map(
+        (k, e) => MapEntry(k, e as String),
+      ),
+      appleAppId: json['appleAppId'] as String?,
     );
 
 Map<String, dynamic> _$FlavorProfileToJson(FlavorProfile instance) =>
@@ -121,6 +125,8 @@ Map<String, dynamic> _$FlavorProfileToJson(FlavorProfile instance) =>
       'prod': instance.prod,
       'versionFiles': instance.versionFiles,
       'sources': instance.sources,
+      'firebaseAppId': ?instance.firebaseAppId,
+      'appleAppId': ?instance.appleAppId,
     };
 
 AppProfile _$AppProfileFromJson(Map<String, dynamic> json) => AppProfile(

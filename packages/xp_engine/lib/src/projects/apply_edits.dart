@@ -31,6 +31,13 @@ AppProfile _applyToApp(AppProfile app, AppEdit edit) {
             shorebird: change.shorebird,
             prod: change.prod,
             versionFiles: change.versionFiles,
+            firebaseAppId: change.firebaseAppId == null
+                ? null
+                : () => _firebaseIds(flavor.firebaseAppId, change),
+            appleAppId: switch (change.appleAppId) {
+              null => null,
+              final id => () => id.isEmpty ? null : id,
+            },
           )
         else
           flavor,
@@ -38,7 +45,24 @@ AppProfile _applyToApp(AppProfile app, AppEdit edit) {
   );
 }
 
+/// The Firebase app ids of a flavor with [change] on top: an empty id
+/// removes the platform's; `null` when none is left.
+Map<String, String>? _firebaseIds(
+  Map<String, String>? scanned,
+  FlavorEdit change,
+) {
+  final ids = {...?scanned, ...?change.firebaseAppId}
+    ..removeWhere((_, id) => id.isEmpty);
+  return ids.isEmpty ? null : ids;
+}
+
 final _storeCountry = RegExp(r'^[A-Za-z]{2}$');
+
+/// A Firebase app id of [platform]: `1:<project number>:<platform>:<hex>`.
+bool _isFirebaseAppId(String platform, String id) =>
+    RegExp('^[0-9]+:[0-9]+:$platform:[0-9a-f]+\$').hasMatch(id);
+
+final _appleAppId = RegExp(r'^[0-9]+$');
 
 /// Checks [edits] against what [profile] has and returns them with the store
 /// countries in lower case.
@@ -85,6 +109,26 @@ AppEdit _validateApp(AppEdit edit, AppProfile? app) {
           '"$path" must be a path inside the repository.',
         );
       }
+    }
+    for (final MapEntry(key: platform, value: id)
+        in (flavor.firebaseAppId ?? const <String, String>{}).entries) {
+      if (platform != 'android' && platform != 'ios') {
+        throw ProjectInvalidException(
+          'firebaseAppId is by platform, android or ios, not "$platform".',
+        );
+      }
+      if (id.isNotEmpty && !_isFirebaseAppId(platform, id)) {
+        throw ProjectInvalidException(
+          '"$id" is not a Firebase app id of $platform, which reads '
+          '1:<project number>:$platform:<hex>.',
+        );
+      }
+    }
+    final apple = flavor.appleAppId;
+    if (apple != null && apple.isNotEmpty && !_appleAppId.hasMatch(apple)) {
+      throw ProjectInvalidException(
+        'appleAppId is the number App Store Connect shows, not "$apple".',
+      );
     }
   }
   return AppEdit(

@@ -76,7 +76,7 @@ once and opens one pull request.
 
 ### Phase U1a-1: Quick fixes: failures and drafts
 
-- **Status:** Not started
+- **Status:** Done
 - **Scope:** Show failures and waits without hovering, and stop losing builder drafts.
 - **Files touched:** `apps/xp_desktop/lib/{job,workflow_builder,shell}/**`,
   `apps/xp_desktop/lib/l10n/arb/app_en.arb`, the matching tests
@@ -104,7 +104,7 @@ Details:
 
 ### Phase U1a-2: Quick fixes: confirmations, setup detours and polish
 
-- **Status:** Not started
+- **Status:** Done
 - **Scope:** Confirm destructive actions, keep the Add project folder, and fix small empty
   state, shortcut, formatting and banner gaps.
 - **Files touched:** `apps/xp_desktop/lib/{engines,app,settings,add_project,releases,tests,credentials,approvals,project_overview,shell,widgets}/**`,
@@ -145,7 +145,7 @@ Details:
 
 ### Phase U1b: Quick fixes: CLI, MCP and engine wording
 
-- **Status:** Not started
+- **Status:** Done
 - **Scope:** The CLI prints what the engine knows about a failure, `--json` works everywhere,
   and engine messages carry no client jargon.
 - **Files touched:** `apps/xp/lib/**`, `apps/xp/test/**`,
@@ -183,7 +183,7 @@ Details:
 
 ### Phase U2a: Flavor store identifiers
 
-- **Status:** Not started
+- **Status:** Done
 - **Scope:** Store ids live on the flavor, so built-ins upload without forking.
 - **Files touched:** `packages/xp_api/lib/src/{project_profile,profile_edits}.dart`,
   `packages/xp_api/openapi.yaml`, `packages/xp_adapters/lib/src/sqlite/migrations.dart` and a
@@ -213,7 +213,7 @@ Details:
 
 ### Phase U2b: Typed inputs and the dispatch form
 
-- **Status:** Not started
+- **Status:** Done
 - **Scope:** Workflow inputs have types, and the dispatch sheet, CLI and MCP collect them.
 - **Files touched:** `packages/xp_engine/lib/src/workflows/**`,
   `packages/xp_api/lib/src/workflow.dart`, `packages/xp_api/openapi.yaml`,
@@ -244,7 +244,7 @@ Details:
 
 ### Phase U2c: Engine dry run and dispatch picker
 
-- **Status:** Not started
+- **Status:** Done
 - **Scope:** The engine plans a dispatch without running it, and every client shows that plan.
 - **Files touched:** `packages/xp_engine/lib/src/dispatch/workflow_dispatcher.dart`,
   `apps/xpd/lib/src/api/workflows/workflows_routes.dart`, `packages/xp_api/**`,
@@ -277,7 +277,7 @@ Details:
 
 ### Phase U3a: Deeper validation and structured issues
 
-- **Status:** Not started
+- **Status:** Done
 - **Scope:** Validation catches typos and missing keys before dispatch and reports them with a
   line and a suggestion.
 - **Files touched:** `packages/xp_engine/lib/src/workflows/**`,
@@ -305,7 +305,7 @@ Details:
 
 ### Phase U3b: Rich step schema and typed step editor
 
-- **Status:** Not started
+- **Status:** Done
 - **Scope:** Every step kind describes itself, and the builder edits `with` fields by type.
 - **Files touched:** `packages/xp_api/lib/src/workflow.dart`,
   `packages/xp_engine/lib/src/workflows/step_catalog.dart`,
@@ -336,7 +336,7 @@ Details:
 
 ### Phase U3c: Builder editing: undo, inputs, templates
 
-- **Status:** Not started
+- **Status:** Done
 - **Scope:** Undo in the builder, a visual input editor, and templates for new workflows.
 - **Files touched:** `apps/xp_desktop/lib/workflow_builder/**`,
   `packages/xp_engine/lib/src/workflows/builtin_workflows.dart` (templates live beside
@@ -358,7 +358,7 @@ Details:
 
 ### Phase U3d: Workflow lifecycle and fork tracking
 
-- **Status:** Not started
+- **Status:** Done
 - **Scope:** Version history, archive, rename, and forks that know when their built-in changed.
 - **Files touched:** `packages/xp_api/lib/src/workflow.dart`, `packages/xp_api/openapi.yaml`,
   `packages/xp_adapters/lib/src/sqlite/migrations.dart` and a new snapshot golden
@@ -384,7 +384,7 @@ Details:
 
 ### Phase U4a: Runs API, CLI follow, MCP runs
 
-- **Status:** Not started
+- **Status:** Done
 - **Scope:** Runs can be listed and followed from every client, and API errors carry a hint.
 - **Files touched:** `packages/xp_api/**`, `packages/xp_engine/lib/src/**` (run queries),
   `packages/xp_adapters/lib/src/sqlite/**`, `apps/xpd/lib/src/api/runs/**`,
@@ -410,7 +410,7 @@ Details:
 
 ### Phase U4b-1: Run again and re-run failed jobs (engine and API)
 
-- **Status:** Not started
+- **Status:** Done
 - **Scope:** The engine can re-dispatch a finished run and resume a failed run's failed jobs,
   reusing artifacts already produced.
 - **Files touched:** `packages/xp_engine/lib/src/**` (re-dispatch, re-run failed),
@@ -423,7 +423,7 @@ Details:
 
 ### Phase U4b-2: Desktop runs, logs and summaries
 
-- **Status:** Not started
+- **Status:** Done
 - **Scope:** Runs are findable from Overview, can be run again from the app, and their logs
   and artifacts are readable.
 - **Files touched:** `apps/xp_desktop/lib/{project_overview,job}/**`,
@@ -447,7 +447,7 @@ Details:
 
 ### Phase U4c: Desktop feedback kit
 
-- **Status:** Not started
+- **Status:** Done
 - **Scope:** One toast, loading and error vocabulary across the app, and honest staleness when
   the engine is away.
 - **Files touched:** `apps/xp_desktop/lib/widgets/**`, `apps/xp_desktop/lib/theme/**`, every

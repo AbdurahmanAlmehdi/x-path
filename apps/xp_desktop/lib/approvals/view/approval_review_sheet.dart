@@ -223,7 +223,7 @@ class _Body extends StatelessWidget {
         ],
         if (state.error case final error? when !settled) ...[
           const SizedBox(height: 12),
-          XpMessage(XpStatus.scanError, error),
+          XpMessage.error(error),
         ],
       ],
     );

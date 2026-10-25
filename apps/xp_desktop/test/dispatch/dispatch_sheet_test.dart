@@ -5,6 +5,7 @@ import 'package:mocktail/mocktail.dart';
 import 'package:xp_api/xp_api.dart';
 import 'package:xp_client/xp_client.dart';
 import 'package:xp_desktop/dispatch/dispatch.dart';
+import 'package:xp_desktop/widgets/widgets.dart';
 import 'package:xp_repositories/xp_repositories.dart';
 
 import '../helpers/fakes.dart';
@@ -33,9 +34,15 @@ void main() {
       expect(find.text('WILL RUN · 4 JOBS IN 3 STAGES'), findsOneWidget);
       expect(find.text('This Mac'), findsOneWidget);
       expect(
-        find.text('This Mac first, else linux-builder-01 · slot 2 of 4'),
+        find.text('This Mac first, else linux-builder-01'),
         findsOneWidget,
       );
+      expect(find.text('Upload prod for ios'), findsOneWidget);
+      expect(
+        find.text('skipped, no App Store app id for prod'),
+        findsOneWidget,
+      );
+      expect(find.text('5.4.1 (3284)'), findsOneWidget);
       expect(find.text('1 job on This Mac'), findsNWidgets(2));
       expect(find.text('Upload approval'), findsOneWidget);
       expect(
@@ -43,7 +50,7 @@ void main() {
         findsOneWidget,
       );
       expect(
-        find.text('from 5.4.1 (3283) in the pubspec at the last scan'),
+        find.text('from 5.4.1 (3283) in the pubspec of the commit'),
         findsOneWidget,
       );
       expect(find.text('Dispatch 4 jobs'), findsOneWidget);
@@ -76,9 +83,12 @@ void main() {
         ),
         findsOneWidget,
       );
-      await tester.tap(find.text('Dispatch 4 jobs'));
+      final button = find.widgetWithText(XpButton, 'Dispatch');
+      expect(tester.widget<XpButton>(button).onPressed, isNull);
+      await tester.tap(button);
       await commandReturn(tester);
       verifyNever(() => harness.workflows.dispatch(any(), any(), any()));
+      verifyNever(() => harness.workflows.plan(any(), any(), any()));
     });
 
     testWidgets('Return does not dispatch; ⌘↩ does', (tester) async {
@@ -114,6 +124,50 @@ void main() {
       expect(harness.result, runningRun().run);
     });
 
+    testWidgets('dispatches a ref the engine does not have yet', (
+      tester,
+    ) async {
+      final harness = DispatchHarness();
+      when(
+        () => harness.workflows.plan(
+          any(),
+          any(),
+          any(that: isA<DispatchRequest>().having((r) => r.ref, 'ref', 'new')),
+        ),
+      ).thenThrow(
+        const ApiException(
+          'This engine has no "new" yet.',
+          statusCode: 422,
+          code: ApiErrorCode.workflowInvalid,
+          hint: 'Dispatching fetches it from the repository first.',
+          details: {'reason': ErrorReason.refUnknown, 'ref': 'new'},
+        ),
+      );
+      when(() => harness.workflows.dispatch('prj_1', 'wf_prod', any()))
+          .thenAnswer((_) async => runningRun().run);
+      await harness.open(tester);
+
+      await tester.enterText(
+        find.byWidgetPredicate(
+          (widget) => widget is TextField && widget.controller?.text == 'main',
+        ),
+        'new',
+      );
+      await tester.pump(DispatchBloc.typingPause);
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text(
+          'This engine has no "new" yet. Dispatching fetches it from the '
+          'repository first.',
+        ),
+        findsOneWidget,
+      );
+      await tester.tap(find.widgetWithText(XpButton, 'Dispatch'));
+      await tester.pumpAndSettle();
+      expect(harness.result, runningRun().run);
+    });
+
     testWidgets('changes what it previews', (tester) async {
       final harness = DispatchHarness();
       await harness.open(tester);
@@ -123,13 +177,18 @@ void main() {
       await tester.tap(find.text('Android'));
       await tester.tap(find.text('Tag'));
       await tester.tap(find.text('Minor'));
-      await tester.enterText(find.byType(TextField), 'release/5.4.1');
+      await tester.enterText(
+        find.byWidgetPredicate(
+          (widget) => widget is TextField && widget.controller?.text == 'main',
+        ),
+        'release/5.4.1',
+      );
       await tester.pumpAndSettle();
       verify(
-        () => harness.workflows.preview(
-          project: any(named: 'project'),
-          workflow: any(named: 'workflow'),
-          request: const DispatchRequest(
+        () => harness.workflows.plan(
+          any(),
+          any(),
+          const DispatchRequest(
             app: '.',
             ref: 'release/5.4.1',
             flavors: ['prod', 'dev'],
@@ -144,6 +203,82 @@ void main() {
       await tester.tap(find.text('Dev build').last);
       await tester.pumpAndSettle();
       verify(() => harness.workflows.getWorkflow('prj_1', 'wf_dev')).called(1);
+    });
+
+    testWidgets('names where a job waits, and what the engine would refuse', (
+      tester,
+    ) async {
+      final harness = DispatchHarness();
+      when(() => harness.workflows.plan(any(), any(), any())).thenAnswer(
+        (_) async => const DispatchPlan(
+          flavors: ['prod'],
+          platforms: ['ios'],
+          stages: [
+            PlannedStage(
+              name: 'build',
+              jobs: [
+                PlannedJob(
+                  name: 'Build prod for ios',
+                  engineOnly: false,
+                  local: false,
+                  waitReason: 'No runner can do ios-sign.',
+                ),
+                PlannedJob(
+                  name: 'Build prod on mini',
+                  engineOnly: false,
+                  local: false,
+                  runner: 'mac-mini',
+                ),
+              ],
+            ),
+          ],
+          skipped: [
+            SkippedJob(
+              name: 'Upload prod for ios',
+              stage: 'upload',
+              reason: 'The flavor has no App Store Connect key.',
+              blocks: true,
+            ),
+          ],
+        ),
+      );
+      await harness.open(tester);
+
+      expect(find.text('No runner can do ios-sign.'), findsOneWidget);
+      expect(find.text('mac-mini'), findsOneWidget);
+      expect(
+        find.text('cannot run: The flavor has no App Store Connect key.'),
+        findsOneWidget,
+      );
+      expect(
+        tester
+            .widget<XpButton>(find.widgetWithText(XpButton, 'Dispatch 2 jobs'))
+            .onPressed,
+        isNull,
+      );
+    });
+
+    testWidgets('names a workflow by its title, with its description', (
+      tester,
+    ) async {
+      final harness = DispatchHarness();
+      when(() => harness.workflows.listWorkflows(any())).thenAnswer(
+        (_) async => [
+          WorkflowSummary(
+            id: 'wf_prod',
+            projectId: 'prj_1',
+            name: 'prod-release',
+            builtin: true,
+            version: prodSummary.version,
+            title: 'Production release',
+            description: 'Releases a production flavor.',
+          ),
+        ],
+      );
+      await harness.open(tester);
+
+      expect(find.text('Production release'), findsOneWidget);
+      expect(find.text('Releases a production flavor.'), findsOneWidget);
     });
 
     testWidgets('closes with Escape or Cancel', (tester) async {
@@ -170,10 +305,10 @@ void main() {
       await tester.tap(find.text('tablet').last);
       await tester.pumpAndSettle();
       verify(
-        () => harness.workflows.preview(
-          project: any(named: 'project'),
-          workflow: any(named: 'workflow'),
-          request: const DispatchRequest(
+        () => harness.workflows.plan(
+          any(),
+          any(),
+          const DispatchRequest(
             app: 'apps/tablet',
             ref: 'main',
             bump: VersionBump.keep,
@@ -187,15 +322,8 @@ void main() {
     ) async {
       final harness = DispatchHarness();
       when(
-        () => harness.workflows.preview(
-          project: any(named: 'project'),
-          workflow: any(named: 'workflow'),
-          request: any(named: 'request'),
-        ),
-      ).thenAnswer(
-        (_) async =>
-            const DispatchPreview(flavors: [], platforms: [], stages: []),
-      );
+        () => harness.workflows.plan(any(), any(), any()),
+      ).thenAnswer((_) async => const DispatchPlan(flavors: [], platforms: []));
       await harness.open(tester);
       expect(
         find.text('Nothing would run for these flavors and platforms.'),
@@ -222,6 +350,237 @@ void main() {
       await tester.tap(find.text('Dispatch 4 jobs'));
       await commandReturn(tester);
       verifyNever(() => harness.workflows.dispatch(any(), any(), any()));
+    });
+  });
+
+  group('inputs (UX-04)', () {
+    Workflow typed(List<WorkflowInput> inputs) => Workflow(
+      id: 'wf_prod',
+      projectId: 'prj_1',
+      name: 'shorebird-patch',
+      builtin: true,
+      version: prodWorkflow.version,
+      versions: prodWorkflow.versions,
+      yaml: 'stages: []',
+      inputs: inputs,
+    );
+
+    Release release(String version, int build, int day) => Release(
+      id: 'rel_$build',
+      projectId: 'prj_1',
+      app: '.',
+      flavor: 'prod',
+      version: version,
+      build: build,
+      state: ReleaseState.live,
+      stores: const [],
+      builds: const [],
+      mergeEnabled: false,
+      createdAt: DateTime.utc(2026, 10, day),
+      updatedAt: DateTime.utc(2026, 10, day),
+    );
+
+    MockReleasesRepository releasesOf(List<Release> releases) {
+      final repository = MockReleasesRepository();
+      when(() => repository.watchReleases(projectId: any(named: 'projectId')))
+          .thenAnswer((_) => Stream.value(Snapshot(releases)));
+      return repository;
+    }
+
+    Finder text(String input) => find.descendant(
+      of: find.byKey(Key('dispatch.input.$input')),
+      matching: find.byType(TextField),
+    );
+
+    testWidgets('a patch dispatches after picking a release', (tester) async {
+      final harness = DispatchHarness();
+      when(() => harness.workflows.getWorkflow(any(), any())).thenAnswer(
+        (_) async => typed(const [
+          WorkflowInput(
+            name: 'releaseVersion',
+            type: InputType.release,
+            description: 'The release the patch applies to.',
+          ),
+          WorkflowInput(
+            name: 'allowNativeDiffs',
+            type: InputType.boolean,
+            defaultValue: false,
+          ),
+          WorkflowInput(
+            name: 'track',
+            type: InputType.choice,
+            options: ['internal', 'beta'],
+            required: true,
+          ),
+        ]),
+      );
+      when(() => harness.workflows.dispatch('prj_1', 'wf_prod', any()))
+          .thenAnswer((_) async => runningRun().run);
+      await harness.open(
+        tester,
+        releases: releasesOf([
+          release('5.4.0', 3200, 1),
+          release('5.4.1', 3283, 9),
+        ]),
+      );
+
+      expect(find.text('INPUTS'), findsOneWidget);
+      expect(find.text('The release the patch applies to.'), findsOneWidget);
+      expect(find.text('5.4.1 (3283) · prod'), findsOneWidget);
+      await tester.tap(find.text('5.4.1 (3283) · prod'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('5.4.0 (3200) · prod').last);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Yes'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('internal'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('beta').last);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Dispatch 4 jobs'));
+      await tester.pumpAndSettle();
+
+      final request =
+          verify(
+                () => harness.workflows.dispatch(
+                  'prj_1',
+                  'wf_prod',
+                  captureAny(),
+                ),
+              ).captured.single
+              as DispatchRequest;
+      expect(request.releaseVersion, '5.4.0+3200');
+      expect(request.inputs, {
+        'releaseVersion': '5.4.0+3200',
+        'allowNativeDiffs': true,
+        'track': 'beta',
+      });
+    });
+
+    testWidgets('a release input waits for a release', (tester) async {
+      final harness = DispatchHarness();
+      when(() => harness.workflows.getWorkflow(any(), any())).thenAnswer(
+        (_) async => typed(const [
+          WorkflowInput(name: 'releaseVersion', type: InputType.release),
+        ]),
+      );
+      await harness.open(tester, releases: releasesOf(const []));
+
+      expect(
+        find.text(
+          'No releases yet: this workflow needs a release that reached a '
+          'store.',
+        ),
+        findsOneWidget,
+      );
+      final button = tester.widget<XpButton>(
+        find.widgetWithText(XpButton, 'Dispatch 4 jobs'),
+      );
+      expect(button.onPressed, isNull);
+    });
+
+    testWidgets('a dev build uploads to a Firebase app id typed in the sheet', (
+      tester,
+    ) async {
+      final harness = DispatchHarness();
+      when(() => harness.workflows.getWorkflow(any(), any())).thenAnswer(
+        (_) async => typed(const [
+          WorkflowInput(name: 'firebaseAppIds', type: InputType.json),
+          WorkflowInput(
+            name: 'notes',
+            type: InputType.string,
+            defaultValue: 'Default notes',
+          ),
+          WorkflowInput(name: 'loose'),
+        ]),
+      );
+      when(() => harness.workflows.dispatch('prj_1', 'wf_prod', any()))
+          .thenAnswer((_) async => runningRun().run);
+      await harness.open(tester);
+
+      expect(
+        tester.widget<TextField>(text('notes')).controller!.text,
+        'Default notes',
+      );
+      await tester.enterText(text('firebaseAppIds'), '{"dev": ');
+      await tester.pumpAndSettle();
+      expect(find.text('Not valid JSON.'), findsOneWidget);
+      expect(
+        tester
+            .widget<XpButton>(find.widgetWithText(XpButton, 'Dispatch 4 jobs'))
+            .onPressed,
+        isNull,
+      );
+      await tester.enterText(
+        text('firebaseAppIds'),
+        '{"dev": {"android": "1:1:android:a"}}',
+      );
+      await tester.enterText(text('loose'), 'true');
+      await tester.enterText(text('notes'), '');
+      await tester.pumpAndSettle();
+      expect(find.text('Not valid JSON.'), findsNothing);
+      await tester.enterText(text('firebaseAppIds'), ' ');
+      await tester.enterText(
+        text('firebaseAppIds'),
+        '{"dev": {"android": "1:1:android:a"}}',
+      );
+      // The preview waits for the typing to pause.
+      await tester.pump(DispatchBloc.typingPause);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Dispatch 4 jobs'));
+      await tester.pumpAndSettle();
+
+      final request =
+          verify(
+                () => harness.workflows.dispatch(
+                  'prj_1',
+                  'wf_prod',
+                  captureAny(),
+                ),
+              ).captured.single
+              as DispatchRequest;
+      expect(request.inputs, {
+        'firebaseAppIds': {
+          'dev': {'android': '1:1:android:a'},
+        },
+        'loose': 'true',
+      });
+    });
+
+    testWidgets('types a version instead of a bump', (tester) async {
+      final harness = DispatchHarness();
+      when(() => harness.workflows.dispatch('prj_1', 'wf_prod', any()))
+          .thenAnswer((_) async => runningRun().run);
+      await harness.open(tester);
+
+      await tester.enterText(
+        find.descendant(
+          of: find.byKey(const Key('dispatch.version')),
+          matching: find.byType(TextField),
+        ),
+        '6.0.0',
+      );
+      await tester.pumpAndSettle();
+      final waiting = tester.widget<XpButton>(
+        find.widgetWithText(XpButton, 'Dispatch 4 jobs'),
+      );
+      expect(waiting.onPressed, isNull, reason: 'the preview waits');
+      await tester.pump(DispatchBloc.typingPause);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Dispatch 4 jobs'));
+      await tester.pumpAndSettle();
+
+      final request =
+          verify(
+                () => harness.workflows.dispatch(
+                  'prj_1',
+                  'wf_prod',
+                  captureAny(),
+                ),
+              ).captured.single
+              as DispatchRequest;
+      expect(request.version, '6.0.0');
+      expect(request.bump, isNull);
     });
   });
 }

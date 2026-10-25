@@ -1,5 +1,6 @@
 export 'bloc/credentials_bloc.dart';
 export 'bloc/project_credentials_bloc.dart';
+export 'cubit/store_ids_cubit.dart';
 export 'view/credentials_page.dart';
 export 'view/flavor_credentials_sheet.dart';
 export 'widgets/credential_dialogs.dart';

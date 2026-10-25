@@ -32,6 +32,17 @@ enum RunState {
 
   /// The name on the wire.
   final String wire;
+
+  /// Whether the run has ended: nothing of it runs or waits any more,
+  /// unless a failed job is resumed.
+  bool get isFinished => switch (this) {
+    succeeded || failed || cancelled => true,
+    queued || running || waitingForApproval => false,
+  };
+
+  /// The state called [wire], or `null`.
+  static RunState? fromWire(String wire) =>
+      values.where((state) => state.wire == wire).firstOrNull;
 }
 
 /// How to bump the version of the app for a run.
@@ -183,6 +194,7 @@ class Run extends Equatable {
     this.ref,
     this.version,
     this.build,
+    this.request,
   });
 
   /// Reads a run from its JSON form.
@@ -225,6 +237,10 @@ class Run extends Equatable {
   /// Its jobs, by stage.
   final List<RunJob> jobs;
 
+  /// What the dispatch asked for: its flavors, platforms, inputs and the
+  /// rest, as it was sent.
+  final DispatchRequest? request;
+
   /// The JSON form.
   Map<String, dynamic> toJson() => _$RunToJson(this);
 
@@ -242,5 +258,30 @@ class Run extends Equatable {
     build,
     createdAt,
     jobs,
+    request,
   ];
+}
+
+/// The body of `GET /runs` and `GET /projects/{id}/runs`: the runs newest
+/// first, and where the next page starts.
+@JsonSerializable(explicitToJson: true, includeIfNull: false)
+class RunsResponse extends Equatable {
+  /// Creates a response.
+  const new(this.runs, {this.next});
+
+  /// Reads a response from its JSON form.
+  factory RunsResponse.fromJson(Map<String, dynamic> json) =>
+      _$RunsResponseFromJson(json);
+
+  /// The runs, newest first.
+  final List<Run> runs;
+
+  /// The `before` of the next page, when there may be one.
+  final String? next;
+
+  /// The JSON form.
+  Map<String, dynamic> toJson() => _$RunsResponseToJson(this);
+
+  @override
+  List<Object?> get props => [runs, next];
 }

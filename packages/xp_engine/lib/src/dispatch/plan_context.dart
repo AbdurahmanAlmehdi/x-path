@@ -183,7 +183,7 @@ class JobContext {
 }
 
 /// The flavor as a workflow reads it (`flavor.name`, `flavor.prod`,
-/// `flavor.credentials.play_sa`, ...).
+/// `flavor.firebaseAppId.android`, `flavor.credentials.play_sa`, ...).
 Map<String, Object?> flavorScope(
   FlavorProfile flavor,
   Iterable<AssignedCredential> credentials,
@@ -196,6 +196,8 @@ Map<String, Object?> flavorScope(
   'iosBundleId': flavor.iosBundleId,
   'androidAppId': flavor.androidAppId,
   'shorebirdAppId': flavor.shorebirdAppId,
+  'firebaseAppId': {...?flavor.firebaseAppId},
+  'appleAppId': flavor.appleAppId,
   'credentials': {
     for (final credential in credentials) credential.kind.wire: true,
   },
@@ -223,9 +225,14 @@ class StepPlanning {
   /// Where the step starts in the document.
   final SourcePosition position;
 
-  /// Stops the dispatch: this step cannot be planned.
-  Never fail(String message) =>
-      throw DispatchException('Line ${position.line}, $kind: $message');
+  /// Stops the dispatch: this step cannot be planned. [hint] says what to do
+  /// about it, and [details] what a client can act on.
+  Never fail(String message, {String? hint, Map<String, Object?>? details}) =>
+      throw DispatchException(
+        'Line ${position.line}, $kind: $message',
+        hint: hint,
+        details: details,
+      );
 
   /// The string at [key], or `null` if the step was not given it.
   String? text(String key) {

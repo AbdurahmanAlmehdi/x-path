@@ -15,6 +15,8 @@ void main() {
     prod: true,
     versionFiles: ['pubspec.yaml'],
     sources: ['gradle'],
+    firebaseAppId: {'android': '1:1:android:a'},
+    appleAppId: '123',
   );
 
   group('FlavorProfile', () {
@@ -64,6 +66,19 @@ void main() {
       expect(changed.name, 'dev');
       expect(changed.iosTeam, 'TEAM123456');
       expect(changed.sources, ['gradle']);
+      expect(changed.firebaseAppId, {'android': '1:1:android:a'});
+      expect(changed.appleAppId, '123');
+    });
+
+    test('copyWith sets or clears the store ids', () {
+      final changed = flavor.copyWith(
+        firebaseAppId: () => {'ios': '1:1:ios:b'},
+        appleAppId: () => null,
+      );
+
+      expect(changed.firebaseAppId, {'ios': '1:1:ios:b'});
+      expect(changed.appleAppId, isNull);
+      expect(changed.toJson().containsKey('appleAppId'), isFalse);
     });
   });
 

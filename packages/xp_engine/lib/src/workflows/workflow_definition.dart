@@ -1,5 +1,7 @@
 import 'package:equatable/equatable.dart';
+import 'package:xp_api/xp_api.dart';
 import 'package:xp_engine/src/scheduler/capability.dart';
+import 'package:xp_engine/src/versioning/app_version.dart';
 import 'package:xp_engine/src/workflows/expression.dart';
 import 'package:xp_engine/src/workflows/gate_action.dart';
 
@@ -24,6 +26,58 @@ const dispatchVariables = {
   'releaseVersion',
   'sha',
   'version',
+};
+
+/// The fields of the variables that are mappings, by the path that reads
+/// them: what `RunContext.scope` and `flavorScope` fill in. `inputs` has the
+/// inputs the workflow declares.
+final variableFields = <String, Set<String>>{
+  'app': const {'name', 'path', 'hasIos', 'hasAndroid', 'version'},
+  'project': const {'id', 'fullName', 'baseBranch'},
+  'flavor': const {
+    'name',
+    'implicit',
+    'prod',
+    'shorebird',
+    'entrypoint',
+    'iosBundleId',
+    'androidAppId',
+    'shorebirdAppId',
+    'firebaseAppId',
+    'appleAppId',
+    'credentials',
+  },
+  'flavor.firebaseAppId': platformNames.toSet(),
+  'flavor.credentials': {for (final kind in CredentialKind.values) kind.wire},
+};
+
+/// Every path an expression can read: the variables of the dispatch and the
+/// matrix, and the fields of each that [variableFields] knows, sorted.
+List<String> get variablePaths {
+  Iterable<String> below(String path) => [
+    path,
+    for (final field in [...?variableFields[path]]..sort())
+      ...below('$path.$field'),
+  ];
+  return [
+    for (final name in {...dispatchVariables, ...matrixAxes}.toList()..sort())
+      ...below(name),
+  ];
+}
+
+/// What the variables that have no fields hold, as in "`build` is a number".
+const scalarVariables = {
+  'platform': 'a string',
+  'ref': 'a string',
+  'sha': 'a string',
+  'release': 'a string',
+  'version': 'a string',
+  'releaseVersion': 'a string',
+  'build': 'a number',
+  'patch': 'a number',
+  'bump': 'true or false',
+  'platforms': 'a list',
+  'flavors': 'a list',
 };
 
 /// The dimensions a job can multiply itself over, and the values `platform`
@@ -58,6 +112,8 @@ class InputDefinition extends Equatable {
   const new({
     required this.name,
     required this.position,
+    this.type,
+    this.options,
     this.description,
     this.defaultValue,
     this.required = false,
@@ -65,6 +121,13 @@ class InputDefinition extends Equatable {
 
   /// The name under `inputs`.
   final String name;
+
+  /// What it takes; `null` for an input without a type, which
+  /// takes any value.
+  final InputType? type;
+
+  /// The values a [InputType.choice] input may take.
+  final List<String>? options;
 
   /// What it is for.
   final String? description;
@@ -79,9 +142,47 @@ class InputDefinition extends Equatable {
   /// Where it is declared.
   final SourcePosition position;
 
+  /// Why [value] is not a value of this input, as the end of a sentence
+  /// about it ("must be true or false"), or `null` when it is one. `null`
+  /// is a value of every input: the one it has without a default.
+  String? problemOf(Object? value) {
+    if (value == null) return null;
+    return switch (type) {
+      null || InputType.json => null,
+      InputType.string when value is! String => 'must be text',
+      InputType.boolean when value is! bool => 'must be true or false',
+      InputType.choice when !(options ?? const []).contains(value) =>
+        'must be one of ${(options ?? const []).join(', ')}',
+      InputType.release when !_isRelease(value) =>
+        'must be a release, x.y.z+build',
+      _ => null,
+    };
+  }
+
+  static bool _isRelease(Object value) {
+    if (value is! String) return false;
+    try {
+      return AppVersion.parse(value).build != null;
+    } on FormatException {
+      return false;
+    }
+  }
+
+  /// The input as clients see it.
+  WorkflowInput toWire() => WorkflowInput(
+    name: name,
+    type: type,
+    description: description,
+    options: options,
+    defaultValue: defaultValue,
+    required: required,
+  );
+
   @override
   List<Object?> get props => [
     name,
+    type,
+    options,
     description,
     defaultValue,
     required,

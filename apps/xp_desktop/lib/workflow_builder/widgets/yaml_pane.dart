@@ -309,9 +309,23 @@ class _IssueList extends StatelessWidget {
                         ),
                       ),
                       Expanded(
-                        child: Text(
-                          issue.message,
-                          style: type.body.copyWith(color: colors.textPrimary),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              issue.message,
+                              style: type.body.copyWith(
+                                color: colors.textPrimary,
+                              ),
+                            ),
+                            if (issue.hint case final hint?)
+                              Text(
+                                hint,
+                                style: type.body.copyWith(
+                                  color: colors.textSecondary,
+                                ),
+                              ),
+                          ],
                         ),
                       ),
                     ],

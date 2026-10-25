@@ -1,14 +1,14 @@
 import 'dart:io' as io;
 
 /// Asks the person at the terminal for a secret without showing what they
-/// type. Tests pass a fake.
+/// type, or for a plain answer. Tests pass a fake.
 abstract interface class SecretPrompt {
   /// Whether there is a person to ask: standard input is a terminal.
   bool get interactive;
 
-  /// Shows [question] and reads one line with the echo off. The line break
-  /// is not part of the answer.
-  String ask(String question);
+  /// Shows [question] and reads one line, with the echo off for a
+  /// [secret]. The line break is not part of the answer.
+  String ask(String question, {bool secret = true});
 }
 
 /// The [SecretPrompt] of the real terminal.
@@ -29,8 +29,9 @@ class TerminalSecretPrompt implements SecretPrompt {
   bool get interactive => _in.hasTerminal;
 
   @override
-  String ask(String question) {
+  String ask(String question, {bool secret = true}) {
     _out.write('$question: ');
+    if (!secret) return _in.readLineSync() ?? '';
     final echo = _in.echoMode;
     _in.echoMode = false;
     try {

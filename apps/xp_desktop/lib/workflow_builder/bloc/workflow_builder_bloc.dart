@@ -37,8 +37,35 @@ final class WorkflowOpened extends WorkflowBuilderEvent {
   List<Object?> get props => [workflowId];
 }
 
-/// Starts a new, unsaved workflow from a small template.
+/// Starts a new, unsaved workflow from [template], or from a blank one.
 final class WorkflowDraftStarted extends WorkflowBuilderEvent {
+  const new({this.template});
+
+  final WorkflowTemplate? template;
+
+  @override
+  List<Object?> get props => [template];
+}
+
+/// Goes back to the YAML before the last change (⌘Z).
+final class WorkflowUndoRequested extends WorkflowBuilderEvent {
+  const new();
+}
+
+/// Puts [yaml] back: the document as it was before a removal, which the
+/// removal's Undo restores whatever came after it. It is a change of its
+/// own, so ⌘Z takes it back.
+final class WorkflowRestored extends WorkflowBuilderEvent {
+  const new(this.yaml);
+
+  final String yaml;
+
+  @override
+  List<Object?> get props => [yaml];
+}
+
+/// Makes the change undone last again (⇧⌘Z).
+final class WorkflowRedoRequested extends WorkflowBuilderEvent {
   const new();
 }
 
@@ -97,6 +124,67 @@ final class WorkflowSaveRequested extends WorkflowBuilderEvent {
   List<Object?> get props => [name];
 }
 
+/// Renames the open workflow of the owner.
+final class WorkflowRenameRequested extends WorkflowBuilderEvent {
+  const new(this.name);
+
+  final String name;
+
+  @override
+  List<Object?> get props => [name];
+}
+
+/// Archives the open workflow of the owner, or unarchives it.
+final class WorkflowArchiveRequested extends WorkflowBuilderEvent {
+  const new({required this.archived, this.workflowId});
+
+  final bool archived;
+
+  /// The workflow to archive or unarchive: the open one when `null`. An
+  /// undo names the one it undoes, which may no longer be open.
+  final String? workflowId;
+
+  @override
+  List<Object?> get props => [archived, workflowId];
+}
+
+/// Deletes the open workflow of the owner; the engine refuses one that ran.
+final class WorkflowDeleteRequested extends WorkflowBuilderEvent {
+  const new();
+}
+
+/// Reads versions [from] and [to] of the open workflow, to compare them.
+final class WorkflowVersionsCompared extends WorkflowBuilderEvent {
+  const new(this.from, this.to);
+
+  final int from;
+  final int to;
+
+  @override
+  List<Object?> get props => [from, to];
+}
+
+/// Saves version [version] of the open workflow again, as its newest.
+final class WorkflowVersionRestored extends WorkflowBuilderEvent {
+  const new(this.version);
+
+  final int version;
+
+  @override
+  List<Object?> get props => [version];
+}
+
+/// Reads the built-in the open copy is based on, then and now, to compare.
+final class WorkflowBuiltinCompared extends WorkflowBuilderEvent {
+  const new();
+}
+
+/// Marks the open copy as caught up with the newest version of its
+/// built-in.
+final class WorkflowCaughtUp extends WorkflowBuilderEvent {
+  const new();
+}
+
 final class _WorkflowValidationRequested extends WorkflowBuilderEvent {
   const new();
 }
@@ -148,11 +236,75 @@ final class WorkflowExportedNotice extends WorkflowNotice {
   List<Object?> get props => [path];
 }
 
+/// The workflow [name] was deleted.
+final class WorkflowDeletedNotice extends WorkflowNotice {
+  const new(this.name);
+
+  final String name;
+
+  @override
+  List<Object?> get props => [name];
+}
+
+/// Version [from] was saved again as [version] of [name].
+final class WorkflowRestoredNotice extends WorkflowNotice {
+  const new(this.name, this.from, this.version);
+
+  final String name;
+  final int from;
+  final int version;
+
+  @override
+  List<Object?> get props => [name, from, version];
+}
+
+/// Two versions of the open workflow, to compare: [before] is version
+/// [from], [after] version [to].
+class VersionDiff extends Equatable {
+  const new({
+    required this.from,
+    required this.to,
+    required this.before,
+    required this.after,
+  });
+
+  final int from;
+  final int to;
+  final String before;
+  final String after;
+
+  @override
+  List<Object?> get props => [from, to, before, after];
+}
+
+/// The built-in an open copy is based on, at the version the copy started
+/// from ([base]) and at its newest ([latest]): a three-way compare with the
+/// copy's own YAML.
+class BuiltinCompare extends Equatable {
+  const new({
+    required this.builtin,
+    required this.base,
+    required this.latest,
+    required this.baseYaml,
+    required this.latestYaml,
+  });
+
+  final String builtin;
+  final int base;
+  final int latest;
+  final String baseYaml;
+  final String latestYaml;
+
+  @override
+  List<Object?> get props => [builtin, base, latest, baseYaml, latestYaml];
+}
+
 class WorkflowBuilderState extends Equatable {
   const new({
     this.loaded = false,
     this.workflows = const [],
     this.schema,
+    this.templates = const [],
     this.workflow,
     this.draftName,
     this.yaml = '',
@@ -165,6 +317,10 @@ class WorkflowBuilderState extends Equatable {
     this.command = WorkflowCommand.none,
     this.notice,
     this.error,
+    this.undoStack = const [],
+    this.redoStack = const [],
+    this.versionDiff,
+    this.builtinCompare,
   });
 
   /// Whether the list of workflows arrived.
@@ -176,6 +332,10 @@ class WorkflowBuilderState extends Equatable {
   /// What a document may name, for the pickers; `null` until the engine
   /// answers.
   final WorkflowSchema? schema;
+
+  /// The documents a new workflow can start from; empty while the engine
+  /// cannot give them (a blank one then).
+  final List<WorkflowTemplate> templates;
 
   /// The saved workflow the builder edits; `null` for a draft.
   final Workflow? workflow;
@@ -206,6 +366,39 @@ class WorkflowBuilderState extends Equatable {
   final WorkflowNotice? notice;
   final String? error;
 
+  /// The YAML before each change, the last one last: what ⌘Z goes back to.
+  final List<String> undoStack;
+
+  /// The YAML of each change undone, the last one last: what ⇧⌘Z redoes.
+  final List<String> redoStack;
+
+  bool get canUndo => undoStack.isNotEmpty;
+  bool get canRedo => redoStack.isNotEmpty;
+
+  /// The two versions being compared, once read.
+  final VersionDiff? versionDiff;
+
+  /// The built-in of the open copy then and now, once read.
+  final BuiltinCompare? builtinCompare;
+
+  /// When the open workflow is a copy of a built-in that has a newer
+  /// version: its name, the version the copy is based on, and the newest.
+  ({String builtin, int base, int latest})? get builtinUpdate {
+    final basedOn = workflow?.basedOn;
+    if (basedOn == null) return null;
+    final builtin = workflows
+        .where((w) => w.builtin && w.name == basedOn.builtin)
+        .firstOrNull;
+    if (builtin == null || builtin.version.version <= basedOn.version) {
+      return null;
+    }
+    return (
+      builtin: basedOn.builtin,
+      base: basedOn.version,
+      latest: builtin.version.version,
+    );
+  }
+
   /// Whether [yaml] differs from what is saved.
   bool get dirty => yaml != savedYaml;
 
@@ -230,6 +423,7 @@ class WorkflowBuilderState extends Equatable {
     bool? loaded,
     List<WorkflowSummary>? workflows,
     WorkflowSchema? schema,
+    List<WorkflowTemplate>? templates,
     Workflow? Function()? workflow,
     String? Function()? draftName,
     String? yaml,
@@ -242,10 +436,15 @@ class WorkflowBuilderState extends Equatable {
     WorkflowCommand? command,
     WorkflowNotice? Function()? notice,
     String? Function()? error,
+    List<String>? undoStack,
+    List<String>? redoStack,
+    VersionDiff? Function()? versionDiff,
+    BuiltinCompare? Function()? builtinCompare,
   }) => WorkflowBuilderState(
     loaded: loaded ?? this.loaded,
     workflows: workflows ?? this.workflows,
     schema: schema ?? this.schema,
+    templates: templates ?? this.templates,
     workflow: workflow == null ? this.workflow : workflow(),
     draftName: draftName == null ? this.draftName : draftName(),
     yaml: yaml ?? this.yaml,
@@ -258,6 +457,12 @@ class WorkflowBuilderState extends Equatable {
     command: command ?? this.command,
     notice: notice == null ? this.notice : notice(),
     error: error == null ? this.error : error(),
+    undoStack: undoStack ?? this.undoStack,
+    redoStack: redoStack ?? this.redoStack,
+    versionDiff: versionDiff == null ? this.versionDiff : versionDiff(),
+    builtinCompare: builtinCompare == null
+        ? this.builtinCompare
+        : builtinCompare(),
   );
 
   @override
@@ -265,6 +470,7 @@ class WorkflowBuilderState extends Equatable {
     loaded,
     workflows,
     schema,
+    templates,
     workflow,
     draftName,
     yaml,
@@ -277,6 +483,10 @@ class WorkflowBuilderState extends Equatable {
     command,
     notice,
     error,
+    undoStack,
+    redoStack,
+    versionDiff,
+    builtinCompare,
   ];
 }
 
@@ -310,7 +520,9 @@ class WorkflowBuilderBloc
     required this._pickFile,
     required this._saveFile,
     this._debounce = const Duration(milliseconds: 400),
-  }) : super(const WorkflowBuilderState()) {
+    DateTime Function()? now,
+  }) : _now = now ?? DateTime.now,
+       super(const WorkflowBuilderState()) {
     on<WorkflowBuilderStarted>(_onStarted, transformer: restartable());
     on<WorkflowOpened>(_onOpened, transformer: restartable());
     on<WorkflowDraftStarted>(_onDraft);
@@ -318,6 +530,26 @@ class WorkflowBuilderBloc
     on<WorkflowExportRequested>(_onExport, transformer: droppable());
     on<WorkflowYamlChanged>(_onYaml);
     on<WorkflowDocumentEdited>(_onEdited);
+    on<WorkflowUndoRequested>(_onUndo);
+    on<WorkflowRedoRequested>(_onRedo);
+    on<WorkflowRestored>(_onRestored);
+    on<WorkflowRenameRequested>(
+      (event, emit) => _update(emit, UpdateWorkflowRequest(name: event.name)),
+      transformer: droppable(),
+    );
+    on<WorkflowArchiveRequested>(
+      (event, emit) => _update(
+        emit,
+        UpdateWorkflowRequest(archived: event.archived),
+        workflowId: event.workflowId,
+      ),
+      transformer: droppable(),
+    );
+    on<WorkflowCaughtUp>(_onCaughtUp, transformer: droppable());
+    on<WorkflowDeleteRequested>(_onDelete, transformer: droppable());
+    on<WorkflowVersionsCompared>(_onVersions, transformer: restartable());
+    on<WorkflowVersionRestored>(_onRestore, transformer: droppable());
+    on<WorkflowBuiltinCompared>(_onBuiltin, transformer: restartable());
     on<WorkflowSelectionChanged>(
       (event, emit) => emit(
         state.copyWith(
@@ -339,6 +571,38 @@ class WorkflowBuilderBloc
   /// How long the YAML must stay still before the engine checks it.
   final Duration _debounce;
 
+  final DateTime Function() _now;
+
+  /// Where the last change came from (typing in the YAML, or a value of
+  /// the visual editor) and when: such changes in a row are one step of
+  /// undo, not one per key.
+  ({String source, DateTime at})? _last;
+
+  /// How long changes of one source in a row stay one step of undo.
+  static const _coalesce = Duration(seconds: 1);
+
+  /// The most steps of undo the builder keeps.
+  static const undoLimit = 100;
+
+  /// The undo stack once the YAML is changed by [source]: the YAML
+  /// before the change pushed, unless the change goes on the one before.
+  List<String> _undoFor(String? source) {
+    final now = _now();
+    final last = _last;
+    _last = source == null ? null : (source: source, at: now);
+    if (source != null &&
+        last != null &&
+        last.source == source &&
+        now.difference(last.at) < _coalesce &&
+        state.undoStack.isNotEmpty) {
+      return state.undoStack;
+    }
+    final stack = [...state.undoStack, state.yaml];
+    return stack.length > undoLimit
+        ? stack.sublist(stack.length - undoLimit)
+        : stack;
+  }
+
   Future<void> _onStarted(
     WorkflowBuilderStarted event,
     Emitter<WorkflowBuilderState> emit,
@@ -349,6 +613,8 @@ class WorkflowBuilderBloc
       emit(state.copyWith(loaded: true, workflows: workflows));
       final schema = await _schema();
       if (schema != null) emit(state.copyWith(schema: schema));
+      final templates = await _templates();
+      if (templates.isNotEmpty) emit(state.copyWith(templates: templates));
       final first =
           event.workflowId ??
           workflows.where((w) => !w.builtin).firstOrNull?.id ??
@@ -377,6 +643,15 @@ class WorkflowBuilderBloc
       return await _workflows.schema();
     } on Exception {
       return null;
+    }
+  }
+
+  /// The templates, or none while the engine cannot give them.
+  Future<List<WorkflowTemplate>> _templates() async {
+    try {
+      return await _workflows.templates();
+    } on Exception {
+      return const [];
     }
   }
 
@@ -413,17 +688,26 @@ class WorkflowBuilderBloc
           savedYaml: workflow.yaml,
           command: WorkflowCommand.none,
           selection: WorkflowSelection.workflow,
+          undoStack: const [],
+          redoStack: const [],
         ),
         workflow.yaml,
       ),
     );
+    _last = null;
     add(const _WorkflowValidationRequested());
   }
 
   void _onDraft(
     WorkflowDraftStarted event,
     Emitter<WorkflowBuilderState> emit,
-  ) => _draft(emit, draftTemplate.toYaml());
+  ) {
+    final template = event.template;
+    if (template == null || template.id == 'blank') {
+      return _draft(emit, template?.yaml ?? draftTemplate.toYaml());
+    }
+    _draft(emit, template.yaml, name: template.id);
+  }
 
   void _draft(Emitter<WorkflowBuilderState> emit, String yaml, {String? name}) {
     emit(
@@ -435,10 +719,13 @@ class WorkflowBuilderBloc
           selection: WorkflowSelection.workflow,
           notice: () => null,
           error: () => null,
+          undoStack: const [],
+          redoStack: const [],
         ),
         yaml,
       ),
     );
+    _last = null;
     add(const _WorkflowValidationRequested());
   }
 
@@ -500,7 +787,16 @@ class WorkflowBuilderBloc
 
   void _onYaml(WorkflowYamlChanged event, Emitter<WorkflowBuilderState> emit) {
     if (event.yaml == state.yaml) return;
-    emit(_read(state.copyWith(notice: () => null), event.yaml));
+    emit(
+      _read(
+        state.copyWith(
+          notice: () => null,
+          undoStack: _undoFor('yaml'),
+          redoStack: const [],
+        ),
+        event.yaml,
+      ),
+    );
     add(const _WorkflowValidationRequested());
   }
 
@@ -509,14 +805,88 @@ class WorkflowBuilderBloc
     Emitter<WorkflowBuilderState> emit,
   ) {
     final document = event.document;
+    final yaml = document.toYaml();
+    final before = state.document;
+    // A value typed in a field goes on the step of undo before it; adding,
+    // removing or moving something is a step of its own.
+    final source = before != null && _shapeOf(before) == _shapeOf(document)
+        ? 'value'
+        : null;
     emit(
       state.copyWith(
-        yaml: document.toYaml(),
+        yaml: yaml,
         document: () => document,
         shapeIssues: const [],
         validation: WorkflowValidation.checking,
         selection: (event.selection ?? state.selection).within(document),
         notice: () => null,
+        undoStack: yaml == state.yaml ? null : _undoFor(source),
+        redoStack: yaml == state.yaml ? null : const [],
+      ),
+    );
+    add(const _WorkflowValidationRequested());
+  }
+
+  /// What [document] is made of, without its values: its inputs, and the
+  /// kinds of the steps of each job of each stage.
+  static String _shapeOf(WorkflowDocument document) => [
+    document.inputs.length,
+    for (final stage in document.stages)
+      [
+        for (final job in stage.jobs) [for (final step in job.steps) step.kind],
+      ],
+  ].toString();
+
+  void _onUndo(
+    WorkflowUndoRequested event,
+    Emitter<WorkflowBuilderState> emit,
+  ) {
+    final undo = state.undoStack;
+    if (undo.isEmpty) return;
+    _last = null;
+    emit(
+      _read(
+        state.copyWith(
+          undoStack: undo.sublist(0, undo.length - 1),
+          redoStack: [...state.redoStack, state.yaml],
+          notice: () => null,
+        ),
+        undo.last,
+      ),
+    );
+    add(const _WorkflowValidationRequested());
+  }
+
+  void _onRestored(WorkflowRestored event, Emitter<WorkflowBuilderState> emit) {
+    if (event.yaml == state.yaml) return;
+    emit(
+      _read(
+        state.copyWith(
+          undoStack: _undoFor(null),
+          redoStack: const [],
+          notice: () => null,
+        ),
+        event.yaml,
+      ),
+    );
+    add(const _WorkflowValidationRequested());
+  }
+
+  void _onRedo(
+    WorkflowRedoRequested event,
+    Emitter<WorkflowBuilderState> emit,
+  ) {
+    final redo = state.redoStack;
+    if (redo.isEmpty) return;
+    _last = null;
+    emit(
+      _read(
+        state.copyWith(
+          undoStack: [...state.undoStack, state.yaml],
+          redoStack: redo.sublist(0, redo.length - 1),
+          notice: () => null,
+        ),
+        redo.last,
       ),
     );
     add(const _WorkflowValidationRequested());
@@ -559,12 +929,9 @@ class WorkflowBuilderBloc
         ),
       );
     } on Exception {
-      emit(
-        state.copyWith(
-          engineIssues: const [],
-          validation: WorkflowValidation.unavailable,
-        ),
-      );
+      // The issues the engine found last stay: the document did not get
+      // better because the engine went away.
+      emit(state.copyWith(validation: WorkflowValidation.unavailable));
     }
   }
 
@@ -586,7 +953,17 @@ class WorkflowBuilderBloc
     try {
       final saved = name == null
           ? await _workflows.saveWorkflow(_projectId, workflow!.id, yaml)
-          : await _workflows.createWorkflow(_projectId, name: name, yaml: yaml);
+          : await _workflows.createWorkflow(
+              _projectId,
+              name: name,
+              yaml: yaml,
+              basedOn: workflow != null && workflow.builtin
+                  ? WorkflowBasedOn(
+                      builtin: workflow.name,
+                      version: workflow.version.version,
+                    )
+                  : workflow?.basedOn,
+            );
       final workflows = await _workflows.listWorkflows(_projectId);
       emit(
         state.copyWith(
@@ -605,6 +982,194 @@ class WorkflowBuilderBloc
           error: () => errorMessage(error),
         ),
       );
+    }
+  }
+
+  /// Runs [action] as a command of the builder: busy while it runs, and
+  /// what went wrong in [WorkflowBuilderState.error].
+  Future<void> _command(
+    Emitter<WorkflowBuilderState> emit,
+    Future<void> Function() action,
+  ) async {
+    emit(
+      state.copyWith(
+        command: WorkflowCommand.saving,
+        notice: () => null,
+        error: () => null,
+      ),
+    );
+    try {
+      await action();
+    } on Exception catch (error) {
+      emit(
+        state.copyWith(
+          command: WorkflowCommand.none,
+          error: () => errorMessage(error),
+        ),
+      );
+    }
+  }
+
+  /// Changes the open workflow as [request] says, and reads the list
+  /// again: it shows the new name, or that it is archived.
+  /// Changes the workflow [workflowId], else the open one of the owner.
+  Future<void> _update(
+    Emitter<WorkflowBuilderState> emit,
+    UpdateWorkflowRequest request, {
+    String? workflowId,
+  }) async {
+    final open = state.workflow;
+    final id = workflowId ?? (open == null || open.builtin ? null : open.id);
+    if (id == null) return;
+    await _command(emit, () async {
+      final updated = await _workflows.updateWorkflow(_projectId, id, request);
+      final workflows = await _workflows.listWorkflows(_projectId);
+      emit(
+        state.copyWith(
+          workflow: () => state.workflow?.id == id ? updated : state.workflow,
+          workflows: workflows,
+          command: WorkflowCommand.none,
+        ),
+      );
+    });
+  }
+
+  Future<void> _onCaughtUp(
+    WorkflowCaughtUp event,
+    Emitter<WorkflowBuilderState> emit,
+  ) async {
+    final update = state.builtinUpdate;
+    if (update == null) return;
+    await _update(emit, UpdateWorkflowRequest(basedOnVersion: update.latest));
+    emit(state.copyWith(builtinCompare: () => null));
+  }
+
+  Future<void> _onDelete(
+    WorkflowDeleteRequested event,
+    Emitter<WorkflowBuilderState> emit,
+  ) async {
+    final workflow = state.workflow;
+    if (workflow == null || workflow.builtin) return;
+    await _command(emit, () async {
+      await _workflows.deleteWorkflow(_projectId, workflow.id);
+      final workflows = await _workflows.listWorkflows(_projectId);
+      emit(state.copyWith(workflows: workflows));
+      final next =
+          workflows.where((w) => !w.builtin).firstOrNull ??
+          workflows.firstOrNull;
+      if (next == null) {
+        emit(state.copyWith(command: WorkflowCommand.none));
+        _draft(emit, draftTemplate.toYaml());
+      } else {
+        await _open(next.id, emit);
+      }
+      emit(state.copyWith(notice: () => WorkflowDeletedNotice(workflow.name)));
+    });
+  }
+
+  Future<void> _onVersions(
+    WorkflowVersionsCompared event,
+    Emitter<WorkflowBuilderState> emit,
+  ) async {
+    final workflow = state.workflow;
+    if (workflow == null) return;
+    emit(state.copyWith(versionDiff: () => null, error: () => null));
+    try {
+      final before = await _workflows.getWorkflow(
+        _projectId,
+        workflow.id,
+        version: event.from,
+      );
+      final after = await _workflows.getWorkflow(
+        _projectId,
+        workflow.id,
+        version: event.to,
+      );
+      emit(
+        state.copyWith(
+          versionDiff: () => VersionDiff(
+            from: event.from,
+            to: event.to,
+            before: before.yaml,
+            after: after.yaml,
+          ),
+        ),
+      );
+    } on Exception catch (error) {
+      emit(state.copyWith(error: () => errorMessage(error)));
+    }
+  }
+
+  Future<void> _onRestore(
+    WorkflowVersionRestored event,
+    Emitter<WorkflowBuilderState> emit,
+  ) async {
+    final workflow = state.workflow;
+    if (workflow == null || workflow.builtin) return;
+    await _command(emit, () async {
+      final old = await _workflows.getWorkflow(
+        _projectId,
+        workflow.id,
+        version: event.version,
+      );
+      final saved = await _workflows.saveWorkflow(
+        _projectId,
+        workflow.id,
+        old.yaml,
+      );
+      final workflows = await _workflows.listWorkflows(_projectId);
+      emit(
+        _read(
+          state.copyWith(
+            workflows: workflows,
+            workflow: () => saved,
+            savedYaml: saved.yaml,
+            command: WorkflowCommand.none,
+            undoStack: _undoFor(null),
+            redoStack: const [],
+            notice: () => WorkflowRestoredNotice(
+              saved.name,
+              event.version,
+              saved.version.version,
+            ),
+          ),
+          saved.yaml,
+        ),
+      );
+      add(const _WorkflowValidationRequested());
+    });
+  }
+
+  Future<void> _onBuiltin(
+    WorkflowBuiltinCompared event,
+    Emitter<WorkflowBuilderState> emit,
+  ) async {
+    final update = state.builtinUpdate;
+    if (update == null) return;
+    final builtin = state.workflows.firstWhere(
+      (w) => w.builtin && w.name == update.builtin,
+    );
+    emit(state.copyWith(builtinCompare: () => null, error: () => null));
+    try {
+      final base = await _workflows.getWorkflow(
+        _projectId,
+        builtin.id,
+        version: update.base,
+      );
+      final latest = await _workflows.getWorkflow(_projectId, builtin.id);
+      emit(
+        state.copyWith(
+          builtinCompare: () => BuiltinCompare(
+            builtin: update.builtin,
+            base: update.base,
+            latest: latest.version.version,
+            baseYaml: base.yaml,
+            latestYaml: latest.yaml,
+          ),
+        ),
+      );
+    } on Exception catch (error) {
+      emit(state.copyWith(error: () => errorMessage(error)));
     }
   }
 }

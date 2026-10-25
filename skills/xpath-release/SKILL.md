@@ -76,10 +76,13 @@ xp workflows show acme/app dev-build
 ```
 
 MCP: `list_projects`, `get_project`, `list_workflows`, `get_workflow`. Every CLI command takes
-`--json` before the command (`xp --json runs show run_...`) to print what the API answered.
+`--json`, before or after the command (`xp runs show run_... --json`), to print what the API
+answered; an error is then `{"code", "message", "hint"}` on standard error.
 
 Every project has the built-ins `dev-build`, `prod-release`, `release-merge`, `shorebird-patch`
-and `test`. Read a workflow's `inputs` before dispatching it.
+and `test`. Read a workflow's `inputs` before dispatching it. `plan_dispatch` (or
+`xp dispatch ... --dry-run`) says what a dispatch would start and which jobs it leaves out and
+why, without starting anything; check it before a release.
 
 ## Dispatch
 
@@ -101,9 +104,12 @@ MCP `dispatch_workflow` takes the same as `project`, `workflow`, `ref`, `app`, `
 
 ### Dev build
 
-Without upload inputs, `dev-build` builds and keeps the artifacts. Android goes to Firebase App
-Distribution when `firebaseAppIds` names the flavor's Firebase app; iOS goes to TestFlight when
-`appleAppIds` names the App Store Connect app.
+Android goes to Firebase App Distribution when `firebaseAppIds` or the flavor's profile names its
+Firebase app; iOS goes to TestFlight when `appleAppIds` or the profile names the App Store
+Connect app. Without either, `dev-build` builds and keeps the artifacts. The owner sets the
+profile's ids once, in the app (Credentials, the flavor's store ids) or with
+`xp projects set acme/app --flavor dev --firebase-app-id android=1:... --apple-app-id 1234567890`;
+an input still wins over them.
 
 ```sh
 xp dispatch acme/app dev-build --flavor dev --platform android \
@@ -152,7 +158,11 @@ xp dispatch acme/app test --input 'paths=["test/unit"]' --input 'tags=["fast"]'
 ## Follow a run
 
 ```sh
+xp runs list --project <p>   # the runs, newest first, wherever they were dispatched from
 xp runs show <run>           # jobs, states, and the approval a waiting run needs
+xp logs <run> -f             # every job's log as it runs; exits with how the run ended
+xp runs rerun <run>          # a new run: same workflow version, commit and inputs
+xp runs rerun <run> --failed # the failed jobs again, from the step that failed
 xp jobs show <job>           # steps with their state and attempts
 xp logs -f <job>             # follow until the job ends; exit 1 if it failed or was cancelled
 xp logs <job> --after 120    # the lines after seq 120, then stop when the engine is quiet
@@ -236,8 +246,9 @@ engine never repeats it on its own. On resume, the step first asks whether its w
 
 ## When something fails
 
-Read the failing step first: `get_job` (or `xp --json jobs show <job>`) has each step's result,
-and a `guard` step lists every check with its `status`, `message` and `fix`. Then
+Read the failing step first: `get_job` (or `xp jobs show <job>`, which prints each failed step's
+message and every guard check's fix) has each step's result, and a `guard` step lists every check
+with its `status`, `message` and `fix`. Then
 `get_job_log_tail`. The common failures, the CLI exit codes and what each means are in
 [references/failures.md](references/failures.md).
 

@@ -7,27 +7,30 @@ import 'package:equatable/equatable.dart';
 /// project, commit and version exists; the `ApprovalService` keeps them.
 enum GateAction {
   /// Releasing a production flavor to the stores.
-  prodRelease('prod_release'),
+  prodRelease('prod_release', 'Production release'),
 
   /// Publishing an over-the-air patch to production.
-  prodPatch('prod_patch'),
+  prodPatch('prod_patch', 'Production patch'),
 
   /// Submitting a build to a store for review.
-  storeSubmission('store_submission'),
+  storeSubmission('store_submission', 'Store submission'),
 
   /// Pushing a branch or a tag.
-  push('push'),
+  push('push', 'Push'),
 
   /// Merging a pull request.
-  merge('merge'),
+  merge('merge', 'Merge'),
 
   /// Deleting something.
-  delete('delete');
+  delete('delete', 'Delete');
 
-  new(this.wire);
+  new(this.wire, this.label);
 
   /// The name in workflows, on the wire and in the database.
   final String wire;
+
+  /// What it approves, for people.
+  final String label;
 
   /// The action called [wire], or `null`.
   static GateAction? fromWire(String wire) {

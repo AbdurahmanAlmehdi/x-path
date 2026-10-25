@@ -100,6 +100,7 @@ class CredentialsState extends Equatable {
     this.busy,
     this.error,
     this.inUse,
+    this.checked,
   });
 
   final bool loaded;
@@ -125,12 +126,16 @@ class CredentialsState extends Equatable {
   /// The credential the engine did not delete because flavors use it.
   final CredentialConflict? inUse;
 
+  /// The credential the engine just checked again, as it found it.
+  final NamedCredential? checked;
+
   CredentialsState copyWith({
     CredentialSaveStatus? save,
     String? saveError,
     String? busy,
     String? error,
     CredentialConflict? inUse,
+    NamedCredential? checked,
   }) => CredentialsState(
     loaded: loaded,
     credentials: credentials,
@@ -140,6 +145,7 @@ class CredentialsState extends Equatable {
     busy: busy,
     error: error,
     inUse: inUse,
+    checked: checked,
   );
 
   @override
@@ -152,6 +158,7 @@ class CredentialsState extends Equatable {
     busy,
     error,
     inUse,
+    checked,
   ];
 }
 
@@ -188,14 +195,7 @@ class CredentialsBloc extends Bloc<CredentialsEvent, CredentialsState> {
       ),
       transformer: droppable(),
     );
-    on<CredentialVerifyRequested>(
-      (event, emit) => _command(
-        event.credentialId,
-        emit,
-        () => _credentials.verifyCredential(event.credentialId),
-      ),
-      transformer: droppable(),
-    );
+    on<CredentialVerifyRequested>(_onVerify, transformer: droppable());
     on<CredentialDeleteRequested>(
       (event, emit) => _command(
         event.credentialId,
@@ -243,6 +243,19 @@ class CredentialsBloc extends Bloc<CredentialsEvent, CredentialsState> {
           saveError: errorMessage(error),
         ),
       );
+    }
+  }
+
+  Future<void> _onVerify(
+    CredentialVerifyRequested event,
+    Emitter<CredentialsState> emit,
+  ) async {
+    emit(state.copyWith(busy: event.credentialId));
+    try {
+      final checked = await _credentials.verifyCredential(event.credentialId);
+      emit(state.copyWith(checked: checked));
+    } on Exception catch (error) {
+      emit(state.copyWith(error: errorMessage(error)));
     }
   }
 

@@ -141,23 +141,25 @@ void main() {
       tester,
     ) async {
       await tester.pumpApp(
-        const Column(
+        Column(
           children: [
-            XpSectionLabel('Projects'),
-            XpPanel(child: Text('panel')),
-            XpHairline(),
-            SizedBox(height: 10, child: XpHairline(vertical: true)),
-            XpCode('5.4.1 (3283)', size: 13),
-            XpPageHeader(
+            const XpSectionLabel('Projects'),
+            const XpPanel(child: Text('panel')),
+            const XpHairline(),
+            const SizedBox(height: 10, child: XpHairline(vertical: true)),
+            const XpCode('5.4.1 (3283)', size: 13),
+            const XpPageHeader(
               title: 'Engines',
               subtitle: 'Where XPath runs',
               actions: [Text('action')],
             ),
-            XpPageHeader(title: 'Bare'),
+            const XpPageHeader(title: 'Bare'),
             XpMessage(XpStatus.scanError, 'Broken'),
+            const XpMessage.error('Not saved.'),
           ],
         ),
       );
+      expect(find.byIcon(PhosphorIconsRegular.warningCircle), findsOneWidget);
       expect(find.text('PROJECTS'), findsOneWidget);
       for (final text in [
         'panel',
@@ -165,9 +167,41 @@ void main() {
         'Engines',
         'action',
         'Broken',
+        'Not saved.',
       ]) {
         expect(find.text(text), findsOneWidget);
       }
+    });
+
+    testWidgets('an error state retries', (tester) async {
+      var retries = 0;
+      await tester.pumpApp(
+        XpErrorState('Cannot reach the engine.', onRetry: () => retries++),
+      );
+      expect(find.text('Cannot reach the engine.'), findsOneWidget);
+      await tester.tap(find.text('Retry'));
+      expect(retries, 1);
+    });
+
+    testWidgets('loading bars stand in for what loads', (tester) async {
+      await tester.pumpApp(const XpLoading(rows: 4));
+      expect(
+        find.descendant(
+          of: find.byType(XpLoading),
+          matching: find.byType(FractionallySizedBox),
+        ),
+        findsNWidgets(4),
+      );
+      expect(find.bySemanticsLabel('Loading'), findsOneWidget);
+
+      await tester.pumpApp(const XpLoading());
+      expect(
+        find.descendant(
+          of: find.byType(XpLoading),
+          matching: find.byType(FractionallySizedBox),
+        ),
+        findsNWidgets(6),
+      );
     });
 
     testWidgets('a text field with a trailing control', (tester) async {
@@ -230,4 +264,106 @@ void main() {
   });
 }
 
-void _never() {}
+void _never() {
+  group('XpConfirmDialog', () {
+    testWidgets('says what happens and answers with the button pressed', (
+      tester,
+    ) async {
+      final answers = <bool>[];
+      await tester.pumpApp(
+        Builder(
+          builder: (context) => XpButton(
+            label: 'Delete',
+            onPressed: () async => answers.add(
+              await confirmAction(
+                context,
+                title: 'Delete it?',
+                points: const ['It is gone for good.'],
+                keep: 'Keep',
+                confirm: 'Delete it',
+              ),
+            ),
+          ),
+        ),
+      );
+      Future<void> open() async {
+        await tester.tap(find.text('Delete'));
+        await tester.pumpAndSettle();
+      }
+
+      await open();
+      expect(find.text('Delete it?'), findsOneWidget);
+      expect(find.text('•  It is gone for good.'), findsOneWidget);
+      // Return does nothing.
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pumpAndSettle();
+      expect(find.byKey(confirmDialogKey), findsOneWidget);
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await tester.pumpAndSettle();
+      await open();
+      await tester.tap(find.text('Keep'));
+      await tester.pumpAndSettle();
+      await open();
+      await tester.tap(find.text('Delete it'));
+      await tester.pumpAndSettle();
+      await open();
+      await tester.tapAt(Offset.zero);
+      await tester.pumpAndSettle();
+      expect(answers, [false, false, true, false]);
+    });
+  });
+
+  group('XpSha', () {
+    testWidgets('shows seven characters and copies the whole commit', (
+      tester,
+    ) async {
+      final clipboard = <String?>[];
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        (call) async {
+          if (call.method == 'Clipboard.setData') {
+            clipboard.add((call.arguments as Map)['text'] as String?);
+          }
+          return null;
+        },
+      );
+      addTearDown(
+        () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          SystemChannels.platform,
+          null,
+        ),
+      );
+      await tester.pumpApp(const XpSha('9a3bc0d4e5f6'));
+      expect(find.text('9a3bc0d'), findsOneWidget);
+      expect(
+        tester.widget<Tooltip>(find.byType(Tooltip)).message,
+        '9a3bc0d4e5f6 · click to copy',
+      );
+      await tester.tap(find.text('9a3bc0d'));
+      await tester.pump();
+      expect(clipboard, ['9a3bc0d4e5f6']);
+      expect(tester.widget<Tooltip>(find.byType(Tooltip)).message, 'Copied');
+      await tester.pump(const Duration(milliseconds: 1300));
+      expect(
+        tester.widget<Tooltip>(find.byType(Tooltip)).message,
+        '9a3bc0d4e5f6 · click to copy',
+      );
+    });
+  });
+
+  group('XpTime', () {
+    testWidgets('shows the time of day or a date, and the time in full', (
+      tester,
+    ) async {
+      final now = testNow.subtract(const Duration(hours: 2));
+      final old = testNow.subtract(const Duration(days: 3));
+      await tester.pumpApp(Column(children: [XpTime(now), XpTime(old)]));
+      expect(find.text(formatTime(now)), findsOneWidget);
+      expect(find.text(formatDateTime(old)), findsOneWidget);
+      expect(
+        tester.widget<Tooltip>(find.byType(Tooltip).first).message,
+        formatAbsolute(now),
+      );
+    });
+  });
+}

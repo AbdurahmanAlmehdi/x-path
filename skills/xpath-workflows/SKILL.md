@@ -18,8 +18,9 @@ name: Dev build                # optional
 description: ...               # optional
 lock: project                  # optional: one run of this workflow at a time per project
 inputs:                        # optional: variables a dispatch can set
-  notes: {description: Release notes, default: ""}
+  notes: {type: string, description: Release notes, default: ""}
   appId: {description: The app id, required: true}
+  track: {type: choice, options: [internal, beta], default: internal}
   extra:                       # empty: no default, not required
 stages:                        # required; run in order
   - name: build
@@ -43,11 +44,16 @@ Allowed keys, and nothing else (an unknown key is an issue that lists the allowe
 | Where | Keys |
 |---|---|
 | the workflow | `schema`, `name`, `description`, `lock`, `inputs`, `stages` |
-| an input | `description`, `default`, `required` (an input with a default cannot be required) |
+| an input | `type`, `description`, `options`, `default`, `required` (an input with a default cannot be required) |
 | a stage | `name`, `jobs` |
 | a job | `name`, `matrix`, `if`, `capabilities`, `steps` |
 | a step | `kind`, `with`, `if`, `gate` |
 
+- Input types (optional): `string` (text), `boolean` (`true`/`false`), `choice` (one of its
+  `options`, which only a choice has and a choice must have), `json` (any value: a list, a map, a
+  number) and `release` (`x.y.z+build` of the project; a dispatch's `releaseVersion` fills it,
+  and it fills `releaseVersion`). A default must be of the input's type. An input without a type
+  takes any value; the CLI sends it as JSON when it parses, else as text, and the app as text.
 - Input names: letters, digits and `_`, not starting with a digit. Job ids: a letter, then
   letters, digits, `-` and `_`.
 - `lock` can only be `project`. A locked run holds the project from its first job until it
@@ -80,7 +86,8 @@ Variables from the dispatch: `app` (`name`, `path`, `hasIos`, `hasAndroid`, `ver
 `project` (`id`, `fullName`, `baseBranch`), `ref`, `sha`, `version` (`x.y.z`), `build`, `bump`,
 `releaseVersion`, `patch`, `release`, `platforms`, `flavors` and `inputs` (the document's
 defaults, then what the dispatch gave). A matrix adds `platform` and `flavor` (`name`, `prod`,
-`shorebird`, `implicit`, `entrypoint`, `iosBundleId`, `androidAppId`, `shorebirdAppId`, and
+`shorebird`, `implicit`, `entrypoint`, `iosBundleId`, `androidAppId`, `shorebirdAppId`,
+`firebaseAppId` (by platform, `flavor.firebaseAppId.android`), `appleAppId`, and
 `credentials.<kind>` for each credential the flavor has, such as `flavor.credentials.play_sa`).
 
 ## Steps
@@ -91,11 +98,21 @@ credentials. Every step kind and its `with` keys are in
 [references/step-kinds.md](references/step-kinds.md). The live list for the engine you talk to:
 
 ```sh
-curl -s -H "Authorization: Bearer $XP_TOKEN" http://127.0.0.1:7480/workflows/schema
+xp workflows schema                     # the step types by group, the gates, the variables
+xp workflows schema --kind build.ios    # one step type: what it does, what runs it, its keys
 ```
 
-It answers the schema version, every step type with its `with` keys, the gates, the
-capabilities, the matrix axes and the platforms.
+With MCP, call `get_workflow_schema` (`kind` optional) or read the resource
+`xpath://workflows/schema`. Each step type comes with a title, a description, its group, the
+runner capabilities it needs (any one set), and its `with` keys typed (`string`, `boolean`,
+`number`, `list`, `map`) with `required`, `default`, `options` and a description. The gates come
+with labels, and `variables` lists every path an expression can read.
+
+For completion in an editor, start the file with:
+
+```yaml
+# yaml-language-server: $schema=https://xpath.abdurahman.ly/schema/workflow-1.json
+```
 
 Rules that shape every workflow:
 
@@ -136,32 +153,47 @@ xp workflows show acme/app dev-build > dev-firebase.yaml   # prints the YAML onl
 xp --json workflows show acme/app dev-build                # id, versions and "yaml" as JSON
 ```
 
-In the app: Workflows, pick the built-in, Save as. Every save is a new version; a job records
-the exact version it ran (`xp workflows show <p> <w> --version n`).
+In the app: Workflows, pick the built-in, Save as. Or `xp workflows copy acme/app dev-build
+dev-firebase`. A copy of a built-in remembers it: when the engine ships a newer version of the
+built-in, the app offers to compare (what the built-in changed, and what the copy changed).
+
+Every save is a new version; a job records the exact version it ran (`xp workflows show <p> <w>
+--version n`). `xp workflows versions <p> <w>` lists them and `xp workflows diff <p> <w> <from>
+[<to>]` shows what changed. `xp workflows rename <p> <w> <name>` renames; `xp workflows archive
+<p> <w>` keeps a workflow with its runs and stops it being dispatched (`--undo` brings it back);
+`xp workflows delete <p> <w>` deletes one only if it never ran.
 
 ## Validate and save
 
 ```sh
-xp workflows validate acme/app -f workflow.yaml       # exit 65 and line:column: message on issues
+xp workflows validate workflow.yaml                   # exit 65 and line:column: message hint on issues
 xp workflows create acme/app dev-firebase -f workflow.yaml
 xp workflows edit acme/app dev-firebase -f workflow.yaml   # a new version
 ```
 
-MCP: `validate_workflow`, `create_workflow`, `update_workflow` (each validates first and saves
-nothing with issues). API: `POST /projects/{id}/workflows/validate` with `{"yaml": "..."}`
-always answers `200` with `valid` and `issues` (`line`, `column`, `message`).
+A document is valid or not for every project alike, so validating needs no project. MCP:
+`validate_workflow` (`project` optional), `create_workflow`, `update_workflow` (each validates
+first and saves nothing with issues). API: `POST /workflows/validate` with `{"yaml": "..."}`
+always answers `200` with `valid` and `issues` (`line`, `column`, `message`, and a `hint` such
+as `Did you mean "inputs.firebaseAppIds"?`). A `422 workflow_invalid` on create or save carries
+the same `issues` in its error.
 
-Validation catches: unknown keys, wrong types, unknown step types or `with` keys, unknown
-capabilities or gates, a matrix axis other than `platform` or `flavor`, a platform other than
-`android` or `ios`, a job id used twice, `commitFrom` or `artifactsFrom` naming a job not in an
-earlier stage, an expression that does not parse, and a variable that does not exist there.
+Validation catches: unknown keys, wrong types, unknown step types or `with` keys, a `with` key
+a step type needs (`exportOptionsPlist` of `build.ios`, `appId` of `upload.firebase`, ...), a
+`with` value of the wrong shape or not one of its options, unknown capabilities or gates, a
+matrix axis other than `platform` or `flavor`, a platform other than `android` or `ios`, a job
+id used twice, `commitFrom` or `artifactsFrom` naming a job not in an earlier stage, an
+expression that does not parse, a variable that does not exist there, an input the workflow does
+not declare (`inputs.x`), and a field `flavor`, `app` or `project` does not have. A typo comes
+back with the name it most likely meant.
 Some problems only show at dispatch (`422 workflow_invalid`): an unknown flavor, a missing
 credential, a value a step refuses. Validate, then dispatch once with the smallest matrix.
 
 ## Worked example: dev build to Firebase with app ids as defaults
 
-The built-in `dev-build` uploads Android only when `firebaseAppIds` is given at dispatch. This
-copy carries the ids as input defaults, builds Android only and sends the APK to a tester group.
+The built-in `dev-build` uploads Android when `firebaseAppIds` is given at dispatch or the flavor
+has a Firebase app id in its profile (`flavor.firebaseAppId`). This copy carries the ids as input
+defaults, builds Android only and sends the APK to a tester group.
 
 ```yaml
 schema: 1
@@ -242,9 +274,9 @@ Why it is shaped this way:
 Save and run it:
 
 ```sh
-xp workflows validate acme/app -f dev-firebase.yaml
+xp workflows validate dev-firebase.yaml
 xp workflows create acme/app dev-firebase -f dev-firebase.yaml
-xp dispatch acme/app dev-firebase --flavor dev
+xp dispatch acme/app dev-firebase --flavor dev --follow   # prints the logs, exits 0 on success
 xp dispatch acme/app dev-firebase --flavor dev --input 'notes=Try the new checkout'
 ```
 

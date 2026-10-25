@@ -98,6 +98,21 @@ String formatDateTime(DateTime time) {
   return '${_months[local.month - 1]} ${local.day} ${formatTime(local)}';
 }
 
+/// A time as a list shows it: `14:02` within a day of [now], else
+/// `Oct 11 14:02`.
+String formatWhen(DateTime time, DateTime now) =>
+    now.difference(time) < const Duration(hours: 24)
+    ? formatTime(time)
+    : formatDateTime(time);
+
+/// A time in full, for a tooltip, in this Mac's time zone:
+/// `Tue, Oct 13, 2026 14:02:41 CEST`.
+String formatAbsolute(DateTime time) {
+  final local = time.toLocal();
+  return '${DateFormat('EEE, MMM d, y HH:mm:ss').format(local)} '
+      '${local.timeZoneName}';
+}
+
 /// A count with thousands separators: `1,284`.
 String formatCount(int count) => NumberFormat.decimalPattern().format(count);
 

@@ -482,11 +482,7 @@ void main() {
         isA<RemoveXPathState>().having(
           (state) => state.steps.last,
           'data',
-          result(
-            RemovalStep.data,
-            RemovalStepState.failed,
-            detail: "FileSystemException: Busy, path = ''",
-          ),
+          result(RemovalStep.data, RemovalStepState.failed, detail: 'Busy'),
         ),
         isA<RemoveXPathState>().having(
           (state) => state.phase,

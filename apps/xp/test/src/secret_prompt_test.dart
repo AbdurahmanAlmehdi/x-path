@@ -53,6 +53,17 @@ void main() {
     expect(prompt.ask('Password'), '');
   });
 
+  test('reads a plain answer with the echo on', () {
+    when(() => stdin.readLineSync()).thenReturn('dev');
+
+    expect(prompt.ask('Flavor', secret: false), 'dev');
+
+    verify(() => stderr.write('Flavor: ')).called(1);
+    verifyNever(() => stdin.echoMode = false);
+    when(() => stdin.readLineSync()).thenReturn(null);
+    expect(prompt.ask('Flavor', secret: false), '');
+  });
+
   test("uses the process's streams by default", () {
     expect(const TerminalSecretPrompt().interactive, isA<bool>());
   });

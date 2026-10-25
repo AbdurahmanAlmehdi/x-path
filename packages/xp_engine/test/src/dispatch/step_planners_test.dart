@@ -31,6 +31,15 @@ Matcher _fails(Object message) => throwsA(
   isA<DispatchException>().having((e) => e.message, 'message', message),
 );
 
+/// Saving the workflow fails: validation finds the issue before a dispatch.
+Matcher _invalid(Object message) => throwsA(
+  isA<WorkflowInvalidException>().having(
+    (e) => e.issues.single.message,
+    'issue',
+    message,
+  ),
+);
+
 void main() {
   late DispatchHarness harness;
 
@@ -139,6 +148,69 @@ void main() {
       expect(planners.withKeys('nope'), isNull);
     });
 
+    test('every step type describes itself and types its keys (UX-02)', () {
+      final planners = StepPlanners(allSteps());
+
+      expect(stepAbout.keys.toSet(), planners.kinds.toSet());
+      for (final kind in planners.kinds) {
+        final type = planners.describe(kind)!;
+        expect(type.title, isNotEmpty, reason: kind);
+        expect(type.description, isNotEmpty, reason: kind);
+        expect(
+          type.group,
+          isIn(['Source', 'Checks', 'Build', 'Upload', 'GitHub', 'Other']),
+          reason: kind,
+        );
+        expect(type.withKeys, [...type.withKeys]..sort(), reason: kind);
+        for (final key in type.keys) {
+          expect(key.type, isNot(StepKeyType.any), reason: '$kind.${key.name}');
+          expect(key.description, isNotEmpty, reason: '$kind.${key.name}');
+        }
+      }
+      expect(planners.describe('nope'), isNull);
+    });
+
+    test('says what a runner needs for each step type', () {
+      final planners = StepPlanners(allSteps());
+
+      expect(planners.describe('build.android')!.capabilities, [
+        ['android', 'flutter'],
+      ]);
+      expect(planners.describe('shorebird.release')!.capabilities, [
+        ['flutter', 'android'],
+        ['flutter', 'ios-sign'],
+      ]);
+      expect(planners.describe('upload.firebase')!.capabilities, isEmpty);
+    });
+
+    test('says which keys a step type needs and what each holds', () {
+      final planners = StepPlanners(allSteps());
+
+      final ios = planners.keysOf('build.ios')!;
+      expect(ios['exportOptionsPlist']!.required, isTrue);
+      expect(ios['obfuscate']!.value, StepValue.flag);
+      expect(planners.keysOf('build.android')!['artifact']!.options, [
+        'apk',
+        'aab',
+      ]);
+      expect(
+        planners.keysOf('guard')!['checks']!.options,
+        contains('versionSync'),
+      );
+      expect(
+        planners.keysOf('guard')!['credentialKinds']!.options,
+        contains('play_sa'),
+      );
+      expect(planners.keysOf('nope'), isNull);
+      for (final kind in planners.kinds) {
+        expect(
+          planners.keysOf(kind)!.keys.toSet(),
+          planners.withKeys(kind),
+          reason: kind,
+        );
+      }
+    });
+
     test('says when the engine cannot run a step type', () async {
       final planners = StepPlanners(StepRegistry(const []));
 
@@ -210,9 +282,7 @@ void main() {
         dispatch('''
           - kind: command
 '''),
-        _fails(
-          'Line 9, command: "executable" is needed: give it under "with".',
-        ),
+        _invalid('"command" needs "executable" under "with".'),
       );
       for (final directory in ['/etc', '../x']) {
         await expectLater(
@@ -259,7 +329,7 @@ void main() {
             with:
               $with_
 '''),
-          _fails(endsWith(message)),
+          _invalid(message),
           reason: with_,
         );
       }
@@ -443,9 +513,7 @@ stages:
         dispatch('''
           - kind: build.ios
 '''),
-        _fails(
-          endsWith('"exportOptionsPlist" is needed: give it under "with".'),
-        ),
+        _invalid('"build.ios" needs "exportOptionsPlist" under "with".'),
       );
     });
 
@@ -563,7 +631,7 @@ stages:
             with:
               platform: windows
 ''', request: const DispatchRequest(releaseVersion: '1.2.0+30')),
-        _fails(contains('"platform" must be android or ios')),
+        _invalid('"platform" takes android, ios.'),
       );
     });
 
@@ -873,7 +941,25 @@ stages:
             flavors: ['dev'],
           ),
         ),
-        _fails(contains('has no play_sa credential assigned')),
+        throwsA(
+          isA<DispatchException>()
+              .having(
+                (e) => e.message,
+                'message',
+                contains('has no play_sa credential assigned'),
+              )
+              .having(
+                (e) => e.hint,
+                'hint',
+                'Add a Google Play service account credential and assign it '
+                    'to dev, then dispatch again.',
+              )
+              .having((e) => e.details, 'details', {
+                'reason': ErrorReason.credentialUnassigned,
+                'kind': 'play_sa',
+                'flavor': 'dev',
+              }),
+        ),
       );
       await harness.saveCredential('dev', CredentialKind.playSa);
       await expectLater(
@@ -889,7 +975,7 @@ stages:
             flavors: ['dev'],
           ),
         ),
-        _fails(endsWith('"userFraction" must be a number.')),
+        _invalid('"userFraction" must be a number.'),
       );
       await expectLater(
         dispatch(

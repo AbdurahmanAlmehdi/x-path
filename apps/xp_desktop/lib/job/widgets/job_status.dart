@@ -38,6 +38,16 @@ XpStatus jobStatus(JobState state) => switch (state) {
   JobState.waitingForApproval => XpStatus.jobWaitingApproval,
 };
 
+/// The status a run in [state] shows.
+XpStatus runStatus(RunState state) => switch (state) {
+  RunState.queued => XpStatus.jobQueued,
+  RunState.running => XpStatus.jobRunning,
+  RunState.waitingForApproval => XpStatus.jobWaitingApproval,
+  RunState.succeeded => XpStatus.jobSucceeded,
+  RunState.failed => XpStatus.jobFailed,
+  RunState.cancelled => XpStatus.jobCancelled,
+};
+
 /// The status a step in [state] shows.
 XpStatus stepStatus(StepState state) => switch (state) {
   StepState.pending => XpStatus.jobQueued,
@@ -68,6 +78,16 @@ extension JobLabels on AppLocalizations {
     JobState.interrupted => statusInterrupted,
     JobState.waitingForResume => statusWaitingForResume,
     JobState.waitingForApproval => statusWaitingForApproval,
+  };
+
+  /// What a run in [state] is called.
+  String runState(RunState state) => switch (state) {
+    RunState.queued => statusQueued,
+    RunState.running => statusRunning,
+    RunState.waitingForApproval => statusWaitingForApproval,
+    RunState.succeeded => statusSucceeded,
+    RunState.failed => statusFailed,
+    RunState.cancelled => statusCancelled,
   };
 
   /// What a step in [state] is called.

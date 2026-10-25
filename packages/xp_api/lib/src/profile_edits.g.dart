@@ -19,6 +19,13 @@ FlavorEdit _$FlavorEditFromJson(Map<String, dynamic> json) =>
           'versionFiles',
           (v) => (v as List<dynamic>?)?.map((e) => e as String).toList(),
         ),
+        firebaseAppId: $checkedConvert(
+          'firebaseAppId',
+          (v) => (v as Map<String, dynamic>?)?.map(
+            (k, e) => MapEntry(k, e as String),
+          ),
+        ),
+        appleAppId: $checkedConvert('appleAppId', (v) => v as String?),
       );
       return val;
     });
@@ -32,6 +39,8 @@ Map<String, dynamic> _$FlavorEditToJson(FlavorEdit instance) =>
       'iosBundleId': ?instance.iosBundleId,
       'androidAppId': ?instance.androidAppId,
       'versionFiles': ?instance.versionFiles,
+      'firebaseAppId': ?instance.firebaseAppId,
+      'appleAppId': ?instance.appleAppId,
     };
 
 AppEdit _$AppEditFromJson(Map<String, dynamic> json) =>

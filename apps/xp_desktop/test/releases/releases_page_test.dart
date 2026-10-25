@@ -6,12 +6,16 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:xp_api/xp_api.dart';
 import 'package:xp_client/xp_client.dart';
+import 'package:xp_desktop/credentials/view/flavor_credentials_sheet.dart';
+import 'package:xp_desktop/dispatch/dispatch.dart';
 import 'package:xp_desktop/l10n/l10n.dart';
 import 'package:xp_desktop/projects/bloc/projects_bloc.dart';
 import 'package:xp_desktop/releases/releases.dart';
 import 'package:xp_desktop/shell/cubit/shell_cubit.dart';
+import 'package:xp_desktop/widgets/widgets.dart';
 import 'package:xp_repositories/xp_repositories.dart';
 
+import '../dispatch/dispatch_harness.dart';
 import '../helpers/approval_fixtures.dart';
 import '../helpers/job_fixtures.dart';
 import '../helpers/pump_app.dart';
@@ -30,6 +34,12 @@ Release _noKey({StoreState apple = StoreState.uploaded}) => reviewRelease(
     ),
     lane(ReleaseStore.play, StoreState.inReview, changedAt: oct12(19, 40)),
   ],
+);
+
+/// The confirming button [label] of the open confirmation.
+Finder confirm(String label) => find.descendant(
+  of: find.byKey(confirmDialogKey),
+  matching: find.text(label),
 );
 
 void main() {
@@ -124,7 +134,16 @@ void main() {
       );
 
       await tester.tap(find.text('Mark approved'));
-      await tester.pump();
+      await tester.pumpAndSettle();
+      expect(find.byKey(confirmDialogKey), findsOneWidget);
+      await tester.tap(find.text('Keep'));
+      await tester.pumpAndSettle();
+      verifyNever(() => repository.setStoreStatus(any(), any(), any()));
+
+      await tester.tap(find.text('Mark approved'));
+      await tester.pumpAndSettle();
+      await tester.tap(confirm('Mark approved'));
+      await tester.pumpAndSettle();
       verify(
         () => repository.setStoreStatus(
           'rel_2',
@@ -132,8 +151,11 @@ void main() {
           StoreState.approved,
         ),
       ).called(1);
+      expect(find.text('Store status saved'), findsOneWidget);
       await tester.tap(find.text('Mark live'));
-      await tester.pump();
+      await tester.pumpAndSettle();
+      await tester.tap(confirm('Mark live'));
+      await tester.pumpAndSettle();
       verify(
         () => repository.setStoreStatus(
           'rel_2',
@@ -142,7 +164,9 @@ void main() {
         ),
       ).called(1);
       await tester.tap(find.text('Add API key…'));
-      expect(shell.state, const CredentialsDestination('prj_1'));
+      await tester.pumpAndSettle();
+      expect(find.byType(FlavorCredentialsSheet), findsOneWidget);
+      expect(shell.state, const HomeDestination());
     });
 
     testWidgets('marks an approved App Store and Google Play live', (
@@ -164,7 +188,9 @@ void main() {
         findsOneWidget,
       );
       await tester.tap(find.text('Mark live').last);
-      await tester.pump();
+      await tester.pumpAndSettle();
+      await tester.tap(confirm('Mark live'));
+      await tester.pumpAndSettle();
       verify(
         () => repository.setStoreStatus(
           'rel_2',
@@ -201,6 +227,58 @@ void main() {
       await tester.tap(find.text('Merge into main'));
       await tester.pump();
       expect(find.text('GitHub said no.'), findsOneWidget);
+      expect(find.text('Release branch merged'), findsNothing);
+    });
+
+    testWidgets('says why the releases cannot be read, and reads again', (
+      tester,
+    ) async {
+      final harness = ReleasesHarness(releases: [liveRelease]);
+      when(() => harness.releasesRepository.watchReleases(projectId: 'prj_1'))
+          .thenAnswer(
+            (_) => Stream.error(const ApiException('Boom.', statusCode: 500)),
+          );
+      await harness.pump(tester);
+      expect(find.text('Boom.'), findsOneWidget);
+
+      when(() => harness.releasesRepository.watchReleases(projectId: 'prj_1'))
+          .thenAnswer((_) => Stream.value(Snapshot([liveRelease])));
+      await tester.tap(find.text('Retry'));
+      await tester.pump();
+      await tester.pump();
+
+      expect(find.text('Boom.'), findsNothing);
+      verify(() => harness.releasesRepository.watchReleases(projectId: 'prj_1'))
+          .called(2);
+    });
+
+    testWidgets('says the release branch merged', (tester) async {
+      final harness = ReleasesHarness(
+        releases: [
+          reviewRelease(
+            state: ReleaseState.live,
+            mergeEnabled: true,
+            stores: [
+              lane(
+                ReleaseStore.apple,
+                StoreState.live,
+                changedAt: oct12(20, 0),
+              ),
+              lane(ReleaseStore.play, StoreState.live, changedAt: oct12(20, 0)),
+            ],
+          ),
+        ],
+      );
+      when(() => harness.releasesRepository.merge('rel_2'))
+          .thenAnswer((_) async => runningRun().run);
+      await harness.pump(tester);
+
+      await tester.tap(find.text('Merge into main'));
+      await tester.pump();
+      await tester.pump();
+
+      verify(() => harness.releasesRepository.merge('rel_2')).called(1);
+      expect(find.text('Release branch merged'), findsOneWidget);
     });
 
     testWidgets('builds a rejected version again after asking', (tester) async {
@@ -301,7 +379,8 @@ void main() {
     });
 
     testWidgets('says when there is no release, or no project', (tester) async {
-      await ReleasesHarness(releases: const []).pump(tester);
+      await ReleasesHarness(releases: const [])
+          .pump(tester, workflows: DispatchHarness().workflows);
       expect(
         find.text(
           'A production release dispatched from the overview shows '
@@ -309,6 +388,11 @@ void main() {
         ),
         findsOneWidget,
       );
+      await tester.tap(find.text('Dispatch Prod release…'));
+      await tester.pumpAndSettle();
+      expect(find.byType(DispatchSheet), findsOneWidget);
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await tester.pumpAndSettle();
       await tester.pumpApp(
         const ReleasesPage(projectId: 'prj_9'),
         projects: projectsIn(const ProjectsState(loaded: true)),

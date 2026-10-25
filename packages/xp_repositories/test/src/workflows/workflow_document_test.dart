@@ -234,6 +234,42 @@ stages:
       );
     });
 
+    test('reads and writes typed inputs', () {
+      const typed = WorkflowDocument(
+        inputs: [
+          WorkflowInput(
+            name: 'track',
+            type: InputType.choice,
+            description: 'The track.',
+            options: ['internal', 'beta'],
+            defaultValue: 'internal',
+          ),
+          WorkflowInput(
+            name: 'release',
+            type: InputType.release,
+            required: true,
+          ),
+        ],
+      );
+
+      expect(
+        typed.toYaml(),
+        startsWith(
+          'schema: 1\n'
+          'inputs:\n'
+          '  track:\n'
+          '    type: choice\n'
+          '    description: The track.\n'
+          '    options: [internal, beta]\n'
+          '    default: internal\n'
+          '  release:\n'
+          '    type: release\n'
+          '    required: true\n',
+        ),
+      );
+      expect(WorkflowDocument.parse(typed.toYaml()), typed);
+    });
+
     test('reads empty containers as nothing', () {
       expect(
         WorkflowDocument.parse('''
@@ -421,7 +457,7 @@ stages:
             column: 5,
             message:
                 'Unknown key "color" in input "b". Allowed: default, '
-                'description, required.',
+                'description, options, required, type.',
           ),
           WorkflowIssue(
             line: 8,
@@ -471,6 +507,21 @@ stages:
           ),
           WorkflowIssue(line: 27, column: 19, message: '"gate" is text.'),
         ],
+      );
+    });
+
+    test('an input type it does not know, and options that are not text', () {
+      expect(
+        issues('inputs:\n  a: {type: number, options: [1]}\nstages: []\n')
+            .map((issue) => issue.message),
+        [
+          '"type" is one of string, boolean, choice, json, release.',
+          '"options" is a list of strings.',
+        ],
+      );
+      expect(
+        issues('inputs:\n  a: {options: x}\nstages: []\n').single.message,
+        '"options" is a list of strings.',
       );
     });
 

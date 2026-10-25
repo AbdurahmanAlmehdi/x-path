@@ -1,8 +1,10 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:xp_api/xp_api.dart';
+import 'package:xp_desktop/credentials/view/flavor_credentials_sheet.dart';
 import 'package:xp_desktop/l10n/l10n.dart';
 import 'package:xp_desktop/project_overview/widgets/release_status.dart';
+import 'package:xp_desktop/projects/bloc/projects_bloc.dart';
 import 'package:xp_desktop/releases/bloc/release_board_bloc.dart';
 import 'package:xp_desktop/shell/cubit/shell_cubit.dart';
 import 'package:xp_desktop/shell/widgets/shell_page.dart';
@@ -257,9 +259,7 @@ class StoreLane extends StatelessWidget {
                   size: XpButtonSize.small,
                   tooltip: canCommand ? null : l10n.readOnlyHint,
                   onPressed: canCommand && !busy
-                      ? () => bloc.add(
-                          ReleaseBoardStoreMarked(store, StoreState.approved),
-                        )
+                      ? () => _mark(context, bloc, StoreState.approved)
                       : null,
                 ),
                 const SizedBox(width: 8),
@@ -269,9 +269,7 @@ class StoreLane extends StatelessWidget {
                 size: XpButtonSize.small,
                 tooltip: canCommand ? null : l10n.readOnlyHint,
                 onPressed: canCommand && !busy
-                    ? () => bloc.add(
-                        ReleaseBoardStoreMarked(store, StoreState.live),
-                      )
+                    ? () => _mark(context, bloc, StoreState.live)
                     : null,
               ),
               const Spacer(),
@@ -281,9 +279,7 @@ class StoreLane extends StatelessWidget {
                     : l10n.laneAddServiceAccount,
                 kind: XpButtonKind.tertiary,
                 size: XpButtonSize.small,
-                onPressed: () => context.read<ShellCubit>().show(
-                  CredentialsDestination(release.projectId),
-                ),
+                onPressed: () => _addCredential(context),
               ),
             ],
           ),
@@ -317,6 +313,48 @@ class StoreLane extends StatelessWidget {
       );
     }
     return widgets;
+  }
+
+  /// Asks, then marks the store [state] by hand.
+  Future<void> _mark(
+    BuildContext context,
+    ReleaseBoardBloc bloc,
+    StoreState state,
+  ) async {
+    final l10n = context.l10n;
+    final confirmed = await confirmAction(
+      context,
+      title: l10n.laneMarkTitle(
+        versionLabel(release.version, release.build),
+        l10n.storeState(store, state),
+      ),
+      points: [l10n.laneMarkManual, l10n.laneMarkFinal],
+      keep: l10n.confirmKeep,
+      confirm: state == StoreState.live
+          ? l10n.laneMarkLive
+          : l10n.laneMarkApproved,
+    );
+    if (confirmed) bloc.add(ReleaseBoardStoreMarked(store, state));
+  }
+
+  /// Opens the credentials of the release's flavor; the credentials page
+  /// when the project or its app is not known here.
+  Future<void> _addCredential(BuildContext context) async {
+    final project = context.read<ProjectsBloc>().state.byId(release.projectId);
+    final app = project?.profile.apps
+        .where((app) => app.path == release.app)
+        .firstOrNull;
+    if (project == null || app == null) {
+      context.read<ShellCubit>().show(
+        CredentialsDestination(release.projectId),
+      );
+      return;
+    }
+    await showFlavorCredentialsSheet(
+      context,
+      project: project,
+      target: (app: app.path, appName: app.name, flavor: release.flavor),
+    );
   }
 
   Future<void> _confirmNewBuild(

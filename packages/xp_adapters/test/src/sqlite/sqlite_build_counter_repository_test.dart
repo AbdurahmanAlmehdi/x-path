@@ -76,6 +76,23 @@ void main() {
     expect(await allocate(0), 79);
   });
 
+  test('peeks at the next number without taking it', () async {
+    expect(await counters.peek(projectId: 'prj_1', appPath: '.', seed: 0), 1);
+    expect(
+      await counters.peek(projectId: 'prj_1', appPath: '.', seed: 3283),
+      3284,
+    );
+    expect(counterOf('.'), 0);
+    expect(
+      () => counters.peek(projectId: 'prj_1', appPath: 'apps/x', seed: 0),
+      throwsA(isA<UnknownAppException>()),
+    );
+    expect(
+      () => counters.peek(projectId: 'prj_1', appPath: '.', seed: -1),
+      throwsRangeError,
+    );
+  });
+
   test('refuses an unknown app and changes nothing', () async {
     await expectLater(
       allocate(9, 'apps/none'),
@@ -98,26 +115,29 @@ void main() {
     expect(allocate(-1), throwsRangeError);
   });
 
-  test('two connections to one file never get the same number', () async {
-    final directory = Directory.systemTemp.createTempSync('xp_counter_');
-    addTearDown(() => directory.deleteSync(recursive: true));
-    final path = p.join(directory.path, 'xpd.db');
-    final first = SqliteDatabase.open(path);
-    await SqliteProjectRepository(first, random: Random(1)).add(_project());
-    final second = SqliteDatabase.open(path);
-    addTearDown(first.close);
-    addTearDown(second.close);
-    final a = SqliteBuildCounterRepository(first);
-    final b = SqliteBuildCounterRepository(second);
+  test(
+    'connections that take turns on one file never get the same number',
+    () async {
+      final directory = Directory.systemTemp.createTempSync('xp_counter_');
+      addTearDown(() => directory.deleteSync(recursive: true));
+      final path = p.join(directory.path, 'xpd.db');
+      final first = SqliteDatabase.open(path);
+      await SqliteProjectRepository(first, random: Random(1)).add(_project());
+      final second = SqliteDatabase.open(path);
+      addTearDown(first.close);
+      addTearDown(second.close);
+      final a = SqliteBuildCounterRepository(first);
+      final b = SqliteBuildCounterRepository(second);
 
-    final numbers = [
-      await a.allocate(projectId: 'prj_1', appPath: '.', seed: 0),
-      await b.allocate(projectId: 'prj_1', appPath: '.', seed: 0),
-      await a.allocate(projectId: 'prj_1', appPath: '.', seed: 0),
-      await b.allocate(projectId: 'prj_1', appPath: '.', seed: 10),
-    ];
+      final numbers = [
+        await a.allocate(projectId: 'prj_1', appPath: '.', seed: 0),
+        await b.allocate(projectId: 'prj_1', appPath: '.', seed: 0),
+        await a.allocate(projectId: 'prj_1', appPath: '.', seed: 0),
+        await b.allocate(projectId: 'prj_1', appPath: '.', seed: 10),
+      ];
 
-    expect(numbers, [1, 2, 3, 11]);
-    expect(counterOf('.', first), 11);
-  });
+      expect(numbers, [1, 2, 3, 11]);
+      expect(counterOf('.', first), 11);
+    },
+  );
 }

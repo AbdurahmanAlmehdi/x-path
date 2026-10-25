@@ -25,20 +25,24 @@ class XpSelect<T> extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final onChanged = this.onChanged;
     final colors = context.xpColors;
     final style = (code ? context.xpType.code : context.xpType.body).copyWith(
       color: onChanged == null ? colors.textDisabled : colors.textPrimary,
     );
-    return PopupMenuButton<T>(
+    // The menu picks an index: it would not report a pick of `null`.
+    return PopupMenuButton<int>(
       enabled: onChanged != null,
       tooltip: '',
-      initialValue: value,
+      initialValue: values.indexOf(value),
       position: PopupMenuPosition.under,
-      onSelected: onChanged,
+      onSelected: onChanged == null
+          ? null
+          : (index) => onChanged(values[index]),
       itemBuilder: (context) => [
-        for (final item in values)
-          PopupMenuItem<T>(
-            value: item,
+        for (final (index, item) in values.indexed)
+          PopupMenuItem<int>(
+            value: index,
             height: context.xpSizes.rowDefault,
             child: Text(labelOf(item), style: style),
           ),

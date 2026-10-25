@@ -29,4 +29,20 @@ class SqliteBuildCounterRepository implements BuildCounterRepository {
     });
     return next;
   }
+
+  @override
+  Future<int> peek({
+    required String projectId,
+    required String appPath,
+    required int seed,
+  }) async {
+    RangeError.checkNotNegative(seed, 'seed');
+    final rows = _database.connection.select(
+      'SELECT max(build_counter, ?) + 1 AS next FROM app '
+      'WHERE project_id = ? AND path = ?',
+      [seed, projectId, appPath],
+    );
+    if (rows.isEmpty) throw UnknownAppException(projectId, appPath);
+    return rows.single['next'] as int;
+  }
 }

@@ -3,11 +3,13 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:xp_api/xp_api.dart';
 import 'package:xp_client/xp_client.dart';
+import 'package:xp_desktop/dispatch/dispatch.dart';
 import 'package:xp_desktop/projects/bloc/projects_bloc.dart';
 import 'package:xp_desktop/shell/cubit/shell_cubit.dart';
 import 'package:xp_desktop/tests/tests.dart';
 import 'package:xp_repositories/xp_repositories.dart';
 
+import '../dispatch/dispatch_harness.dart';
 import '../helpers/engine_fixtures.dart';
 import '../helpers/fakes.dart';
 import '../helpers/pump_app.dart';
@@ -55,9 +57,11 @@ class TestsHarness {
     ShellCubit? shell,
     String projectId = 'prj_1',
     Brightness brightness = Brightness.light,
+    WorkflowsRepository? workflows,
   }) async {
     await tester.pumpApp(
       TestsPage(projectId: projectId, jobId: jobId),
+      workflowsRepository: workflows,
       shell: shell,
       brightness: brightness,
       testsRepository: tests,
@@ -219,9 +223,15 @@ void main() {
       expect(find.text('Locked.'), findsOneWidget);
     });
 
-    testWidgets('says when there is no run yet', (tester) async {
-      await TestsHarness(baselines: const []).pump(tester, jobId: null);
+    testWidgets('says when there is no run yet, and runs the tests', (
+      tester,
+    ) async {
+      await TestsHarness(baselines: const [])
+          .pump(tester, jobId: null, workflows: DispatchHarness().workflows);
       expect(find.text('No test runs yet'), findsOneWidget);
+      await tester.tap(find.text('Run Tests…'));
+      await tester.pumpAndSettle();
+      expect(find.byType(DispatchSheet), findsOneWidget);
     });
 
     testWidgets('says when the project is gone', (tester) async {
