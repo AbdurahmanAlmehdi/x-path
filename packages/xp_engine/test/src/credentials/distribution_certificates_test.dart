@@ -24,6 +24,16 @@ class _Keys implements DistributionKeys {
   }
 }
 
+/// A secret store that refuses writes once told to.
+class _LockingSecrets extends BytesSecretStore {
+  bool locked = false;
+
+  @override
+  Future<void> writeBytes(String key, List<int> value) => locked
+      ? throw const SecretsLockedException('locked')
+      : super.writeBytes(key, value);
+}
+
 /// An App Store Connect that cannot revoke a certificate.
 class _NoRevoke extends FakeAppStoreConnect {
   @override
@@ -34,7 +44,7 @@ class _NoRevoke extends FakeAppStoreConnect {
 void main() {
   final owner = tokenOf(DeviceTokenKind.cli);
   late InMemoryCredentialRepository repository;
-  late BytesSecretStore secrets;
+  late _LockingSecrets secrets;
   late FakeAppStoreConnect asc;
   late _Keys keys;
   late Map<CredentialKind, FakeCredentialVerifier> verifiers;
@@ -92,7 +102,7 @@ void main() {
         scannedAt: DateTime.utc(2026),
       ),
     );
-    secrets = BytesSecretStore();
+    secrets = _LockingSecrets();
     asc = FakeAppStoreConnect()
       ..createdContent = base64.decode(testDistributionCertificate);
     keys = _Keys();
@@ -254,6 +264,24 @@ void main() {
       ),
     );
     expect(asc.calls.last, startsWith('revokeCertificate certificate-'));
+    expect(asc.certificates, isEmpty);
+  });
+
+  test('revokes the certificate when the secret store refuses its '
+      'key', () async {
+    await giveAscKey();
+    secrets.locked = true;
+
+    await expectLater(
+      create(),
+      throwsA(
+        isA<CredentialUnreachableException>().having(
+          (e) => e.message,
+          'message',
+          allOf(contains('so it revoked it'), contains('locked')),
+        ),
+      ),
+    );
     expect(asc.certificates, isEmpty);
   });
 
