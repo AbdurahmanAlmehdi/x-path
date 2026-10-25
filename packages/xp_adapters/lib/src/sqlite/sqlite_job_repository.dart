@@ -21,8 +21,8 @@ class SqliteJobRepository implements JobRepository {
 
   static const _jobColumns =
       'id, workflow_version_id, project_id, release_id, sha, state, '
-      'runner_id, lease_until, run_id, stage, name, capabilities, message, '
-      'created_at, started_at, finished_at';
+      'runner_id, lease_until, run_id, stage, name, capabilities, narrowing, '
+      'message, created_at, started_at, finished_at';
 
   static const _stepColumns =
       'job_id, ordinal, kind, state, side_effect, input, attempts, result, '
@@ -33,7 +33,7 @@ class SqliteJobRepository implements JobRepository {
     _database.transaction(() {
       _db.execute(
         'INSERT INTO job ($_jobColumns) '
-        'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
         [
           job.id,
           job.workflowVersionId,
@@ -47,6 +47,7 @@ class SqliteJobRepository implements JobRepository {
           job.stage,
           job.name,
           jsonEncode(job.capabilities),
+          jsonEncode(job.narrowing),
           job.message,
           toDatabaseTime(job.createdAt),
           _time(job.startedAt),
@@ -223,6 +224,8 @@ class SqliteJobRepository implements JobRepository {
     stage: row['stage'] as int,
     name: row['name'] as String?,
     capabilities: (jsonDecode(row['capabilities'] as String) as List<dynamic>)
+        .cast<String>(),
+    narrowing: (jsonDecode(row['narrowing'] as String) as List<dynamic>)
         .cast<String>(),
     message: row['message'] as String?,
     createdAt: fromDatabaseTime(row['created_at'] as int),

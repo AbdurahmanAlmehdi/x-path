@@ -20,6 +20,7 @@ class JobRecord extends Equatable {
     this.stage = 0,
     this.name,
     this.capabilities = const [],
+    this.narrowing = const [],
     this.message,
     this.startedAt,
     this.finishedAt,
@@ -60,8 +61,14 @@ class JobRecord extends Equatable {
   /// What the workflow calls it.
   final String? name;
 
-  /// The capabilities a runner needs to run it, by their wire names.
+  /// What a runner needs to run it: each entry one capability, or several
+  /// joined by `|` of which any will do (`CapabilityNeed`).
   final List<String> capabilities;
+
+  /// Why the planner ruled out an iOS build on Linux for it, so that it needs
+  /// `ios-sign` (ADR 0014): one reason per thing the job uses that Linux iOS
+  /// builds lack. Its queue message repeats them. Empty when nothing did.
+  final List<String> narrowing;
 
   /// Why it failed or was cancelled, or why a queued job still waits.
   final String? message;
@@ -99,6 +106,7 @@ class JobRecord extends Equatable {
     stage: stage,
     name: name,
     capabilities: capabilities,
+    narrowing: narrowing,
     message: identical(message, _unset) ? this.message : message as String?,
     createdAt: createdAt,
     startedAt: identical(startedAt, _unset)
@@ -123,6 +131,7 @@ class JobRecord extends Equatable {
     stage,
     name,
     capabilities,
+    narrowing,
     message,
     createdAt,
     startedAt,

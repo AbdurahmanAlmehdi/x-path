@@ -8,7 +8,8 @@ import 'package:xp/src/runner/runner_socket.dart';
 import 'package:xp/src/runner/secrets/lease_secret_store.dart';
 import 'package:xp_api/xp_api.dart';
 import 'package:xp_client/xp_client.dart';
-import 'package:xp_engine/xp_engine.dart' show ProbeExecutor;
+import 'package:xp_engine/xp_engine.dart'
+    show CapabilityNeed, ProbeExecutor, RunnerProbe;
 
 /// Why [RunnerAgent.run] ended.
 enum AgentExit {
@@ -59,8 +60,13 @@ class _Lease {
   Duration renewedAt;
 
   LeaseRef get ref => LeaseRef(jobId: offer.jobId, leaseId: offer.leaseId);
-  bool get needsIosSign => offer.capabilities.contains('ios-sign');
+  bool get isIos => _isIos(offer);
 }
+
+/// Whether the job of [offer] takes the one iOS place of the machine: it
+/// needs `ios-sign` or `ios-linux`, alone or as one of several.
+bool _isIos(LeaseOfferFrame offer) =>
+    CapabilityNeed.parseAll(offer.capabilities).any((need) => need.isIos);
 
 /// The runner: dials out to the engine and does what it says (D-08, D-19).
 ///
@@ -73,8 +79,9 @@ class _Lease {
 ///   them from the probe and says what it found (`probed`), which the runner
 ///   prints the first time and whenever it changes: what it offers and, for
 ///   each capability it lacks, why and what gives it.
-/// - **Takes leases** within its slots (an `ios-sign` job never runs beside
-///   another), refuses the others with a reason, and refuses all of them
+/// - **Takes leases** within its slots (an iOS job, `ios-sign` or
+///   `ios-linux`, never runs beside another), refuses the others with a
+///   reason, and refuses all of them
 ///   while draining. **Heartbeats** every `heartbeatSeconds` of the welcome,
 ///   well inside the lease of 90 seconds.
 /// - **Reports** through each lease's [LeaseOutbox], which keeps what the
@@ -111,6 +118,7 @@ class RunnerAgent {
     required this.cores,
     required this.slots,
     this.requestedSlots,
+    this._iosLinuxDirectory,
     this.oneShot = false,
     this.secretTimeout = const Duration(seconds: 60),
     Backoff? backoff,
@@ -133,6 +141,7 @@ class RunnerAgent {
   final RunnerConnector _connect;
   final LeaseStarter _start;
   final ProbeExecutor _probe;
+  final String? _iosLinuxDirectory;
   final Set<String> _stepKinds;
   final void Function(String message) _log;
   final Backoff _backoff;
@@ -534,9 +543,22 @@ class RunnerAgent {
     HeartbeatFrame(leases: [for (final lease in _active.values) lease.ref]),
   );
 
+  /// Runs the engine's probe, and the commands of the omarchy-apple-dev
+  /// checkout after it when this runner is configured for Linux iOS builds:
+  /// only the runner knows the folder, so it sends it with the results.
   Future<void> _probed(ProbeFrame frame) async {
-    final results = await _probe.run(frame.commands);
-    _sendFrame(ProbeResultFrame(probeId: frame.probeId, results: results));
+    final directory = _iosLinuxDirectory;
+    final results = await _probe.run([
+      ...frame.commands,
+      if (directory != null) ...const RunnerProbe().iosLinuxCommands(directory),
+    ]);
+    _sendFrame(
+      ProbeResultFrame(
+        probeId: frame.probeId,
+        results: results,
+        iosLinuxDir: directory,
+      ),
+    );
   }
 
   /// Says what the engine found this runner offers: after the first probe,
@@ -573,8 +595,7 @@ class RunnerAgent {
       refusal = 'unsupported: this runner has no step ${unknown.join(', ')}';
     } else if (_active.length >= slots || _active.containsKey(offer.jobId)) {
       refusal = 'busy';
-    } else if (offer.capabilities.contains('ios-sign') &&
-        _active.values.any((lease) => lease.needsIosSign)) {
+    } else if (_isIos(offer) && _active.values.any((lease) => lease.isIos)) {
       refusal = 'busy';
     }
     if (refusal != null) {

@@ -13,6 +13,7 @@
         "hasIos": true,
         "hasAndroid": true,
         "iosPackageManager": "none",
+        "iosAppExtensions": [],
         "flavors": [
           {
             "name": "staging",

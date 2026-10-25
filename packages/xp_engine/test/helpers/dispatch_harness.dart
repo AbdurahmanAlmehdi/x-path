@@ -77,6 +77,7 @@ class DispatchHarness {
     JobRepository? jobRepository,
     bool seeded = true,
     ReleaseOpener? releases,
+    bool linuxIosBuilds = false,
   }) async {
     final git = ScriptedGit()..refs['main'] = mainSha;
     final projects = InMemoryProjectRepository();
@@ -92,7 +93,7 @@ class DispatchHarness {
     final clock = ManualClock(DateTime.utc(2026, 10, 13, 9));
     final events = InMemoryEventLog(clock: clock);
     final registry = allSteps(git: git, jobs: jobs.jobs);
-    final planners = StepPlanners(registry);
+    final planners = StepPlanners(registry, linuxIosBuilds: linuxIosBuilds);
     final scheduler = Scheduler(
       runner: jobs.runner,
       records: jobs.jobs,

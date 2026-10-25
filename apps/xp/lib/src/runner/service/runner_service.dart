@@ -27,11 +27,12 @@ abstract final class RunnerServiceDefinition {
   ///
   /// The service runs `current/bin/xp` of the data directory, so that an
   /// update (a new `current`) is what the next start runs (D-24). It sets
-  /// [runnerManagedVariable], and [tools]: where the Android SDK and the JDK
-  /// are (`ANDROID_HOME`, `JAVA_HOME`), which a service would not find
-  /// otherwise. With [runnerManagedVariable] the runner exits with a restart
-  /// code after an update, and the manager starts it again. systemd does not
-  /// restart it after the codes of a revoked, replaced or unpaired runner.
+  /// [runnerManagedVariable], and [tools]: where the Android SDK, the JDK
+  /// and the omarchy-apple-dev checkout are (`ANDROID_HOME`, `JAVA_HOME`,
+  /// `XP_IOS_LINUX_DIR`), which a service would not find otherwise. With
+  /// [runnerManagedVariable] the runner exits with a restart code after an
+  /// update, and the manager starts it again. systemd does not restart it
+  /// after the codes of a revoked, replaced or unpaired runner.
   static ServiceDefinition definition({
     required RunnerPaths paths,
     required String path,

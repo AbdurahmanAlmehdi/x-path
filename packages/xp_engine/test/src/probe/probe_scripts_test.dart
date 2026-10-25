@@ -136,6 +136,89 @@ void main() {
       expect(result.stdout, isEmpty);
     });
   });
+
+  group('ios_linux_sdk', () {
+    const bundle = 'swiftpm/swift-sdks/darwin.artifactbundle';
+
+    test('finds the bundle under XDG_CONFIG_HOME, else ~/.swiftpm', () {
+      dir('config/$bundle');
+      dir('home/.swiftpm/swift-sdks/darwin.artifactbundle');
+
+      expect(
+        run(RunnerProbe.darwinSdkScript, {
+          'XDG_CONFIG_HOME': '${root.path}/config',
+          'HOME': '${root.path}/nowhere',
+        }).exitCode,
+        0,
+      );
+      expect(
+        run(RunnerProbe.darwinSdkScript, {
+          'HOME': '${root.path}/home',
+        }).exitCode,
+        0,
+      );
+    });
+
+    test('fails without the bundle where SwiftPM looks', () {
+      dir('home/.swiftpm/swift-sdks/darwin.artifactbundle');
+
+      expect(
+        run(RunnerProbe.darwinSdkScript, {
+          'XDG_CONFIG_HOME': '${root.path}/config',
+          'HOME': '${root.path}/home',
+        }).exitCode,
+        1,
+      );
+      expect(
+        run(RunnerProbe.darwinSdkScript, {
+          'HOME': '${root.path}/empty',
+        }).exitCode,
+        1,
+      );
+    });
+  });
+
+  group('ios_linux_tools', () {
+    test('names the tools and the python that are missing', () {
+      final bin = dir('bin');
+      tool(bin, 'rcodesign');
+      tool(bin, 'llvm-strip');
+
+      final result = run(RunnerProbe.iosLinuxToolsScript, {
+        'PATH': bin.path,
+        'HOME': '${root.path}/home',
+      });
+
+      expect(result.exitCode, 1);
+      expect(
+        (result.stdout as String).trim(),
+        'llvm-lipo llvm-otool llvm-install-name-tool llvm-ar pymobile3',
+      );
+    });
+
+    test('passes when all of them are there', () {
+      final bin = dir('bin');
+      for (final name in [
+        'rcodesign',
+        'llvm-strip',
+        'llvm-lipo',
+        'llvm-otool',
+        'llvm-install-name-tool',
+        'llvm-ar',
+      ]) {
+        tool(bin, name);
+      }
+      tool(dir('home/pymobile3-venv/bin'), 'python');
+
+      final result = run(RunnerProbe.iosLinuxToolsScript, {
+        'PATH': bin.path,
+        'HOME': '${root.path}/home',
+      });
+
+      expect(result.exitCode, 0);
+      expect(result.stdout, isEmpty);
+    });
+  });
 }
 
 /// Why a test of the JDK fallback cannot run here: Android Studio on this

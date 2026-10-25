@@ -37,6 +37,10 @@ class XcodeTarget extends Equatable {
   /// extension.
   bool get isApplication => productType == 'com.apple.product-type.application';
 
+  /// Whether the target builds an app extension: a widget, a share or
+  /// notification service extension, an iMessage or watch extension.
+  bool get isAppExtension => productType.contains('extension');
+
   @override
   List<Object?> get props => [name, productType, configurations];
 }

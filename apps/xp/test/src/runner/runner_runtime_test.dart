@@ -210,6 +210,57 @@ void main() {
     expect(said.first, contains('Cleaned up after an earlier run'));
   });
 
+  test(
+    'probes the omarchy-apple-dev checkout XP_IOS_LINUX_DIR names',
+    () async {
+      host = RunnerHost(
+        operatingSystem: host.operatingSystem,
+        cores: 8,
+        pid: pid,
+        environment: {
+          ...host.environment,
+          iosLinuxDirectoryVariable: directory.path,
+        },
+        runner: const IoProcessRunner(),
+      );
+      final runner = await buildRunner(setup());
+      final running = runner.run();
+      final session = await engine.connection;
+      session.send(
+        WelcomeFrame(
+          runnerId: 'rnr_1',
+          engineVersion: packageVersion,
+          apiVersion: apiVersion,
+        ),
+      );
+      await session.next<HelloFrame>();
+
+      session.send(
+        const ProbeFrame(
+          probeId: 'prb_1',
+          commands: [
+            ProbeCommand(
+              id: 'git',
+              executable: 'git',
+              arguments: ['--version'],
+            ),
+          ],
+        ),
+      );
+      final probed = await session.next<ProbeResultFrame>();
+
+      expect(probed.iosLinuxDir, directory.path);
+      expect(probed.results.map((result) => result.id), [
+        'git',
+        'ios_linux_commit',
+        'ios_linux_sdk',
+        'ios_linux_tools',
+      ]);
+      await runner.stop();
+      await running;
+    },
+  );
+
   test('runs one job and exits when it is one-shot', () async {
     final runner = await buildRunner(setup(oneShot: true));
     final running = runner.run();
@@ -495,6 +546,19 @@ void main() {
       expect(real.home, '/home/me');
       expect(RunnerHost.system(const {}).home, isEmpty);
       expect(real.isMacOS, Platform.isMacOS);
+    });
+
+    test('reads the omarchy-apple-dev checkout from XP_IOS_LINUX_DIR', () {
+      expect(
+        RunnerHost.system({iosLinuxDirectoryVariable: '/srv/omarchy'})
+            .iosLinuxDirectory,
+        '/srv/omarchy',
+      );
+      expect(
+        RunnerHost.system({iosLinuxDirectoryVariable: ''}).iosLinuxDirectory,
+        isNull,
+      );
+      expect(RunnerHost.system(const {}).iosLinuxDirectory, isNull);
     });
   });
 }

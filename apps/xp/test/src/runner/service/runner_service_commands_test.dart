@@ -374,6 +374,27 @@ void main() {
       },
     );
 
+    test('writes the omarchy-apple-dev checkout, so that ios-linux survives a '
+        'restart', () async {
+      use(
+        hostOn(
+          'linux',
+          environment: {'XP_IOS_LINUX_DIR': '/home/me/omarchy-apple-dev'},
+        ),
+      );
+      await pair();
+
+      expect(
+        await run(['install-service', '--data-dir', paths.root]),
+        XpExit.ok,
+      );
+
+      expect(
+        File(unit()).readAsStringSync(),
+        contains('Environment=XP_IOS_LINUX_DIR=/home/me/omarchy-apple-dev\n'),
+      );
+    });
+
     test('hands the key of the credential file to the runner', () async {
       await pair();
 

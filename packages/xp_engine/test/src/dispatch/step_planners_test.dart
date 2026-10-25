@@ -720,6 +720,38 @@ stages:
       });
     });
 
+    test(
+      'to App Store Connect need a Mac only for an Apple ID (altool)',
+      () async {
+        await harness.saveCredential('prod', CredentialKind.ascKey);
+        await harness.saveCredential(
+          'dev',
+          CredentialKind.appleId,
+          account: 'dev@example.com',
+        );
+        const steps = '''
+          - kind: version.bump
+          - kind: upload.appStore
+            with:
+              appleAppId: "1"
+''';
+
+        final apiKey = await dispatch(
+          steps,
+          matrix: _flavorMatrix,
+          request: const DispatchRequest(platforms: ['ios'], flavors: ['prod']),
+        );
+        final appleId = await dispatch(
+          steps,
+          matrix: _flavorMatrix,
+          request: const DispatchRequest(platforms: ['ios'], flavors: ['dev']),
+        );
+
+        expect(apiKey.jobs.single.capabilities, isEmpty);
+        expect(appleId.jobs.single.capabilities, ['ios-sign']);
+      },
+    );
+
     test('take their file from the build job of the same cell', () async {
       await harness.saveCredential('dev', CredentialKind.playSa);
       await harness.saveCredential('dev', CredentialKind.firebaseSa);

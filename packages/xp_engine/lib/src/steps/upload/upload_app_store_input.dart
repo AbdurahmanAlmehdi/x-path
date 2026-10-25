@@ -169,14 +169,15 @@ class UploadAppStoreResult extends Equatable {
   /// uploaded.
   final bool alreadyUploaded;
 
-  /// Whether altool said the upload went through (a success line in its
-  /// output).
+  /// Whether App Store Connect accepted the upload, or altool said it went
+  /// through (a success line in its output).
   final bool confirmed;
 
   /// altool's delivery UUID, for `altool --build-status`.
   final String? deliveryId;
 
-  /// The id of the build in the REST API, when an API key found it.
+  /// The id of the build in the REST API, when an API key found or uploaded
+  /// it.
   final String? buildId;
 
   /// The processing state (`PROCESSING`, `VALID`, ...) when an API key found

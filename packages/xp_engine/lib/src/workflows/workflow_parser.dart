@@ -367,11 +367,11 @@ class _Reader {
       final capability = item is YamlScalar && item.value is String
           ? Capability.fromWire(item.value as String)
           : null;
-      if (capability == null) {
+      if (capability == null || !Capability.named.contains(capability)) {
         _issueAt(
           item,
           'Unknown capability. Allowed: '
-          '${Capability.values.map((c) => c.wire).join(', ')}.',
+          '${Capability.named.map((c) => c.wire).join(', ')}.',
         );
       } else {
         capabilities.add(capability);

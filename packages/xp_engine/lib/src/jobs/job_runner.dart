@@ -101,6 +101,7 @@ class JobRunner implements JobControl {
     int stage = 0,
     String? name,
     List<String> capabilities = const [],
+    List<String> narrowing = const [],
   }) async {
     final job = JobRecord(
       id: id ?? newJobId(),
@@ -112,6 +113,7 @@ class JobRunner implements JobControl {
       stage: stage,
       name: name,
       capabilities: capabilities,
+      narrowing: narrowing,
       state: JobState.queued,
       createdAt: _clock.now(),
     );

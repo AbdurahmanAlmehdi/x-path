@@ -387,6 +387,7 @@ void main() {
       expect(command.withKeys, [...command.withKeys]..sort());
       expect(schema.gates, contains('prod_release'));
       expect(schema.capabilities, contains('ios-sign'));
+      expect(schema.capabilities, isNot(contains('ios-linux')));
       expect(schema.matrixAxes, ['platform', 'flavor']);
       expect(schema.platforms, ['android', 'ios']);
     });

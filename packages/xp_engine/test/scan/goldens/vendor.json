@@ -11,6 +11,7 @@
         "hasIos": true,
         "hasAndroid": true,
         "iosPackageManager": "cocoapods",
+        "iosAppExtensions": [],
         "flavors": [
           {
             "name": "dev",

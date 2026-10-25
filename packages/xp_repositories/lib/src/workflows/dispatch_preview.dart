@@ -92,10 +92,16 @@ class DispatchPreview extends Equatable {
             for (final step in job.steps)
               if (_holds(step.condition, jobScope)) step,
           ];
+          final ascKey = credentials.any(
+            (credential) =>
+                credential.app == app.path &&
+                credential.flavor == cell['flavor'] &&
+                credential.kind == CredentialKind.ascKey,
+          );
           final capabilities = {
             ...job.capabilities,
             for (final step in steps)
-              ..._capabilitiesOf(step.kind, cell['platform']),
+              ..._capabilitiesOf(step.kind, cell['platform'], ascKey: ascKey),
           }.toList()..sort();
           final engineOnly = steps.any(
             (step) => step.gate != null || _isEngineOnly(step.kind),
@@ -352,11 +358,17 @@ bool _isEngineOnly(String kind) =>
     kind.startsWith('upload.') ||
     kind.startsWith('github.');
 
-/// What a step of [kind] needs of a runner (the engine's step planners).
-Set<String> _capabilitiesOf(String kind, String? platform) => switch (kind) {
+/// What a step of [kind] needs of a runner (the engine's step planners). An
+/// App Store upload with an API key ([ascKey]) needs no Mac.
+Set<String> _capabilitiesOf(
+  String kind,
+  String? platform, {
+  required bool ascKey,
+}) => switch (kind) {
   'build.android' => {'android', 'flutter'},
   'build.ios' => {'ios-sign', 'flutter'},
-  'ios.stripAndReexport' || 'upload.appStore' => {'ios-sign'},
+  'ios.stripAndReexport' => {'ios-sign'},
+  'upload.appStore' => ascKey ? const {} : {'ios-sign'},
   'shorebird.release' || 'shorebird.patch' => {
     'flutter',
     if (platform == 'ios') 'ios-sign' else 'android',

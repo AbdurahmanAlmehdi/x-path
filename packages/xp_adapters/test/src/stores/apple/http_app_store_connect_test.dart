@@ -25,6 +25,7 @@ void main() {
     Uri? baseUrl,
     int maxAttempts = 3,
     Duration timeout = const Duration(seconds: 60),
+    Duration uploadTimeout = const Duration(minutes: 10),
   }) {
     final created = HttpAppStoreConnect(
       key: key,
@@ -33,6 +34,7 @@ void main() {
       baseUrl: baseUrl ?? server.baseUrl,
       maxAttempts: maxAttempts,
       timeout: timeout,
+      uploadTimeout: uploadTimeout,
       sleep: (duration) async => sleeps.add(duration),
     );
     addTearDown(created.close);
@@ -381,6 +383,326 @@ void main() {
         client().updatePhasedRelease('nope', PhasedReleaseState.complete),
         throwsA(isA<AscNotFoundException>()),
       );
+    });
+  });
+
+  group('build uploads', () {
+    late FakeAscApp app;
+    final ipa = utf8.encode('an IPA of 23 bytes, ok.');
+
+    setUp(() {
+      app = server.addApp('ly.example.app');
+      server.uploadPartSize = 10;
+    });
+
+    Future<AscBuildUpload> upload({
+      HttpAppStoreConnect? api,
+      List<List<int>>? chunks,
+      int? length,
+    }) => (api ?? client()).uploadBuild(
+      app.id,
+      version: '5.4.1',
+      buildNumber: '3283',
+      fileName: 'prod-5.4.1+3283.ipa',
+      length: length ?? ipa.length,
+      content: () => Stream.fromIterable(
+        chunks ?? [ipa.sublist(0, 7), ipa.sublist(7, 12), ipa.sublist(12)],
+      ),
+    );
+
+    test('send the parts without the token and mark the file', () async {
+      final started = await upload();
+
+      expect(started.state, AscBuildUploadState.processing);
+      final created = server.buildUploads[started.id]!;
+      expect(created.version, '5.4.1');
+      expect(created.buildNumber, '3283');
+      expect(created.appId, app.id);
+      final file = created.file!;
+      expect(file.fileName, 'prod-5.4.1+3283.ipa');
+      expect(file.fileSize, ipa.length);
+      expect(file.bytes, ipa);
+      expect(file.uploaded, isTrue);
+      final parts = [
+        for (final request in server.requests)
+          if (request.uri.path.startsWith('/upload/')) request,
+      ];
+      expect(parts, hasLength(3));
+      expect(parts.map((part) => part.method).toSet(), {'PUT'});
+      expect(parts.map((part) => part.authorization).toSet(), {null});
+      expect(
+        parts.map((part) => part.contentType),
+        everyElement('application/octet-stream'),
+      );
+      expect(
+        server.requests
+            .where((request) => request.uri.path.startsWith('/v1/'))
+            .map((request) => request.tokenProblem)
+            .toSet(),
+        {null},
+      );
+    });
+
+    test('are read until App Store Connect made the build', () async {
+      final api = client();
+      final started = await upload(api: api);
+
+      final done = await api.buildUpload(started.id);
+
+      expect(done.state, AscBuildUploadState.complete);
+      expect(done.buildId, server.builds.single.id);
+      expect(server.builds.single.buildNumber, '3283');
+      expect(done.errors, isEmpty);
+    });
+
+    test('carry the errors of a rejection', () async {
+      server
+        ..uploadPollsBeforeDone = 1
+        ..uploadOutcomes.add(
+          const FakeAscUploadOutcome.rejected([
+            FakeAscIssue('90186', 'The train is closed.'),
+          ]),
+        );
+
+      final rejected = await upload();
+
+      expect(rejected.state, AscBuildUploadState.failed);
+      expect(rejected.errors, const [
+        AscUploadIssue(code: '90186', description: 'The train is closed.'),
+      ]);
+      expect(rejected.buildId, isNull);
+    });
+
+    test('of a used build number are a conflict with its code', () async {
+      server.addBuild(app.id, buildNumber: '3283', version: '5.4.1');
+
+      await expectLater(
+        upload(),
+        throwsA(
+          isA<AscConflictException>().having(
+            (e) => e.code,
+            'code',
+            'ENTITY_ERROR.ATTRIBUTE.INVALID.DUPLICATE',
+          ),
+        ),
+      );
+    });
+
+    test('stop when a part is refused', () async {
+      server.failNext(500, pathPrefix: '/upload/');
+
+      await expectLater(
+        upload(),
+        throwsA(
+          isA<AscServerException>().having(
+            (e) => e.message,
+            'message',
+            'App Store Connect refused part 1 of the upload (HTTP 500).',
+          ),
+        ),
+      );
+      expect(sleeps, isEmpty);
+    });
+
+    /// A client whose App Store Connect answers every call with a file of
+    /// one part at [partUrl], and whose upload host does what [part] says.
+    HttpAppStoreConnect onePart(
+      Uri partUrl,
+      Future<http.Response> Function(http.BaseRequest request) part, {
+      Duration uploadTimeout = const Duration(minutes: 10),
+    }) => client(
+      uploadTimeout: uploadTimeout,
+      httpClient: MockClient((request) async {
+        if (request.url.host == partUrl.host) return await part(request);
+        return http.Response(
+          jsonEncode({
+            'data': {
+              'type': 'buildUploadFiles',
+              'id': 'x',
+              'attributes': {
+                'uploadOperations': [
+                  {
+                    'method': 'PUT',
+                    'url': '$partUrl',
+                    'offset': 0,
+                    'length': ipa.length,
+                    'requestHeaders': [
+                      {
+                        'name': 'Content-Type',
+                        'value': 'application/octet-stream',
+                      },
+                    ],
+                  },
+                ],
+              },
+            },
+          }),
+          201,
+        );
+      }),
+    );
+
+    final signed = Uri.parse(
+      'https://upload.example/part/1?X-Amz-Signature=SECRET&expires=9',
+    );
+
+    test('send each part as told, without following a redirect', () async {
+      http.BaseRequest? sent;
+      final api = onePart(signed, (request) async {
+        sent = request;
+        return http.Response('', 200);
+      });
+
+      await upload(api: api);
+
+      expect(sent!.method, 'PUT');
+      expect(sent!.url, signed);
+      expect(sent!.followRedirects, isFalse);
+      expect(sent!.headers['Content-Type'], 'application/octet-stream');
+      expect(sent!.headers.containsKey('Authorization'), isFalse);
+    });
+
+    test('never name the signed address of a part that fails', () async {
+      final api = onePart(
+        signed,
+        (request) async =>
+            throw http.ClientException('Connection reset by $signed', signed),
+      );
+
+      final error = await upload(api: api)
+          .then<Object?>((_) => null, onError: (Object error) => error);
+
+      final message = (error! as AscServerException).message;
+      expect(message, startsWith('App Store Connect is not reachable: '));
+      expect(message, isNot(contains('SECRET')));
+      expect(message, isNot(contains('X-Amz-Signature')));
+      expect('$error', isNot(contains('SECRET')));
+    });
+
+    test('give up on a part that is not answered in time', () async {
+      final never = Completer<http.Response>();
+      final api = onePart(
+        signed,
+        (request) => never.future,
+        uploadTimeout: const Duration(milliseconds: 20),
+      );
+
+      await expectLater(
+        upload(api: api),
+        throwsA(
+          isA<AscServerException>().having(
+            (e) => e.message,
+            'message',
+            contains('did not answer in time'),
+          ),
+        ),
+      );
+    });
+
+    test('refuse an IPA that is not the size it was said to be', () async {
+      await expectLater(
+        upload(chunks: [ipa.sublist(0, 12)]),
+        throwsA(
+          isA<AscServerException>().having(
+            (e) => e.message,
+            'message',
+            contains('not the size'),
+          ),
+        ),
+      );
+      await expectLater(
+        upload(chunks: [ipa, ipa]),
+        throwsA(isA<AscServerException>()),
+      );
+    });
+
+    test('refuse parts that do not cover the IPA', () async {
+      Map<String, Object?> operation(int offset, int length) => {
+        'method': 'PUT',
+        'url': 'https://upload.example/$offset',
+        'offset': offset,
+        'length': length,
+      };
+      for (final (operations, problem) in [
+        (<Object?>[], 'do not cover the IPA'),
+        ([operation(0, 10), operation(12, 11)], 'do not cover the IPA'),
+        ([operation(0, 10)], 'do not cover the IPA'),
+        ([operation(0, 10)..['offset'] = '0'], 'no "offset"'),
+      ]) {
+        final api = client(
+          httpClient: MockClient(
+            (request) async => http.Response(
+              jsonEncode({
+                'data': {
+                  'type': request.url.path.endsWith('Files')
+                      ? 'buildUploadFiles'
+                      : 'buildUploads',
+                  'id': 'x',
+                  'attributes': {'uploadOperations': operations},
+                },
+              }),
+              201,
+            ),
+          ),
+        );
+
+        await expectLater(
+          upload(api: api),
+          throwsA(
+            isA<AscServerException>().having(
+              (e) => e.message,
+              'message',
+              contains(problem),
+            ),
+          ),
+        );
+      }
+    });
+
+    test('read a state without details as unknown', () async {
+      final api = client(
+        httpClient: MockClient(
+          (_) async => http.Response(
+            jsonEncode({
+              'data': {
+                'type': 'buildUploads',
+                'id': 'u',
+                'attributes': {
+                  'state': {
+                    'state': 'SIDEWAYS',
+                    'errors': [
+                      {'code': 7},
+                    ],
+                  },
+                },
+                'relationships': {'build': 'none'},
+              },
+            }),
+            200,
+          ),
+        ),
+      );
+
+      final read = await api.buildUpload('u');
+
+      expect(read.state, AscBuildUploadState.unknown);
+      expect(read.errors, const [AscUploadIssue(code: '', description: '')]);
+      expect(read.buildId, isNull);
+    });
+
+    test('read an upload without a state as unknown', () async {
+      final api = client(
+        httpClient: MockClient(
+          (_) async => http.Response(
+            jsonEncode({
+              'data': {'type': 'buildUploads', 'id': 'u'},
+            }),
+            200,
+          ),
+        ),
+      );
+
+      expect((await api.buildUpload('u')).state, AscBuildUploadState.unknown);
     });
   });
 

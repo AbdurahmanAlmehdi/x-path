@@ -63,9 +63,9 @@ class Runner extends Equatable {
   final RunnerStatus status;
 
   /// What the engine found it can do (`ios-sign`, `android`, `flutter`,
-  /// `swift-linux`), from the probe it ran on the runner at its last
-  /// connection, never from what the runner says about itself (D-19). Empty
-  /// until the first probe.
+  /// `swift-linux`, `ios-linux`), from the probe it ran on the runner at its
+  /// last connection, never from what the runner says about itself (D-19).
+  /// Empty until the first probe.
   final List<String> capabilities;
 
   /// What it cannot do, why, and what gives it, from the same probe as

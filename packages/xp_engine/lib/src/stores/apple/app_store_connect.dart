@@ -53,6 +53,26 @@ abstract interface class AppStoreConnect {
     PhasedReleaseState state,
   );
 
+  /// Uploads the IPA [content] ([length] bytes, named [fileName]) as the
+  /// build [buildNumber] of the version [version] of the app [appId], through
+  /// the build-upload API: it creates the build upload and its file, sends the
+  /// parts App Store Connect asks for and marks the file uploaded. The token
+  /// is never sent with the parts, which go to the addresses Apple names.
+  ///
+  /// App Store Connect goes on processing the upload after it returns; ask
+  /// [buildUpload] until its state is final.
+  Future<AscBuildUpload> uploadBuild(
+    String appId, {
+    required String version,
+    required String buildNumber,
+    required String fileName,
+    required int length,
+    required Stream<List<int>> Function() content,
+  });
+
+  /// The build upload [id], with its state, errors and warnings.
+  Future<AscBuildUpload> buildUpload(String id);
+
   /// Proves that Apple accepts the key: it reads one app (`GET /v1/apps` with
   /// a limit of 1). Credential checks use it; a `401` is an expired or revoked
   /// key.
@@ -81,6 +101,13 @@ class FakeAppStoreConnect implements AppStoreConnect {
 
   /// The phased release of each version id.
   final phasedReleases = <String, AscPhasedRelease>{};
+
+  /// What [buildUpload] answers, oldest first; the last one is answered
+  /// again. With none, every upload is complete.
+  final uploadAnswers = <AscBuildUpload>[];
+
+  /// The bytes of each upload, by its id.
+  final uploads = <String, List<int>>{};
 
   /// What the next call throws, once; `null` for nothing.
   AppStoreConnectException? failure;
@@ -188,6 +215,36 @@ class FakeAppStoreConnect implements AppStoreConnect {
       state: state,
       currentDayNumber: entry.value.currentDayNumber,
     );
+  }
+
+  @override
+  Future<AscBuildUpload> uploadBuild(
+    String appId, {
+    required String version,
+    required String buildNumber,
+    required String fileName,
+    required int length,
+    required Stream<List<int>> Function() content,
+  }) async {
+    _call('uploadBuild $appId $version $buildNumber $fileName $length');
+    final id = 'upload-${calls.length}';
+    uploads[id] = [await for (final chunk in content()) ...chunk];
+    return AscBuildUpload(id: id, state: AscBuildUploadState.processing);
+  }
+
+  @override
+  Future<AscBuildUpload> buildUpload(String id) async {
+    _call('buildUpload $id');
+    if (uploadAnswers.isEmpty) {
+      return AscBuildUpload(
+        id: id,
+        state: AscBuildUploadState.complete,
+        buildId: 'build-of-$id',
+      );
+    }
+    return uploadAnswers.length == 1
+        ? uploadAnswers.single
+        : uploadAnswers.removeAt(0);
   }
 
   @override

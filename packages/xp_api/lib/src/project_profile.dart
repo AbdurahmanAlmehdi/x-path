@@ -313,6 +313,7 @@ class AppProfile extends Equatable {
     this.hasIos = false,
     this.hasAndroid = false,
     this.iosPackageManager = IosPackageManager.none,
+    this.iosAppExtensions = const [],
     this.flavors = const [],
     this.plists = const [],
     this.keystore,
@@ -355,6 +356,10 @@ class AppProfile extends Equatable {
   /// How iOS plugins are integrated.
   final IosPackageManager iosPackageManager;
 
+  /// The app extension targets of the Xcode project (widgets, share,
+  /// notification service).
+  final List<String> iosAppExtensions;
+
   /// The build variants.
   final List<FlavorProfile> flavors;
 
@@ -381,6 +386,7 @@ class AppProfile extends Equatable {
         hasIos: hasIos,
         hasAndroid: hasAndroid,
         iosPackageManager: iosPackageManager,
+        iosAppExtensions: iosAppExtensions,
         flavors: flavors ?? this.flavors,
         plists: plists,
         keystore: keystore,
@@ -402,6 +408,7 @@ class AppProfile extends Equatable {
     hasIos,
     hasAndroid,
     iosPackageManager,
+    iosAppExtensions,
     flavors,
     plists,
     keystore,

@@ -87,6 +87,33 @@ List<ProbeResult> linuxProbe({bool android = true, bool swift = false}) => [
   ),
 ];
 
+/// The results of the commands of an omarchy-apple-dev checkout
+/// (`RunnerProbe.iosLinuxCommands`): at [commit], with the darwin SDK bundle
+/// when [sdk], and without the tools [missingTools] names.
+List<ProbeResult> iosLinuxProbe({
+  String commit = RunnerProbe.iosLinuxPin,
+  bool sdk = true,
+  String missingTools = '',
+}) => [
+  ProbeResult(
+    id: 'ios_linux_commit',
+    status: ProbeStatus.exited,
+    exitCode: 0,
+    stdout: '$commit\n',
+  ),
+  ProbeResult(
+    id: 'ios_linux_sdk',
+    status: ProbeStatus.exited,
+    exitCode: sdk ? 0 : 1,
+  ),
+  ProbeResult(
+    id: 'ios_linux_tools',
+    status: ProbeStatus.exited,
+    exitCode: missingTools.isEmpty ? 0 : 1,
+    stdout: missingTools.isEmpty ? '' : '$missingTools\n',
+  ),
+];
+
 /// A runner as the tests play it: it speaks the frames of the protocol to the
 /// hub over a [FakeRunnerLink].
 class FakeRunner {

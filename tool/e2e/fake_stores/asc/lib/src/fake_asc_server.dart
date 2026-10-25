@@ -1,7 +1,9 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
+import 'package:pointycastle/digests/md5.dart';
 import 'package:xp_fake_asc/src/fake_asc_key.dart';
 import 'package:xp_fake_asc/src/fake_asc_state.dart';
 import 'package:xp_fake_asc/src/token_verifier.dart';
@@ -9,10 +11,14 @@ import 'package:xp_fake_asc/src/token_verifier.dart';
 /// A fake App Store Connect API and iTunes lookup on a loopback port.
 ///
 /// It serves the endpoints XPath uses (apps, builds, App Store versions,
-/// review submissions, phased releases) from state held in memory, in
-/// JSON:API shape, and checks the bearer token like Apple does. Tests fill the
-/// state with the `add*` methods, make it misbehave with [failNext] and
-/// [rateLimitNext], and read what it received from [requests].
+/// review submissions, phased releases, build uploads) from state held in
+/// memory, in JSON:API shape, and checks the bearer token like Apple does.
+/// Tests fill the state with the `add*` methods, make it misbehave with
+/// [failNext] and [rateLimitNext], decide how uploads end with
+/// [uploadOutcomes], and read what it received from [requests].
+///
+/// The parts of a build upload go to `/upload/<file>/<part>` on the same
+/// address, which takes no token, as Apple's upload hosts do.
 class FakeAscServer {
   new _(this._server, this._verifier, this._now, this._quota) {
     _server.listen(_handle);
@@ -63,6 +69,23 @@ class FakeAscServer {
 
   /// The iTunes lookup entries, by `bundleId country`.
   final itunes = <String, FakeItunesEntry>{};
+
+  /// The build uploads, by id.
+  final buildUploads = <String, FakeAscBuildUpload>{};
+
+  /// The files of the build uploads, by id.
+  final uploadFiles = <String, FakeAscUploadFile>{};
+
+  /// How the next build uploads end, oldest first; once it is empty every
+  /// upload completes.
+  final uploadOutcomes = <FakeAscUploadOutcome>[];
+
+  /// The size of each part of an upload but the last.
+  int uploadPartSize = 5 * 1024 * 1024;
+
+  /// How often a build upload is read while it processes before it ends: the
+  /// first read is the one right after its file is marked uploaded.
+  int uploadPollsBeforeDone = 2;
 
   /// Every request received, oldest first.
   final requests = <FakeAscRequest>[];
@@ -172,20 +195,32 @@ class FakeAscServer {
   }
 
   Future<void> _handle(HttpRequest request) async {
-    final text = await utf8.decoder.bind(request).join();
-    final body = text.isEmpty ? null : jsonDecode(text);
+    final bytes = await request.fold(
+      <int>[],
+      (all, chunk) => all..addAll(chunk),
+    );
     final uri = request.uri;
     final isLookup = uri.path == '/lookup';
-    final token = request.headers
-        .value(HttpHeaders.authorizationHeader)
-        ?.replaceFirst(RegExp('^Bearer '), '');
-    final problem = isLookup ? null : _verifier.problem(token);
+    final isPart = uri.path.startsWith('/upload/');
+    final text = isPart ? '' : utf8.decode(bytes);
+    final Object? body = isPart
+        ? bytes
+        : text.isEmpty
+        ? null
+        : jsonDecode(text);
+    final authorization = request.headers.value(
+      HttpHeaders.authorizationHeader,
+    );
+    final token = authorization?.replaceFirst(RegExp('^Bearer '), '');
+    final problem = isLookup || isPart ? null : _verifier.problem(token);
     requests.add(
       FakeAscRequest(
         method: request.method,
         uri: uri,
         body: body,
         tokenProblem: problem,
+        authorization: authorization,
+        contentType: request.headers.contentType?.mimeType,
       ),
     );
 
@@ -193,6 +228,11 @@ class FakeAscServer {
     try {
       if (isLookup) {
         _send(response, 200, _lookup(uri));
+        return;
+      }
+      if (isPart) {
+        _takeFailure(uri);
+        _send(response, 200, _receivePart(request.method, uri, bytes));
         return;
       }
       if (problem != null) {
@@ -216,18 +256,7 @@ class FakeAscServer {
           'The rate limit for this key was exceeded.',
         );
       }
-      final failure = _failures
-          .where((failure) => uri.path.startsWith(failure.pathPrefix))
-          .firstOrNull;
-      if (failure != null) {
-        _failures.remove(failure);
-        throw _AscError(
-          failure.status,
-          failure.code,
-          failure.title,
-          failure.detail,
-        );
-      }
+      _takeFailure(uri);
       _used++;
       response.headers.set(
         'X-Rate-Limit',
@@ -247,6 +276,21 @@ class FakeAscServer {
         ],
       });
     }
+  }
+
+  /// Throws the failure [failNext] set for [uri], once.
+  void _takeFailure(Uri uri) {
+    final failure = _failures
+        .where((failure) => uri.path.startsWith(failure.pathPrefix))
+        .firstOrNull;
+    if (failure == null) return;
+    _failures.remove(failure);
+    throw _AscError(
+      failure.status,
+      failure.code,
+      failure.title,
+      failure.detail,
+    );
   }
 
   void _send(HttpResponse response, int status, Object? body) {
@@ -335,6 +379,14 @@ class FakeAscServer {
         return (200, {'data': _phased(release)});
       case ('PATCH', ['appStoreVersionPhasedReleases', final id]):
         return _updatePhased(id, body);
+      case ('POST', ['buildUploads']):
+        return _createUpload(body);
+      case ('GET', ['buildUploads', final id]):
+        return (200, {'data': _upload(_readUpload(id))});
+      case ('POST', ['buildUploadFiles']):
+        return _createFile(body);
+      case ('PATCH', ['buildUploadFiles', final id]):
+        return _commitFile(id, body);
     }
     throw _notFound(uri);
   }
@@ -480,6 +532,165 @@ class FakeAscServer {
     return (200, {'data': _phased(release)});
   }
 
+  (int, Object?) _createUpload(Object? body) {
+    final data = _data(body);
+    final appId = _relationship(data, 'app');
+    _app404(appId);
+    final attributes = data['attributes'] as Map<String, dynamic>?;
+    final version = attributes?['cfBundleShortVersionString'];
+    final buildNumber = attributes?['cfBundleVersion'];
+    if (version is! String || buildNumber is! String) {
+      throw const _AscError(
+        409,
+        'ENTITY_ERROR.ATTRIBUTE.REQUIRED',
+        'A required attribute is missing.',
+        'cfBundleShortVersionString and cfBundleVersion are required.',
+      );
+    }
+    if (builds.any(
+      (build) => build.appId == appId && build.buildNumber == buildNumber,
+    )) {
+      throw _AscError(
+        409,
+        'ENTITY_ERROR.ATTRIBUTE.INVALID.DUPLICATE',
+        'The build number was used already.',
+        'The bundle version $buildNumber must be higher than the previously '
+            'uploaded version (90189).',
+      );
+    }
+    final upload = FakeAscBuildUpload(
+      id: 'upload-${++_ids}',
+      appId: appId,
+      version: version,
+      buildNumber: buildNumber,
+      outcome: uploadOutcomes.isEmpty
+          ? const FakeAscUploadOutcome.complete()
+          : uploadOutcomes.removeAt(0),
+    );
+    buildUploads[upload.id] = upload;
+    return (201, {'data': _upload(upload)});
+  }
+
+  /// The upload [id], moved on by one read while it processes.
+  FakeAscBuildUpload _readUpload(String id) {
+    final upload = _upload404(id);
+    if (upload.state != 'PROCESSING' || upload.outcome.stalls) return upload;
+    if (++upload.polls < uploadPollsBeforeDone) return upload;
+    if (upload.outcome.errors.isNotEmpty) {
+      upload.state = 'FAILED';
+    } else {
+      upload
+        ..state = 'COMPLETE'
+        ..build = addBuild(
+          upload.appId,
+          buildNumber: upload.buildNumber,
+          version: upload.version,
+          processingState: 'PROCESSING',
+        );
+    }
+    return upload;
+  }
+
+  (int, Object?) _createFile(Object? body) {
+    final data = _data(body);
+    final upload = _upload404(_relationship(data, 'buildUpload'));
+    if (upload.file != null) {
+      throw const _AscError(
+        409,
+        'ENTITY_ERROR',
+        'The build upload has a file already.',
+      );
+    }
+    final attributes = data['attributes'] as Map<String, dynamic>?;
+    final fileName = attributes?['fileName'];
+    final fileSize = attributes?['fileSize'];
+    if (fileName is! String ||
+        fileSize is! int ||
+        attributes?['uti'] != 'com.apple.ipa' ||
+        attributes?['assetType'] != 'ASSET') {
+      throw const _AscError(
+        409,
+        'ENTITY_ERROR.ATTRIBUTE.INVALID',
+        'An attribute value is invalid.',
+        'fileName, fileSize, uti com.apple.ipa and assetType ASSET are '
+            'required.',
+      );
+    }
+    final file = FakeAscUploadFile(
+      id: 'file-${++_ids}',
+      uploadId: upload.id,
+      fileName: fileName,
+      fileSize: fileSize,
+      partSize: uploadPartSize,
+    );
+    upload.file = uploadFiles[file.id] = file;
+    return (201, {'data': _file(file)});
+  }
+
+  Object? _receivePart(String method, Uri uri, List<int> bytes) {
+    final path = uri.pathSegments;
+    final file = path.length == 3 ? uploadFiles[path[1]] : null;
+    final part = path.length == 3 ? int.tryParse(path[2]) : null;
+    if (method != 'PUT' ||
+        file == null ||
+        part == null ||
+        part < 0 ||
+        part >= file.partCount) {
+      throw _notFound(uri);
+    }
+    final length = _partLength(file, part);
+    if (bytes.length != length) {
+      throw _AscError(
+        400,
+        'PARAMETER_ERROR.INVALID',
+        'The part has the wrong size.',
+        'Part $part has ${bytes.length} bytes, not $length.',
+      );
+    }
+    file.parts[part] = bytes;
+    return null;
+  }
+
+  (int, Object?) _commitFile(String id, Object? body) {
+    final file =
+        uploadFiles[id] ??
+        (throw _AscError(404, 'NOT_FOUND', 'Not found.', 'No file $id.'));
+    final attributes = _data(body)['attributes'] as Map<String, dynamic>?;
+    final bytes = file.bytes;
+    if (attributes?['uploaded'] != true || bytes == null) {
+      throw const _AscError(
+        409,
+        'ENTITY_ERROR',
+        'The file is not uploaded.',
+        'Send every part, then set uploaded to true.',
+      );
+    }
+    final checksums = attributes?['sourceFileChecksums'];
+    final sent = checksums is Map<String, dynamic> ? checksums['file'] : null;
+    final checksum = sent is Map<String, dynamic> ? sent['hash'] : null;
+    final md5 = [
+      for (final byte in MD5Digest().process(Uint8List.fromList(bytes)))
+        byte.toRadixString(16).padLeft(2, '0'),
+    ].join();
+    if (checksum != md5) {
+      throw const _AscError(
+        409,
+        'ENTITY_ERROR.ATTRIBUTE.INVALID',
+        'The checksum does not match.',
+        'sourceFileChecksums must hold the MD5 of the parts.',
+      );
+    }
+    file.uploaded = true;
+    buildUploads[file.uploadId]!.state = 'PROCESSING';
+    return (200, {'data': _file(file)});
+  }
+
+  int _partLength(FakeAscUploadFile file, int part) {
+    final start = part * file.partSize;
+    final end = start + file.partSize;
+    return (end > file.fileSize ? file.fileSize : end) - start;
+  }
+
   Map<String, dynamic> _data(Object? body) {
     final data = body is Map<String, dynamic> ? body['data'] : null;
     if (data is! Map<String, dynamic>) {
@@ -513,6 +724,10 @@ class FakeAscServer {
       throw _AscError(404, 'NOT_FOUND', 'Not found.', 'No app $id.');
     }
   }
+
+  FakeAscBuildUpload _upload404(String id) =>
+      buildUploads[id] ??
+      (throw _AscError(404, 'NOT_FOUND', 'Not found.', 'No upload $id.'));
 
   FakeAscSubmission _submission404(String id) =>
       submissions[id] ??
@@ -571,6 +786,64 @@ class FakeAscServer {
       'platform': submission.platform,
       'state': submission.state,
       'submittedDate': submission.submittedDate?.toIso8601String(),
+    },
+  };
+
+  Map<String, Object?> _upload(FakeAscBuildUpload upload) {
+    List<Map<String, Object?>> issues(List<FakeAscIssue> list) => [
+      for (final issue in list)
+        {'code': issue.code, 'description': issue.description},
+    ];
+    final build = upload.build;
+    return {
+      'type': 'buildUploads',
+      'id': upload.id,
+      'attributes': {
+        'cfBundleShortVersionString': upload.version,
+        'cfBundleVersion': upload.buildNumber,
+        'platform': 'IOS',
+        'state': {
+          'state': upload.state,
+          'errors': upload.state == 'FAILED'
+              ? issues(upload.outcome.errors)
+              : const <Object?>[],
+          'warnings': upload.state == 'COMPLETE'
+              ? issues(upload.outcome.warnings)
+              : const <Object?>[],
+          'infos': const <Object?>[],
+        },
+      },
+      'relationships': {
+        'build': {
+          'data': build == null ? null : {'type': 'builds', 'id': build.id},
+        },
+      },
+    };
+  }
+
+  Map<String, Object?> _file(FakeAscUploadFile file) => {
+    'type': 'buildUploadFiles',
+    'id': file.id,
+    'attributes': {
+      'fileName': file.fileName,
+      'fileSize': file.fileSize,
+      'uti': 'com.apple.ipa',
+      'assetType': 'ASSET',
+      'assetDeliveryState': {
+        'state': file.uploaded ? 'COMPLETE' : 'AWAITING_UPLOAD',
+      },
+      'uploadOperations': [
+        for (var part = 0; part < file.partCount; part++)
+          {
+            'method': 'PUT',
+            'url': baseUrl.replace(path: '/upload/${file.id}/$part').toString(),
+            'offset': part * file.partSize,
+            'length': _partLength(file, part),
+            'requestHeaders': [
+              {'name': 'Content-Type', 'value': 'application/octet-stream'},
+            ],
+          },
+      ],
     },
   };
 

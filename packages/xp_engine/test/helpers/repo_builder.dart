@@ -4,11 +4,12 @@ import 'package:xp_engine/xp_engine.dart';
 ///
 /// [runner] maps a configuration name to the target's settings for it,
 /// [project] does the same for the project. [spm] adds a Swift package
-/// reference.
+/// reference, [extensions] app extension targets of those names.
 String pbxproj({
   Map<String, Map<String, String>> runner = const {},
   Map<String, Map<String, String>> project = const {},
   bool spm = false,
+  List<String> extensions = const [],
 }) {
   var next = 0;
   String id() => (0xA000 + next++).toRadixString(16).toUpperCase();
@@ -43,6 +44,18 @@ ${ids.map((configId) => '$configId,').join('\n')}
 
   final runnerList = list(runner);
   final projectList = list(project);
+  final extensionIds = [
+    for (final name in extensions) 'EXT_${name.toUpperCase()}',
+  ];
+  for (final (index, name) in extensions.indexed) {
+    blocks.writeln('''
+${extensionIds[index]} = {
+isa = PBXNativeTarget;
+buildConfigurationList = ${list(const {})};
+name = $name;
+productType = "com.apple.product-type.app-extension";
+};''');
+  }
   if (spm) {
     blocks.writeln('''
 ${id()} = {
@@ -63,7 +76,7 @@ productType = "com.apple.product-type.application";
 PROJECT = {
 isa = PBXProject;
 buildConfigurationList = $projectList;
-targets = ( RUNNER, );
+targets = ( RUNNER, ${extensionIds.map((id) => '$id, ').join()});
 };
 $blocks
 };

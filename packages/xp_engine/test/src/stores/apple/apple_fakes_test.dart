@@ -131,6 +131,54 @@ void main() {
       expect(await connect.findApp('a.b'), isNotNull);
     });
 
+    test('keeps the bytes of an upload and completes it by default', () async {
+      final upload = await connect.uploadBuild(
+        '1',
+        version: '1.0.0',
+        buildNumber: '7',
+        fileName: 'a.ipa',
+        length: 3,
+        content: () => Stream.fromIterable([
+          [1],
+          [2, 3],
+        ]),
+      );
+
+      expect(upload.state, AscBuildUploadState.processing);
+      expect(connect.uploads[upload.id], [1, 2, 3]);
+      expect(
+        await connect.buildUpload(upload.id),
+        AscBuildUpload(
+          id: upload.id,
+          state: AscBuildUploadState.complete,
+          buildId: 'build-of-${upload.id}',
+        ),
+      );
+      expect(connect.calls, [
+        'uploadBuild 1 1.0.0 7 a.ipa 3',
+        'buildUpload ${upload.id}',
+      ]);
+    });
+
+    test(
+      'answers the upload states it was given, the last one again',
+      () async {
+        const processing = AscBuildUpload(
+          id: 'u',
+          state: AscBuildUploadState.processing,
+        );
+        const failed = AscBuildUpload(
+          id: 'u',
+          state: AscBuildUploadState.failed,
+        );
+        connect.uploadAnswers.addAll([processing, failed]);
+
+        expect(await connect.buildUpload('u'), processing);
+        expect(await connect.buildUpload('u'), failed);
+        expect(await connect.buildUpload('u'), failed);
+      },
+    );
+
     test('reports the rate limit it was given', () {
       connect.rateLimit = const AscRateLimit(limit: 10, remaining: 9);
 

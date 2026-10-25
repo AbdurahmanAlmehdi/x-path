@@ -360,8 +360,8 @@ class ServeCommand extends XpdCommand {
           repository: artifactRepository,
           store: artifactStore,
           secrets: secrets,
-          secretFiles: secretFiles,
           isMacOS: isMacOS,
+          uploadWait: testing.ascUploadWait,
         ),
         play.uploadStep(
           repository: artifactRepository,

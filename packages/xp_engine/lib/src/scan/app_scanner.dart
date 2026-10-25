@@ -195,6 +195,10 @@ class _AppScan {
       hasIos: hasIos,
       hasAndroid: hasAndroid,
       iosPackageManager: await _packageManager(),
+      iosAppExtensions: [
+        for (final target in _xcode?.targets ?? const <XcodeTarget>[])
+          if (target.isAppExtension) target.name,
+      ],
       flavors: [
         for (final flavor in flavors)
           flavor.copyWith(

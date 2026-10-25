@@ -492,5 +492,61 @@ void main() {
         hasLength(received.length - 0),
       );
     });
+
+    test('a Linux runner configured for iOS reports ios-linux', () async {
+      final stream = await client.engine.connectRunner(
+        token: client.credential,
+      );
+      addTearDown(stream.close);
+      await stream.nextOf<WelcomeFrame>();
+      stream.send(
+        const HelloFrame(version: '1.0.0', os: 'linux', arch: 'x64', cores: 8),
+      );
+      final probe = await stream.nextOf<ProbeFrame>();
+      const pin = RunnerProbe.iosLinuxPin;
+      final answer = ProbeResultFrame(
+        probeId: probe.probeId,
+        results: [
+          for (final (id, stdout) in const [
+            ('os', 'Linux\n'),
+            ('git', 'git version 2.43.0\n'),
+            ('flutter_tools', ''),
+            ('swift', 'Swift version 6.4\n'),
+            ('ios_linux_commit', '$pin\n'),
+            ('ios_linux_sdk', ''),
+            ('ios_linux_tools', ''),
+          ])
+            ProbeResult(
+              id: id,
+              status: ProbeStatus.exited,
+              exitCode: 0,
+              stdout: stdout,
+            ),
+        ],
+        iosLinuxDir: '/home/me/omarchy-apple-dev',
+      );
+      expect(
+        contract.validateSchema(
+          'RunnerFrame',
+          jsonDecode(jsonEncode(answer.toJson())),
+        ),
+        isEmpty,
+      );
+      stream.send(answer);
+
+      final probed = await stream.nextOf<ProbedFrame>();
+      expect(probed.capabilities, ['flutter', 'ios-linux', 'swift-linux']);
+      expect(
+        contract.validateSchema(
+          'EngineFrame',
+          jsonDecode(jsonEncode(probed.toJson())),
+        ),
+        isEmpty,
+      );
+      await client.waitOnline();
+      final listed = await client.send('GET', '/runners');
+      expectContract(listed, path: '/runners', status: 200);
+      expect(listed.body, contains('"ios-linux"'));
+    });
   });
 }

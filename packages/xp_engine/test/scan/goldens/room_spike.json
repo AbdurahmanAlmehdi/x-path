@@ -13,6 +13,7 @@
         "hasIos": true,
         "hasAndroid": true,
         "iosPackageManager": "spm",
+        "iosAppExtensions": [],
         "flavors": [
           {
             "name": "default",

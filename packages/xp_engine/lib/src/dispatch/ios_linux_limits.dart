@@ -1,0 +1,79 @@
+import 'package:xp_api/xp_api.dart';
+import 'package:xp_engine/src/steps/step.dart';
+
+/// Why omarchy-apple-dev cannot build the iOS app of a job on Linux (ADR
+/// 0014), from the planned [steps] of the job and its [app]: one reason for
+/// each thing the job uses that Linux iOS builds lack, with the work that
+/// would lift it. Empty when nothing rules Linux out.
+///
+/// The dispatcher narrows a job with reasons to `ios-sign` (a Mac), at plan
+/// time, so that no job fails on Linux part-way through. Each case is
+/// removed once omarchy-apple-dev can build it and XPath pins that commit.
+List<String> iosLinuxLimits(List<StepPlan> steps, AppProfile app) {
+  final reasons = <String>{};
+  for (final StepPlan(:kind, :input) in steps) {
+    switch (kind) {
+      case 'build.ios' || 'ios.stripAndReexport' when input['flavor'] is String:
+        reasons.add(
+          'the app uses the flavor ${input['flavor']}, which Linux iOS '
+          'builds do not support yet (omarchy-apple-dev: flavors)',
+        );
+      case 'shorebird.release' || 'shorebird.patch'
+          when input['platform'] == 'ios':
+        reasons.add(
+          'the job uses Shorebird iOS, which needs macOS (Shorebird iOS on '
+          'Linux is not decided)',
+        );
+      case 'command':
+        reasons.addAll(_commandLimits(input));
+    }
+  }
+  final extensions = app.iosAppExtensions;
+  if (extensions.isNotEmpty) {
+    reasons.add(
+      'the app has the app extension${extensions.length == 1 ? '' : 's'} '
+      '${extensions.join(', ')}, which Linux iOS builds do not support yet '
+      '(omarchy-apple-dev: app extensions)',
+    );
+  }
+  return reasons.toList();
+}
+
+/// What a `command` step uses that Linux iOS builds lack: the iOS Simulator
+/// (`xcrun simctl`, `--simulator`, an `iphonesimulator` SDK or destination),
+/// or a debug or profile build of the iOS app.
+List<String> _commandLimits(Map<String, dynamic> input) {
+  final words = [
+    if (input['executable'] case final String executable) executable,
+    for (final argument in input['arguments'] as List? ?? const [])
+      if (argument is String) argument,
+  ];
+  bool has(bool Function(String word) test) => words.any(test);
+  final simulator = has(
+    (word) =>
+        word == 'simctl' ||
+        word == '--simulator' ||
+        word.toLowerCase().contains('iphonesimulator') ||
+        word.contains('iOS Simulator'),
+  );
+  final iosBuild =
+      has((word) => word == 'flutter' || word.endsWith('/flutter')) &&
+      has((word) => word == 'build') &&
+      has((word) => word == 'ios' || word == 'ipa');
+  final limits = <String>[];
+  if (simulator) {
+    limits.add(
+      'the job uses the iOS Simulator, which needs macOS (Linux workflows '
+      'test on an Android emulator)',
+    );
+  }
+  for (final mode in const ['debug', 'profile']) {
+    if (iosBuild && has((word) => word == '--$mode')) {
+      limits.add(
+        'the job makes a $mode build of the iOS app, and Linux iOS builds '
+        'are release builds only',
+      );
+    }
+  }
+  return limits;
+}
