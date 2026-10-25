@@ -1353,5 +1353,25 @@ void main() {
       await repository.clearGitHubToken();
       verify(client.deleteGitHubToken).called(1);
     });
+
+    test('makes a token for xp or an agent', () async {
+      final created = CreatedToken(
+        info: TokenInfo(
+          id: 'tok_1',
+          name: 'xp',
+          kind: DeviceTokenKind.cli,
+          createdAt: DateTime.utc(2026, 10, 25),
+        ),
+        token: 'xpt_x',
+      );
+      when(
+        () => harness.client.createToken(name: 'xp', kind: DeviceTokenKind.cli),
+      ).thenAnswer((_) async => created);
+
+      expect(
+        await repository.createToken(name: 'xp', kind: DeviceTokenKind.cli),
+        created,
+      );
+    });
   });
 }

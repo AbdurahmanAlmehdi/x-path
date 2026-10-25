@@ -3620,4 +3620,50 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get scanPathCopied => 'Path copied';
+
+  @override
+  String get settingsTokens => 'CLI and agents';
+
+  @override
+  String get settingsTokensBody =>
+      'Make a token for xp in a terminal, on this Mac or another, or for an agent that runs xp mcp. Agents can ask for approvals, never give them.';
+
+  @override
+  String get settingsTokensNewCli => 'New xp token';
+
+  @override
+  String get settingsTokensNewMcp => 'New agent token';
+
+  @override
+  String settingsTokensCliName(String device) {
+    return 'xp on $device';
+  }
+
+  @override
+  String settingsTokensMcpName(String device) {
+    return 'Agent on $device';
+  }
+
+  @override
+  String settingsTokensCliMade(String name) {
+    return 'Made \"$name\". Run this in a terminal to connect xp:';
+  }
+
+  @override
+  String settingsTokensMcpMade(String name) {
+    return 'Made \"$name\". Add this to the MCP config of the agent:';
+  }
+
+  @override
+  String get settingsTokensOnce =>
+      'The token is shown this once. Copy it now; make another if it is lost.';
+
+  @override
+  String get settingsTokensCopyCommand => 'Copy command';
+
+  @override
+  String get settingsTokensCopyConfig => 'Copy config';
+
+  @override
+  String get settingsTokensDone => 'Done';
 }

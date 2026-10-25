@@ -61,6 +61,7 @@ export 'src/notify/notifier.dart';
 export 'src/notify/release_notes_builder.dart';
 export 'src/notify/release_notes_service.dart';
 export 'src/notify/slack_webhook.dart';
+export 'src/probe/engine_doctor.dart';
 export 'src/probe/probe_executor.dart';
 export 'src/probe/runner_probe.dart';
 export 'src/process/fake_process_runner.dart';

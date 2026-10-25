@@ -589,6 +589,17 @@ class ServeCommand extends XpdCommand {
         clock: const SystemClock(),
       );
       final runnerEvents = runnerLog.follow(events, runnerService);
+      final githubToken = GitHubTokenService(
+        secrets: secrets,
+        verifier: credentialChecks.githubVerifier,
+        cli: LocatingGitHubCliToken(
+          runner: runner,
+          secrets: secrets,
+          path: context.environment['PATH'],
+          fallbacks: context.ghFallbackPaths,
+        ),
+        masker: masker,
+      );
       final server = await XpdServer.start(
         tokens: tokenService,
         events: events,
@@ -606,17 +617,7 @@ class ServeCommand extends XpdCommand {
           projects: projectRepository,
         ),
         credentials: credentialChecks.service,
-        githubToken: GitHubTokenService(
-          secrets: secrets,
-          verifier: credentialChecks.githubVerifier,
-          cli: LocatingGitHubCliToken(
-            runner: runner,
-            secrets: secrets,
-            path: context.environment['PATH'],
-            fallbacks: context.ghFallbackPaths,
-          ),
-          masker: masker,
-        ),
+        githubToken: githubToken,
         workflows: workflows,
         dispatcher: dispatcher,
         runs: runService,
@@ -642,6 +643,14 @@ class ServeCommand extends XpdCommand {
             executable: context.executable,
           ),
         ),
+        doctor: EngineDoctor(
+          local: findings,
+          github: githubToken,
+          credentials: credentialChecks.repository,
+          projects: projectRepository,
+          runner: runner,
+        ),
+        secrets: secrets,
         clock: const SystemClock(),
         engineVersion: packageVersion,
         host: host,

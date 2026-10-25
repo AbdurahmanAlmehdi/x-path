@@ -588,6 +588,31 @@ class XpClient {
     await _send('DELETE', ['github-token']);
   }
 
+  // ---------------------------------------------------- tokens and doctor
+
+  /// `POST /tokens`: makes a token called [name] for `xp` or `xp mcp`
+  /// ([kind]); only an app token may. The answer holds its secret, shown
+  /// this once.
+  Future<CreatedToken> createToken({
+    required String name,
+    required DeviceTokenKind kind,
+  }) async => CreatedToken.fromJson(
+    await _json(
+      await _send('POST', [
+        'tokens',
+      ], body: CreateTokenRequest(name: name, kind: kind).toJson()),
+    ),
+  );
+
+  /// `GET /status`: the token this client holds, without its secret, and
+  /// whether the engine can reach its secrets.
+  Future<StatusResponse> status() async =>
+      StatusResponse.fromJson(await _json(await _send('GET', ['status'])));
+
+  /// `GET /doctor`: what the engine finds about the machine it runs on.
+  Future<DoctorResponse> doctor() async =>
+      DoctorResponse.fromJson(await _json(await _send('GET', ['doctor'])));
+
   // ------------------------------------------------------------- approvals
 
   /// `GET /approvals`, newest first, of one [projectId] or [state] if given.

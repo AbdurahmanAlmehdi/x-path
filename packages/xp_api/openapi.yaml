@@ -2253,6 +2253,87 @@ paths:
           $ref: "#/components/responses/SecretsLocked"
         "500":
           $ref: "#/components/responses/InternalError"
+  /tokens:
+    post:
+      operationId: createToken
+      summary: Make a token for `xp` or `xp mcp`. Only `app` tokens may.
+      description: |
+        The app makes the token of the CLI or of an agent (U5b), so
+        connecting `xp` needs no access to the `xpd` binary. `kind` is
+        `cli` or `mcp`; app and runner tokens come from `xpd token create`
+        and pairing only. The secret is in this response only and never
+        again; only its hash is kept. Any other token kind answers `403
+        forbidden`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateTokenRequest"
+      responses:
+        "201":
+          description: The token made, with its secret.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreatedToken"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /status:
+    get:
+      operationId: getStatus
+      summary: The token that asks, and whether the engine can reach its secrets.
+      description: |
+        What `xp status` shows beyond `GET /health` and `GET /version`:
+        the name and kind of the token that asks (never its secret), and
+        whether the engine could not reach its secrets at its last try
+        (D-10). It asks GitHub and the stores nothing, so it answers at
+        once; `GET /doctor` checks more.
+      responses:
+        "200":
+          description: The status.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StatusResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /doctor:
+    get:
+      operationId: getDoctor
+      summary: What the engine finds about the machine it runs on.
+      description: |
+        The checks `xp doctor` prints (U5b), made by the engine itself
+        rather than in the shell of the CLI, which may be on another
+        machine with another `PATH`: the capabilities of its own runner
+        (with the reason and fix of each one missing), whether it can read
+        its secrets, what GitHub says of its token, the credentials
+        refused at their last check, and SSH to the git host of each
+        project not on GitHub. `state` is `ok`, `missing` or `skipped`.
+        Closed to `runner` tokens.
+      responses:
+        "200":
+          description: The checks, in the order they ran.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DoctorResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/InternalError"
   /runners:
     get:
       operationId: listRunners
@@ -4319,6 +4400,82 @@ components:
         fix:
           type: string
           description: What to do about `message`.
+      additionalProperties: false
+    CreateTokenRequest:
+      type: object
+      required: [name, kind]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          description: What the owner calls the client, for example `xp on MacBook`.
+        kind:
+          type: string
+          enum: [cli, mcp]
+      additionalProperties: false
+    TokenInfo:
+      type: object
+      description: A device token, never its secret.
+      required: [id, name, kind, createdAt]
+      properties:
+        id:
+          type: string
+          pattern: "^tok_"
+        name:
+          type: string
+        kind:
+          type: string
+          enum: [app, cli, mcp, runner]
+        createdAt:
+          type: string
+          format: date-time
+      additionalProperties: false
+    CreatedToken:
+      type: object
+      required: [info, token]
+      properties:
+        info:
+          $ref: "#/components/schemas/TokenInfo"
+        token:
+          type: string
+          pattern: "^xpt_"
+          description: The bearer secret. Shown here only, never again.
+      additionalProperties: false
+    StatusResponse:
+      type: object
+      required: [token, secretsLocked]
+      properties:
+        token:
+          $ref: "#/components/schemas/TokenInfo"
+        secretsLocked:
+          type: boolean
+          description: Whether the engine could not reach its secrets at its last try.
+      additionalProperties: false
+    EngineCheck:
+      type: object
+      required: [name, state]
+      properties:
+        name:
+          type: string
+          description: What was checked, for example `android`, `secrets` or `ssh bitbucket.org`.
+        state:
+          type: string
+          enum: [ok, missing, skipped]
+        detail:
+          type: string
+          description: What was found, one sentence without its full stop.
+        fix:
+          type: string
+          description: What to do about it, one sentence without its full stop.
+      additionalProperties: false
+    DoctorResponse:
+      type: object
+      required: [checks]
+      properties:
+        checks:
+          type: array
+          items:
+            $ref: "#/components/schemas/EngineCheck"
       additionalProperties: false
     SetGitHubTokenRequest:
       type: object

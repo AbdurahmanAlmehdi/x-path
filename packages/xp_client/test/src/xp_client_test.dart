@@ -33,6 +33,16 @@ class _Endpoint {
   final Map<String, dynamic>? body;
 }
 
+final _createdToken = CreatedToken(
+  info: TokenInfo(
+    id: 'tok_1',
+    name: 'xp',
+    kind: DeviceTokenKind.cli,
+    createdAt: DateTime.utc(2026, 10, 25),
+  ),
+  token: 'xpt_x',
+);
+
 void main() {
   late FakeEngine engine;
   late XpClient client;
@@ -693,6 +703,43 @@ void main() {
         return 'deleted';
       },
       expected: 'deleted',
+    ),
+    _Endpoint(
+      'createToken',
+      method: 'POST',
+      path: '/tokens',
+      status: 201,
+      response: _createdToken.toJson(),
+      call: (client) =>
+          client.createToken(name: 'xp', kind: DeviceTokenKind.cli),
+      expected: _createdToken,
+      body: const CreateTokenRequest(
+        name: 'xp',
+        kind: DeviceTokenKind.cli,
+      ).toJson(),
+    ),
+    _Endpoint(
+      'status',
+      method: 'GET',
+      path: '/status',
+      response: StatusResponse(
+        token: _createdToken.info,
+        secretsLocked: false,
+      ).toJson(),
+      call: (client) => client.status(),
+      expected: StatusResponse(token: _createdToken.info, secretsLocked: false),
+    ),
+    _Endpoint(
+      'doctor',
+      method: 'GET',
+      path: '/doctor',
+      response: const DoctorResponse([
+        EngineCheck(name: 'flutter', state: CheckState.ok),
+      ]).toJson(),
+      call: (client) => client.doctor(),
+      expected: const DoctorResponse([
+        EngineCheck(name: 'flutter', state: CheckState.ok),
+      ]),
     ),
     _Endpoint(
       'listApprovals',

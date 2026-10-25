@@ -6,11 +6,13 @@ import 'package:xp_desktop/app/app_services.dart';
 import 'package:xp_desktop/app/bloc/engine_connection_bloc.dart';
 import 'package:xp_desktop/l10n/l10n.dart';
 import 'package:xp_desktop/local_engine/local_engine.dart';
+import 'package:xp_desktop/settings/bloc/cli_token_bloc.dart';
 import 'package:xp_desktop/settings/bloc/command_line_tool_bloc.dart';
 import 'package:xp_desktop/settings/bloc/github_token_bloc.dart';
 import 'package:xp_desktop/settings/bloc/remove_xpath_bloc.dart';
 import 'package:xp_desktop/settings/bloc/runner_url_bloc.dart';
 import 'package:xp_desktop/settings/bloc/settings_bloc.dart';
+import 'package:xp_desktop/settings/widgets/cli_token_section.dart';
 import 'package:xp_desktop/settings/widgets/command_line_tool_section.dart';
 import 'package:xp_desktop/settings/widgets/github_token_section.dart';
 import 'package:xp_desktop/settings/widgets/remove_xpath_sheet.dart';
@@ -23,8 +25,8 @@ import 'package:xp_macos_services/xp_macos_services.dart';
 import 'package:xp_repositories/xp_repositories.dart';
 
 /// The settings (XPath ▸ Settings…, ⌘,): the versions and the engine's
-/// login item, the `xp` link, the engine's GitHub token, the runner URL,
-/// and "Remove XPath". [github]
+/// login item, the `xp` link, tokens for `xp` and agents, the engine's
+/// GitHub token, the runner URL, and "Remove XPath". [github]
 /// puts the cursor in the GitHub token field.
 class SettingsPage extends StatelessWidget {
   const new({this.github = false, super.key});
@@ -49,6 +51,7 @@ class SettingsPage extends StatelessWidget {
               CommandLineToolBloc(linker: services.linker)
                 ..add(const CommandLineToolRequested()),
         ),
+        BlocProvider(create: (_) => CliTokenBloc(settings: settings)),
         BlocProvider(
           create: (_) =>
               GitHubTokenBloc(settings: settings)
@@ -98,6 +101,10 @@ class SettingsView extends StatelessWidget {
             padding: EdgeInsets.all(16),
             child: CommandLineToolSection(),
           ),
+          const SizedBox(height: 20),
+          XpSectionLabel(l10n.settingsTokens),
+          const SizedBox(height: 8),
+          const XpPanel(padding: EdgeInsets.all(16), child: CliTokenSection()),
           const SizedBox(height: 20),
           XpSectionLabel(l10n.settingsGitHub),
           const SizedBox(height: 8),

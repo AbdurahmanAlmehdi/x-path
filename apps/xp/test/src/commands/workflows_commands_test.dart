@@ -36,6 +36,23 @@ void main() {
     expect(env.logger.out, contains('yes'));
   });
 
+  test('list without a project takes the one of the folder', () async {
+    when(() => env.client.listProjects())
+        .thenAnswer((_) async => [sample.project, sample.bareProject]);
+    env.remote = 'git@github.com:Acme/App.git';
+
+    await env.runOk(['workflows', 'list']);
+
+    expect(env.logger.out, contains('wf_1'));
+  });
+
+  test('list without a project outside a known clone asks for one', () async {
+    when(() => env.client.listProjects()).thenAnswer((_) async => []);
+    env.remote = 'git@github.com:acme/app.git';
+
+    expect(await env.run(['workflows', 'list']), 64);
+  });
+
   test('list with --json prints them as JSON', () async {
     await env.runOk(['--json', 'workflows', 'list', 'prj_1']);
 

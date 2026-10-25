@@ -240,6 +240,70 @@ void main() {
     );
   });
 
+  group('CliTokenBloc', () {
+    final created = CreatedToken(
+      info: TokenInfo(
+        id: 'tok_1',
+        name: 'xp on MacBook',
+        kind: DeviceTokenKind.cli,
+        createdAt: DateTime.utc(2026, 10, 25),
+      ),
+      token: 'xpt_x',
+    );
+    late MockSettingsRepository settings;
+
+    setUp(() => settings = quietSettings());
+
+    test('events compare by value', () {
+      expect(
+        const CliTokenRequested(name: 'xp', kind: DeviceTokenKind.cli).props,
+        ['xp', DeviceTokenKind.cli],
+      );
+      expect(const CliTokenDismissed().props, isEmpty);
+    });
+
+    blocTest<CliTokenBloc, CliTokenState>(
+      'makes a token, then forgets it',
+      setUp: () => when(
+        () => settings.createToken(
+          name: 'xp on MacBook',
+          kind: DeviceTokenKind.cli,
+        ),
+      ).thenAnswer((_) async => created),
+      build: () => CliTokenBloc(settings: settings),
+      act: (bloc) async {
+        bloc.add(
+          const CliTokenRequested(
+            name: 'xp on MacBook',
+            kind: DeviceTokenKind.cli,
+          ),
+        );
+        await Future<void>.delayed(Duration.zero);
+        bloc.add(const CliTokenDismissed());
+      },
+      expect: () => [
+        const CliTokenState(creating: DeviceTokenKind.cli),
+        CliTokenState(created: created),
+        const CliTokenState(),
+      ],
+    );
+
+    blocTest<CliTokenBloc, CliTokenState>(
+      'says why the engine made none',
+      setUp: () => when(
+        () => settings.createToken(name: 'agent', kind: DeviceTokenKind.mcp),
+      ).thenThrow(const ConnectionException('The engine is away.')),
+      build: () => CliTokenBloc(settings: settings),
+      act: (bloc) => bloc.add(
+        const CliTokenRequested(name: 'agent', kind: DeviceTokenKind.mcp),
+      ),
+      expect: () => const [
+        CliTokenState(creating: DeviceTokenKind.mcp),
+        CliTokenState(error: 'The engine is away.'),
+      ],
+    );
+  });
+
   group('CommandLineToolBloc', () {
     const linked = CliLink(CliLinkState.linked, path: '/usr/local/bin/xp');
     const elsewhere = CliLink(

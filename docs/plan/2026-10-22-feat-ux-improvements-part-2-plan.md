@@ -106,7 +106,7 @@ Details:
 
 ### Phase U5b: CLI setup: tokens, status and doctor
 
-- **Status:** Not started
+- **Status:** Done
 - **Scope:** The CLI can be connected from a token minted in the app, and can check itself and
   the engine.
 - **Files touched:** `apps/xpd/lib/src/api/**` (token-minting route), `packages/xp_api/openapi.yaml`,

@@ -12,7 +12,9 @@ class BytesSecretStore implements SecretStore {
   SecretStoreException? failure;
 
   @override
-  SecretsStatus get status => SecretsStatus.unlocked;
+  SecretsStatus get status => failure is SecretsLockedException
+      ? SecretsStatus.locked
+      : SecretsStatus.unlocked;
 
   @override
   Stream<SecretsStatus> get statusChanges => const Stream.empty();

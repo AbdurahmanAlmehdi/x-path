@@ -73,6 +73,79 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  group('CliTokenSection', () {
+    TokenInfo info(DeviceTokenKind kind) => TokenInfo(
+      id: 'tok_1',
+      name: kind == DeviceTokenKind.cli ? 'xp on MacBook' : 'Agent on MacBook',
+      kind: kind,
+      createdAt: DateTime.utc(2026, 10, 25),
+    );
+
+    setUp(() {
+      for (final kind in [DeviceTokenKind.cli, DeviceTokenKind.mcp]) {
+        when(() => settings.createToken(name: info(kind).name, kind: kind))
+            .thenAnswer(
+              (_) async =>
+                  CreatedToken(info: info(kind), token: 'xpt_${kind.name}'),
+            );
+      }
+    });
+
+    testWidgets('makes an xp token and shows the connect command once', (
+      tester,
+    ) async {
+      await pump(tester);
+
+      await tester.tap(find.text('New xp token'));
+      await tester.pumpAndSettle();
+      expect(
+        find.text('xp connect http://127.0.0.1:7480 --token xpt_cli'),
+        findsOne,
+      );
+      expect(find.text('Copy command'), findsOne);
+
+      await tester.tap(find.text('Done'));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('xpt_cli'), findsNothing);
+    });
+
+    testWidgets('makes an agent token with its MCP config', (tester) async {
+      await pump(tester);
+
+      await tester.tap(find.text('New agent token'));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('"XP_MCP_TOKEN": "xpt_mcp"'), findsOne);
+      expect(find.text('Copy config'), findsOne);
+    });
+
+    testWidgets('says why no token was made', (tester) async {
+      when(
+        () => settings.createToken(
+          name: 'xp on MacBook',
+          kind: DeviceTokenKind.cli,
+        ),
+      ).thenThrow(const ConnectionException('The engine is away.'));
+      await pump(tester);
+
+      await tester.tap(find.text('New xp token'));
+      await tester.pumpAndSettle();
+      expect(find.text('The engine is away.'), findsOne);
+    });
+  });
+
+  test('connectCommand and mcpConfig put the URL and token in place', () {
+    final url = Uri.parse('https://mac.example');
+
+    expect(
+      connectCommand(url, 'xpt_x'),
+      'xp connect https://mac.example --token xpt_x',
+    );
+    expect(
+      mcpConfig(url, 'xpt_y'),
+      contains('"XP_ENGINE_URL": "https://mac.example"'),
+    );
+  });
+
   group('RunnerUrlSection', () {
     testWidgets('shows the URL with its warning, saves and clears it', (
       tester,

@@ -73,6 +73,12 @@ class MemoryTokenVault implements TokenVault {
     if (failWith case final error?) throw error;
     tokens[kind] = token;
   }
+
+  @override
+  Future<void> delete(DeviceTokenKind kind) async {
+    if (failWith case final error?) throw error;
+    tokens.remove(kind);
+  }
 }
 
 /// A terminal that answers the questions it is asked from [answers], in
@@ -137,6 +143,7 @@ class TestEnv {
       secretPrompt: prompt,
       pollInterval: Duration.zero,
       ansi: ansi,
+      currentRemote: () async => remote,
     );
     runner = XpCommandRunner(context: context);
     formatTimesInUtc = true;
@@ -153,6 +160,9 @@ class TestEnv {
   final update = FakeUpdateCheck();
   final prompt = FakeSecretPrompt();
   final connections = <Connection>[];
+
+  /// The `origin` of the folder the command runs in, if it is a clone.
+  String? remote;
   final stdin = StreamController<List<int>>();
   final stdoutController = StreamController<List<int>>();
   StreamSink<List<int>> get stdout => stdoutController.sink;

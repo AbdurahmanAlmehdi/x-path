@@ -87,6 +87,24 @@ abstract class XpCommand extends Command<int> {
     return rest;
   }
 
+  /// Like [positionals] for [names] that start with `project`: when the
+  /// project is left out, it is the one whose repository the current folder
+  /// is a clone of, if exactly one is.
+  Future<List<String>> projectPositionals(
+    XpClient client,
+    List<String> names,
+  ) async {
+    final rest = argResults!.rest;
+    if (rest.length == names.length - 1) {
+      final project = await projectOfRemote(
+        client,
+        await context.currentRemote(),
+      );
+      if (project != null) return [project.id, ...rest];
+    }
+    return positionals(names);
+  }
+
   /// Prints [value] as JSON, or [human] as text when the user did not ask
   /// for JSON.
   void emit(Object? value, String Function() human) =>

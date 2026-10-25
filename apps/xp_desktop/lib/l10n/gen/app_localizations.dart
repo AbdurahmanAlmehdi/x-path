@@ -5925,6 +5925,78 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Path copied'**
   String get scanPathCopied;
+
+  /// Section label (U5b).
+  ///
+  /// In en, this message translates to:
+  /// **'CLI and agents'**
+  String get settingsTokens;
+
+  /// Settings ▸ CLI and agents.
+  ///
+  /// In en, this message translates to:
+  /// **'Make a token for xp in a terminal, on this Mac or another, or for an agent that runs xp mcp. Agents can ask for approvals, never give them.'**
+  String get settingsTokensBody;
+
+  /// Makes a cli token.
+  ///
+  /// In en, this message translates to:
+  /// **'New xp token'**
+  String get settingsTokensNewCli;
+
+  /// Makes an mcp token.
+  ///
+  /// In en, this message translates to:
+  /// **'New agent token'**
+  String get settingsTokensNewMcp;
+
+  /// No description provided for @settingsTokensCliName.
+  ///
+  /// In en, this message translates to:
+  /// **'xp on {device}'**
+  String settingsTokensCliName(String device);
+
+  /// No description provided for @settingsTokensMcpName.
+  ///
+  /// In en, this message translates to:
+  /// **'Agent on {device}'**
+  String settingsTokensMcpName(String device);
+
+  /// No description provided for @settingsTokensCliMade.
+  ///
+  /// In en, this message translates to:
+  /// **'Made \"{name}\". Run this in a terminal to connect xp:'**
+  String settingsTokensCliMade(String name);
+
+  /// No description provided for @settingsTokensMcpMade.
+  ///
+  /// In en, this message translates to:
+  /// **'Made \"{name}\". Add this to the MCP config of the agent:'**
+  String settingsTokensMcpMade(String name);
+
+  /// Under a new token.
+  ///
+  /// In en, this message translates to:
+  /// **'The token is shown this once. Copy it now; make another if it is lost.'**
+  String get settingsTokensOnce;
+
+  /// Copies the xp connect command.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy command'**
+  String get settingsTokensCopyCommand;
+
+  /// Copies the MCP config.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy config'**
+  String get settingsTokensCopyConfig;
+
+  /// Hides the new token for good.
+  ///
+  /// In en, this message translates to:
+  /// **'Done'**
+  String get settingsTokensDone;
 }
 
 class _AppLocalizationsDelegate
