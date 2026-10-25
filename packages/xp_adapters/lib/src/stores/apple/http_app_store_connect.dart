@@ -302,6 +302,26 @@ class HttpAppStoreConnect implements AppStoreConnect {
   }
 
   @override
+  Future<AscCertificate> createDistributionCertificate(String csr) async =>
+      _certificate(
+        _one(
+          await _send(
+            'POST',
+            _url('/v1/certificates'),
+            body: {
+              'data': {
+                'type': 'certificates',
+                'attributes': {
+                  'certificateType': 'DISTRIBUTION',
+                  'csrContent': csr,
+                },
+              },
+            },
+          ),
+        ),
+      );
+
+  @override
   Future<String?> bundleIdOf(String identifier) async {
     // The filter also matches longer identifiers; only the exact one counts.
     final documents = await _list('/v1/bundleIds', {
@@ -750,32 +770,36 @@ class HttpAppStoreConnect implements AppStoreConnect {
 
   AscCertificate _certificate(Map<String, dynamic> resource) {
     final attributes = _attributes(resource);
+    final content = _optional(attributes, 'certificateContent');
     return AscCertificate(
       id: _string(resource, 'id'),
       serialNumber: _string(attributes, 'serialNumber'),
       name:
           _optional(attributes, 'displayName') ?? _optional(attributes, 'name'),
       expirationDate: _date(attributes, 'expirationDate'),
+      content: content == null ? null : _base64(content, 'certificate'),
     );
   }
 
   AscProfile _profile(Map<String, dynamic> resource) {
     final attributes = _attributes(resource);
-    final List<int> content;
-    try {
-      content = base64.decode(_string(attributes, 'profileContent'));
-    } on FormatException {
-      throw const AscServerException(
-        0,
-        'App Store Connect sent a profile that is not base64.',
-      );
-    }
     return AscProfile(
       id: _string(resource, 'id'),
       name: _string(attributes, 'name'),
-      content: content,
+      content: _base64(_string(attributes, 'profileContent'), 'profile'),
       expirationDate: _date(attributes, 'expirationDate'),
     );
+  }
+
+  List<int> _base64(String text, String what) {
+    try {
+      return base64.decode(text);
+    } on FormatException {
+      throw AscServerException(
+        0,
+        'App Store Connect sent a $what that is not base64.',
+      );
+    }
   }
 
   AscPhasedRelease _phased(Map<String, dynamic> resource) {

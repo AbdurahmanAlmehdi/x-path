@@ -356,6 +356,33 @@ void main() {
       expect(find.text('Connection refused.'), findsOneWidget);
     });
 
+    testWidgets('has the engine create a distribution certificate for the '
+        'flavor', (tester) async {
+      when(
+        () => credentials.createDistributionCertificate(
+          any(),
+          app: any(named: 'app'),
+          flavor: any(named: 'flavor'),
+          name: any(named: 'name'),
+        ),
+      ).thenAnswer((_) async => slackWebhook);
+      await open(tester);
+
+      await tap(
+        tester,
+        find.byKey(const Key('flavorCredentials.createCertificate')),
+      );
+
+      verify(
+        () => credentials.createDistributionCertificate(
+          'prj_1',
+          app: '.',
+          flavor: 'prod',
+          name: 'Apple Distribution · ${mataa.fullName} prod',
+        ),
+      ).called(1);
+    });
+
     testWidgets('has no scope to choose for an app with one flavor', (
       tester,
     ) async {

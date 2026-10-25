@@ -258,6 +258,60 @@ void main() {
       expect(printed(), isNot(contains('BEGIN PRIVATE KEY')));
     });
 
+    test('has the engine create a distribution certificate for a flavor '
+        '(--create)', () async {
+      when(
+        () => env.client.createDistributionCertificate(
+          any(),
+          app: any(named: 'app'),
+          flavor: any(named: 'flavor'),
+          name: any(named: 'name'),
+        ),
+      ).thenAnswer((_) async => sample.ascCredential);
+
+      await env.runOk([
+        'credentials',
+        'add',
+        '--kind',
+        'apple-distribution',
+        '--name',
+        'Linux signing',
+        '--create',
+        '--project',
+        'acme/app',
+        '--flavor',
+        'prod',
+      ]);
+
+      verify(
+        () => env.client.createDistributionCertificate(
+          'prj_1',
+          flavor: 'prod',
+          name: 'Linux signing',
+        ),
+      ).called(1);
+      verifyNever(() => env.client.createCredential(any()));
+      expect(env.logger.out, contains('Added "Acme ASC"'));
+    });
+
+    test('--create is for an Apple Distribution identity, without its '
+        'files, and needs a flavor', () async {
+      final key = file('key.pem', 'k');
+      for (final arguments in [
+        ['--kind', 'asc_key', '--create'],
+        ['--kind', 'apple_distribution', '--create', '--private-key', key],
+        ['--kind', 'apple_distribution', '--create', '--project', 'prj_1'],
+        ['--kind', 'slack', '--flavor', 'prod'],
+      ]) {
+        expect(
+          await env.run(['credentials', 'add', '--name', 'X', ...arguments]),
+          64,
+          reason: '$arguments',
+        );
+      }
+      verifyNever(() => env.client.createCredential(any()));
+    });
+
     test('leaves the key kind to the engine when not given', () async {
       answerCreate();
       final p8 = file('AuthKey.p8', 'key');

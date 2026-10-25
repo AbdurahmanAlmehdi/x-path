@@ -84,6 +84,10 @@ abstract interface class AppStoreConnect {
   /// shows as Apple Distribution), revoked ones left out.
   Future<List<AscCertificate>> distributionCertificates();
 
+  /// Creates an Apple Distribution certificate (`DISTRIBUTION`) for the
+  /// certificate signing request [csr] (PEM) and returns it with its content.
+  Future<AscCertificate> createDistributionCertificate(String csr);
+
   /// The id of the bundle id resource registered for [identifier], or
   /// `null` if the team has none.
   Future<String?> bundleIdOf(String identifier);
@@ -132,6 +136,12 @@ class FakeAppStoreConnect implements AppStoreConnect {
 
   /// The distribution certificates of the team.
   final certificates = <AscCertificate>[];
+
+  /// The content of the certificates [createDistributionCertificate] makes.
+  List<int> createdContent = const [0x30];
+
+  /// The certificate signing requests [createDistributionCertificate] got.
+  final requests = <String>[];
 
   /// The bundle id resources, by identifier.
   final bundleIds = <String, String>{};
@@ -287,6 +297,19 @@ class FakeAppStoreConnect implements AppStoreConnect {
   Future<List<AscCertificate>> distributionCertificates() async {
     _call('distributionCertificates');
     return [...certificates];
+  }
+
+  @override
+  Future<AscCertificate> createDistributionCertificate(String csr) async {
+    _call('createDistributionCertificate');
+    requests.add(csr);
+    final certificate = AscCertificate(
+      id: 'certificate-${calls.length}',
+      serialNumber: '${calls.length}',
+      content: createdContent,
+    );
+    certificates.add(certificate);
+    return certificate;
   }
 
   @override

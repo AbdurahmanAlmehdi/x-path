@@ -735,11 +735,30 @@ void main() {
           serialNumber: '0A1B2C3D4E5F',
           name: 'Apple Distribution: Fake Team',
           expirationDate: DateTime.utc(2027, 3),
+          content: const [1, 2, 3],
         ),
       ]);
       expect(
         server.requests.single.uri.queryParameters['filter[certificateType]'],
         'DISTRIBUTION',
+      );
+    });
+
+    test('a distribution certificate is created for a request, with its '
+        'content', () async {
+      const csr =
+          '-----BEGIN CERTIFICATE REQUEST-----\nMIIC\n'
+          '-----END CERTIFICATE REQUEST-----\n';
+
+      final created = await client().createDistributionCertificate(csr);
+
+      expect(created.serialNumber, fakeDistributionSerial);
+      expect(created.content, base64.decode(fakeDistributionCertificate));
+      expect(server.certificates[created.id]?.csr, csr);
+      expect(server.certificates[created.id]?.certificateType, 'DISTRIBUTION');
+      await expectLater(
+        client().createDistributionCertificate('not a request'),
+        throwsA(isA<AscConflictException>()),
       );
     });
 

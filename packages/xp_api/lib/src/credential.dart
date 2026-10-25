@@ -509,6 +509,30 @@ class RenameCredentialRequest extends Equatable {
   List<Object?> get props => [name];
 }
 
+/// The body of `POST /projects/{id}/flavors/{flavor}/distribution-certificate`:
+/// the [name] of the Apple Distribution identity the engine creates with the
+/// flavor's App Store Connect key (ADR 0014).
+class CreateDistributionCertificateRequest extends Equatable {
+  /// Creates a request.
+  const new(this.name);
+
+  /// Reads a request from its JSON form.
+  ///
+  /// Throws a [FormatException] if `name` is not a usable name.
+  factory CreateDistributionCertificateRequest.fromJson(
+    Map<String, dynamic> json,
+  ) => CreateDistributionCertificateRequest(credentialName(json['name']));
+
+  /// The name of the identity.
+  final String name;
+
+  /// The JSON form.
+  Map<String, dynamic> toJson() => {'name': name};
+
+  @override
+  List<Object?> get props => [name];
+}
+
 /// The body of `PUT /projects/{id}/flavors/{flavor}/credentials/{kind}`:
 /// which credential the flavor uses for the kind.
 ///

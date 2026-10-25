@@ -63,6 +63,13 @@ class CredentialChecks {
       events: events,
       clock: clock,
     );
+    certificates = DistributionCertificates(
+      credentials: service,
+      repository: repository,
+      secrets: secrets,
+      connect: apple.connect,
+      keys: const RsaDistributionKeys(),
+    );
     profiles = AppStoreProfiles(
       credentials: repository,
       secrets: secrets,
@@ -98,6 +105,10 @@ class CredentialChecks {
 
   /// The App Store profiles the engine makes for Linux iOS builds.
   late final AppStoreProfiles profiles;
+
+  /// The Apple Distribution certificates the engine creates for owners
+  /// without a Mac.
+  late final DistributionCertificates certificates;
 
   /// The `credentials` guard check.
   GuardCheck get guardCheck => CredentialsCheck(repository);

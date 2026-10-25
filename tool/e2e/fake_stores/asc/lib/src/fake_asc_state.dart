@@ -317,6 +317,7 @@ class FakeAscCertificate {
     required this.certificateType,
     required this.content,
     this.name = 'Apple Distribution: Fake Team',
+    this.csr,
     DateTime? expirationDate,
   }) : expirationDate = expirationDate ?? DateTime.utc(2027);
 
@@ -337,6 +338,9 @@ class FakeAscCertificate {
 
   /// When it expires.
   final DateTime expirationDate;
+
+  /// The certificate signing request it was made for, if it was made here.
+  final String? csr;
 }
 
 /// A provisioning profile of the fake server.

@@ -389,6 +389,25 @@ void main() {
     });
   });
 
+  group('CreateDistributionCertificateRequest', () {
+    test('reads a usable name', () {
+      final request = CreateDistributionCertificateRequest.fromJson(const {
+        'name': ' Linux signing ',
+      });
+
+      expect(request.name, 'Linux signing');
+      expect(request.toJson(), {'name': 'Linux signing'});
+      expect(
+        CreateDistributionCertificateRequest.fromJson(request.toJson()),
+        request,
+      );
+      expect(
+        () => CreateDistributionCertificateRequest.fromJson(const {}),
+        throwsFormatException,
+      );
+    });
+  });
+
   group('AssignCredentialRequest', () {
     test('defaults to this flavor only, without replacing', () {
       final request = AssignCredentialRequest.fromJson(const {

@@ -194,7 +194,7 @@ once and opens one pull request.
 
 ### Phase 4b: Signing set-up without a Mac
 
-- **Status:** Not started
+- **Status:** Done
 - **Scope:** An owner without a Mac (so without the desktop app) creates the distribution
   certificate from the CLI.
 - **Files touched:** `apps/xpd/lib/src/api/credentials/**` (a certificate-creation route),
@@ -209,13 +209,17 @@ once and opens one pull request.
   leaves the engine.
 - **Validation:** `melos run test:coverage && melos run test:contract`
 
-- [ ] The engine makes a key and a CSR and creates the certificate through the App Store
+- [x] The engine makes a key and a CSR and creates the certificate through the App Store
       Connect API with the flavor's ASC key, which stays on the engine (D-09). The CLI and the
-      app call that route.
-- [ ] Before creating one, the route reads the team's distribution certificates and refuses
+      app call that route. `POST /projects/{id}/flavors/{flavor}/distribution-certificate`
+      (`DistributionCertificates`, RSA 2048 and PKCS#10 by `RsaDistributionKeys`), which saves
+      the identity and assigns it to the flavor; `xp credentials add --kind
+      apple-distribution --create --project --flavor`, and "Create certificate" in the
+      flavor's credentials sheet.
+- [x] Before creating one, the route reads the team's distribution certificates and refuses
       with the count and Apple's limit when the team is at it, naming the ones it could
-      revoke.
-- [ ] The ASC key and the runner URL (runner plan R4) are already settable from the CLI.
+      revoke (`409 conflict`, `details.reason` `certificate_limit`).
+- [x] The ASC key and the runner URL (runner plan R4) are already settable from the CLI.
 
 ### Phase 5: Scan, dry run and docs
 

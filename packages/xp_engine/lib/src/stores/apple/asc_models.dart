@@ -438,6 +438,7 @@ class AscCertificate extends Equatable {
     required this.serialNumber,
     this.name,
     this.expirationDate,
+    this.content,
   });
 
   /// The id of the certificate resource.
@@ -452,8 +453,11 @@ class AscCertificate extends Equatable {
   /// When it expires, in UTC.
   final DateTime? expirationDate;
 
+  /// The certificate, DER, when App Store Connect sent it.
+  final List<int>? content;
+
   @override
-  List<Object?> get props => [id, serialNumber, name, expirationDate];
+  List<Object?> get props => [id, serialNumber, name, expirationDate, content];
 }
 
 /// A provisioning profile in App Store Connect.

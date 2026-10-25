@@ -980,6 +980,33 @@ void main() {
       );
     });
 
+    test('certificates are created from a PEM request', () async {
+      Map<String, Object?> certificate(String csr) => {
+        'data': {
+          'type': 'certificates',
+          'attributes': {'certificateType': 'DISTRIBUTION', 'csrContent': csr},
+        },
+      };
+
+      final created = await call(
+        'POST',
+        '/v1/certificates',
+        body: certificate('-----BEGIN CERTIFICATE REQUEST-----\nx'),
+      );
+      final refused = await call(
+        'POST',
+        '/v1/certificates',
+        body: certificate('x'),
+      );
+
+      expect(created.statusCode, 201);
+      expect(
+        ((json(created)['data'] as Map)['attributes'] as Map)['serialNumber'],
+        fakeDistributionSerial,
+      );
+      expect(refused.statusCode, 409);
+    });
+
     test('refuse what does not exist or is not complete', () async {
       for (final (body, status) in [
         (

@@ -4,6 +4,7 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:pointycastle/digests/md5.dart';
+import 'package:xp_fake_asc/src/fake_asc_certificate.dart';
 import 'package:xp_fake_asc/src/fake_asc_key.dart';
 import 'package:xp_fake_asc/src/fake_asc_state.dart';
 import 'package:xp_fake_asc/src/token_verifier.dart';
@@ -403,6 +404,8 @@ class FakeAscServer {
             if (type == null || certificate.certificateType == type)
               _certificate(certificate),
         ]);
+      case ('POST', ['certificates']):
+        return _createCertificate(body);
       case ('GET', ['bundleIds']):
         final identifier = query['filter[identifier]'];
         return _ok(uri, [
@@ -595,6 +598,31 @@ class FakeAscServer {
       'profileContent': base64.encode(profile.content),
     },
   };
+
+  (int, Object?) _createCertificate(Object? body) {
+    final attributes = _data(body)['attributes'] as Map<String, dynamic>?;
+    final type = attributes?['certificateType'];
+    final csr = attributes?['csrContent'];
+    if (type is! String ||
+        csr is! String ||
+        !csr.contains('-----BEGIN CERTIFICATE REQUEST-----')) {
+      throw const _AscError(
+        409,
+        'ENTITY_ERROR.ATTRIBUTE.INVALID',
+        'An attribute value is invalid.',
+        'certificateType and a PEM csrContent are required.',
+      );
+    }
+    final certificate = FakeAscCertificate(
+      id: 'certificate-${++_ids}',
+      serialNumber: fakeDistributionSerial,
+      certificateType: type,
+      content: base64.decode(fakeDistributionCertificate),
+      csr: csr,
+    );
+    certificates[certificate.id] = certificate;
+    return (201, {'data': _certificate(certificate)});
+  }
 
   (int, Object?) _createProfile(Object? body) {
     final data = _data(body);

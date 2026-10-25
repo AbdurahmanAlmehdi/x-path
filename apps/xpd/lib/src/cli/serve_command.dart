@@ -608,6 +608,7 @@ class ServeCommand extends XpdCommand {
           projects: projectRepository,
         ),
         credentials: credentialChecks.service,
+        certificates: credentialChecks.certificates,
         githubToken: GitHubTokenService(
           secrets: secrets,
           verifier: credentialChecks.githubVerifier,

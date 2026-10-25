@@ -402,6 +402,31 @@ class _KindRow extends StatelessWidget {
                 tooltip: canCommand ? null : l10n.readOnlyHint,
                 onPressed: canCommand && !editing && !busy ? onEdit : null,
               ),
+              if (assigned == null &&
+                  kind == CredentialKind.appleDistribution) ...[
+                const SizedBox(width: 6),
+                XpButton(
+                  key: const Key('flavorCredentials.createCertificate'),
+                  label: l10n.flavorCredentialsCreateCertificate,
+                  size: XpButtonSize.small,
+                  kind: XpButtonKind.tertiary,
+                  tooltip: canCommand
+                      ? l10n.flavorCredentialsCreateCertificateTooltip
+                      : l10n.readOnlyHint,
+                  onPressed: canCommand && !editing && !busy
+                      ? () => context.read<ProjectCredentialsBloc>().add(
+                          ProjectCertificateCreateRequested(
+                            app: target.app,
+                            flavor: target.flavor,
+                            name: l10n.flavorCredentialsCertificateName(
+                              project.fullName,
+                              target.flavor,
+                            ),
+                          ),
+                        )
+                      : null,
+                ),
+              ],
               if (assigned != null) ...[
                 const SizedBox(width: 6),
                 XpButton(

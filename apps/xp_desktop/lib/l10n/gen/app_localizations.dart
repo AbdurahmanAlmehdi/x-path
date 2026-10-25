@@ -1342,6 +1342,24 @@ abstract class AppLocalizations {
   /// **'Private key (.p8)'**
   String get fieldPrivateKey;
 
+  /// Button: the engine creates an Apple Distribution certificate for the flavor.
+  ///
+  /// In en, this message translates to:
+  /// **'Create certificate'**
+  String get flavorCredentialsCreateCertificate;
+
+  /// Tooltip of the create certificate button.
+  ///
+  /// In en, this message translates to:
+  /// **'The engine creates a new Apple Distribution certificate with this flavor\'s App Store Connect key and assigns it. Apple allows a team three.'**
+  String get flavorCredentialsCreateCertificateTooltip;
+
+  /// Name of the identity the engine creates.
+  ///
+  /// In en, this message translates to:
+  /// **'Apple Distribution · {project} {flavor}'**
+  String flavorCredentialsCertificateName(String project, String flavor);
+
   /// Field label: the private key of an Apple Distribution identity.
   ///
   /// In en, this message translates to:

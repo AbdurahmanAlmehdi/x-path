@@ -115,6 +115,17 @@ class CredentialsAddCommand extends XpCommand {
         valueHelp: 'name',
       );
     _addMaterialOptions(argParser);
+    argParser
+      ..addSeparator('apple_distribution --create (no Mac needed; ADR 0014):')
+      ..addFlag(
+        'create',
+        negatable: false,
+        help:
+            "The engine creates a new certificate with the flavor's App "
+            'Store Connect key and assigns the identity to the flavor. Apple '
+            'allows a team 3; the engine refuses at the limit and lists them.',
+      );
+    _addFlavorOptions(argParser, 'With --create: the flavor to assign it to.');
   }
 
   @override
@@ -127,7 +138,9 @@ class CredentialsAddCommand extends XpCommand {
 
   @override
   String get invocation =>
-      'xp credentials add --kind <kind> --name <name> [options of the kind]';
+      'xp credentials add --kind <kind> --name <name> [options of the kind]\n'
+      '       xp credentials add --kind apple-distribution --name <name> '
+      '--create --project <project> --flavor <flavor> [--app <path>]';
 
   @override
   String get usageFooter => _secretsFooter;
@@ -140,10 +153,21 @@ class CredentialsAddCommand extends XpCommand {
       this,
       argResults!.option('name') ?? usageException('Missing --name.'),
     );
-    final material = await _material(this, kind);
-    final credential = await client.createCredential(
-      CreateCredentialRequest(name: name, kind: kind, material: material),
-    );
+    final create = argResults!.flag('create');
+    for (final option in const ['project', 'app', 'flavor']) {
+      if (!create && argResults!.wasParsed(option)) {
+        usageException('--$option goes with --create.');
+      }
+    }
+    final credential = create
+        ? await _create(client, kind, name)
+        : await client.createCredential(
+            CreateCredentialRequest(
+              name: name,
+              kind: kind,
+              material: await _material(this, kind),
+            ),
+          );
     emit(
       credential.toJson(),
       () =>
@@ -151,6 +175,33 @@ class CredentialsAddCommand extends XpCommand {
           '${describeCredential(credential)}',
     );
     return XpExit.ok;
+  }
+
+  /// Has the engine create an Apple Distribution certificate for a flavor.
+  Future<NamedCredential> _create(
+    XpClient client,
+    CredentialKind kind,
+    String name,
+  ) async {
+    final args = argResults!;
+    if (kind != CredentialKind.appleDistribution) {
+      usageException('--create is for --kind apple-distribution only.');
+    }
+    for (final option in _kindOptions[kind]!) {
+      if (args.wasParsed(option)) {
+        usageException('Give --create or --$option, not both.');
+      }
+    }
+    final flavor =
+        args.option('flavor') ??
+        usageException('Missing --flavor (the flavor to assign it to).');
+    final projectId = await resolveProject(client, _project(this));
+    return await client.createDistributionCertificate(
+      projectId,
+      app: args.option('app')!,
+      flavor: flavor,
+      name: name,
+    );
   }
 
   CredentialKind _kind(String? wire) {

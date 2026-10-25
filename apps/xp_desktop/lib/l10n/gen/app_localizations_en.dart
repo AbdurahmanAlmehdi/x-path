@@ -763,6 +763,18 @@ class AppLocalizationsEn extends AppLocalizations {
   String get fieldPrivateKey => 'Private key (.p8)';
 
   @override
+  String get flavorCredentialsCreateCertificate => 'Create certificate';
+
+  @override
+  String get flavorCredentialsCreateCertificateTooltip =>
+      'The engine creates a new Apple Distribution certificate with this flavor\'s App Store Connect key and assigns it. Apple allows a team three.';
+
+  @override
+  String flavorCredentialsCertificateName(String project, String flavor) {
+    return 'Apple Distribution · $project $flavor';
+  }
+
+  @override
   String get fieldSigningKey => 'Private key (PEM)';
 
   @override
