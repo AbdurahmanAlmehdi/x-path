@@ -240,7 +240,7 @@ void main() {
         sha: 'a' * 40,
         name: 'Build prod for android',
         repository: const LeaseRepository(
-          githubRepoId: 7,
+          cacheKey: '7',
           sshUrl: 'git@github.com:owner/app.git',
         ),
         stage: 1,
@@ -341,6 +341,19 @@ void main() {
         'secrets',
       });
       expect(frames[10].toJson().keys, {'type', 'jobId', 'reason'});
+    });
+
+    test('a repository on another host has a cache key and no GitHub id', () {
+      const bitbucket = LeaseRepository(
+        cacheKey: 'h0123456789abcdef',
+        sshUrl: 'git@bitbucket.org:ws/app.git',
+      );
+
+      expect(LeaseRepository.fromJson(wire(bitbucket.toJson())), bitbucket);
+      expect(bitbucket.toJson(), {
+        'cacheKey': 'h0123456789abcdef',
+        'sshUrl': 'git@bitbucket.org:ws/app.git',
+      });
     });
 
     test('the welcome frame carries the 30 s and 90 s rules', () {

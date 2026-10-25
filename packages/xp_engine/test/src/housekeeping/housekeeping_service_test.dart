@@ -79,14 +79,14 @@ void main() {
         ..logs.addAll({'job_7': 4, 'job_1': 6})
         ..worktreeList.add(
           const WorktreeDirectory(
-            githubRepoId: 42,
+            key: '42',
             name: 'job_7',
             path: '/w/job_7',
             bytes: 50,
           ),
         )
         ..mirrorList.add(
-          const MirrorDirectory(githubRepoId: 9, path: '/m/9.git', bytes: 200),
+          const MirrorDirectory(key: '9', path: '/m/9.git', bytes: 200),
         )
         ..sdks.add(
           const FlutterDirectory(version: '3.0.0', path: '/f', bytes: 900),
@@ -143,7 +143,7 @@ void main() {
         await h.addBuild(id: 'job_$day', days: day);
       }
       h.files.mirrorList.add(
-        const MirrorDirectory(githubRepoId: 9, path: '/m/9.git', bytes: 200),
+        const MirrorDirectory(key: '9', path: '/m/9.git', bytes: 200),
       );
     });
 

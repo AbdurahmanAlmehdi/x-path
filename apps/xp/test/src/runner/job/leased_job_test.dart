@@ -74,10 +74,7 @@ void main() {
     projectId: 'prj_1',
     sha: 'a' * 40,
     name: 'Job',
-    repository: const LeaseRepository(
-      githubRepoId: 42,
-      sshUrl: 'git@x:y/z.git',
-    ),
+    repository: const LeaseRepository(cacheKey: '42', sshUrl: 'git@x:y/z.git'),
     stage: 0,
     capabilities: const [],
     expiresAt: DateTime.utc(2026, 10, 14, 12),
@@ -686,8 +683,17 @@ void main() {
   test('keeps the process group of a running step in the journal', () async {
     final seen = Completer<String>();
     supervisor.handler = (process) async {
-      await Future<void>.delayed(const Duration(milliseconds: 30));
-      seen.complete(File(p.join(paths.state, 'pgids.json')).readAsStringSync());
+      // The journal is written beside the start, not before it: wait for the
+      // file (it appears whole, by a rename) rather than for a fixed time.
+      final journal = File(p.join(paths.state, 'pgids.json'));
+      for (var i = 0; i < 500 && !journal.existsSync(); i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+      }
+      try {
+        seen.complete(journal.readAsStringSync());
+      } on Object catch (error, stackTrace) {
+        seen.completeError(error, stackTrace);
+      }
       return 0;
     };
 

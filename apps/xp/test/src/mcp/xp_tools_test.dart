@@ -170,6 +170,28 @@ void main() {
       ).called(1);
     });
 
+    test(
+      'add_project adds a folder at the SSH URL the owner confirmed',
+      () async {
+        when(() => client.addProject(any()))
+            .thenAnswer((_) async => sample.project);
+
+        await call('add_project', {
+          'path': '/work/app',
+          'sshUrl': 'git@bitbucket.org:ws/app.git',
+        });
+
+        verify(
+          () => client.addProject(
+            const AddProjectRequest(
+              path: '/work/app',
+              sshUrl: 'git@bitbucket.org:ws/app.git',
+            ),
+          ),
+        ).called(1);
+      },
+    );
+
     test('add_project adds a folder', () async {
       when(() => client.addProject(any()))
           .thenAnswer((_) async => sample.project);

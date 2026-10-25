@@ -5,6 +5,7 @@ import 'package:xp_desktop/approvals/widgets/needs_you_bar.dart';
 import 'package:xp_desktop/l10n/l10n.dart';
 import 'package:xp_desktop/project_overview/widgets/release_status.dart';
 import 'package:xp_desktop/projects/bloc/projects_bloc.dart';
+import 'package:xp_desktop/projects/widgets/project_host.dart';
 import 'package:xp_desktop/releases/bloc/release_board_bloc.dart';
 import 'package:xp_desktop/releases/widgets/release_hero.dart';
 import 'package:xp_desktop/releases/widgets/release_panels.dart';
@@ -130,7 +131,7 @@ class ReleasesView extends StatelessWidget {
                   if (release != null)
                     _Board(release: release, state: state)
                   else if (state.loaded)
-                    const _NoRelease(),
+                    _NoRelease(project),
                 ],
               ),
             ),
@@ -198,7 +199,9 @@ class _Board extends StatelessWidget {
 }
 
 class _NoRelease extends StatelessWidget {
-  const new();
+  const new(this.project);
+
+  final Project project;
 
   @override
   Widget build(BuildContext context) {
@@ -220,7 +223,9 @@ class _NoRelease extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            l10n.releasesEmpty,
+            project.isOnGitHub
+                ? l10n.releasesEmpty
+                : l10n.releasesEmptyNoGitHub(project.hostLabel(l10n)),
             style: context.xpType.body.copyWith(color: colors.textSecondary),
           ),
         ],

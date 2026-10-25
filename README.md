@@ -435,13 +435,24 @@ cannot name the home folder). The jobs, the tool probes and every program the en
 
 ## Projects and scans
 
-A project is a GitHub repository, keyed by its GitHub repository id (D-05). The folder you pick only
-identifies the repository and seeds the first scan; builds run from the engine's own bare mirror.
+A project is a repository, keyed by its source key (D-05, ADR 0015): the GitHub repository id for a GitHub
+project, `h` and 16 hex digits of the SHA-256 of the normalised remote for any other host. The folder you pick
+only identifies the repository and seeds the first scan; builds run from the engine's own bare mirror.
+
+**Other git hosts** (Bitbucket, GitLab, any SSH server, a `file://` repository) are added by an SSH URL
+(`git@host:path` or `ssh://`) or a `file://` URL. The engine reads them with its own SSH key
+(`~/.ssh/id_ed25519.pub` of the user it runs as, with no passphrase: the LaunchAgent has no terminal) and
+`GIT_SSH_COMMAND='ssh -o BatchMode=yes -o ConnectTimeout=30 -o StrictHostKeyChecking=accept-new'`, so the first
+connection records the host key and a changed one fails. Adding proves access with `git ls-remote` and, when it
+fails, says where to add the key (an access key on Bitbucket). An HTTPS origin on another host answers `422
+ssh_url_required` with the SSH URL of the same repository; add it again with that URL (`sshUrl` with a folder).
+Only workflows without a `github.*` or `git.push` step run on such a project (`dev-build`, `test`, or custom ones
+like them); the others are refused at dispatch with the reason. Pull requests on other hosts are later work.
 All routes need a device token.
 
 | Route | What it does |
 |---|---|
-| `POST /projects` | Adds a project from `{"path": "/abs/clone"}` (reads its `origin`) or `{"remote": "owner/name"}` (or a GitHub URL), asks GitHub for the repository, sets up the mirror and scans. `409` if it is a project already. |
+| `POST /projects` | Adds a project from `{"path": "/abs/clone"}` (reads its `origin`) or `{"remote": "owner/name"}` (or a GitHub URL, or the SSH or `file://` URL of another host), asks GitHub for a GitHub repository or runs `git ls-remote` for another one, sets up the mirror and scans. `409` if it is a project already; `422 ssh_url_required` (with `sshUrl`) for an HTTPS origin on another host. |
 | `GET /projects`, `GET /projects/{id}` | The projects, each with its profile and the findings of the last scan. |
 | `POST /projects/{id}/scan` | Scans again: the folder it was added from if it still exists, else a fresh worktree of the mirror. Follows a GitHub rename or a new default branch. |
 | `PATCH /projects/{id}` | Edits the profile (production flavor, store country, base branch, Shorebird, ids, version files). Edits are kept apart from the scan and applied on top of every scan, so a rescan never undoes them. |
@@ -1302,6 +1313,11 @@ Android SDK or Xcode and takes about four minutes, most of it the production lea
 can. The build job of `dev-build` goes to the runner (its own checkout, a real APK), the check and the upload (to a
 local fake Firebase) stay on the engine, and the APK in the engine store is the one the runner built.
 
+`tool/e2e/runner_any_host_e2e.sh` (ADR 0015) runs it with `--mode runner-any-host`: the same build for a project whose
+origin is a `file://` bare repository, on an engine with no GitHub token. The engine adds it without GitHub, the
+runner fetches the commit from the URL of the lease into a cache named by the source key, and `prod-release` is
+refused at dispatch with the host and its `git.push` step.
+
 ## Runners
 
 A runner is a machine that runs jobs for the engine (D-08, D-19): another Mac for `ios-sign`, a Linux box for
@@ -1464,7 +1480,8 @@ xp runner install-service [--slots 4]                                # keeps it 
   (engine, id, name) and no secret. `--name` only warns when the engine named the runner otherwise: the pairing
   token fixes the name. Pairing again in a paired data directory needs `--force`.
 - **Data directory** (`--data-dir`, else `$XP_RUNNER_DATA_DIR`, else `~/.local/share/xpath/runner`):
-  `source/mirrors/<repo id>.git` (the bare cache), `source/worktrees/<repo id>/<job id>` (fresh worktrees),
+  `source/mirrors/<key>.git` (the bare cache), `source/worktrees/<key>/<job id>` (fresh worktrees), where the key is
+  the project's source key (the GitHub repository id, or `h` and 16 hex digits for another host, ADR 0015),
   `jobs/<job id>` (what a job leaves before it is uploaded), `toolchains/flutter`, `secrets/` (where no tmpfs is
   available), `keychains/`, `state/pgids.json`, and for updates and services `versions/<version>/` (the installed
   `xp` bundles), `current` (a symlink to the version that starts), `update.json`, `service-logs/` (see Runner updates
@@ -1488,12 +1505,15 @@ xp runner install-service [--slots 4]                                # keeps it 
   directory below it) are translated to the runner's (`LeasePaths`). Every step of the offer starts again, since
   the work of an earlier lease is not on this machine, but the attempts are kept, so that a step with side effects
   asks first whether its work exists (`alreadyDone`). `step_state` frames report each new state of a step.
-- **Source (ADR 0009).** `git.checkout` is `RemoteCheckoutStep`: it fetches the exact commit of the offer into the
-  runner's own bare cache (`git fetch origin <sha>` with `GIT_SSH_COMMAND='ssh -o BatchMode=yes'`, no global git
-  configuration, no prompt), cuts a fresh worktree and verifies `HEAD == sha` before anything runs. A key that
-  cannot read the repository fails the job with "add this runner's SSH key as a deploy key on `<owner/repo>`", an
-  unknown host key with "run `ssh -T git@github.com` once", a commit that was never pushed with "push it". The
-  machine needs `git`, `ssh` and its own access to GitHub (a deploy key or the key of a user). **Test only:**
+- **Source (ADR 0009, ADR 0015).** `git.checkout` is `RemoteCheckoutStep`: it fetches the exact commit of the offer
+  into the runner's own bare cache (`git fetch origin <sha>` with
+  `GIT_SSH_COMMAND='ssh -o BatchMode=yes -o ConnectTimeout=30 -o StrictHostKeyChecking=accept-new'`, no global git
+  configuration, no prompt), cuts a fresh worktree and verifies `HEAD == sha` before anything runs. SSH records the
+  host key of a server it has not seen; a key that changed still fails. A key that cannot read the repository fails
+  the job with what to do on its host ("add this runner's SSH key as a deploy key on `<owner/repo>`" on GitHub, "as
+  an access key of `<workspace/repo>`" on Bitbucket), a changed host key with "remove the old one (`ssh-keygen -R
+  <host>`)", a commit that was never pushed with "push it". The machine needs `git`, `ssh` and its own access to the
+  git host (a deploy or access key, or the key of a user). **Test only:**
   `XP_RUNNER_TEST_SOURCE_URL` replaces the URL of every lease (the end-to-end test points it at a local bare
   repository); a real runner never sets it.
 - **Logs and reports.** The output of the processes goes to the engine as `log_chunk` frames numbered from 1 per
@@ -1735,7 +1755,7 @@ escaped) and WhatsApp text (`*bold*`, the link as plain text). `409` while the r
 xpd token create --name "My Mac" --kind cli                     # on the engine machine; printed once
 xpd token create --name "Claude" --kind mcp                     # a second token, for `xp mcp`
 xp connect http://127.0.0.1:7480 --token <cli token> --mcp-token <mcp token>
-xp projects add acme/app            # or a folder on the engine machine
+xp projects add acme/app            # or a folder on the engine machine, or git@bitbucket.org:ws/app.git
 xp workflows list acme/app
 xp dispatch acme/app dev-build --flavor dev --platform android
 xp logs -f <job id>

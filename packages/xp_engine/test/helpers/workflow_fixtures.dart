@@ -38,6 +38,8 @@ ProjectRecord demoProject({
   int repoId = 42,
 }) => ProjectRecord(
   id: id,
+  host: 'github.com',
+  sourceKey: '$repoId',
   githubRepoId: repoId,
   fullName: 'octo/demo',
   remote: 'https://github.com/octo/demo.git',

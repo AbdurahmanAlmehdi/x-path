@@ -81,6 +81,8 @@ const app = AppProfile(
 
 const mataa = Project(
   id: 'prj_1',
+  host: 'github.com',
+  sourceKey: '1',
   githubRepoId: 1,
   fullName: 'acme/mataa',
   remote: 'git@github.com:acme/mataa.git',
@@ -311,6 +313,8 @@ stages:
     test('takes the only flavor and the version asked for', () {
       const single = Project(
         id: 'prj_2',
+        host: 'github.com',
+        sourceKey: '2',
         githubRepoId: 2,
         fullName: 'acme/one',
         remote: 'r',

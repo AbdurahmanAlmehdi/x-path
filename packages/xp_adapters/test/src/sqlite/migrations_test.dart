@@ -199,8 +199,8 @@ INSERT INTO credential_ref (id, flavor_id, kind, secret_key, verified_at,
       final database = SqliteDatabase.openInMemory();
       addTearDown(database.close);
       database.connection.execute('''
-INSERT INTO project (id, github_repo_id, remote, default_base_branch)
-  VALUES ('prj_1', 1, 'r', 'main');
+INSERT INTO project (id, host, source_key, github_repo_id, remote,
+  default_base_branch) VALUES ('prj_1', 'github.com', '1', 1, 'r', 'main');
 INSERT INTO app (id, project_id, path, framework, store_country)
   VALUES ('app_1', 'prj_1', '.', 'flutter', 'us');
 INSERT INTO flavor (id, app_id, name, entrypoint)
@@ -234,14 +234,164 @@ INSERT INTO credential (id, name, kind, secret_key)
     });
   });
 
-  test('v16 gives the jobs of before no narrowing', () {
+  group('v16 projects on any git host', () {
+    test('rebuilds project and keeps every row and foreign key', () async {
+      final path = '${tempDirectory().path}/xpath.db';
+      sqlite3.open(path)
+        ..execute(_golden(15))
+        ..userVersion = 15
+        ..execute('''
+INSERT INTO project (id, github_repo_id, remote, default_base_branch,
+  release_model, gates, full_name, local_path, github_default_branch, scan,
+  findings, scanned_at, edits) VALUES
+  ('prj_1', 101, 'https://github.com/acme/shop.git', 'main', '{"a":1}',
+    '{"b":2}', 'acme/shop', '/work/shop', 'main', '{"apps":[]}', '[]', 7,
+    '{}'),
+  ('prj_2', 202, 'https://github.com/acme/admin.git', 'dev', '{}', '{}',
+    'acme/admin', NULL, 'dev', '{}', '[]', 0, '{}');
+INSERT INTO app (id, project_id, path, framework, store_country) VALUES
+  ('app_1', 'prj_1', '.', 'flutter', 'us'),
+  ('app_2', 'prj_2', '.', 'flutter', 'us');
+INSERT INTO flavor (id, app_id, name, entrypoint) VALUES
+  ('flv_1', 'app_1', 'prod', 'lib/main.dart');
+INSERT INTO workflow (id, project_id, name) VALUES ('wf_1', 'prj_1', 'ship');
+INSERT INTO workflow_version (id, workflow_id, version, yaml)
+  VALUES ('wv_1', 'wf_1', 1, 'jobs: {}');
+INSERT INTO release (id, app_id, version, build, state)
+  VALUES ('rel_1', 'app_1', '1.0.0', 1, 'draft');
+INSERT INTO run (id, project_id, workflow_id, workflow_version_id, sha,
+  created_at) VALUES ('run_1', 'prj_1', 'wf_1', 'wv_1', 'abc', 1);
+INSERT INTO job (id, workflow_version_id, project_id, release_id, state,
+  run_id) VALUES ('job_1', 'wv_1', 'prj_1', 'rel_1', 'done', 'run_1');
+INSERT INTO approval (id, project_id, action, state, run_id, job_id)
+  VALUES ('apr_1', 'prj_1', 'promote', 'pending', 'run_1', 'job_1');
+''')
+        ..close();
+
+      final database = SqliteDatabase.open(path);
+      addTearDown(database.close);
+      final db = database.connection;
+
+      expect(db.userVersion, latest);
+      expect(File('$path.bak-v15').existsSync(), isTrue);
+      expect(
+        [
+          for (final row in db.select(
+            'SELECT id, host, source_key, github_repo_id, remote, '
+            'default_base_branch, release_model, gates, full_name, '
+            'local_path, github_default_branch, scan, scanned_at '
+            'FROM project ORDER BY rowid',
+          ))
+            row.values,
+        ],
+        [
+          [
+            'prj_1',
+            'github.com',
+            '101',
+            101,
+            'https://github.com/acme/shop.git',
+            'main',
+            '{"a":1}',
+            '{"b":2}',
+            'acme/shop',
+            '/work/shop',
+            'main',
+            '{"apps":[]}',
+            7,
+          ],
+          [
+            'prj_2',
+            'github.com',
+            '202',
+            202,
+            'https://github.com/acme/admin.git',
+            'dev',
+            '{}',
+            '{}',
+            'acme/admin',
+            null,
+            'dev',
+            '{}',
+            0,
+          ],
+        ],
+      );
+      for (final (table, rows) in [
+        ('app', 2),
+        ('flavor', 1),
+        ('workflow', 1),
+        ('workflow_version', 1),
+        ('release', 1),
+        ('run', 1),
+        ('job', 1),
+        ('approval', 1),
+      ]) {
+        expect(
+          db.select('SELECT count(*) FROM $table').single.columnAt(0),
+          rows,
+          reason: table,
+        );
+      }
+      expect(db.select('PRAGMA foreign_key_check'), isEmpty);
+      expect(db.select('PRAGMA foreign_keys').single.columnAt(0), 1);
+
+      db.execute("DELETE FROM project WHERE id = 'prj_2'");
+      expect(
+        db
+            .select("SELECT count(*) FROM app WHERE project_id = 'prj_2'")
+            .single
+            .columnAt(0),
+        0,
+        reason: 'the cascade from project still works after the rebuild',
+      );
+      expect(
+        () => db.execute("DELETE FROM project WHERE id = 'prj_1'"),
+        throwsA(isA<SqliteException>()),
+        reason: 'history still holds on to its project',
+      );
+
+      final record = await SqliteProjectRepository(database).get('prj_1');
+      expect(record!.sourceKey, '101');
+      expect(record.isOnGitHub, isTrue);
+    });
+
+    test('refuses a GitHub id off github.com, none on it, and no host', () {
+      final database = SqliteDatabase.openInMemory();
+      addTearDown(database.close);
+      final db = database.connection
+        ..execute(
+          'INSERT INTO project (id, host, source_key, remote, '
+          "default_base_branch) VALUES ('prj_1', 'local', 'h0123456789abcdef', "
+          "'file:///srv/app.git', 'main')",
+        );
+      for (final (host, key, repoId) in [
+        ('github.com', '9', null),
+        ('bitbucket.org', 'h1123456789abcdef', 9),
+        ('local', 'h0123456789abcdef', null),
+        ('', 'h2123456789abcdef', null),
+      ]) {
+        expect(
+          () => db.execute(
+            'INSERT INTO project (id, host, source_key, github_repo_id, '
+            "remote, default_base_branch) VALUES ('prj_x', ?, ?, ?, 'r', 'm')",
+            [host, key, repoId],
+          ),
+          throwsA(isA<SqliteException>()),
+          reason: '$host $key $repoId',
+        );
+      }
+    });
+  });
+
+  test('v17 gives the jobs of before no narrowing', () {
     final path = '${tempDirectory().path}/xpath.db';
     sqlite3.open(path)
-      ..execute(_golden(15))
-      ..userVersion = 15
+      ..execute(_golden(16))
+      ..userVersion = 16
       ..execute('''
-INSERT INTO project (id, github_repo_id, remote, default_base_branch)
-  VALUES ('prj_1', 1, 'r', 'main');
+INSERT INTO project (id, host, source_key, github_repo_id, remote,
+  default_base_branch) VALUES ('prj_1', 'github.com', '1', 1, 'r', 'main');
 INSERT INTO workflow (id, project_id, name) VALUES ('wf_1', 'prj_1', 'w');
 INSERT INTO workflow_version (id, workflow_id, version, yaml)
   VALUES ('wfv_1', 'wf_1', 1, '');
