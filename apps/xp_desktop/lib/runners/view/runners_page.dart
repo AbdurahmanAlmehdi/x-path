@@ -24,6 +24,7 @@ class RunnersPage extends StatelessWidget {
     final canCommand = context.canCommand;
     return ShellPage(
       title: l10n.runnersTitle,
+      cached: state.cached,
       subtitle: active.isEmpty
           ? null
           : l10n.runnersSubtitle(active.length, state.busy),
@@ -41,13 +42,22 @@ class RunnersPage extends StatelessWidget {
       child: ListView(
         padding: const EdgeInsets.all(20),
         children: [
-          if (state.error case final error?) ...[
-            XpMessage(XpStatus.scanError, error),
+          if (state.error case final error? when state.runners.isEmpty)
+            XpErrorState(
+              error,
+              onRetry: () => context.read<RunnersBloc>().add(
+                const RunnersSubscriptionRequested(),
+              ),
+            )
+          else if (state.error case final error?) ...[
+            XpMessage.error(error),
             const SizedBox(height: 12),
           ],
-          if (active.isNotEmpty)
+          if (!state.loaded)
+            const XpLoading(rows: 3)
+          else if (active.isNotEmpty)
             RunnersTable(runners: active)
-          else if (state.loaded)
+          else if (state.error == null)
             const _NoRunners(),
           if (revoked.isNotEmpty) ...[
             const SizedBox(height: 24),

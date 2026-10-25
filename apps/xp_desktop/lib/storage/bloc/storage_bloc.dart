@@ -92,8 +92,10 @@ class StorageState extends Equatable {
 /// again after each command.
 class StorageBloc extends Bloc<StorageEvent, StorageState> {
   new({required this._storage}) : super(const StorageState()) {
-    on<StorageSubscriptionRequested>(
-      (event, emit) => emit.forEach<Snapshot<StorageReport>>(
+    on<StorageSubscriptionRequested>((event, emit) {
+      // Read again (Retry): what failed before no longer stands.
+      if (state.error != null) emit(state.copyWith(error: () => null));
+      return emit.forEach<Snapshot<StorageReport>>(
         _storage.watchStorage(),
         onData: (snapshot) => state.copyWith(
           loaded: true,
@@ -102,9 +104,8 @@ class StorageBloc extends Bloc<StorageEvent, StorageState> {
         ),
         onError: (error, _) =>
             state.copyWith(loaded: true, error: () => errorMessage(error)),
-      ),
-      transformer: restartable(),
-    );
+      );
+    }, transformer: restartable());
     on<StorageFreeRequested>(_onFree, transformer: droppable());
     on<StorageRetentionChanged>(_onRetention, transformer: droppable());
   }

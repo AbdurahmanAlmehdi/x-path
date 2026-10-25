@@ -4,6 +4,8 @@ import 'package:mocktail/mocktail.dart';
 import 'package:xp_api/xp_api.dart';
 import 'package:xp_desktop/app/app_services.dart';
 import 'package:xp_desktop/projects/bloc/projects_bloc.dart';
+import 'package:xp_desktop/shell/cubit/shell_cubit.dart';
+import 'package:xp_desktop/toast/cubit/toast_cubit.dart';
 import 'package:xp_desktop/workflow_builder/workflow_builder.dart';
 
 import '../helpers/fakes.dart';
@@ -91,7 +93,42 @@ WorkflowSummary summaryOf(Workflow workflow) => WorkflowSummary(
 const schema = WorkflowSchema(
   schema: 1,
   steps: [
-    StepType(kind: 'build.android', withKeys: ['artifact', 'obfuscate']),
+    StepType(
+      kind: 'build.android',
+      withKeys: ['artifact', 'obfuscate'],
+      title: 'Build Android',
+      description: 'Builds an APK or an App Bundle.',
+      group: 'Build',
+      keys: [
+        StepKeySchema(
+          name: 'artifact',
+          type: StepKeyType.string,
+          options: ['apk', 'aab'],
+          defaultValue: 'apk',
+          description: 'What to build.',
+        ),
+        StepKeySchema(
+          name: 'obfuscate',
+          type: StepKeyType.boolean,
+          defaultValue: false,
+        ),
+      ],
+    ),
+    StepType(
+      kind: 'build.ios',
+      withKeys: ['exportOptionsPlist'],
+      title: 'Build iOS',
+      description: 'Builds and signs an IPA.',
+      group: 'Build',
+      keys: [
+        StepKeySchema(
+          name: 'exportOptionsPlist',
+          type: StepKeyType.string,
+          required: true,
+          description: 'The export options plist.',
+        ),
+      ],
+    ),
     StepType(kind: 'command', withKeys: ['run']),
     StepType(kind: 'git.checkout', withKeys: ['commitFrom']),
     StepType(kind: 'guard', withKeys: ['checks']),
@@ -101,7 +138,30 @@ const schema = WorkflowSchema(
   capabilities: ['android', 'flutter', 'ios-sign'],
   matrixAxes: ['platform', 'flavor'],
   platforms: ['android', 'ios'],
+  variables: ['flavor', 'flavor.name', 'flavor.prod', 'platform'],
 );
+
+/// The templates the engine offers in these tests.
+const templates = [
+  WorkflowTemplate(
+    id: 'blank',
+    title: 'Blank',
+    description: 'One job.',
+    yaml:
+        'schema: 1\nname: New workflow\nstages:\n  - name: build\n'
+        '    jobs:\n      build:\n        steps:\n'
+        '          - kind: git.checkout\n',
+  ),
+  WorkflowTemplate(
+    id: 'tests',
+    title: 'Tests only',
+    description: 'Runs the tests.',
+    yaml:
+        'schema: 1\nname: Test\nstages:\n  - name: test\n'
+        '    jobs:\n      test:\n        steps:\n'
+        '          - kind: git.checkout\n',
+  ),
+];
 
 /// A workflows repository over [releaseWorkflow] and [devBuild], whose
 /// engine finds no issue.
@@ -111,6 +171,7 @@ MockWorkflowsRepository workflowsRepository() {
     () => repository.listWorkflows('prj_1'),
   ).thenAnswer((_) async => [summaryOf(devBuild), summaryOf(releaseWorkflow)]);
   when(repository.schema).thenAnswer((_) async => schema);
+  when(repository.templates).thenAnswer((_) async => templates);
   when(() => repository.getWorkflow('prj_1', 'wf_mine'))
       .thenAnswer((_) async => releaseWorkflow);
   when(() => repository.getWorkflow('prj_1', 'wf_dev'))
@@ -128,9 +189,13 @@ Future<void> pumpBuilder(
   Brightness brightness = Brightness.light,
   FilePicker? pickFile,
   FileSaver? saveFile,
+  ShellCubit? shell,
+  ToastCubit? toasts,
 }) async {
   await tester.pumpApp(
     WorkflowBuilderPage(projectId: 'prj_1', workflowId: workflowId),
+    shell: shell,
+    toasts: toasts,
     workflowsRepository: repository ?? workflowsRepository(),
     services: testServices(pickFile: pickFile, saveFile: saveFile),
     brightness: brightness,

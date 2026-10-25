@@ -62,6 +62,16 @@ class WorkflowBuiltinException extends WorkflowException {
   String toString() => 'WorkflowBuiltinException: $message';
 }
 
+/// The workflow is archived, so it does not run until it is unarchived.
+class WorkflowArchivedException extends WorkflowException {
+  /// Creates the exception for the workflow called [name].
+  const new(String name)
+    : super('The workflow "$name" is archived. Unarchive it to run it.');
+
+  @override
+  String toString() => 'WorkflowArchivedException: $message';
+}
+
 /// Jobs ran the workflow, so it cannot be deleted.
 class WorkflowInUseException extends WorkflowException {
   /// Creates the exception.
@@ -94,6 +104,16 @@ class WorkflowNameException extends WorkflowException {
   String toString() => 'WorkflowNameException: $message';
 }
 
+/// A change of a workflow does not apply to it, for example catching up
+/// with a built-in that it is not a copy of.
+class WorkflowEditException extends WorkflowException {
+  /// Creates the exception.
+  const new(super.message);
+
+  @override
+  String toString() => 'WorkflowEditException: $message';
+}
+
 /// The workflow document has issues.
 class WorkflowInvalidException extends WorkflowException {
   /// Creates the exception from the [issues] found.
@@ -102,7 +122,7 @@ class WorkflowInvalidException extends WorkflowException {
         'The workflow has ${issues.length} issue'
         '${issues.length == 1 ? '' : 's'}: '
         '${issues.map((issue) => 'line ${issue.line}, column ${issue.column}: '
-            '${issue.message}').join(' ')}',
+            '${[issue.message, ?issue.hint].join(' ')}').join(' ')}',
       );
 
   /// The issues, in the order of the document.
@@ -114,8 +134,15 @@ class WorkflowInvalidException extends WorkflowException {
 
 /// A dispatch asks for something the project cannot do.
 class DispatchException extends WorkflowException {
-  /// Creates the exception.
-  const new(super.message);
+  /// Creates the exception, with what to do about it ([hint]) and the
+  /// [details] a client can act on.
+  const new(super.message, {this.hint, this.details});
+
+  /// What to do about it, for the owner; it names no command.
+  final String? hint;
+
+  /// Facts a client can act on, such as the `kind` of a missing credential.
+  final Map<String, Object?>? details;
 
   @override
   String toString() => 'DispatchException: $message';

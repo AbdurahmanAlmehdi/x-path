@@ -55,7 +55,7 @@ void main() {
       final lines = env.logger.out.split('\n');
       expect(
         lines.first,
-        'NAME          ID     STATUS  LAST SEEN         CAPABILITIES     '
+        'NAME          ID     STATUS  LAST SEEN             CAPABILITIES     '
         'SLOTS  JOBS   MACHINE',
       );
       expect(lines[1], startsWith('AWS Instance  rnr_2  busy    2026-10-22 '));

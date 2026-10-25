@@ -30,6 +30,8 @@ class JobHarness {
     when(() => jobs.listArtifacts(any())).thenAnswer((_) async => iosArtifacts);
     when(() => workflows.workflowOf(any()))
         .thenAnswer((_) async => prodWorkflow);
+    when(() => workflows.getWorkflow(any(), any()))
+        .thenAnswer((_) async => prodWorkflow);
     when(runners.watchRunners)
         .thenAnswer((_) => Stream.value(Snapshot([linuxRunner])));
     runs.add(Snapshot(run ?? runningRun()));
@@ -49,9 +51,14 @@ class JobHarness {
     EngineConnectionBloc? connection,
     ShellCubit? shell,
     String? jobId,
+    AppServices? services,
+    TestsRepository? tests,
+    Project? project,
   }) async {
     await tester.pumpApp(
       JobPage(runId: 'run_1', jobId: jobId),
+      services: services,
+      testsRepository: tests,
       brightness: brightness,
       connection: connection,
       shell: shell,
@@ -59,7 +66,7 @@ class JobHarness {
       workflowsRepository: workflows,
       runnersRepository: runners,
       projects: projectsIn(
-        const ProjectsState(loaded: true, projects: [mataa]),
+        ProjectsState(loaded: true, projects: [project ?? mataa]),
       ),
     );
     await tester.pump();

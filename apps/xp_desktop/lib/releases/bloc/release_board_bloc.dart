@@ -238,7 +238,8 @@ class ReleaseBoardBloc extends Bloc<ReleaseBoardEvent, ReleaseBoardState> {
     ReleaseBoardSubscriptionRequested event,
     Emitter<ReleaseBoardState> emit,
   ) async {
-    emit(state.copyWith(selectedId: () => event.releaseId));
+    // Read again (Retry): what failed before no longer stands.
+    emit(state.copyWith(selectedId: () => event.releaseId, error: () => null));
     final releases = emit.forEach<Snapshot<List<Release>>>(
       _releases.watchReleases(projectId: event.projectId),
       onData: (snapshot) {

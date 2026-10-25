@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:xp_desktop/app/app_services.dart';
 import 'package:xp_desktop/app/bloc/engine_connection_bloc.dart';
 import 'package:xp_desktop/l10n/l10n.dart';
 import 'package:xp_desktop/local_engine/local_engine.dart';
@@ -36,7 +39,8 @@ class ConnectionBanner extends StatelessWidget {
             ? l10n.bannerLocalStarting
             : localEngineFailureText(l10n, local) ?? l10n.bannerLocalStopped,
       EngineStatus.unreachable => l10n.bannerUnreachable(engine),
-      EngineStatus.secretsLocked => l10n.bannerSecretsLocked(engine),
+      EngineStatus.secretsLocked =>
+        '${l10n.bannerSecretsLocked(engine)} ${l10n.bannerSecretsLockedSteps}',
       EngineStatus.rejected => l10n.bannerRejected(engine),
     };
     if (message == null) return const SizedBox.shrink();
@@ -66,6 +70,17 @@ class ConnectionBanner extends StatelessWidget {
             ),
             const SizedBox(width: 12),
             if (localDown) ...[
+              if (local.failure == LocalEngineFailure.timedOut) ...[
+                XpButton(
+                  label: l10n.bannerShowLog,
+                  size: XpButtonSize.small,
+                  onPressed: () {
+                    final services = context.read<AppServices>();
+                    unawaited(services.revealFile(services.engineLog));
+                  },
+                ),
+                const SizedBox(width: 8),
+              ],
               if (local.failure == LocalEngineFailure.needsApproval) ...[
                 XpButton(
                   label: l10n.onboardingOpenLoginItems,
@@ -90,7 +105,17 @@ class ConnectionBanner extends StatelessWidget {
                         ),
                       ),
               ),
-            ] else if (state.status != EngineStatus.rejected)
+            ] else if (state.status == EngineStatus.rejected) ...[
+              if (state.active?.isLocal ?? false)
+                XpButton(
+                  label: l10n.bannerSetUpAgain,
+                  kind: XpButtonKind.primary,
+                  size: XpButtonSize.small,
+                  onPressed: () => context.read<ShellCubit>().show(
+                    const OnboardingDestination(),
+                  ),
+                ),
+            ] else
               XpButton(
                 label: l10n.bannerRetry,
                 size: XpButtonSize.small,

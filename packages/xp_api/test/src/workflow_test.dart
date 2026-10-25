@@ -40,12 +40,59 @@ void main() {
           },
         ],
         'yaml': 'schema: 1',
+        'inputs': <Object?>[],
       });
     });
 
     test('round-trips through JSON', () {
       expect(Workflow.fromJson(workflow.toJson()), workflow);
       expect(WorkflowVersionInfo.fromJson(version.toJson()), version);
+    });
+
+    test('carries its typed inputs', () {
+      final typed = Workflow(
+        id: 'wf_1',
+        projectId: 'prj_1',
+        name: 'n',
+        builtin: false,
+        version: version,
+        versions: [version],
+        yaml: 'schema: 1',
+        inputs: const [
+          WorkflowInput(
+            name: 'track',
+            type: InputType.choice,
+            description: 'Where it goes.',
+            options: ['internal', 'beta'],
+            defaultValue: 'internal',
+          ),
+          WorkflowInput(
+            name: 'release',
+            type: InputType.release,
+            required: true,
+          ),
+          WorkflowInput(name: 'loose'),
+        ],
+      );
+
+      expect(Workflow.fromJson(typed.toJson()), typed);
+      expect(typed.toJson()['inputs'], [
+        {
+          'name': 'track',
+          'type': 'choice',
+          'description': 'Where it goes.',
+          'options': ['internal', 'beta'],
+          'default': 'internal',
+          'required': false,
+        },
+        {'name': 'release', 'type': 'release', 'required': true},
+        {'name': 'loose', 'required': false},
+      ]);
+      expect(Workflow.fromJson(workflow.toJson()..remove('inputs')), workflow);
+      expect(
+        [for (final type in InputType.values) type.wire],
+        ['string', 'boolean', 'choice', 'json', 'release'],
+      );
     });
   });
 
@@ -62,6 +109,46 @@ void main() {
 
       expect(WorkflowSummary.fromJson(summary.toJson()), summary);
       expect(WorkflowsResponse.fromJson(response.toJson()), response);
+      expect(summary.archived, isFalse);
+    });
+
+    test('say what a copy is based on, and when it was archived (UX-06)', () {
+      const basedOn = WorkflowBasedOn(builtin: 'dev-build', version: 3);
+      final summary = WorkflowSummary(
+        id: 'wf_2',
+        projectId: 'prj_1',
+        name: 'my-dev-build',
+        builtin: false,
+        version: version,
+        basedOn: basedOn,
+        archivedAt: created,
+      );
+
+      expect(basedOn.toJson(), {'builtin': 'dev-build', 'version': 3});
+      expect(WorkflowBasedOn.fromJson(basedOn.toJson()), basedOn);
+      expect(summary.archived, isTrue);
+      expect(WorkflowSummary.fromJson(summary.toJson()), summary);
+    });
+  });
+
+  group('templates', () {
+    test('round-trip through JSON', () {
+      const template = WorkflowTemplate(
+        id: 'android-firebase',
+        title: 'Android to Firebase',
+        description: 'Builds an APK and sends it to testers.',
+        yaml: 'schema: 1',
+      );
+      const response = WorkflowTemplatesResponse([template]);
+
+      expect(template.toJson(), {
+        'id': 'android-firebase',
+        'title': 'Android to Firebase',
+        'description': 'Builds an APK and sends it to testers.',
+        'yaml': 'schema: 1',
+      });
+      expect(WorkflowTemplate.fromJson(template.toJson()), template);
+      expect(WorkflowTemplatesResponse.fromJson(response.toJson()), response);
     });
   });
 
@@ -84,6 +171,35 @@ void main() {
       });
     });
 
+    test('a copy names its built-in, and an update only what changes', () {
+      const create = CreateWorkflowRequest(
+        name: 'mine',
+        yaml: 'y',
+        basedOn: WorkflowBasedOn(builtin: 'dev-build', version: 3),
+      );
+      expect(create.toJson(), {
+        'name': 'mine',
+        'yaml': 'y',
+        'basedOn': {'builtin': 'dev-build', 'version': 3},
+      });
+      expect(CreateWorkflowRequest.fromJson(create.toJson()), create);
+
+      const update = UpdateWorkflowRequest(
+        name: 'renamed',
+        archived: true,
+        basedOnVersion: 4,
+      );
+      expect(update.toJson(), {
+        'name': 'renamed',
+        'archived': true,
+        'basedOnVersion': 4,
+      });
+      expect(UpdateWorkflowRequest.fromJson(update.toJson()), update);
+      expect(const UpdateWorkflowRequest(archived: false).toJson(), {
+        'archived': false,
+      });
+    });
+
     test('reject a missing yaml', () {
       expect(
         () => WorkflowYamlRequest.fromJson(const {}),
@@ -97,6 +213,23 @@ void main() {
       const issue = WorkflowIssue(line: 3, column: 5, message: 'Unknown key.');
 
       expect(issue.toString(), '3:5: Unknown key.');
+      expect(WorkflowIssue.fromJson(issue.toJson()), issue);
+      expect(issue.toJson().containsKey('hint'), isFalse);
+    });
+
+    test('an issue can carry a hint (UX-02)', () {
+      const issue = WorkflowIssue(
+        line: 3,
+        column: 5,
+        message: 'Unknown key "stage".',
+        hint: 'Did you mean "stages"?',
+      );
+
+      expect(
+        issue.toString(),
+        '3:5: Unknown key "stage". Did you mean "stages"?',
+      );
+      expect(issue.toJson()['hint'], 'Did you mean "stages"?');
       expect(WorkflowIssue.fromJson(issue.toJson()), issue);
     });
 
@@ -128,8 +261,68 @@ void main() {
       expect(schema.steps.first.toJson(), {
         'kind': 'build.android',
         'with': ['artifact', 'flavor'],
+        'title': '',
+        'description': '',
+        'group': '',
+        'capabilities': <Object?>[],
+        'keys': <Object?>[],
       });
       expect(StepType.fromJson(const {'kind': 'test'}), schema.steps.last);
+    });
+
+    test('a step type says what it does and types its keys (UX-02)', () {
+      const type = StepType(
+        kind: 'upload.play',
+        withKeys: ['status'],
+        title: 'Upload to Google Play',
+        description: 'Uploads.',
+        group: 'Upload',
+        keys: [
+          StepKeySchema(
+            name: 'status',
+            type: StepKeyType.string,
+            options: ['completed', 'draft'],
+            defaultValue: 'completed',
+            description: 'Release now or keep a draft.',
+          ),
+        ],
+      );
+
+      expect(type.toJson()['keys'], [
+        {
+          'name': 'status',
+          'type': 'string',
+          'required': false,
+          'default': 'completed',
+          'options': ['completed', 'draft'],
+          'description': 'Release now or keep a draft.',
+        },
+      ]);
+      expect(StepType.fromJson(type.toJson()), type);
+      expect(
+        StepKeySchema.fromJson(const {'name': 'x'}),
+        const StepKeySchema(name: 'x'),
+      );
+    });
+
+    test('labels the gates and lists the variables', () {
+      const labelled = WorkflowSchema(
+        schema: 1,
+        steps: [],
+        gates: ['push'],
+        gateLabels: {'push': 'Push'},
+        capabilities: [],
+        matrixAxes: [],
+        platforms: [],
+        variables: ['platform'],
+      );
+
+      expect(labelled.toJson()['gateLabels'], {'push': 'Push'});
+      expect(WorkflowSchema.fromJson(labelled.toJson()), labelled);
+      expect(
+        WorkflowSchema.fromJson(schema.toJson()..remove('variables')),
+        schema,
+      );
     });
 
     test('round-trips through JSON', () {

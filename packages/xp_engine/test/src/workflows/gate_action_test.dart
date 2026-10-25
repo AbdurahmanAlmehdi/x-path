@@ -26,6 +26,13 @@ void main() {
     expect(GateAction.fromWire('ship'), isNull);
   });
 
+  test('every action has a label', () {
+    expect(GateAction.prodRelease.label, 'Production release');
+    for (final action in GateAction.values) {
+      expect(action.label, isNotEmpty, reason: action.wire);
+    }
+  });
+
   test('a request compares by value', () {
     expect(
       request,

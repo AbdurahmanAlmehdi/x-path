@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:xp/src/commands/xp_command.dart';
 import 'package:xp/src/context.dart';
@@ -9,6 +10,7 @@ import 'package:xp/src/resolve.dart';
 import 'package:xp/src/run_approvals.dart';
 import 'package:xp_api/xp_api.dart';
 import 'package:xp_client/xp_client.dart';
+import 'package:yaml/yaml.dart';
 
 /// `xp dispatch <project> <workflow>`: runs a workflow.
 class DispatchCommand extends XpCommand {
@@ -36,10 +38,33 @@ class DispatchCommand extends XpCommand {
       ..addMultiOption(
         'input',
         help:
-            'An input of the workflow, key=value. The value is JSON if it '
-            'parses as JSON, else text. Repeatable.',
+            'An input of the workflow, key=value, read as its declared type '
+            '(text, true or false, JSON, ...); an input without a type is '
+            'JSON if it parses as JSON, else text. Repeatable.',
         valueHelp: 'key=value',
         splitCommas: false,
+      )
+      ..addOption(
+        'input-file',
+        help:
+            'A YAML or JSON file of inputs, name: value. --input wins over '
+            'it.',
+        valueHelp: 'file',
+      )
+      ..addFlag(
+        'dry-run',
+        negatable: false,
+        help:
+            'Print what would run, where, what is left out and why, and the '
+            'build number it would take; start nothing.',
+      )
+      ..addFlag(
+        'follow',
+        abbr: 'f',
+        negatable: false,
+        help:
+            'Follow the run: print the log of each job as it runs, and exit '
+            'with how the run ended (0 when it succeeded).',
       );
   }
 
@@ -59,13 +84,45 @@ class DispatchCommand extends XpCommand {
       'workflow',
     ]);
     final results = argResults!;
-    final inputs = <String, dynamic>{};
+    final given = <String, String>{};
     for (final input in results.multiOption('input')) {
       final split = input.indexOf('=');
       if (split < 1) usageException('--input must be key=value, not "$input".');
-      inputs[input.substring(0, split)] = _parseInput(
-        input.substring(split + 1),
-      );
+      given[input.substring(0, split)] = input.substring(split + 1);
+    }
+    final file = results.option('input-file');
+    final fromFile = file == null
+        ? const <String, Object?>{}
+        : _readInputs(file);
+    final projectId = await resolveProject(client, projectReference);
+    final workflowId = await resolveWorkflow(
+      client,
+      projectId,
+      workflowReference,
+    );
+    final declared = {
+      for (final input in (await client.getWorkflow(
+        projectId,
+        workflowId,
+      )).inputs)
+        input.name: input,
+    };
+    final inputs = <String, dynamic>{
+      ...fromFile,
+      for (final MapEntry(key: name, value: text) in given.entries)
+        name: _coerce(name, declared[name], text),
+    };
+    final prompt = context.secretPrompt;
+    for (final input in declared.values) {
+      if (input.required &&
+          !inputs.containsKey(input.name) &&
+          prompt.interactive) {
+        final answer = prompt.ask(
+          [input.name, ?input.description].join(' — '),
+          secret: false,
+        );
+        inputs[input.name] = _coerce(input.name, input, answer);
+      }
     }
     final bump = results.option('bump');
     final flavors = results.multiOption('flavor');
@@ -82,24 +139,127 @@ class DispatchCommand extends XpCommand {
       releaseVersion: results.option('release-version'),
       inputs: inputs,
     );
-    final projectId = await resolveProject(client, projectReference);
-    final run = await client.dispatchWorkflow(
-      projectId,
-      await resolveWorkflow(client, projectId, workflowReference),
-      request,
-    );
+    if (results.flag('dry-run')) {
+      final plan = await client.planDispatch(projectId, workflowId, request);
+      emit(plan.toJson(), () => describePlan(plan));
+      return plan.blocked ? XpExit.invalid : XpExit.ok;
+    }
+    final run = await client.dispatchWorkflow(projectId, workflowId, request);
+    if (results.flag('follow')) {
+      if (!asJson) logger.info('Dispatched ${run.id}.');
+      return await printRunLogs(this, client, run.id, follow: true);
+    }
     emit(run.toJson(), () => 'Dispatched ${run.id}.\n\n${describeRun(run)}');
     return XpExit.ok;
   }
-}
 
-dynamic _parseInput(String text) {
-  try {
-    return jsonDecode(text);
-  } on FormatException {
-    return text;
+  /// The value [text] gives the input [name], read as its declared [input]
+  /// type: text stays text, a boolean is true or false, JSON is
+  /// decoded. An input without a type, or one the workflow does not declare
+  /// (the engine refuses it), is JSON if it parses as JSON, else text.
+  Object? _coerce(String name, WorkflowInput? input, String text) {
+    switch (input?.type) {
+      case InputType.string || InputType.choice || InputType.release:
+        return text;
+      case InputType.boolean:
+        return switch (text.toLowerCase()) {
+          'true' => true,
+          'false' => false,
+          _ => usageException(
+            'The input "$name" is true or false, not "$text".',
+          ),
+        };
+      case InputType.json:
+        try {
+          return jsonDecode(text);
+        } on FormatException {
+          usageException('The input "$name" must be JSON: $text');
+        }
+      case null:
+        try {
+          return jsonDecode(text);
+        } on FormatException {
+          return text;
+        }
+    }
+  }
+
+  /// The inputs of an `--input-file`: a YAML (or JSON, which is YAML) mapping
+  /// from a name to its value.
+  Map<String, Object?> _readInputs(String path) {
+    final String text;
+    try {
+      text = File(path).readAsStringSync();
+    } on FileSystemException catch (error) {
+      throw ReferenceException(
+        'Cannot read "$path": ${error.osError?.message ?? error.message}.',
+        notFound: true,
+      );
+    }
+    final Object? document;
+    try {
+      document = loadYaml(text);
+    } on YamlException catch (error) {
+      usageException('$path is not YAML or JSON: ${error.message}');
+    }
+    if (document is! Map) {
+      usageException('$path must be a mapping of input names to values.');
+    }
+    return {
+      for (final MapEntry(:key, :value) in document.entries)
+        '$key': _plain(value),
+    };
   }
 }
+
+/// [value] of a YAML document as plain lists, maps and scalars.
+Object? _plain(Object? value) => switch (value) {
+  final Map<Object?, Object?> map => {
+    for (final MapEntry(:key, :value) in map.entries) '$key': _plain(value),
+  },
+  final List<Object?> list => [for (final item in list) _plain(item)],
+  _ => value,
+};
+
+/// The lines `xp dispatch --dry-run` prints: what the engine would start,
+/// where, what it leaves out and why.
+String describePlan(DispatchPlan plan) {
+  final version = plan.version;
+  final lines = [
+    [
+      'flavors: ${plan.flavors.join(', ')}',
+      'platforms: ${plan.platforms.join(', ')}',
+      if (version != null)
+        'version: $version${plan.build == null ? '' : '+${plan.build}'}',
+      if (plan.releaseVersion case final release?) 'patches: $release',
+    ].join('  '),
+    '',
+    renderTable(
+      ['STAGE', 'JOB', 'WHERE'],
+      [
+        for (final stage in plan.stages)
+          for (final job in stage.jobs) [stage.name, job.name, _where(job)],
+      ],
+    ),
+    for (final stage in plan.stages)
+      if (stage.gates.isNotEmpty)
+        '${stage.name} waits for approval: ${stage.gates.join(', ')}',
+    if (plan.skipped.isNotEmpty) ...[
+      '',
+      for (final job in plan.skipped)
+        '${job.blocks ? 'cannot run' : 'skipped'}  ${job.name}: ${job.reason}',
+    ],
+  ];
+  return lines.join('\n');
+}
+
+String _where(PlannedJob job) => switch (job) {
+  PlannedJob(:final waitReason?) => 'waits: $waitReason',
+  PlannedJob(engineOnly: true) => 'engine',
+  PlannedJob(:final runner?, local: true) => 'engine, else $runner',
+  PlannedJob(:final runner?) => runner,
+  _ => 'engine',
+};
 
 /// The lines `xp runs show` prints.
 String describeRun(Run run, {List<Approval> approvals = const []}) {
@@ -112,6 +272,8 @@ String describeRun(Run run, {List<Approval> approvals = const []}) {
   final lines = [
     head,
     'sha: ${run.sha}  dispatched: ${formatTime(run.createdAt)}',
+    if (run.request case DispatchRequest(:final flavors?, :final platforms?))
+      'flavors: ${flavors.join(', ')}  platforms: ${platforms.join(', ')}',
     '',
     renderTable(
       ['JOB', 'NAME', 'STAGE', 'STATE'],
@@ -130,12 +292,213 @@ String _waitingFor(Approval approval) =>
     'with: xp approvals approve ${approval.id}';
 
 /// `xp runs`: the runs a dispatch made.
-XpGroup runsCommand(XpContext context) => XpGroup(
-  context,
-  'runs',
-  'Show and cancel runs.',
-  [RunsShowCommand(context), RunsCancelCommand(context)],
-);
+XpGroup runsCommand(XpContext context) =>
+    XpGroup(context, 'runs', 'List, show, run again and cancel runs.', [
+      RunsListCommand(context),
+      RunsShowCommand(context),
+      RunsRerunCommand(context),
+      RunsCancelCommand(context),
+    ]);
+
+/// `xp runs list [--project <p>] [--workflow <w>] [--state <s>]`.
+class RunsListCommand extends XpCommand {
+  /// Creates the command.
+  new(super.context) {
+    argParser
+      ..addOption('project', help: 'Only the runs of this project.')
+      ..addOption(
+        'workflow',
+        help: 'Only the runs of this workflow (needs --project for a name).',
+      )
+      ..addOption(
+        'state',
+        help: 'Only the runs in this state.',
+        allowed: [for (final state in RunState.values) state.wire],
+      )
+      ..addOption(
+        'limit',
+        help: 'At most this many runs.',
+        valueHelp: 'n',
+        defaultsTo: '20',
+      )
+      ..addOption(
+        'before',
+        help: 'Only the runs dispatched before this run: the next page.',
+        valueHelp: 'run',
+      );
+  }
+
+  @override
+  String get name => 'list';
+
+  @override
+  String get description =>
+      'List the runs, newest first, wherever they were dispatched from.';
+
+  @override
+  String get invocation =>
+      'xp runs list [--project <p>] [--workflow <w>] [--state <s>]';
+
+  @override
+  Future<int> execute(XpClient client) async {
+    positionals(const []);
+    final results = argResults!;
+    final limit = int.tryParse(results.option('limit')!);
+    if (limit == null || limit < 1 || limit > 200) {
+      usageException('--limit must be a number from 1 to 200.');
+    }
+    final projectReference = results.option('project');
+    final projectId = projectReference == null
+        ? null
+        : await resolveProject(client, projectReference);
+    final workflowReference = results.option('workflow');
+    final workflowId = workflowReference == null
+        ? null
+        : projectId == null
+        ? workflowReference
+        : await resolveWorkflow(client, projectId, workflowReference);
+    final page = await client.listRuns(
+      projectId: projectId,
+      workflowId: workflowId,
+      state: switch (results.option('state')) {
+        null => null,
+        final state => RunState.fromWire(state),
+      },
+      before: results.option('before'),
+      limit: limit,
+    );
+    if (asJson) {
+      emit(page.toJson(), () => '');
+      return XpExit.ok;
+    }
+    final names = <String, String>{
+      for (final project in {for (final run in page.runs) run.projectId})
+        for (final workflow in await client.listWorkflows(project))
+          workflow.id: workflow.name,
+    };
+    final projects = projectId != null
+        ? const <String, String>{}
+        : {
+            for (final project in await client.listProjects())
+              project.id: project.fullName.isEmpty
+                  ? project.id
+                  : project.fullName,
+          };
+    emit(page.toJson(), () {
+      if (page.runs.isEmpty) return 'No runs.';
+      return [
+        renderTable(
+          [
+            'RUN',
+            if (projectId == null) 'PROJECT',
+            'WORKFLOW',
+            'STATE',
+            'VERSION',
+            'DISPATCHED',
+          ],
+          [
+            for (final run in page.runs)
+              [
+                run.id,
+                if (projectId == null) projects[run.projectId] ?? run.projectId,
+                names[run.workflowId] ?? run.workflowId,
+                paintState(run.state.wire, ansi: context.ansi),
+                [?run.version, ?run.build?.toString()].join('+'),
+                formatTime(run.createdAt),
+              ],
+          ],
+        ),
+        if (page.next case final next?)
+          '\nMore with: xp runs list --before $next',
+      ].join('\n');
+    });
+    return XpExit.ok;
+  }
+}
+
+/// Prints the log of every job of the run [runId], each line after the
+/// name of its job, a job at a time in the order the run made them; with
+/// [follow], waiting for each to start and until the run ends. Returns the
+/// exit code: with [follow], [XpExit.ok] only when the run succeeded.
+Future<int> printRunLogs(
+  XpCommand command,
+  XpClient client,
+  String runId, {
+  required bool follow,
+}) async {
+  final context = command.context;
+  var run = await client.getRun(runId);
+  for (var index = 0; index < run.jobs.length; index++) {
+    var job = run.jobs[index];
+    bool waits() =>
+        follow && job.state == JobState.queued && !run.state.isFinished;
+    // A spinner on a terminal while the job waits for its turn.
+    final progress = waits() && context.ansi && !command.asJson
+        ? command.logger.progress('${job.name} waits for its turn')
+        : null;
+    while (waits()) {
+      await Future<void>.delayed(context.pollInterval);
+      run = await client.getRun(runId);
+      job = run.jobs[index];
+    }
+    progress?.complete('${job.name} ${job.state.wire}');
+    if (job.state == JobState.queued) continue;
+    await streamJobLog(
+      command,
+      client,
+      job.id,
+      whole: follow || job.state.isFinished,
+      prefix: '${job.name} | ',
+    );
+    run = await client.getRun(runId);
+  }
+  while (follow && !run.state.isFinished) {
+    await Future<void>.delayed(context.pollInterval);
+    run = await client.getRun(runId);
+  }
+  if (!command.asJson) {
+    command.logger.info(
+      '-- run ${paintState(run.state.wire, ansi: context.ansi)}',
+    );
+  }
+  return follow && run.state != RunState.succeeded ? XpExit.failed : XpExit.ok;
+}
+
+/// Prints the log of the job [jobId] from line [after], each line after
+/// [prefix]: to its end when [whole], else until the engine is quiet for
+/// `XpContext.logIdle`. Returns the end of the log, when it came.
+Future<LogEndFrame?> streamJobLog(
+  XpCommand command,
+  XpClient client,
+  String jobId, {
+  required bool whole,
+  int after = 0,
+  String prefix = '',
+}) async {
+  final lines = StreamIterator(client.followJobLogs(jobId, after: after));
+  LogEndFrame? end;
+  try {
+    while (true) {
+      final more = whole
+          ? await lines.moveNext()
+          : await lines.moveNext().timeout(
+              command.context.logIdle,
+              onTimeout: () => false,
+            );
+      if (!more) break;
+      final frame = lines.current;
+      if (frame is LogEndFrame) end = frame;
+      if (command.asJson) {
+        command.logger.info(jsonEncode({'job': jobId, ...frame.toJson()}));
+      } else if (frame is LogLineFrame) {
+        command.logger.info('$prefix${frame.text}');
+      }
+    }
+  } finally {
+    await lines.cancel();
+  }
+  return end;
+}
 
 /// `xp runs show <run>`.
 class RunsShowCommand extends XpCommand {
@@ -162,6 +525,56 @@ class RunsShowCommand extends XpCommand {
       if (approvals.isNotEmpty)
         'pendingApprovals': [for (final a in approvals) a.toJson()],
     }, () => describeRun(run, approvals: approvals));
+    return XpExit.ok;
+  }
+}
+
+/// `xp runs rerun <run> [--failed]`.
+class RunsRerunCommand extends XpCommand {
+  /// Creates the command.
+  new(super.context) {
+    argParser
+      ..addFlag(
+        'failed',
+        negatable: false,
+        help:
+            'Run only the failed jobs again, each from the step that failed, '
+            'in the same run: nothing that succeeded is built again.',
+      )
+      ..addFlag(
+        'follow',
+        abbr: 'f',
+        negatable: false,
+        help: 'Follow the run, as xp dispatch --follow does.',
+      );
+  }
+
+  @override
+  String get name => 'rerun';
+
+  @override
+  String get description =>
+      'Run a run again: a new run of the version of the workflow it ran, at '
+      'its commit, with its inputs; with --failed, its failed jobs only.';
+
+  @override
+  String get invocation => 'xp runs rerun <run> [--failed] [-f]';
+
+  @override
+  Future<int> execute(XpClient client) async {
+    final [id] = positionals(['run']);
+    final failed = argResults!.flag('failed');
+    final run = failed
+        ? await client.rerunFailed(id)
+        : await client.runAgain(id);
+    final started = failed
+        ? 'Running the failed jobs of $id again.'
+        : 'Started ${run.id}, again of $id.';
+    if (argResults!.flag('follow')) {
+      if (!asJson) logger.info(started);
+      return await printRunLogs(this, client, run.id, follow: true);
+    }
+    emit(run.toJson(), () => '$started\n\n${describeRun(run)}');
     return XpExit.ok;
   }
 }
@@ -197,7 +610,8 @@ XpGroup jobsCommand(XpContext context) =>
       JobsResumeCommand(context),
     ]);
 
-/// The lines `xp jobs show` prints.
+/// The lines `xp jobs show` prints: the job, its steps, why each failed step
+/// failed, and what each guard check says to fix.
 String describeJob(Job job) {
   final name = job.name;
   final times =
@@ -212,11 +626,39 @@ String describeJob(Job job) {
       ['STEP', 'KIND', 'STATE', 'TRIES'],
       [
         for (final step in job.steps)
-          ['${step.ordinal}', step.kind, step.state.name, '${step.attempts}'],
+          [
+            '${step.ordinal}',
+            step.kind,
+            snakeCase(step.state.name),
+            '${step.attempts}',
+          ],
       ],
     ),
+    for (final step in job.steps)
+      if (step.state == StepState.failed && step.message != null)
+        _failure(step),
+    for (final step in job.steps) ..._guardFixes(step),
   ];
   return lines.join('\n');
+}
+
+String _failure(JobStep step) =>
+    '\nstep ${step.ordinal} (${step.kind}) failed:\n${_indent(step.message!)}';
+
+String _indent(String text) =>
+    text.split('\n').map((line) => '  $line').join('\n');
+
+/// What the checks of a guard step that ran say to fix (a failed one says
+/// it in its message).
+Iterable<String> _guardFixes(JobStep step) sync* {
+  if (step.kind != 'guard') return;
+  final results = step.result?['results'];
+  if (results is! List) return;
+  for (final result in results) {
+    if (result case {'name': final String check, 'fix': final String fix}) {
+      yield '\nfix (${step.kind} $check): $fix';
+    }
+  }
 }
 
 /// `xp jobs show <job>`.
@@ -301,8 +743,9 @@ class JobsResumeCommand extends XpCommand {
 
 /// `xp logs <job> [-f]`: the log of a job.
 class LogsCommand extends XpCommand {
-  /// Creates the command. Without `-f` the log so far is printed once the
-  /// engine has been quiet for `XpContext.logIdle`.
+  /// Creates the command. Without `-f` the log of a job that ended is
+  /// printed to its end; that of a job that runs, until the engine has been
+  /// quiet for `XpContext.logIdle`.
   new(super.context) {
     argParser
       ..addFlag(
@@ -323,10 +766,11 @@ class LogsCommand extends XpCommand {
   String get name => 'logs';
 
   @override
-  String get description => 'Print the log of a job; with -f, follow it.';
+  String get description =>
+      'Print the log of a job, or of every job of a run; with -f, follow it.';
 
   @override
-  String get invocation => 'xp logs <job> [-f] [--after <seq>]';
+  String get invocation => 'xp logs <job|run> [-f] [--after <seq>]';
 
   @override
   Future<int> execute(XpClient client) async {
@@ -336,30 +780,21 @@ class LogsCommand extends XpCommand {
       usageException('--after must be a non-negative number.');
     }
     final follow = argResults!.flag('follow');
-    final lines = StreamIterator(client.followJobLogs(id, after: after));
-    LogEndFrame? end;
-    try {
-      while (true) {
-        final more = follow
-            ? await lines.moveNext()
-            : await lines.moveNext().timeout(
-                context.logIdle,
-                onTimeout: () => false,
-              );
-        if (!more) break;
-        final frame = lines.current;
-        if (frame is LogEndFrame) end = frame;
-        if (asJson) {
-          logger.info(jsonEncode(frame.toJson()));
-        } else if (frame is LogLineFrame) {
-          logger.info(frame.text);
-        }
-      }
-    } finally {
-      await lines.cancel();
+    if (id.startsWith('run_')) {
+      return await printRunLogs(this, client, id, follow: follow);
     }
+    // A job that ended has its whole log: read it to its end, however long
+    // the engine takes. One that runs prints what it has so far.
+    final whole = follow || (await client.getJob(id)).state.isFinished;
+    final end = await streamJobLog(
+      this,
+      client,
+      id,
+      whole: whole,
+      after: after,
+    );
     if (!asJson && end != null) {
-      logger.info('-- job ${end.state.wire}');
+      logger.info('-- job ${paintState(end.state.wire, ansi: context.ansi)}');
     }
     return switch (end?.state) {
       JobState.failed ||

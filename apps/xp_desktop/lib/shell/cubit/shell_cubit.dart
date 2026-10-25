@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:bloc/bloc.dart';
 import 'package:equatable/equatable.dart';
 
@@ -58,6 +60,16 @@ final class TestsDestination extends ShellDestination {
 
   @override
   List<Object?> get props => [projectId, jobId];
+}
+
+/// The runs of [projectId], newest first.
+final class RunsDestination extends ShellDestination {
+  const new(this.projectId);
+
+  final String projectId;
+
+  @override
+  List<Object?> get props => [projectId];
 }
 
 /// The workflows of [projectId] in the builder, showing [workflowId] first
@@ -128,12 +140,41 @@ final class SettingsDestination extends ShellDestination {
   List<Object?> get props => [github];
 }
 
+/// Whether the shown destination may be left; `false` keeps it (the owner
+/// chose to keep a draft).
+typedef CanLeave = Future<bool> Function();
+
 /// Where the shell is. It lives inside the engine's subtree, so switching
 /// engines starts over at [HomeDestination].
 class ShellCubit extends Cubit<ShellDestination> {
   new([super.initialState = const HomeDestination()]);
 
-  void show(ShellDestination destination) => emit(destination);
+  CanLeave? _canLeave;
+
+  /// Shows [destination], once the guard of the shown one (if any) lets it
+  /// go.
+  void show(ShellDestination destination) {
+    if (destination == state) return;
+    final canLeave = _canLeave;
+    if (canLeave == null) {
+      emit(destination);
+      return;
+    }
+    unawaited(_leave(canLeave, destination));
+  }
+
+  Future<void> _leave(CanLeave canLeave, ShellDestination destination) async {
+    if (await canLeave() && !isClosed) emit(destination);
+  }
+
+  /// Asks [canLeave] before every later [show] that leaves the shown
+  /// destination (the builder with a draft). Returns what lets it go again.
+  void Function() guard(CanLeave canLeave) {
+    _canLeave = canLeave;
+    return () {
+      if (identical(_canLeave, canLeave)) _canLeave = null;
+    };
+  }
 
   /// The project the destination shows, if it shows one.
   String? get projectId => switch (state) {

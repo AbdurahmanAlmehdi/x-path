@@ -9,6 +9,7 @@ import 'package:xp_desktop/storage/widgets/retention_panel.dart';
 import 'package:xp_desktop/storage/widgets/storage_labels.dart';
 import 'package:xp_desktop/storage/widgets/storage_tables.dart';
 import 'package:xp_desktop/theme/theme.dart';
+import 'package:xp_desktop/toast/cubit/toast_cubit.dart';
 import 'package:xp_desktop/widgets/widgets.dart';
 
 /// What the engine keeps on its disk (PRODUCT §6.11): what each category
@@ -25,8 +26,9 @@ class StoragePage extends StatelessWidget {
     final report = state.report;
     final canCommand = context.canCommand;
     final busy = state.command != StorageCommand.none;
-    return ShellPage(
+    final page = ShellPage(
       title: l10n.storageTitle,
+      cached: state.cached,
       subtitle: report == null
           ? null
           : l10n.storageChecked(formatDateTime(report.generatedAt)),
@@ -57,15 +59,23 @@ class StoragePage extends StatelessWidget {
       child: ListView(
         padding: const EdgeInsets.all(20),
         children: [
-          if (state.error case final error?) ...[
-            XpMessage(XpStatus.scanError, error),
+          if (state.error case final error? when report == null)
+            XpErrorState(
+              error,
+              onRetry: () => bloc.add(const StorageSubscriptionRequested()),
+            )
+          else if (state.error case final error?) ...[
+            XpMessage.error(error),
             const SizedBox(height: 12),
           ],
-          if (state.freed case final freed?) ...[
-            _Freed(freed),
-            const SizedBox(height: 16),
-          ],
-          if (report != null) ...[
+          if (state.freed?.failures case final failures?)
+            for (final failure in failures) ...[
+              XpMessage(XpStatus.scanWarning, failure),
+              const SizedBox(height: 6),
+            ],
+          if (report == null && state.error == null)
+            const XpLoading()
+          else if (report != null) ...[
             _Hero(report),
             const SizedBox(height: 24),
             CategoriesTable(report: report),
@@ -78,6 +88,13 @@ class StoragePage extends StatelessWidget {
           ],
         ],
       ),
+    );
+    return BlocListener<StorageBloc, StorageState>(
+      listenWhen: (previous, current) =>
+          current.freed != null && previous.freed != current.freed,
+      listener: (context, state) =>
+          context.read<ToastCubit>().show(freedText(l10n, state.freed!)),
+      child: page,
     );
   }
 
@@ -118,38 +135,18 @@ class _Hero extends StatelessWidget {
   }
 }
 
-/// What the last "free up space" gave back, and what it could not remove.
-class _Freed extends StatelessWidget {
-  const new(this.result);
-
-  final FreeSpaceResult result;
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = context.l10n;
-    final parts = [
-      for (final category in result.categories)
-        if (category.items > 0)
-          l10n.storageFreedPart(
-            categoryName(category.category, l10n),
-            category.items,
-          ),
-    ];
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        XpMessage(
-          XpStatus.jobSucceeded,
-          [
-            l10n.storageFreed(formatSize(result.bytes)),
-            if (parts.isNotEmpty) parts.join(', '),
-          ].join(' · '),
+/// What a "free up space" gave back: `Freed 1.2 GB · Builds 3, Logs 12`.
+String freedText(AppLocalizations l10n, FreeSpaceResult result) {
+  final parts = [
+    for (final category in result.categories)
+      if (category.items > 0)
+        l10n.storageFreedPart(
+          categoryName(category.category, l10n),
+          category.items,
         ),
-        for (final failure in result.failures) ...[
-          const SizedBox(height: 6),
-          XpMessage(XpStatus.scanWarning, failure),
-        ],
-      ],
-    );
-  }
+  ];
+  return [
+    l10n.storageFreed(formatSize(result.bytes)),
+    if (parts.isNotEmpty) parts.join(', '),
+  ].join(' · ');
 }

@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:args/args.dart';
 import 'package:args/command_runner.dart';
 import 'package:cli_completion/cli_completion.dart';
@@ -14,6 +16,7 @@ import 'package:xp/src/commands/storage_commands.dart';
 import 'package:xp/src/commands/workflows_commands.dart';
 import 'package:xp/src/context.dart';
 import 'package:xp/src/mcp/mcp_command.dart';
+import 'package:xp/src/output/error_json.dart';
 import 'package:xp/src/runner/runner_command.dart';
 import 'package:xp/src/version.dart';
 
@@ -83,30 +86,36 @@ class XpCommandRunner extends CompletionCommandRunner<int> {
 
   @override
   Future<int> run(Iterable<String> args) async {
+    final arguments = jsonFirst(args);
+    final json = arguments.firstOrNull == '--json';
     try {
-      final topLevelResults = parse(args);
+      final topLevelResults = parse(arguments);
       if (topLevelResults['verbose'] == true) {
         _logger.level = Level.verbose;
       }
       return await runCommand(topLevelResults) ?? ExitCode.success.code;
-    } on FormatException catch (e, stackTrace) {
+    } on FormatException catch (e) {
       // On format errors, show the commands error message, root usage and
       // exit with an error code
-      _logger
-        ..err(e.message)
-        ..err('$stackTrace')
-        ..info('')
-        ..info(usage);
+      _usageError(e.message, usage, json: json);
       return ExitCode.usage.code;
     } on UsageException catch (e) {
       // On usage errors, show the commands usage message and
       // exit with an error code
-      _logger
-        ..err(e.message)
-        ..info('')
-        ..info(e.usage);
+      _usageError(e.message, e.usage, json: json);
       return ExitCode.usage.code;
     }
+  }
+
+  void _usageError(String message, String usage, {required bool json}) {
+    if (json) {
+      _logger.err(jsonEncode(errorJson('usage', message)));
+      return;
+    }
+    _logger
+      ..err(message)
+      ..info('')
+      ..info(usage);
   }
 
   @override
@@ -179,6 +188,21 @@ class XpCommandRunner extends CompletionCommandRunner<int> {
 }
 
 const _updateGrace = Duration(milliseconds: 150);
+
+/// [args] with `--json` first: it is an option of `xp` itself, and scripts
+/// put it after the command too (`xp projects list --json`). Arguments after
+/// `--` stay where they are.
+List<String> jsonFirst(Iterable<String> args) {
+  final list = args.toList();
+  final end = list.indexOf('--');
+  final options = end < 0 ? list : list.sublist(0, end);
+  if (!options.contains('--json')) return list;
+  return [
+    '--json',
+    ...options.where((arg) => arg != '--json'),
+    if (end >= 0) ...list.sublist(end),
+  ];
+}
 
 /// The options whose values are tokens.
 const _secretOptions = {'token', 'mcp-token'};

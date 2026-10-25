@@ -37,6 +37,7 @@ void main() {
         const StreamOpened(),
         const ProjectAdded(projectId: 'prj_1', fullName: 'o/r'),
         const ProjectScanned(projectId: 'prj_1', errors: 1, warnings: 2),
+        const ProjectEdited(projectId: 'prj_1'),
         const ProjectRemoved(projectId: 'prj_1'),
         const JobStateChanged(
           jobId: 'job_1',
@@ -136,6 +137,12 @@ void main() {
           workflowId: 'wf_1',
           projectId: 'prj_1',
           name: 'dev-build',
+        ),
+        const WorkflowUpdated(
+          workflowId: 'wf_1',
+          projectId: 'prj_1',
+          name: 'nightly',
+          archived: true,
         ),
         const RunDispatched(
           runId: 'run_1',
@@ -278,6 +285,7 @@ void main() {
         StreamOpened() => 'opened',
         ProjectAdded() => 'added',
         ProjectScanned() => 'scanned',
+        ProjectEdited() => 'edited',
         ProjectRemoved() => 'removed',
         JobStateChanged() => 'job',
         JobStepChanged() => 'step',
@@ -291,6 +299,7 @@ void main() {
         CredentialUnassigned() => 'unassigned credential',
         WorkflowSaved() => 'workflow saved',
         WorkflowRemoved() => 'workflow removed',
+        WorkflowUpdated() => 'workflow updated',
         RunDispatched() => 'run',
         ApprovalRequested() => 'requested',
         ApprovalDecided() => 'decided',
@@ -447,6 +456,17 @@ void main() {
           const WorkflowRemoved(workflowId: 'w', projectId: 'p', name: 'n'),
         ),
         'workflow removed',
+      );
+      expect(
+        describe(
+          const WorkflowUpdated(
+            workflowId: 'w',
+            projectId: 'p',
+            name: 'n',
+            archived: false,
+          ),
+        ),
+        'workflow updated',
       );
       expect(
         describe(

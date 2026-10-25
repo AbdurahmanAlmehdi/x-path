@@ -174,6 +174,7 @@ void main() {
         isNot(const AddProjectSubmitted('a')),
       );
       expect(const AddProjectRescanned(), const AddProjectRescanned());
+      expect(const AddProjectDiscarded().props, isEmpty);
     });
   });
 }

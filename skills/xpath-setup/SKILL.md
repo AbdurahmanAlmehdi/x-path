@@ -175,8 +175,10 @@ xp projects scan acme/app
 ```
 
 The scan is read-only. Findings with severity `error` must be fixed in the repository and scanned
-again. The Firebase app ids and App Store Connect app ids are not scanned: they are workflow
-inputs (`firebaseAppIds`, `appleAppIds`; skill `xpath-workflows`).
+again. The scan fills in each flavor's Firebase app ids where `google-services.json`,
+`GoogleService-Info.plist` or `firebase_options.dart` name them; the App Store Connect app id is
+set by the owner (the flavor's store ids in Credentials, or `xp projects set --apple-app-id`).
+The built-ins upload to these when a dispatch gives no `firebaseAppIds` or `appleAppIds` input.
 
 ## Runners
 

@@ -32,12 +32,32 @@ void main() {
       expect(schema.schema, 1);
       expect(schema.steps.map((step) => step.kind), contains('build.ios'));
       expect(schema.gates, contains('push'));
+      final ios = schema.steps.firstWhere((step) => step.kind == 'build.ios');
+      expect(ios.title, 'Build iOS');
+      expect(
+        ios.keys.firstWhere((key) => key.name == 'exportOptionsPlist').required,
+        isTrue,
+      );
+      expect(schema.gateLabels['push'], 'Push');
+      expect(schema.variables, contains('flavor.prod'));
     });
 
     test('needs a token', () async {
       final response = await engine.request('/workflows/schema', token: '');
 
       expect(response.statusCode, 401);
+    });
+  });
+
+  group('GET /workflows/templates', () {
+    test('lists the templates of new workflows', () async {
+      final response = await client.send('GET', '/workflows/templates');
+
+      expect(response.statusCode, 200);
+      final templates = WorkflowTemplatesResponse.fromJson(response.json)
+          .templates;
+      expect(templates.first.id, 'blank');
+      expect(templates.map((t) => t.id), contains('ios-testflight'));
     });
   });
 
@@ -129,6 +149,13 @@ void main() {
           'The workflow has 1 issue: line 2, column 9: "stages" is a list with '
           'at least one stage.',
         );
+        expect(ErrorResponse.fromJson(response.json).error.issues, const [
+          WorkflowIssue(
+            line: 2,
+            column: 9,
+            message: '"stages" is a list with at least one stage.',
+          ),
+        ]);
       },
     );
 
@@ -185,6 +212,29 @@ void main() {
       final response = await client.send('POST', '${client.base}/validate', {});
 
       expect(response.statusCode, 400);
+    });
+  });
+
+  group('POST /workflows/validate', () {
+    test('checks a document without a project, with hints', () async {
+      final response = await client.send('POST', '/workflows/validate', {
+        'yaml': 'schema: 1\nstage: []\n',
+      });
+
+      expect(response.statusCode, 200);
+      final result = ValidateWorkflowResponse.fromJson(response.json);
+      expect(result.valid, isFalse);
+      expect(result.issues.first.hint, 'Did you mean "stages"?');
+    });
+
+    test('answers 401 without a token', () async {
+      final response = await engine.request(
+        '/workflows/validate',
+        method: 'POST',
+        token: '',
+      );
+
+      expect(response.statusCode, 401);
     });
   });
 
@@ -276,6 +326,86 @@ void main() {
     );
   });
 
+  group('PATCH /projects/{id}/workflows/{workflowId}', () {
+    test('renames and archives a workflow of the owner', () async {
+      final id = await client.create('mine', echoWorkflow);
+
+      final renamed = await client.send('PATCH', '${client.base}/$id', {
+        'name': 'nightly',
+        'archived': true,
+      });
+
+      expect(renamed.statusCode, 200);
+      final workflow = Workflow.fromJson(renamed.json);
+      expect(workflow.name, 'nightly');
+      expect(workflow.archivedAt, isNotNull);
+      final list = WorkflowsResponse.fromJson(
+        (await client.send('GET', client.base)).json,
+      ).workflows;
+      expect(list.firstWhere((w) => w.id == id).archived, isTrue);
+
+      final refused = await client.dispatch(id);
+      expect(refused.statusCode, 409);
+      expect(ErrorResponse.fromJson(refused.json).error.details, {
+        'reason': ErrorReason.archived,
+      });
+    });
+
+    test('keeps what a copy of a built-in is based on', () async {
+      final response = await client.send('POST', client.base, {
+        'name': 'my-dev',
+        'yaml': echoWorkflow,
+        'basedOn': {'builtin': 'dev-build', 'version': 1},
+      });
+      final id = response.json['id']! as String;
+
+      final caught = await client.send('PATCH', '${client.base}/$id', {
+        'basedOnVersion': 2,
+      });
+
+      expect(
+        Workflow.fromJson(caught.json).basedOn,
+        const WorkflowBasedOn(builtin: 'dev-build', version: 2),
+      );
+    });
+
+    test('answers 400, 404 and 409 for what it cannot change', () async {
+      final builtin = await client.builtin('test');
+      final id = await client.create('mine', echoWorkflow);
+
+      expect(
+        (await client.send('PATCH', '${client.base}/$id', {
+          'basedOnVersion': 2,
+        })).statusCode,
+        400,
+      );
+      expect(
+        (await client.send('PATCH', '${client.base}/$id', {
+          'archived': 'yes',
+        })).statusCode,
+        400,
+      );
+      expect(
+        (await client.send('PATCH', '${client.base}/$builtin', {
+          'archived': true,
+        })).statusCode,
+        409,
+      );
+      expect(
+        (await client.send('PATCH', '${client.base}/$id', {
+          'name': 'dev-build',
+        })).statusCode,
+        409,
+      );
+      expect(
+        (await client.send('PATCH', '${client.base}/wf_nope', {
+          'archived': true,
+        })).statusCode,
+        404,
+      );
+    });
+  });
+
   group('DELETE /projects/{id}/workflows/{workflowId}', () {
     test('deletes a workflow of the owner', () async {
       final id = await client.create('mine', echoWorkflow);
@@ -301,6 +431,9 @@ void main() {
       final inUse = await client.send('DELETE', '${client.base}/$id');
       expect(inUse.statusCode, 409);
       expect(errorMessage(inUse), contains('has been run'));
+      expect(ErrorResponse.fromJson(inUse.json).error.details, {
+        'reason': ErrorReason.hasRuns,
+      });
     });
 
     test('answers 404 for an unknown workflow', () async {
@@ -409,6 +542,32 @@ void main() {
 
       expect(response.statusCode, 503);
       expect(errorCode(response), 'secrets_locked');
+      expect(
+        ErrorResponse.fromJson(response.json).error.hint,
+        startsWith('Unlock them in the XPath app'),
+      );
+    });
+
+    test('says what to do about a missing credential (UX-05)', () async {
+      final id = await client.create('upload', r'''
+schema: 1
+stages:
+  - name: a
+    jobs:
+      j:
+        matrix:
+          platform: [android]
+          flavor: ${{ flavors }}
+        steps:
+          - kind: upload.play
+''');
+
+      final response = await client.dispatch(id);
+
+      expect(response.statusCode, 422);
+      final error = ErrorResponse.fromJson(response.json).error;
+      expect(error.hint, contains('Google Play service account'));
+      expect(error.details, containsPair('kind', 'play_sa'));
     });
 
     test('queues a second production release behind the first', () async {

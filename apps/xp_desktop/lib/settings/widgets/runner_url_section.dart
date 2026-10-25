@@ -57,7 +57,7 @@ class _RunnerUrlSectionState extends State<RunnerUrlSection> {
             ],
             if (state.error case final error?) ...[
               const SizedBox(height: 8),
-              XpMessage(XpStatus.scanError, error),
+              XpMessage.error(error),
             ],
             const SizedBox(height: 12),
             XpTextField(

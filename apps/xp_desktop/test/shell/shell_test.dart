@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter/gestures.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
@@ -8,6 +11,7 @@ import 'package:xp_desktop/add_project/view/add_project_page.dart';
 import 'package:xp_desktop/app/app.dart';
 import 'package:xp_desktop/approvals/approvals.dart';
 import 'package:xp_desktop/credentials/view/credentials_page.dart';
+import 'package:xp_desktop/dispatch/dispatch.dart';
 import 'package:xp_desktop/engines/view/engines_page.dart';
 import 'package:xp_desktop/job/view/job_page.dart';
 import 'package:xp_desktop/local_engine/local_engine.dart';
@@ -17,6 +21,7 @@ import 'package:xp_desktop/projects/bloc/projects_bloc.dart';
 import 'package:xp_desktop/projects/view/no_projects_page.dart';
 import 'package:xp_desktop/releases/view/releases_page.dart';
 import 'package:xp_desktop/runners/runners.dart';
+import 'package:xp_desktop/runs/view/runs_page.dart';
 import 'package:xp_desktop/settings/settings.dart';
 import 'package:xp_desktop/shell/shell.dart';
 import 'package:xp_desktop/storage/storage.dart';
@@ -26,6 +31,7 @@ import 'package:xp_desktop/workflow_builder/workflow_builder.dart';
 import 'package:xp_macos_services/testing.dart';
 import 'package:xp_repositories/xp_repositories.dart';
 
+import '../dispatch/dispatch_harness.dart';
 import '../helpers/approval_fixtures.dart';
 import '../helpers/engine_fixtures.dart';
 import '../helpers/fakes.dart';
@@ -35,6 +41,7 @@ import '../workflow_builder/workflow_builder_harness.dart';
 void main() {
   setUpAll(() {
     registerFallbackValue(const EngineCheckRequested());
+    registerDispatchFallbacks();
   });
 
   late MockProjectsRepository repository;
@@ -83,6 +90,67 @@ void main() {
       menu.chooseSettings();
     });
 
+    testWidgets('⌘N dispatches for the shown project from any of its pages', (
+      tester,
+    ) async {
+      await tester.pumpApp(
+        const AppShell(),
+        shell: ShellCubit(const ReleasesDestination('prj_1')),
+        projects: projectsIn(
+          const ProjectsState(loaded: true, projects: [mataa, captain]),
+        ),
+        projectsRepository: repository,
+        workflowsRepository: DispatchHarness().workflows,
+      );
+      await tester.pump();
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.metaLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyN);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.metaLeft);
+      await tester.pumpAndSettle();
+      expect(find.byType(DispatchSheet), findsOneWidget);
+    });
+
+    testWidgets('⌘N does nothing without a project', (tester) async {
+      await tester.pumpApp(
+        const AppShell(),
+        shell: ShellCubit(const RunnersDestination()),
+        projects: projectsIn(
+          const ProjectsState(loaded: true, projects: [mataa]),
+        ),
+        projectsRepository: repository,
+      );
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.metaLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyN);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.metaLeft);
+      await tester.pumpAndSettle();
+      expect(find.byType(DispatchSheet), findsNothing);
+    });
+
+    testWidgets('⌘1–⌘9 show the projects in sidebar order', (tester) async {
+      final shell = ShellCubit(const RunnersDestination());
+      await tester.pumpApp(
+        const AppShell(),
+        shell: shell,
+        projects: projectsIn(
+          const ProjectsState(loaded: true, projects: [mataa, captain]),
+        ),
+        projectsRepository: repository,
+      );
+      Future<void> press(LogicalKeyboardKey key) async {
+        await tester.sendKeyDownEvent(LogicalKeyboardKey.metaLeft);
+        await tester.sendKeyEvent(key);
+        await tester.sendKeyUpEvent(LogicalKeyboardKey.metaLeft);
+        await tester.pump();
+      }
+
+      await press(LogicalKeyboardKey.digit2);
+      expect(shell.state, ProjectDestination(captain.id));
+      await press(LogicalKeyboardKey.digit9);
+      expect(shell.state, ProjectDestination(captain.id));
+      await press(LogicalKeyboardKey.digit1);
+      expect(shell.state, ProjectDestination(mataa.id));
+    });
+
     testWidgets('shows the first project at home', (tester) async {
       await pumpShell(tester);
       expect(find.byType(ProjectOverviewPage), findsOneWidget);
@@ -115,6 +183,7 @@ void main() {
       (const AddProjectDestination(), AddProjectPage),
       (const ReleasesDestination('prj_1'), ReleasesPage),
       (const TestsDestination('prj_1'), TestsPage),
+      (const RunsDestination('prj_1'), RunsPage),
       (const RunnersDestination(), RunnersPage),
       (const StorageDestination(), StoragePage),
       (const ApprovalsDestination(), ApprovalsPage),
@@ -148,6 +217,71 @@ void main() {
       'prj_1',
       'wf_1',
     ]);
+  });
+
+  group('ShellCubit', () {
+    blocTest<ShellCubit, ShellDestination>(
+      'shows a destination at once without a guard',
+      build: ShellCubit.new,
+      act: (shell) => shell.show(const RunnersDestination()),
+      expect: () => [const RunnersDestination()],
+    );
+
+    blocTest<ShellCubit, ShellDestination>(
+      'stays when the guard keeps the destination',
+      build: ShellCubit.new,
+      act: (shell) async {
+        shell
+          ..guard(() async => false)
+          ..show(const RunnersDestination());
+        await Future<void>.delayed(Duration.zero);
+      },
+      expect: () => const <ShellDestination>[],
+    );
+
+    blocTest<ShellCubit, ShellDestination>(
+      'leaves once the guard lets go, and asks nothing for the shown one',
+      build: ShellCubit.new,
+      act: (shell) async {
+        var asked = 0;
+        shell
+          ..guard(() async {
+            asked++;
+            return true;
+          })
+          ..show(const HomeDestination())
+          ..show(const RunnersDestination());
+        await Future<void>.delayed(Duration.zero);
+        expect(asked, 1);
+      },
+      expect: () => [const RunnersDestination()],
+    );
+
+    blocTest<ShellCubit, ShellDestination>(
+      'asks nothing once the guard is released, and keeps a newer guard',
+      build: ShellCubit.new,
+      act: (shell) async {
+        final release = shell.guard(() async => false);
+        shell.guard(() async => false);
+        release();
+        shell.show(const RunnersDestination());
+        await Future<void>.delayed(Duration.zero);
+        shell.guard(() async => true)();
+        shell.show(const StorageDestination());
+      },
+      expect: () => [const StorageDestination()],
+    );
+
+    test('does not leave once closed', () async {
+      final answer = Completer<bool>();
+      final shell = ShellCubit()
+        ..guard(() => answer.future)
+        ..show(const RunnersDestination());
+      await shell.close();
+      answer.complete(true);
+      await Future<void>.delayed(Duration.zero);
+      expect(shell.state, const HomeDestination());
+    });
   });
 
   group('Sidebar', () {
@@ -337,6 +471,7 @@ void main() {
           shell: shell,
         );
         expect(find.textContaining(text), findsOneWidget);
+        expect(find.text('Set up this Mac again'), findsNothing);
         if (status == EngineStatus.rejected) {
           expect(find.text('Retry'), findsNothing);
         } else {
@@ -347,6 +482,32 @@ void main() {
         expect(shell.state, const EnginesDestination());
       });
     }
+
+    testWidgets('says how to unlock a locked Keychain', (tester) async {
+      await tester.pumpApp(
+        const ConnectionBanner(),
+        connection: connectionIn(
+          connectedTo(status: EngineStatus.secretsLocked, active: macMini),
+        ),
+      );
+      expect(
+        find.textContaining('unlock its login keychain in Keychain Access'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('sets this Mac up again when its engine refuses the token', (
+      tester,
+    ) async {
+      final shell = ShellCubit();
+      await tester.pumpApp(
+        const ConnectionBanner(),
+        connection: connectionIn(connectedTo(status: EngineStatus.rejected)),
+        shell: shell,
+      );
+      await tester.tap(find.text('Set up this Mac again'));
+      expect(shell.state, const OnboardingDestination());
+    });
 
     testWidgets('is hidden while connected or connecting', (tester) async {
       for (final status in [EngineStatus.connected, EngineStatus.connecting]) {
@@ -436,6 +597,30 @@ void main() {
           expect(find.text('Start engine'), findsOneWidget);
         });
       }
+
+      testWidgets('shows the log when the engine did not answer', (
+        tester,
+      ) async {
+        final revealed = <String>[];
+        await tester.pumpApp(
+          const ConnectionBanner(),
+          connection: connectionIn(unreachable),
+          services: testServices(
+            revealFile: (path) async => revealed.add(path),
+          ),
+          localEngine: localEngineIn(
+            const LocalEngineState(
+              running: false,
+              progress: LocalEngineProgress.failed,
+              failure: LocalEngineFailure.timedOut,
+            ),
+          ),
+        );
+        await tester.tap(find.text('Show log in Finder'));
+        expect(revealed, [
+          '/Users/me/Library/Application Support/XPath/service-logs/xpd.log',
+        ]);
+      });
 
       testWidgets('opens Login Items when macOS waits for the owner', (
         tester,

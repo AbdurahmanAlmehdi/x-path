@@ -108,6 +108,66 @@ void main() {
       expected: 'removed',
     ),
     _Endpoint(
+      'runAgain',
+      method: 'POST',
+      path: '/runs/run_1/run-again',
+      status: 202,
+      response: sample.run.toJson(),
+      call: (client) => client.runAgain('run_1'),
+      expected: sample.run,
+    ),
+    _Endpoint(
+      'rerunFailed',
+      method: 'POST',
+      path: '/runs/run_1/rerun-failed',
+      response: sample.run.toJson(),
+      call: (client) => client.rerunFailed('run_1'),
+      expected: sample.run,
+    ),
+    _Endpoint(
+      'listRuns',
+      method: 'GET',
+      path: '/runs',
+      query: {
+        'project': 'prj_1',
+        'workflow': 'wf_1',
+        'state': 'failed',
+        'before': 'run_9',
+        'limit': '5',
+      },
+      response: const RunsResponse([]).toJson(),
+      call: (client) => client.listRuns(
+        projectId: 'prj_1',
+        workflowId: 'wf_1',
+        state: RunState.failed,
+        before: 'run_9',
+        limit: 5,
+      ),
+      expected: const RunsResponse([]),
+    ),
+    _Endpoint(
+      'listWorkflowTemplates',
+      method: 'GET',
+      path: '/workflows/templates',
+      response: const WorkflowTemplatesResponse([
+        WorkflowTemplate(
+          id: 'blank',
+          title: 'Blank',
+          description: 'One job.',
+          yaml: 'schema: 1\n',
+        ),
+      ]).toJson(),
+      call: (client) => client.listWorkflowTemplates(),
+      expected: const [
+        WorkflowTemplate(
+          id: 'blank',
+          title: 'Blank',
+          description: 'One job.',
+          yaml: 'schema: 1\n',
+        ),
+      ],
+    ),
+    _Endpoint(
       'getWorkflowSchema',
       method: 'GET',
       path: '/workflows/schema',
@@ -183,6 +243,15 @@ void main() {
       body: {'yaml': 'name: x\n'},
     ),
     _Endpoint(
+      'validateWorkflow without a project',
+      method: 'POST',
+      path: '/workflows/validate',
+      response: const ValidateWorkflowResponse(valid: true).toJson(),
+      call: (client) => client.validateWorkflow(null, 'name: x\n'),
+      expected: const ValidateWorkflowResponse(valid: true),
+      body: {'yaml': 'name: x\n'},
+    ),
+    _Endpoint(
       'saveWorkflow',
       method: 'PUT',
       path: '/projects/prj_1/workflows/wf_1',
@@ -190,6 +259,19 @@ void main() {
       call: (client) => client.saveWorkflow('prj_1', 'wf_1', 'name: y\n'),
       expected: sample.workflow,
       body: {'yaml': 'name: y\n'},
+    ),
+    _Endpoint(
+      'updateWorkflow',
+      method: 'PATCH',
+      path: '/projects/prj_1/workflows/wf_1',
+      response: sample.workflow.toJson(),
+      call: (client) => client.updateWorkflow(
+        'prj_1',
+        'wf_1',
+        const UpdateWorkflowRequest(archived: true),
+      ),
+      expected: sample.workflow,
+      body: {'archived': true},
     ),
     _Endpoint(
       'deleteWorkflow',
@@ -219,6 +301,28 @@ void main() {
         flavors: ['prod'],
         bump: VersionBump.patch,
       ).toJson(),
+    ),
+    _Endpoint(
+      'planDispatch',
+      method: 'POST',
+      path: '/projects/prj_1/workflows/wf_1/dispatch',
+      query: {'dryRun': 'true'},
+      response: const DispatchPlan(
+        flavors: ['prod'],
+        platforms: ['ios'],
+        build: 46,
+      ).toJson(),
+      call: (client) => client.planDispatch(
+        'prj_1',
+        'wf_1',
+        const DispatchRequest(flavors: ['prod']),
+      ),
+      expected: const DispatchPlan(
+        flavors: ['prod'],
+        platforms: ['ios'],
+        build: 46,
+      ),
+      body: const DispatchRequest(flavors: ['prod']).toJson(),
     ),
     _Endpoint(
       'getRun',
@@ -1021,6 +1125,11 @@ void main() {
         throwsA(
           isA<ConnectionException>()
               .having((e) => e.message, 'message', contains(url.toString()))
+              .having(
+                (e) => e.message,
+                'message',
+                contains('Is xpd running? Its health is at'),
+              )
               .having((e) => e.cause, 'cause', isNotNull)
               .having(
                 (e) => '$e',

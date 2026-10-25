@@ -2,6 +2,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:xp_api/xp_api.dart';
 import 'package:xp_desktop/approvals/widgets/needs_you_bar.dart';
+import 'package:xp_desktop/dispatch/view/dispatch_sheet.dart';
 import 'package:xp_desktop/l10n/l10n.dart';
 import 'package:xp_desktop/project_overview/widgets/release_status.dart';
 import 'package:xp_desktop/projects/bloc/projects_bloc.dart';
@@ -14,6 +15,7 @@ import 'package:xp_desktop/releases/widgets/store_lane.dart';
 import 'package:xp_desktop/shell/cubit/shell_cubit.dart';
 import 'package:xp_desktop/shell/widgets/shell_page.dart';
 import 'package:xp_desktop/theme/theme.dart';
+import 'package:xp_desktop/toast/cubit/toast_cubit.dart';
 import 'package:xp_desktop/widgets/widgets.dart';
 import 'package:xp_repositories/xp_repositories.dart';
 
@@ -67,13 +69,29 @@ class ReleasesView extends StatelessWidget {
     final name = project.fullName.split('/').last;
     final runId = release?.builds.lastOrNull?.runId;
     final canCommand = context.canCommand;
-    return BlocListener<ReleaseBoardBloc, ReleaseBoardState>(
-      listenWhen: (previous, current) =>
-          current.builtRun != null && current.builtRun != previous.builtRun,
-      listener: (context, state) => context.read<ShellCubit>().show(
-        JobDestination(state.builtRun!.id, projectId: project.id),
-      ),
+    return MultiBlocListener(
+      listeners: [
+        BlocListener<ReleaseBoardBloc, ReleaseBoardState>(
+          listenWhen: (previous, current) =>
+              current.builtRun != null && current.builtRun != previous.builtRun,
+          listener: (context, state) => context.read<ShellCubit>().show(
+            JobDestination(state.builtRun!.id, projectId: project.id),
+          ),
+        ),
+        for (final (command, toast) in [
+          (ReleaseCommand.marking, l10n.releaseMarkedToast),
+          (ReleaseCommand.merging, l10n.releaseMergedToast),
+        ])
+          BlocListener<ReleaseBoardBloc, ReleaseBoardState>(
+            listenWhen: (previous, current) =>
+                previous.command == command &&
+                current.command == ReleaseCommand.none &&
+                current.error == null,
+            listener: (context, _) => context.read<ToastCubit>().show(toast),
+          ),
+      ],
       child: ShellPage(
+        cached: state.cached,
         title: release == null
             ? l10n.releasesTitle
             : l10n.releaseTitle(versionLabel(release.version, release.build)),
@@ -124,13 +142,25 @@ class ReleasesView extends StatelessWidget {
               child: ListView(
                 padding: const EdgeInsets.all(20),
                 children: [
-                  if (state.error case final error?) ...[
-                    XpMessage(XpStatus.scanError, error),
+                  if (state.error case final error? when release == null)
+                    XpErrorState(
+                      error,
+                      onRetry: () => bloc.add(
+                        ReleaseBoardSubscriptionRequested(
+                          project.id,
+                          releaseId: state.selectedId,
+                        ),
+                      ),
+                    )
+                  else if (state.error case final error?) ...[
+                    XpMessage.error(error),
                     const SizedBox(height: 12),
                   ],
                   if (release != null)
                     _Board(release: release, state: state)
-                  else if (state.loaded)
+                  else if (!state.loaded)
+                    const XpLoading()
+                  else if (state.error == null)
                     _NoRelease(project),
                 ],
               ),
@@ -228,6 +258,24 @@ class _NoRelease extends StatelessWidget {
                 : l10n.releasesEmptyNoGitHub(project.hostLabel(l10n)),
             style: context.xpType.body.copyWith(color: colors.textSecondary),
           ),
+          // A production release runs on GitHub only (ADR 0015).
+          if (project.isOnGitHub) ...[
+            const SizedBox(height: 16),
+            XpButton(
+              label: l10n.releasesDispatchProd,
+              icon: PhosphorIconsRegular.paperPlaneTilt,
+              kind: XpButtonKind.primary,
+              hint: '⌘N',
+              tooltip: context.canCommand ? null : l10n.readOnlyHint,
+              onPressed: context.canCommand
+                  ? () => dispatchFor(
+                      context,
+                      project,
+                      workflowId: 'prod-release',
+                    )
+                  : null,
+            ),
+          ],
         ],
       ),
     );

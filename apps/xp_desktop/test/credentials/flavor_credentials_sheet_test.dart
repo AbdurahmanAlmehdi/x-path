@@ -29,6 +29,7 @@ void main() {
       ),
     );
     registerFallbackValue(CredentialKind.slack);
+    registerFallbackValue(const ProfileEdits());
   });
 
   late MockCredentialsRepository credentials;
@@ -75,6 +76,7 @@ void main() {
     Project project = mataa,
     EngineStatus status = EngineStatus.connected,
     List<NamedCredential> list = const [],
+    bool focusStoreIds = false,
   }) async {
     await tester.pumpApp(
       Builder(
@@ -88,6 +90,7 @@ void main() {
               appName: project.profile.apps.first.name,
               flavor: flavor,
             ),
+            focusStoreIds: focusStoreIds,
           ),
         ),
       ),
@@ -375,5 +378,97 @@ void main() {
         ),
       );
     });
+  });
+
+  group('store ids', () {
+    Finder field(String key) => find.descendant(
+      of: find.byKey(Key('storeIds.$key')),
+      matching: find.byType(EditableText),
+    );
+
+    testWidgets('saves the store ids of the flavor', (tester) async {
+      when(() => projects.editProject(any(), any()))
+          .thenAnswer((_) async => mataa);
+      await open(tester, flavor: 'dev', focusStoreIds: true);
+      await tester.pumpAndSettle();
+
+      expect(find.text('STORE IDS'), findsOneWidget);
+      expect(
+        tester
+            .widget<EditableText>(field('firebaseAndroid'))
+            .focusNode
+            .hasFocus,
+        isTrue,
+      );
+      await tester.enterText(field('firebaseAndroid'), '1:1:android:a');
+      await tester.enterText(field('apple'), '123');
+      await tap(tester, find.text('Save ids'));
+
+      final edits =
+          verify(() => projects.editProject('prj_1', captureAny()))
+                  .captured
+                  .single
+              as ProfileEdits;
+      final edit = edits.apps.single.flavors.single;
+      expect(edit.name, 'dev');
+      expect(edit.firebaseAppId, {'android': '1:1:android:a', 'ios': ''});
+      expect(edit.appleAppId, '123');
+      expect(
+        find.text('Saved. The next dispatch uploads to these apps.'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('shows the ids the flavor has, and why a save failed', (
+      tester,
+    ) async {
+      when(() => projects.editProject(any(), any())).thenThrow(
+        const ApiException('Not a Firebase app id.', statusCode: 400),
+      );
+      final app = mataa.profile.apps.first;
+      final project = Project(
+        id: mataa.id,
+        githubRepoId: mataa.githubRepoId,
+        host: mataa.host,
+        sourceKey: mataa.sourceKey,
+        fullName: mataa.fullName,
+        remote: mataa.remote,
+        defaultBaseBranch: mataa.defaultBaseBranch,
+        profile: ProjectProfile(
+          apps: [
+            app.copyWith(
+              flavors: [
+                for (final flavor in app.flavors)
+                  flavor.copyWith(
+                    firebaseAppId: () => {'ios': '1:1:ios:b'},
+                    appleAppId: () => '9',
+                  ),
+              ],
+            ),
+          ],
+        ),
+      );
+      await open(tester, project: project);
+
+      expect(
+        tester.widget<EditableText>(field('firebaseIos')).controller.text,
+        '1:1:ios:b',
+      );
+      expect(tester.widget<EditableText>(field('apple')).controller.text, '9');
+      await tap(tester, find.text('Save ids'));
+      expect(find.text('Not a Firebase app id.'), findsOneWidget);
+    });
+
+    testWidgets('waits for the engine to save', (tester) async {
+      await open(tester, status: EngineStatus.unreachable);
+
+      await tap(tester, find.text('Save ids'));
+
+      verifyNever(() => projects.editProject(any(), any()));
+    });
+  });
+
+  test('flavorOf finds the flavor a target names, if it is there', () {
+    expect(flavorOf(mataa, (app: '.', appName: 'x', flavor: 'nope')), isNull);
   });
 }

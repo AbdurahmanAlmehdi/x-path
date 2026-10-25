@@ -9,8 +9,10 @@ void main() {
   late FakeStoreBuildNumbers store;
   late InMemoryBuildCounterRepository counters;
   late BuildNumberAllocator allocator;
+  late ManualClock clock;
 
   setUp(() {
+    clock = ManualClock(DateTime.utc(2026, 10, 24, 9));
     git = StubGit();
     store = FakeStoreBuildNumbers(const StoreBuilds({}));
     counters = InMemoryBuildCounterRepository([('prj_1', '.')]);
@@ -18,6 +20,7 @@ void main() {
       counters: counters,
       stores: store,
       git: git,
+      clock: clock,
     );
   });
 
@@ -96,4 +99,53 @@ void main() {
       expect(await allocate(), 3283);
     },
   );
+
+  test('peeks at the number it would allocate without taking it', () async {
+    store.builds = const StoreBuilds({3282});
+
+    final peeked = await allocator.peek(
+      projectId: 'prj_1',
+      appPath: '.',
+      mirror: mirror,
+      iosBundleId: 'com.mataa.app',
+    );
+
+    expect(peeked, 3283);
+    expect(counters.counterOf('prj_1', '.'), 0);
+    expect(await allocate(), 3283);
+  });
+
+  test('a peek asks the stores again only after a minute', () async {
+    Future<int> peek() => allocator.peek(
+      projectId: 'prj_1',
+      appPath: '.',
+      mirror: mirror,
+      iosBundleId: 'com.mataa.app',
+    );
+    store.builds = const StoreBuilds({10});
+
+    expect(await peek(), 11);
+    store.builds = const StoreBuilds({20});
+    expect(await peek(), 11, reason: 'what the stores said a moment ago');
+    expect(store.lookups, hasLength(1));
+
+    clock.advance(BuildNumberAllocator.storeAnswerKept);
+    expect(await peek(), 21);
+    expect(store.lookups, hasLength(2));
+  });
+
+  test('an allocation always asks the stores', () async {
+    store.builds = const StoreBuilds({10});
+    await allocator.peek(
+      projectId: 'prj_1',
+      appPath: '.',
+      mirror: mirror,
+      iosBundleId: 'com.mataa.app',
+      androidAppId: 'com.mataa.app',
+    );
+    store.builds = const StoreBuilds({20});
+
+    expect(await allocate(), 21);
+    expect(store.lookups, hasLength(2));
+  });
 }

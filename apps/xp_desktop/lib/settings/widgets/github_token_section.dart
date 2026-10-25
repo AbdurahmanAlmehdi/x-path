@@ -78,7 +78,7 @@ class _GitHubTokenSectionState extends State<GitHubTokenSection> {
             _status(context, state),
             if (state.error case final error?) ...[
               const SizedBox(height: 8),
-              XpMessage(XpStatus.scanError, l10n.settingsGitHubFailed(error)),
+              XpMessage.error(l10n.settingsGitHubFailed(error)),
             ],
             const SizedBox(height: 16),
             XpTextField(
@@ -110,7 +110,21 @@ class _GitHubTokenSectionState extends State<GitHubTokenSection> {
                     busy: state.command == GitHubTokenCommand.clearing,
                     onPressed: state.busy || !canCommand
                         ? null
-                        : () => bloc.add(const GitHubTokenCleared()),
+                        : () async {
+                            final confirmed = await confirmAction(
+                              context,
+                              title: l10n.settingsGitHubRemoveTitle,
+                              points: [
+                                l10n.settingsGitHubRemoveStops,
+                                l10n.settingsGitHubRemoveKeeps,
+                              ],
+                              keep: l10n.confirmKeep,
+                              confirm: l10n.settingsGitHubRemove,
+                            );
+                            if (confirmed) {
+                              bloc.add(const GitHubTokenCleared());
+                            }
+                          },
                   ),
                   const SizedBox(width: 8),
                 ],

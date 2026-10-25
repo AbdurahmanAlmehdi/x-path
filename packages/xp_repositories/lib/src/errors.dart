@@ -1,14 +1,37 @@
+import 'dart:io';
+
 import 'package:xp_client/xp_client.dart';
 import 'package:xp_repositories/src/approvals_repository.dart';
 import 'package:xp_repositories/src/credentials_repository.dart';
 import 'package:xp_repositories/src/projects_repository.dart';
 
+/// What to tell the user about an error nobody expected: its own text is
+/// for the log, not for a person.
+const unexpectedErrorMessage =
+    'Something went wrong that XPath did not expect. Try again; if it keeps '
+    'happening, restart XPath.';
+
 /// What to tell the user about [error], thrown by a repository: the engine's
-/// own words for an error it answered, the network's for one it did not.
+/// own words for an error it answered, with what it says to do, the
+/// network's for one it did not, the file system's for a file it refused
+/// (with the path), and [unexpectedErrorMessage] for anything else.
 String errorMessage(Object error) => switch (error) {
+  ApiException(:final message, :final hint?) => '$message $hint',
   XpClientException(:final message) => message,
   ApprovalAlreadyDecided(:final message) => message,
   CredentialInUse(:final message) => message,
   SshUrlRequired(:final message) => message,
-  _ => '$error',
+  FileSystemException(:final message, :final osError, :final path) => [
+    message,
+    if (osError?.message case final reason? when reason.isNotEmpty) reason,
+    if (path case final path? when path.isNotEmpty) path,
+  ].join(': '),
+  _ => unexpectedErrorMessage,
+};
+
+/// The `reason` the engine gave for [error] (an `ErrorReason`), when it
+/// gave one: what a client answers differently, without reading the words.
+String? errorReason(Object error) => switch (error) {
+  ApiException(details: {'reason': final String reason}) => reason,
+  _ => null,
 };

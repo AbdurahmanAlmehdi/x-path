@@ -67,6 +67,8 @@ void main() {
       expect(workflows.every((w) => w.version.version == 1), isTrue);
       expect(workflows.first.id, startsWith('wf_'));
       expect(workflows.first.version.id, startsWith('wfv_'));
+      expect(workflows.first.title, 'Dev build');
+      expect(workflows.first.description, startsWith('Builds the dev flavors'));
       expect(await logged(), isEmpty);
     });
 
@@ -154,6 +156,32 @@ void main() {
       expect(first.yaml, _simple);
       expect(second.version.id, newest.version.id);
       expect(newest.builtin, isFalse);
+    });
+
+    test('reads the inputs its version declares, typed', () async {
+      await service.list('prj_1');
+      final patch = (await service.list('prj_1'))
+          .firstWhere((workflow) => workflow.name == 'shorebird-patch');
+
+      final inputs = (await service.get('prj_1', patch.id)).inputs;
+
+      expect(inputs.first, isA<WorkflowInput>());
+      expect({
+        for (final input in inputs) input.name: input.type,
+      }, containsPair('releaseVersion', InputType.release));
+      expect({
+        for (final input in inputs) input.name: input.type,
+      }, containsPair('allowNativeDiffs', InputType.boolean));
+      final plain = await service.create('prj_1', name: 'plain', yaml: _simple);
+      expect((await service.get('prj_1', plain.id)).inputs, isEmpty);
+      // A version saved before this engine's rules reads without inputs.
+      await repository.addVersion(
+        workflowId: plain.id,
+        versionId: 'wfv_old',
+        yaml: 'schema: 1\ninputs:\n  a: {type: nope}\n',
+        createdAt: DateTime.utc(2026),
+      );
+      expect((await service.get('prj_1', plain.id)).inputs, isEmpty);
     });
 
     test('says when there is no such version or workflow', () async {
@@ -274,6 +302,178 @@ void main() {
     });
   });
 
+  group('copies of built-ins', () {
+    test('remember the built-in and its version', () async {
+      final copy = await service.create(
+        'prj_1',
+        name: 'my-dev',
+        yaml: _simple,
+        basedOn: const WorkflowBasedOn(builtin: 'dev-build', version: 1),
+      );
+
+      const basedOn = WorkflowBasedOn(builtin: 'dev-build', version: 1);
+      expect(copy.basedOn, basedOn);
+      expect(
+        (await service.list('prj_1'))
+            .firstWhere((w) => w.id == copy.id)
+            .basedOn,
+        basedOn,
+      );
+    });
+
+    test('refuse a built-in that does not exist', () async {
+      await expectLater(
+        service.create(
+          'prj_1',
+          name: 'mine',
+          yaml: _simple,
+          basedOn: const WorkflowBasedOn(builtin: 'nope', version: 1),
+        ),
+        throwsA(
+          isA<WorkflowEditException>().having(
+            (e) => e.toString(),
+            'toString',
+            'WorkflowEditException: "nope" is not a built-in workflow.',
+          ),
+        ),
+      );
+    });
+  });
+
+  group('update', () {
+    late Workflow mine;
+
+    setUp(() async {
+      mine = await service.create('prj_1', name: 'mine', yaml: _simple);
+    });
+
+    test('renames, without a new version, and announces it', () async {
+      final renamed = await service.update(
+        'prj_1',
+        mine.id,
+        const UpdateWorkflowRequest(name: 'nightly'),
+      );
+
+      expect(renamed.name, 'nightly');
+      expect(renamed.versions, hasLength(1));
+      expect(
+        await logged(),
+        contains(
+          WorkflowUpdated(
+            workflowId: mine.id,
+            projectId: 'prj_1',
+            name: 'nightly',
+            archived: false,
+          ),
+        ),
+      );
+    });
+
+    test('refuses a name that is not allowed or used', () async {
+      await expectLater(
+        service.update(
+          'prj_1',
+          mine.id,
+          const UpdateWorkflowRequest(name: 'a b'),
+        ),
+        throwsA(isA<WorkflowNameException>()),
+      );
+      await expectLater(
+        service.update(
+          'prj_1',
+          mine.id,
+          const UpdateWorkflowRequest(name: 'dev-build'),
+        ),
+        throwsA(isA<WorkflowExistsException>()),
+      );
+      expect(
+        (await service.update(
+          'prj_1',
+          mine.id,
+          const UpdateWorkflowRequest(name: 'mine'),
+        )).name,
+        'mine',
+      );
+    });
+
+    test('archives and unarchives (UX-06)', () async {
+      final archived = await service.update(
+        'prj_1',
+        mine.id,
+        const UpdateWorkflowRequest(archived: true),
+      );
+      expect(archived.archivedAt, DateTime.utc(2026, 10, 13, 9));
+
+      clock.advance(const Duration(hours: 1));
+      final again = await service.update(
+        'prj_1',
+        mine.id,
+        const UpdateWorkflowRequest(archived: true),
+      );
+      expect(again.archivedAt, archived.archivedAt, reason: 'first time kept');
+      expect(
+        (await service.list('prj_1'))
+            .firstWhere((w) => w.id == mine.id)
+            .archived,
+        isTrue,
+      );
+
+      final back = await service.update(
+        'prj_1',
+        mine.id,
+        const UpdateWorkflowRequest(archived: false),
+      );
+      expect(back.archivedAt, isNull);
+    });
+
+    test('catches a copy up with its built-in, and only a copy', () async {
+      final copy = await service.create(
+        'prj_1',
+        name: 'my-dev',
+        yaml: _simple,
+        basedOn: const WorkflowBasedOn(builtin: 'dev-build', version: 1),
+      );
+
+      final caught = await service.update(
+        'prj_1',
+        copy.id,
+        const UpdateWorkflowRequest(basedOnVersion: 2),
+      );
+      expect(
+        caught.basedOn,
+        const WorkflowBasedOn(builtin: 'dev-build', version: 2),
+      );
+      await expectLater(
+        service.update(
+          'prj_1',
+          mine.id,
+          const UpdateWorkflowRequest(basedOnVersion: 2),
+        ),
+        throwsA(isA<WorkflowEditException>()),
+      );
+    });
+
+    test(
+      'changes no built-in, and says nothing when nothing changes',
+      () async {
+        final builtin = (await service.list('prj_1'))
+            .firstWhere((w) => w.builtin);
+        await expectLater(
+          service.update(
+            'prj_1',
+            builtin.id,
+            const UpdateWorkflowRequest(archived: true),
+          ),
+          throwsA(isA<WorkflowBuiltinException>()),
+        );
+
+        final before = (await logged()).length;
+        await service.update('prj_1', mine.id, const UpdateWorkflowRequest());
+        expect(await logged(), hasLength(before));
+      },
+    );
+  });
+
   group('save', () {
     test('adds a version and announces it', () async {
       final created = await service.create(
@@ -391,6 +591,48 @@ void main() {
       expect(schema.matrixAxes, ['platform', 'flavor']);
       expect(schema.platforms, ['android', 'ios']);
     });
+
+    test('labels the gates and lists the variables (UX-02)', () {
+      final schema = service.schema();
+
+      expect(schema.gateLabels['prod_release'], 'Production release');
+      expect(schema.gateLabels.keys, schema.gates);
+      expect(
+        schema.variables,
+        containsAll([
+          'app.name',
+          'flavor.prod',
+          'flavor.credentials.play_sa',
+          'flavor.firebaseAppId.ios',
+          'inputs',
+          'platform',
+        ]),
+      );
+      expect(schema.variables, [...schema.variables]..sort());
+    });
+  });
+
+  group('templates', () {
+    test('offers each template, valid as it is (UX-02)', () {
+      final templates = service.templates();
+
+      expect(templates.map((t) => t.id), [
+        'blank',
+        'android-firebase',
+        'ios-testflight',
+        'tests',
+        'shorebird-patch',
+      ]);
+      for (final template in templates) {
+        expect(template.title, isNotEmpty, reason: template.id);
+        expect(template.description, isNotEmpty, reason: template.id);
+        expect(
+          service.validate(template.yaml).issues,
+          isEmpty,
+          reason: template.id,
+        );
+      }
+    });
   });
 
   group('validate', () {
@@ -448,12 +690,29 @@ void main() {
         startsWith('WorkflowInUseException: '),
       );
       expect(
+        const WorkflowArchivedException('w').toString(),
+        'WorkflowArchivedException: The workflow "w" is archived. Unarchive '
+        'it to run it.',
+      );
+      expect(
         const WorkflowNameException('w').toString(),
         startsWith('WorkflowNameException: '),
       );
       expect(
         WorkflowInvalidException(const []).toString(),
         startsWith('WorkflowInvalidException: The workflow has 0 issues'),
+      );
+      expect(
+        WorkflowInvalidException(const [
+          WorkflowIssue(
+            line: 3,
+            column: 5,
+            message: 'The workflow has no input "notez".',
+            hint: 'Did you mean "inputs.notes"?',
+          ),
+        ]).message,
+        'The workflow has 1 issue: line 3, column 5: The workflow has no '
+        'input "notez". Did you mean "inputs.notes"?',
       );
       expect(const DispatchException('m').toString(), 'DispatchException: m');
     });

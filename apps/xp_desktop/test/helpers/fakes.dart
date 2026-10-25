@@ -79,6 +79,21 @@ MockJobsRepository quietJobs() {
   final repository = MockJobsRepository();
   when(() => repository.watchRunJobs(any()))
       .thenAnswer((_) => const Stream.empty());
+  when(
+    () => repository.watchRuns(
+      any(),
+      workflowId: any(named: 'workflowId'),
+      state: any(named: 'state'),
+      limit: any(named: 'limit'),
+    ),
+  ).thenAnswer((_) => const Stream.empty());
+  return repository;
+}
+
+/// A workflows repository of a project without workflows.
+MockWorkflowsRepository quietWorkflows() {
+  final repository = MockWorkflowsRepository();
+  when(() => repository.listWorkflows(any())).thenAnswer((_) async => []);
   return repository;
 }
 
@@ -105,6 +120,8 @@ MockTestsRepository quietTests() {
       .thenAnswer((_) => const Stream.empty());
   when(() => repository.completedRuns(any()))
       .thenAnswer((_) => const Stream.empty());
+  when(() => repository.watchRun(any()))
+      .thenAnswer((_) => Stream.error(const ConnectionException('away')));
   return repository;
 }
 
@@ -345,6 +362,15 @@ class SessionHarness {
     when(() => client.listReleases(projectId: any(named: 'projectId')))
         .thenAnswer((_) async => []);
     when(client.listRunners).thenAnswer((_) async => []);
+    when(() => client.listWorkflows(any())).thenAnswer((_) async => []);
+    when(
+      () => client.listRuns(
+        projectId: any(named: 'projectId'),
+        workflowId: any(named: 'workflowId'),
+        state: any(named: 'state'),
+        limit: any(named: 'limit'),
+      ),
+    ).thenAnswer((_) async => const RunsResponse([]));
     when(client.getStorage).thenAnswer(
       (_) async => StorageReport(
         generatedAt: at,
@@ -397,6 +423,9 @@ AppServices testServices({
   FolderPicker? pickFolder,
   FilePicker? pickFile,
   FileSaver? saveFile,
+  DownloadSaver? saveDownload,
+  FileRevealer? revealFile,
+  UrlOpener? openUrl,
   FakeNeedsYouAlerts? alerts,
   FakeRunningApp? runningApp,
   FakeAppMenu? appMenu,
@@ -413,6 +442,10 @@ AppServices testServices({
   pickFolder: pickFolder ?? () async => null,
   pickFile: pickFile ?? () async => null,
   saveFile: saveFile ?? (_, _) async => null,
+  saveDownload: saveDownload ?? (_, _) async => null,
+  revealFile: revealFile ?? (_) async {},
+  openUrl: openUrl ?? (_) async {},
+  engineLog: '/Users/me/Library/Application Support/XPath/service-logs/xpd.log',
   deviceName: 'MacBook',
   alerts: alerts ?? FakeNeedsYouAlerts(),
   runningApp: runningApp ?? FakeRunningApp(),

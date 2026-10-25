@@ -1,5 +1,7 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:xp_api/xp_api.dart';
+import 'package:xp_desktop/credentials/view/flavor_credentials_sheet.dart';
+import 'package:xp_desktop/credentials/widgets/credential_labels.dart';
 import 'package:xp_desktop/l10n/l10n.dart';
 import 'package:xp_desktop/theme/theme.dart';
 import 'package:xp_desktop/widgets/widgets.dart';
@@ -43,7 +45,7 @@ class ScanSummary extends StatelessWidget {
                   children: [
                     for (final (index, finding) in findings.indexed) ...[
                       if (index > 0) const XpHairline(),
-                      _FindingRow(finding),
+                      _FindingRow(finding, project: project),
                     ],
                   ],
                 ),
@@ -221,9 +223,24 @@ class _Chip extends StatelessWidget {
 }
 
 class _FindingRow extends StatelessWidget {
-  const new(this.finding);
+  const new(this.finding, {required this.project});
 
   final Finding finding;
+  final Project project;
+
+  /// The flavor whose store ids fix the finding, when that is what it says
+  /// is missing.
+  FlavorTarget? get _storeIdsOf {
+    if (finding.code != 'firebase_app_id_missing') return null;
+    final path = finding.app ?? '.';
+    final app = project.profile.apps.where((app) => app.path == path);
+    if (app.isEmpty) return null;
+    return (
+      app: path,
+      appName: app.first.name,
+      flavor: finding.flavor ?? 'default',
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -261,6 +278,17 @@ class _FindingRow extends StatelessWidget {
               ],
             ),
           ),
+          if (_storeIdsOf case final target?)
+            XpButton(
+              label: l10n.scanSetStoreId,
+              size: XpButtonSize.small,
+              onPressed: () => showFlavorCredentialsSheet(
+                context,
+                project: project,
+                target: target,
+                focusStoreIds: true,
+              ),
+            ),
         ],
       ),
     );

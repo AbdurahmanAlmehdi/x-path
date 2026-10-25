@@ -17,10 +17,14 @@ class SqliteWorkflowRepository implements WorkflowRepository {
 
   static const _versionColumns = 'id, workflow_id, version, yaml, created_at';
 
+  static const _workflowColumns =
+      'id, project_id, name, builtin, based_on_builtin, based_on_version, '
+      'archived_at';
+
   @override
   Future<List<WorkflowRecord>> list(String projectId) async => [
     for (final row in _db.select(
-      'SELECT id, project_id, name, builtin FROM workflow '
+      'SELECT $_workflowColumns FROM workflow '
       'WHERE project_id = ? ORDER BY name',
       [projectId],
     ))
@@ -29,17 +33,14 @@ class SqliteWorkflowRepository implements WorkflowRepository {
 
   @override
   Future<WorkflowRecord?> get(String id) async => _one(
-    _db.select(
-      'SELECT id, project_id, name, builtin FROM workflow WHERE id = ?',
-      [id],
-    ),
+    _db.select('SELECT $_workflowColumns FROM workflow WHERE id = ?', [id]),
   );
 
   @override
   Future<WorkflowRecord?> findByName(String projectId, String name) async =>
       _one(
         _db.select(
-          'SELECT id, project_id, name, builtin FROM workflow '
+          'SELECT $_workflowColumns FROM workflow '
           'WHERE project_id = ? AND name = ?',
           [projectId, name],
         ),
@@ -53,13 +54,16 @@ class SqliteWorkflowRepository implements WorkflowRepository {
     _database.transaction(() {
       _db
         ..execute(
-          'INSERT INTO workflow (id, project_id, name, builtin) '
-          'VALUES (?, ?, ?, ?)',
+          'INSERT INTO workflow ($_workflowColumns) '
+          'VALUES (?, ?, ?, ?, ?, ?, ?)',
           [
             workflow.id,
             workflow.projectId,
             workflow.name,
             if (workflow.builtin) 1 else 0,
+            workflow.basedOnBuiltin,
+            workflow.basedOnVersion,
+            _time(workflow.archivedAt),
           ],
         )
         ..execute(
@@ -75,6 +79,18 @@ class SqliteWorkflowRepository implements WorkflowRepository {
         );
     });
   }
+
+  @override
+  Future<void> update(WorkflowRecord workflow) async => _db.execute(
+    'UPDATE workflow SET name = ?, based_on_version = ?, archived_at = ? '
+    'WHERE id = ?',
+    [
+      workflow.name,
+      workflow.basedOnVersion,
+      _time(workflow.archivedAt),
+      workflow.id,
+    ],
+  );
 
   @override
   Future<WorkflowVersionRecord> addVersion({
@@ -150,7 +166,16 @@ class SqliteWorkflowRepository implements WorkflowRepository {
     projectId: row['project_id'] as String,
     name: row['name'] as String,
     builtin: row['builtin'] == 1,
+    basedOnBuiltin: row['based_on_builtin'] as String?,
+    basedOnVersion: row['based_on_version'] as int?,
+    archivedAt: switch (row['archived_at']) {
+      final int at => fromDatabaseTime(at),
+      _ => null,
+    },
   );
+
+  static int? _time(DateTime? time) =>
+      time == null ? null : toDatabaseTime(time);
 
   static WorkflowVersionRecord _version(Row row) => WorkflowVersionRecord(
     id: row['id'] as String,

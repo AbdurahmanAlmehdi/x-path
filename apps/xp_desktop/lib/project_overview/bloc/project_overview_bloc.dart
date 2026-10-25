@@ -85,7 +85,7 @@ class ProjectOverviewState extends Equatable {
   final RunJobs? heroRun;
 
   /// The workflow [heroRun] runs, for the names of its stages.
-  final WorkflowOutline? heroOutline;
+  final WorkflowDocument? heroOutline;
 
   /// The name of each runner, by id.
   final Map<String, String> runners;
@@ -118,7 +118,7 @@ class ProjectOverviewState extends Equatable {
     List<Credential>? credentials,
     bool? cached,
     RunJobs? Function()? heroRun,
-    WorkflowOutline? Function()? heroOutline,
+    WorkflowDocument? Function()? heroOutline,
     Map<String, String>? runners,
     String? Function()? filter,
     String? Function()? error,
@@ -243,7 +243,9 @@ class ProjectOverviewBloc
     try {
       final workflow = await _workflows.workflowOf(event.run);
       emit(
-        state.copyWith(heroOutline: () => WorkflowOutline.parse(workflow.yaml)),
+        state.copyWith(
+          heroOutline: () => WorkflowDocument.parse(workflow.yaml),
+        ),
       );
     } on Exception {
       // The stages keep their numbers.

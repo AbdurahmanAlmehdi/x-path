@@ -46,10 +46,12 @@ class ReleasesHarness {
     EngineConnectionBloc? connection,
     String? releaseId,
     List<Approval> pending = const [],
+    WorkflowsRepository? workflows,
     Project? project,
   }) async {
     await tester.pumpApp(
       ReleasesPage(projectId: 'prj_1', releaseId: releaseId),
+      workflowsRepository: workflows,
       brightness: brightness,
       shell: shell,
       connection: connection,

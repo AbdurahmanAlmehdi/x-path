@@ -268,6 +268,50 @@ void main() {
       );
     });
 
+    test('writes the store ids of a flavor to its row (UX-03)', () async {
+      await repository.add(
+        _record(
+          apps: [
+            AppProfile(
+              name: 'app',
+              path: '.',
+              flavors: [
+                _dev.copyWith(
+                  firebaseAppId: () => {
+                    'android': '1:1:android:a',
+                    'ios': '1:1:ios:b',
+                  },
+                  appleAppId: () => '123',
+                ),
+                _prod,
+              ],
+            ),
+          ],
+        ),
+      );
+
+      expect(
+        rows(
+          'SELECT name, firebase_app_id_android, firebase_app_id_ios, '
+          'apple_app_id FROM flavor ORDER BY name',
+        ),
+        [
+          {
+            'name': 'dev',
+            'firebase_app_id_android': '1:1:android:a',
+            'firebase_app_id_ios': '1:1:ios:b',
+            'apple_app_id': '123',
+          },
+          {
+            'name': 'prod',
+            'firebase_app_id_android': null,
+            'firebase_app_id_ios': null,
+            'apple_app_id': null,
+          },
+        ],
+      );
+    });
+
     test('refuses a second project for a repository', () async {
       await repository.add(_record());
 

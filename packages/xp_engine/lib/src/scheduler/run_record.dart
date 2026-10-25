@@ -2,6 +2,30 @@ import 'package:equatable/equatable.dart';
 import 'package:xp_api/xp_api.dart';
 import 'package:xp_engine/src/jobs/job_record.dart';
 
+/// A run cannot be found or changed.
+class RunException implements Exception {
+  /// Creates the exception with a [message] for the owner.
+  const new(this.message);
+
+  /// What is wrong.
+  final String message;
+
+  @override
+  String toString() => 'RunException: $message';
+}
+
+/// There is no such run.
+class RunNotFoundException extends RunException {
+  /// Creates the exception.
+  const new(this.id) : super('There is no run $id.');
+
+  /// The id that was asked for.
+  final String id;
+
+  @override
+  String toString() => 'RunNotFoundException: $message';
+}
+
 /// What the engine stores about a run: one dispatch of a workflow.
 class RunRecord extends Equatable {
   /// Creates a record.
@@ -77,6 +101,7 @@ class RunRecord extends Equatable {
 
   /// The API form, with its [jobs] in the order they were made.
   Run toRun(List<JobRecord> jobs) => Run(
+    request: dispatchRequest,
     id: id,
     projectId: projectId,
     workflowId: workflowId,
@@ -100,6 +125,19 @@ class RunRecord extends Equatable {
         ),
     ],
   );
+
+  /// [request] as the API reads it; `null` for a run with none stored, or
+  /// one stored in a form this engine no longer reads.
+  DispatchRequest? get dispatchRequest {
+    if (request.isEmpty) return null;
+    try {
+      return DispatchRequest.fromJson(request);
+    } on Exception {
+      // A CheckedFromJsonException: a field of a type this engine does not
+      // read.
+      return null;
+    }
+  }
 
   @override
   List<Object?> get props => [
@@ -161,6 +199,15 @@ abstract interface class RunRepository {
 
   /// The runs that hold the project lock now.
   Future<List<RunRecord>> held();
+
+  /// The runs, newest first: of [projectId] and of [workflowId] when given,
+  /// dispatched before the run [before] when given, at most [limit].
+  Future<List<RunRecord>> list({
+    String? projectId,
+    String? workflowId,
+    String? before,
+    int limit = 50,
+  });
 }
 
 /// A [RunRepository] that forgets everything on exit.
@@ -186,4 +233,30 @@ class InMemoryRunRepository implements RunRepository {
     for (final run in _runs.values)
       if (run.lockHeld) run,
   ];
+
+  @override
+  Future<List<RunRecord>> list({
+    String? projectId,
+    String? workflowId,
+    String? before,
+    int limit = 50,
+  }) async {
+    final newest = _runs.values.toList()..sort(_newestFirst);
+    final from = before == null ? null : _runs[before];
+    if (before != null && from == null) return const [];
+    return newest
+        .where(
+          (run) =>
+              (projectId == null || run.projectId == projectId) &&
+              (workflowId == null || run.workflowId == workflowId) &&
+              (from == null || _newestFirst(from, run) < 0),
+        )
+        .take(limit)
+        .toList();
+  }
+
+  static int _newestFirst(RunRecord a, RunRecord b) {
+    final time = b.createdAt.compareTo(a.createdAt);
+    return time != 0 ? time : b.id.compareTo(a.id);
+  }
 }

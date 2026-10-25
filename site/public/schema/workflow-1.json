@@ -1,0 +1,1466 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://xpath.abdurahman.ly/schema/workflow-1.json",
+  "title": "XPath workflow",
+  "description": "A workflow document, schema 1: stages that run in order, each with jobs that run in parallel.",
+  "type": "object",
+  "required": [
+    "schema",
+    "stages"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "const": 1
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "description": {
+      "type": "string",
+      "minLength": 1
+    },
+    "lock": {
+      "const": "project",
+      "description": "One run at a time per project."
+    },
+    "inputs": {
+      "type": "object",
+      "description": "The variables a dispatch can set (inputs.<name>).",
+      "propertyNames": {
+        "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+      },
+      "additionalProperties": {
+        "anyOf": [
+          {
+            "type": "null"
+          },
+          {
+            "$ref": "#/$defs/input"
+          }
+        ]
+      }
+    },
+    "stages": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/stage"
+      }
+    }
+  },
+  "$defs": {
+    "input": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "type": {
+          "enum": [
+            "string",
+            "boolean",
+            "choice",
+            "json",
+            "release"
+          ]
+        },
+        "options": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          }
+        },
+        "default": {},
+        "required": {
+          "type": "boolean"
+        }
+      }
+    },
+    "stage": {
+      "type": "object",
+      "required": [
+        "name",
+        "jobs"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "jobs": {
+          "type": "object",
+          "minProperties": 1,
+          "propertyNames": {
+            "pattern": "^[A-Za-z][A-Za-z0-9_-]*$"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/job"
+          }
+        }
+      }
+    },
+    "job": {
+      "type": "object",
+      "required": [
+        "steps"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "matrix": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": false,
+          "properties": {
+            "platform": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "enum": [
+                      "android",
+                      "ios"
+                    ]
+                  }
+                },
+                {
+                  "type": "string",
+                  "pattern": "\\$\\{\\{",
+                  "description": "A placeholder, such as ${{ inputs.notes }}."
+                }
+              ]
+            },
+            "flavor": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "string",
+                  "pattern": "\\$\\{\\{",
+                  "description": "A placeholder, such as ${{ inputs.notes }}."
+                }
+              ]
+            }
+          }
+        },
+        "if": {
+          "$ref": "#/$defs/condition"
+        },
+        "capabilities": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "ios-sign",
+              "android",
+              "flutter",
+              "swift-linux"
+            ]
+          }
+        },
+        "steps": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/step"
+          }
+        }
+      }
+    },
+    "condition": {
+      "type": "string",
+      "minLength": 1,
+      "description": "An expression, such as platform == 'android' && flavor.prod."
+    },
+    "step": {
+      "type": "object",
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "enum": [
+            "analyze",
+            "build.android",
+            "build.ios",
+            "build.verifyCompiledConfig",
+            "command",
+            "git.checkout",
+            "git.push",
+            "git.releaseBranch",
+            "git.tag",
+            "github.createPr",
+            "github.mergePr",
+            "guard",
+            "ios.stripAndReexport",
+            "record.manifest",
+            "shorebird.patch",
+            "shorebird.release",
+            "symbols.archive",
+            "test",
+            "upload.appStore",
+            "upload.firebase",
+            "upload.play",
+            "version.bump"
+          ]
+        },
+        "with": {
+          "type": "object"
+        },
+        "if": {
+          "$ref": "#/$defs/condition"
+        },
+        "gate": {
+          "enum": [
+            "prod_release",
+            "prod_patch",
+            "store_submission",
+            "push",
+            "merge",
+            "delete"
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "analyze"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "kind": {
+                "description": "Runs flutter analyze and fails on issues."
+              },
+              "with": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "failOn": {
+                    "description": "The least severe issue that fails the step.",
+                    "default": "error",
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "error",
+                          "warning",
+                          "info"
+                        ]
+                      },
+                      {
+                        "type": "string",
+                        "pattern": "\\$\\{\\{",
+                        "description": "A placeholder, such as ${{ inputs.notes }}."
+                      }
+                    ]
+                  }
+                },
+                "required": []
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "build.android"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "kind": {
+                "description": "Builds an APK or an App Bundle of the flavor."
+              },
+              "with": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "artifact": {
+                    "description": "An APK to install, or an App Bundle for Google Play.",
+                    "default": "apk",
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "apk",
+                          "aab"
+                        ]
+                      },
+                      {
+                        "type": "string",
+                        "pattern": "\\$\\{\\{",
+                        "description": "A placeholder, such as ${{ inputs.notes }}."
+                      }
+                    ]
+                  },
+                  "dartDefineFile": {
+                    "description": "A JSON or .env file of --dart-define values, in the app.",
+                    "type": "string"
+                  },
+                  "obfuscate": {
+                    "description": "Obfuscate the Dart code and keep its symbols.",
+                    "default": false,
+                    "anyOf": [
+                      {
+                        "type": "boolean"
+                      },
+                      {
+                        "type": "string",
+                        "pattern": "\\$\\{\\{",
+                        "description": "A placeholder, such as ${{ inputs.notes }}."
+                      }
+                    ]
+                  },
+                  "keystore": {
+                    "description": "Sign with the keystore of the flavor, when it has one.",
+                    "default": true,
+                    "anyOf": [
+                      {
+                        "type": "boolean"
+                      },
+                      {
+                        "type": "string",
+                        "pattern": "\\$\\{\\{",
+                        "description": "A placeholder, such as ${{ inputs.notes }}."
+                      }
+                    ]
+                  }
+                },
+                "required": []
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "build.ios"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "with"
+            ],
+            "properties": {
+              "kind": {
+                "description": "Builds and signs an IPA of the flavor."
+              },
+              "with": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "exportOptionsPlist": {
+                    "description": "The export options plist, in the app.",
+                    "type": "string"
+                  },
+                  "dartDefineFile": {
+                    "description": "A JSON or .env file of --dart-define values, in the app.",
+                    "type": "string"
+                  },
+                  "obfuscate": {
+                    "description": "Obfuscate the Dart code and keep its symbols.",
+                    "default": false,
+                    "anyOf": [
+                      {
+                        "type": "boolean"
+                      },
+                      {
+                        "type": "string",
+                        "pattern": "\\$\\{\\{",
+                        "description": "A placeholder, such as ${{ inputs.notes }}."
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "exportOptionsPlist"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "build.verifyCompiledConfig"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "kind": {
+                "description": "Checks that the build has the values of the dart-define file in it."
+              },
+              "with": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "artifactName": {
+                    "description": "The artifact to look in; the one of the job by default.",
+                    "type": "string"
+                  },
+                  "dartDefineFile": {
+                    "description": "A JSON or .env file of --dart-define values, in the app.",
+                    "type": "string"
+                  },
+                  "keys": {
+                    "description": "The keys of the file whose values must be in the build.",
+                    "anyOf": [
+                      {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      {
+                        "type": "string",
+                        "pattern": "\\$\\{\\{",
+                        "description": "A placeholder, such as ${{ inputs.notes }}."
+                      }
+                    ]
+                  },
+                  "needles": {
+                    "description": "Other text that must be in the build.",
+                    "anyOf": [
+                      {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      {
+                        "type": "string",
+                        "pattern": "\\$\\{\\{",
+                        "description": "A placeholder, such as ${{ inputs.notes }}."
+                      }
+                    ]
+                  }
+                },
+                "required": []
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "command"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "with"
+            ],
+            "properties": {
+              "kind": {
+                "description": "Runs a program in the app, with the variables you give it."
+              },
+              "with": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "executable": {
+                    "description": "The program to run, such as dart or ./tool/x.sh.",
+                    "type": "string"
+                  },
+                  "arguments": {
+                    "description": "Its arguments, one item each.",
+                    "anyOf": [
+                      {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      {
+                        "type": "string",
+                        "pattern": "\\$\\{\\{",
+                        "description": "A placeholder, such as ${{ inputs.notes }}."
+                      }
+                    ]
+                  },
+                  "workingDirectory": {
+                    "description": "A folder inside the app to run it in.",
+                    "type": "string"
+                  },
+                  "environment": {
+                    "description": "Environment variables to set.",
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "additionalProperties": {
+                          "type": "string"
+                        }
+                      },
+                      {
+                        "type": "string",
+                        "pattern": "\\$\\{\\{",
+                        "description": "A placeholder, such as ${{ inputs.notes }}."
+                      }
+                    ]
+                  },
+                  "passThroughEnvironment": {
+                    "description": "Environment variables of the engine to pass on.",
+                    "anyOf": [
+                      {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      {
+                        "type": "string",
+                        "pattern": "\\$\\{\\{",
+                        "description": "A placeholder, such as ${{ inputs.notes }}."
+                      }
+                    ]
+                  },
+                  "secretEnvironment": {
+                    "description": "Variables set to stored secrets, by variable.",
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "additionalProperties": {
+                          "type": "string"
+                        }
+                      },
+                      {
+                        "type": "string",
+                        "pattern": "\\$\\{\\{",
+                        "description": "A placeholder, such as ${{ inputs.notes }}."
+                      }
+                    ]
+                  },
+                  "secretFiles": {
+                    "description": "Variables set to the path of a stored secret file.",
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "additionalProperties": {
+                          "type": "string"
+                        }
+                      },
+                      {
+                        "type": "string",
+                        "pattern": "\\$\\{\\{",
+                        "description": "A placeholder, such as ${{ inputs.notes }}."
+                      }
+                    ]
+                  },
+                  "sideEffect": {
+                    "description": "Whether it changes something outside the job.",
+                    "default": false,
+                    "anyOf": [
+                      {
+                        "type": "boolean"
+                      },
+                      {
+                        "type": "string",
+                        "pattern": "\\$\\{\\{",
+                        "description": "A placeholder, such as ${{ inputs.notes }}."
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "executable"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "git.checkout"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "kind": {
+                "description": "Makes the worktree of the job at the commit of the run, or at the commit an earlier job left."
+              },
+              "with": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "commitFrom": {
+                    "description": "A job of an earlier stage whose commit to start from.",
+                    "type": "string"
+                  }
+                },
+                "required": []
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "git.push"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "kind": {
+                "description": "Pushes the release branch and the tag to GitHub."
+              },
+              "with": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "branch": {
+                    "description": "Push the release branch; when the run bumps by default.",
+                    "anyOf": [
+                      {
+                        "type": "boolean"
+                      },
+                      {
+                        "type": "string",
+                        "pattern": "\\$\\{\\{",
+                        "description": "A placeholder, such as ${{ inputs.notes }}."
+                      }
+                    ]
+                  },
+                  "tag": {
+                    "description": "Push the tag.",
+                    "default": true,
+                    "anyOf": [
+                      {
+                        "type": "boolean"
+                      },
+                      {
+                        "type": "string",
+                        "pattern": "\\$\\{\\{",
+                        "description": "A placeholder, such as ${{ inputs.notes }}."
+                      }
+                    ]
+                  }
+                },
+                "required": []
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "git.releaseBranch"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "kind": {
+                "description": "Makes the release branch of the version at the commit."
+              },
+              "with": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {},
+                "required": []
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "git.tag"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "kind": {
+                "description": "Tags the commit with the version and build number."
+              },
+              "with": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {},
+                "required": []
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "github.createPr"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "kind": {
+                "description": "Opens a pull request from the release branch."
+              },
+              "with": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "title": {
+                    "description": "The title; \"Release x.y.z\" by default.",
+                    "type": "string"
+                  },
+                  "body": {
+                    "description": "The description of the pull request.",
+                    "type": "string"
+                  }
+                },
+                "required": []
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "github.mergePr"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "kind": {
+                "description": "Merges the pull request of the release."
+              },
+              "with": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {},
+                "required": []
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "guard"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "kind": {
+                "description": "Stops the job when a check fails: the version, the store, the credentials, native changes in a patch."
+              },
+              "with": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "checks": {
+                    "description": "The checks to run before going on.",
+                    "anyOf": [
+                      {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "enum": [
+                            "source",
+                            "appStoreTrain",
+                            "versionSync",
+                            "patchTarget",
+                            "newReleaseNumber",
+                            "patchNativeDiff",
+                            "playTargetSdk",
+                            "buildNumberReuse",
+                            "credentials"
+                          ]
+                        }
+                      },
+                      {
+                        "type": "string",
+                        "pattern": "\\$\\{\\{",
+                        "description": "A placeholder, such as ${{ inputs.notes }}."
+                      }
+                    ]
+                  },
+                  "credentialKinds": {
+                    "description": "The credentials the flavor must have, checked.",
+                    "anyOf": [
+                      {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "enum": [
+                            "asc_key",
+                            "apple_id",
+                            "play_sa",
+                            "firebase_sa",
+                            "keystore",
+                            "shorebird",
+                            "github",
+                            "slack"
+                          ]
+                        }
+                      },
+                      {
+                        "type": "string",
+                        "pattern": "\\$\\{\\{",
+                        "description": "A placeholder, such as ${{ inputs.notes }}."
+                      }
+                    ]
+                  }
+                },
+                "required": []
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "ios.stripAndReexport"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "with"
+            ],
+            "properties": {
+              "kind": {
+                "description": "Removes frameworks from the iOS archive and exports the IPA again."
+              },
+              "with": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "frameworks": {
+                    "description": "The frameworks to strip from the archive.",
+                    "anyOf": [
+                      {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      {
+                        "type": "string",
+                        "pattern": "\\$\\{\\{",
+                        "description": "A placeholder, such as ${{ inputs.notes }}."
+                      }
+                    ]
+                  },
+                  "exportOptionsPlist": {
+                    "description": "The export options plist, in the app.",
+                    "type": "string"
+                  },
+                  "dartDefineFile": {
+                    "description": "A JSON or .env file of --dart-define values, in the app.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "exportOptionsPlist"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "record.manifest"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "kind": {
+                "description": "Records what the release was built from."
+              },
+              "with": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "dartDefineFile": {
+                    "description": "A JSON or .env file of --dart-define values, in the app.",
+                    "type": "string"
+                  }
+                },
+                "required": []
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "shorebird.patch"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "kind": {
+                "description": "Builds a patch of a Shorebird release and publishes it."
+              },
+              "with": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "platform": {
+                    "description": "The platform; the one of the job by default.",
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "android",
+                          "ios"
+                        ]
+                      },
+                      {
+                        "type": "string",
+                        "pattern": "\\$\\{\\{",
+                        "description": "A placeholder, such as ${{ inputs.notes }}."
+                      }
+                    ]
+                  },
+                  "exportOptionsPlist": {
+                    "description": "For iOS, the export options plist, in the app.",
+                    "type": "string"
+                  },
+                  "dartDefineFile": {
+                    "description": "A JSON or .env file of --dart-define values, in the app.",
+                    "type": "string"
+                  },
+                  "obfuscate": {
+                    "description": "Obfuscate the Dart code and keep its symbols.",
+                    "default": false,
+                    "anyOf": [
+                      {
+                        "type": "boolean"
+                      },
+                      {
+                        "type": "string",
+                        "pattern": "\\$\\{\\{",
+                        "description": "A placeholder, such as ${{ inputs.notes }}."
+                      }
+                    ]
+                  },
+                  "allowNativeDiffs": {
+                    "description": "Patch even when native code changed since the release.",
+                    "default": false,
+                    "anyOf": [
+                      {
+                        "type": "boolean"
+                      },
+                      {
+                        "type": "string",
+                        "pattern": "\\$\\{\\{",
+                        "description": "A placeholder, such as ${{ inputs.notes }}."
+                      }
+                    ]
+                  },
+                  "shorebirdAppId": {
+                    "description": "The Shorebird app; the one of the flavor by default.",
+                    "type": "string"
+                  }
+                },
+                "required": []
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "shorebird.release"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "kind": {
+                "description": "Builds a release that Shorebird can patch later."
+              },
+              "with": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "platform": {
+                    "description": "The platform; the one of the job by default.",
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "android",
+                          "ios"
+                        ]
+                      },
+                      {
+                        "type": "string",
+                        "pattern": "\\$\\{\\{",
+                        "description": "A placeholder, such as ${{ inputs.notes }}."
+                      }
+                    ]
+                  },
+                  "artifact": {
+                    "description": "For Android, an APK or an App Bundle.",
+                    "default": "aab",
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "apk",
+                          "aab"
+                        ]
+                      },
+                      {
+                        "type": "string",
+                        "pattern": "\\$\\{\\{",
+                        "description": "A placeholder, such as ${{ inputs.notes }}."
+                      }
+                    ]
+                  },
+                  "exportOptionsPlist": {
+                    "description": "For iOS, the export options plist, in the app.",
+                    "type": "string"
+                  },
+                  "dartDefineFile": {
+                    "description": "A JSON or .env file of --dart-define values, in the app.",
+                    "type": "string"
+                  },
+                  "obfuscate": {
+                    "description": "Obfuscate the Dart code and keep its symbols.",
+                    "default": false,
+                    "anyOf": [
+                      {
+                        "type": "boolean"
+                      },
+                      {
+                        "type": "string",
+                        "pattern": "\\$\\{\\{",
+                        "description": "A placeholder, such as ${{ inputs.notes }}."
+                      }
+                    ]
+                  },
+                  "keystore": {
+                    "description": "Sign with the keystore of the flavor, when it has one.",
+                    "default": true,
+                    "anyOf": [
+                      {
+                        "type": "boolean"
+                      },
+                      {
+                        "type": "string",
+                        "pattern": "\\$\\{\\{",
+                        "description": "A placeholder, such as ${{ inputs.notes }}."
+                      }
+                    ]
+                  },
+                  "shorebirdAppId": {
+                    "description": "The Shorebird app; the one of the flavor by default.",
+                    "type": "string"
+                  }
+                },
+                "required": []
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "symbols.archive"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "kind": {
+                "description": "Keeps the debug symbols of the build, to read crash reports later."
+              },
+              "with": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "android": {
+                    "description": "Keep the Android symbols; in an Android job by default.",
+                    "anyOf": [
+                      {
+                        "type": "boolean"
+                      },
+                      {
+                        "type": "string",
+                        "pattern": "\\$\\{\\{",
+                        "description": "A placeholder, such as ${{ inputs.notes }}."
+                      }
+                    ]
+                  },
+                  "ios": {
+                    "description": "Keep the iOS symbols; in an iOS job by default.",
+                    "anyOf": [
+                      {
+                        "type": "boolean"
+                      },
+                      {
+                        "type": "string",
+                        "pattern": "\\$\\{\\{",
+                        "description": "A placeholder, such as ${{ inputs.notes }}."
+                      }
+                    ]
+                  },
+                  "debugInfoDirectory": {
+                    "description": "Where the build wrote the Dart symbols.",
+                    "type": "string"
+                  },
+                  "dartDefineFile": {
+                    "description": "A JSON or .env file of --dart-define values, in the app.",
+                    "type": "string"
+                  },
+                  "obfuscate": {
+                    "description": "Whether the build was obfuscated.",
+                    "default": false,
+                    "anyOf": [
+                      {
+                        "type": "boolean"
+                      },
+                      {
+                        "type": "string",
+                        "pattern": "\\$\\{\\{",
+                        "description": "A placeholder, such as ${{ inputs.notes }}."
+                      }
+                    ]
+                  }
+                },
+                "required": []
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "test"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "kind": {
+                "description": "Runs flutter test and keeps the results."
+              },
+              "with": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "paths": {
+                    "description": "The test files or folders; all tests by default.",
+                    "anyOf": [
+                      {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      {
+                        "type": "string",
+                        "pattern": "\\$\\{\\{",
+                        "description": "A placeholder, such as ${{ inputs.notes }}."
+                      }
+                    ]
+                  },
+                  "tags": {
+                    "description": "Run only the tests with these tags.",
+                    "anyOf": [
+                      {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      {
+                        "type": "string",
+                        "pattern": "\\$\\{\\{",
+                        "description": "A placeholder, such as ${{ inputs.notes }}."
+                      }
+                    ]
+                  }
+                },
+                "required": []
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "upload.appStore"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "with"
+            ],
+            "properties": {
+              "kind": {
+                "description": "Uploads the IPA to App Store Connect, for TestFlight."
+              },
+              "with": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "artifactName": {
+                    "description": "The file to upload; the IPA of the job by default.",
+                    "type": "string"
+                  },
+                  "artifactsFrom": {
+                    "description": "A build job of an earlier stage to take the file from.",
+                    "type": "string"
+                  },
+                  "bundleId": {
+                    "description": "The bundle id; the one of the flavor by default.",
+                    "type": "string"
+                  },
+                  "appleAppId": {
+                    "description": "The App Store Connect app id, a number.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "appleAppId"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "upload.firebase"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "with"
+            ],
+            "properties": {
+              "kind": {
+                "description": "Sends the build to testers with Firebase App Distribution."
+              },
+              "with": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "artifactName": {
+                    "description": "The file to upload; the APK of the job by default.",
+                    "type": "string"
+                  },
+                  "artifactsFrom": {
+                    "description": "A build job of an earlier stage to take the file from.",
+                    "type": "string"
+                  },
+                  "appId": {
+                    "description": "The Firebase app id, such as 1:123:android:abc.",
+                    "type": "string"
+                  },
+                  "testerEmails": {
+                    "description": "Testers to invite, by email.",
+                    "anyOf": [
+                      {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      {
+                        "type": "string",
+                        "pattern": "\\$\\{\\{",
+                        "description": "A placeholder, such as ${{ inputs.notes }}."
+                      }
+                    ]
+                  },
+                  "groupAliases": {
+                    "description": "Tester groups to invite, by alias.",
+                    "anyOf": [
+                      {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      {
+                        "type": "string",
+                        "pattern": "\\$\\{\\{",
+                        "description": "A placeholder, such as ${{ inputs.notes }}."
+                      }
+                    ]
+                  },
+                  "releaseNotes": {
+                    "description": "What the testers see.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "appId"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "upload.play"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "kind": {
+                "description": "Uploads the App Bundle to a track of Google Play."
+              },
+              "with": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "artifactName": {
+                    "description": "The file to upload; the App Bundle of the job by default.",
+                    "type": "string"
+                  },
+                  "artifactsFrom": {
+                    "description": "A build job of an earlier stage to take the file from.",
+                    "type": "string"
+                  },
+                  "packageName": {
+                    "description": "The application id; the one of the flavor by default.",
+                    "type": "string"
+                  },
+                  "track": {
+                    "description": "The track: internal, alpha, beta, production or yours.",
+                    "default": "internal",
+                    "type": "string"
+                  },
+                  "status": {
+                    "description": "Release now, roll out to a fraction, or keep a draft.",
+                    "default": "completed",
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "completed",
+                          "inProgress",
+                          "draft"
+                        ]
+                      },
+                      {
+                        "type": "string",
+                        "pattern": "\\$\\{\\{",
+                        "description": "A placeholder, such as ${{ inputs.notes }}."
+                      }
+                    ]
+                  },
+                  "userFraction": {
+                    "description": "For a roll-out, the fraction of users, above 0, below 1.",
+                    "anyOf": [
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "type": "string",
+                        "pattern": "\\$\\{\\{",
+                        "description": "A placeholder, such as ${{ inputs.notes }}."
+                      }
+                    ]
+                  },
+                  "releaseName": {
+                    "description": "The name of the release.",
+                    "type": "string"
+                  },
+                  "releaseNotes": {
+                    "description": "What is new, by language, such as en-US.",
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "additionalProperties": {
+                          "type": "string"
+                        }
+                      },
+                      {
+                        "type": "string",
+                        "pattern": "\\$\\{\\{",
+                        "description": "A placeholder, such as ${{ inputs.notes }}."
+                      }
+                    ]
+                  }
+                },
+                "required": []
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "version.bump"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "kind": {
+                "description": "Writes the version and build number of the run to the pubspec and commits it in the job."
+              },
+              "with": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {},
+                "required": []
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}
