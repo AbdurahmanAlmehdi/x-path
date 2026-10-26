@@ -7,8 +7,8 @@ to a high bar: every change comes with tests, and nothing ever talks to a real s
 
 - For anything bigger than a small fix, open an issue first and describe the change. It saves you
   from building something that does not fit.
-- Read the [README](README.md): the repository layout, the dependency direction between packages,
-  and the coverage policy are enforced by CI.
+- Read [Developing XPath](docs/reference/development.md): the repository layout, the dependency
+  direction between packages, and the coverage policy are enforced by CI.
 - Architecture decisions live in [`docs/adr/`](docs/adr). A change that goes against one needs a new
   ADR in the same pull request.
 - Security problems are not reported in issues. See [SECURITY.md](SECURITY.md).
@@ -49,9 +49,10 @@ Tests are part of the change, not a follow-up.
   at least 90% everywhere else.
 - Store APIs, GitHub and Shorebird are tested against the fakes in `tool/e2e/fake_stores` or fake
   HTTP servers. Never use real credentials, real store accounts or a real Keychain in a test.
-- Tests that need macOS or real processes carry the tags described in the README.
+- Tests that need macOS or real processes carry the tags described in
+  [Developing XPath](docs/reference/development.md).
 - Desktop goldens are drawn on macOS and pass when at most 0.1% of their pixels differ, as Macs draw
-  text slightly differently (see Goldens in the README). After a deliberate UI change, update them
+  text slightly differently (see Goldens in docs/reference/development.md). After a deliberate UI change, update them
   with `flutter test --update-goldens --tags golden` in `apps/xp_desktop`.
 
 Run the full check before you push:

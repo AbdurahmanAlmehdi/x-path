@@ -1,6 +1,6 @@
 // xpath.abdurahman.ly: static assets only, no Worker script and no build step.
 // Deployed by Cloudflare Workers Builds (root directory `site`, deploy command
-// `npx wrangler deploy`); see "Website" in the README.
+// `npx wrangler deploy`); see "Website" in docs/reference/development.md.
 {
   "name": "x-path",
   "compatibility_date": "2026-05-01",

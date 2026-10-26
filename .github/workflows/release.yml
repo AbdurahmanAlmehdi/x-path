@@ -346,7 +346,7 @@ jobs:
 
   # GitHub-hosted macOS runners are free only for public repositories. The
   # job skips itself, with a notice, until every signing secret is set (see
-  # README, "Releases and installation"). The certificate goes into a
+  # docs/reference/installation.md). The certificate goes into a
   # keychain of its own that the last step deletes.
   dmg:
     needs: [version, release]
@@ -373,7 +373,7 @@ jobs:
             && [ -n "${NOTARY_KEY_ID}" ] && [ -n "${NOTARY_ISSUER_ID}" ]; then
             echo "ready=true" >> "$GITHUB_OUTPUT"
           else
-            echo "::notice title=No DMG for ${TAG}::Set the secrets MAC_DEVELOPER_ID_P12_BASE64, MAC_DEVELOPER_ID_P12_PASSWORD, MAC_NOTARY_KEY_P8_BASE64, MAC_NOTARY_KEY_ID and MAC_NOTARY_ISSUER_ID to build the notarized DMG (README, Releases and installation)."
+            echo "::notice title=No DMG for ${TAG}::Set the secrets MAC_DEVELOPER_ID_P12_BASE64, MAC_DEVELOPER_ID_P12_PASSWORD, MAC_NOTARY_KEY_P8_BASE64, MAC_NOTARY_KEY_ID and MAC_NOTARY_ISSUER_ID to build the notarized DMG (docs/reference/installation.md)."
             echo "ready=false" >> "$GITHUB_OUTPUT"
           fi
 

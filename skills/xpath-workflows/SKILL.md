@@ -288,4 +288,5 @@ input the workflow does not declare is refused, and a `required` input must be g
 ## More
 
 - Dispatching, following runs and approvals: skill `xpath-release`.
-- The README sections "Workflows and the scheduler" and "Runners" in the XPath repository.
+- In the XPath repository: `docs/guide/workflows.md`, `docs/reference/workflows.md` and
+  `docs/reference/runners.md`.

@@ -284,7 +284,7 @@ Details:
 
 ### Phase U8: Docs, quickstart and troubleshooting
 
-- **Status:** Not started
+- **Status:** Done
 - **Scope:** A guide a new user can follow alone, a troubleshooting page the error hints link
   to, and a README short enough to read. Absorbs the docs part of Phase 19.
 - **Files touched:** `docs/guide/**`, `docs/reference/**`, `README.md`, `site/**`, `skills/**`,

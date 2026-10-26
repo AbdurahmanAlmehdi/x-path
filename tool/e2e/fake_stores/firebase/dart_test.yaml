@@ -1,4 +1,4 @@
-# Tags every test file may use. See the "Testing" section of the root README.
+# Tags every test file may use. See "Testing" in docs/reference/development.md.
 tags:
   # Checks API responses against openapi.yaml.
   contract:

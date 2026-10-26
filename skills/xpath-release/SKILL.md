@@ -273,5 +273,6 @@ remove credentials: tell the owner, who uses the app or `xp credentials`.
 
 - Workflow documents, inputs and step kinds: skill `xpath-workflows`.
 - Installing, tokens, credentials and runners: skill `xpath-setup`.
-- The README sections "The `xp` command line", "`xp mcp`", "Workflows and the scheduler" and
-  "Releases" in the XPath repository.
+- In the XPath repository: `docs/guide/releases.md`, `docs/guide/approvals.md`,
+  `docs/reference/clients.md` (`xp` and `xp mcp`), `docs/reference/workflows.md` and
+  `docs/reference/releases.md`.

@@ -2,8 +2,8 @@
 
 A runner is another machine that runs jobs for your engine: a Linux box for Android and Flutter
 builds, another Mac for iOS signing. It dials out to the engine, so nothing on the runner needs an
-open port. This guide is the setup from the owner's side; the README's Runners section has the
-protocol and the details.
+open port. This guide is the setup from the owner's side; [the reference](../reference/runners.md)
+has the protocol and the details.
 
 ## Pair a runner
 

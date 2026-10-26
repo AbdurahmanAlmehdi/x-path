@@ -177,10 +177,14 @@ Future<int> guarded(
     );
     return XpExit.forApi(error);
   } on ConnectionException catch (error) {
-    fail('unreachable', error.message);
+    fail('unreachable', error.message, _unreachableHint);
     return XpExit.unavailable;
   } on DownloadException catch (error) {
     fail('download_failed', error.message);
     return XpExit.failed;
   }
 }
+
+/// Where to read about an engine `xp` cannot reach.
+const _unreachableHint =
+    'See docs/guide/troubleshooting.md#the-engine-does-not-answer.';
