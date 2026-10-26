@@ -158,6 +158,32 @@ void main() {
     expect(job.narrowing, ['the app builds its iOS plugins with CocoaPods']);
   });
 
+  test('an app the owner turned Linux iOS builds off for narrows every iOS '
+      'job, in the dry run too', () async {
+    final h = await harness();
+    final project = (await h.projects.get('prj_1'))!;
+    await h.projects.update(
+      project.copyWith(
+        edits: const ProfileEdits(apps: [AppEdit(path: '.', iosLinux: false)]),
+      ),
+    );
+    final workflow = await h.custom(_workflow('', flavors: true));
+
+    final plan = await h.dispatcher.plan(
+      'prj_1',
+      workflow,
+      const DispatchRequest(),
+    );
+    final run = await h.dispatchCustom(_workflow('', flavors: true));
+
+    final planned = plan.stages.single.jobs.single;
+    expect(planned.capabilities, ['flutter', 'ios-sign']);
+    expect(planned.narrowing, ['Linux iOS builds are turned off for this app']);
+    final job = await only(h, run);
+    expect(job.capabilities, ['flutter', 'ios-sign']);
+    expect(job.narrowing, ['Linux iOS builds are turned off for this app']);
+  });
+
   for (final (name, kinds, bundleId) in [
     (
       'an identity without an ASC key',

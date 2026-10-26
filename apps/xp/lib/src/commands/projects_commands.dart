@@ -110,7 +110,8 @@ String describeProject(Project project) {
 String _describeApp(AppProfile app) {
   final version = app.version;
   return 'app ${app.name} (${app.path}), ${app.framework}'
-      '${version == null ? '' : ' $version'}';
+      '${version == null ? '' : ' $version'}'
+      '${app.iosLinux ? '' : ', Linux iOS builds off'}';
 }
 
 String _describeFlavor(FlavorProfile flavor) {
@@ -237,8 +238,8 @@ class ProjectsScanCommand extends XpCommand {
   }
 }
 
-/// `xp projects set <project> --flavor <name> ...`: edits a flavor of the
-/// profile. Edits survive rescans.
+/// `xp projects set <project> ...`: edits the store ids of a flavor, or
+/// whether Linux runners may build the iOS app. Edits survive rescans.
 class ProjectsSetCommand extends XpCommand {
   /// Creates the command.
   new(super.context) {
@@ -255,6 +256,13 @@ class ProjectsSetCommand extends XpCommand {
       ..addOption(
         'apple-app-id',
         help: 'The App Store Connect app id; empty removes it.',
+      )
+      ..addFlag(
+        'ios-linux',
+        defaultsTo: null,
+        help:
+            'Whether Linux runners may build the iOS app; --no-ios-linux '
+            'sends every iOS job of the app to a Mac.',
       );
   }
 
@@ -263,12 +271,14 @@ class ProjectsSetCommand extends XpCommand {
 
   @override
   String get description =>
-      'Set the store ids of a flavor, which the built-in workflows upload to.';
+      'Set the store ids of a flavor, which the built-in workflows upload to, '
+      'or whether Linux runners may build the iOS app.';
 
   @override
   String get invocation =>
-      'xp projects set <project> --flavor <name> '
-      '[--firebase-app-id <platform=id>] [--apple-app-id <id>]';
+      'xp projects set <project> [--flavor <name> '
+      '[--firebase-app-id <platform=id>] [--apple-app-id <id>]] '
+      '[--[no-]ios-linux]';
 
   @override
   Future<int> execute(XpClient client) async {
@@ -282,11 +292,18 @@ class ProjectsSetCommand extends XpCommand {
       }
       firebase[value.substring(0, split)] = value.substring(split + 1);
     }
-    final flavor = results.option('flavor') ?? usageException('Give --flavor.');
     final apple = results.option('apple-app-id');
-    if (firebase.isEmpty && apple == null) {
-      usageException('Give --firebase-app-id, --apple-app-id or both.');
+    final storeIds = firebase.isNotEmpty || apple != null;
+    final iosLinux = results.wasParsed('ios-linux')
+        ? results.flag('ios-linux')
+        : null;
+    if (!storeIds && iosLinux == null) {
+      usageException(
+        'Give --firebase-app-id, --apple-app-id or --[no-]ios-linux.',
+      );
     }
+    final flavor = results.option('flavor');
+    if (storeIds && flavor == null) usageException('Give --flavor.');
     final id = await resolveProject(client, reference);
     final project = await client.updateProject(
       id,
@@ -294,12 +311,14 @@ class ProjectsSetCommand extends XpCommand {
         apps: [
           AppEdit(
             path: results.option('app') ?? await _onlyApp(client, id),
+            iosLinux: iosLinux,
             flavors: [
-              FlavorEdit(
-                name: flavor,
-                firebaseAppId: firebase.isEmpty ? null : firebase,
-                appleAppId: apple,
-              ),
+              if (flavor != null && storeIds)
+                FlavorEdit(
+                  name: flavor,
+                  firebaseAppId: firebase.isEmpty ? null : firebase,
+                  appleAppId: apple,
+                ),
             ],
           ),
         ],

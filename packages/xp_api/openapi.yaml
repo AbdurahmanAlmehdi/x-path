@@ -3455,6 +3455,13 @@ components:
             Flutter's template, a Flutter older than 3.47.
           items:
             type: string
+        iosLinux:
+          type: boolean
+          default: true
+          description: >-
+            Whether Linux runners may build the iOS app (ADR 0014). Present,
+            and false, only when the owner turned Linux iOS builds off, which
+            sends every iOS job of the app to a Mac.
         flavors:
           type: array
           items:
@@ -3642,6 +3649,11 @@ components:
         storeCountry:
           type: string
           pattern: "^[A-Za-z]{2}$"
+        iosLinux:
+          type: boolean
+          description: >-
+            Whether Linux runners may build the iOS app; false sends every iOS
+            job of the app to a Mac (ADR 0014), true lets Linux build it again.
         flavors:
           type: array
           items:

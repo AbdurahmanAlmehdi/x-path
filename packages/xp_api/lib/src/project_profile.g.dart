@@ -155,6 +155,7 @@ AppProfile _$AppProfileFromJson(Map<String, dynamic> json) => AppProfile(
           ?.map((e) => e as String)
           .toList() ??
       const [],
+  iosLinux: json['iosLinux'] as bool? ?? true,
   flavors:
       (json['flavors'] as List<dynamic>?)
           ?.map((e) => FlavorProfile.fromJson(e as Map<String, dynamic>))
@@ -188,6 +189,7 @@ Map<String, dynamic> _$AppProfileToJson(
   'iosPackageManager': _$IosPackageManagerEnumMap[instance.iosPackageManager]!,
   'iosAppExtensions': instance.iosAppExtensions,
   'iosLinuxLimits': instance.iosLinuxLimits,
+  'iosLinux': ?_offOnly(instance.iosLinux),
   'flavors': instance.flavors.map((e) => e.toJson()).toList(),
   'plists': instance.plists.map((e) => e.toJson()).toList(),
   'keystore': ?instance.keystore?.toJson(),

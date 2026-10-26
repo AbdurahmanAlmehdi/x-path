@@ -151,7 +151,7 @@ support, and C and D keep a Mac for it.
 
 ### Phase 1: Per-app opt-out
 
-- **Status:** Not started
+- **Status:** Done
 - **Scope:** `AppEdit.iosLinux` (bool, default on) in `ProfileEdits`, applied to
   `AppProfile.iosLinux`; when off, `iosLinuxLimits` narrows every iOS job of the app with
   "Linux iOS builds are turned off for this app". Edits are stored as JSON in the project's

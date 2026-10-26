@@ -70,6 +70,17 @@ creating one. Rejected: sending the ASC key to the runner for the job so omarchy
 the certificate and profile itself. It is less code, but it would widen D-09 and put a key that
 manages the whole App Store team on remote runners, the machines most likely to be lost.
 
+## Amendment (per-app opt-out)
+
+The owner can turn Linux iOS builds off for one app with a project edit: `iosLinux: false` on the
+app in `PATCH /projects/{id}` (`xp projects set <project> --no-ios-linux`), shown as
+`AppProfile.iosLinux`. The planner then narrows every iOS job of the app to `ios-sign` with the
+reason "Linux iOS builds are turned off for this app", listed before any other reason. It is the
+rollback when a new omarchy-apple-dev pin breaks one app's build, short of downgrading XPath, so it
+ships before the planner stops narrowing flavors. Like every other edit it survives rescans and needs
+no migration: edits are stored as JSON, and edits stored before it leave Linux iOS builds on.
+Everything else in this ADR stands.
+
 ## Consequences
 
 - A Linux engine (including the Docker image) with a Linux runner can run a whole release

@@ -141,6 +141,28 @@ void main() {
     );
   });
 
+  test('an app with Linux iOS builds turned off, before every other '
+      'reason', () {
+    const off = AppProfile(
+      name: 'demo',
+      path: '.',
+      iosLinux: false,
+      iosLinuxLimits: ['the app pins Flutter 3.44.2'],
+    );
+
+    expect(iosLinuxLimits([_step('build.ios', _signing)], off), [
+      'Linux iOS builds are turned off for this app',
+      'the app pins Flutter 3.44.2',
+    ]);
+    expect(
+      iosLinuxLimits(
+        const [],
+        const AppProfile(name: 'a', path: '.', iosLinux: false),
+      ),
+      [iosLinuxOff],
+    );
+  });
+
   test('app extensions of the Xcode project', () {
     expect(
       iosLinuxLimits(

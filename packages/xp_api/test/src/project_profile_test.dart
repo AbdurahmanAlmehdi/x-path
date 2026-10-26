@@ -95,6 +95,7 @@ void main() {
       iosPackageManager: IosPackageManager.cocoapods,
       iosAppExtensions: ['Widgets'],
       iosLinuxLimits: ['the app builds its iOS plugins with CocoaPods'],
+      iosLinux: false,
       flavors: [flavor],
       plists: [
         PlistVersion(
@@ -124,6 +125,7 @@ void main() {
       expect(read.iosPackageManager, IosPackageManager.none);
       expect(read.iosAppExtensions, isEmpty);
       expect(read.iosLinuxLimits, isEmpty);
+      expect(read.iosLinux, isTrue);
       expect(read.flavors, isEmpty);
       expect(read.hasIos, isFalse);
     });
@@ -139,6 +141,16 @@ void main() {
       expect(changed.keystore, app.keystore);
       expect(changed.iosAppExtensions, ['Widgets']);
       expect(changed.iosLinuxLimits, app.iosLinuxLimits);
+      expect(changed.iosLinux, isFalse);
+      expect(app.copyWith(iosLinux: true).iosLinux, isTrue);
+    });
+
+    test('writes Linux iOS builds only when they are off', () {
+      expect(app.toJson()['iosLinux'], isFalse);
+      expect(
+        const AppProfile(name: 'a', path: '.').toJson(),
+        isNot(contains('iosLinux')),
+      );
     });
 
     test('names the package managers', () {

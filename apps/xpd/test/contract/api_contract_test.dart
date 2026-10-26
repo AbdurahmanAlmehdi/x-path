@@ -157,6 +157,7 @@ void main() {
               {
                 'path': '.',
                 'storeCountry': 'ly',
+                'iosLinux': false,
                 'flavors': [
                   {
                     'name': 'prod',
@@ -389,6 +390,31 @@ void main() {
       });
       expect((flavor.single as Map)['appleAppId'], '1234567890');
       expectContract(response, path: '/projects/$id', method: 'PATCH');
+    });
+
+    test('PATCH /projects/{id} turns Linux iOS builds off and on for an '
+        'app', () async {
+      final id = await addProject();
+      Future<Map<String, Object?>> turn({required bool on}) async {
+        final response = await send('PATCH', '/projects/$id', {
+          'apps': [
+            {'path': '.', 'iosLinux': on},
+          ],
+        });
+        expect(response.statusCode, 200);
+        expectContract(response, path: '/projects/$id', method: 'PATCH');
+        return ((response.json['profile'] as Map)['apps'] as List).single
+            as Map<String, Object?>;
+      }
+
+      expect((await turn(on: false))['iosLinux'], isFalse);
+      final read = await send('GET', '/projects/$id');
+      expect(
+        (((read.json['profile'] as Map)['apps'] as List).single
+            as Map)['iosLinux'],
+        isFalse,
+      );
+      expect(await turn(on: true), isNot(contains('iosLinux')));
     });
 
     test('PATCH /projects/{id} 400 for a store id of the wrong form', () async {

@@ -48,6 +48,7 @@ void main() {
 
       final app = edited.apps.first;
       expect(app.storeCountry, 'ly');
+      expect(app.iosLinux, isTrue);
       expect(app.flavors.first, profile.apps.first.flavors.first);
       final prod = app.flavors.last;
       expect(prod.prod, isTrue);
@@ -57,6 +58,17 @@ void main() {
       expect(prod.androidAppId, 'com.android');
       expect(prod.versionFiles, ['pubspec.yaml']);
       expect(edited.apps.last, profile.apps.last);
+    });
+
+    test('turns Linux iOS builds off and on again', () {
+      ProfileEdits turn({required bool on}) => ProfileEdits(
+        apps: [AppEdit(path: 'apps/two', iosLinux: on)],
+      );
+
+      final off = applyEdits(profile, turn(on: false));
+      expect(off.apps.last.iosLinux, isFalse);
+      expect(off.apps.first, profile.apps.first);
+      expect(applyEdits(off, turn(on: true)).apps.last.iosLinux, isTrue);
     });
 
     test('sets, keeps and removes the store ids', () {
@@ -162,12 +174,14 @@ void main() {
                 ),
               ],
             ),
-            AppEdit(path: 'apps/two'),
+            AppEdit(path: 'apps/two', iosLinux: false),
           ],
         ),
       );
 
       expect(valid.defaultBaseBranch, 'dev');
+      expect(valid.apps.first.iosLinux, isNull);
+      expect(valid.apps.last.iosLinux, isFalse);
       expect(valid.apps.first.storeCountry, 'ly');
       expect(valid.apps.first.flavors.single.name, 'dev');
       expect(valid.apps.last.storeCountry, isNull);

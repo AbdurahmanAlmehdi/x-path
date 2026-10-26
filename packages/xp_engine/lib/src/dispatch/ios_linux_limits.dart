@@ -5,13 +5,15 @@ import 'package:xp_engine/src/steps/step.dart';
 /// 0014), from the planned [steps] of the job and its [app] (what the scan
 /// found, `AppProfile.iosLinuxLimits`, and its extensions): one reason for
 /// each thing the job uses that Linux iOS builds lack, with the work that
-/// would lift it. Empty when nothing rules Linux out.
+/// would lift it, led by [iosLinuxOff] when the owner turned Linux iOS
+/// builds off for the app (`AppProfile.iosLinux`). Empty when nothing rules
+/// Linux out.
 ///
 /// The dispatcher narrows a job with reasons to `ios-sign` (a Mac), at plan
 /// time, so that no job fails on Linux part-way through. Each case is
 /// removed once omarchy-apple-dev can build it and XPath pins that commit.
 List<String> iosLinuxLimits(List<StepPlan> steps, AppProfile app) {
-  final reasons = <String>{};
+  final reasons = <String>{if (!app.iosLinux) iosLinuxOff};
   for (final StepPlan(:kind, :input) in steps) {
     switch (kind) {
       case 'build.ios' || 'ios.stripAndReexport':
@@ -53,6 +55,9 @@ List<String> iosLinuxLimits(List<StepPlan> steps, AppProfile app) {
   }
   return reasons.toList();
 }
+
+/// Why an app whose owner turned Linux iOS builds off builds on a Mac.
+const iosLinuxOff = 'Linux iOS builds are turned off for this app';
 
 /// Why Linux iOS builds cannot build an app with the Flutter [flavors]: one
 /// a job builds, or all a scan found.

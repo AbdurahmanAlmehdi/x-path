@@ -335,6 +335,7 @@ class AppProfile extends Equatable {
     this.iosPackageManager = IosPackageManager.none,
     this.iosAppExtensions = const [],
     this.iosLinuxLimits = const [],
+    this.iosLinux = true,
     this.flavors = const [],
     this.plists = const [],
     this.keystore,
@@ -388,6 +389,12 @@ class AppProfile extends Equatable {
   /// from the job. Empty when the project does not rule Linux out.
   final List<String> iosLinuxLimits;
 
+  /// Whether Linux runners may build the iOS app (ADR 0014). The owner turns
+  /// it off to send every iOS job of the app to a Mac. Written to JSON only
+  /// when off, so a profile from before it reads the same.
+  @JsonKey(toJson: _offOnly)
+  final bool iosLinux;
+
   /// The build variants.
   final List<FlavorProfile> flavors;
 
@@ -402,25 +409,29 @@ class AppProfile extends Equatable {
   final ShorebirdProfile? shorebird;
 
   /// A copy with the editable fields replaced where given.
-  AppProfile copyWith({String? storeCountry, List<FlavorProfile>? flavors}) =>
-      AppProfile(
-        name: name,
-        path: path,
-        framework: framework,
-        version: version,
-        storeCountry: storeCountry ?? this.storeCountry,
-        flutterVersion: flutterVersion,
-        flutterVersionSource: flutterVersionSource,
-        hasIos: hasIos,
-        hasAndroid: hasAndroid,
-        iosPackageManager: iosPackageManager,
-        iosAppExtensions: iosAppExtensions,
-        iosLinuxLimits: iosLinuxLimits,
-        flavors: flavors ?? this.flavors,
-        plists: plists,
-        keystore: keystore,
-        shorebird: shorebird,
-      );
+  AppProfile copyWith({
+    String? storeCountry,
+    bool? iosLinux,
+    List<FlavorProfile>? flavors,
+  }) => AppProfile(
+    name: name,
+    path: path,
+    framework: framework,
+    version: version,
+    storeCountry: storeCountry ?? this.storeCountry,
+    flutterVersion: flutterVersion,
+    flutterVersionSource: flutterVersionSource,
+    hasIos: hasIos,
+    hasAndroid: hasAndroid,
+    iosPackageManager: iosPackageManager,
+    iosAppExtensions: iosAppExtensions,
+    iosLinuxLimits: iosLinuxLimits,
+    iosLinux: iosLinux ?? this.iosLinux,
+    flavors: flavors ?? this.flavors,
+    plists: plists,
+    keystore: keystore,
+    shorebird: shorebird,
+  );
 
   /// The JSON form.
   Map<String, dynamic> toJson() => _$AppProfileToJson(this);
@@ -439,12 +450,16 @@ class AppProfile extends Equatable {
     iosPackageManager,
     iosAppExtensions,
     iosLinuxLimits,
+    iosLinux,
     flavors,
     plists,
     keystore,
     shorebird,
   ];
 }
+
+/// `false`, or `null` to leave the default out of the JSON.
+bool? _offOnly(bool on) => on ? null : false;
 
 /// What a scan learned about a repository: its apps, flavors, identifiers
 /// and branches.

@@ -130,6 +130,25 @@ void main() {
       );
     });
 
+    test('describes the per-app switch for Linux iOS builds', () {
+      const off = AppProfile(name: 'shop', path: '.', iosLinux: false);
+      const edits = ProfileEdits(apps: [AppEdit(path: '.', iosLinux: false)]);
+
+      expect(shipped.validateSchema('AppProfile', off.toJson()), isEmpty);
+      expect(
+        shipped.validateSchema(
+          'AppProfile',
+          const AppProfile(name: 'shop', path: '.').toJson(),
+        ),
+        isEmpty,
+      );
+      expect(shipped.validateSchema('ProfileEdits', edits.toJson()), isEmpty);
+      expect(
+        shipped.validateSchema('AppEdit', {'path': '.', 'iosLinux': 'off'}),
+        isNotEmpty,
+      );
+    });
+
     test('documents the job endpoints and their error responses', () {
       final unauthorized = jsonEncode(
         ErrorResponse.of(ApiErrorCode.unauthorized, 'm').toJson(),
