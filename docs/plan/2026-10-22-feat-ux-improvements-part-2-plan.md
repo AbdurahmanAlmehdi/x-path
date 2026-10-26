@@ -180,7 +180,7 @@ Details:
 
 ### Phase U6c: Accessibility, density and context menus
 
-- **Status:** Not started
+- **Status:** Done
 - **Scope:** Every primary action works from the keyboard and a screen reader; Reduce Motion
   and compact density are honoured.
 - **Files touched:** `apps/xp_desktop/lib/{widgets,shell,approvals,job,project_overview,credentials,theme,app}/**`

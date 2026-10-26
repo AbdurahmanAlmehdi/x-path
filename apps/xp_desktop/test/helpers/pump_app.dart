@@ -244,6 +244,9 @@ extension PumpApp on WidgetTester {
               value: storage ?? storageIn(const StorageState()),
             ),
             BlocProvider<ToastCubit>(create: (_) => toasts ?? ToastCubit()),
+            BlocProvider<DensityCubit>(
+              create: (_) => DensityCubit(AppPreferences()),
+            ),
             BlocProvider<EngineNoticesBloc>.value(
               value: notices ?? noticesIn(const EngineNoticesState()),
             ),

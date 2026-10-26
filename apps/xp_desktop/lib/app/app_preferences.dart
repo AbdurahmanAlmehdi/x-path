@@ -2,8 +2,8 @@ import 'dart:convert';
 import 'dart:io';
 
 /// What the app remembers between launches on this Mac (U6b): whether
-/// closing the window keeps it running, the notices the owner turned off,
-/// and the page last shown of each engine. A small JSON object.
+/// closing the window keeps it running, compact rows, the notices the owner
+/// turned off, and the page last shown of each engine. A small JSON object.
 class AppPreferences {
   /// Preferences kept in memory only, starting as [values].
   new([Map<String, Object?> values = const {}]) : _file = null {
@@ -31,12 +31,16 @@ class AppPreferences {
   final _values = <String, Object?>{};
 
   static const _keepRunning = 'keepRunning';
+  static const _compact = 'compactRows';
   static const _muted = 'mutedNotices';
   static const _destinations = 'lastDestinations';
 
   /// Whether closing the window keeps XPath in the menu bar (UX-07); on by
   /// default.
   bool get keepRunning => _values[_keepRunning] as bool? ?? true;
+
+  /// Whether rows are compact (⌃⌘=, U6c); off by default.
+  bool get compactRows => _values[_compact] as bool? ?? false;
 
   /// The notices the owner turned off, by name.
   Set<String> get mutedNotices => {
@@ -49,6 +53,9 @@ class AppPreferences {
 
   Future<void> setKeepRunning({required bool keep}) =>
       _write(_keepRunning, keep);
+
+  Future<void> setCompactRows({required bool compact}) =>
+      _write(_compact, compact);
 
   Future<void> setMutedNotices(Set<String> names) =>
       _write(_muted, [...names]..sort());

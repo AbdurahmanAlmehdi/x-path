@@ -345,8 +345,9 @@ class _Row extends StatelessWidget {
     ),
     child: Row(
       children: [
-        SizedBox(
-          width: 180,
+        ConstrainedBox(
+          // Grows with the text size (U6c).
+          constraints: const BoxConstraints(minWidth: 180),
           child: Text(
             label,
             style: context.xpType.body.copyWith(

@@ -265,7 +265,10 @@ class _FindingRow extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(width: 90, child: XpStatusLabel(status, label)),
+          ConstrainedBox(
+            constraints: const BoxConstraints(minWidth: 90),
+            child: XpStatusLabel(status, label),
+          ),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:xp_desktop/app/app_services.dart';
+import 'package:xp_desktop/app/bloc/density_cubit.dart';
 import 'package:xp_desktop/app/bloc/engine_connection_bloc.dart';
 import 'package:xp_desktop/app/bloc/engine_notices_bloc.dart';
 import 'package:xp_desktop/approvals/bloc/pending_approvals_bloc.dart';
@@ -51,6 +52,7 @@ class App extends StatelessWidget {
           ),
         ),
         BlocProvider(create: (_) => ToastCubit()),
+        BlocProvider(create: (_) => DensityCubit(services.preferences)),
       ],
       child: const XpClock(child: AppView()),
     ),
@@ -71,7 +73,16 @@ class AppView extends StatelessWidget {
       ...GlobalMaterialLocalizations.delegates,
     ],
     supportedLocales: AppLocalizations.supportedLocales,
-    builder: (context, child) => XpToastHost(child: child!),
+    // Reduce Motion, the text size of macOS and compact rows (U6c).
+    builder: (context, child) => Theme(
+      data: appTheme(
+        Theme.of(context).brightness,
+        reduceMotion: MediaQuery.disableAnimationsOf(context),
+        compact: context.watch<DensityCubit>().state,
+        textScale: MediaQuery.textScalerOf(context).scale(1),
+      ),
+      child: XpToastHost(child: child!),
+    ),
     home: const LocalEngineListener(child: AppHome()),
   );
 }

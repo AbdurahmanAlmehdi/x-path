@@ -272,15 +272,11 @@ class _PipelineNodeTileState extends State<PipelineNodeTile> {
       ),
     );
     if (widget.onTap == null) return tile;
-    return Semantics(
-      button: true,
+    return XpTappable(
+      onTap: widget.onTap,
       selected: node.selected,
-      child: MouseRegion(
-        cursor: SystemMouseCursors.click,
-        onEnter: (_) => setState(() => _hovered = true),
-        onExit: (_) => setState(() => _hovered = false),
-        child: GestureDetector(onTap: widget.onTap, child: tile),
-      ),
+      onHover: (value) => setState(() => _hovered = value),
+      child: tile,
     );
   }
 }

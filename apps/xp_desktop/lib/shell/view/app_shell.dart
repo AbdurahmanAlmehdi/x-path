@@ -5,6 +5,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:xp_api/xp_api.dart';
 import 'package:xp_desktop/add_project/view/add_project_page.dart';
 import 'package:xp_desktop/app/app_services.dart';
+import 'package:xp_desktop/app/bloc/density_cubit.dart';
 import 'package:xp_desktop/approvals/bloc/pending_approvals_bloc.dart';
 import 'package:xp_desktop/approvals/view/approval_review_sheet.dart';
 import 'package:xp_desktop/approvals/view/approvals_page.dart';
@@ -119,6 +120,8 @@ class _AppShellState extends State<AppShell> {
         XpCommand.forward: shell.forward,
         XpCommand.sidebar: () => setState(() => _sidebar = !_sidebar),
         XpCommand.shortcuts: () => unawaited(showShortcutSheet(context)),
+        XpCommand.compact: () =>
+            unawaited(context.read<DensityCubit>().toggle()),
         XpCommand.settings: () => shell.show(const SettingsDestination()),
       },
       child: CallbackShortcuts(

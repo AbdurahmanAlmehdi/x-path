@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
@@ -250,6 +251,21 @@ void main() {
       expect(find.text('Approved · not published'), findsOneWidget);
       expect(find.text('Not checked'), findsOneWidget);
       expect(find.text('no live release'), findsNWidgets(2));
+    });
+
+    testWidgets('a right click on a flavor copies its bundle ID', (
+      tester,
+    ) async {
+      await OverviewHarness().pump(tester);
+
+      await tester.tapAt(
+        tester.getCenter(find.text('prod').last),
+        buttons: kSecondaryButton,
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Copy bundle ID com.sixdtec.mata'), findsOneWidget);
+      expect(find.text('Copy bundle ID com.mataaa'), findsOneWidget);
     });
 
     testWidgets('sums up the credentials of each flavor and opens them', (

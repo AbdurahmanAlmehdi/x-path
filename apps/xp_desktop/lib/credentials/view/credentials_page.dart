@@ -326,20 +326,28 @@ class _CredentialTable extends StatelessWidget {
                             : null,
                       ),
                       const SizedBox(width: 6),
-                      for (final (label, action) in [
-                        (l10n.credentialsRename, onRename),
-                        (l10n.credentialsReplace, onReplace),
-                        (l10n.credentialsDelete, onDelete),
-                      ]) ...[
-                        XpButton(
-                          label: label,
-                          size: XpButtonSize.small,
-                          kind: XpButtonKind.tertiary,
-                          onPressed: canCommand
-                              ? () => action(credential)
-                              : null,
-                        ),
-                      ],
+                      // Rename and Replace in a menu, Delete last and in the
+                      // negative colour (U6c).
+                      XpMenuButton(
+                        label: l10n.credentialsMore,
+                        actions: canCommand
+                            ? [
+                                XpMenuAction(
+                                  l10n.credentialsRename,
+                                  () => onRename(credential),
+                                ),
+                                XpMenuAction(
+                                  l10n.credentialsReplace,
+                                  () => onReplace(credential),
+                                ),
+                                XpMenuAction(
+                                  l10n.credentialsDelete,
+                                  () => onDelete(credential),
+                                  destructive: true,
+                                ),
+                              ]
+                            : null,
+                      ),
                     ],
                   ),
                 ),

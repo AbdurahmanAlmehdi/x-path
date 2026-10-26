@@ -3882,4 +3882,51 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get menuBarDispatch => 'Dispatch…';
+
+  @override
+  String copiedValue(String value) {
+    return 'Copied $value';
+  }
+
+  @override
+  String get engineSwitcherTooltip => 'Switch engine';
+
+  @override
+  String get selectTooltip => 'Choose';
+
+  @override
+  String get menuCopySha => 'Copy commit';
+
+  @override
+  String get menuCopyVersion => 'Copy version';
+
+  @override
+  String menuCopyBundleId(String id) {
+    return 'Copy bundle ID $id';
+  }
+
+  @override
+  String get menuOpenJob => 'Open job';
+
+  @override
+  String get menuRevealArtifact => 'Show in Finder';
+
+  @override
+  String credentialActions(String name) {
+    return 'Actions of $name';
+  }
+
+  @override
+  String sidebarNeedsYouCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'need',
+      one: 'needs',
+    );
+    return '$count $_temp0 you';
+  }
+
+  @override
+  String get credentialsMore => 'More';
 }

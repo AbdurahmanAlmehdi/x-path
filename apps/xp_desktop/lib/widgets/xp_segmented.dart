@@ -1,5 +1,6 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:xp_desktop/theme/theme.dart';
+import 'package:xp_desktop/widgets/xp_tappable.dart';
 
 /// A segmented control (`size.control.md`): the selected segment sits on
 /// `surface.raised` with a hairline inside a sunken well.
@@ -56,39 +57,32 @@ class _Segment extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.xpColors;
-    return Semantics(
-      button: true,
+    return XpTappable(
+      onTap: onTap,
       selected: selected,
       label: label,
-      excludeSemantics: true,
-      child: MouseRegion(
-        cursor: onTap == null ? MouseCursor.defer : SystemMouseCursors.click,
-        child: GestureDetector(
-          onTap: onTap,
-          child: AnimatedContainer(
-            duration: context.xpMotion.durationBase,
-            padding: const EdgeInsets.symmetric(horizontal: 10),
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: selected ? colors.surfaceRaised : Colors.transparent,
-              borderRadius: BorderRadius.circular(context.xpRadii.sm),
-              border: Border.all(
-                color: selected ? colors.borderDefault : Colors.transparent,
-              ),
-            ),
-            child: Text(
-              label,
-              style:
-                  (selected ? context.xpType.bodyStrong : context.xpType.body)
-                      .copyWith(
-                        color: onTap == null
-                            ? colors.textDisabled
-                            : selected
-                            ? colors.textPrimary
-                            : colors.textSecondary,
-                      ),
-            ),
+      radius: context.xpRadii.sm,
+      child: AnimatedContainer(
+        duration: context.xpMotion.durationBase,
+        padding: const EdgeInsets.symmetric(horizontal: 10),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: selected ? colors.surfaceRaised : Colors.transparent,
+          borderRadius: BorderRadius.circular(context.xpRadii.sm),
+          border: Border.all(
+            color: selected ? colors.borderDefault : Colors.transparent,
           ),
+        ),
+        child: Text(
+          label,
+          style: (selected ? context.xpType.bodyStrong : context.xpType.body)
+              .copyWith(
+                color: onTap == null
+                    ? colors.textDisabled
+                    : selected
+                    ? colors.textPrimary
+                    : colors.textSecondary,
+              ),
         ),
       ),
     );
@@ -122,37 +116,31 @@ class XpChip extends StatelessWidget {
         ? colors.accentOnContainer
         : colors.textPrimary;
     return Semantics(
-      button: true,
       toggled: selected,
-      label: label,
-      excludeSemantics: true,
-      child: MouseRegion(
-        cursor: onChanged == null
-            ? MouseCursor.defer
-            : SystemMouseCursors.click,
-        child: GestureDetector(
-          onTap: onChanged == null ? null : () => onChanged!(!selected),
-          child: AnimatedContainer(
-            duration: context.xpMotion.durationFast,
-            height: context.xpSizes.controlSm,
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            decoration: BoxDecoration(
-              color: selected ? colors.accentContainer : colors.surfaceRaised,
-              borderRadius: BorderRadius.circular(context.xpRadii.sm),
-              border: Border.all(
-                color: selected ? colors.accentDefault : colors.borderDefault,
-              ),
+      child: XpTappable(
+        onTap: onChanged == null ? null : () => onChanged!(!selected),
+        label: label,
+        radius: context.xpRadii.sm,
+        child: AnimatedContainer(
+          duration: context.xpMotion.durationFast,
+          height: context.xpSizes.controlSm,
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          decoration: BoxDecoration(
+            color: selected ? colors.accentContainer : colors.surfaceRaised,
+            borderRadius: BorderRadius.circular(context.xpRadii.sm),
+            border: Border.all(
+              color: selected ? colors.accentDefault : colors.borderDefault,
             ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (icon case final icon?) ...[
-                  Icon(icon, size: context.xpSizes.iconSm, color: ink),
-                  const SizedBox(width: 4),
-                ],
-                Text(label, style: context.xpType.body.copyWith(color: ink)),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (icon case final icon?) ...[
+                Icon(icon, size: context.xpSizes.iconSm, color: ink),
+                const SizedBox(width: 4),
               ],
-            ),
+              Text(label, style: context.xpType.body.copyWith(color: ink)),
+            ],
           ),
         ),
       ),

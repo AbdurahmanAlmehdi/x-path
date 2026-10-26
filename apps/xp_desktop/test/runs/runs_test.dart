@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:bloc_test/bloc_test.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:mocktail/mocktail.dart';
@@ -9,6 +10,7 @@ import 'package:xp_client/xp_client.dart';
 import 'package:xp_desktop/projects/bloc/projects_bloc.dart';
 import 'package:xp_desktop/runs/bloc/runs_bloc.dart';
 import 'package:xp_desktop/runs/view/runs_page.dart';
+import 'package:xp_desktop/runs/widgets/run_row.dart';
 import 'package:xp_desktop/shell/cubit/shell_cubit.dart';
 import 'package:xp_repositories/xp_repositories.dart';
 
@@ -260,5 +262,28 @@ void main() {
       await tester.pump();
       expect(shell.state, const RunsDestination('prj_1'));
     });
+  });
+
+  testWidgets('a right click on a run opens it or copies its commit', (
+    tester,
+  ) async {
+    final shell = ShellCubit();
+    final run = _run('run_1', RunState.failed);
+    await tester.pumpApp(
+      RunRow(run: run, workflowName: 'Prod release'),
+      shell: shell,
+    );
+
+    await tester.tapAt(
+      tester.getCenter(find.byType(RunRow)),
+      buttons: kSecondaryButton,
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Copy commit'), findsOneWidget);
+    expect(find.text('Copy version'), findsOneWidget);
+    await tester.tap(find.text('Open job'));
+    await tester.pumpAndSettle();
+
+    expect(shell.state, const JobDestination('run_1', projectId: 'prj_1'));
   });
 }

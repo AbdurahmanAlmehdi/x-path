@@ -6363,6 +6363,72 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Dispatch…'**
   String get menuBarDispatch;
+
+  /// No description provided for @copiedValue.
+  ///
+  /// In en, this message translates to:
+  /// **'Copied {value}'**
+  String copiedValue(String value);
+
+  /// Tooltip of the engine switcher.
+  ///
+  /// In en, this message translates to:
+  /// **'Switch engine'**
+  String get engineSwitcherTooltip;
+
+  /// Tooltip of a select menu.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose'**
+  String get selectTooltip;
+
+  /// Context menu.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy commit'**
+  String get menuCopySha;
+
+  /// Context menu.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy version'**
+  String get menuCopyVersion;
+
+  /// No description provided for @menuCopyBundleId.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy bundle ID {id}'**
+  String menuCopyBundleId(String id);
+
+  /// Context menu.
+  ///
+  /// In en, this message translates to:
+  /// **'Open job'**
+  String get menuOpenJob;
+
+  /// Context menu of a downloaded artifact.
+  ///
+  /// In en, this message translates to:
+  /// **'Show in Finder'**
+  String get menuRevealArtifact;
+
+  /// No description provided for @credentialActions.
+  ///
+  /// In en, this message translates to:
+  /// **'Actions of {name}'**
+  String credentialActions(String name);
+
+  /// No description provided for @sidebarNeedsYouCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} {count, plural, =1{needs} other{need}} you'**
+  String sidebarNeedsYouCount(int count);
+
+  /// Opens the menu of a credential's other actions.
+  ///
+  /// In en, this message translates to:
+  /// **'More'**
+  String get credentialsMore;
 }
 
 class _AppLocalizationsDelegate

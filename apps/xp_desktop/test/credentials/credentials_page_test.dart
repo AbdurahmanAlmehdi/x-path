@@ -95,10 +95,21 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  /// Taps [label] in the row of [id]: a button, or an item of its menu
+  /// (U6c), which a disabled More does not open.
   Future<void> tapIn(WidgetTester tester, String id, String label) async {
-    await tester.tap(
-      find.descendant(of: find.byKey(ValueKey(id)), matching: find.text(label)),
+    Finder inRow(String text) => find.descendant(
+      of: find.byKey(ValueKey(id)),
+      matching: find.text(text),
     );
+    if (const {'Rename…', 'Replace secret…', 'Delete…'}.contains(label)) {
+      await tester.tap(inRow('More'));
+      await tester.pumpAndSettle();
+      if (find.text(label).evaluate().isEmpty) return;
+      await tester.tap(find.text(label).last);
+    } else {
+      await tester.tap(inRow(label));
+    }
     await tester.pumpAndSettle();
   }
 

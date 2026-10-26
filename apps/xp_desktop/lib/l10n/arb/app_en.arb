@@ -2107,5 +2107,30 @@
   "menuBarRunDetail": "{project} · {done} of {total} jobs",
   "@menuBarRunDetail": {"placeholders": {"project": {"type": "String"}, "done": {"type": "int"}, "total": {"type": "int"}}},
   "menuBarDispatch": "Dispatch…",
-  "@menuBarDispatch": {"description": "Quick dispatch menu of the menu bar extra."}
+  "@menuBarDispatch": {"description": "Quick dispatch menu of the menu bar extra."},
+
+  "copiedValue": "Copied {value}",
+  "@copiedValue": {"placeholders": {"value": {"type": "String"}}},
+  "engineSwitcherTooltip": "Switch engine",
+  "@engineSwitcherTooltip": {"description": "Tooltip of the engine switcher."},
+  "selectTooltip": "Choose",
+  "@selectTooltip": {"description": "Tooltip of a select menu."},
+  "menuCopySha": "Copy commit",
+  "@menuCopySha": {"description": "Context menu."},
+  "menuCopyVersion": "Copy version",
+  "@menuCopyVersion": {"description": "Context menu."},
+  "menuCopyBundleId": "Copy bundle ID {id}",
+  "@menuCopyBundleId": {"placeholders": {"id": {"type": "String"}}},
+  "menuOpenJob": "Open job",
+  "@menuOpenJob": {"description": "Context menu."},
+  "menuRevealArtifact": "Show in Finder",
+  "@menuRevealArtifact": {"description": "Context menu of a downloaded artifact."},
+  "credentialActions": "Actions of {name}",
+  "@credentialActions": {"placeholders": {"name": {"type": "String"}}},
+
+  "sidebarNeedsYouCount": "{count} {count, plural, =1{needs} other{need}} you",
+  "@sidebarNeedsYouCount": {"placeholders": {"count": {"type": "int"}}},
+
+  "credentialsMore": "More",
+  "@credentialsMore": {"description": "Opens the menu of a credential's other actions."}
 }

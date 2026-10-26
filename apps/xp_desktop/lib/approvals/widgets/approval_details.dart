@@ -216,8 +216,9 @@ class ApprovalDetails extends StatelessWidget {
             if (index > 0) const SizedBox(height: 8),
             Row(
               children: [
-                SizedBox(
-                  width: 96,
+                ConstrainedBox(
+                  // Grows with the text size (U6c).
+                  constraints: const BoxConstraints(minWidth: 96),
                   child: Text(
                     label,
                     style: type.caption.copyWith(color: colors.textSecondary),

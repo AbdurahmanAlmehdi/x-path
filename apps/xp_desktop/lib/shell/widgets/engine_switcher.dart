@@ -22,7 +22,7 @@ class EngineSwitcher extends StatelessWidget {
     final type = context.xpType;
     final l10n = context.l10n;
     return PopupMenuButton<String>(
-      tooltip: '',
+      tooltip: context.l10n.engineSwitcherTooltip,
       position: PopupMenuPosition.under,
       onSelected: (engineId) => engineId == manage
           ? context.read<ShellCubit>().show(const EnginesDestination())

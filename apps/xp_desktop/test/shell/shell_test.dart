@@ -4,6 +4,7 @@ import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:xp_api/xp_api.dart';
@@ -397,6 +398,40 @@ void main() {
       expect(shell.state, const ApprovalsDestination());
       await press(tester, XpCommand.forward.activator);
       expect(shell.state, const SettingsDestination());
+    });
+
+    testWidgets('⌃⌘= switches to compact rows and back', (tester) async {
+      await pumpShell(tester, shell: ShellCubit(const ApprovalsDestination()));
+      await tester.pump();
+      final density = tester
+          .element(find.byType(AppShell))
+          .read<DensityCubit>();
+
+      runCommand(XpCommand.compact);
+      await tester.pump();
+      expect(density.state, isTrue);
+      runCommand(XpCommand.compact);
+      await tester.pump();
+      expect(density.state, isFalse);
+    });
+
+    testWidgets('the sidebar reads out what waits', (tester) async {
+      await tester.pumpApp(
+        const Sidebar(),
+        shell: ShellCubit(const ProjectDestination('prj_1')),
+        projects: projectsIn(
+          const ProjectsState(loaded: true, projects: [mataa, captain]),
+        ),
+        pendingApprovals: pendingIn(
+          PendingApprovalsState(loaded: true, approvals: [pendingApproval]),
+        ),
+      );
+
+      expect(find.bySemanticsLabel('Approvals, 1 needs you'), findsOneWidget);
+      expect(
+        find.bySemanticsLabel(RegExp('acme/mataa_new_app, 1 app')),
+        findsOneWidget,
+      );
     });
 
     testWidgets('⌃⌘S hides and shows the sidebar', (tester) async {

@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart' hide StepState;
@@ -532,13 +533,27 @@ void main() {
           revealFile: (path) async => revealed.add(path),
         ),
       );
-      await tester.tap(find.byTooltip('Download…'));
+      Future<void> rightClick() async {
+        await tester.tapAt(
+          tester.getCenter(find.text('mataa.ipa')),
+          buttons: kSecondaryButton,
+        );
+        await tester.pumpAndSettle();
+      }
+
+      // Before it is downloaded, a right click offers to download it.
+      await rightClick();
+      await tester.tap(find.text('Download…').last);
       await tester.pump();
       await tester.pump();
 
       await tester.tap(find.byTooltip('Reveal in Finder'));
       await tester.pump();
       expect(revealed, ['/Downloads/mataa.ipa']);
+      await rightClick();
+      await tester.tap(find.text('Show in Finder'));
+      await tester.pumpAndSettle();
+      expect(revealed, ['/Downloads/mataa.ipa', '/Downloads/mataa.ipa']);
       String? copied;
       tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
         SystemChannels.platform,

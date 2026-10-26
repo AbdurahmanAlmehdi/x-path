@@ -251,8 +251,9 @@ class _StepRow extends StatelessWidget {
         children: [
           XpStatusIcon(status),
           const SizedBox(width: 8),
-          SizedBox(
-            width: 180,
+          ConstrainedBox(
+            // Grows with the text size (U6c).
+            constraints: const BoxConstraints(minWidth: 180),
             child: Text(
               title,
               style: context.xpType.body.copyWith(color: colors.textPrimary),
