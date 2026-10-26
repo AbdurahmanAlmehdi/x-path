@@ -205,6 +205,13 @@ class TestEngine {
       VersionBumpStep(git: git, workspaces: (_) => InMemoryWorkspace(const {})),
       GitHubCreatePrStep(github),
       GitHubMergePrStep(github: github, releases: releaseRepository),
+      StoreRolloutStep(
+        releases: releaseRepository,
+        ascCredentials: FakeAscCredentialSource(),
+        appStoreConnect: (_) => FakeAppStoreConnect(),
+        playCredentials: FakePlayCredentialSource(),
+        googlePlay: (_) => FakeGooglePlay(),
+      ),
     ]);
     final jobs = JobRunner(
       jobs: jobRepository,

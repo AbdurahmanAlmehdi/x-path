@@ -59,6 +59,9 @@ enum ReleaseRunKind {
 
   /// It merges the pull request.
   merge,
+
+  /// It changes the rollout in a store (U7a).
+  rollout,
 }
 
 /// What a dispatch tells the releases. `ReleaseService` implements it; the

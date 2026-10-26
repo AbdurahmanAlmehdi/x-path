@@ -81,6 +81,7 @@ class ReleasesView extends StatelessWidget {
         for (final (command, toast) in [
           (ReleaseCommand.marking, l10n.releaseMarkedToast),
           (ReleaseCommand.merging, l10n.releaseMergedToast),
+          (ReleaseCommand.rollingOut, l10n.releaseRolloutToast),
         ])
           BlocListener<ReleaseBoardBloc, ReleaseBoardState>(
             listenWhen: (previous, current) =>

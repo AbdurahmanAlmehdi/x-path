@@ -1033,6 +1033,12 @@ void main() {
       when(() => client.startReleaseBuild('rel_1'))
           .thenAnswer((_) async => _run);
       when(() => client.mergeRelease('rel_1')).thenAnswer((_) async => _run);
+      const pause = RolloutRequest(
+        store: ReleaseStore.apple,
+        action: RolloutAction.pause,
+      );
+      when(() => client.requestRollout('rel_1', pause))
+          .thenAnswer((_) async => _run);
       when(() => client.abandonRelease('rel_1', reason: 'no'))
           .thenAnswer((_) async => _release);
       when(() => client.getReleaseNotes('rel_1'))
@@ -1049,6 +1055,7 @@ void main() {
       );
       expect(await repository.startBuild('rel_1'), _run);
       expect(await repository.merge('rel_1'), _run);
+      expect(await repository.rollout('rel_1', pause), _run);
       expect(await repository.abandon('rel_1', reason: 'no'), _release);
       expect(await repository.notes('rel_1'), notes);
     });

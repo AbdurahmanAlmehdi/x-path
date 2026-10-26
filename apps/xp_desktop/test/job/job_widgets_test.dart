@@ -49,11 +49,12 @@ void main() {
         'git.releaseBranch',
         'github.createPr',
         'github.mergePr',
+        'store.rollout',
         'record.manifest',
         'gate',
         'command',
       ];
-      expect({for (final kind in kinds) l10n.stepKind(kind)}, hasLength(23));
+      expect({for (final kind in kinds) l10n.stepKind(kind)}, hasLength(24));
       expect(l10n.stepKind('custom.step'), 'custom.step');
       for (final action in [
         'prod_release',
@@ -61,6 +62,7 @@ void main() {
         'store_submission',
         'push',
         'merge',
+        'rollout',
         'delete',
       ]) {
         expect(l10n.gateAction(action), isNotEmpty);

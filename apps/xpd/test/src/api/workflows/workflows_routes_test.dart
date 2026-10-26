@@ -71,6 +71,7 @@ void main() {
         'dev-build',
         'prod-release',
         'release-merge',
+        'release-rollout',
         'shorebird-patch',
         'smoke-build',
         'test',

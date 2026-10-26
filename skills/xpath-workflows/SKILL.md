@@ -1,6 +1,6 @@
 ---
 name: xpath-workflows
-description: Write, change and validate XPath workflow YAML (schema 1), the documents XPath dispatches to build, test, upload and release Flutter apps. Use when creating a workflow, copying and changing a built-in one (dev-build, prod-release, release-merge, shorebird-patch, smoke-build, test), adding inputs with defaults (such as firebaseAppIds or appleAppIds), stages, jobs, matrix, if expressions, gates or capabilities, choosing step kinds and their `with` keys, or fixing a workflow_invalid error.
+description: Write, change and validate XPath workflow YAML (schema 1), the documents XPath dispatches to build, test, upload and release Flutter apps. Use when creating a workflow, copying and changing a built-in one (dev-build, prod-release, release-merge, release-rollout, shorebird-patch, smoke-build, test), adding inputs with defaults (such as firebaseAppIds or appleAppIds), stages, jobs, matrix, if expressions, gates or capabilities, choosing step kinds and their `with` keys, or fixing a workflow_invalid error.
 license: Apache-2.0
 ---
 
@@ -130,7 +130,7 @@ Rules that shape every workflow:
 
 ## Gates and capabilities
 
-`gate: prod_release | prod_patch | store_submission | push | merge | delete` on a step puts an
+`gate: prod_release | prod_patch | store_submission | push | merge | rollout | delete` on a step puts an
 approval in front of it. The job stops in `waiting_for_approval` (holding no slot or runner)
 until the owner decides with an `app` or `cli` token. Which gates a project enforces is the
 owner's setting (`xp gates show <project>`; only the app turns a gate off). Never remove a gate
@@ -143,8 +143,8 @@ platform's for Shorebird steps; `flutter` for `test` and `analyze`.
 
 ## Built-ins: copy, never edit
 
-Every project has `dev-build`, `prod-release`, `release-merge`, `shorebird-patch`, `smoke-build`
-and `test`.
+Every project has `dev-build`, `prod-release`, `release-merge`, `release-rollout`,
+`shorebird-patch`, `smoke-build` and `test`.
 They cannot be edited or deleted (`409`). Their stages and steps are in
 [references/built-in-workflows.md](references/built-in-workflows.md). To change one, copy its YAML
 into a workflow of your own:

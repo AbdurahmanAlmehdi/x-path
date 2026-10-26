@@ -931,6 +931,45 @@ class StepPlanners implements StepCatalog {
         'githubRepoId': _githubRepoIdOf(p.job.run.project, p.fail),
       },
     ),
+    StepPlanSpec(
+      'store.rollout',
+      const [
+        StepKey.choice('store', [
+          'apple',
+          'play',
+        ], description: 'The store whose rollout changes.'),
+        StepKey.choice(
+          'action',
+          ['pause', 'resume', 'complete', 'halt', 'fraction'],
+          description:
+              'Apple: pause, resume or complete. Google Play: fraction, '
+              'halt or complete.',
+        ),
+        StepKey(
+          'userFraction',
+          value: StepValue.number,
+          description:
+              'For "fraction", the share of users, above 0, at most 1.',
+        ),
+      ],
+      (p) async {
+        final request = RolloutRequest(
+          store: ReleaseStore.values.byName(p.requireText('store')),
+          action: RolloutAction.values.byName(p.requireText('action')),
+          userFraction: p.number('userFraction')?.toDouble(),
+        );
+        if (request.problem case final problem?) p.fail(problem);
+        return {
+          'releaseId':
+              p.job.run.release ??
+              p.fail(
+                'There is no release to roll out: dispatch this workflow with '
+                '"release", or ask on the release page.',
+              ),
+          ...request.toJson(),
+        };
+      },
+    ),
   ];
 
   // --------------------------------------------------------------- helpers
@@ -1207,6 +1246,13 @@ const stepAbout = <String, StepAbout>{
     title: 'Merge the pull request',
     description: 'Merges the pull request of the release.',
     group: 'GitHub',
+  ),
+  'store.rollout': (
+    title: 'Change the rollout',
+    description:
+        "Pauses, resumes or completes Apple's phased release, or sets, halts "
+        "or completes Google Play's staged rollout.",
+    group: 'Upload',
   ),
   'command': (
     title: 'Run a command',

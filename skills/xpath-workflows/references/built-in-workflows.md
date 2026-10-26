@@ -45,6 +45,13 @@ One stage `merge`, one job: `github.mergePr` behind `gate: merge`. Started by
 `POST /releases/{id}/merge` (`xp releases merge <release>`) once every store the release went to
 is live. No project lock.
 
+## `release-rollout`
+
+One stage `rollout`, one engine job: `store.rollout` behind `gate: rollout`. Inputs `store`,
+`action` and `userFraction`. Started by `POST /releases/{id}/rollout`
+(`xp releases rollout <release> --store <apple|play> --pause|--resume|--complete|--halt|--percent <n>`,
+or the MCP tool `request_rollout`) once the stores approved the release. No project lock.
+
 ## `shorebird-patch`
 
 `lock: project`. Dispatch with `releaseVersion` (`x.y.z+build`, never `latest`). Every job runs

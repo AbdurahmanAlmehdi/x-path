@@ -48,6 +48,12 @@ void main() {
   setUpAll(() {
     registerFallbackValue(ReleaseStore.apple);
     registerFallbackValue(StoreState.live);
+    registerFallbackValue(
+      const RolloutRequest(
+        store: ReleaseStore.apple,
+        action: RolloutAction.pause,
+      ),
+    );
   });
 
   setUp(() {
@@ -226,6 +232,83 @@ void main() {
       await tester.pump();
       expect(find.text('GitHub said no.'), findsOneWidget);
       expect(find.text('Release branch merged'), findsNothing);
+    });
+
+    testWidgets('changes the rollout of a live release in each store', (
+      tester,
+    ) async {
+      final harness = ReleasesHarness(
+        releases: [
+          reviewRelease(
+            state: ReleaseState.live,
+            stores: [
+              lane(
+                ReleaseStore.apple,
+                StoreState.live,
+                changedAt: oct12(20, 0),
+              ),
+              lane(ReleaseStore.play, StoreState.live, changedAt: oct12(20, 0)),
+            ],
+          ),
+        ],
+      );
+      final repository = harness.releasesRepository;
+      when(() => repository.rollout('rel_2', any()))
+          .thenAnswer((_) async => runningRun().run);
+      await harness.pump(tester);
+      expect(
+        find.text('Each change waits for your approval.'),
+        findsNWidgets(2),
+      );
+
+      await tester.tap(find.text('Pause'));
+      await tester.pump();
+      expect(
+        find.text('Rollout change requested: approve it to apply'),
+        findsOneWidget,
+      );
+      await tester.tap(find.text('Roll out to'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('50 % of users'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Halt'));
+      await tester.pump();
+
+      expect(
+        verify(() => repository.rollout('rel_2', captureAny())).captured,
+        const [
+          RolloutRequest(
+            store: ReleaseStore.apple,
+            action: RolloutAction.pause,
+          ),
+          RolloutRequest(
+            store: ReleaseStore.play,
+            action: RolloutAction.fraction,
+            userFraction: 0.5,
+          ),
+          RolloutRequest(store: ReleaseStore.play, action: RolloutAction.halt),
+        ],
+      );
+    });
+
+    testWidgets('offers no rollout change for a store it cannot read', (
+      tester,
+    ) async {
+      await ReleasesHarness(
+        credentials: const [],
+        releases: [
+          reviewRelease(
+            state: ReleaseState.live,
+            stores: [
+              lane(ReleaseStore.apple, StoreState.live),
+              lane(ReleaseStore.play, StoreState.live),
+            ],
+          ),
+        ],
+      ).pump(tester);
+
+      expect(find.text('Pause'), findsNothing);
+      expect(find.text('Roll out to'), findsNothing);
     });
 
     testWidgets('says why the releases cannot be read, and reads again', (

@@ -706,7 +706,7 @@ stages:
       expect(
         issues(step('          - kind: guard\n            gate: ship')).single,
         '8:19 Unknown gate "ship". Allowed: delete, merge, prod_patch, '
-        'prod_release, push, store_submission.',
+        'prod_release, push, rollout, store_submission.',
       );
       expect(
         issues(step('          - kind: guard\n            gate: 3')).single,

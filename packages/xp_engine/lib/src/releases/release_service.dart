@@ -34,6 +34,17 @@ typedef DispatchWorkflow = Future<Run> Function(
 /// The built-in workflow that merges the pull request of a release.
 const releaseMergeWorkflow = 'release-merge';
 
+/// The built-in workflow that changes the rollout of a release (U7a).
+const releaseRolloutWorkflow = 'release-rollout';
+
+/// The states of a release whose store rollouts can change: the stores
+/// approved it, or it is out.
+const Set<ReleaseState> _rolledOut = {
+  ReleaseState.approved,
+  ReleaseState.live,
+  ReleaseState.merged,
+};
+
 /// The states in which the stores still decide where a release goes.
 const Set<ReleaseState> _waitingOnStores = {
   ReleaseState.uploaded,
@@ -270,6 +281,13 @@ class ReleaseService implements ReleaseOpener {
           );
         }
         await _save(release, release.copyWith(mergeRunId: runId));
+      case ReleaseRunKind.rollout:
+        if (!_rolledOut.contains(release.state)) {
+          throw ReleaseStateException(
+            'The rollout of ${release.id} cannot change: it is '
+            '${release.state.wire}.',
+          );
+        }
     }
   });
 
@@ -678,6 +696,53 @@ class ReleaseService implements ReleaseOpener {
         flavors: [release.flavor],
         releaseVersion: '${release.version}+${release.build}',
         release: release.id,
+      ),
+    );
+  }
+
+  // --------------------------------------------------------------- rollout
+
+  /// Requests the rollout change [request] of the release [id] (U7a): runs
+  /// the `release-rollout` workflow on the commit of the release, whose
+  /// change waits for the owner's approval (D-13).
+  ///
+  /// Throws a [ReleaseNotFoundException], a [ReleaseStateException] unless
+  /// the stores approved the release and it went to the store of [request],
+  /// a [ReleaseRequestException] for a change the store cannot make, and
+  /// what the dispatch throws.
+  Future<Run> requestRollout(String id, RolloutRequest request) async {
+    if (request.problem case final problem?) {
+      throw ReleaseRequestException(problem);
+    }
+    final release = await sync(id);
+    if (!_rolledOut.contains(release.state)) {
+      throw ReleaseStateException(
+        'The rollout of ${release.id} cannot change: it is '
+        '${release.state.wire}. A rollout changes once the stores approved '
+        'the release.',
+      );
+    }
+    if (!release.stores.containsKey(request.store)) {
+      throw ReleaseStateException(
+        'The release ${release.id} did not go to ${request.store.wire}.',
+      );
+    }
+    final workflow = (await _workflows.list(release.projectId))
+        .firstWhere((workflow) => workflow.name == releaseRolloutWorkflow);
+    return await _dispatch(
+      release.projectId,
+      workflow.id,
+      DispatchRequest(
+        ref: release.tag ?? release.branch,
+        app: release.appPath,
+        flavors: [release.flavor],
+        releaseVersion: '${release.version}+${release.build}',
+        release: release.id,
+        inputs: {
+          'store': request.store.wire,
+          'action': request.action.wire,
+          'userFraction': ?request.userFraction,
+        },
       ),
     );
   }

@@ -67,6 +67,10 @@ class ReleasesRepository {
   Future<Run> merge(String id) =>
       _session.call((client) => client.mergeRelease(id));
 
+  /// Asks to change the rollout of [id] in a store.
+  Future<Run> rollout(String id, RolloutRequest request) =>
+      _session.call((client) => client.requestRollout(id, request));
+
   /// Abandons [id].
   Future<Release> abandon(String id, {String? reason}) =>
       _session.call((client) => client.abandonRelease(id, reason: reason));

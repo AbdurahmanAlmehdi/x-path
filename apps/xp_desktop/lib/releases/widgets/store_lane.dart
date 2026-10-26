@@ -31,6 +31,16 @@ const Set<StoreState> _markable = {
   StoreState.approved,
 };
 
+/// The release states whose rollout can change: the stores approved it.
+const Set<ReleaseState> _rolledOut = {
+  ReleaseState.approved,
+  ReleaseState.live,
+  ReleaseState.merged,
+};
+
+/// The shares of users, in percent, Google Play's staged rollout offers.
+const List<int> _shares = [5, 10, 20, 50];
+
 /// The steps of a lane in [status]. A store the engine reads ([manual] is
 /// false) shows its review; one it cannot read shows what it cannot know.
 List<LaneStep> laneSteps(
@@ -300,6 +310,15 @@ class StoreLane extends StatelessWidget {
     } else if (!manual && status.note != null) {
       widgets.add(XpMessage(XpStatus.scanWarning, status.note!));
     }
+    if (!manual &&
+        status.state == StoreState.live &&
+        _rolledOut.contains(release.state)) {
+      if (widgets.isNotEmpty) widgets.add(const SizedBox(height: 8));
+      widgets
+        ..add(_rollout(context, bloc, enabled: canCommand && !busy))
+        ..add(const SizedBox(height: 6))
+        ..add(Text(l10n.laneRolloutCaption, style: caption));
+    }
     final before = liveBefore(board.releases, release, store);
     if (before != null && release.state != ReleaseState.rejected) {
       if (widgets.isNotEmpty) widgets.add(const SizedBox(height: 8));
@@ -313,6 +332,70 @@ class StoreLane extends StatelessWidget {
       );
     }
     return widgets;
+  }
+
+  /// The rollout controls of the store (U7a): Apple's phased release
+  /// pauses, resumes or goes to everyone; Google Play's staged rollout takes
+  /// a share of users, halts or goes to everyone.
+  Widget _rollout(
+    BuildContext context,
+    ReleaseBoardBloc bloc, {
+    required bool enabled,
+  }) {
+    final l10n = context.l10n;
+    final board = bloc.state;
+    final tooltip = context.canCommand ? null : l10n.readOnlyHint;
+    VoidCallback? request(RolloutAction action, [double? fraction]) => enabled
+        ? () => bloc.add(
+            ReleaseBoardRolloutRequested(
+              RolloutRequest(
+                store: store,
+                action: action,
+                userFraction: fraction,
+              ),
+            ),
+          )
+        : null;
+    Widget button(String label, RolloutAction action) => Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: XpButton(
+        label: label,
+        size: XpButtonSize.small,
+        busy: board.command == ReleaseCommand.rollingOut,
+        tooltip: tooltip,
+        onPressed: request(action),
+      ),
+    );
+    return Wrap(
+      runSpacing: 8,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: switch (store) {
+        ReleaseStore.apple => [
+          button(l10n.lanePause, RolloutAction.pause),
+          button(l10n.laneResume, RolloutAction.resume),
+          button(l10n.laneReleaseToAll, RolloutAction.complete),
+        ],
+        ReleaseStore.play => [
+          Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: XpMenuButton(
+              label: l10n.laneRollOutTo,
+              actions: enabled
+                  ? [
+                      for (final percent in _shares)
+                        XpMenuAction(
+                          l10n.lanePercent(percent),
+                          request(RolloutAction.fraction, percent / 100)!,
+                        ),
+                    ]
+                  : null,
+            ),
+          ),
+          button(l10n.laneHalt, RolloutAction.halt),
+          button(l10n.laneReleaseToAll, RolloutAction.complete),
+        ],
+      },
+    );
   }
 
   /// Asks, then marks the store [state] by hand.

@@ -1977,6 +1977,51 @@ paths:
           $ref: "#/components/responses/SecretsLocked"
         "500":
           $ref: "#/components/responses/InternalError"
+  /releases/{id}/rollout:
+    parameters:
+      - $ref: "#/components/parameters/ReleaseId"
+    post:
+      operationId: rolloutRelease
+      summary: Request a change of the rollout of the release in a store.
+      description: |
+        Open once the stores approved the release (`approved`, `live` or
+        `merged`), for a store it went to. Apple's phased release pauses,
+        resumes or completes; Google Play's staged rollout takes a new
+        `userFraction`, halts or completes. It dispatches the
+        `release-rollout` workflow, whose change is a gated action (D-13):
+        the run waits for an `app` or `cli` token to approve it, and then
+        the engine changes the rollout with the store credentials of the
+        app. `400 invalid_request` for a change the store cannot make,
+        `409 conflict` before the stores approved the release.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RolloutRequest"
+      responses:
+        "202":
+          description: The run that changes the rollout.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Run"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/WorkflowInvalid"
+        "503":
+          $ref: "#/components/responses/SecretsLocked"
+        "500":
+          $ref: "#/components/responses/InternalError"
   /releases/{id}/abandon:
     parameters:
       - $ref: "#/components/parameters/ReleaseId"
@@ -4958,6 +5003,7 @@ components:
         - push
         - merge
         - delete
+        - rollout
     ApprovalsResponse:
       type: object
       required: [approvals]
@@ -5140,6 +5186,26 @@ components:
           type: string
           enum: [approved, live]
           description: '`approved` or `live` for Apple, `live` for Google Play.'
+    RolloutAction:
+      type: string
+      description: |
+        Apple: `pause`, `resume` or `complete`. Google Play: `fraction`,
+        `halt` or `complete`.
+      enum: [pause, resume, complete, halt, fraction]
+    RolloutRequest:
+      type: object
+      required: [store, action]
+      additionalProperties: false
+      properties:
+        store:
+          $ref: "#/components/schemas/ReleaseStore"
+        action:
+          $ref: "#/components/schemas/RolloutAction"
+        userFraction:
+          type: number
+          exclusiveMinimum: 0
+          maximum: 1
+          description: For `fraction`, the share of users to reach.
     AbandonRequest:
       type: object
       additionalProperties: false

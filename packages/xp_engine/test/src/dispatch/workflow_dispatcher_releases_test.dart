@@ -251,6 +251,72 @@ void main() {
     });
   });
 
+  group('the rollout of a release', () {
+    test('attaches the run and gates the change on the release', () async {
+      final run = await harness.dispatchBuiltin(
+        'release-rollout',
+        const DispatchRequest(
+          ref: 'main',
+          flavors: ['prod'],
+          releaseVersion: '1.2.0+5',
+          release: 'rel_1',
+          inputs: {'store': 'play', 'action': 'fraction', 'userFraction': 0.2},
+        ),
+      );
+
+      expect(releases.attached, ['rel_1 prj_1 rollout ${run.id} null']);
+      expect(run.locksProject, isFalse);
+      final job = await harness.job(run.jobs.single.id);
+      expect(harness.kinds(job), ['gate', 'store.rollout']);
+      expect(await harness.input(job, 'gate'), {
+        'action': 'rollout',
+        'projectId': 'prj_1',
+        'sha': mainSha,
+        'version': '1.2.0+5',
+      });
+      expect(await harness.input(job, 'store.rollout'), {
+        'releaseId': 'rel_1',
+        'store': 'play',
+        'action': 'fraction',
+        'userFraction': 0.2,
+      });
+    });
+
+    test('says what is wrong with the change', () async {
+      await expectLater(
+        harness.dispatchBuiltin(
+          'release-rollout',
+          const DispatchRequest(
+            ref: 'main',
+            flavors: ['prod'],
+            release: 'rel_1',
+            inputs: {'store': 'apple', 'action': 'fraction'},
+          ),
+        ),
+        throwsA(isA<DispatchException>()),
+      );
+    });
+
+    test('needs a release to roll out', () async {
+      await expectLater(
+        harness.dispatchBuiltin(
+          'release-rollout',
+          const DispatchRequest(
+            flavors: ['prod'],
+            inputs: {'store': 'apple', 'action': 'pause'},
+          ),
+        ),
+        throwsA(
+          isA<DispatchException>().having(
+            (e) => e.message,
+            'message',
+            contains('There is no release to roll out'),
+          ),
+        ),
+      );
+    });
+  });
+
   group('a release that cannot be named', () {
     test('is refused by an engine that tracks no releases', () async {
       harness = await DispatchHarness.create();
@@ -271,8 +337,9 @@ void main() {
           const DispatchRequest(release: 'rel_1'),
         ),
         _dispatchError(
-          'A run of a release has to build it again (a "version.bump" step) '
-          'or merge its pull request (a "github.mergePr" step).',
+          'A run of a release has to build it again (a "version.bump" step), '
+          'merge its pull request (a "github.mergePr" step) or change its '
+          'rollout (a "store.rollout" step).',
         ),
       );
     });

@@ -229,7 +229,7 @@ Details:
 
 ### Phase U7a: Rollout controls
 
-- **Status:** Not started
+- **Status:** Done
 - **Scope:** Gated rollout controls for both stores, with CLI and MCP mirrors.
 - **Files touched:** `packages/xp_engine/lib/src/{releases,stores}/**`,
   `packages/xp_adapters/lib/src/stores/**`, `apps/xpd/lib/src/api/releases/**`,

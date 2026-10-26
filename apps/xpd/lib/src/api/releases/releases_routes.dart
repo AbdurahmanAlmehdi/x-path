@@ -10,11 +10,11 @@ import 'package:xpd/src/api/workflows/workflows_routes.dart';
 /// The release endpoints (D-17): list and read the releases, read the notes
 /// of one for Slack and WhatsApp (D-22), ask the stores
 /// about one now, say what a store did by hand, build the same version again
-/// after a rejection, request the merge of the pull request and give a
-/// release up.
+/// after a rejection, request the merge of the pull request, request a change
+/// of the rollout in a store (U7a) and give a release up.
 ///
 /// Anyone with a token may read, refresh, start a new build and request the
-/// merge: the build and the merge are gated actions, which wait for the owner
+/// merge or a rollout change: these are gated actions, which wait for the owner
 /// to approve them (D-13). Setting a store status and abandoning are for `app`
 /// and `cli` tokens only, because a status moves a release toward the merge
 /// of its pull request; the rules are the [ReleaseService]'s, and a token that
@@ -36,6 +36,7 @@ class ReleasesRoutes {
       ..post('/releases/<id>/stores/<store>/status', _setStatus)
       ..post('/releases/<id>/builds', _newBuild)
       ..post('/releases/<id>/merge', _merge)
+      ..post('/releases/<id>/rollout', _rollout)
       ..post('/releases/<id>/abandon', _abandon);
   }
 
@@ -96,6 +97,11 @@ class ReleasesRoutes {
 
   Future<Response> _merge(Request request, String id) => _guard(() async {
     return _accepted(await _releases.requestMerge(id));
+  });
+
+  Future<Response> _rollout(Request request, String id) => _guard(() async {
+    final body = await readJsonBody(request, RolloutRequest.fromJson);
+    return _accepted(await _releases.requestRollout(id, body));
   });
 
   Future<Response> _abandon(Request request, String id) => _guard(() async {

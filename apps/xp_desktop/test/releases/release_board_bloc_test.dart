@@ -13,6 +13,11 @@ import '../helpers/fakes.dart';
 import '../helpers/job_fixtures.dart';
 import '../helpers/release_fixtures.dart';
 
+const _pause = RolloutRequest(
+  store: ReleaseStore.apple,
+  action: RolloutAction.pause,
+);
+
 void main() {
   late MockReleasesRepository releases;
   late MockApprovalsRepository approvals;
@@ -62,6 +67,7 @@ void main() {
       [ReleaseStore.play, StoreState.live],
     );
     expect(const ReleaseBoardMergeRequested().props, isEmpty);
+    expect(const ReleaseBoardRolloutRequested(_pause).props, [_pause]);
   });
 
   group('ReleaseBoardState', () {
@@ -166,7 +172,7 @@ void main() {
   );
 
   blocTest<ReleaseBoardBloc, ReleaseBoardState>(
-    'refreshes, marks, merges and builds again',
+    'refreshes, marks, merges, rolls out and builds again',
     setUp: () {
       when(() => releases.refresh('rel_2'))
           .thenAnswer((_) async => reviewRelease());
@@ -178,6 +184,8 @@ void main() {
         ),
       ).thenAnswer((_) async => reviewRelease());
       when(() => releases.merge('rel_2'))
+          .thenAnswer((_) async => runningRun().run);
+      when(() => releases.rollout('rel_2', _pause))
           .thenAnswer((_) async => runningRun().run);
       when(() => releases.startBuild('rel_2'))
           .thenAnswer((_) async => runningRun().run);
@@ -193,6 +201,8 @@ void main() {
       await pumpEventQueue();
       bloc.add(const ReleaseBoardMergeRequested());
       await pumpEventQueue();
+      bloc.add(const ReleaseBoardRolloutRequested(_pause));
+      await pumpEventQueue();
       expect(bloc.state.builtRun, isNull);
       bloc.add(const ReleaseBoardNewBuildRequested());
       await pumpEventQueue();
@@ -202,6 +212,7 @@ void main() {
       expect(bloc.state.builtRun, runningRun().run);
       verify(() => releases.refresh('rel_2')).called(1);
       verify(() => releases.merge('rel_2')).called(1);
+      verify(() => releases.rollout('rel_2', _pause)).called(1);
     },
   );
 

@@ -183,6 +183,12 @@ class TestEnv {
 void registerFallbacks() {
   registerFallbackValue(const AddProjectRequest());
   registerFallbackValue(const DispatchRequest());
+  registerFallbackValue(
+    const RolloutRequest(
+      store: ReleaseStore.apple,
+      action: RolloutAction.pause,
+    ),
+  );
   registerFallbackValue(const CreateWorkflowRequest(name: 'n', yaml: 'y'));
   registerFallbackValue(const UpdateWorkflowRequest());
   registerFallbackValue(const FreeSpaceRequest());

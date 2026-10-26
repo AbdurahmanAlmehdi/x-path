@@ -56,6 +56,17 @@ final class ReleaseBoardMergeRequested extends ReleaseBoardEvent {
   const new();
 }
 
+/// Asks to change the rollout of the release in a store (U7a); the change
+/// waits for the owner's approval.
+final class ReleaseBoardRolloutRequested extends ReleaseBoardEvent {
+  const new(this.request);
+
+  final RolloutRequest request;
+
+  @override
+  List<Object?> get props => [request];
+}
+
 /// Builds the rejected version again with a new build number.
 final class ReleaseBoardNewBuildRequested extends ReleaseBoardEvent {
   const new();
@@ -68,7 +79,7 @@ final class _ReleaseBoardNotesRequested extends ReleaseBoardEvent {
 }
 
 /// What the board is sending to the engine.
-enum ReleaseCommand { none, refreshing, marking, merging, building }
+enum ReleaseCommand { none, refreshing, marking, merging, rollingOut, building }
 
 class ReleaseBoardState extends Equatable {
   const new({
@@ -189,8 +200,8 @@ class ReleaseBoardState extends Equatable {
 }
 
 /// The releases of a project (concept 3A): the release shown with its store
-/// lanes, timeline and notes; refresh, the manual store buttons, "New build,
-/// same version" and Merge.
+/// lanes, timeline and notes; refresh, the manual store buttons, the
+/// rollout controls, "New build, same version" and Merge.
 class ReleaseBoardBloc extends Bloc<ReleaseBoardEvent, ReleaseBoardState> {
   new({
     required this._releases,
@@ -209,6 +220,7 @@ class ReleaseBoardBloc extends Bloc<ReleaseBoardEvent, ReleaseBoardState> {
     on<ReleaseBoardRefreshRequested>(_onRefresh, transformer: droppable());
     on<ReleaseBoardStoreMarked>(_onMark, transformer: droppable());
     on<ReleaseBoardMergeRequested>(_onMerge, transformer: droppable());
+    on<ReleaseBoardRolloutRequested>(_onRollout, transformer: droppable());
     on<ReleaseBoardNewBuildRequested>(_onNewBuild, transformer: droppable());
   }
 
@@ -339,6 +351,15 @@ class ReleaseBoardBloc extends Bloc<ReleaseBoardEvent, ReleaseBoardState> {
     emit,
     ReleaseCommand.merging,
     (release) => _releases.merge(release.id),
+  );
+
+  Future<void> _onRollout(
+    ReleaseBoardRolloutRequested event,
+    Emitter<ReleaseBoardState> emit,
+  ) => _command(
+    emit,
+    ReleaseCommand.rollingOut,
+    (release) => _releases.rollout(release.id, event.request),
   );
 
   Future<void> _onNewBuild(

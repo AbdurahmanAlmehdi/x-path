@@ -373,6 +373,13 @@ class ServeCommand extends XpdCommand {
           store: artifactStore,
           secrets: secrets,
         ),
+        StoreRolloutStep(
+          releases: releaseRepository,
+          ascCredentials: apple.credentials,
+          appStoreConnect: apple.connect,
+          playCredentials: play.credentials,
+          googlePlay: play.connect,
+        ),
         GuardStep(
           checks: [
             const SourceCheck(),

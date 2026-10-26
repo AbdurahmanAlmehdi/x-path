@@ -207,4 +207,52 @@ void main() {
       );
     });
   });
+
+  group('RolloutRequest', () {
+    test('round-trips through JSON', () {
+      const request = RolloutRequest(
+        store: ReleaseStore.play,
+        action: RolloutAction.fraction,
+        userFraction: 0.5,
+      );
+
+      expect(request.toJson(), {
+        'store': 'play',
+        'action': 'fraction',
+        'userFraction': 0.5,
+      });
+      expect(RolloutRequest.fromJson(request.toJson()), request);
+    });
+
+    test('says what a store cannot do', () {
+      String? problem(
+        ReleaseStore store,
+        RolloutAction action, [
+        double? fraction,
+      ]) => RolloutRequest(
+        store: store,
+        action: action,
+        userFraction: fraction,
+      ).problem;
+
+      for (final action in [
+        RolloutAction.pause,
+        RolloutAction.resume,
+        RolloutAction.complete,
+      ]) {
+        expect(problem(ReleaseStore.apple, action), isNull);
+      }
+      expect(problem(ReleaseStore.apple, RolloutAction.halt), isNotNull);
+      expect(problem(ReleaseStore.play, RolloutAction.pause), isNotNull);
+      expect(problem(ReleaseStore.play, RolloutAction.halt), isNull);
+      expect(problem(ReleaseStore.play, RolloutAction.fraction, 0.1), isNull);
+      expect(problem(ReleaseStore.play, RolloutAction.fraction, 1), isNull);
+      expect(problem(ReleaseStore.play, RolloutAction.fraction), isNotNull);
+      expect(problem(ReleaseStore.play, RolloutAction.fraction, 0), isNotNull);
+      expect(
+        problem(ReleaseStore.play, RolloutAction.fraction, 1.5),
+        isNotNull,
+      );
+    });
+  });
 }

@@ -38,6 +38,13 @@ StepRegistry allSteps({
       github: FakeGitHubClient({}),
       releases: InMemoryReleaseRepository(),
     ),
+    StoreRolloutStep(
+      releases: InMemoryReleaseRepository(),
+      ascCredentials: FakeAscCredentialSource(),
+      appStoreConnect: connect,
+      playCredentials: FakePlayCredentialSource(),
+      googlePlay: connect,
+    ),
     VersionBumpStep(git: service, workspaces: workspace),
     BuildAndroidStep(
       toolchain: harness.toolchain,

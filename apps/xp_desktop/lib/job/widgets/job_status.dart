@@ -125,6 +125,7 @@ extension JobLabels on AppLocalizations {
     'git.releaseBranch' => stepReleaseBranch,
     'github.createPr' => stepCreatePr,
     'github.mergePr' => stepMergePr,
+    'store.rollout' => stepRollout,
     'record.manifest' => stepManifest,
     'gate' => stepGate,
     'command' => stepCommand,
@@ -139,6 +140,7 @@ extension JobLabels on AppLocalizations {
     'store_submission' => gateStoreSubmission,
     'push' => gatePush,
     'merge' => gateMerge,
+    'rollout' => gateRollout,
     'delete' => gateDelete,
     _ => action,
   };

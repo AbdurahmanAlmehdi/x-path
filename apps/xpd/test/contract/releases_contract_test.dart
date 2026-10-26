@@ -284,6 +284,65 @@ void main() {
       );
     });
 
+    test('POST rollout 202, 400, 401, 403, 404 and 409', () async {
+      final id = await client.uploaded();
+      final path = '/releases/$id/rollout';
+      const pause = {'store': 'apple', 'action': 'pause'};
+
+      expectContract(
+        await client.send('POST', path, body: pause),
+        path: path,
+        method: 'POST',
+        status: 409,
+      );
+      for (final store in ['apple', 'play']) {
+        await client.send(
+          'POST',
+          '/releases/$id/stores/$store/status',
+          body: {'state': 'live'},
+        );
+      }
+      expectContract(
+        await client.send('POST', path, body: pause),
+        path: path,
+        method: 'POST',
+        status: 202,
+      );
+      expectContract(
+        await client.send(
+          'POST',
+          path,
+          body: {'store': 'play', 'action': 'pause'},
+        ),
+        path: path,
+        method: 'POST',
+        status: 400,
+      );
+      expectContract(
+        await client.send(
+          'POST',
+          path,
+          body: pause,
+          kind: DeviceTokenKind.runner,
+        ),
+        path: path,
+        method: 'POST',
+        status: 403,
+      );
+      expectContract(
+        await client.engine.request(path, method: 'POST', token: ''),
+        path: path,
+        method: 'POST',
+        status: 401,
+      );
+      expectContract(
+        await client.send('POST', '/releases/rel_nope/rollout', body: pause),
+        path: '/releases/rel_nope/rollout',
+        method: 'POST',
+        status: 404,
+      );
+    });
+
     test('POST abandon 200, 400, 401, 403, 404 and 409', () async {
       final id = await client.open();
       final path = '/releases/$id/abandon';

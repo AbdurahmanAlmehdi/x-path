@@ -57,6 +57,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get releaseMergedToast => 'Release branch merged';
 
   @override
+  String get releaseRolloutToast =>
+      'Rollout change requested: approve it to apply';
+
+  @override
   String get jobCancelledToast => 'Run cancelled';
 
   @override
@@ -1100,6 +1104,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get stepMergePr => 'Merge the release PR';
 
   @override
+  String get stepRollout => 'Change the rollout';
+
+  @override
   String get stepManifest => 'Record the manifest';
 
   @override
@@ -1122,6 +1129,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get gateMerge => 'merge';
+
+  @override
+  String get gateRollout => 'rollout change';
 
   @override
   String get gateDelete => 'delete';
@@ -2035,6 +2045,29 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get laneMarkLive => 'Mark live';
+
+  @override
+  String get lanePause => 'Pause';
+
+  @override
+  String get laneResume => 'Resume';
+
+  @override
+  String get laneReleaseToAll => 'Release to all';
+
+  @override
+  String get laneHalt => 'Halt';
+
+  @override
+  String get laneRollOutTo => 'Roll out to';
+
+  @override
+  String lanePercent(int percent) {
+    return '$percent % of users';
+  }
+
+  @override
+  String get laneRolloutCaption => 'Each change waits for your approval.';
 
   @override
   String laneMarkTitle(String version, String state) {

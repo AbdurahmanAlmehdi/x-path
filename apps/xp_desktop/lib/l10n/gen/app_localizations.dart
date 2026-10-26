@@ -172,6 +172,12 @@ abstract class AppLocalizations {
   /// **'Release branch merged'**
   String get releaseMergedToast;
 
+  /// Toast: a change of the store rollout was asked for and waits for an approval.
+  ///
+  /// In en, this message translates to:
+  /// **'Rollout change requested: approve it to apply'**
+  String get releaseRolloutToast;
+
   /// Toast: the jobs of the run that had not ended were cancelled.
   ///
   /// In en, this message translates to:
@@ -1939,6 +1945,12 @@ abstract class AppLocalizations {
   /// Name of a kind of step.
   ///
   /// In en, this message translates to:
+  /// **'Change the rollout'**
+  String get stepRollout;
+
+  /// Name of a kind of step.
+  ///
+  /// In en, this message translates to:
   /// **'Record the manifest'**
   String get stepManifest;
 
@@ -1983,6 +1995,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'merge'**
   String get gateMerge;
+
+  /// A gated action, inside a sentence.
+  ///
+  /// In en, this message translates to:
+  /// **'rollout change'**
+  String get gateRollout;
 
   /// A gated action, inside a sentence.
   ///
@@ -3345,6 +3363,48 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Mark live'**
   String get laneMarkLive;
+
+  /// Pauses Apple's phased release.
+  ///
+  /// In en, this message translates to:
+  /// **'Pause'**
+  String get lanePause;
+
+  /// Resumes Apple's phased release.
+  ///
+  /// In en, this message translates to:
+  /// **'Resume'**
+  String get laneResume;
+
+  /// Completes the phased or staged rollout: every user gets the release.
+  ///
+  /// In en, this message translates to:
+  /// **'Release to all'**
+  String get laneReleaseToAll;
+
+  /// Halts Google Play's staged rollout.
+  ///
+  /// In en, this message translates to:
+  /// **'Halt'**
+  String get laneHalt;
+
+  /// Opens the shares of users Google Play's staged rollout can reach.
+  ///
+  /// In en, this message translates to:
+  /// **'Roll out to'**
+  String get laneRollOutTo;
+
+  /// No description provided for @lanePercent.
+  ///
+  /// In en, this message translates to:
+  /// **'{percent} % of users'**
+  String lanePercent(int percent);
+
+  /// Under the rollout buttons of a store lane.
+  ///
+  /// In en, this message translates to:
+  /// **'Each change waits for your approval.'**
+  String get laneRolloutCaption;
 
   /// No description provided for @laneMarkTitle.
   ///

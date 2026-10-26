@@ -386,6 +386,77 @@ void main() {
     });
   });
 
+  group('POST /releases/{id}/rollout', () {
+    late String id;
+
+    Future<void> live() async {
+      id = await client.uploaded();
+      for (final store in ['apple', 'play']) {
+        await client.send(
+          'POST',
+          '/releases/$id/stores/$store/status',
+          body: {'state': 'live'},
+        );
+      }
+    }
+
+    test('requests the change, which waits for the owner', () async {
+      await live();
+
+      final response = await client.send(
+        'POST',
+        '/releases/$id/rollout',
+        body: {'store': 'play', 'action': 'fraction', 'userFraction': 0.5},
+        kind: DeviceTokenKind.mcp,
+      );
+
+      expect(response.statusCode, 202);
+      final run = Run.fromJson(response.json);
+      expect(response.headers['location'], '/runs/${run.id}');
+      final approvals = await client.engine.approvals.list();
+      expect(approvals.single.action, 'rollout');
+      expect(approvals.single.version, '1.2.0+5');
+    });
+
+    test('says what is wrong with the change (400)', () async {
+      await live();
+
+      final response = await client.send(
+        'POST',
+        '/releases/$id/rollout',
+        body: {'store': 'apple', 'action': 'halt'},
+      );
+
+      expect(response.statusCode, 400);
+      expect(errorOf(response).error.message, contains('phased release'));
+    });
+
+    test('waits until the stores approved the release (409)', () async {
+      id = await client.uploaded();
+
+      final response = await client.send(
+        'POST',
+        '/releases/$id/rollout',
+        body: {'store': 'apple', 'action': 'pause'},
+      );
+
+      expect(response.statusCode, 409);
+    });
+
+    test('is closed to runner tokens', () async {
+      await live();
+
+      final response = await client.send(
+        'POST',
+        '/releases/$id/rollout',
+        body: {'store': 'apple', 'action': 'pause'},
+        kind: DeviceTokenKind.runner,
+      );
+
+      expect(response.statusCode, 403);
+    });
+  });
+
   group('POST /releases/{id}/abandon', () {
     test('gives the release up, with a reason', () async {
       final id = await client.open();

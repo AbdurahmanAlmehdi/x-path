@@ -48,6 +48,7 @@ const _unversionedKinds = {
   'git.checkout',
   'github.mergePr',
   'guard',
+  'store.rollout',
   'test',
 };
 
@@ -486,10 +487,13 @@ class WorkflowDispatcher {
         kind = ReleaseRunKind.merge;
       } else if (kinds.contains('version.bump')) {
         kind = ReleaseRunKind.build;
+      } else if (kinds.contains('store.rollout')) {
+        kind = ReleaseRunKind.rollout;
       } else {
         throw const DispatchException(
-          'A run of a release has to build it again (a "version.bump" step) '
-          'or merge its pull request (a "github.mergePr" step).',
+          'A run of a release has to build it again (a "version.bump" step), '
+          'merge its pull request (a "github.mergePr" step) or change its '
+          'rollout (a "store.rollout" step).',
         );
       }
       try {

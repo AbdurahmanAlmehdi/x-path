@@ -79,8 +79,8 @@ MCP: `list_projects`, `get_project`, `list_workflows`, `get_workflow`. Every CLI
 `--json`, before or after the command (`xp runs show run_... --json`), to print what the API
 answered; an error is then `{"code", "message", "hint"}` on standard error.
 
-Every project has the built-ins `dev-build`, `prod-release`, `release-merge`, `shorebird-patch`
-and `test`. Read a workflow's `inputs` before dispatching it. `plan_dispatch` (or
+Every project has the built-ins `dev-build`, `prod-release`, `release-merge`, `release-rollout`,
+`shorebird-patch`, `smoke-build` and `test`. Read a workflow's `inputs` before dispatching it. `plan_dispatch` (or
 `xp dispatch ... --dry-run`) says what a dispatch would start and which jobs it leaves out and
 why, without starting anything; check it before a release.
 
@@ -226,6 +226,10 @@ What only the owner does, and you only suggest:
   only when the owner asks for it.
 - Once every store is `live`, request the merge (`xp releases merge <release>`, or Merge in the
   app). It starts `release-merge`, which waits at the `merge` gate for the owner.
+- Change a rollout once the stores approved the release, only when the owner asks:
+  `xp releases rollout <release> --store apple --pause` (or `--resume`, `--complete`), or
+  `--store play --percent 50` (or `--halt`, `--complete`); the MCP tool is `request_rollout`. It
+  starts `release-rollout`, which waits at the `rollout` gate for the owner.
 - Abandon a release.
 
 ## Resume and cancel

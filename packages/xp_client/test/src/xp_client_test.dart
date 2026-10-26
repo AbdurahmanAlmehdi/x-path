@@ -884,6 +884,23 @@ void main() {
       expected: sample.run,
     ),
     _Endpoint(
+      'requestRollout',
+      method: 'POST',
+      path: '/releases/rel_1/rollout',
+      status: 202,
+      response: sample.run.toJson(),
+      call: (client) => client.requestRollout(
+        'rel_1',
+        const RolloutRequest(
+          store: ReleaseStore.play,
+          action: RolloutAction.fraction,
+          userFraction: 0.2,
+        ),
+      ),
+      expected: sample.run,
+      body: {'store': 'play', 'action': 'fraction', 'userFraction': 0.2},
+    ),
+    _Endpoint(
       'abandonRelease',
       method: 'POST',
       path: '/releases/rel_1/abandon',

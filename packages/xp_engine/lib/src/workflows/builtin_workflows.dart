@@ -7,6 +7,7 @@ const builtinWorkflows = <String, String>{
   'dev-build': _devBuild,
   'prod-release': _prodRelease,
   'release-merge': _releaseMerge,
+  'release-rollout': _releaseRollout,
   'shorebird-patch': _shorebirdPatch,
   'smoke-build': _smokeBuild,
   'test': _test,
@@ -328,6 +329,40 @@ stages:
         steps:
           - kind: github.mergePr
             gate: merge
+''';
+
+// The rollout of a release once it is in a store (U7a): Apple's phased
+// release and Google Play's staged rollout. The change is a gated action
+// (D-13), and only the engine reaches the stores.
+const _releaseRollout = r'''
+schema: 1
+name: Change the rollout of a release
+description: >-
+  Pauses, resumes or completes Apple's phased release, or sets, halts or
+  completes Google Play's staged rollout. Started from the release; the change
+  waits for the owner's approval.
+inputs:
+  store:
+    type: choice
+    options: [apple, play]
+  action:
+    type: choice
+    options: [pause, resume, complete, halt, fraction]
+  userFraction:
+    type: json
+    description: For "fraction", the share of users, above 0, at most 1.
+stages:
+  - name: rollout
+    jobs:
+      rollout:
+        name: Change the ${{ inputs.store }} rollout
+        steps:
+          - kind: store.rollout
+            gate: rollout
+            with:
+              store: ${{ inputs.store }}
+              action: ${{ inputs.action }}
+              userFraction: ${{ inputs.userFraction }}
 ''';
 
 // A patch is ship.sh `patch prod`: an over-the-air code patch against an

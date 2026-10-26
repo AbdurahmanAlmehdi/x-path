@@ -1157,7 +1157,7 @@ stages:                        # required; run in order
   planner stores the id of the job of the same matrix cell as `artifactJob` in the step input; a step
   without it looks in its own job. This is how an upload can run on the engine while the build ran on a
   runner, which uploaded what it built to the engine's artifact store (ADR 0010).
-- **Gates** (D-13). `gate: prod_release | prod_patch | store_submission | push | merge | delete` on a step
+- **Gates** (D-13). `gate: prod_release | prod_patch | store_submission | push | merge | rollout | delete` on a step
   puts a `gate` step in front of it. The gate asks the `ApprovalGate` port (`xp_engine`) about the action,
   project, commit and version, and while nobody decided, its step returns `StepWaiting`: the job stops in
   state **`waiting_for_approval`**, holding no slot and no runner, and its run holds the project lock.
@@ -1181,7 +1181,7 @@ stages:                        # required; run in order
 
 ### Built-in workflows and versions
 
-Every project gets `dev-build`, `prod-release`, `release-merge`, `shorebird-patch`, `smoke-build` and `test` the first time its workflows
+Every project gets `dev-build`, `prod-release`, `release-merge`, `release-rollout`, `shorebird-patch`, `smoke-build` and `test` the first time its workflows
 are listed (and a new version of one when the engine ships another document). They compose the steps in the
 order of `ship.sh`. **The job that builds has no step only the engine may run** (ADR 0010), so that it can be
 leased to a runner: the guards, the gates, the uploads, the tag and the pushes are in engine jobs of an earlier
@@ -1192,6 +1192,7 @@ or later stage, and the uploads take what the runner built from the engine's art
 | `dev-build` | `check`, `build`, `upload` (each: platform x flavor) | No lock: as many as the slots allow. `check` (engine): `git.checkout`, `guard` source and credentials. `build` (runner-eligible): `git.checkout`, `version.bump` (a dev build pushes nothing, so the version commit stays in the job's worktree), `build.android` / `build.ios`, `record.manifest`. `upload` (engine, only for a platform and flavor that has something to upload): `upload.firebase` (an Android build with an app id in `firebaseAppIds`) or `upload.appStore` (an iOS build with an id in `appleAppIds`). |
 | `prod-release` | `prepare`, `check`, `build`, `upload`, `finalize` | `lock: project`. `prepare` (engine) bumps the version once, cuts the release branch after `gate: prod_release` and pushes the branch after `gate: push`, so that a runner can fetch the version commit (ADR 0009). `check` (engine): `versionSync`, `buildNumberReuse`, `credentials`, and the store checks, from that commit. `build` (runner-eligible): `git.checkout` from that commit, `shorebird.release` (a Shorebird flavor) or `build.android` / `build.ios`, `symbols.archive`, `record.manifest`. `upload` (engine): `upload.play`, `upload.firebase`, `upload.appStore`, the ones the flavor has credentials for. `finalize` (engine) tags, pushes the tag and opens the release pull request (`github.createPr`). The approval of the push covers the tag push too (it binds to the same project, commit, version and run). A run of it is a release (see Releases). |
 | `release-merge` | `merge` | Merges the pull request of a release: `gate: merge`, then `github.mergePr`. Started by `POST /releases/{id}/merge`, no project lock. |
+| `release-rollout` | `rollout` | Changes the rollout of a release in a store: `gate: rollout`, then `store.rollout` (engine only). Inputs `store`, `action` and `userFraction`. Started by `POST /releases/{id}/rollout`, no project lock. |
 | `shorebird-patch` | `check`, `patch` (platform x flavor), `finalize` | `lock: project`. Dispatch it with `releaseVersion` (`x.y.z+build`, never `latest`). `check` (engine): the guards, and `gate: prod_patch` in front of the last of them (so that the owner is asked only about a patch that passed the others). `patch` (runner-eligible): `git.checkout`, `shorebird.patch`. `finalize` (engine): the patch tag `v<x.y.z>+<build>-p<n>` and `gate: push`. |
 | `smoke-build` | `build` (each flavor) | `git.checkout`, then `build.android` with `keystore: false`: an APK signed with the debug key, from the pubspec version. No credential, no store id, no upload, no build number. The app offers it after the first scan, for a green build before signing is set up. |
 | `test` | `test` | `test` and `analyze`; allocates no build number. |
@@ -1676,6 +1677,7 @@ draft -> building -> uploaded -> in_review -> approved -> live -> merged
 | `POST /releases/{id}/stores/{store}/status` | `{"state": "approved" or "live"}`. `app` and `cli` tokens; `409` when the store has no build yet or is past that status. |
 | `POST /releases/{id}/builds` | New build, same version. `202` with the run; `409` unless the release is `rejected`. |
 | `POST /releases/{id}/merge` | Request the merge. `202` with the run, which waits for approval; `409` unless the release is `live` with a pull request. |
+| `POST /releases/{id}/rollout` | `{"store", "action", "userFraction"}`: pause, resume or complete Apple's phased release; set the `fraction`, `halt` or `complete` Google Play's staged rollout. `202` with the run of `release-rollout`, which waits at `gate: rollout`; `400` for a change the store cannot make, `409` before the stores approved the release. |
 | `POST /releases/{id}/abandon` | `{"reason"}` optional. `app` and `cli` tokens; cancels a run that still builds it. |
 
 `release.created`, `release.state_changed` and `release.store_changed` go on `/events`.
@@ -1790,7 +1792,7 @@ the API answered, for scripts; otherwise it prints text and tables.
 | `xp logs <job> [-f] [--after seq]` | `/jobs/{id}/logs` (WebSocket) |
 | `xp approvals list [--project --state]`, `show <a>`, `approve <a> [--reason]`, `deny <a> [--reason]` | `/approvals`; the CLI token is a `cli` token, which may decide (D-13) |
 | `xp gates show <p>`, `tighten <p> <action>...` | `/projects/{id}/gates`; only the app loosens a gate |
-| `xp releases list`, `show <r>`, `refresh <r>`, `status <r> <apple\|play> <state>`, `build <r>`, `merge <r>`, `abandon <r>`, `notes <r> [--format slack\|whatsapp]` | `/releases` |
+| `xp releases list`, `show <r>`, `refresh <r>`, `status <r> <apple\|play> <state>`, `build <r>`, `merge <r>`, `rollout <r> --store <apple\|play> (--pause\|--resume\|--complete\|--halt\|--percent <n>)`, `abandon <r>`, `notes <r> [--format slack\|whatsapp]` | `/releases` |
 | `xp storage report`, `free [--apply] [--category c]`, `retention [--keep n] [--log-days n]` | `/storage` (`free` is a dry run unless you pass `--apply`) |
 | `xp runners pair <name>`, `revoke <runner>` | `POST /runners/pairing-tokens`, `POST /runners/{id}/revoke` (a runner is its name or id); see Runners |
 | `xp runner pair`, `start` | the runner agent of this machine (`POST /runners/pair`, `GET /runners/connect`); see The runner agent |
@@ -1867,7 +1869,7 @@ The tools (all of them answer with JSON text, or with `isError` and a message):
 |---|---|
 | Read | `list_projects`, `get_project`, `list_workflows`, `get_workflow`, `get_run`, `get_job`, `get_job_log_tail`, `list_artifacts`, `get_job_tests`, `get_test_baselines`, `list_releases`, `get_release`, `get_release_notes`, `list_approvals`, `get_approval`, `get_gates`, `get_storage_report`, `list_runners`, `list_credentials` (names, kinds, accounts, checks and the flavors that use each; never a secret; no tool adds, assigns or removes one) |
 | Create and edit | `add_project`, `scan_project`, `update_project`, `validate_workflow`, `create_workflow`, `update_workflow` (a document is validated first; with issues nothing is saved and they come back with `line` and `column`) |
-| Run | `dispatch_workflow` |
+| Run | `dispatch_workflow`, `request_rollout` (asks for a rollout change; it waits at `gate: rollout` like any gated action) |
 
 **Gates (D-13).** There is no tool to approve, deny, merge, abandon, delete or change a gate, and the engine answers
 `403` to an `mcp` token that tries it by hand anyway. A gated action, such as a production release, stops at its gate:

@@ -165,3 +165,25 @@ AbandonRequest _$AbandonRequestFromJson(Map<String, dynamic> json) =>
 
 Map<String, dynamic> _$AbandonRequestToJson(AbandonRequest instance) =>
     <String, dynamic>{'reason': ?instance.reason};
+
+RolloutRequest _$RolloutRequestFromJson(Map<String, dynamic> json) =>
+    RolloutRequest(
+      store: $enumDecode(_$ReleaseStoreEnumMap, json['store']),
+      action: $enumDecode(_$RolloutActionEnumMap, json['action']),
+      userFraction: (json['userFraction'] as num?)?.toDouble(),
+    );
+
+Map<String, dynamic> _$RolloutRequestToJson(RolloutRequest instance) =>
+    <String, dynamic>{
+      'store': _$ReleaseStoreEnumMap[instance.store]!,
+      'action': _$RolloutActionEnumMap[instance.action]!,
+      'userFraction': ?instance.userFraction,
+    };
+
+const _$RolloutActionEnumMap = {
+  RolloutAction.pause: 'pause',
+  RolloutAction.resume: 'resume',
+  RolloutAction.complete: 'complete',
+  RolloutAction.halt: 'halt',
+  RolloutAction.fraction: 'fraction',
+};

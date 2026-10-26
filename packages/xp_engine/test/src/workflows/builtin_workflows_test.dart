@@ -11,6 +11,7 @@ void main() {
       'dev-build',
       'prod-release',
       'release-merge',
+      'release-rollout',
       'shorebird-patch',
       'smoke-build',
       'test',
@@ -36,6 +37,7 @@ void main() {
       expect(locks('shorebird-patch'), isTrue);
       expect(locks('dev-build'), isFalse);
       expect(locks('release-merge'), isFalse);
+      expect(locks('release-rollout'), isFalse);
       expect(locks('smoke-build'), isFalse);
       expect(locks('test'), isFalse);
     },
@@ -50,6 +52,7 @@ void main() {
 
     expect(gates('prod-release'), {GateAction.prodRelease, GateAction.push});
     expect(gates('release-merge'), {GateAction.merge});
+    expect(gates('release-rollout'), {GateAction.rollout});
     expect(gates('shorebird-patch'), {GateAction.prodPatch, GateAction.push});
     expect(gates('dev-build'), isEmpty);
     expect(gates('smoke-build'), isEmpty);

@@ -975,6 +975,58 @@ void main() {
     });
   });
 
+  group('request_rollout', () {
+    test('requests the change and shows the approval it waits for', () async {
+      when(
+        () => client.requestRollout('rel_1', any()),
+      ).thenAnswer((_) async => sample.run(state: RunState.waitingForApproval));
+      when(
+        () => client.listApprovals(
+          projectId: 'prj_1',
+          state: ApprovalState.pending,
+        ),
+      ).thenAnswer((_) async => [sample.approval()]);
+
+      final result = await call('request_rollout', {
+        'release': 'rel_1',
+        'store': 'play',
+        'action': 'fraction',
+        'percent': 50,
+      });
+
+      expect(
+        verify(() => client.requestRollout('rel_1', captureAny()))
+            .captured
+            .single,
+        const RolloutRequest(
+          store: ReleaseStore.play,
+          action: RolloutAction.fraction,
+          userFraction: 0.5,
+        ),
+      );
+      final json = decoded(result)! as Map<String, dynamic>;
+      expect(json['note'], contains('Only the owner can approve'));
+      expect(tools['request_rollout']!.readOnly, isFalse);
+    });
+
+    test('refuses a store or a change it does not know', () async {
+      for (final (store, action, problem) in [
+        ('moon', 'pause', '"store" is apple or play.'),
+        ('apple', 'stop', contains('"action" is pause')),
+      ]) {
+        final result = await call('request_rollout', {
+          'release': 'rel_1',
+          'store': store,
+          'action': action,
+        });
+
+        expect(result.isError, isTrue);
+        expect(message(result), problem);
+      }
+      verifyNever(() => client.requestRollout(any(), any()));
+    });
+  });
+
   group('approvals', () {
     test('get_approval polls by id', () async {
       when(() => client.getApproval('apr_1'))

@@ -150,6 +150,7 @@ export 'src/steps/guard/guard_check.dart';
 export 'src/steps/guard/guard_input.dart';
 export 'src/steps/guard/guard_ports.dart';
 export 'src/steps/guard/guard_step.dart';
+export 'src/steps/rollout/store_rollout.dart';
 export 'src/steps/shorebird/shorebird_patch.dart';
 export 'src/steps/shorebird/shorebird_release.dart';
 export 'src/steps/shorebird/shorebird_release_record.dart';

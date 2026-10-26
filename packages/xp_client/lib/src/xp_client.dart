@@ -730,6 +730,19 @@ class XpClient {
   Future<Run> mergeRelease(String id) async =>
       Run.fromJson(await _json(await _send('POST', ['releases', id, 'merge'])));
 
+  /// `POST /releases/{id}/rollout`: asks to change the rollout of the release
+  /// in a store. Returns the run that does it, which waits for the owner.
+  Future<Run> requestRollout(String id, RolloutRequest request) async =>
+      Run.fromJson(
+        await _json(
+          await _send('POST', [
+            'releases',
+            id,
+            'rollout',
+          ], body: request.toJson()),
+        ),
+      );
+
   /// `POST /releases/{id}/abandon`.
   Future<Release> abandonRelease(String id, {String? reason}) async =>
       Release.fromJson(
