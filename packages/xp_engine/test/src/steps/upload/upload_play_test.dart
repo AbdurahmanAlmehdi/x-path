@@ -170,6 +170,47 @@ void main() {
       );
     });
 
+    test(
+      "sends the What's new of the release without notes of its own",
+      () async {
+        final texts = FakeReleaseTextsSource(
+          const ReleaseTexts(whatsNew: 'Faster checkout.'),
+        );
+        UploadPlayStep withTexts() => UploadPlayStep(
+          repository: repository,
+          store: store,
+          secrets: secrets,
+          connect: (_) => play,
+          texts: texts,
+        );
+
+        final sent = <Map<String, String>>[];
+        for (final (release, input) in [
+          (const ReleaseTexts(whatsNew: 'Faster checkout.'), _input()),
+          (const ReleaseTexts(), _input()),
+          (
+            const ReleaseTexts(whatsNew: 'Ignored.'),
+            _input(
+              overrides: {
+                'releaseNotes': {'ar': 'إصلاحات'},
+              },
+            ),
+          ),
+        ]) {
+          play = FakeGooglePlay()..uploadVersionCodes.add(3283);
+          texts.texts = release;
+          await withTexts().run(input, NoProcessContext());
+          sent.add(play.updatedTracks.single.releases.single.releaseNotes);
+        }
+
+        expect(sent, [
+          {'en-US': 'Faster checkout.'},
+          isEmpty,
+          {'ar': 'إصلاحات'},
+        ]);
+      },
+    );
+
     test('still succeeds when the review state cannot be read', () async {
       play.failures['releases'] = const PlayServerException(503, 'down');
 

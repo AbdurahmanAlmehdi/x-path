@@ -12,6 +12,27 @@ import 'package:xp_client/xp_client.dart';
 /// Makes the client for a [Connection].
 typedef ClientFactory = XpClient Function(Connection connection);
 
+/// The URL of the `origin` of the git repository the current folder is in,
+/// or `null` outside one.
+typedef CurrentRemote = Future<String?> Function();
+
+Future<String?> _noRemote() async => null;
+
+/// The `origin` of the current folder, as `git remote get-url origin` says.
+Future<String?> gitOrigin() async {
+  try {
+    final result = await io.Process.run('git', const [
+      'remote',
+      'get-url',
+      'origin',
+    ]);
+    final url = '${result.stdout}'.trim();
+    return result.exitCode == 0 && url.isNotEmpty ? url : null;
+  } on io.ProcessException {
+    return null;
+  }
+}
+
 /// What the commands of `xp` run against: where they print, where their
 /// settings are, how they reach the engine. Tests pass fakes.
 class XpContext {
@@ -28,6 +49,7 @@ class XpContext {
     this.secretPrompt = const TerminalSecretPrompt(),
     this.pollInterval = const Duration(seconds: 2),
     this.ansi = false,
+    this.currentRemote = _noRemote,
   });
 
   /// The context of the real process.
@@ -56,6 +78,7 @@ class XpContext {
       stdin: io.stdin,
       stdout: io.stdout,
       ansi: io.stdout.hasTerminal && io.stdout.supportsAnsiEscapes,
+      currentRemote: gitOrigin,
     );
   }
 
@@ -94,4 +117,8 @@ class XpContext {
   /// Whether the output is a terminal that shows colours: states are
   /// coloured then.
   final bool ansi;
+
+  /// The `origin` of the current folder, which names the project a command
+  /// is about when it is left out.
+  final CurrentRemote currentRemote;
 }

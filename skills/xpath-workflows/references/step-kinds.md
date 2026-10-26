@@ -64,6 +64,8 @@ stage (the build job), which is how an upload runs on the engine while the build
 | `git.push` | `branch`, `tag` | Pushes the release branch and the tag. `branch` defaults to true when the run bumps a version; `tag` to true. |
 | `github.createPr` | `title`, `body` | Opens the release pull request from the release branch to the base branch, or reuses an open one. |
 | `github.mergePr` | none | Merges the release's pull request with a merge commit, only when the release is `live` and only the tagged commit. Needs a run with `release` (started by `POST /releases/{id}/merge`). |
+| `shorebird.track` | `patchNumber` (required), `action` (`promote` or `rollback`), `shorebirdAppId` | Engine only. Promotes a Shorebird patch of the dispatched `releaseVersion` to the stable track, or rolls it back, with the flavor's Shorebird key. Needs a run with `release` (started by `POST /releases/{id}/patches/{number}/{action}`). |
+| `store.rollout` | `store` (`apple` or `play`), `action`, `userFraction` | Engine only. Apple's phased release: `pause`, `resume` or `complete`. Google Play's staged rollout of the release's track: `fraction` (with `userFraction` above 0, at most 1), `halt` or `complete`. Uses the store credential of the release's flavor. Needs a run with `release` (started by `POST /releases/{id}/rollout`). |
 
 ## Command
 
@@ -74,4 +76,6 @@ stage (the build job), which is how an upload runs on the engine while the build
 ## Gate
 
 `gate` is not written as a step: `gate: <action>` on a step puts a gate step in front of it.
-Actions: `prod_release`, `prod_patch`, `store_submission`, `push`, `merge`, `delete`. Engine only.
+Actions: `prod_release`, `prod_patch`, `store_submission`, `push`, `merge`, `rollout`, `delete`. Engine only.
+`store.rollout` must carry `gate: rollout` and `shorebird.track` `gate: prod_patch`: a workflow
+without them is invalid.

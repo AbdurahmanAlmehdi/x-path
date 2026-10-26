@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:xp_api/xp_api.dart';
@@ -44,13 +43,9 @@ class ApprovalsView extends StatelessWidget {
     final state = context.watch<ApprovalsInboxBloc>().state;
     final bloc = context.read<ApprovalsInboxBloc>();
     final selected = state.selected;
-    return CallbackShortcuts(
-      bindings: {
-        const SingleActivator(
-          LogicalKeyboardKey.keyA,
-          meta: true,
-          shift: true,
-        ): () {
+    return XpCommands(
+      handlers: {
+        XpCommand.approvals: () {
           if (selected != null && selected.state == ApprovalState.pending) {
             unawaited(showApprovalReview(context, selected.id));
           }
@@ -162,75 +157,66 @@ class _Row extends StatelessWidget {
       approval.projectId,
     );
     final now = XpClock.wall(context);
-    return Semantics(
-      button: true,
+    return XpTappable(
       selected: selected,
       label: l10n.approvalTitle(approval),
-      child: MouseRegion(
-        cursor: SystemMouseCursors.click,
-        child: GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTap: () => context.read<ApprovalsInboxBloc>().add(
-            ApprovalsInboxApprovalSelected(approval.id),
+      onTap: () => context.read<ApprovalsInboxBloc>().add(
+        ApprovalsInboxApprovalSelected(approval.id),
+      ),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 4),
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: selected ? colors.surfaceSelected : null,
+          borderRadius: BorderRadius.circular(context.xpRadii.md),
+          border: Border.all(
+            color: selected ? colors.borderStrong : Colors.transparent,
           ),
-          child: Container(
-            margin: const EdgeInsets.only(bottom: 4),
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: selected ? colors.surfaceSelected : null,
-              borderRadius: BorderRadius.circular(context.xpRadii.md),
-              border: Border.all(
-                color: selected ? colors.borderStrong : Colors.transparent,
-              ),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
               children: [
-                Row(
-                  children: [
-                    XpStatusIcon(approvalStatus(approval.state)),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        l10n.approvalTitle(approval),
-                        overflow: TextOverflow.ellipsis,
-                        style: type.bodyStrong.copyWith(
-                          color: colors.textPrimary,
-                        ),
-                      ),
-                    ),
-                    XpTime(
-                      approval.createdAt,
-                      style: type.code.copyWith(color: colors.textSecondary),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  [
-                    project?.fullName.split('/').last ?? approval.projectId,
-                    l10n.gateAction(approval.action),
-                    shortSha(approval.sha),
-                  ].join(' · '),
-                  overflow: TextOverflow.ellipsis,
-                  style: type.caption.copyWith(color: colors.textSecondary),
-                ),
-                if (approval.state == ApprovalState.pending) ...[
-                  const SizedBox(height: 2),
-                  Text(
-                    l10n.approvalExpiresShort(
-                      formatCountdown(approval.expiresAt, now),
-                    ),
-                    style: type.caption.copyWith(
-                      color: expiresSoon(approval, now)
-                          ? colors.statusCautionOnContainer
-                          : colors.textSecondary,
-                    ),
+                XpStatusIcon(approvalStatus(approval.state)),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    l10n.approvalTitle(approval),
+                    overflow: TextOverflow.ellipsis,
+                    style: type.bodyStrong.copyWith(color: colors.textPrimary),
                   ),
-                ],
+                ),
+                XpTime(
+                  approval.createdAt,
+                  style: type.code.copyWith(color: colors.textSecondary),
+                ),
               ],
             ),
-          ),
+            const SizedBox(height: 4),
+            Text(
+              [
+                project?.fullName.split('/').last ?? approval.projectId,
+                l10n.gateAction(approval.action),
+                shortSha(approval.sha),
+              ].join(' · '),
+              overflow: TextOverflow.ellipsis,
+              style: type.caption.copyWith(color: colors.textSecondary),
+            ),
+            if (approval.state == ApprovalState.pending) ...[
+              const SizedBox(height: 2),
+              Text(
+                l10n.approvalExpiresShort(
+                  formatCountdown(approval.expiresAt, now),
+                ),
+                style: type.caption.copyWith(
+                  color: expiresSoon(approval, now)
+                      ? colors.statusCautionOnContainer
+                      : colors.textSecondary,
+                ),
+              ),
+            ],
+          ],
         ),
       ),
     );

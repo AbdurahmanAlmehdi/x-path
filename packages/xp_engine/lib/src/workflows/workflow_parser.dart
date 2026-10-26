@@ -521,6 +521,13 @@ class _Reader {
         );
       }
     }
+    if (requiredGates[kind] case final required? when gate != required) {
+      _issueAt(
+        gateNode ?? node,
+        '"$kind" runs only behind "gate: ${required.wire}".',
+        hint: 'Add "gate: ${required.wire}" to the step.',
+      );
+    }
     if (kind == null || keys == null) return null;
     return StepDefinition(
       kind: kind,

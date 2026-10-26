@@ -61,8 +61,11 @@ class WorkflowClient {
   final String projectId;
 
   /// Adds a project from a folder and returns a client for it.
-  static Future<WorkflowClient> add(TestEngine engine) async {
-    engine.folders['/work/app'] = projectFiles;
+  static Future<WorkflowClient> add(
+    TestEngine engine, {
+    Map<String, String> files = projectFiles,
+  }) async {
+    engine.folders['/work/app'] = files;
     final response = await engine.request(
       '/projects',
       method: 'POST',

@@ -115,14 +115,7 @@ class _StepRow extends StatelessWidget {
       ),
     );
     if (onTap == null) return row;
-    return Semantics(
-      button: true,
-      selected: selected,
-      child: MouseRegion(
-        cursor: SystemMouseCursors.click,
-        child: GestureDetector(onTap: onTap, child: row),
-      ),
-    );
+    return XpTappable(onTap: onTap, selected: selected, child: row);
   }
 }
 
@@ -174,42 +167,61 @@ class _Artifacts extends StatelessWidget {
       label: l10n.jobArtifactsLabel,
       rows: [
         for (final artifact in artifacts)
-          Row(
+          GestureDetector(
             key: ValueKey(('artifact', artifact.id)),
-            children: [
-              Expanded(
-                child: _PlanRow(
-                  icon: PhosphorIconsRegular.package,
-                  text: artifact.name,
-                  meta: formatSize(artifact.size),
-                ),
-              ),
-              _ArtifactAction(
-                icon: PhosphorIconsRegular.downloadSimple,
-                tooltip: l10n.jobArtifactDownload,
-                onTap: busy
-                    ? null
-                    : () =>
+            // A right click reveals a downloaded artifact (U6c).
+            onSecondaryTapUp: (details) =>
+                showXpContextMenu(context, details.globalPosition, [
+                  if (downloads[artifact.id] case final path?) ...[
+                    XpMenuAction(
+                      l10n.menuRevealArtifact,
+                      () => context.read<AppServices>().revealFile(path),
+                    ),
+                    XpMenuAction.copy(l10n.jobArtifactCopyPath, path),
+                  ] else
+                    XpMenuAction(
+                      l10n.jobArtifactDownload,
+                      () =>
                           bloc.add(JobViewArtifactDownloadRequested(artifact)),
-              ),
-              if (downloads[artifact.id] case final path?) ...[
-                _ArtifactAction(
-                  icon: PhosphorIconsRegular.folderOpen,
-                  tooltip: l10n.jobArtifactReveal,
-                  onTap: () => context.read<AppServices>().revealFile(path),
+                    ),
+                ]),
+            child: Row(
+              children: [
+                Expanded(
+                  child: _PlanRow(
+                    icon: PhosphorIconsRegular.package,
+                    text: artifact.name,
+                    meta: formatSize(artifact.size),
+                  ),
                 ),
                 _ArtifactAction(
-                  icon: PhosphorIconsRegular.copy,
-                  tooltip: l10n.jobArtifactCopyPath,
-                  onTap: () async {
-                    await Clipboard.setData(ClipboardData(text: path));
-                    if (context.mounted) {
-                      context.read<ToastCubit>().show(l10n.jobArtifactCopied);
-                    }
-                  },
+                  icon: PhosphorIconsRegular.downloadSimple,
+                  tooltip: l10n.jobArtifactDownload,
+                  onTap: busy
+                      ? null
+                      : () => bloc.add(
+                          JobViewArtifactDownloadRequested(artifact),
+                        ),
                 ),
+                if (downloads[artifact.id] case final path?) ...[
+                  _ArtifactAction(
+                    icon: PhosphorIconsRegular.folderOpen,
+                    tooltip: l10n.jobArtifactReveal,
+                    onTap: () => context.read<AppServices>().revealFile(path),
+                  ),
+                  _ArtifactAction(
+                    icon: PhosphorIconsRegular.copy,
+                    tooltip: l10n.jobArtifactCopyPath,
+                    onTap: () async {
+                      await Clipboard.setData(ClipboardData(text: path));
+                      if (context.mounted) {
+                        context.read<ToastCubit>().show(l10n.jobArtifactCopied);
+                      }
+                    },
+                  ),
+                ],
               ],
-            ],
+            ),
           ),
       ],
     );

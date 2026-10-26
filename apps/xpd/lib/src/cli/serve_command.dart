@@ -278,6 +278,10 @@ class ServeCommand extends XpdCommand {
         clock: const SystemClock(),
         resume: (projectId) => scheduler.resumeWaiting(projectId: projectId),
       );
+      final releaseTexts = JobReleaseTexts(
+        jobs: jobRepository,
+        releases: releaseRepository,
+      );
       final registry = StepRegistry([
         GateStep(approvals),
         GitCheckoutStep(git: git, jobs: jobRepository),
@@ -367,11 +371,23 @@ class ServeCommand extends XpdCommand {
           repository: artifactRepository,
           store: artifactStore,
           secrets: secrets,
+          texts: releaseTexts,
         ),
         firebase.uploadStep(
           repository: artifactRepository,
           store: artifactStore,
           secrets: secrets,
+          texts: releaseTexts,
+        ),
+        ShorebirdTrackStep(
+          ShorebirdCliPatches(runner: runner, secrets: secrets),
+        ),
+        StoreRolloutStep(
+          releases: releaseRepository,
+          ascCredentials: apple.credentials,
+          appStoreConnect: apple.connect,
+          playCredentials: play.credentials,
+          googlePlay: play.connect,
         ),
         GuardStep(
           checks: [
@@ -591,6 +607,17 @@ class ServeCommand extends XpdCommand {
         clock: const SystemClock(),
       );
       final runnerEvents = runnerLog.follow(events, runnerService);
+      final githubToken = GitHubTokenService(
+        secrets: secrets,
+        verifier: credentialChecks.githubVerifier,
+        cli: LocatingGitHubCliToken(
+          runner: runner,
+          secrets: secrets,
+          path: context.environment['PATH'],
+          fallbacks: context.ghFallbackPaths,
+        ),
+        masker: masker,
+      );
       final server = await XpdServer.start(
         tokens: tokenService,
         events: events,
@@ -609,17 +636,7 @@ class ServeCommand extends XpdCommand {
         ),
         credentials: credentialChecks.service,
         certificates: credentialChecks.certificates,
-        githubToken: GitHubTokenService(
-          secrets: secrets,
-          verifier: credentialChecks.githubVerifier,
-          cli: LocatingGitHubCliToken(
-            runner: runner,
-            secrets: secrets,
-            path: context.environment['PATH'],
-            fallbacks: context.ghFallbackPaths,
-          ),
-          masker: masker,
-        ),
+        githubToken: githubToken,
         workflows: workflows,
         dispatcher: dispatcher,
         runs: runService,
@@ -645,6 +662,14 @@ class ServeCommand extends XpdCommand {
             executable: context.executable,
           ),
         ),
+        doctor: EngineDoctor(
+          local: findings,
+          github: githubToken,
+          credentials: credentialChecks.repository,
+          projects: projectRepository,
+          runner: runner,
+        ),
+        secrets: secrets,
         clock: const SystemClock(),
         engineVersion: packageVersion,
         host: host,

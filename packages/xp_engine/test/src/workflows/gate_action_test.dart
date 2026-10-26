@@ -20,6 +20,7 @@ void main() {
         'push',
         'merge',
         'delete',
+        'rollout',
       },
     );
     expect(GateAction.fromWire('push'), GateAction.push);

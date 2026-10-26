@@ -91,12 +91,36 @@ class XpConfig {
   Future<void> saveEngineUrl(Uri url) async {
     final settings = await _read();
     settings['engine'] = url.toString();
+    await _write(settings);
+  }
+
+  Future<void> _write(Map<String, dynamic> settings) async {
     await Directory(directory).create(recursive: true);
     final temporary = File('${_file.path}.tmp');
     await temporary.writeAsString(
       '${const JsonEncoder.withIndent('  ').convert(settings)}\n',
     );
     await temporary.rename(_file.path);
+  }
+
+  /// Forgets the saved engine URL and the saved `cli` and `mcp` tokens
+  /// (`xp disconnect`). The environment variables still apply. Returns the
+  /// URL it forgot, if one was saved.
+  Future<Uri?> forget() async {
+    final settings = await _read();
+    final saved = settings.remove('engine');
+    if (saved != null) await _write(settings);
+    try {
+      final vault = _openVault();
+      for (final kind in [DeviceTokenKind.cli, DeviceTokenKind.mcp]) {
+        await vault.delete(kind);
+      }
+    } on SecretsLockedException catch (error) {
+      throw NotConnectedException(
+        '${error.message} Unlock it to forget the tokens.',
+      );
+    }
+    return saved is String ? parseEngineUrl(saved) : null;
   }
 
   /// The token of [kind]: from the environment, else the secret store.

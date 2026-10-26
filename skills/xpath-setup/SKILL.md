@@ -105,10 +105,11 @@ service stops at logout unless the user lingers: `sudo loginctl enable-linger <u
 ### Docker
 
 ```sh
-tool/release/bundles.sh && docker build -t xpath .
-docker run -d --name xpath -p 127.0.0.1:7480:7480 -v xpath-data:/data xpath
+docker run -d --name xpath -p 127.0.0.1:7480:7480 -v xpath-data:/data ghcr.io/abdurahmanalmehdi/xpath
 docker exec xpath xpd token create --name laptop --kind cli
 ```
+
+To build the image from the repository instead: `tool/release/bundles.sh && docker build -t xpath .`.
 
 The image has no Flutter: builds go to runners. Data lives in the `/data` volume.
 
@@ -252,5 +253,6 @@ items** remove the rest. Repositories are never touched. Only do this when the u
 ## More
 
 - Running releases once set up: skill `xpath-release`.
-- `docs/guide/try-it-locally.md` and the README sections "Running the engine", "Running as a
-  service", "Releases and installation", "Credentials" and "Runners" in the XPath repository.
+- `docs/guide/try-it-locally.md`, `docs/reference/engine.md` (running the engine and running it
+  as a service), `docs/reference/installation.md`, `docs/reference/stores.md` (credentials) and
+  `docs/reference/runners.md` in the XPath repository.

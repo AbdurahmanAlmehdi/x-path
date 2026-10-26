@@ -67,6 +67,22 @@ class ReleasesRepository {
   Future<Run> merge(String id) =>
       _session.call((client) => client.mergeRelease(id));
 
+  /// Asks to change the rollout of [id] in a store.
+  Future<Run> rollout(String id, RolloutRequest request) =>
+      _session.call((client) => client.requestRollout(id, request));
+
+  /// What happened to [id], oldest first.
+  Future<ReleaseHistory> history(String id) =>
+      _session.call((client) => client.getReleaseHistory(id));
+
+  /// Sets the texts the uploads of [id] send.
+  Future<Release> setTexts(String id, ReleaseTexts texts) =>
+      _session.call((client) => client.setReleaseTexts(id, texts));
+
+  /// Asks to [action] the Shorebird patch [number] of [id].
+  Future<Run> movePatch(String id, int number, PatchAction action) =>
+      _session.call((client) => client.moveReleasePatch(id, number, action));
+
   /// Abandons [id].
   Future<Release> abandon(String id, {String? reason}) =>
       _session.call((client) => client.abandonRelease(id, reason: reason));

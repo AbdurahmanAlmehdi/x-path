@@ -7,8 +7,8 @@ license: Apache-2.0
 # Contributing to XPath
 
 XPath releases other people's apps with their signing keys, so every change comes with tests and
-nothing ever talks to a real store from a test. Read `CONTRIBUTING.md` first; the README sections
-named below hold the details, so read them instead of guessing.
+nothing ever talks to a real store from a test. Read `CONTRIBUTING.md` first; the `docs/reference`
+pages named below hold the details, so read them instead of guessing.
 
 ## Set up
 
@@ -117,6 +117,7 @@ change touches:
 | `release_e2e.sh dev` | `dev-build` for Android through the real engine to a fake Firebase | Android SDK; minutes |
 | `release_e2e.sh prod` | a whole production release from `draft` to `merged`, no secret in any log, argv or file | macOS with Xcode, Android SDK; several minutes |
 | `mcp_gate_e2e.sh` | `xp mcp` dispatches, stops at a gate, gets `403` on approve | about half a minute |
+| `quickstart_cli.sh` | the CLI path of `docs/guide/quickstart.md`: connect, status, doctor, a `file://` project, a green `test` run (CI runs it) | Flutter; about a minute |
 | `runner_loss_e2e.sh` | a runner killed mid-job: the 90 second lease rule, no secret left | about four minutes |
 | `runner_build_e2e.sh` | a build job leased to a runner, upload from the engine | Android SDK on the runner side |
 | `build_fixture_apk.sh` | builds the fixture app's APK through a job | Android SDK |
@@ -193,12 +194,13 @@ release whose version the title decides** (Conventional Commits; the table is in
 
 Write the title as what changes for a user, in the present tense:
 `feat: retry Play uploads after a 503`. Every pull request needs an approving review and green
-CI. The spell check (`.github/cspell.json`) reads `README.md` and `docs/adr`; add real words it
-does not know to its `words` list.
+CI. The spell check (`.github/cspell.json`) reads every Markdown file, the guide and the reference
+included; add real words it does not know to its `words` list.
 
 ## Where to read more
 
 - `CONTRIBUTING.md`: the process and the PR title table.
-- `README.md`: "Repository layout", "Dependency direction", "Development setup", "Testing",
-  "Continuous integration", and the section of the area you change.
+- `docs/reference/development.md`: "Repository layout", "Dependency direction", "Development
+  setup", "Testing" and "Continuous integration"; the other `docs/reference` page of the area
+  you change. A user-facing change also updates its page in `docs/guide`.
 - `docs/adr/`: the decisions; `docs/plan/` for the phases and D-numbers the code cites.

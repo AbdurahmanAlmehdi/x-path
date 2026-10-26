@@ -28,15 +28,18 @@ class FirebaseStores {
       );
 
   /// The `upload.firebase` step, uploading from the artifact [store].
+  /// [texts] gives it the texts of the release of the job (U7b).
   UploadFirebaseStep uploadStep({
     required ArtifactRepository repository,
     required ArtifactStore store,
     required SecretStore secrets,
+    ReleaseTextsSource? texts,
   }) => UploadFirebaseStep(
     repository: repository,
     store: store,
     secrets: secrets,
     connect: connect,
+    texts: texts,
   );
 
   /// Releases the HTTP clients.

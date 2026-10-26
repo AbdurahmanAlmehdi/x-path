@@ -155,11 +155,14 @@ void main() {
       expect(await app.version(), '1.0.0 (7)');
       expect(await app.moveToTrash(), isTrue);
       await app.quit();
+      await app.setKeepRunning(keep: false);
       expect(calls.map((call) => call.method), [
         'appVersion',
         'appMoveToTrash',
         'appQuit',
+        'appKeepRunning',
       ]);
+      expect(calls.last.arguments, {'keep': false});
     });
 
     test('reads nothing as no version and no trash', () async {

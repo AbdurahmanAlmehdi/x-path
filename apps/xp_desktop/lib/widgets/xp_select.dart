@@ -1,4 +1,5 @@
 import 'package:material_ui/material_ui.dart';
+import 'package:xp_desktop/l10n/l10n.dart';
 import 'package:xp_desktop/theme/theme.dart';
 
 /// A pop-up button: the [value]'s label in a field-shaped control
@@ -33,7 +34,7 @@ class XpSelect<T> extends StatelessWidget {
     // The menu picks an index: it would not report a pick of `null`.
     return PopupMenuButton<int>(
       enabled: onChanged != null,
-      tooltip: '',
+      tooltip: context.l10n.selectTooltip,
       initialValue: values.indexOf(value),
       position: PopupMenuPosition.under,
       onSelected: onChanged == null

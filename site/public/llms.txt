@@ -17,7 +17,10 @@ Key facts:
 
 ## Docs
 
-- [README](https://raw.githubusercontent.com/AbdurahmanAlmehdi/x-path/main/README.md): architecture, install, the engine API, workflows, runners, releases, the CLI and `xp mcp`
+- [README](https://raw.githubusercontent.com/AbdurahmanAlmehdi/x-path/main/README.md): what XPath is, install, and the index of the guide and the reference
+- [Quickstart](https://raw.githubusercontent.com/AbdurahmanAlmehdi/x-path/main/docs/guide/quickstart.md): from nothing to a green build, with the app or the CLI
+- [Troubleshooting](https://raw.githubusercontent.com/AbdurahmanAlmehdi/x-path/main/docs/guide/troubleshooting.md): what to do when something does not work
+- [Reference](https://github.com/AbdurahmanAlmehdi/x-path/tree/main/docs/reference): the engine, stores, workflows, runners, releases, the CLI and `xp mcp`
 - [SECURITY.md](https://raw.githubusercontent.com/AbdurahmanAlmehdi/x-path/main/SECURITY.md): how XPath protects secrets, and how to report a vulnerability
 - [CONTRIBUTING.md](https://raw.githubusercontent.com/AbdurahmanAlmehdi/x-path/main/CONTRIBUTING.md): setup, tests, pull request titles
 - [OpenAPI description](https://raw.githubusercontent.com/AbdurahmanAlmehdi/x-path/main/packages/xp_api/openapi.yaml): every engine route and the runner protocol frames

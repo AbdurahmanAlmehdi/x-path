@@ -53,6 +53,27 @@ Future<String> resolveProject(XpClient client, String reference) async {
   );
 }
 
+/// The project whose repository [remote] (the `origin` of a clone) is, when
+/// exactly one is: the same host and path, whatever the spelling of the URL
+/// (ADR 0015). An HTTPS URL is read as the SSH URL of the same repository.
+Future<Project?> projectOfRemote(XpClient client, String? remote) async {
+  if (remote == null) return null;
+  final parsed =
+      GitRemote.parse(remote) ??
+      switch (GitRemote.sshUrlFor(remote)) {
+        final ssh? => GitRemote.parse(ssh),
+        null => null,
+      };
+  if (parsed == null) return null;
+  final path = parsed.path.toLowerCase();
+  final matches = [
+    for (final project in await client.listProjects())
+      if (project.host == parsed.host && project.fullName.toLowerCase() == path)
+        project,
+  ];
+  return matches.length == 1 ? matches.single : null;
+}
+
 /// The id of the workflow called [reference] in [projectId]: an id
 /// (`wf_...`) or its name.
 Future<String> resolveWorkflow(

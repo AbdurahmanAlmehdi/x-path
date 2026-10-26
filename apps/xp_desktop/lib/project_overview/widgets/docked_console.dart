@@ -108,12 +108,6 @@ class _Strip extends StatelessWidget {
       ),
     );
     if (onToggle == null) return strip;
-    return Semantics(
-      button: true,
-      child: MouseRegion(
-        cursor: SystemMouseCursors.click,
-        child: GestureDetector(onTap: onToggle, child: strip),
-      ),
-    );
+    return XpTappable(onTap: onToggle, radius: 0, child: strip);
   }
 }

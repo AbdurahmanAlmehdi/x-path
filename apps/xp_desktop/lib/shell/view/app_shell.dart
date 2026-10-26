@@ -1,11 +1,11 @@
 import 'dart:async';
 
-import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:xp_api/xp_api.dart';
 import 'package:xp_desktop/add_project/view/add_project_page.dart';
 import 'package:xp_desktop/app/app_services.dart';
+import 'package:xp_desktop/app/bloc/density_cubit.dart';
 import 'package:xp_desktop/approvals/bloc/pending_approvals_bloc.dart';
 import 'package:xp_desktop/approvals/view/approval_review_sheet.dart';
 import 'package:xp_desktop/approvals/view/approvals_page.dart';
@@ -13,33 +13,31 @@ import 'package:xp_desktop/credentials/view/credentials_page.dart';
 import 'package:xp_desktop/dispatch/view/dispatch_sheet.dart';
 import 'package:xp_desktop/engines/view/engines_page.dart';
 import 'package:xp_desktop/job/view/job_page.dart';
-import 'package:xp_desktop/l10n/l10n.dart';
 import 'package:xp_desktop/onboarding/view/onboarding_page.dart';
 import 'package:xp_desktop/project_overview/view/project_overview_page.dart';
 import 'package:xp_desktop/projects/bloc/projects_bloc.dart';
-import 'package:xp_desktop/projects/view/no_projects_page.dart';
+import 'package:xp_desktop/projects/view/project_settings_page.dart';
 import 'package:xp_desktop/releases/view/releases_page.dart';
 import 'package:xp_desktop/runners/view/runners_page.dart';
 import 'package:xp_desktop/runs/view/runs_page.dart';
 import 'package:xp_desktop/settings/view/settings_page.dart';
+import 'package:xp_desktop/shell/bloc/command_palette_bloc.dart';
 import 'package:xp_desktop/shell/cubit/shell_cubit.dart';
-import 'package:xp_desktop/shell/widgets/shell_page.dart';
+import 'package:xp_desktop/shell/view/home_page.dart';
+import 'package:xp_desktop/shell/widgets/app_menu_bar.dart';
+import 'package:xp_desktop/shell/widgets/command_palette.dart';
+import 'package:xp_desktop/shell/widgets/shortcut_sheet.dart';
 import 'package:xp_desktop/shell/widgets/sidebar.dart';
 import 'package:xp_desktop/storage/view/storage_page.dart';
 import 'package:xp_desktop/tests/view/tests_page.dart';
 import 'package:xp_desktop/theme/theme.dart';
+import 'package:xp_desktop/toast/cubit/toast_cubit.dart';
 import 'package:xp_desktop/widgets/widgets.dart';
 import 'package:xp_desktop/workflow_builder/view/workflow_builder_page.dart';
 
-/// The project the shell shows: the destination's, or the first one on
-/// the home page.
-String? shownProjectId(BuildContext context) {
-  final shell = context.read<ShellCubit>();
-  return shell.projectId ??
-      (shell.state is HomeDestination
-          ? context.read<ProjectsBloc>().state.projects.firstOrNull?.id
-          : null);
-}
+/// The project the shell shows, if it shows one.
+String? shownProjectId(BuildContext context) =>
+    context.read<ShellCubit>().projectId;
 
 /// ⇧⌘A (Keyboard guide): reviews the approval of the shown project that
 /// expires first, else opens the approvals inbox.
@@ -74,20 +72,9 @@ void showProjectAt(BuildContext context, int index) {
   }
 }
 
-const _digits = <LogicalKeyboardKey>[
-  LogicalKeyboardKey.digit1,
-  LogicalKeyboardKey.digit2,
-  LogicalKeyboardKey.digit3,
-  LogicalKeyboardKey.digit4,
-  LogicalKeyboardKey.digit5,
-  LogicalKeyboardKey.digit6,
-  LogicalKeyboardKey.digit7,
-  LogicalKeyboardKey.digit8,
-  LogicalKeyboardKey.digit9,
-];
-
-/// The window: the sidebar and the content area of the destination.
-/// XPath ▸ Settings… (⌘,) shows the settings.
+/// The window: the sidebar and the content area of the destination, under
+/// the menu bar. It does the commands of the keyboard guide that are not a
+/// page's own: ⌘K, ⌘N, ⇧⌘A, ⌘[ and ⌘], ⌃⌘S, ⌘/ and ⌘, (with ⌘1–⌘9).
 class AppShell extends StatefulWidget {
   const new({super.key});
 
@@ -97,6 +84,7 @@ class AppShell extends StatefulWidget {
 
 class _AppShellState extends State<AppShell> {
   StreamSubscription<void>? _settings;
+  var _sidebar = true;
 
   @override
   void initState() {
@@ -114,87 +102,94 @@ class _AppShellState extends State<AppShell> {
   }
 
   @override
-  Widget build(BuildContext context) => CallbackShortcuts(
-    bindings: {
-      const SingleActivator(
-        LogicalKeyboardKey.keyA,
-        meta: true,
-        shift: true,
-      ): () =>
-          reviewApprovals(context),
-      const SingleActivator(LogicalKeyboardKey.keyN, meta: true): () =>
-          unawaited(dispatchShown(context)),
-      for (final (index, digit) in _digits.indexed)
-        SingleActivator(digit, meta: true): () => showProjectAt(context, index),
-    },
-    child: Material(
-      color: context.xpColors.surfaceWindow,
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const Sidebar(),
-          const XpHairline(vertical: true),
-          Expanded(
-            child: BlocBuilder<ShellCubit, ShellDestination>(
-              builder: (context, destination) => switch (destination) {
-                HomeDestination() => const _Home(),
-                ProjectDestination(:final projectId) => ProjectOverviewPage(
-                  projectId,
-                ),
-                JobDestination(:final runId, :final jobId) => JobPage(
-                  runId: runId,
-                  jobId: jobId,
-                ),
-                ReleasesDestination(:final projectId, :final releaseId) =>
-                  ReleasesPage(projectId: projectId, releaseId: releaseId),
-                TestsDestination(:final projectId, :final jobId) => TestsPage(
-                  projectId: projectId,
-                  jobId: jobId,
-                ),
-                RunsDestination(:final projectId) => RunsPage(
-                  projectId: projectId,
-                ),
-                WorkflowsDestination(:final projectId, :final workflowId) =>
-                  WorkflowBuilderPage(
-                    projectId: projectId,
-                    workflowId: workflowId,
-                  ),
-                RunnersDestination() => const RunnersPage(),
-                StorageDestination() => const StoragePage(),
-                ApprovalsDestination(:final approvalId) => ApprovalsPage(
-                  approvalId: approvalId,
-                ),
-                AddProjectDestination() => const AddProjectPage(),
-                CredentialsDestination(:final projectId) => CredentialsPage(
-                  projectId: projectId,
-                ),
-                EnginesDestination() => const EnginesPage(),
-                OnboardingDestination() => const OnboardingPage(),
-                SettingsDestination(:final github) => SettingsPage(
-                  github: github,
-                ),
-              },
-            ),
+  Widget build(BuildContext context) {
+    final shell = context.read<ShellCubit>();
+    return BlocListener<CommandPaletteBloc, CommandPaletteState>(
+      // A command of the palette ended: open the run it started, or say
+      // why it failed.
+      listenWhen: (previous, current) => current.done != previous.done,
+      listener: (context, state) {
+        if (state.error case final error?) {
+          context.read<ToastCubit>().show(error);
+        } else if (state.startedRun case final run?) {
+          shell.show(JobDestination(run.id, projectId: run.projectId));
+        }
+      },
+      child: XpCommands(
+        handlers: {
+          XpCommand.palette: () => unawaited(
+            showCommandPalette(context, projectId: shownProjectId(context)),
           ),
-        ],
+          XpCommand.dispatch: () => unawaited(dispatchShown(context)),
+          XpCommand.approvals: () => reviewApprovals(context),
+          XpCommand.back: shell.back,
+          XpCommand.forward: shell.forward,
+          XpCommand.sidebar: () => setState(() => _sidebar = !_sidebar),
+          XpCommand.shortcuts: () => unawaited(showShortcutSheet(context)),
+          XpCommand.compact: () =>
+              unawaited(context.read<DensityCubit>().toggle()),
+          XpCommand.settings: () => shell.show(const SettingsDestination()),
+        },
+        child: CallbackShortcuts(
+          bindings: {
+            for (final (index, digit) in projectDigits.indexed)
+              SingleActivator(digit, meta: true): () =>
+                  showProjectAt(context, index),
+          },
+          child: AppMenuBar(child: _content(context)),
+        ),
       ),
+    );
+  }
+
+  Widget _content(BuildContext context) => Material(
+    color: context.xpColors.surfaceWindow,
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (_sidebar) ...[const Sidebar(), const XpHairline(vertical: true)],
+        Expanded(
+          child: BlocBuilder<ShellCubit, ShellDestination>(
+            builder: (context, destination) => switch (destination) {
+              HomeDestination() => const HomePage(),
+              ProjectDestination(:final projectId) => ProjectOverviewPage(
+                projectId,
+              ),
+              JobDestination(:final runId, :final jobId) => JobPage(
+                runId: runId,
+                jobId: jobId,
+              ),
+              ReleasesDestination(:final projectId, :final releaseId) =>
+                ReleasesPage(projectId: projectId, releaseId: releaseId),
+              TestsDestination(:final projectId, :final jobId) => TestsPage(
+                projectId: projectId,
+                jobId: jobId,
+              ),
+              RunsDestination(:final projectId) => RunsPage(
+                projectId: projectId,
+              ),
+              WorkflowsDestination(:final projectId, :final workflowId) =>
+                WorkflowBuilderPage(
+                  projectId: projectId,
+                  workflowId: workflowId,
+                ),
+              ProjectSettingsDestination(:final projectId) =>
+                ProjectSettingsPage(projectId),
+              RunnersDestination() => const RunnersPage(),
+              StorageDestination() => const StoragePage(),
+              ApprovalsDestination(:final approvalId) => ApprovalsPage(
+                approvalId: approvalId,
+              ),
+              AddProjectDestination() => const AddProjectPage(),
+              CredentialsDestination(:final projectId, :final github) =>
+                CredentialsPage(projectId: projectId, github: github),
+              EnginesDestination() => const EnginesPage(),
+              OnboardingDestination() => const OnboardingPage(),
+              SettingsDestination() => const SettingsPage(),
+            },
+          ),
+        ),
+      ],
     ),
   );
-}
-
-class _Home extends StatelessWidget {
-  const new();
-
-  @override
-  Widget build(BuildContext context) {
-    final state = context.watch<ProjectsBloc>().state;
-    if (!state.loaded) {
-      return ShellPage(
-        title: context.l10n.appTitle,
-        child: const Padding(padding: EdgeInsets.all(20), child: XpLoading()),
-      );
-    }
-    if (state.projects.isEmpty) return const NoProjectsPage();
-    return ProjectOverviewPage(state.projects.first.id);
-  }
 }

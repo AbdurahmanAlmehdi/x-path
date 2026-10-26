@@ -80,7 +80,7 @@ once and opens one pull request.
 
 ### Phase U5a: First run in the app
 
-- **Status:** Not started
+- **Status:** Done
 - **Scope:** A new owner reaches a first green build from the app alone.
 - **Files touched:** `apps/xp_desktop/lib/{onboarding,projects,project_overview}/**`,
   `packages/xp_engine/lib/src/workflows/builtin_workflows.dart` (debug smoke build), the
@@ -106,7 +106,7 @@ Details:
 
 ### Phase U5b: CLI setup: tokens, status and doctor
 
-- **Status:** Not started
+- **Status:** Done
 - **Scope:** The CLI can be connected from a token minted in the app, and can check itself and
   the engine.
 - **Files touched:** `apps/xpd/lib/src/api/**` (token-minting route), `packages/xp_api/openapi.yaml`,
@@ -137,7 +137,7 @@ Details:
 
 ### Phase U6a: Navigation, menus and the command palette
 
-- **Status:** Not started
+- **Status:** Done
 - **Scope:** Back and forward, a command palette and a real macOS menu.
 - **Files touched:** `apps/xp_desktop/lib/shell/**`, `apps/xp_desktop/lib/app/**`,
   `apps/xp_desktop/lib/widgets/**`
@@ -156,7 +156,7 @@ Details:
 
 ### Phase U6b: Menu bar, notifications and window
 
-- **Status:** Not started
+- **Status:** Done
 - **Scope:** XPath keeps running in the menu bar and notifies on the events that matter.
 - **Files touched:** `apps/xp_desktop/macos/Runner/**`, `packages/xp_macos_services/**`,
   `apps/xp_desktop/lib/{approvals,settings,app}/**`
@@ -180,7 +180,7 @@ Details:
 
 ### Phase U6c: Accessibility, density and context menus
 
-- **Status:** Not started
+- **Status:** Done
 - **Scope:** Every primary action works from the keyboard and a screen reader; Reduce Motion
   and compact density are honoured.
 - **Files touched:** `apps/xp_desktop/lib/{widgets,shell,approvals,job,project_overview,credentials,theme,app}/**`
@@ -207,7 +207,7 @@ Details:
 
 ### Phase U6d: Information architecture
 
-- **Status:** Not started
+- **Status:** Done
 - **Scope:** A cross-project Home, a project settings page, and lists instead of dropdowns.
 - **Files touched:** `apps/xp_desktop/lib/{shell,projects,project_overview,releases,tests,credentials,settings}/**`
 - **Acceptance criteria:** an owner with three projects sees each one's live and in-review
@@ -220,14 +220,16 @@ Details:
   project" (`shell/view/app_shell.dart:150`).
 - Keep the selected project expanded while on engine pages (`shell/widgets/sidebar.dart:38-40`).
 - Project settings page: rename, base branch, gates (`/projects/{id}/gates`), flavor store ids,
-  git host (read-only, once the runner plan's R10 lands), remove project.
+  git host (read-only, once the runner plan's R10 lands), remove project. Rename is left out:
+  the engine names a project after its repository (`fullName`) and has no name of its own to
+  change.
 - The GitHub token moves from Settings to Credentials.
 - Releases and test runs become lists with status and search instead of `XpSelect` dropdowns
   (`releases/view/releases_page.dart:84`, `tests/view/tests_page.dart`).
 
 ### Phase U7a: Rollout controls
 
-- **Status:** Not started
+- **Status:** Done
 - **Scope:** Gated rollout controls for both stores, with CLI and MCP mirrors.
 - **Files touched:** `packages/xp_engine/lib/src/{releases,stores}/**`,
   `packages/xp_adapters/lib/src/stores/**`, `apps/xpd/lib/src/api/releases/**`,
@@ -252,7 +254,7 @@ Details:
 
 ### Phase U7b: Release timeline, Shorebird controls and notes
 
-- **Status:** Not started
+- **Status:** Done
 - **Scope:** One timeline per release, Shorebird promote and roll back, and release notes kept
   on the release.
 - **Files touched:** `packages/xp_engine/lib/src/releases/**`,
@@ -273,10 +275,16 @@ Details:
   that cannot merge (the runner plan's R10).
 - Shorebird: promote a patch between tracks and roll back from the release page (gated).
 - Release notes and "What to test" text kept on the release and sent with uploads.
+- As built: the history is a `release_event` table (migration v21; main took v20 for iOS on Linux) the engine writes as things
+  happen; a `shorebird-patch` run of a released version is linked to its release, and the
+  `shorebird-track` built-in moves a patch behind `gate: prod_patch`. There is no fake Shorebird
+  server: the `shorebird patches` adapter is tested against a fake CLI. "What to test" reaches
+  Firebase testers; TestFlight's "What to Test" needs the App Store Connect beta localizations
+  API and is left out.
 
 ### Phase U8: Docs, quickstart and troubleshooting
 
-- **Status:** Not started
+- **Status:** Done
 - **Scope:** A guide a new user can follow alone, a troubleshooting page the error hints link
   to, and a README short enough to read. Absorbs the docs part of Phase 19.
 - **Files touched:** `docs/guide/**`, `docs/reference/**`, `README.md`, `site/**`, `skills/**`,

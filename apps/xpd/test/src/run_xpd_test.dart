@@ -1084,7 +1084,10 @@ void main() {
         'dev-build',
         'prod-release',
         'release-merge',
+        'release-rollout',
         'shorebird-patch',
+        'shorebird-track',
+        'smoke-build',
         'test',
       ]);
       expect(created, 201);

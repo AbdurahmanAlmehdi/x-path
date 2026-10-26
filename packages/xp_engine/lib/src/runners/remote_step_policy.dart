@@ -28,6 +28,8 @@ abstract final class RemoteStepPolicy {
   /// The step kinds that only the engine runs, besides every `upload.*` and
   /// `github.*` step.
   static const engineOnlyKinds = {
+    'store.rollout',
+    'shorebird.track',
     'git.push',
     'git.tag',
     'git.releaseBranch',

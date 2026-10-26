@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:args/command_runner.dart';
+import 'package:mason_logger/mason_logger.dart';
 import 'package:path/path.dart' as p;
 import 'package:xp/src/commands/runners_commands.dart' show reachingTheEngine;
 import 'package:xp/src/config/xp_config.dart';
@@ -55,6 +56,18 @@ class DoctorCheck {
     'detail': ?detail,
     'fix': ?fix,
   };
+}
+
+/// Prints [checks] as `xp runner doctor` and `xp doctor` do: the state, the
+/// name and what was found, then the fix as a sentence of its own.
+void printDoctorChecks(Logger logger, Iterable<DoctorCheck> checks) {
+  for (final check in checks) {
+    final detail = check.detail == null ? '' : ': ${check.detail}';
+    logger.info('${check.state.name.padRight(8)} ${check.name}$detail');
+    if (check.fix case final fix?) {
+      logger.info('         ${fix[0].toUpperCase()}${fix.substring(1)}.');
+    }
+  }
 }
 
 /// What `xp runner doctor` found.
@@ -500,13 +513,7 @@ class RunnerDoctorCommand extends Command<int> {
     if (globalResults?['json'] == true) {
       logger.info(prettyJson(report.toJson()));
     } else {
-      for (final check in report.checks) {
-        final detail = check.detail == null ? '' : ': ${check.detail}';
-        logger.info('${check.state.name.padRight(8)} ${check.name}$detail');
-        if (check.fix case final fix?) {
-          logger.info('         ${fix[0].toUpperCase()}${fix.substring(1)}.');
-        }
-      }
+      printDoctorChecks(logger, report.checks);
       logger.info(
         report.ready
             ? 'This runner can take jobs.'

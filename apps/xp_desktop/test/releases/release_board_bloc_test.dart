@@ -13,7 +13,21 @@ import '../helpers/fakes.dart';
 import '../helpers/job_fixtures.dart';
 import '../helpers/release_fixtures.dart';
 
+const _pause = RolloutRequest(
+  store: ReleaseStore.apple,
+  action: RolloutAction.pause,
+);
+
+const _texts = ReleaseTexts(whatsNew: 'New');
+
+final _created = ReleaseEvent(
+  kind: ReleaseEventKind.created,
+  at: DateTime.utc(2026, 10, 12),
+);
+
 void main() {
+  setUpAll(() => registerFallbackValue(PatchAction.promote));
+
   late MockReleasesRepository releases;
   late MockApprovalsRepository approvals;
   late MockProjectsRepository projects;
@@ -31,6 +45,8 @@ void main() {
     when(() => projects.watchCredentials('prj_1'))
         .thenAnswer((_) => Stream.value(const Snapshot([verifiedKey])));
     when(() => releases.notes('rel_2')).thenAnswer((_) async => reviewNotes);
+    when(() => releases.history(any()))
+        .thenAnswer((_) async => const ReleaseHistory([]));
     // The notes of the live release never arrive.
     when(() => releases.notes('rel_1'))
         .thenAnswer((_) => Completer<ReleaseNotes>().future);
@@ -62,6 +78,12 @@ void main() {
       [ReleaseStore.play, StoreState.live],
     );
     expect(const ReleaseBoardMergeRequested().props, isEmpty);
+    expect(const ReleaseBoardRolloutRequested(_pause).props, [_pause]);
+    expect(const ReleaseBoardTextsSaved(_texts).props, [_texts]);
+    expect(const ReleaseBoardPatchMoved(2, PatchAction.promote).props, [
+      2,
+      PatchAction.promote,
+    ]);
   });
 
   group('ReleaseBoardState', () {
@@ -103,6 +125,76 @@ void main() {
       expect(state.credentials, const [verifiedKey]);
       expect(state.notes, reviewNotes);
     },
+  );
+
+  group('the history', () {
+    late StreamController<Snapshot<List<Approval>>> decisions;
+
+    setUp(() {
+      decisions = StreamController<Snapshot<List<Approval>>>();
+      when(() => approvals.watchApprovals(projectId: 'prj_1'))
+          .thenAnswer((_) => decisions.stream);
+      when(() => releases.history('rel_2'))
+          .thenAnswer((_) async => ReleaseHistory([_created]));
+      when(() => releases.history('rel_1'))
+          .thenThrow(const ApiException('Gone.', statusCode: 404));
+    });
+
+    tearDown(() => unawaited(decisions.close()));
+
+    blocTest<ReleaseBoardBloc, ReleaseBoardState>(
+      'is read for the shown release when it or an approval changes',
+      build: build,
+      act: (bloc) async {
+        await loaded(bloc);
+        // The same release, unchanged: nothing to read again.
+        list.add(Snapshot([reviewRelease(), liveRelease]));
+        await pumpEventQueue();
+        decisions.add(Snapshot([pendingApproval]));
+        await pumpEventQueue();
+        expect(bloc.state.history, [_created]);
+        bloc.add(const ReleaseBoardReleaseSelected('rel_1'));
+        await pumpEventQueue();
+      },
+      verify: (bloc) {
+        expect(bloc.state.history, isEmpty, reason: 'another release');
+        verify(() => releases.history('rel_2')).called(2);
+        verify(() => releases.history('rel_1')).called(1);
+      },
+    );
+  });
+
+  blocTest<ReleaseBoardBloc, ReleaseBoardState>(
+    'saves the texts and moves a patch, then reads the history again',
+    setUp: () {
+      when(() => releases.setTexts('rel_2', _texts))
+          .thenAnswer((_) async => reviewRelease());
+      when(() => releases.movePatch('rel_2', 2, PatchAction.rollback))
+          .thenAnswer((_) async => runningRun().run);
+    },
+    build: build,
+    act: (bloc) async {
+      await loaded(bloc);
+      bloc.add(const ReleaseBoardTextsSaved(_texts));
+      await pumpEventQueue();
+      bloc.add(const ReleaseBoardPatchMoved(2, PatchAction.rollback));
+      await pumpEventQueue();
+    },
+    verify: (bloc) {
+      expect(bloc.state.command, ReleaseCommand.none);
+      verify(() => releases.setTexts('rel_2', _texts)).called(1);
+      verify(() => releases.movePatch('rel_2', 2, PatchAction.rollback))
+          .called(1);
+      verify(() => releases.history('rel_2')).called(2);
+    },
+  );
+
+  blocTest<ReleaseBoardBloc, ReleaseBoardState>(
+    'moves no patch without a release',
+    build: build,
+    act: (bloc) =>
+        bloc.add(const ReleaseBoardPatchMoved(1, PatchAction.promote)),
+    verify: (_) => verifyNever(() => releases.movePatch(any(), any(), any())),
   );
 
   blocTest<ReleaseBoardBloc, ReleaseBoardState>(
@@ -166,7 +258,7 @@ void main() {
   );
 
   blocTest<ReleaseBoardBloc, ReleaseBoardState>(
-    'refreshes, marks, merges and builds again',
+    'refreshes, marks, merges, rolls out and builds again',
     setUp: () {
       when(() => releases.refresh('rel_2'))
           .thenAnswer((_) async => reviewRelease());
@@ -178,6 +270,8 @@ void main() {
         ),
       ).thenAnswer((_) async => reviewRelease());
       when(() => releases.merge('rel_2'))
+          .thenAnswer((_) async => runningRun().run);
+      when(() => releases.rollout('rel_2', _pause))
           .thenAnswer((_) async => runningRun().run);
       when(() => releases.startBuild('rel_2'))
           .thenAnswer((_) async => runningRun().run);
@@ -193,6 +287,8 @@ void main() {
       await pumpEventQueue();
       bloc.add(const ReleaseBoardMergeRequested());
       await pumpEventQueue();
+      bloc.add(const ReleaseBoardRolloutRequested(_pause));
+      await pumpEventQueue();
       expect(bloc.state.builtRun, isNull);
       bloc.add(const ReleaseBoardNewBuildRequested());
       await pumpEventQueue();
@@ -202,6 +298,7 @@ void main() {
       expect(bloc.state.builtRun, runningRun().run);
       verify(() => releases.refresh('rel_2')).called(1);
       verify(() => releases.merge('rel_2')).called(1);
+      verify(() => releases.rollout('rel_2', _pause)).called(1);
     },
   );
 

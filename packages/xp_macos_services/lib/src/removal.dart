@@ -127,6 +127,10 @@ abstract interface class RunningApp {
 
   /// Quits the app.
   Future<void> quit();
+
+  /// Whether closing the main window keeps the app running in the menu bar
+  /// (UX-07); otherwise it quits. macOS keeps the choice.
+  Future<void> setKeepRunning({required bool keep});
 }
 
 /// The [RunningApp] over the platform channel of the macOS runner.
@@ -147,6 +151,10 @@ class MethodChannelRunningApp implements RunningApp {
 
   @override
   Future<void> quit() => channel.invokeMethod<void>('appQuit');
+
+  @override
+  Future<void> setKeepRunning({required bool keep}) =>
+      channel.invokeMethod<void>('appKeepRunning', {'keep': keep});
 }
 
 /// The name of the channel of the app menu (`MacosServicesChannel.swift`).

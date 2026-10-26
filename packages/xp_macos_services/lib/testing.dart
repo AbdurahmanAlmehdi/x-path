@@ -195,6 +195,9 @@ class FakeNeedsYouAlerts implements NeedsYouAlerts {
   /// The approvals whose notification was withdrawn, oldest first.
   final withdrawn = <String>[];
 
+  /// The engine notices shown, oldest first.
+  final engineNotices = <EngineNotice>[];
+
   /// Every content of the menu bar extra, oldest first.
   final menus = <MenuBarContent>[];
 
@@ -205,6 +208,10 @@ class FakeNeedsYouAlerts implements NeedsYouAlerts {
 
   @override
   Future<void> notify(ApprovalNotice notice) async => notices.add(notice);
+
+  @override
+  Future<void> notifyNotice(EngineNotice notice) async =>
+      engineNotices.add(notice);
 
   @override
   Future<void> withdraw(String approvalId) async => withdrawn.add(approvalId);
@@ -278,6 +285,9 @@ class FakeRunningApp implements RunningApp {
   /// Whether [quit] was called.
   bool quitted = false;
 
+  /// What [setKeepRunning] was told last, if anything.
+  bool? keepRunning;
+
   @override
   Future<String> version() async => appVersion;
 
@@ -289,6 +299,9 @@ class FakeRunningApp implements RunningApp {
 
   @override
   Future<void> quit() async => quitted = true;
+
+  @override
+  Future<void> setKeepRunning({required bool keep}) async => keepRunning = keep;
 }
 
 /// An [AppMenu] whose items the test chooses with [chooseSettings].

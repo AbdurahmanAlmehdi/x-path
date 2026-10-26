@@ -11,6 +11,9 @@ abstract interface class TokenVault {
 
   /// Saves the token of [kind], replacing any earlier one.
   Future<void> write(DeviceTokenKind kind, String token);
+
+  /// Forgets the token of [kind]. Does nothing if none was saved.
+  Future<void> delete(DeviceTokenKind kind);
 }
 
 /// A [TokenVault] over the OS secret store: the Keychain on macOS, an
@@ -29,4 +32,7 @@ class SecretStoreTokenVault implements TokenVault {
   @override
   Future<void> write(DeviceTokenKind kind, String token) =>
       _store.write(_key(kind), token);
+
+  @override
+  Future<void> delete(DeviceTokenKind kind) => _store.delete(_key(kind));
 }

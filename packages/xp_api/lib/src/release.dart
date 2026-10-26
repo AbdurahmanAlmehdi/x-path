@@ -48,6 +48,10 @@ enum ReleaseState {
 
   /// Whether the release is over: it never changes again.
   bool get isTerminal => this == merged || this == abandoned;
+
+  /// Whether every store approved the release: its rollouts and Shorebird
+  /// patches can change.
+  bool get storesApproved => this == approved || this == live || this == merged;
 }
 
 /// A store a release is uploaded to.
@@ -227,6 +231,8 @@ class Release extends Equatable {
     this.mergeCommit,
     this.mergeRunId,
     this.message,
+    this.whatsNew,
+    this.whatToTest,
   });
 
   /// Reads a release from its JSON form.
@@ -291,6 +297,13 @@ class Release extends Equatable {
   /// Why the release was abandoned, or what the owner should know.
   final String? message;
 
+  /// What is new, for Google Play's release notes (U7b).
+  final String? whatsNew;
+
+  /// What testers should try, for the release notes of Firebase App
+  /// Distribution (U7b).
+  final String? whatToTest;
+
   /// When the release was dispatched, in UTC.
   final DateTime createdAt;
 
@@ -321,6 +334,8 @@ class Release extends Equatable {
     mergeCommit,
     mergeRunId,
     message,
+    whatsNew,
+    whatToTest,
     createdAt,
     updatedAt,
   ];
@@ -386,4 +401,70 @@ class AbandonRequest extends Equatable {
 
   @override
   List<Object?> get props => [reason];
+}
+
+/// A change to how a release reaches users once it is in the stores (U7a):
+/// Apple's phased release (pause, resume, complete) and Google Play's staged
+/// rollout (a new fraction, halt, complete). Each is a gated action (D-13).
+@JsonEnum(valueField: 'wire')
+enum RolloutAction {
+  /// Apple: pause the phased release.
+  pause('pause'),
+
+  /// Apple: resume the paused phased release.
+  resume('resume'),
+
+  /// Both: release to every user now.
+  complete('complete'),
+
+  /// Google Play: stop the staged rollout where it is.
+  halt('halt'),
+
+  /// Google Play: roll out to [RolloutRequest.userFraction] of the users.
+  fraction('fraction');
+
+  new(this.wire);
+
+  /// The name on the wire.
+  final String wire;
+}
+
+/// The body of `POST /releases/{id}/rollout`.
+@JsonSerializable(includeIfNull: false)
+class RolloutRequest extends Equatable {
+  /// Creates a request.
+  const new({required this.store, required this.action, this.userFraction});
+
+  /// Reads a request from its JSON form.
+  factory RolloutRequest.fromJson(Map<String, dynamic> json) =>
+      _$RolloutRequestFromJson(json);
+
+  /// The store whose rollout changes.
+  final ReleaseStore store;
+
+  /// What changes.
+  final RolloutAction action;
+
+  /// For [RolloutAction.fraction]: the share of users, `0 < f ≤ 1`.
+  final double? userFraction;
+
+  /// Why the store cannot do [action], or `null` when it can.
+  String? get problem => switch ((store, action)) {
+    (ReleaseStore.apple, RolloutAction.halt || RolloutAction.fraction) =>
+      'App Store Connect pauses, resumes or completes a phased release; it '
+          'has no fraction to set.',
+    (ReleaseStore.play, RolloutAction.pause || RolloutAction.resume) =>
+      'Google Play halts a staged rollout or sets its fraction; it has no '
+          'pause.',
+    (_, RolloutAction.fraction)
+        when userFraction == null || userFraction! <= 0 || userFraction! > 1 =>
+      'Give the share of users as a fraction above 0 and at most 1.',
+    _ => null,
+  };
+
+  /// The JSON form.
+  Map<String, dynamic> toJson() => _$RolloutRequestToJson(this);
+
+  @override
+  List<Object?> get props => [store, action, userFraction];
 }

@@ -90,10 +90,23 @@ void main() {
     expect(env.logger.errors.single, contains('<url>'));
   });
 
-  test('without a token is a usage error', () async {
+  test('without a token and a terminal is a usage error', () async {
     expect(await env.run(['connect', 'http://e:1']), 64);
     expect(env.logger.errors.single, contains('--token'));
     expect(env.vault.tokens, isEmpty);
+  });
+
+  test('without a token asks for it at the terminal', () async {
+    env.prompt
+      ..interactive = true
+      ..answers.addAll([' c1 \n', '']);
+
+    await env.runOk(['connect', 'http://e:1']);
+    expect(env.vault.tokens, {DeviceTokenKind.cli: 'c1'});
+    expect(env.prompt.questions.single, contains('token of this CLI'));
+
+    expect(await env.run(['connect', 'http://e:1']), 64);
+    expect(env.logger.errors.last, contains('No token'));
   });
 
   test('with a URL that is not an engine address is a usage error', () async {

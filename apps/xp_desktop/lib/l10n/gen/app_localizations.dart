@@ -172,6 +172,12 @@ abstract class AppLocalizations {
   /// **'Release branch merged'**
   String get releaseMergedToast;
 
+  /// Toast: a change of the store rollout was asked for and waits for an approval.
+  ///
+  /// In en, this message translates to:
+  /// **'Rollout change requested: approve it to apply'**
+  String get releaseRolloutToast;
+
   /// Toast: the jobs of the run that had not ended were cancelled.
   ///
   /// In en, this message translates to:
@@ -1573,7 +1579,7 @@ abstract class AppLocalizations {
   /// On a finding of a missing Firebase app id: opens the flavor's store ids.
   ///
   /// In en, this message translates to:
-  /// **'Set the id…'**
+  /// **'Set Firebase app id…'**
   String get scanSetStoreId;
 
   /// The flavor has no credential of a kind.
@@ -1975,6 +1981,18 @@ abstract class AppLocalizations {
   /// Name of a kind of step.
   ///
   /// In en, this message translates to:
+  /// **'Change the rollout'**
+  String get stepRollout;
+
+  /// Name of a kind of step.
+  ///
+  /// In en, this message translates to:
+  /// **'Move a Shorebird patch'**
+  String get stepShorebirdTrack;
+
+  /// Name of a kind of step.
+  ///
+  /// In en, this message translates to:
   /// **'Record the manifest'**
   String get stepManifest;
 
@@ -2019,6 +2037,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'merge'**
   String get gateMerge;
+
+  /// A gated action, inside a sentence.
+  ///
+  /// In en, this message translates to:
+  /// **'rollout change'**
+  String get gateRollout;
 
   /// A gated action, inside a sentence.
   ///
@@ -3388,6 +3412,48 @@ abstract class AppLocalizations {
   /// **'Mark live'**
   String get laneMarkLive;
 
+  /// Pauses Apple's phased release.
+  ///
+  /// In en, this message translates to:
+  /// **'Pause'**
+  String get lanePause;
+
+  /// Resumes Apple's phased release.
+  ///
+  /// In en, this message translates to:
+  /// **'Resume'**
+  String get laneResume;
+
+  /// Completes the phased or staged rollout: every user gets the release.
+  ///
+  /// In en, this message translates to:
+  /// **'Release to all'**
+  String get laneReleaseToAll;
+
+  /// Halts Google Play's staged rollout.
+  ///
+  /// In en, this message translates to:
+  /// **'Halt'**
+  String get laneHalt;
+
+  /// Opens the shares of users Google Play's staged rollout can reach.
+  ///
+  /// In en, this message translates to:
+  /// **'Roll out to'**
+  String get laneRollOutTo;
+
+  /// No description provided for @lanePercent.
+  ///
+  /// In en, this message translates to:
+  /// **'{percent} % of users'**
+  String lanePercent(int percent);
+
+  /// Under the rollout buttons of a store lane.
+  ///
+  /// In en, this message translates to:
+  /// **'Each change waits for your approval.'**
+  String get laneRolloutCaption;
+
   /// No description provided for @laneMarkTitle.
   ///
   /// In en, this message translates to:
@@ -3585,6 +3651,156 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Merged into {branch}'**
   String timelineMerged(String branch);
+
+  /// Timeline entry.
+  ///
+  /// In en, this message translates to:
+  /// **'Merge requested'**
+  String get timelineMergeRequested;
+
+  /// Timeline entry.
+  ///
+  /// In en, this message translates to:
+  /// **'Rollout change requested'**
+  String get timelineRolloutRequested;
+
+  /// Timeline entry.
+  ///
+  /// In en, this message translates to:
+  /// **'{store} rollout changed'**
+  String timelineRollout(String store);
+
+  /// Timeline entry: a rollout changed in a store the engine did not name.
+  ///
+  /// In en, this message translates to:
+  /// **'Rollout changed'**
+  String get timelineRolloutChanged;
+
+  /// Timeline entry: a Shorebird patch.
+  ///
+  /// In en, this message translates to:
+  /// **'Patch {number} published'**
+  String timelinePatch(int number);
+
+  /// Timeline entry.
+  ///
+  /// In en, this message translates to:
+  /// **'Promotion of patch {number} requested'**
+  String timelinePatchPromoteRequested(int number);
+
+  /// Timeline entry.
+  ///
+  /// In en, this message translates to:
+  /// **'Rollback of patch {number} requested'**
+  String timelinePatchRollbackRequested(int number);
+
+  /// Timeline entry.
+  ///
+  /// In en, this message translates to:
+  /// **'Patch {number} promoted to stable'**
+  String timelinePatchPromoted(int number);
+
+  /// Timeline entry.
+  ///
+  /// In en, this message translates to:
+  /// **'Patch {number} rolled back'**
+  String timelinePatchRolledBack(int number);
+
+  /// Timeline entry: the What's new or What to test text of the release changed.
+  ///
+  /// In en, this message translates to:
+  /// **'Store texts changed'**
+  String get timelineTexts;
+
+  /// Label of the panel of the texts the uploads send.
+  ///
+  /// In en, this message translates to:
+  /// **'Store texts'**
+  String get textsTitle;
+
+  /// Field: Google Play's release notes.
+  ///
+  /// In en, this message translates to:
+  /// **'What\'s new'**
+  String get textsWhatsNew;
+
+  /// Field: what Firebase testers should try.
+  ///
+  /// In en, this message translates to:
+  /// **'What to test'**
+  String get textsWhatToTest;
+
+  /// Under the store texts.
+  ///
+  /// In en, this message translates to:
+  /// **'Uploads send them when they run: What\'s new to Google Play, What to test to Firebase testers. Notes a workflow gives win.'**
+  String get textsCaption;
+
+  /// Saves the store texts.
+  ///
+  /// In en, this message translates to:
+  /// **'Save texts'**
+  String get textsSave;
+
+  /// Toast: the texts of the release were saved.
+  ///
+  /// In en, this message translates to:
+  /// **'Store texts saved'**
+  String get releaseTextsToast;
+
+  /// Label of the panel of the patches of the release.
+  ///
+  /// In en, this message translates to:
+  /// **'Shorebird patches'**
+  String get patchesTitle;
+
+  /// No description provided for @patchLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Patch {number}'**
+  String patchLabel(int number);
+
+  /// State of a patch.
+  ///
+  /// In en, this message translates to:
+  /// **'Published'**
+  String get patchPublished;
+
+  /// State of a patch: promoted to the stable track.
+  ///
+  /// In en, this message translates to:
+  /// **'On stable'**
+  String get patchPromoted;
+
+  /// State of a patch.
+  ///
+  /// In en, this message translates to:
+  /// **'Rolled back'**
+  String get patchRolledBack;
+
+  /// Promotes a patch to the stable track.
+  ///
+  /// In en, this message translates to:
+  /// **'Promote'**
+  String get patchPromote;
+
+  /// Rolls a patch back.
+  ///
+  /// In en, this message translates to:
+  /// **'Roll back'**
+  String get patchRollback;
+
+  /// Under the patches.
+  ///
+  /// In en, this message translates to:
+  /// **'Each change waits for your approval.'**
+  String get patchesCaption;
+
+  /// Toast: a patch promotion or rollback was asked for and waits for an approval.
+  ///
+  /// In en, this message translates to:
+  /// **'Patch change requested: approve it to apply'**
+  String get releasePatchToast;
 
   /// Where a store status came from.
   ///
@@ -5811,6 +6027,834 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'GitHub refuses the engine\'s token, so it cannot add a project from GitHub. Save a new one below.'**
   String get addProjectGitHubRejected;
+
+  /// Onboarding: what a first release needs, up front (U5a).
+  ///
+  /// In en, this message translates to:
+  /// **'A first release needs four things: this engine, a GitHub token for projects on GitHub, the project\'s folder, and the store credentials of each flavor. After these three steps, the app shows what is left.'**
+  String get onboardingFirstRelease;
+
+  /// Title of the setup checklist (U5a).
+  ///
+  /// In en, this message translates to:
+  /// **'Get to a first build'**
+  String get setupTitle;
+
+  /// No description provided for @setupProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'{done} of {total} done'**
+  String setupProgress(int done, int total);
+
+  /// Setup step: always done in the shell.
+  ///
+  /// In en, this message translates to:
+  /// **'The engine runs'**
+  String get setupEngine;
+
+  /// Setup step.
+  ///
+  /// In en, this message translates to:
+  /// **'Connect GitHub'**
+  String get setupGitHub;
+
+  /// Setup step body.
+  ///
+  /// In en, this message translates to:
+  /// **'The engine reads and releases projects on GitHub with a token. A project on another git host needs none.'**
+  String get setupGitHubBody;
+
+  /// Setup step.
+  ///
+  /// In en, this message translates to:
+  /// **'Add a project'**
+  String get setupProject;
+
+  /// Setup step body.
+  ///
+  /// In en, this message translates to:
+  /// **'The folder of a Flutter app\'s repository. The engine scans it for apps and flavors.'**
+  String get setupProjectBody;
+
+  /// Setup step.
+  ///
+  /// In en, this message translates to:
+  /// **'Add credentials'**
+  String get setupCredentials;
+
+  /// No description provided for @setupCredentialsBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Every flavor needs the keys that sign and upload it. {flavor} has none yet.'**
+  String setupCredentialsBody(String flavor);
+
+  /// Setup step.
+  ///
+  /// In en, this message translates to:
+  /// **'Set the store ids'**
+  String get setupStoreIds;
+
+  /// No description provided for @setupStoreIdsBody.
+  ///
+  /// In en, this message translates to:
+  /// **'A build is uploaded to the app id its flavor has in Firebase or App Store Connect. {flavor} is missing one.'**
+  String setupStoreIdsBody(String flavor);
+
+  /// Setup step, shown when no runner can run a build.
+  ///
+  /// In en, this message translates to:
+  /// **'Find a machine for the builds'**
+  String get setupRunners;
+
+  /// Opens docs/guide/runners.md.
+  ///
+  /// In en, this message translates to:
+  /// **'Runners guide'**
+  String get setupRunnersGuide;
+
+  /// Opens the runners page.
+  ///
+  /// In en, this message translates to:
+  /// **'Runners'**
+  String get setupRunnersOpen;
+
+  /// Setup step.
+  ///
+  /// In en, this message translates to:
+  /// **'Run a first build'**
+  String get setupFirstBuild;
+
+  /// Setup step body.
+  ///
+  /// In en, this message translates to:
+  /// **'An unsigned build needs no credential or store id: it shows the project builds before signing is set up.'**
+  String get setupFirstBuildBody;
+
+  /// Dispatches the built-in smoke-build.
+  ///
+  /// In en, this message translates to:
+  /// **'Try an unsigned build'**
+  String get setupTrySmoke;
+
+  /// Opens the dispatch sheet.
+  ///
+  /// In en, this message translates to:
+  /// **'Dispatch…'**
+  String get setupDispatch;
+
+  /// Opens the GitHub token in Settings.
+  ///
+  /// In en, this message translates to:
+  /// **'Connect…'**
+  String get setupConnect;
+
+  /// Opens Add project.
+  ///
+  /// In en, this message translates to:
+  /// **'Add…'**
+  String get setupAdd;
+
+  /// Opens the credentials of a flavor.
+  ///
+  /// In en, this message translates to:
+  /// **'Assign…'**
+  String get setupAssign;
+
+  /// Opens the store ids of a flavor.
+  ///
+  /// In en, this message translates to:
+  /// **'Set ids…'**
+  String get setupSetIds;
+
+  /// On a finding a credential fixes: opens the flavor's credentials.
+  ///
+  /// In en, this message translates to:
+  /// **'Add credential…'**
+  String get scanAddCredential;
+
+  /// On a finding with a file: copies its path.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy path'**
+  String get scanCopyPath;
+
+  /// Toast after Copy path.
+  ///
+  /// In en, this message translates to:
+  /// **'Path copied'**
+  String get scanPathCopied;
+
+  /// Section label (U5b).
+  ///
+  /// In en, this message translates to:
+  /// **'CLI and agents'**
+  String get settingsTokens;
+
+  /// Settings ▸ CLI and agents.
+  ///
+  /// In en, this message translates to:
+  /// **'Make a token for xp in a terminal, on this Mac or another, or for an agent that runs xp mcp. Agents can ask for approvals, never give them.'**
+  String get settingsTokensBody;
+
+  /// Makes a cli token.
+  ///
+  /// In en, this message translates to:
+  /// **'New xp token'**
+  String get settingsTokensNewCli;
+
+  /// Makes an mcp token.
+  ///
+  /// In en, this message translates to:
+  /// **'New agent token'**
+  String get settingsTokensNewMcp;
+
+  /// No description provided for @settingsTokensCliName.
+  ///
+  /// In en, this message translates to:
+  /// **'xp on {device}'**
+  String settingsTokensCliName(String device);
+
+  /// No description provided for @settingsTokensMcpName.
+  ///
+  /// In en, this message translates to:
+  /// **'Agent on {device}'**
+  String settingsTokensMcpName(String device);
+
+  /// No description provided for @settingsTokensCliMade.
+  ///
+  /// In en, this message translates to:
+  /// **'Made \"{name}\". Run this in a terminal to connect xp, then paste the token when it asks:'**
+  String settingsTokensCliMade(String name);
+
+  /// No description provided for @settingsTokensMcpMade.
+  ///
+  /// In en, this message translates to:
+  /// **'Made \"{name}\". Add this to the MCP config of the agent:'**
+  String settingsTokensMcpMade(String name);
+
+  /// Under a new token.
+  ///
+  /// In en, this message translates to:
+  /// **'The token is shown this once. Copy it now; make another if it is lost.'**
+  String get settingsTokensOnce;
+
+  /// Copies the xp connect command.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy command'**
+  String get settingsTokensCopyCommand;
+
+  /// Copies the MCP config.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy config'**
+  String get settingsTokensCopyConfig;
+
+  /// Copies the new token, to paste when xp connect asks for it.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy token'**
+  String get settingsTokensCopyToken;
+
+  /// Hides the new token for good.
+  ///
+  /// In en, this message translates to:
+  /// **'Done'**
+  String get settingsTokensDone;
+
+  /// ⌘K (keyboard guide).
+  ///
+  /// In en, this message translates to:
+  /// **'Command palette'**
+  String get commandPalette;
+
+  /// ⌘N.
+  ///
+  /// In en, this message translates to:
+  /// **'Dispatch…'**
+  String get commandDispatch;
+
+  /// ⌘R.
+  ///
+  /// In en, this message translates to:
+  /// **'Re-run job'**
+  String get commandRerun;
+
+  /// ⌥⌘R.
+  ///
+  /// In en, this message translates to:
+  /// **'Resume from selected step'**
+  String get commandResume;
+
+  /// ⌘.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel job'**
+  String get commandCancel;
+
+  /// ⇧⌘A.
+  ///
+  /// In en, this message translates to:
+  /// **'Approvals'**
+  String get commandApprovals;
+
+  /// ⌘[.
+  ///
+  /// In en, this message translates to:
+  /// **'Back'**
+  String get commandBack;
+
+  /// ⌘].
+  ///
+  /// In en, this message translates to:
+  /// **'Forward'**
+  String get commandForward;
+
+  /// ⌃⌘S.
+  ///
+  /// In en, this message translates to:
+  /// **'Show or hide sidebar'**
+  String get commandSidebar;
+
+  /// ⇧⌘C.
+  ///
+  /// In en, this message translates to:
+  /// **'Show or hide console'**
+  String get commandConsole;
+
+  /// ⌘F.
+  ///
+  /// In en, this message translates to:
+  /// **'Find in log'**
+  String get commandFind;
+
+  /// ⌘G.
+  ///
+  /// In en, this message translates to:
+  /// **'Next match'**
+  String get commandFindNext;
+
+  /// ⇧⌘G.
+  ///
+  /// In en, this message translates to:
+  /// **'Previous match'**
+  String get commandFindPrevious;
+
+  /// ⌘E.
+  ///
+  /// In en, this message translates to:
+  /// **'Jump to error'**
+  String get commandJumpToError;
+
+  /// ⌘↓.
+  ///
+  /// In en, this message translates to:
+  /// **'Follow tail'**
+  String get commandFollowTail;
+
+  /// ⇧⌘T.
+  ///
+  /// In en, this message translates to:
+  /// **'Show or hide timestamps'**
+  String get commandTimestamps;
+
+  /// ⌥Z.
+  ///
+  /// In en, this message translates to:
+  /// **'Wrap lines'**
+  String get commandWrap;
+
+  /// ⌃⌘=.
+  ///
+  /// In en, this message translates to:
+  /// **'Compact rows'**
+  String get commandCompact;
+
+  /// ⌘/: the shortcut sheet.
+  ///
+  /// In en, this message translates to:
+  /// **'Keyboard shortcuts'**
+  String get commandShortcuts;
+
+  /// ⌘,.
+  ///
+  /// In en, this message translates to:
+  /// **'Settings…'**
+  String get commandSettings;
+
+  /// Menu bar.
+  ///
+  /// In en, this message translates to:
+  /// **'Go'**
+  String get menuGo;
+
+  /// Menu bar.
+  ///
+  /// In en, this message translates to:
+  /// **'Project'**
+  String get menuProject;
+
+  /// Menu bar.
+  ///
+  /// In en, this message translates to:
+  /// **'Job'**
+  String get menuJob;
+
+  /// Menu bar.
+  ///
+  /// In en, this message translates to:
+  /// **'View'**
+  String get menuView;
+
+  /// Menu bar.
+  ///
+  /// In en, this message translates to:
+  /// **'Window'**
+  String get menuWindow;
+
+  /// Menu bar: ⌘1–⌘9.
+  ///
+  /// In en, this message translates to:
+  /// **'Projects'**
+  String get menuProjects;
+
+  /// Placeholder of the palette's field.
+  ///
+  /// In en, this message translates to:
+  /// **'Go to a project, release, run or workflow, or run a command'**
+  String get paletteHint;
+
+  /// The palette found nothing.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing matches.'**
+  String get paletteEmpty;
+
+  /// No description provided for @paletteDispatch.
+  ///
+  /// In en, this message translates to:
+  /// **'Dispatch… {project}'**
+  String paletteDispatch(String project);
+
+  /// No description provided for @paletteRunAgain.
+  ///
+  /// In en, this message translates to:
+  /// **'Run again: {run}'**
+  String paletteRunAgain(String run);
+
+  /// No description provided for @paletteCancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel: {run}'**
+  String paletteCancel(String run);
+
+  /// No description provided for @paletteApprove.
+  ///
+  /// In en, this message translates to:
+  /// **'Review: {action} {version}'**
+  String paletteApprove(String action, String version);
+
+  /// No description provided for @paletteRelease.
+  ///
+  /// In en, this message translates to:
+  /// **'Release {version} · {flavor}'**
+  String paletteRelease(String version, String flavor);
+
+  /// No description provided for @paletteRun.
+  ///
+  /// In en, this message translates to:
+  /// **'Run {name}'**
+  String paletteRun(String name);
+
+  /// No description provided for @paletteWorkflow.
+  ///
+  /// In en, this message translates to:
+  /// **'Workflow {name}'**
+  String paletteWorkflow(String name);
+
+  /// No description provided for @palettePage.
+  ///
+  /// In en, this message translates to:
+  /// **'Go to {page}'**
+  String palettePage(String page);
+
+  /// Title of the shortcut sheet (⌘/).
+  ///
+  /// In en, this message translates to:
+  /// **'Keyboard shortcuts'**
+  String get shortcutsTitle;
+
+  /// ⌘1–⌘9 in the shortcut sheet.
+  ///
+  /// In en, this message translates to:
+  /// **'Projects in sidebar order'**
+  String get shortcutsProjects;
+
+  /// Closes the shortcut sheet.
+  ///
+  /// In en, this message translates to:
+  /// **'Close'**
+  String get shortcutsClose;
+
+  /// Settings section (U6b).
+  ///
+  /// In en, this message translates to:
+  /// **'Notifications'**
+  String get settingsNotices;
+
+  /// Settings switch (UX-07).
+  ///
+  /// In en, this message translates to:
+  /// **'Keep XPath in the menu bar when the window closes'**
+  String get settingsKeepRunning;
+
+  /// Under the switch.
+  ///
+  /// In en, this message translates to:
+  /// **'Builds, approvals and notifications go on with the window closed. Quit with ⌘Q.'**
+  String get settingsKeepRunningBody;
+
+  /// Above the notice toggles.
+  ///
+  /// In en, this message translates to:
+  /// **'XPath tells you about these on macOS when the window is closed or behind. Approvals always notify.'**
+  String get settingsNoticesBody;
+
+  /// Notice kind.
+  ///
+  /// In en, this message translates to:
+  /// **'A production job failed'**
+  String get noticeJobFailed;
+
+  /// Notice kind.
+  ///
+  /// In en, this message translates to:
+  /// **'A production job succeeded'**
+  String get noticeJobSucceeded;
+
+  /// Notice kind.
+  ///
+  /// In en, this message translates to:
+  /// **'A store rejected a release'**
+  String get noticeReleaseRejected;
+
+  /// Notice kind.
+  ///
+  /// In en, this message translates to:
+  /// **'The stores approved a release'**
+  String get noticeReleaseApproved;
+
+  /// Notice kind.
+  ///
+  /// In en, this message translates to:
+  /// **'A release is live'**
+  String get noticeReleaseLive;
+
+  /// Notice kind.
+  ///
+  /// In en, this message translates to:
+  /// **'A credential stopped working'**
+  String get noticeCredentialExpired;
+
+  /// Notice kind.
+  ///
+  /// In en, this message translates to:
+  /// **'The engine cannot read its secrets'**
+  String get noticeSecretsLocked;
+
+  /// Notice kind and title.
+  ///
+  /// In en, this message translates to:
+  /// **'A runner lost a job'**
+  String get noticeRunnerLost;
+
+  /// Notice kind.
+  ///
+  /// In en, this message translates to:
+  /// **'A runner lost a capability'**
+  String get noticeCapabilityLost;
+
+  /// Notice kind and title.
+  ///
+  /// In en, this message translates to:
+  /// **'A job waits for a runner'**
+  String get noticeJobWaiting;
+
+  /// No description provided for @noticeRunnerLostBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Its lease ran out, so the job is {state} again.'**
+  String noticeRunnerLostBody(String state);
+
+  /// No description provided for @noticeCapabilityLostTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'{runner} can no longer do {capabilities}'**
+  String noticeCapabilityLostTitle(String runner, String capabilities);
+
+  /// Notice body.
+  ///
+  /// In en, this message translates to:
+  /// **'Jobs that need it wait for another runner.'**
+  String get noticeCapabilityLostBody;
+
+  /// No description provided for @noticeJobWaitingBody.
+  ///
+  /// In en, this message translates to:
+  /// **'{job} has waited 10 minutes: {reason}'**
+  String noticeJobWaitingBody(String job, String reason);
+
+  /// No description provided for @menuBarRunning.
+  ///
+  /// In en, this message translates to:
+  /// **'Running · {count}'**
+  String menuBarRunning(int count);
+
+  /// No description provided for @menuBarRunTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'{workflow} {version}'**
+  String menuBarRunTitle(String workflow, String version);
+
+  /// No description provided for @menuBarRunDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'{project} · {done} of {total} jobs'**
+  String menuBarRunDetail(String project, int done, int total);
+
+  /// Quick dispatch menu of the menu bar extra.
+  ///
+  /// In en, this message translates to:
+  /// **'Dispatch…'**
+  String get menuBarDispatch;
+
+  /// No description provided for @copiedValue.
+  ///
+  /// In en, this message translates to:
+  /// **'Copied {value}'**
+  String copiedValue(String value);
+
+  /// Tooltip of the engine switcher.
+  ///
+  /// In en, this message translates to:
+  /// **'Switch engine'**
+  String get engineSwitcherTooltip;
+
+  /// Tooltip of a select menu.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose'**
+  String get selectTooltip;
+
+  /// Context menu.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy commit'**
+  String get menuCopySha;
+
+  /// Context menu.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy version'**
+  String get menuCopyVersion;
+
+  /// No description provided for @menuCopyBundleId.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy bundle ID {id}'**
+  String menuCopyBundleId(String id);
+
+  /// Context menu.
+  ///
+  /// In en, this message translates to:
+  /// **'Open job'**
+  String get menuOpenJob;
+
+  /// Context menu of a downloaded artifact.
+  ///
+  /// In en, this message translates to:
+  /// **'Show in Finder'**
+  String get menuRevealArtifact;
+
+  /// No description provided for @credentialActions.
+  ///
+  /// In en, this message translates to:
+  /// **'Actions of {name}'**
+  String credentialActions(String name);
+
+  /// No description provided for @sidebarNeedsYouCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} {count, plural, =1{needs} other{need}} you'**
+  String sidebarNeedsYouCount(int count);
+
+  /// Opens the menu of a credential's other actions.
+  ///
+  /// In en, this message translates to:
+  /// **'More'**
+  String get credentialsMore;
+
+  /// Search field of the release list.
+  ///
+  /// In en, this message translates to:
+  /// **'Find a release'**
+  String get releasesSearch;
+
+  /// Search field of the test run list.
+  ///
+  /// In en, this message translates to:
+  /// **'Find a test run'**
+  String get testsSearch;
+
+  /// The cross-project dashboard (U6d).
+  ///
+  /// In en, this message translates to:
+  /// **'Home'**
+  String get homeTitle;
+
+  /// No description provided for @homeSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 project} other{{count} projects}}'**
+  String homeSubtitle(int count);
+
+  /// No description provided for @homeLive.
+  ///
+  /// In en, this message translates to:
+  /// **'Live: {version}'**
+  String homeLive(String version);
+
+  /// Home card of a project with no live release.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing live yet'**
+  String get homeNothingLive;
+
+  /// No description provided for @homeInReview.
+  ///
+  /// In en, this message translates to:
+  /// **'{version}: {state}'**
+  String homeInReview(String version, String state);
+
+  /// Sidebar row and page title (U6d).
+  ///
+  /// In en, this message translates to:
+  /// **'Project settings'**
+  String get sidebarProjectSettings;
+
+  /// Project settings section.
+  ///
+  /// In en, this message translates to:
+  /// **'Git host'**
+  String get projectGitHost;
+
+  /// Project settings section.
+  ///
+  /// In en, this message translates to:
+  /// **'Base branch'**
+  String get projectBaseBranch;
+
+  /// Saves the base branch.
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get projectBaseBranchSave;
+
+  /// No description provided for @projectBaseBranchSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Releases are based on {branch} now'**
+  String projectBaseBranchSaved(String branch);
+
+  /// Project settings section.
+  ///
+  /// In en, this message translates to:
+  /// **'Gates'**
+  String get projectGates;
+
+  /// Above the gates.
+  ///
+  /// In en, this message translates to:
+  /// **'These actions wait for your approval before they happen. Agents can never turn a gate off.'**
+  String get projectGatesBody;
+
+  /// No description provided for @projectGateOffTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Turn the {action} gate off?'**
+  String projectGateOffTitle(String action);
+
+  /// No description provided for @projectGateOffNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Every {action} of this project then happens without asking you.'**
+  String projectGateOffNow(String action);
+
+  /// No description provided for @projectGateOffWaiting.
+  ///
+  /// In en, this message translates to:
+  /// **'Jobs that wait for a {action} approval go on at once, without review.'**
+  String projectGateOffWaiting(String action);
+
+  /// Keeps a project gate on.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep the gate'**
+  String get projectGateOffKeep;
+
+  /// Turns a project gate off.
+  ///
+  /// In en, this message translates to:
+  /// **'Turn off'**
+  String get projectGateOff;
+
+  /// Project settings section.
+  ///
+  /// In en, this message translates to:
+  /// **'Store ids'**
+  String get projectStoreIds;
+
+  /// Project settings section.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove the project'**
+  String get projectRemove;
+
+  /// Project settings.
+  ///
+  /// In en, this message translates to:
+  /// **'The engine forgets the project, its workflows and runs. The repository and the stores are not touched.'**
+  String get projectRemoveBody;
+
+  /// Removes the project after a confirmation.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove…'**
+  String get projectRemoveButton;
+
+  /// No description provided for @projectRemoveTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove {name}?'**
+  String projectRemoveTitle(String name);
+
+  /// Confirmation point.
+  ///
+  /// In en, this message translates to:
+  /// **'Its workflows, runs and releases go from this engine. Credentials stay.'**
+  String get projectRemovePoint;
+
+  /// Confirmation keep button.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep'**
+  String get projectRemoveKeep;
+
+  /// Confirmation remove button.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove'**
+  String get projectRemoveConfirm;
 }
 
 class _AppLocalizationsDelegate

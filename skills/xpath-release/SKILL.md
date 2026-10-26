@@ -79,8 +79,8 @@ MCP: `list_projects`, `get_project`, `list_workflows`, `get_workflow`. Every CLI
 `--json`, before or after the command (`xp runs show run_... --json`), to print what the API
 answered; an error is then `{"code", "message", "hint"}` on standard error.
 
-Every project has the built-ins `dev-build`, `prod-release`, `release-merge`, `shorebird-patch`
-and `test`. Read a workflow's `inputs` before dispatching it. `plan_dispatch` (or
+Every project has the built-ins `dev-build`, `prod-release`, `release-merge`, `release-rollout`,
+`shorebird-patch`, `shorebird-track`, `smoke-build` and `test`. Read a workflow's `inputs` before dispatching it. `plan_dispatch` (or
 `xp dispatch ... --dry-run`) says what a dispatch would start and which jobs it leaves out and
 why, without starting anything; check it before a release.
 
@@ -226,6 +226,16 @@ What only the owner does, and you only suggest:
   only when the owner asks for it.
 - Once every store is `live`, request the merge (`xp releases merge <release>`, or Merge in the
   app). It starts `release-merge`, which waits at the `merge` gate for the owner.
+- Change a rollout once the stores approved the release, only when the owner asks:
+  `xp releases rollout <release> --store apple --pause` (or `--resume`, `--complete`), or
+  `--store play --percent 50` (or `--halt`, `--complete`); the MCP tool is `request_rollout`. It
+  starts `release-rollout`, which waits at the `rollout` gate for the owner.
+- The history of a release (`GET /releases/{id}/history`): dispatch, builds, store changes, merge,
+  rollout changes and Shorebird patches, with who acted. A Shorebird patch of a released version
+  is promoted or rolled back from the release page (`POST /releases/{id}/patches/{n}/promote`
+  or `/rollback`), behind the `prod_patch` gate.
+- The store texts of a release (`PUT /releases/{id}/texts`, the app's Store texts panel):
+  `whatsNew` reaches Google Play, `whatToTest` Firebase testers, when the upload runs.
 - Abandon a release.
 
 ## Resume and cancel
@@ -263,5 +273,6 @@ remove credentials: tell the owner, who uses the app or `xp credentials`.
 
 - Workflow documents, inputs and step kinds: skill `xpath-workflows`.
 - Installing, tokens, credentials and runners: skill `xpath-setup`.
-- The README sections "The `xp` command line", "`xp mcp`", "Workflows and the scheduler" and
-  "Releases" in the XPath repository.
+- In the XPath repository: `docs/guide/releases.md`, `docs/guide/approvals.md`,
+  `docs/reference/clients.md` (`xp` and `xp mcp`), `docs/reference/workflows.md` and
+  `docs/reference/releases.md`.

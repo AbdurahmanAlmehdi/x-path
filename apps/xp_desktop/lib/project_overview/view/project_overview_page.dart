@@ -1,4 +1,5 @@
-import 'package:flutter/services.dart';
+import 'dart:async';
+
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:xp_api/xp_api.dart';
@@ -10,6 +11,7 @@ import 'package:xp_desktop/project_overview/bloc/project_overview_bloc.dart';
 import 'package:xp_desktop/project_overview/widgets/docked_console.dart';
 import 'package:xp_desktop/project_overview/widgets/flavor_ledger.dart';
 import 'package:xp_desktop/project_overview/widgets/release_rail.dart';
+import 'package:xp_desktop/project_overview/widgets/setup_checklist.dart';
 import 'package:xp_desktop/projects/bloc/projects_bloc.dart';
 import 'package:xp_desktop/projects/widgets/project_host.dart';
 import 'package:xp_desktop/projects/widgets/scan_summary.dart';
@@ -96,15 +98,10 @@ class _ProjectOverviewViewState extends State<ProjectOverviewView> {
         .where((job) => job.state == JobState.waitingForApproval)
         .length;
     final canCommand = context.canCommand;
-    return CallbackShortcuts(
-      bindings: {
-        const SingleActivator(LogicalKeyboardKey.keyN, meta: true): _dispatch,
-        const SingleActivator(
-          LogicalKeyboardKey.keyC,
-          meta: true,
-          shift: true,
-        ): () =>
-            setState(() => _console = !_console),
+    return XpCommands(
+      handlers: {
+        XpCommand.dispatch: () => unawaited(_dispatch()),
+        XpCommand.console: () => setState(() => _console = !_console),
       },
       child: Focus(
         autofocus: true,
@@ -161,6 +158,7 @@ class _ProjectOverviewViewState extends State<ProjectOverviewView> {
                 child: ListView(
                   padding: const EdgeInsets.all(20),
                   children: [
+                    SetupChecklist(project: project),
                     if (state.error case final error?) ...[
                       XpErrorState(
                         error,

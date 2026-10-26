@@ -12,7 +12,9 @@
 #     xp_client, xp_engine and xp_repositories, 90% for the rest),
 #   - contract: the contract tests,
 #   - smoke: the xpd bundle smoke test,
-#   - runner-offline: tool/e2e/runner_offline_e2e.sh.
+#   - runner-offline: tool/e2e/runner_offline_e2e.sh,
+#   - quickstart: tool/e2e/quickstart_cli.sh, the CLI path of
+#     docs/guide/quickstart.md.
 #
 # A new workspace package goes into the coverage matrix below (and into the
 # one of macos.yaml if it has macOS-only tests); `dart run
@@ -194,10 +196,32 @@ jobs:
       - name: Runner Offline E2E
         run: tool/e2e/runner_offline_e2e.sh
 
+  quickstart:
+    name: quickstart
+    needs: changes
+    if: ${{ needs.changes.outputs.code == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # The script commits the app and pushes it to a bare repository at once;
+    # background maintenance is off, as for runner-offline.
+    env:
+      GIT_CONFIG_COUNT: "2"
+      GIT_CONFIG_KEY_0: maintenance.auto
+      GIT_CONFIG_VALUE_0: "false"
+      GIT_CONFIG_KEY_1: gc.auto
+      GIT_CONFIG_VALUE_1: "0"
+    steps:
+      - *checkout
+      - *setup-flutter
+      - *install-dependencies
+
+      - name: CLI Quickstart E2E
+        run: tool/e2e/quickstart_cli.sh
+
   gate:
     name: gate
     if: ${{ always() }}
-    needs: [changes, analyze, coverage, contract, smoke, runner-offline]
+    needs: [changes, analyze, coverage, contract, smoke, runner-offline, quickstart]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:

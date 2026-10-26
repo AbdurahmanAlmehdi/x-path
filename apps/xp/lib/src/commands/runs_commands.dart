@@ -79,10 +79,10 @@ class DispatchCommand extends XpCommand {
 
   @override
   Future<int> execute(XpClient client) async {
-    final [projectReference, workflowReference] = positionals([
-      'project',
-      'workflow',
-    ]);
+    final [projectReference, workflowReference] = await projectPositionals(
+      client,
+      ['project', 'workflow'],
+    );
     final results = argResults!;
     final given = <String, String>{};
     for (final input in results.multiOption('input')) {

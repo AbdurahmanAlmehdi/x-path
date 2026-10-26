@@ -21,6 +21,7 @@ class ShorebirdPatchInput extends Equatable {
     this.exportOptionsPlist,
     this.allowNativeDiffs = false,
     this.tokenSecret,
+    this.patchNumber,
   });
 
   /// Reads the input from its stored form.
@@ -39,6 +40,10 @@ class ShorebirdPatchInput extends Equatable {
         : requiredRelative(json, 'exportOptionsPlist');
     final problem = exportOptionsProblem(platform, exportOptionsPlist);
     if (problem != null) throw FormatException(problem);
+    final number = json['patchNumber'];
+    if (number != null && number is! int) {
+      throw const FormatException('"patchNumber" must be a number.');
+    }
     return ShorebirdPatchInput(
       settings: BuildSettings.fromJson(json),
       platform: platform,
@@ -46,6 +51,7 @@ class ShorebirdPatchInput extends Equatable {
       exportOptionsPlist: exportOptionsPlist,
       allowNativeDiffs: optionalFlag(json, 'allowNativeDiffs'),
       tokenSecret: optionalString(json, 'tokenSecret'),
+      patchNumber: number as int?,
     );
   }
 
@@ -71,6 +77,10 @@ class ShorebirdPatchInput extends Equatable {
   /// as `SHOREBIRD_TOKEN`; `null` uses the login of the machine.
   final String? tokenSecret;
 
+  /// The number XPath gives the patch (its tag is `-p<n>`), for the history
+  /// of the release (U7b).
+  final int? patchNumber;
+
   /// The stored form.
   Map<String, dynamic> toJson() => {
     ...settings.toJson(),
@@ -79,6 +89,7 @@ class ShorebirdPatchInput extends Equatable {
     'exportOptionsPlist': ?exportOptionsPlist,
     'allowNativeDiffs': allowNativeDiffs,
     'tokenSecret': ?tokenSecret,
+    'patchNumber': ?patchNumber,
   };
 
   @override
@@ -89,6 +100,7 @@ class ShorebirdPatchInput extends Equatable {
     exportOptionsPlist,
     allowNativeDiffs,
     tokenSecret,
+    patchNumber,
   ];
 }
 

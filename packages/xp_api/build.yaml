@@ -8,7 +8,9 @@ targets:
           - lib/src/approval.dart
           - lib/src/artifact.dart
           - lib/src/credential.dart
+          - lib/src/device_token.dart
           - lib/src/dispatch_plan.dart
+          - lib/src/engine_check.dart
           - lib/src/finding.dart
           - lib/src/github_token.dart
           - lib/src/profile_edits.dart
@@ -17,6 +19,7 @@ targets:
           - lib/src/project.dart
           - lib/src/project_profile.dart
           - lib/src/release.dart
+          - lib/src/release_history.dart
           - lib/src/release_notes.dart
           - lib/src/run.dart
           - lib/src/runner.dart

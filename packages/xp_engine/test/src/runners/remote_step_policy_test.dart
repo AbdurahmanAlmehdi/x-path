@@ -32,6 +32,13 @@ void main() {
       }
     });
 
+    test('keeps a rollout change and a patch move on the engine', () {
+      for (final kind in ['store.rollout', 'shorebird.track']) {
+        expect(RemoteStepPolicy.isEngineOnly(kind), isTrue, reason: kind);
+        expect(RemoteStepPolicy.canRunRemotely([kind]), isFalse, reason: kind);
+      }
+    });
+
     test('lets Shorebird go: its key travels like signing material', () {
       for (final kind in ['shorebird.release', 'shorebird.patch']) {
         expect(RemoteStepPolicy.isEngineOnly(kind), isFalse, reason: kind);

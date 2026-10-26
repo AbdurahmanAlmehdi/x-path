@@ -1,0 +1,56 @@
+name: Bug report
+description: Something in XPath does not work as the docs say.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. Check [Troubleshooting](https://github.com/AbdurahmanAlmehdi/x-path/blob/main/docs/guide/troubleshooting.md) first; `xp doctor` often says what to fix.
+        Never paste a token, a key or any other secret here.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected and what XPath did instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. xp dispatch my_app test --follow
+        2. ...
+    validations:
+      required: true
+  - type: input
+    id: xp-version
+    attributes:
+      label: xp version
+      description: The output of `xp --version`.
+    validations:
+      required: true
+  - type: input
+    id: engine-version
+    attributes:
+      label: Engine version
+      description: The output of `xpd --version` on the engine machine, or the version `xp status` prints.
+    validations:
+      required: true
+  - type: dropdown
+    id: where
+    attributes:
+      label: Where the engine runs
+      options:
+        - The Mac app
+        - Linux (install.sh)
+        - Docker
+        - From source
+    validations:
+      required: true
+  - type: textarea
+    id: doctor
+    attributes:
+      label: xp doctor
+      description: The output of `xp doctor`, and the engine log lines around the failure if you have them.
+      render: text

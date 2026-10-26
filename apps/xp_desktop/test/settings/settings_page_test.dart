@@ -1,5 +1,6 @@
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:xp_api/xp_api.dart';
@@ -45,14 +46,13 @@ void main() {
 
   Future<void> pump(
     WidgetTester tester, {
-    bool github = false,
     EngineStatus status = EngineStatus.connected,
     LocalEngineBloc? localEngine,
     List<EngineProfile>? engineList,
     RunnersRepository? runners,
   }) async {
     await tester.pumpApp(
-      SettingsPage(github: github),
+      const SettingsPage(),
       settingsRepository: settings,
       runnersRepository: runners,
       connection: connectionIn(
@@ -69,9 +69,115 @@ void main() {
       ),
     );
     // Tall enough for the whole page, so every section is built.
-    tester.view.physicalSize = const Size(1440, 1400);
+    tester.view.physicalSize = const Size(1440, 2400);
     await tester.pumpAndSettle();
   }
+
+  group('CliTokenSection', () {
+    TokenInfo info(DeviceTokenKind kind) => TokenInfo(
+      id: 'tok_1',
+      name: kind == DeviceTokenKind.cli ? 'xp on MacBook' : 'Agent on MacBook',
+      kind: kind,
+      createdAt: DateTime.utc(2026, 10, 25),
+    );
+
+    setUp(() {
+      for (final kind in [DeviceTokenKind.cli, DeviceTokenKind.mcp]) {
+        when(() => settings.createToken(name: info(kind).name, kind: kind))
+            .thenAnswer(
+              (_) async =>
+                  CreatedToken(info: info(kind), token: 'xpt_${kind.name}'),
+            );
+      }
+    });
+
+    testWidgets('makes an xp token and shows the connect command once', (
+      tester,
+    ) async {
+      await pump(tester);
+
+      final copied = <String?>[];
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        (call) async {
+          if (call.method == 'Clipboard.setData') {
+            copied.add((call.arguments as Map)['text'] as String?);
+          }
+          return null;
+        },
+      );
+      addTearDown(
+        () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          SystemChannels.platform,
+          null,
+        ),
+      );
+
+      await tester.tap(find.text('New xp token'));
+      await tester.pumpAndSettle();
+      expect(find.text('xp connect http://127.0.0.1:7480'), findsOne);
+      await tester.tap(find.text('Copy command'));
+      await tester.pump();
+      await tester.tap(find.text('Copy token'));
+      await tester.pump();
+      expect(copied, ['xp connect http://127.0.0.1:7480', 'xpt_cli']);
+      await tester.pump(const Duration(seconds: 2));
+
+      await tester.tap(find.text('Done'));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('xpt_cli'), findsNothing);
+    });
+
+    testWidgets('makes an agent token with its MCP config', (tester) async {
+      await pump(tester);
+
+      await tester.tap(find.text('New agent token'));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('"XP_MCP_TOKEN": "xpt_mcp"'), findsOne);
+      expect(find.text('Copy config'), findsOne);
+    });
+
+    testWidgets('says why no token was made', (tester) async {
+      when(
+        () => settings.createToken(
+          name: 'xp on MacBook',
+          kind: DeviceTokenKind.cli,
+        ),
+      ).thenThrow(const ConnectionException('The engine is away.'));
+      await pump(tester);
+
+      await tester.tap(find.text('New xp token'));
+      await tester.pumpAndSettle();
+      expect(find.text('The engine is away.'), findsOne);
+    });
+  });
+
+  test('connectCommand leaves the token out, mcpConfig puts it in', () {
+    final url = Uri.parse('https://mac.example');
+
+    expect(connectCommand(url), 'xp connect https://mac.example');
+    expect(
+      mcpConfig(url, 'xpt_y'),
+      contains('"XP_ENGINE_URL": "https://mac.example"'),
+    );
+  });
+
+  testWidgets('Notifications keeps XPath running and turns notices off', (
+    tester,
+  ) async {
+    await pump(tester);
+
+    await tester.tap(find.byKey(const Key('settings.keepRunning')));
+    await tester.tap(find.text('A production job succeeded'));
+    await tester.pump();
+
+    expect(app.keepRunning, isFalse);
+    final checks = tester.widgetList<XpCheckbox>(find.byType(XpCheckbox));
+    expect(checks.where((check) => !check.value).map((check) => check.label), [
+      'Keep XPath in the menu bar when the window closes',
+      'A production job succeeded',
+    ]);
+  });
 
   group('RunnerUrlSection', () {
     testWidgets('shows the URL with its warning, saves and clears it', (
@@ -348,6 +454,29 @@ void main() {
     final field = find.byKey(const Key('settings.githubToken'));
     final save = find.byKey(const Key('settings.githubSave'));
 
+    // The section lives on the credentials page now (U6d).
+    Widget section({bool github = false}) => BlocProvider(
+      create: (_) =>
+          GitHubTokenBloc(settings: settings)
+            ..add(const GitHubTokenRequested()),
+      child: SingleChildScrollView(
+        child: GitHubTokenSection(autofocus: github),
+      ),
+    );
+
+    Future<void> pump(
+      WidgetTester tester, {
+      bool github = false,
+      EngineStatus status = EngineStatus.connected,
+    }) async {
+      await tester.pumpApp(
+        section(github: github),
+        settingsRepository: settings,
+        connection: connectionIn(connectedTo(status: status)),
+      );
+      await tester.pumpAndSettle();
+    }
+
     testWidgets('saves a pasted token and clears the field', (tester) async {
       when(() => settings.setGitHubToken('ghp_new'))
           .thenAnswer((_) async => connected);
@@ -466,7 +595,7 @@ void main() {
       when(settings.gitHubToken).thenAnswer(
         (_) => Future.delayed(const Duration(seconds: 1), () => missing),
       );
-      await tester.pumpApp(const SettingsPage(), settingsRepository: settings);
+      await tester.pumpApp(section(), settingsRepository: settings);
       await tester.pump();
 
       expect(find.text('Asking GitHub…'), findsOneWidget);

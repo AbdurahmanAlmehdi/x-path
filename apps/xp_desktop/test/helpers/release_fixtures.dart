@@ -13,6 +13,7 @@ Release release(
   List<StoreStatus> stores = const [],
   String flavor = 'prod',
   String? runId,
+  String? whatsNew,
 }) => Release(
   id: id,
   projectId: 'prj_1',
@@ -28,6 +29,7 @@ Release release(
   ],
   mergeEnabled: false,
   headSha: state == ReleaseState.building ? null : sha,
+  whatsNew: whatsNew,
   createdAt: local(14, 2),
   updatedAt: local(14, 2),
 );

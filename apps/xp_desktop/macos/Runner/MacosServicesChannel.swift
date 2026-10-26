@@ -55,6 +55,9 @@ enum MacosServicesChannel {
         NSWorkspace.shared.recycle([Bundle.main.bundleURL]) { _, error in
           DispatchQueue.main.async { result(error == nil) }
         }
+      case "appKeepRunning":
+        UserDefaults.standard.set(arguments["keep"] as? Bool ?? true, forKey: AppDelegate.keepRunningKey)
+        result(nil)
       case "appQuit":
         result(nil)
         DispatchQueue.main.async { NSApp.terminate(nil) }
@@ -303,6 +306,9 @@ final class NeedsYouChannel: NSObject, UNUserNotificationCenterDelegate {
         center.removeDeliveredNotifications(withIdentifiers: [id])
         center.removePendingNotificationRequests(withIdentifiers: [id])
         result(nil)
+      case "notice":
+        shared.notice(arguments)
+        result(nil)
       case "menuBar":
         shared.updateMenuBar(arguments)
         result(nil)
@@ -343,6 +349,21 @@ final class NeedsYouChannel: NSObject, UNUserNotificationCenterDelegate {
       content.body = arguments["body"] as? String ?? ""
       content.categoryIdentifier = Self.category
       content.sound = .default
+      center.add(UNNotificationRequest(identifier: id, content: content, trigger: nil))
+    }
+  }
+
+  /// A notification without buttons: what the engine said happened. A
+  /// click on it opens what its id names (U6b).
+  private func notice(_ arguments: [String: Any]) {
+    let center = UNUserNotificationCenter.current()
+    center.requestAuthorization(options: [.alert, .sound]) { granted, _ in
+      guard granted else { return }
+      let content = UNMutableNotificationContent()
+      content.title = arguments["title"] as? String ?? ""
+      content.body = arguments["body"] as? String ?? ""
+      content.sound = .default
+      let id = arguments["id"] as? String ?? UUID().uuidString
       center.add(UNNotificationRequest(identifier: id, content: content, trigger: nil))
     }
   }
@@ -413,6 +434,46 @@ final class NeedsYouChannel: NSObject, UNUserNotificationCenterDelegate {
       }
       menu.addItem(row)
     }
+    // What runs now, each opening its job view (U6b).
+    if let header = arguments["runningHeader"] as? String {
+      menu.addItem(.separator())
+      let running = NSMenuItem(title: header, action: nil, keyEquivalent: "")
+      running.isEnabled = false
+      menu.addItem(running)
+      for entry in arguments["running"] as? [[String: Any]] ?? [] {
+        let row = NSMenuItem(
+          title: entry["title"] as? String ?? "",
+          action: #selector(show(_:)),
+          keyEquivalent: ""
+        )
+        row.target = self
+        row.representedObject = entry["id"] as? String
+        row.toolTip = entry["detail"] as? String
+        if #available(macOS 14.4, *) {
+          row.subtitle = entry["detail"] as? String
+        }
+        menu.addItem(row)
+      }
+    }
+    // Quick dispatch: a project opens the dispatch sheet in the window.
+    let projects = arguments["projects"] as? [[String: Any]] ?? []
+    if let title = arguments["dispatch"] as? String, !projects.isEmpty {
+      menu.addItem(.separator())
+      let dispatch = NSMenuItem(title: title, action: nil, keyEquivalent: "")
+      let submenu = NSMenu()
+      for entry in projects {
+        let row = NSMenuItem(
+          title: entry["title"] as? String ?? "",
+          action: #selector(dispatch(_:)),
+          keyEquivalent: ""
+        )
+        row.target = self
+        row.representedObject = entry["id"] as? String
+        submenu.addItem(row)
+      }
+      dispatch.submenu = submenu
+      menu.addItem(dispatch)
+    }
     menu.addItem(.separator())
     let open = NSMenuItem(
       title: arguments["openApp"] as? String ?? "",
@@ -422,6 +483,14 @@ final class NeedsYouChannel: NSObject, UNUserNotificationCenterDelegate {
     open.target = self
     menu.addItem(open)
     item.menu = menu
+  }
+
+  @objc private func show(_ sender: NSMenuItem) {
+    send("show", sender.representedObject as? String)
+  }
+
+  @objc private func dispatch(_ sender: NSMenuItem) {
+    send("dispatch", sender.representedObject as? String)
   }
 
   @objc private func review(_ sender: NSMenuItem) {
@@ -435,8 +504,7 @@ final class NeedsYouChannel: NSObject, UNUserNotificationCenterDelegate {
   /// Brings the main window forward, then tells Dart what was clicked.
   private func send(_ method: String, _ id: String?) {
     DispatchQueue.main.async {
-      NSApp.activate(ignoringOtherApps: true)
-      NSApp.windows.first(where: { $0 is MainFlutterWindow })?.makeKeyAndOrderFront(nil)
+      AppDelegate.showMainWindow()
       self.channel?.invokeMethod(method, arguments: id.map { ["id": $0] })
     }
   }

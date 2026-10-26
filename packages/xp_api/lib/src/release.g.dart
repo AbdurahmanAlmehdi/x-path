@@ -91,6 +91,8 @@ Release _$ReleaseFromJson(Map<String, dynamic> json) => Release(
   mergeCommit: json['mergeCommit'] as String?,
   mergeRunId: json['mergeRunId'] as String?,
   message: json['message'] as String?,
+  whatsNew: json['whatsNew'] as String?,
+  whatToTest: json['whatToTest'] as String?,
 );
 
 Map<String, dynamic> _$ReleaseToJson(Release instance) => <String, dynamic>{
@@ -113,6 +115,8 @@ Map<String, dynamic> _$ReleaseToJson(Release instance) => <String, dynamic>{
   'mergeCommit': ?instance.mergeCommit,
   'mergeRunId': ?instance.mergeRunId,
   'message': ?instance.message,
+  'whatsNew': ?instance.whatsNew,
+  'whatToTest': ?instance.whatToTest,
   'createdAt': instance.createdAt.toIso8601String(),
   'updatedAt': instance.updatedAt.toIso8601String(),
 };
@@ -165,3 +169,25 @@ AbandonRequest _$AbandonRequestFromJson(Map<String, dynamic> json) =>
 
 Map<String, dynamic> _$AbandonRequestToJson(AbandonRequest instance) =>
     <String, dynamic>{'reason': ?instance.reason};
+
+RolloutRequest _$RolloutRequestFromJson(Map<String, dynamic> json) =>
+    RolloutRequest(
+      store: $enumDecode(_$ReleaseStoreEnumMap, json['store']),
+      action: $enumDecode(_$RolloutActionEnumMap, json['action']),
+      userFraction: (json['userFraction'] as num?)?.toDouble(),
+    );
+
+Map<String, dynamic> _$RolloutRequestToJson(RolloutRequest instance) =>
+    <String, dynamic>{
+      'store': _$ReleaseStoreEnumMap[instance.store]!,
+      'action': _$RolloutActionEnumMap[instance.action]!,
+      'userFraction': ?instance.userFraction,
+    };
+
+const _$RolloutActionEnumMap = {
+  RolloutAction.pause: 'pause',
+  RolloutAction.resume: 'resume',
+  RolloutAction.complete: 'complete',
+  RolloutAction.halt: 'halt',
+  RolloutAction.fraction: 'fraction',
+};

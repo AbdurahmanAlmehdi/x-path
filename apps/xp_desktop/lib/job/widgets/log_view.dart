@@ -98,7 +98,7 @@ class _LogViewState extends State<LogView> {
   @override
   void initState() {
     super.initState();
-    _filter.addListener(() => setState(() {}));
+    _filter.addListener(() => setState(() => _match = -1));
     _scheduleFollow();
   }
 
@@ -201,6 +201,25 @@ class _LogViewState extends State<LogView> {
     }
   }
 
+  /// The line of the filter's matches that ⌘G and ⇧⌘G last went to.
+  var _match = -1;
+
+  /// ⌘G / ⇧⌘G: scrolls to the next or previous line that matches the
+  /// filter (with [by] 1 or -1), round the end.
+  void _jumpToMatch(List<_Item> items, int by) {
+    if (_filter.text.trim().isEmpty) return;
+    final offsets = <double>[];
+    var offset = 0.0;
+    for (final item in items) {
+      if (item is _Line) offsets.add(offset);
+      offset += item is _Header ? logHeaderExtent : logLineExtent;
+    }
+    if (offsets.isEmpty) return;
+    _match = (_match + by) % offsets.length;
+    setState(() => _follow = false);
+    _scroll.jumpTo(offsets[_match].clamp(0, _scroll.position.maxScrollExtent));
+  }
+
   Future<void> _copy(LogLineFrame line) async {
     final place = [?widget.jobId, '${line.seq}'].join(':');
     await Clipboard.setData(ClipboardData(text: '$place  ${line.text}'));
@@ -229,22 +248,15 @@ class _LogViewState extends State<LogView> {
         if (mounted && _scroll.hasClients) _jumpToError(_items());
       });
     }
-    return CallbackShortcuts(
-      bindings: {
-        const SingleActivator(LogicalKeyboardKey.keyF, meta: true):
-            _filterFocus.requestFocus,
-        const SingleActivator(LogicalKeyboardKey.keyE, meta: true): () =>
-            _jumpToError(items),
-        const SingleActivator(LogicalKeyboardKey.arrowDown, meta: true): () =>
-            _setFollow(!_follow),
-        const SingleActivator(
-          LogicalKeyboardKey.keyT,
-          meta: true,
-          shift: true,
-        ): () =>
-            setState(() => _timestamps = !_timestamps),
-        const SingleActivator(LogicalKeyboardKey.keyZ, alt: true): () =>
-            setState(() => _wrap = !_wrap),
+    return XpCommands(
+      handlers: {
+        XpCommand.find: _filterFocus.requestFocus,
+        XpCommand.findNext: () => _jumpToMatch(items, 1),
+        XpCommand.findPrevious: () => _jumpToMatch(items, -1),
+        XpCommand.jumpToError: () => _jumpToError(items),
+        XpCommand.followTail: () => _setFollow(!_follow),
+        XpCommand.timestamps: () => setState(() => _timestamps = !_timestamps),
+        XpCommand.wrap: () => setState(() => _wrap = !_wrap),
       },
       child: Focus(
         child: ColoredBox(

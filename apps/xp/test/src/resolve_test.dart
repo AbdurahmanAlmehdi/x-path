@@ -11,6 +11,54 @@ void main() {
 
   setUp(() => client = MockXpClient());
 
+  group('projectOfRemote', () {
+    const bitbucket = Project(
+      id: 'prj_3',
+      host: 'bitbucket.org',
+      sourceKey: 'h1',
+      fullName: 'ws/mobile/shop',
+      remote: 'git@bitbucket.org:ws/mobile/shop.git',
+      defaultBaseBranch: 'main',
+    );
+
+    setUp(
+      () => when(() => client.listProjects()).thenAnswer(
+        (_) async => [sample.project, sample.bareProject, bitbucket],
+      ),
+    );
+
+    test('matches every spelling of the same repository', () async {
+      for (final remote in [
+        'https://github.com/acme/app.git',
+        'git@github.com:ACME/app',
+        'ssh://git@github.com/acme/app.git',
+      ]) {
+        expect(
+          (await projectOfRemote(client, remote))?.id,
+          'prj_1',
+          reason: remote,
+        );
+      }
+      expect(
+        (await projectOfRemote(
+          client,
+          'git@bitbucket.org:ws/mobile/shop.git',
+        ))?.id,
+        'prj_3',
+      );
+    });
+
+    test('is null outside a clone, for another repository or URL', () async {
+      expect(await projectOfRemote(client, null), isNull);
+      expect(
+        await projectOfRemote(client, 'git@gitlab.com:acme/app.git'),
+        isNull,
+      );
+      expect(await projectOfRemote(client, 'not a url'), isNull);
+      verify(() => client.listProjects()).called(1);
+    });
+  });
+
   group('resolveProject', () {
     test('passes an id through without asking', () async {
       expect(await resolveProject(client, 'prj_9'), 'prj_9');

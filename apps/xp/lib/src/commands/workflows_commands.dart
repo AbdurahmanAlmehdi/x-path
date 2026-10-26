@@ -46,7 +46,7 @@ class WorkflowsListCommand extends XpCommand {
 
   @override
   Future<int> execute(XpClient client) async {
-    final [reference] = positionals(['project']);
+    final [reference] = await projectPositionals(client, ['project']);
     final workflows = await client.listWorkflows(
       await resolveProject(client, reference),
     );
@@ -91,10 +91,10 @@ class WorkflowsShowCommand extends XpCommand {
 
   @override
   Future<int> execute(XpClient client) async {
-    final [projectReference, workflowReference] = positionals([
-      'project',
-      'workflow',
-    ]);
+    final [projectReference, workflowReference] = await projectPositionals(
+      client,
+      ['project', 'workflow'],
+    );
     final versionText = argResults!.option('version');
     final version = versionText == null ? null : int.tryParse(versionText);
     if (versionText != null && version == null) {
@@ -295,7 +295,10 @@ class WorkflowsCreateCommand extends XpCommand {
 
   @override
   Future<int> execute(XpClient client) async {
-    final [reference, workflowName] = positionals(['project', 'name']);
+    final [reference, workflowName] = await projectPositionals(client, [
+      'project',
+      'name',
+    ]);
     final yaml = readWorkflowFile(this);
     final workflow = await client.createWorkflow(
       await resolveProject(client, reference),
@@ -336,10 +339,10 @@ class WorkflowsEditCommand extends XpCommand {
 
   @override
   Future<int> execute(XpClient client) async {
-    final [projectReference, workflowReference] = positionals([
-      'project',
-      'workflow',
-    ]);
+    final [projectReference, workflowReference] = await projectPositionals(
+      client,
+      ['project', 'workflow'],
+    );
     final yaml = readWorkflowFile(this);
     final projectId = await resolveProject(client, projectReference);
     final workflowId = await resolveWorkflow(
@@ -389,11 +392,8 @@ class WorkflowsCopyCommand extends XpCommand {
 
   @override
   Future<int> execute(XpClient client) async {
-    final [projectReference, workflowReference, newName] = positionals([
-      'project',
-      'workflow',
-      'name',
-    ]);
+    final [projectReference, workflowReference, newName] =
+        await projectPositionals(client, ['project', 'workflow', 'name']);
     final (projectId, workflowId) = await _projectAndWorkflow(
       client,
       projectReference,
@@ -438,11 +438,8 @@ class WorkflowsRenameCommand extends XpCommand {
 
   @override
   Future<int> execute(XpClient client) async {
-    final [projectReference, workflowReference, newName] = positionals([
-      'project',
-      'workflow',
-      'name',
-    ]);
+    final [projectReference, workflowReference, newName] =
+        await projectPositionals(client, ['project', 'workflow', 'name']);
     final (projectId, workflowId) = await _projectAndWorkflow(
       client,
       projectReference,
@@ -482,10 +479,10 @@ class WorkflowsArchiveCommand extends XpCommand {
 
   @override
   Future<int> execute(XpClient client) async {
-    final [projectReference, workflowReference] = positionals([
-      'project',
-      'workflow',
-    ]);
+    final [projectReference, workflowReference] = await projectPositionals(
+      client,
+      ['project', 'workflow'],
+    );
     final (projectId, workflowId) = await _projectAndWorkflow(
       client,
       projectReference,
@@ -526,10 +523,10 @@ class WorkflowsDeleteCommand extends XpCommand {
 
   @override
   Future<int> execute(XpClient client) async {
-    final [projectReference, workflowReference] = positionals([
-      'project',
-      'workflow',
-    ]);
+    final [projectReference, workflowReference] = await projectPositionals(
+      client,
+      ['project', 'workflow'],
+    );
     final (projectId, workflowId) = await _projectAndWorkflow(
       client,
       projectReference,
@@ -557,10 +554,10 @@ class WorkflowsVersionsCommand extends XpCommand {
 
   @override
   Future<int> execute(XpClient client) async {
-    final [projectReference, workflowReference] = positionals([
-      'project',
-      'workflow',
-    ]);
+    final [projectReference, workflowReference] = await projectPositionals(
+      client,
+      ['project', 'workflow'],
+    );
     final (projectId, workflowId) = await _projectAndWorkflow(
       client,
       projectReference,

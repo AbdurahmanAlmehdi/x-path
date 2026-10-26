@@ -204,6 +204,61 @@ void main() {
 
       expect(await env.run(['releases', 'merge', 'rel_1']), 73);
     });
+
+    test('rollout asks for a change of the rollout', () async {
+      when(() => env.client.requestRollout('rel_1', any()))
+          .thenAnswer((_) async => sample.run(state: RunState.queued));
+
+      await env.runOk([
+        'releases',
+        'rollout',
+        'rel_1',
+        '--store',
+        'play',
+        '--percent',
+        '50',
+      ]);
+      await env.runOk([
+        'releases',
+        'rollout',
+        'rel_1',
+        '--store',
+        'apple',
+        '--pause',
+      ]);
+
+      expect(env.logger.out, contains('Started run_1.'));
+      expect(
+        verify(() => env.client.requestRollout('rel_1', captureAny())).captured,
+        const [
+          RolloutRequest(
+            store: ReleaseStore.play,
+            action: RolloutAction.fraction,
+            userFraction: 0.5,
+          ),
+          RolloutRequest(
+            store: ReleaseStore.apple,
+            action: RolloutAction.pause,
+          ),
+        ],
+      );
+    });
+
+    test('rollout takes a store and one change', () async {
+      for (final args in [
+        ['--pause'],
+        ['--store', 'apple'],
+        ['--store', 'apple', '--pause', '--complete'],
+        ['--store', 'play', '--percent', 'half'],
+      ]) {
+        expect(
+          await env.run(['releases', 'rollout', 'rel_1', ...args]),
+          64,
+          reason: '$args',
+        );
+      }
+      verifyNever(() => env.client.requestRollout(any(), any()));
+    });
   });
 
   group('notes', () {

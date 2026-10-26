@@ -387,7 +387,11 @@ void main() {
 
     test('an engine that cannot be reached is exit 69', () async {
       expect(await listWith(const ConnectionException('Cannot reach.')), 69);
-      expect(env.logger.errors.single, 'Cannot reach.');
+      expect(
+        env.logger.errors.single,
+        'Cannot reach. See '
+        'docs/guide/troubleshooting.md#the-engine-does-not-answer.',
+      );
     });
 
     test('a download that broke is exit 1', () async {

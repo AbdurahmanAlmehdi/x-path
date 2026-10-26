@@ -124,13 +124,19 @@ class ReleaseHarness {
         ));
         // What the dispatcher does: it attaches the run to the release.
         final runId = 'run_${dispatched.length + 1}';
-        final merge = request.release != null && request.version == null;
+        final kind = request.version != null
+            ? ReleaseRunKind.build
+            : request.inputs.containsKey('store')
+            ? ReleaseRunKind.rollout
+            : request.inputs.containsKey('patchNumber')
+            ? ReleaseRunKind.patch
+            : ReleaseRunKind.merge;
         await service.attach(
           releaseId: request.release!,
           projectId: project,
-          kind: merge ? ReleaseRunKind.merge : ReleaseRunKind.build,
+          kind: kind,
           runId: runId,
-          build: merge ? null : 6,
+          build: kind == ReleaseRunKind.build ? 6 : null,
         );
         await runs.create(
           RunRecord(
@@ -228,7 +234,7 @@ class ReleaseHarness {
   }
 
   /// Adds a job of [releaseId] to the run [runId] with steps in the given
-  /// states (`kind`, `state`, `result`).
+  /// states (`kind`, `state`, `result`), and the [inputs] of the first ones.
   Future<String> addJob(
     String releaseId,
     List<(String, StepState, Map<String, dynamic>?)> steps, {
@@ -236,6 +242,8 @@ class ReleaseHarness {
     JobState state = JobState.running,
     int stage = 0,
     String? message,
+    List<Map<String, dynamic>> inputs = const [],
+    DateTime? finishedAt,
   }) async {
     final id = 'job_${++_jobs}';
     await jobs.create(
@@ -250,6 +258,7 @@ class ReleaseHarness {
         state: state,
         message: message,
         createdAt: clock.now(),
+        finishedAt: finishedAt,
       ),
       [
         for (final (ordinal, (kind, stepState, result)) in steps.indexed)
@@ -258,7 +267,7 @@ class ReleaseHarness {
             ordinal: ordinal,
             kind: kind,
             sideEffect: true,
-            input: const {},
+            input: ordinal < inputs.length ? inputs[ordinal] : const {},
             state: stepState,
             result: result,
           ),

@@ -24,10 +24,21 @@ class RunRow extends StatelessWidget {
     final type = context.xpType;
     final request = run.request;
     final scope = [...?request?.flavors, ...?request?.platforms].join(' · ');
-    return InkWell(
-      onTap: () => context.read<ShellCubit>().show(
-        JobDestination(run.id, projectId: run.projectId),
-      ),
+    void open() => context.read<ShellCubit>().show(
+      JobDestination(run.id, projectId: run.projectId),
+    );
+    return XpTappable(
+      onTap: open,
+      radius: 0,
+      onSecondaryTap: (position) => showXpContextMenu(context, position, [
+        XpMenuAction(l10n.menuOpenJob, open),
+        XpMenuAction.copy(l10n.menuCopySha, run.sha),
+        if (run.version case final version?)
+          XpMenuAction.copy(
+            l10n.menuCopyVersion,
+            versionLabel(version, run.build),
+          ),
+      ]),
       child: SizedBox(
         height: context.xpSizes.rowDefault,
         child: Padding(
@@ -36,8 +47,9 @@ class RunRow extends StatelessWidget {
             children: [
               XpStatusIcon(runStatus(run.state)),
               const SizedBox(width: 8),
-              SizedBox(
-                width: 120,
+              ConstrainedBox(
+                // Grows with the text size (U6c).
+                constraints: const BoxConstraints(minWidth: 120),
                 child: Text(
                   l10n.runState(run.state),
                   style: type.body.copyWith(color: colors.textSecondary),

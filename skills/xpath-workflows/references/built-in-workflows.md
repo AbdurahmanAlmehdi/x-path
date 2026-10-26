@@ -45,6 +45,13 @@ One stage `merge`, one job: `github.mergePr` behind `gate: merge`. Started by
 `POST /releases/{id}/merge` (`xp releases merge <release>`) once every store the release went to
 is live. No project lock.
 
+## `release-rollout`
+
+One stage `rollout`, one engine job: `store.rollout` behind `gate: rollout`. Inputs `store`,
+`action` and `userFraction`. Started by `POST /releases/{id}/rollout`
+(`xp releases rollout <release> --store <apple|play> --pause|--resume|--complete|--halt|--percent <n>`,
+or the MCP tool `request_rollout`) once the stores approved the release. No project lock.
+
 ## `shorebird-patch`
 
 `lock: project`. Dispatch with `releaseVersion` (`x.y.z+build`, never `latest`). Every job runs
@@ -57,6 +64,21 @@ only for Shorebird flavors (`if: flavor.shorebird`).
 | `finalize` | `tag` (engine) | flavor | `git.checkout`; `git.tag` (`v<x.y.z>+<build>-p<n>`); `git.push` behind `gate: push` |
 
 Inputs: `exportOptionsPlist`, `dartDefineFile`, `allowNativeDiffs` (default `false`).
+
+## `shorebird-track`
+
+One stage `track`, one engine job per Shorebird flavor: `shorebird.track` behind
+`gate: prod_patch`. Inputs `patchNumber` and `action` (`promote` or `rollback`). Started by
+`POST /releases/{id}/patches/{number}/{promote|rollback}` (Promote or Roll back on the release
+page) for a patch XPath published. No project lock.
+
+## `smoke-build`
+
+One stage `build`, one job per flavor (runner-eligible): `git.checkout`; `build.android`
+(`artifact: apk`, `keystore: false`). An APK signed with the debug key, from the version in the
+pubspec: no credential, no store id, no upload, no build number. The app offers it after the
+first scan ("Try an unsigned build"), so a new project sees a green build before signing is set
+up. No inputs.
 
 ## `test`
 

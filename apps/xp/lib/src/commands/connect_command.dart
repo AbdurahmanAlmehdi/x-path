@@ -6,13 +6,16 @@ import 'package:xp/src/exit_codes.dart';
 import 'package:xp_api/xp_api.dart';
 import 'package:xp_client/xp_client.dart';
 
-/// `xp connect <url> --token <token> [--mcp-token <token>]`: saves the engine
-/// and the tokens to use with it.
+/// `xp connect <url> [--token <token>] [--mcp-token <token>]`: saves the
+/// engine and the tokens to use with it. Without a token it asks for the CLI
+/// token, which then stays out of the arguments and the shell history.
 ///
 /// Before it saves anything it checks that the URL is an XPath engine
 /// (`GET /health` and `GET /version`, which need no token) and that each token
-/// works (an authenticated `GET /projects`). The engine prints a token once,
-/// with `xpd token create --kind cli` (and `--kind mcp` for `xp mcp`).
+/// works (an authenticated `GET /projects`). The app makes the tokens
+/// (Settings ▸ CLI and agents, with this command ready to paste), and so
+/// does `xpd token create --kind cli` (`--kind mcp` for `xp mcp`) on the
+/// engine machine; each is shown once.
 class ConnectCommand extends Command<int> {
   /// Creates the command.
   new(this._context) {
@@ -20,12 +23,16 @@ class ConnectCommand extends Command<int> {
       ..addOption(
         'token',
         abbr: 't',
-        help: 'The token of this CLI (`xpd token create --kind cli`).',
+        help:
+            'The token of this CLI (the app: Settings ▸ CLI and agents; or '
+            '`xpd token create --kind cli`).',
         valueHelp: 'token',
       )
       ..addOption(
         'mcp-token',
-        help: 'The token of `xp mcp` (`xpd token create --kind mcp`).',
+        help:
+            'The token of `xp mcp` (the app: Settings ▸ CLI and agents; or '
+            '`xpd token create --kind mcp`).',
         valueHelp: 'token',
       );
   }
@@ -39,7 +46,7 @@ class ConnectCommand extends Command<int> {
   String get description => 'Connect to an engine and save the tokens.';
 
   @override
-  String get invocation => 'xp connect [<url>] --token <token>';
+  String get invocation => 'xp connect [<url>] [--token <token>]';
 
   @override
   void printUsage() => _context.logger.info(usage);
@@ -52,10 +59,17 @@ class ConnectCommand extends Command<int> {
       final logger = _context.logger;
       final rest = argResults!.rest;
       if (rest.length > 1) usageException('Unexpected "${rest[1]}".');
-      final token = argResults!.option('token');
+      var token = argResults!.option('token');
       final mcpToken = argResults!.option('mcp-token');
       if (token == null && mcpToken == null) {
-        usageException('Give --token, --mcp-token or both.');
+        // Asked for, the token stays out of the arguments and the shell
+        // history.
+        final prompt = _context.secretPrompt;
+        if (!prompt.interactive) {
+          usageException('Give --token, --mcp-token or both.');
+        }
+        token = prompt.ask('The token of this CLI (it is not shown)').trim();
+        if (token.isEmpty) usageException('No token given.');
       }
       final Uri url;
       try {
@@ -91,8 +105,9 @@ class ConnectCommand extends Command<int> {
           } on ApiException catch (error) {
             if (error.isUnauthorized) {
               logger.err(
-                'The engine rejected the ${entry.key.name} token. Create one '
-                'with: xpd token create --name <name> --kind ${entry.key.name}',
+                'The engine rejected the ${entry.key.name} token. Make one in '
+                'the app (Settings ▸ CLI and agents), or with: xpd token '
+                'create --name <name> --kind ${entry.key.name}',
               );
               return XpExit.permission;
             }

@@ -60,7 +60,10 @@ void main() {
         'dev-build',
         'prod-release',
         'release-merge',
+        'release-rollout',
         'shorebird-patch',
+        'shorebird-track',
+        'smoke-build',
         'test',
       ]);
       expect(workflows.every((w) => w.builtin), isTrue);

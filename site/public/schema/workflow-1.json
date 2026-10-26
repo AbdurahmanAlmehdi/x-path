@@ -209,6 +209,8 @@
             "record.manifest",
             "shorebird.patch",
             "shorebird.release",
+            "shorebird.track",
+            "store.rollout",
             "symbols.archive",
             "test",
             "upload.appStore",
@@ -230,7 +232,8 @@
             "store_submission",
             "push",
             "merge",
-            "delete"
+            "delete",
+            "rollout"
           ]
         }
       },
@@ -1094,6 +1097,136 @@
                   "shorebirdAppId": {
                     "description": "The Shorebird app; the one of the flavor by default.",
                     "type": "string"
+                  }
+                },
+                "required": []
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "shorebird.track"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "kind": {
+                "description": "Promotes a patch of a release to the stable track, or rolls it back."
+              },
+              "with": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "patchNumber": {
+                    "description": "The patch of the release to move.",
+                    "anyOf": [
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "type": "string",
+                        "pattern": "\\$\\{\\{",
+                        "description": "A placeholder, such as ${{ inputs.notes }}."
+                      }
+                    ]
+                  },
+                  "action": {
+                    "description": "Promote the patch to the stable track, or roll it back.",
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "promote",
+                          "rollback"
+                        ]
+                      },
+                      {
+                        "type": "string",
+                        "pattern": "\\$\\{\\{",
+                        "description": "A placeholder, such as ${{ inputs.notes }}."
+                      }
+                    ]
+                  },
+                  "shorebirdAppId": {
+                    "description": "The Shorebird app; the one of the flavor by default.",
+                    "type": "string"
+                  }
+                },
+                "required": []
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "store.rollout"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "kind": {
+                "description": "Pauses, resumes or completes Apple's phased release, or sets, halts or completes Google Play's staged rollout."
+              },
+              "with": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "store": {
+                    "description": "The store whose rollout changes.",
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "apple",
+                          "play"
+                        ]
+                      },
+                      {
+                        "type": "string",
+                        "pattern": "\\$\\{\\{",
+                        "description": "A placeholder, such as ${{ inputs.notes }}."
+                      }
+                    ]
+                  },
+                  "action": {
+                    "description": "Apple: pause, resume or complete. Google Play: fraction, halt or complete.",
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "pause",
+                          "resume",
+                          "complete",
+                          "halt",
+                          "fraction"
+                        ]
+                      },
+                      {
+                        "type": "string",
+                        "pattern": "\\$\\{\\{",
+                        "description": "A placeholder, such as ${{ inputs.notes }}."
+                      }
+                    ]
+                  },
+                  "userFraction": {
+                    "description": "For \"fraction\", the share of users, above 0, at most 1.",
+                    "anyOf": [
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "type": "string",
+                        "pattern": "\\$\\{\\{",
+                        "description": "A placeholder, such as ${{ inputs.notes }}."
+                      }
+                    ]
                   }
                 },
                 "required": []

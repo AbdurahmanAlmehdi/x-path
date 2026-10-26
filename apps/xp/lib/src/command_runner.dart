@@ -12,6 +12,7 @@ import 'package:xp/src/commands/projects_commands.dart';
 import 'package:xp/src/commands/releases_commands.dart';
 import 'package:xp/src/commands/runners_commands.dart';
 import 'package:xp/src/commands/runs_commands.dart';
+import 'package:xp/src/commands/setup_commands.dart';
 import 'package:xp/src/commands/storage_commands.dart';
 import 'package:xp/src/commands/workflows_commands.dart';
 import 'package:xp/src/context.dart';
@@ -57,6 +58,9 @@ class XpCommandRunner extends CompletionCommandRunner<int> {
         help: 'Print results as JSON, for scripts.',
       );
     addCommand(ConnectCommand(_context));
+    addCommand(DisconnectCommand(_context));
+    addCommand(StatusCommand(_context));
+    addCommand(DoctorCommand(_context));
     addCommand(projectsCommand(_context));
     addCommand(credentialsCommand(_context));
     addCommand(workflowsCommand(_context));

@@ -8,8 +8,28 @@ export 'xp_tokens.dart';
 /// plus what the Material widgets the app still uses (text fields, menus,
 /// tooltips, scroll bars) need to look like the rest. No ripples: macOS
 /// controls change colour on hover and press instead.
-ThemeData appTheme(Brightness brightness, {bool reduceMotion = false}) {
-  final base = xpTheme(brightness, reduceMotion: reduceMotion);
+ThemeData appTheme(
+  Brightness brightness, {
+  bool reduceMotion = false,
+  bool compact = false,
+  double textScale = 1,
+}) {
+  final tokens = xpTheme(
+    brightness,
+    reduceMotion: reduceMotion,
+    compact: compact,
+  );
+  final base = textScale == 1
+      ? tokens
+      : tokens.copyWith(
+          extensions: [
+            for (final extension in tokens.extensions.values)
+              if (extension is XpSizes)
+                _scaled(extension, textScale)
+              else
+                extension,
+          ],
+        );
   final colors = base.extension<XpColors>()!;
   final type = base.extension<XpTypography>()!;
   final radii = base.extension<XpRadii>()!;
@@ -63,6 +83,19 @@ ThemeData appTheme(Brightness brightness, {bool reduceMotion = false}) {
     ),
   );
 }
+
+/// [sizes] with the heights of rows and controls scaled by [scale], so they
+/// grow with the text size of macOS (U6c).
+XpSizes _scaled(XpSizes sizes, double scale) => sizes.copyWith(
+  rowDefault: sizes.rowDefault * scale,
+  rowCompact: sizes.rowCompact * scale,
+  rowSidebar: sizes.rowSidebar * scale,
+  controlSm: sizes.controlSm * scale,
+  controlMd: sizes.controlMd * scale,
+  controlLg: sizes.controlLg * scale,
+  nodeHeight: sizes.nodeHeight * scale,
+  toolbarHeight: sizes.toolbarHeight * scale,
+);
 
 /// The token families `XpThemeX` does not reach.
 extension XpThemeMore on BuildContext {

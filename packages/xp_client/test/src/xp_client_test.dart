@@ -33,6 +33,16 @@ class _Endpoint {
   final Map<String, dynamic>? body;
 }
 
+final _createdToken = CreatedToken(
+  info: TokenInfo(
+    id: 'tok_1',
+    name: 'xp',
+    kind: DeviceTokenKind.cli,
+    createdAt: DateTime.utc(2026, 10, 25),
+  ),
+  token: 'xpt_x',
+);
+
 void main() {
   late FakeEngine engine;
   late XpClient client;
@@ -725,6 +735,43 @@ void main() {
       expected: 'deleted',
     ),
     _Endpoint(
+      'createToken',
+      method: 'POST',
+      path: '/tokens',
+      status: 201,
+      response: _createdToken.toJson(),
+      call: (client) =>
+          client.createToken(name: 'xp', kind: DeviceTokenKind.cli),
+      expected: _createdToken,
+      body: const CreateTokenRequest(
+        name: 'xp',
+        kind: DeviceTokenKind.cli,
+      ).toJson(),
+    ),
+    _Endpoint(
+      'status',
+      method: 'GET',
+      path: '/status',
+      response: StatusResponse(
+        token: _createdToken.info,
+        secretsLocked: false,
+      ).toJson(),
+      call: (client) => client.status(),
+      expected: StatusResponse(token: _createdToken.info, secretsLocked: false),
+    ),
+    _Endpoint(
+      'doctor',
+      method: 'GET',
+      path: '/doctor',
+      response: const DoctorResponse([
+        EngineCheck(name: 'flutter', state: CheckState.ok),
+      ]).toJson(),
+      call: (client) => client.doctor(),
+      expected: const DoctorResponse([
+        EngineCheck(name: 'flutter', state: CheckState.ok),
+      ]),
+    ),
+    _Endpoint(
       'listApprovals',
       method: 'GET',
       path: '/approvals',
@@ -864,6 +911,55 @@ void main() {
       status: 202,
       response: sample.run.toJson(),
       call: (client) => client.mergeRelease('rel_1'),
+      expected: sample.run,
+    ),
+    _Endpoint(
+      'requestRollout',
+      method: 'POST',
+      path: '/releases/rel_1/rollout',
+      status: 202,
+      response: sample.run.toJson(),
+      call: (client) => client.requestRollout(
+        'rel_1',
+        const RolloutRequest(
+          store: ReleaseStore.play,
+          action: RolloutAction.fraction,
+          userFraction: 0.2,
+        ),
+      ),
+      expected: sample.run,
+      body: {'store': 'play', 'action': 'fraction', 'userFraction': 0.2},
+    ),
+    _Endpoint(
+      'getReleaseHistory',
+      method: 'GET',
+      path: '/releases/rel_1/history',
+      response: ReleaseHistory([
+        ReleaseEvent(kind: ReleaseEventKind.created, at: DateTime.utc(2026)),
+      ]).toJson(),
+      call: (client) => client.getReleaseHistory('rel_1'),
+      expected: ReleaseHistory([
+        ReleaseEvent(kind: ReleaseEventKind.created, at: DateTime.utc(2026)),
+      ]),
+    ),
+    _Endpoint(
+      'setReleaseTexts',
+      method: 'PUT',
+      path: '/releases/rel_1/texts',
+      response: sample.release.toJson(),
+      call: (client) =>
+          client.setReleaseTexts('rel_1', const ReleaseTexts(whatsNew: 'New')),
+      expected: sample.release,
+      body: {'whatsNew': 'New'},
+    ),
+    _Endpoint(
+      'moveReleasePatch',
+      method: 'POST',
+      path: '/releases/rel_1/patches/2/rollback',
+      status: 202,
+      response: sample.run.toJson(),
+      call: (client) =>
+          client.moveReleasePatch('rel_1', 2, PatchAction.rollback),
       expected: sample.run,
     ),
     _Endpoint(

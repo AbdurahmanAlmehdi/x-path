@@ -76,7 +76,7 @@ class ProjectsShowCommand extends XpCommand {
 
   @override
   Future<int> execute(XpClient client) async {
-    final [reference] = positionals(['project']);
+    final [reference] = await projectPositionals(client, ['project']);
     final project = await client.getProject(
       await resolveProject(client, reference),
     );
@@ -225,7 +225,7 @@ class ProjectsScanCommand extends XpCommand {
 
   @override
   Future<int> execute(XpClient client) async {
-    final [reference] = positionals(['project']);
+    final [reference] = await projectPositionals(client, ['project']);
     final project = await client.scanProject(
       await resolveProject(client, reference),
     );
@@ -272,7 +272,7 @@ class ProjectsSetCommand extends XpCommand {
 
   @override
   Future<int> execute(XpClient client) async {
-    final [reference] = positionals(['project']);
+    final [reference] = await projectPositionals(client, ['project']);
     final results = argResults!;
     final firebase = <String, String>{};
     for (final value in results.multiOption('firebase-app-id')) {
@@ -336,7 +336,7 @@ class ProjectsRemoveCommand extends XpCommand {
 
   @override
   Future<int> execute(XpClient client) async {
-    final [reference] = positionals(['project']);
+    final [reference] = await projectPositionals(client, ['project']);
     final id = await resolveProject(client, reference);
     await client.removeProject(id);
     emit({'removed': id}, () => 'Removed $id.');

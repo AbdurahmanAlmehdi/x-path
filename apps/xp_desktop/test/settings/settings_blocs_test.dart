@@ -5,6 +5,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:xp_api/xp_api.dart';
 import 'package:xp_client/xp_client.dart';
+import 'package:xp_desktop/app/app.dart';
+import 'package:xp_desktop/app/bloc/engine_notices_bloc.dart';
 import 'package:xp_desktop/settings/settings.dart';
 import 'package:xp_macos_services/testing.dart';
 import 'package:xp_macos_services/xp_macos_services.dart';
@@ -238,6 +240,95 @@ void main() {
       ],
       verify: (_) => verify(settings.clearGitHubToken).called(1),
     );
+  });
+
+  group('CliTokenBloc', () {
+    final created = CreatedToken(
+      info: TokenInfo(
+        id: 'tok_1',
+        name: 'xp on MacBook',
+        kind: DeviceTokenKind.cli,
+        createdAt: DateTime.utc(2026, 10, 25),
+      ),
+      token: 'xpt_x',
+    );
+    late MockSettingsRepository settings;
+
+    setUp(() => settings = quietSettings());
+
+    test('events compare by value', () {
+      expect(
+        const CliTokenRequested(name: 'xp', kind: DeviceTokenKind.cli).props,
+        ['xp', DeviceTokenKind.cli],
+      );
+      expect(const CliTokenDismissed().props, isEmpty);
+    });
+
+    blocTest<CliTokenBloc, CliTokenState>(
+      'makes a token, then forgets it',
+      setUp: () => when(
+        () => settings.createToken(
+          name: 'xp on MacBook',
+          kind: DeviceTokenKind.cli,
+        ),
+      ).thenAnswer((_) async => created),
+      build: () => CliTokenBloc(settings: settings),
+      act: (bloc) async {
+        bloc.add(
+          const CliTokenRequested(
+            name: 'xp on MacBook',
+            kind: DeviceTokenKind.cli,
+          ),
+        );
+        await Future<void>.delayed(Duration.zero);
+        bloc.add(const CliTokenDismissed());
+      },
+      expect: () => [
+        const CliTokenState(creating: DeviceTokenKind.cli),
+        CliTokenState(created: created),
+        const CliTokenState(),
+      ],
+    );
+
+    blocTest<CliTokenBloc, CliTokenState>(
+      'says why the engine made none',
+      setUp: () => when(
+        () => settings.createToken(name: 'agent', kind: DeviceTokenKind.mcp),
+      ).thenThrow(const ConnectionException('The engine is away.')),
+      build: () => CliTokenBloc(settings: settings),
+      act: (bloc) => bloc.add(
+        const CliTokenRequested(name: 'agent', kind: DeviceTokenKind.mcp),
+      ),
+      expect: () => const [
+        CliTokenState(creating: DeviceTokenKind.mcp),
+        CliTokenState(error: 'The engine is away.'),
+      ],
+    );
+  });
+
+  group('NoticeSettingsCubit', () {
+    test('reads, keeps and passes on the choices', () async {
+      final preferences = AppPreferences({
+        'mutedNotices': ['jobSucceeded'],
+      });
+      final app = FakeRunningApp();
+      final cubit = NoticeSettingsCubit(preferences: preferences, app: app);
+
+      expect(cubit.state.keepRunning, isTrue);
+      expect(cubit.state.shows(NoticeKind.jobSucceeded), isFalse);
+      expect(cubit.state.shows(NoticeKind.jobFailed), isTrue);
+
+      await cubit.setKeepRunning(keep: false);
+      await cubit.show(NoticeKind.jobSucceeded, shown: true);
+      await cubit.show(NoticeKind.releaseLive, shown: false);
+
+      expect(cubit.state.keepRunning, isFalse);
+      expect(cubit.state.muted, {NoticeKind.releaseLive});
+      expect(app.keepRunning, isFalse);
+      expect(preferences.keepRunning, isFalse);
+      expect(preferences.mutedNotices, {'releaseLive'});
+      await cubit.close();
+    });
   });
 
   group('CommandLineToolBloc', () {

@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:material_ui/material_ui.dart' hide StepState;
 import 'package:xp_api/xp_api.dart';
@@ -313,30 +312,21 @@ class _JobShortcuts extends StatelessWidget {
 
     final state = bloc.state;
     final job = state.selectedJob;
-    return CallbackShortcuts(
-      bindings: {
-        const SingleActivator(LogicalKeyboardKey.period, meta: true): () =>
-            ifCommand(() {
-              if (state.runJobs!.jobs.any((job) => !job.state.isFinished)) {
-                unawaited(
-                  cancelRun(
-                    context,
-                    state.workflowName ?? context.l10n.jobTitle,
-                  ),
-                );
-              }
-            }),
-        const SingleActivator(LogicalKeyboardKey.keyR, meta: true): () =>
-            ifCommand(() {
-              if (job != null && isResumable(job.state)) {
-                bloc.add(const JobViewResumeRequested(fromStep: 0));
-              }
-            }),
-        const SingleActivator(
-          LogicalKeyboardKey.keyR,
-          meta: true,
-          alt: true,
-        ): () => ifCommand(() {
+    return XpCommands(
+      handlers: {
+        XpCommand.cancel: () => ifCommand(() {
+          if (state.runJobs!.jobs.any((job) => !job.state.isFinished)) {
+            unawaited(
+              cancelRun(context, state.workflowName ?? context.l10n.jobTitle),
+            );
+          }
+        }),
+        XpCommand.rerun: () => ifCommand(() {
+          if (job != null && isResumable(job.state)) {
+            bloc.add(const JobViewResumeRequested(fromStep: 0));
+          }
+        }),
+        XpCommand.resume: () => ifCommand(() {
           final from = job == null || !isResumable(job.state)
               ? null
               : resumeFrom(job, state.selectedStep);

@@ -251,6 +251,196 @@ void main() {
     });
   });
 
+  group('the rollout of a release', () {
+    test('attaches the run and gates the change on the release', () async {
+      final run = await harness.dispatchBuiltin(
+        'release-rollout',
+        const DispatchRequest(
+          ref: 'main',
+          flavors: ['prod'],
+          releaseVersion: '1.2.0+5',
+          release: 'rel_1',
+          inputs: {'store': 'play', 'action': 'fraction', 'userFraction': 0.2},
+        ),
+      );
+
+      expect(releases.attached, ['rel_1 prj_1 rollout ${run.id} null']);
+      expect(run.jobs.single.name, 'play rollout, fraction 0.2');
+      final pause = await harness.dispatchBuiltin(
+        'release-rollout',
+        const DispatchRequest(
+          ref: 'main',
+          flavors: ['prod'],
+          releaseVersion: '1.2.0+5',
+          release: 'rel_1',
+          inputs: {'store': 'apple', 'action': 'pause'},
+        ),
+      );
+      expect(pause.jobs.single.name, 'apple rollout, pause');
+      expect(run.locksProject, isFalse);
+      final job = await harness.job(run.jobs.single.id);
+      expect(harness.kinds(job), ['gate', 'store.rollout']);
+      expect(await harness.input(job, 'gate'), {
+        'action': 'rollout',
+        'projectId': 'prj_1',
+        'sha': mainSha,
+        'version': '1.2.0+5',
+      });
+      expect(await harness.input(job, 'store.rollout'), {
+        'releaseId': 'rel_1',
+        'store': 'play',
+        'action': 'fraction',
+        'userFraction': 0.2,
+      });
+    });
+
+    test('says what is wrong with the change', () async {
+      await expectLater(
+        harness.dispatchBuiltin(
+          'release-rollout',
+          const DispatchRequest(
+            ref: 'main',
+            flavors: ['prod'],
+            release: 'rel_1',
+            inputs: {'store': 'apple', 'action': 'fraction'},
+          ),
+        ),
+        throwsA(isA<DispatchException>()),
+      );
+    });
+
+    test('needs a release to roll out', () async {
+      await expectLater(
+        harness.dispatchBuiltin(
+          'release-rollout',
+          const DispatchRequest(
+            flavors: ['prod'],
+            inputs: {'store': 'apple', 'action': 'pause'},
+          ),
+        ),
+        throwsA(
+          isA<DispatchException>().having(
+            (e) => e.message,
+            'message',
+            contains('There is no release to roll out'),
+          ),
+        ),
+      );
+    });
+  });
+
+  group('a Shorebird patch', () {
+    test('links each job to the release of its flavor', () async {
+      releases.patchables['prod'] = 'rel_prod';
+
+      final run = await harness.dispatchBuiltin(
+        'shorebird-patch',
+        const DispatchRequest(
+          releaseVersion: '1.2.0+30',
+          platforms: ['android'],
+        ),
+      );
+
+      expect(releases.attached, ['rel_prod prj_1 patch ${run.id} null']);
+      for (final job in run.jobs) {
+        expect(await releaseOf(job.id), 'rel_prod');
+      }
+    });
+
+    test('of a release the engine does not track links none', () async {
+      final run = await harness.dispatchBuiltin(
+        'shorebird-patch',
+        const DispatchRequest(
+          releaseVersion: '1.2.0+30',
+          platforms: ['android'],
+        ),
+      );
+
+      expect(releases.attached, isEmpty);
+      expect(await releaseOf(run.jobs.first.id), isNull);
+    });
+
+    test('is promoted behind the prod_patch gate', () async {
+      final run = await harness.dispatchBuiltin(
+        'shorebird-track',
+        const DispatchRequest(
+          ref: 'main',
+          flavors: ['prod'],
+          releaseVersion: '1.2.0+30',
+          release: 'rel_1',
+          inputs: {'patchNumber': 2, 'action': 'promote'},
+        ),
+      );
+
+      expect(releases.attached, ['rel_1 prj_1 patch ${run.id} null']);
+      expect(run.locksProject, isFalse);
+      final job = await harness.job(run.jobs.single.id);
+      expect(harness.kinds(job), ['gate', 'shorebird.track']);
+      expect((await harness.input(job, 'gate'))['action'], 'prod_patch');
+      final track = await harness.input(job, 'shorebird.track');
+      expect(track['shorebirdAppId'], 'sb-prod');
+      expect(track['releaseVersion'], '1.2.0+30');
+      expect(track['patchNumber'], 2);
+      expect(track['action'], 'promote');
+      expect(RemoteStepPolicy.canRunRemotely(harness.kinds(job)), isFalse);
+    });
+
+    test('needs the Shorebird app of the flavor', () async {
+      await expectLater(
+        harness.dispatchCustom(
+          _workflow('''
+          - kind: shorebird.track
+            gate: prod_patch
+            with:
+              patchNumber: 1
+              action: promote
+'''),
+          const DispatchRequest(releaseVersion: '1.2.0+30', release: 'rel_1'),
+        ),
+        throwsA(
+          isA<DispatchException>().having(
+            (e) => e.message,
+            'message',
+            contains('no Shorebird app id'),
+          ),
+        ),
+      );
+    });
+
+    test('needs a patch number and the release it belongs to', () async {
+      for (final (request, message) in [
+        (
+          const DispatchRequest(
+            flavors: ['prod'],
+            releaseVersion: '1.2.0+30',
+            release: 'rel_1',
+            inputs: {'action': 'promote'},
+          ),
+          'Give "patchNumber"',
+        ),
+        (
+          const DispatchRequest(
+            flavors: ['prod'],
+            release: 'rel_1',
+            inputs: {'patchNumber': 2, 'action': 'promote'},
+          ),
+          'moves a patch of a release',
+        ),
+      ]) {
+        await expectLater(
+          harness.dispatchBuiltin('shorebird-track', request),
+          throwsA(
+            isA<DispatchException>().having(
+              (e) => e.message,
+              'message',
+              contains(message),
+            ),
+          ),
+        );
+      }
+    });
+  });
+
   group('a release that cannot be named', () {
     test('is refused by an engine that tracks no releases', () async {
       harness = await DispatchHarness.create();
@@ -271,8 +461,10 @@ void main() {
           const DispatchRequest(release: 'rel_1'),
         ),
         _dispatchError(
-          'A run of a release has to build it again (a "version.bump" step) '
-          'or merge its pull request (a "github.mergePr" step).',
+          'A run of a release has to build it again (a "version.bump" step), '
+          'merge its pull request (a "github.mergePr" step), change its '
+          'rollout (a "store.rollout" step) or move a patch (a '
+          '"shorebird.track" step).',
         ),
       );
     });

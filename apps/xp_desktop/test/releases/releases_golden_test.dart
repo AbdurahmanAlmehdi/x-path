@@ -106,6 +106,34 @@ void main() {
         ),
         liveRelease,
       ],
+      history: [
+        ReleaseEvent(
+          kind: ReleaseEventKind.created,
+          at: DateTime.utc(2026, 10, 12, 18, 30),
+          runId: 'run_1',
+        ),
+        ReleaseEvent(
+          kind: ReleaseEventKind.store,
+          at: DateTime.utc(2026, 10, 13, 9, 5),
+          store: ReleaseStore.play,
+          detail: 'live',
+          by: 'MacBook',
+        ),
+        ReleaseEvent(
+          kind: ReleaseEventKind.rollout,
+          at: DateTime.utc(2026, 10, 14, 7),
+          store: ReleaseStore.play,
+          detail: 'inProgress · 50 %',
+          runId: 'run_2',
+        ),
+        ReleaseEvent(
+          kind: ReleaseEventKind.patch,
+          at: DateTime.utc(2026, 10, 14, 8),
+          detail: 'android',
+          runId: 'run_3',
+          patchNumber: 1,
+        ),
+      ],
     ).pump(tester);
     await expectLater(
       find.byType(ReleasesPage),

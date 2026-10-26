@@ -175,8 +175,9 @@ class _XpButtonState extends State<XpButton> {
       ),
     );
 
+    // A busy button keeps the focus it had, so Tab goes on from it (U6c).
     button = FocusableActionDetector(
-      enabled: _enabled,
+      enabled: widget.onPressed != null,
       mouseCursor: _enabled ? SystemMouseCursors.click : MouseCursor.defer,
       onShowHoverHighlight: (value) => setState(() => _hovered = value),
       onShowFocusHighlight: (value) => setState(() => _focused = value),

@@ -57,6 +57,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get releaseMergedToast => 'Release branch merged';
 
   @override
+  String get releaseRolloutToast =>
+      'Rollout change requested: approve it to apply';
+
+  @override
   String get jobCancelledToast => 'Run cancelled';
 
   @override
@@ -904,7 +908,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'Saved. The next dispatch uploads to these apps.';
 
   @override
-  String get scanSetStoreId => 'Set the id…';
+  String get scanSetStoreId => 'Set Firebase app id…';
 
   @override
   String get flavorCredentialsNotAssigned => 'Not assigned';
@@ -1121,6 +1125,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get stepMergePr => 'Merge the release PR';
 
   @override
+  String get stepRollout => 'Change the rollout';
+
+  @override
+  String get stepShorebirdTrack => 'Move a Shorebird patch';
+
+  @override
   String get stepManifest => 'Record the manifest';
 
   @override
@@ -1143,6 +1153,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get gateMerge => 'merge';
+
+  @override
+  String get gateRollout => 'rollout change';
 
   @override
   String get gateDelete => 'delete';
@@ -2063,6 +2076,29 @@ class AppLocalizationsEn extends AppLocalizations {
   String get laneMarkLive => 'Mark live';
 
   @override
+  String get lanePause => 'Pause';
+
+  @override
+  String get laneResume => 'Resume';
+
+  @override
+  String get laneReleaseToAll => 'Release to all';
+
+  @override
+  String get laneHalt => 'Halt';
+
+  @override
+  String get laneRollOutTo => 'Roll out to';
+
+  @override
+  String lanePercent(int percent) {
+    return '$percent % of users';
+  }
+
+  @override
+  String get laneRolloutCaption => 'Each change waits for your approval.';
+
+  @override
   String laneMarkTitle(String version, String state) {
     return 'Mark $version $state?';
   }
@@ -2198,6 +2234,96 @@ class AppLocalizationsEn extends AppLocalizations {
   String timelineMerged(String branch) {
     return 'Merged into $branch';
   }
+
+  @override
+  String get timelineMergeRequested => 'Merge requested';
+
+  @override
+  String get timelineRolloutRequested => 'Rollout change requested';
+
+  @override
+  String timelineRollout(String store) {
+    return '$store rollout changed';
+  }
+
+  @override
+  String get timelineRolloutChanged => 'Rollout changed';
+
+  @override
+  String timelinePatch(int number) {
+    return 'Patch $number published';
+  }
+
+  @override
+  String timelinePatchPromoteRequested(int number) {
+    return 'Promotion of patch $number requested';
+  }
+
+  @override
+  String timelinePatchRollbackRequested(int number) {
+    return 'Rollback of patch $number requested';
+  }
+
+  @override
+  String timelinePatchPromoted(int number) {
+    return 'Patch $number promoted to stable';
+  }
+
+  @override
+  String timelinePatchRolledBack(int number) {
+    return 'Patch $number rolled back';
+  }
+
+  @override
+  String get timelineTexts => 'Store texts changed';
+
+  @override
+  String get textsTitle => 'Store texts';
+
+  @override
+  String get textsWhatsNew => 'What\'s new';
+
+  @override
+  String get textsWhatToTest => 'What to test';
+
+  @override
+  String get textsCaption =>
+      'Uploads send them when they run: What\'s new to Google Play, What to test to Firebase testers. Notes a workflow gives win.';
+
+  @override
+  String get textsSave => 'Save texts';
+
+  @override
+  String get releaseTextsToast => 'Store texts saved';
+
+  @override
+  String get patchesTitle => 'Shorebird patches';
+
+  @override
+  String patchLabel(int number) {
+    return 'Patch $number';
+  }
+
+  @override
+  String get patchPublished => 'Published';
+
+  @override
+  String get patchPromoted => 'On stable';
+
+  @override
+  String get patchRolledBack => 'Rolled back';
+
+  @override
+  String get patchPromote => 'Promote';
+
+  @override
+  String get patchRollback => 'Roll back';
+
+  @override
+  String get patchesCaption => 'Each change waits for your approval.';
+
+  @override
+  String get releasePatchToast => 'Patch change requested: approve it to apply';
 
   @override
   String get sourceUpload => 'Upload step';
@@ -3558,4 +3684,510 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get addProjectGitHubRejected =>
       'GitHub refuses the engine\'s token, so it cannot add a project from GitHub. Save a new one below.';
+
+  @override
+  String get onboardingFirstRelease =>
+      'A first release needs four things: this engine, a GitHub token for projects on GitHub, the project\'s folder, and the store credentials of each flavor. After these three steps, the app shows what is left.';
+
+  @override
+  String get setupTitle => 'Get to a first build';
+
+  @override
+  String setupProgress(int done, int total) {
+    return '$done of $total done';
+  }
+
+  @override
+  String get setupEngine => 'The engine runs';
+
+  @override
+  String get setupGitHub => 'Connect GitHub';
+
+  @override
+  String get setupGitHubBody =>
+      'The engine reads and releases projects on GitHub with a token. A project on another git host needs none.';
+
+  @override
+  String get setupProject => 'Add a project';
+
+  @override
+  String get setupProjectBody =>
+      'The folder of a Flutter app\'s repository. The engine scans it for apps and flavors.';
+
+  @override
+  String get setupCredentials => 'Add credentials';
+
+  @override
+  String setupCredentialsBody(String flavor) {
+    return 'Every flavor needs the keys that sign and upload it. $flavor has none yet.';
+  }
+
+  @override
+  String get setupStoreIds => 'Set the store ids';
+
+  @override
+  String setupStoreIdsBody(String flavor) {
+    return 'A build is uploaded to the app id its flavor has in Firebase or App Store Connect. $flavor is missing one.';
+  }
+
+  @override
+  String get setupRunners => 'Find a machine for the builds';
+
+  @override
+  String get setupRunnersGuide => 'Runners guide';
+
+  @override
+  String get setupRunnersOpen => 'Runners';
+
+  @override
+  String get setupFirstBuild => 'Run a first build';
+
+  @override
+  String get setupFirstBuildBody =>
+      'An unsigned build needs no credential or store id: it shows the project builds before signing is set up.';
+
+  @override
+  String get setupTrySmoke => 'Try an unsigned build';
+
+  @override
+  String get setupDispatch => 'Dispatch…';
+
+  @override
+  String get setupConnect => 'Connect…';
+
+  @override
+  String get setupAdd => 'Add…';
+
+  @override
+  String get setupAssign => 'Assign…';
+
+  @override
+  String get setupSetIds => 'Set ids…';
+
+  @override
+  String get scanAddCredential => 'Add credential…';
+
+  @override
+  String get scanCopyPath => 'Copy path';
+
+  @override
+  String get scanPathCopied => 'Path copied';
+
+  @override
+  String get settingsTokens => 'CLI and agents';
+
+  @override
+  String get settingsTokensBody =>
+      'Make a token for xp in a terminal, on this Mac or another, or for an agent that runs xp mcp. Agents can ask for approvals, never give them.';
+
+  @override
+  String get settingsTokensNewCli => 'New xp token';
+
+  @override
+  String get settingsTokensNewMcp => 'New agent token';
+
+  @override
+  String settingsTokensCliName(String device) {
+    return 'xp on $device';
+  }
+
+  @override
+  String settingsTokensMcpName(String device) {
+    return 'Agent on $device';
+  }
+
+  @override
+  String settingsTokensCliMade(String name) {
+    return 'Made \"$name\". Run this in a terminal to connect xp, then paste the token when it asks:';
+  }
+
+  @override
+  String settingsTokensMcpMade(String name) {
+    return 'Made \"$name\". Add this to the MCP config of the agent:';
+  }
+
+  @override
+  String get settingsTokensOnce =>
+      'The token is shown this once. Copy it now; make another if it is lost.';
+
+  @override
+  String get settingsTokensCopyCommand => 'Copy command';
+
+  @override
+  String get settingsTokensCopyConfig => 'Copy config';
+
+  @override
+  String get settingsTokensCopyToken => 'Copy token';
+
+  @override
+  String get settingsTokensDone => 'Done';
+
+  @override
+  String get commandPalette => 'Command palette';
+
+  @override
+  String get commandDispatch => 'Dispatch…';
+
+  @override
+  String get commandRerun => 'Re-run job';
+
+  @override
+  String get commandResume => 'Resume from selected step';
+
+  @override
+  String get commandCancel => 'Cancel job';
+
+  @override
+  String get commandApprovals => 'Approvals';
+
+  @override
+  String get commandBack => 'Back';
+
+  @override
+  String get commandForward => 'Forward';
+
+  @override
+  String get commandSidebar => 'Show or hide sidebar';
+
+  @override
+  String get commandConsole => 'Show or hide console';
+
+  @override
+  String get commandFind => 'Find in log';
+
+  @override
+  String get commandFindNext => 'Next match';
+
+  @override
+  String get commandFindPrevious => 'Previous match';
+
+  @override
+  String get commandJumpToError => 'Jump to error';
+
+  @override
+  String get commandFollowTail => 'Follow tail';
+
+  @override
+  String get commandTimestamps => 'Show or hide timestamps';
+
+  @override
+  String get commandWrap => 'Wrap lines';
+
+  @override
+  String get commandCompact => 'Compact rows';
+
+  @override
+  String get commandShortcuts => 'Keyboard shortcuts';
+
+  @override
+  String get commandSettings => 'Settings…';
+
+  @override
+  String get menuGo => 'Go';
+
+  @override
+  String get menuProject => 'Project';
+
+  @override
+  String get menuJob => 'Job';
+
+  @override
+  String get menuView => 'View';
+
+  @override
+  String get menuWindow => 'Window';
+
+  @override
+  String get menuProjects => 'Projects';
+
+  @override
+  String get paletteHint =>
+      'Go to a project, release, run or workflow, or run a command';
+
+  @override
+  String get paletteEmpty => 'Nothing matches.';
+
+  @override
+  String paletteDispatch(String project) {
+    return 'Dispatch… $project';
+  }
+
+  @override
+  String paletteRunAgain(String run) {
+    return 'Run again: $run';
+  }
+
+  @override
+  String paletteCancel(String run) {
+    return 'Cancel: $run';
+  }
+
+  @override
+  String paletteApprove(String action, String version) {
+    return 'Review: $action $version';
+  }
+
+  @override
+  String paletteRelease(String version, String flavor) {
+    return 'Release $version · $flavor';
+  }
+
+  @override
+  String paletteRun(String name) {
+    return 'Run $name';
+  }
+
+  @override
+  String paletteWorkflow(String name) {
+    return 'Workflow $name';
+  }
+
+  @override
+  String palettePage(String page) {
+    return 'Go to $page';
+  }
+
+  @override
+  String get shortcutsTitle => 'Keyboard shortcuts';
+
+  @override
+  String get shortcutsProjects => 'Projects in sidebar order';
+
+  @override
+  String get shortcutsClose => 'Close';
+
+  @override
+  String get settingsNotices => 'Notifications';
+
+  @override
+  String get settingsKeepRunning =>
+      'Keep XPath in the menu bar when the window closes';
+
+  @override
+  String get settingsKeepRunningBody =>
+      'Builds, approvals and notifications go on with the window closed. Quit with ⌘Q.';
+
+  @override
+  String get settingsNoticesBody =>
+      'XPath tells you about these on macOS when the window is closed or behind. Approvals always notify.';
+
+  @override
+  String get noticeJobFailed => 'A production job failed';
+
+  @override
+  String get noticeJobSucceeded => 'A production job succeeded';
+
+  @override
+  String get noticeReleaseRejected => 'A store rejected a release';
+
+  @override
+  String get noticeReleaseApproved => 'The stores approved a release';
+
+  @override
+  String get noticeReleaseLive => 'A release is live';
+
+  @override
+  String get noticeCredentialExpired => 'A credential stopped working';
+
+  @override
+  String get noticeSecretsLocked => 'The engine cannot read its secrets';
+
+  @override
+  String get noticeRunnerLost => 'A runner lost a job';
+
+  @override
+  String get noticeCapabilityLost => 'A runner lost a capability';
+
+  @override
+  String get noticeJobWaiting => 'A job waits for a runner';
+
+  @override
+  String noticeRunnerLostBody(String state) {
+    return 'Its lease ran out, so the job is $state again.';
+  }
+
+  @override
+  String noticeCapabilityLostTitle(String runner, String capabilities) {
+    return '$runner can no longer do $capabilities';
+  }
+
+  @override
+  String get noticeCapabilityLostBody =>
+      'Jobs that need it wait for another runner.';
+
+  @override
+  String noticeJobWaitingBody(String job, String reason) {
+    return '$job has waited 10 minutes: $reason';
+  }
+
+  @override
+  String menuBarRunning(int count) {
+    return 'Running · $count';
+  }
+
+  @override
+  String menuBarRunTitle(String workflow, String version) {
+    return '$workflow $version';
+  }
+
+  @override
+  String menuBarRunDetail(String project, int done, int total) {
+    return '$project · $done of $total jobs';
+  }
+
+  @override
+  String get menuBarDispatch => 'Dispatch…';
+
+  @override
+  String copiedValue(String value) {
+    return 'Copied $value';
+  }
+
+  @override
+  String get engineSwitcherTooltip => 'Switch engine';
+
+  @override
+  String get selectTooltip => 'Choose';
+
+  @override
+  String get menuCopySha => 'Copy commit';
+
+  @override
+  String get menuCopyVersion => 'Copy version';
+
+  @override
+  String menuCopyBundleId(String id) {
+    return 'Copy bundle ID $id';
+  }
+
+  @override
+  String get menuOpenJob => 'Open job';
+
+  @override
+  String get menuRevealArtifact => 'Show in Finder';
+
+  @override
+  String credentialActions(String name) {
+    return 'Actions of $name';
+  }
+
+  @override
+  String sidebarNeedsYouCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'need',
+      one: 'needs',
+    );
+    return '$count $_temp0 you';
+  }
+
+  @override
+  String get credentialsMore => 'More';
+
+  @override
+  String get releasesSearch => 'Find a release';
+
+  @override
+  String get testsSearch => 'Find a test run';
+
+  @override
+  String get homeTitle => 'Home';
+
+  @override
+  String homeSubtitle(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count projects',
+      one: '1 project',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String homeLive(String version) {
+    return 'Live: $version';
+  }
+
+  @override
+  String get homeNothingLive => 'Nothing live yet';
+
+  @override
+  String homeInReview(String version, String state) {
+    return '$version: $state';
+  }
+
+  @override
+  String get sidebarProjectSettings => 'Project settings';
+
+  @override
+  String get projectGitHost => 'Git host';
+
+  @override
+  String get projectBaseBranch => 'Base branch';
+
+  @override
+  String get projectBaseBranchSave => 'Save';
+
+  @override
+  String projectBaseBranchSaved(String branch) {
+    return 'Releases are based on $branch now';
+  }
+
+  @override
+  String get projectGates => 'Gates';
+
+  @override
+  String get projectGatesBody =>
+      'These actions wait for your approval before they happen. Agents can never turn a gate off.';
+
+  @override
+  String projectGateOffTitle(String action) {
+    return 'Turn the $action gate off?';
+  }
+
+  @override
+  String projectGateOffNow(String action) {
+    return 'Every $action of this project then happens without asking you.';
+  }
+
+  @override
+  String projectGateOffWaiting(String action) {
+    return 'Jobs that wait for a $action approval go on at once, without review.';
+  }
+
+  @override
+  String get projectGateOffKeep => 'Keep the gate';
+
+  @override
+  String get projectGateOff => 'Turn off';
+
+  @override
+  String get projectStoreIds => 'Store ids';
+
+  @override
+  String get projectRemove => 'Remove the project';
+
+  @override
+  String get projectRemoveBody =>
+      'The engine forgets the project, its workflows and runs. The repository and the stores are not touched.';
+
+  @override
+  String get projectRemoveButton => 'Remove…';
+
+  @override
+  String projectRemoveTitle(String name) {
+    return 'Remove $name?';
+  }
+
+  @override
+  String get projectRemovePoint =>
+      'Its workflows, runs and releases go from this engine. Credentials stay.';
+
+  @override
+  String get projectRemoveKeep => 'Keep';
+
+  @override
+  String get projectRemoveConfirm => 'Remove';
 }

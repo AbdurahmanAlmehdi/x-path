@@ -9,6 +9,7 @@ export 'src/engines/engines_repository.dart';
 export 'src/engines/token_vault.dart';
 export 'src/errors.dart';
 export 'src/jobs_repository.dart';
+export 'src/notices_repository.dart';
 export 'src/projects_repository.dart';
 export 'src/releases_repository.dart';
 export 'src/run_jobs.dart';

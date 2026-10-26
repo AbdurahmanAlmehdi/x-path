@@ -118,8 +118,9 @@ class ToolChecklist extends StatelessWidget {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                SizedBox(
-                  width: 110,
+                ConstrainedBox(
+                  // Grows with the text size (U6c).
+                  constraints: const BoxConstraints(minWidth: 110),
                   child: Text(
                     _name(l10n, check.tool),
                     style: type.bodyStrong.copyWith(color: colors.textPrimary),

@@ -1,9 +1,14 @@
+import 'dart:async';
+
+import 'package:flutter/services.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:xp_api/xp_api.dart';
 import 'package:xp_desktop/credentials/view/flavor_credentials_sheet.dart';
 import 'package:xp_desktop/credentials/widgets/credential_labels.dart';
 import 'package:xp_desktop/l10n/l10n.dart';
 import 'package:xp_desktop/theme/theme.dart';
+import 'package:xp_desktop/toast/cubit/toast_cubit.dart';
 import 'package:xp_desktop/widgets/widgets.dart';
 
 /// What a scan found: one panel per app with a ledger of its flavors, then
@@ -228,18 +233,21 @@ class _FindingRow extends StatelessWidget {
   final Finding finding;
   final Project project;
 
-  /// The flavor whose store ids fix the finding, when that is what it says
-  /// is missing.
-  FlavorTarget? get _storeIdsOf {
-    if (finding.code != 'firebase_app_id_missing') return null;
+  /// The scan codes a credential of the flavor fixes.
+  static const _credentialCodes = {
+    'keystore_properties_missing',
+    'keystore_not_referenced',
+  };
+
+  /// The flavor whose store ids or credentials fix the finding: the one it
+  /// names, or the first of its app.
+  FlavorTarget? get _target {
     final path = finding.app ?? '.';
     final app = project.profile.apps.where((app) => app.path == path);
     if (app.isEmpty) return null;
-    return (
-      app: path,
-      appName: app.first.name,
-      flavor: finding.flavor ?? 'default',
-    );
+    final flavor = finding.flavor ?? app.first.flavors.firstOrNull?.name;
+    if (flavor == null) return null;
+    return (app: path, appName: app.first.name, flavor: flavor);
   }
 
   @override
@@ -257,7 +265,10 @@ class _FindingRow extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(width: 90, child: XpStatusLabel(status, label)),
+          ConstrainedBox(
+            constraints: const BoxConstraints(minWidth: 90),
+            child: XpStatusLabel(status, label),
+          ),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -278,19 +289,47 @@ class _FindingRow extends StatelessWidget {
               ],
             ),
           ),
-          if (_storeIdsOf case final target?)
-            XpButton(
-              label: l10n.scanSetStoreId,
-              size: XpButtonSize.small,
-              onPressed: () => showFlavorCredentialsSheet(
-                context,
-                project: project,
-                target: target,
-                focusStoreIds: true,
-              ),
-            ),
+          Wrap(
+            spacing: 6,
+            children: [
+              if (finding.code == 'firebase_app_id_missing')
+                if (_target case final target?)
+                  _action(
+                    l10n.scanSetStoreId,
+                    () => showFlavorCredentialsSheet(
+                      context,
+                      project: project,
+                      target: target,
+                      focusStoreIds: true,
+                    ),
+                  ),
+              if (_credentialCodes.contains(finding.code))
+                if (_target case final target?)
+                  _action(
+                    l10n.scanAddCredential,
+                    () => showFlavorCredentialsSheet(
+                      context,
+                      project: project,
+                      target: target,
+                    ),
+                  ),
+              if (finding.path case final path?)
+                _action(l10n.scanCopyPath, () async {
+                  await Clipboard.setData(ClipboardData(text: path));
+                  if (context.mounted) {
+                    context.read<ToastCubit>().show(l10n.scanPathCopied);
+                  }
+                }),
+            ],
+          ),
         ],
       ),
     );
   }
+
+  Widget _action(String label, Future<void> Function() onPressed) => XpButton(
+    label: label,
+    size: XpButtonSize.small,
+    onPressed: () => unawaited(onPressed()),
+  );
 }

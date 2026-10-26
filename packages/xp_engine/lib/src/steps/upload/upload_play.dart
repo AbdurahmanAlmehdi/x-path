@@ -1,6 +1,7 @@
 import 'package:xp_api/xp_api.dart';
 import 'package:xp_engine/src/artifacts/artifact_repository.dart';
 import 'package:xp_engine/src/artifacts/artifact_store.dart';
+import 'package:xp_engine/src/releases/release_texts_source.dart';
 import 'package:xp_engine/src/secrets/secret_store.dart';
 import 'package:xp_engine/src/steps/build/stored_artifacts.dart';
 import 'package:xp_engine/src/steps/step.dart';
@@ -29,10 +30,15 @@ class UploadPlayStep extends Step<UploadPlayInput, UploadPlayResult> {
     required this.store,
     required this.secrets,
     required this.connect,
+    this.texts,
   });
 
   /// The records of the stored artifacts.
   final ArtifactRepository repository;
+
+  /// The texts of the release the job uploads: its "What's new" goes to
+  /// Google Play when the step gives no release notes (U7b).
+  final ReleaseTextsSource? texts;
 
   /// The artifact store, whose AAB is streamed to Google Play.
   final ArtifactStore store;
@@ -42,6 +48,17 @@ class UploadPlayStep extends Step<UploadPlayInput, UploadPlayResult> {
 
   /// Makes the Google Play client of a service account.
   final GooglePlayFactory connect;
+
+  /// The release notes of [input], else the "What's new" of the release of
+  /// the job.
+  Future<Map<String, String>> _releaseNotes(
+    UploadPlayInput input,
+    StepContext context,
+  ) async {
+    if (input.releaseNotes.isNotEmpty) return input.releaseNotes;
+    final whatsNew = (await texts?.ofJob(context.jobId))?.whatsNew;
+    return whatsNew == null ? const {} : {releaseTextsLanguage: whatsNew};
+  }
 
   @override
   String get kind => 'upload.play';
@@ -172,7 +189,7 @@ class UploadPlayStep extends Step<UploadPlayInput, UploadPlayResult> {
             status: input.status,
             userFraction: input.userFraction,
             name: input.releaseName,
-            releaseNotes: input.releaseNotes,
+            releaseNotes: await _releaseNotes(input, context),
           ),
         ],
       ),

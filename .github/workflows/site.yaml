@@ -1,5 +1,5 @@
 # Checks the website (site/, served at https://xpath.abdurahman.ly) on pull requests that touch it. It never
-# deploys: Cloudflare Workers Builds deploys site/ when it changes on main (see "Website" in the README).
+# deploys: Cloudflare Workers Builds deploys site/ when it changes on main (see "Website" in docs/reference/development.md).
 #
 #   check.mjs      internal links and #fragments, images, canonical URLs and the sitemap, JSON-LD (it must
 #                  parse; the FAQPage must match the visible FAQ), _redirects, and that the design tokens are
