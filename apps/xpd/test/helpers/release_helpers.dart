@@ -53,7 +53,11 @@ class ReleaseClient {
   /// Starts an engine whose gates ask its approvals.
   static Future<ReleaseClient> start() async {
     final engine = await TestEngine.start(realApprovals: true);
-    final workflows = await WorkflowClient.add(engine);
+    // A Shorebird app, so that its patches can be promoted (U7b).
+    final workflows = await WorkflowClient.add(
+      engine,
+      files: {...projectFiles, 'shorebird.yaml': 'app_id: sb-demo\n'},
+    );
     final workflowId = await workflows.create('ship', releaseWorkflow);
     final secrets = <DeviceTokenKind, String>{
       DeviceTokenKind.app: engine.secret,

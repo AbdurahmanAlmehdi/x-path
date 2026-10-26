@@ -10,6 +10,7 @@ import 'package:xp_desktop/projects/widgets/project_host.dart';
 import 'package:xp_desktop/releases/bloc/release_board_bloc.dart';
 import 'package:xp_desktop/releases/widgets/release_hero.dart';
 import 'package:xp_desktop/releases/widgets/release_panels.dart';
+import 'package:xp_desktop/releases/widgets/release_texts_panel.dart';
 import 'package:xp_desktop/releases/widgets/release_timeline.dart';
 import 'package:xp_desktop/releases/widgets/store_lane.dart';
 import 'package:xp_desktop/shell/cubit/shell_cubit.dart';
@@ -82,6 +83,8 @@ class ReleasesView extends StatelessWidget {
           (ReleaseCommand.marking, l10n.releaseMarkedToast),
           (ReleaseCommand.merging, l10n.releaseMergedToast),
           (ReleaseCommand.rollingOut, l10n.releaseRolloutToast),
+          (ReleaseCommand.savingTexts, l10n.releaseTextsToast),
+          (ReleaseCommand.movingPatch, l10n.releasePatchToast),
         ])
           BlocListener<ReleaseBoardBloc, ReleaseBoardState>(
             listenWhen: (previous, current) =>
@@ -217,10 +220,21 @@ class _Board extends StatelessWidget {
             child: ReleaseTimeline(
               release: release,
               approvals: state.approvals,
+              history: state.history,
             ),
           ),
           const SizedBox(width: 16),
-          Expanded(flex: 4, child: ReleaseNotesPanel(release: release)),
+          Expanded(
+            flex: 4,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                ReleaseNotesPanel(release: release),
+                const SizedBox(height: 16),
+                ReleaseTextsPanel(release: release),
+              ],
+            ),
+          ),
           const SizedBox(width: 16),
           Expanded(
             flex: 4,
@@ -230,6 +244,11 @@ class _Board extends StatelessWidget {
                 MinVersionPanel(release: release),
                 const SizedBox(height: 16),
                 ReleasePrPanel(release: release),
+                if (releasePatches(state.history) case final patches
+                    when patches.isNotEmpty) ...[
+                  const SizedBox(height: 16),
+                  ReleasePatchesPanel(patches: patches),
+                ],
               ],
             ),
           ),

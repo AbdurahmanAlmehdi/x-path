@@ -254,7 +254,7 @@ Details:
 
 ### Phase U7b: Release timeline, Shorebird controls and notes
 
-- **Status:** Not started
+- **Status:** Done
 - **Scope:** One timeline per release, Shorebird promote and roll back, and release notes kept
   on the release.
 - **Files touched:** `packages/xp_engine/lib/src/releases/**`,
@@ -275,6 +275,12 @@ Details:
   that cannot merge (the runner plan's R10).
 - Shorebird: promote a patch between tracks and roll back from the release page (gated).
 - Release notes and "What to test" text kept on the release and sent with uploads.
+- As built: the history is a `release_event` table (migration v20) the engine writes as things
+  happen; a `shorebird-patch` run of a released version is linked to its release, and the
+  `shorebird-track` built-in moves a patch behind `gate: prod_patch`. There is no fake Shorebird
+  server: the `shorebird patches` adapter is tested against a fake CLI. "What to test" reaches
+  Firebase testers; TestFlight's "What to Test" needs the App Store Connect beta localizations
+  API and is left out.
 
 ### Phase U8: Docs, quickstart and troubleshooting
 

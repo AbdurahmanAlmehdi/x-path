@@ -1107,6 +1107,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get stepRollout => 'Change the rollout';
 
   @override
+  String get stepShorebirdTrack => 'Move a Shorebird patch';
+
+  @override
   String get stepManifest => 'Record the manifest';
 
   @override
@@ -2205,6 +2208,93 @@ class AppLocalizationsEn extends AppLocalizations {
   String timelineMerged(String branch) {
     return 'Merged into $branch';
   }
+
+  @override
+  String get timelineMergeRequested => 'Merge requested';
+
+  @override
+  String get timelineRolloutRequested => 'Rollout change requested';
+
+  @override
+  String timelineRollout(String store) {
+    return '$store rollout changed';
+  }
+
+  @override
+  String timelinePatch(int number) {
+    return 'Patch $number published';
+  }
+
+  @override
+  String timelinePatchPromoteRequested(int number) {
+    return 'Promotion of patch $number requested';
+  }
+
+  @override
+  String timelinePatchRollbackRequested(int number) {
+    return 'Rollback of patch $number requested';
+  }
+
+  @override
+  String timelinePatchPromoted(int number) {
+    return 'Patch $number promoted to stable';
+  }
+
+  @override
+  String timelinePatchRolledBack(int number) {
+    return 'Patch $number rolled back';
+  }
+
+  @override
+  String get timelineTexts => 'Store texts changed';
+
+  @override
+  String get textsTitle => 'Store texts';
+
+  @override
+  String get textsWhatsNew => 'What\'s new';
+
+  @override
+  String get textsWhatToTest => 'What to test';
+
+  @override
+  String get textsCaption =>
+      'Uploads send them when they run: What\'s new to Google Play, What to test to Firebase testers. Notes a workflow gives win.';
+
+  @override
+  String get textsSave => 'Save texts';
+
+  @override
+  String get releaseTextsToast => 'Store texts saved';
+
+  @override
+  String get patchesTitle => 'Shorebird patches';
+
+  @override
+  String patchLabel(int number) {
+    return 'Patch $number';
+  }
+
+  @override
+  String get patchPublished => 'Published';
+
+  @override
+  String get patchPromoted => 'On stable';
+
+  @override
+  String get patchRolledBack => 'Rolled back';
+
+  @override
+  String get patchPromote => 'Promote';
+
+  @override
+  String get patchRollback => 'Roll back';
+
+  @override
+  String get patchesCaption => 'Each change waits for your approval.';
+
+  @override
+  String get releasePatchToast => 'Patch change requested: approve it to apply';
 
   @override
   String get sourceUpload => 'Upload step';

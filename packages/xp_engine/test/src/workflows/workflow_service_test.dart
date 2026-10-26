@@ -62,6 +62,7 @@ void main() {
         'release-merge',
         'release-rollout',
         'shorebird-patch',
+        'shorebird-track',
         'smoke-build',
         'test',
       ]);

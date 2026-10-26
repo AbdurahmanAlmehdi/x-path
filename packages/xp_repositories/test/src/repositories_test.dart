@@ -1039,6 +1039,14 @@ void main() {
       );
       when(() => client.requestRollout('rel_1', pause))
           .thenAnswer((_) async => _run);
+      const history = ReleaseHistory([]);
+      const texts = ReleaseTexts(whatsNew: 'New');
+      when(() => client.getReleaseHistory('rel_1'))
+          .thenAnswer((_) async => history);
+      when(() => client.setReleaseTexts('rel_1', texts))
+          .thenAnswer((_) async => _release);
+      when(() => client.moveReleasePatch('rel_1', 2, PatchAction.promote))
+          .thenAnswer((_) async => _run);
       when(() => client.abandonRelease('rel_1', reason: 'no'))
           .thenAnswer((_) async => _release);
       when(() => client.getReleaseNotes('rel_1'))
@@ -1056,6 +1064,12 @@ void main() {
       expect(await repository.startBuild('rel_1'), _run);
       expect(await repository.merge('rel_1'), _run);
       expect(await repository.rollout('rel_1', pause), _run);
+      expect(await repository.history('rel_1'), history);
+      expect(await repository.setTexts('rel_1', texts), _release);
+      expect(
+        await repository.movePatch('rel_1', 2, PatchAction.promote),
+        _run,
+      );
       expect(await repository.abandon('rel_1', reason: 'no'), _release);
       expect(await repository.notes('rel_1'), notes);
     });

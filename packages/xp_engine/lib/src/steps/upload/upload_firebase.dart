@@ -1,5 +1,6 @@
 import 'package:xp_engine/src/artifacts/artifact_repository.dart';
 import 'package:xp_engine/src/artifacts/artifact_store.dart';
+import 'package:xp_engine/src/releases/release_texts_source.dart';
 import 'package:xp_engine/src/secrets/secret_store.dart';
 import 'package:xp_engine/src/steps/build/stored_artifacts.dart';
 import 'package:xp_engine/src/steps/step.dart';
@@ -39,6 +40,7 @@ class UploadFirebaseStep
     required this.store,
     required this.secrets,
     required this.connect,
+    this.texts,
     this.pollInterval = const Duration(seconds: 3),
     this.maxPolls = 200,
     this.sleep = Future.delayed,
@@ -55,6 +57,18 @@ class UploadFirebaseStep
 
   /// Makes the Firebase client of a service account.
   final FirebaseAppDistributionFactory connect;
+
+  /// The texts of the release the job uploads: its "What to test" (else its
+  /// "What's new") goes to the testers when the step gives no release notes
+  /// (U7b).
+  final ReleaseTextsSource? texts;
+
+  /// The release notes of [input], else the texts of the release of the job.
+  Future<String?> _notes(UploadFirebaseInput input, StepContext context) async {
+    if (input.releaseNotes case final notes?) return notes;
+    final release = await texts?.ofJob(context.jobId);
+    return release?.whatToTest ?? release?.whatsNew;
+  }
 
   /// How long to wait between two polls of the upload.
   final Duration pollInterval;
@@ -101,7 +115,7 @@ class UploadFirebaseStep
       final releases = await connect(account)
           .releases(input.appName, pages: _searchedPages);
       final release = releases.where((r) => _isBuildOf(r, input)).firstOrNull;
-      final notes = input.releaseNotes;
+      final notes = await _notes(input, context);
       if (release == null || (notes != null && release.releaseNotes != notes)) {
         return null;
       }
@@ -174,7 +188,7 @@ class UploadFirebaseStep
       final mismatch = _versionMismatch(release, input);
       if (mismatch != null) return StepFailed(mismatch);
 
-      final notes = input.releaseNotes;
+      final notes = await _notes(input, context);
       if (notes != null && notes.isNotEmpty) {
         release = await firebase.updateReleaseNotes(release.name, notes);
       }

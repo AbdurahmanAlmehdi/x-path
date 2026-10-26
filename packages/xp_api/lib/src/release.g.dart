@@ -91,6 +91,8 @@ Release _$ReleaseFromJson(Map<String, dynamic> json) => Release(
   mergeCommit: json['mergeCommit'] as String?,
   mergeRunId: json['mergeRunId'] as String?,
   message: json['message'] as String?,
+  whatsNew: json['whatsNew'] as String?,
+  whatToTest: json['whatToTest'] as String?,
 );
 
 Map<String, dynamic> _$ReleaseToJson(Release instance) => <String, dynamic>{
@@ -113,6 +115,8 @@ Map<String, dynamic> _$ReleaseToJson(Release instance) => <String, dynamic>{
   'mergeCommit': ?instance.mergeCommit,
   'mergeRunId': ?instance.mergeRunId,
   'message': ?instance.message,
+  'whatsNew': ?instance.whatsNew,
+  'whatToTest': ?instance.whatToTest,
   'createdAt': instance.createdAt.toIso8601String(),
   'updatedAt': instance.updatedAt.toIso8601String(),
 };

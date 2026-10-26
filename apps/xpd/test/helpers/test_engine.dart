@@ -212,6 +212,7 @@ class TestEngine {
         playCredentials: FakePlayCredentialSource(),
         googlePlay: (_) => FakeGooglePlay(),
       ),
+      ShorebirdTrackStep(FakeShorebirdPatches()),
     ]);
     final jobs = JobRunner(
       jobs: jobRepository,

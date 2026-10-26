@@ -65,6 +65,13 @@ only for Shorebird flavors (`if: flavor.shorebird`).
 
 Inputs: `exportOptionsPlist`, `dartDefineFile`, `allowNativeDiffs` (default `false`).
 
+## `shorebird-track`
+
+One stage `track`, one engine job per Shorebird flavor: `shorebird.track` behind
+`gate: prod_patch`. Inputs `patchNumber` and `action` (`promote` or `rollback`). Started by
+`POST /releases/{id}/patches/{number}/{promote|rollback}` (Promote or Roll back on the release
+page) for a patch XPath published. No project lock.
+
 ## `smoke-build`
 
 One stage `build`, one job per flavor (runner-eligible): `git.checkout`; `build.android`

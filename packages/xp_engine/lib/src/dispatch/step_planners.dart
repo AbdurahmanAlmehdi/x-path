@@ -537,6 +537,7 @@ class StepPlanners implements StepCatalog {
           'exportOptionsPlist': ?p.text('exportOptionsPlist'),
           'allowNativeDiffs': p.flag('allowNativeDiffs'),
           'tokenSecret': ?_secretOf(p, CredentialKind.shorebird),
+          'patchNumber': ?p.job.run.patch,
         };
       },
       needs: _shorebirdNeeds,
@@ -970,6 +971,50 @@ class StepPlanners implements StepCatalog {
         };
       },
     ),
+    StepPlanSpec(
+      'shorebird.track',
+      const [
+        StepKey(
+          'patchNumber',
+          value: StepValue.number,
+          description: 'The patch of the release to move.',
+        ),
+        StepKey.choice(
+          'action',
+          ['promote', 'rollback'],
+          description:
+              'Promote the patch to the stable track, or roll it back.',
+        ),
+        StepKey(
+          'shorebirdAppId',
+          description: 'The Shorebird app; the one of the flavor by default.',
+        ),
+      ],
+      (p) async {
+        final number = p.number('patchNumber');
+        if (number is! int || number < 1) {
+          p.fail('Give "patchNumber", a patch number from 1.');
+        }
+        final release =
+            p.job.run.releaseVersion ??
+            p.fail(
+              'This workflow moves a patch of a release: give '
+              '"releaseVersion", for example 5.4.1+3283.',
+            );
+        return {
+          'shorebirdAppId':
+              p.text('shorebirdAppId') ??
+              _shorebirdAppId(p) ??
+              p.fail(
+                'The flavor has no Shorebird app id; give "shorebirdAppId".',
+              ),
+          'releaseVersion': '$release',
+          'patchNumber': number,
+          'action': p.requireText('action'),
+          'tokenSecret': ?_secretOf(p, CredentialKind.shorebird),
+        };
+      },
+    ),
   ];
 
   // --------------------------------------------------------------- helpers
@@ -1205,6 +1250,12 @@ const stepAbout = <String, StepAbout>{
     title: 'Shorebird release',
     description: 'Builds a release that Shorebird can patch later.',
     group: 'Build',
+  ),
+  'shorebird.track': (
+    title: 'Move a Shorebird patch',
+    description:
+        'Promotes a patch of a release to the stable track, or rolls it back.',
+    group: 'Upload',
   ),
   'shorebird.patch': (
     title: 'Shorebird patch',

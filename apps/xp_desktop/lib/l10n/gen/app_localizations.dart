@@ -1951,6 +1951,12 @@ abstract class AppLocalizations {
   /// Name of a kind of step.
   ///
   /// In en, this message translates to:
+  /// **'Move a Shorebird patch'**
+  String get stepShorebirdTrack;
+
+  /// Name of a kind of step.
+  ///
+  /// In en, this message translates to:
   /// **'Record the manifest'**
   String get stepManifest;
 
@@ -3603,6 +3609,150 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Merged into {branch}'**
   String timelineMerged(String branch);
+
+  /// Timeline entry.
+  ///
+  /// In en, this message translates to:
+  /// **'Merge requested'**
+  String get timelineMergeRequested;
+
+  /// Timeline entry.
+  ///
+  /// In en, this message translates to:
+  /// **'Rollout change requested'**
+  String get timelineRolloutRequested;
+
+  /// Timeline entry.
+  ///
+  /// In en, this message translates to:
+  /// **'{store} rollout changed'**
+  String timelineRollout(String store);
+
+  /// Timeline entry: a Shorebird patch.
+  ///
+  /// In en, this message translates to:
+  /// **'Patch {number} published'**
+  String timelinePatch(int number);
+
+  /// Timeline entry.
+  ///
+  /// In en, this message translates to:
+  /// **'Promotion of patch {number} requested'**
+  String timelinePatchPromoteRequested(int number);
+
+  /// Timeline entry.
+  ///
+  /// In en, this message translates to:
+  /// **'Rollback of patch {number} requested'**
+  String timelinePatchRollbackRequested(int number);
+
+  /// Timeline entry.
+  ///
+  /// In en, this message translates to:
+  /// **'Patch {number} promoted to stable'**
+  String timelinePatchPromoted(int number);
+
+  /// Timeline entry.
+  ///
+  /// In en, this message translates to:
+  /// **'Patch {number} rolled back'**
+  String timelinePatchRolledBack(int number);
+
+  /// Timeline entry: the What's new or What to test text of the release changed.
+  ///
+  /// In en, this message translates to:
+  /// **'Store texts changed'**
+  String get timelineTexts;
+
+  /// Label of the panel of the texts the uploads send.
+  ///
+  /// In en, this message translates to:
+  /// **'Store texts'**
+  String get textsTitle;
+
+  /// Field: Google Play's release notes.
+  ///
+  /// In en, this message translates to:
+  /// **'What\'s new'**
+  String get textsWhatsNew;
+
+  /// Field: what Firebase testers should try.
+  ///
+  /// In en, this message translates to:
+  /// **'What to test'**
+  String get textsWhatToTest;
+
+  /// Under the store texts.
+  ///
+  /// In en, this message translates to:
+  /// **'Uploads send them when they run: What\'s new to Google Play, What to test to Firebase testers. Notes a workflow gives win.'**
+  String get textsCaption;
+
+  /// Saves the store texts.
+  ///
+  /// In en, this message translates to:
+  /// **'Save texts'**
+  String get textsSave;
+
+  /// Toast: the texts of the release were saved.
+  ///
+  /// In en, this message translates to:
+  /// **'Store texts saved'**
+  String get releaseTextsToast;
+
+  /// Label of the panel of the patches of the release.
+  ///
+  /// In en, this message translates to:
+  /// **'Shorebird patches'**
+  String get patchesTitle;
+
+  /// No description provided for @patchLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Patch {number}'**
+  String patchLabel(int number);
+
+  /// State of a patch.
+  ///
+  /// In en, this message translates to:
+  /// **'Published'**
+  String get patchPublished;
+
+  /// State of a patch: promoted to the stable track.
+  ///
+  /// In en, this message translates to:
+  /// **'On stable'**
+  String get patchPromoted;
+
+  /// State of a patch.
+  ///
+  /// In en, this message translates to:
+  /// **'Rolled back'**
+  String get patchRolledBack;
+
+  /// Promotes a patch to the stable track.
+  ///
+  /// In en, this message translates to:
+  /// **'Promote'**
+  String get patchPromote;
+
+  /// Rolls a patch back.
+  ///
+  /// In en, this message translates to:
+  /// **'Roll back'**
+  String get patchRollback;
+
+  /// Under the patches.
+  ///
+  /// In en, this message translates to:
+  /// **'Each change waits for your approval.'**
+  String get patchesCaption;
+
+  /// Toast: a patch promotion or rollback was asked for and waits for an approval.
+  ///
+  /// In en, this message translates to:
+  /// **'Patch change requested: approve it to apply'**
+  String get releasePatchToast;
 
   /// Where a store status came from.
   ///

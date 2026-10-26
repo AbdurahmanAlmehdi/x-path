@@ -50,11 +50,12 @@ void main() {
         'github.createPr',
         'github.mergePr',
         'store.rollout',
+        'shorebird.track',
         'record.manifest',
         'gate',
         'command',
       ];
-      expect({for (final kind in kinds) l10n.stepKind(kind)}, hasLength(24));
+      expect({for (final kind in kinds) l10n.stepKind(kind)}, hasLength(25));
       expect(l10n.stepKind('custom.step'), 'custom.step');
       for (final action in [
         'prod_release',

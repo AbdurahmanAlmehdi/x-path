@@ -76,6 +76,8 @@ void main() {
         mergeCommit: 'b' * 40,
         mergeRunId: 'run_2',
         message: 'm',
+        whatsNew: 'Faster checkout.',
+        whatToTest: 'Pay with a saved card.',
         updatedAt: created.add(const Duration(hours: 1)),
       );
       await repository.create(record('rel_1'));
@@ -83,6 +85,35 @@ void main() {
       await repository.update(full);
 
       expect(await repository.get('rel_1'), full);
+      await repository.create(
+        record('rel_2').copyWith(whatsNew: 'From the start.'),
+      );
+      expect((await repository.get('rel_2'))!.whatsNew, 'From the start.');
+    });
+
+    test('keeps the history of each release, oldest first', () async {
+      await repository.create(record('rel_1'));
+      await repository.create(record('rel_2'));
+      final later = ReleaseEvent(
+        kind: ReleaseEventKind.patchPromoted,
+        at: created.add(const Duration(hours: 2)),
+        store: ReleaseStore.play,
+        detail: 'stable',
+        by: 'MacBook',
+        runId: 'run_9',
+        patchNumber: 2,
+      );
+      final first = ReleaseEvent(kind: ReleaseEventKind.created, at: created);
+
+      await repository.addEvent('rel_1', later);
+      await repository.addEvent('rel_1', first);
+      await repository.addEvent(
+        'rel_2',
+        ReleaseEvent(kind: ReleaseEventKind.merged, at: created),
+      );
+
+      expect(await repository.events('rel_1'), [first, later]);
+      expect(await repository.events('rel_3'), isEmpty);
     });
 
     test('replaces the stores and the builds', () async {

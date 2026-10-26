@@ -29,6 +29,7 @@ abstract final class RemoteStepPolicy {
   /// `github.*` step.
   static const engineOnlyKinds = {
     'store.rollout',
+    'shorebird.track',
     'git.push',
     'git.tag',
     'git.releaseBranch',

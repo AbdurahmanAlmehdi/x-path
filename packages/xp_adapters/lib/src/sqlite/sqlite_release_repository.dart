@@ -23,7 +23,8 @@ class SqliteReleaseRepository implements ReleaseRepository {
       'SELECT r.id, a.project_id, a.path AS app_path, r.flavor, r.version, '
       'r.build, r.state, r.store_status, r.builds, r.base_branch, r.branch, '
       'r.tag, r.head_sha, r.pr_number, r.pr_url, r.merge_sha, '
-      'r.merge_run_id, r.message, r.created_at, r.updated_at '
+      'r.merge_run_id, r.message, r.whats_new, r.what_to_test, r.created_at, '
+      'r.updated_at '
       'FROM release r JOIN app a ON a.id = r.app_id';
 
   @override
@@ -57,9 +58,10 @@ class SqliteReleaseRepository implements ReleaseRepository {
     _db.execute(
       'INSERT INTO release (id, app_id, version, build, state, tag, pr_url, '
       'store_status, flavor, base_branch, branch, head_sha, pr_number, '
-      'merge_sha, merge_run_id, message, builds, created_at, updated_at) '
+      'merge_sha, merge_run_id, message, builds, whats_new, what_to_test, '
+      'created_at, updated_at) '
       'VALUES (?, (SELECT id FROM app WHERE project_id = ? AND path = ?), '
-      '?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      '?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
       [
         release.id,
         release.projectId,
@@ -79,6 +81,8 @@ class SqliteReleaseRepository implements ReleaseRepository {
         release.mergeRunId,
         release.message,
         jsonEncode([for (final build in release.builds) build.toJson()]),
+        release.whatsNew,
+        release.whatToTest,
         toDatabaseTime(release.createdAt),
         toDatabaseTime(release.updatedAt),
       ],
@@ -91,7 +95,7 @@ class SqliteReleaseRepository implements ReleaseRepository {
       'UPDATE release SET build = ?, state = ?, tag = ?, pr_url = ?, '
       'store_status = ?, branch = ?, head_sha = ?, pr_number = ?, '
       'merge_sha = ?, merge_run_id = ?, message = ?, builds = ?, '
-      'updated_at = ? WHERE id = ?',
+      'whats_new = ?, what_to_test = ?, updated_at = ? WHERE id = ?',
       [
         release.build,
         release.state.wire,
@@ -105,11 +109,54 @@ class SqliteReleaseRepository implements ReleaseRepository {
         release.mergeRunId,
         release.message,
         jsonEncode([for (final build in release.builds) build.toJson()]),
+        release.whatsNew,
+        release.whatToTest,
         toDatabaseTime(release.updatedAt),
         release.id,
       ],
     );
   }
+
+  @override
+  Future<void> addEvent(String releaseId, ReleaseEvent event) async {
+    _db.execute(
+      'INSERT INTO release_event (release_id, kind, at, store, detail, '
+      'by_name, run_id, patch_number) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      [
+        releaseId,
+        event.kind.wire,
+        toDatabaseTime(event.at),
+        event.store?.wire,
+        event.detail,
+        event.by,
+        event.runId,
+        event.patchNumber,
+      ],
+    );
+  }
+
+  @override
+  Future<List<ReleaseEvent>> events(String releaseId) async => [
+    for (final row in _db.select(
+      'SELECT kind, at, store, detail, by_name, run_id, patch_number '
+      'FROM release_event WHERE release_id = ? ORDER BY at, id',
+      [releaseId],
+    ))
+      ReleaseEvent(
+        kind: ReleaseEventKind.values.firstWhere((k) => k.wire == row['kind']),
+        at: fromDatabaseTime(row['at'] as int),
+        store: switch (row['store']) {
+          final String wire => ReleaseStore.values.firstWhere(
+            (store) => store.wire == wire,
+          ),
+          _ => null,
+        },
+        detail: row['detail'] as String?,
+        by: row['by_name'] as String?,
+        runId: row['run_id'] as String?,
+        patchNumber: row['patch_number'] as int?,
+      ),
+  ];
 
   static ReleaseRecord _fromRow(Row row) => ReleaseRecord(
     id: row['id'] as String,
@@ -135,6 +182,8 @@ class SqliteReleaseRepository implements ReleaseRepository {
     mergeCommit: row['merge_sha'] as String?,
     mergeRunId: row['merge_run_id'] as String?,
     message: row['message'] as String?,
+    whatsNew: row['whats_new'] as String?,
+    whatToTest: row['what_to_test'] as String?,
     createdAt: fromDatabaseTime(row['created_at'] as int),
     updatedAt: fromDatabaseTime(row['updated_at'] as int),
   );

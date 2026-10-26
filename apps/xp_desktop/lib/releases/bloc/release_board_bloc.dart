@@ -72,6 +72,34 @@ final class ReleaseBoardNewBuildRequested extends ReleaseBoardEvent {
   const new();
 }
 
+/// Saves the texts the uploads of the shown release send (U7b).
+final class ReleaseBoardTextsSaved extends ReleaseBoardEvent {
+  const new(this.texts);
+
+  final ReleaseTexts texts;
+
+  @override
+  List<Object?> get props => [texts];
+}
+
+/// Asks to promote or roll back the Shorebird patch [number] of the shown
+/// release (U7b); the change waits for the owner's approval.
+final class ReleaseBoardPatchMoved extends ReleaseBoardEvent {
+  const new(this.number, this.action);
+
+  final int number;
+  final PatchAction action;
+
+  @override
+  List<Object?> get props => [number, action];
+}
+
+final class _ReleaseBoardHistoryRequested extends ReleaseBoardEvent {
+  const new(this.releaseId);
+
+  final String releaseId;
+}
+
 final class _ReleaseBoardNotesRequested extends ReleaseBoardEvent {
   const new(this.releaseId);
 
@@ -79,7 +107,16 @@ final class _ReleaseBoardNotesRequested extends ReleaseBoardEvent {
 }
 
 /// What the board is sending to the engine.
-enum ReleaseCommand { none, refreshing, marking, merging, rollingOut, building }
+enum ReleaseCommand {
+  none,
+  refreshing,
+  marking,
+  merging,
+  rollingOut,
+  savingTexts,
+  movingPatch,
+  building,
+}
 
 class ReleaseBoardState extends Equatable {
   const new({
@@ -91,6 +128,7 @@ class ReleaseBoardState extends Equatable {
     this.credentials = const [],
     this.notes,
     this.notesError,
+    this.history = const [],
     this.command = ReleaseCommand.none,
     this.error,
     this.builtRun,
@@ -120,6 +158,10 @@ class ReleaseBoardState extends Equatable {
 
   /// Why the notes could not be read.
   final String? notesError;
+
+  /// What happened to the shown release, oldest first (U7b); empty for a
+  /// release from before the engine kept it.
+  final List<ReleaseEvent> history;
 
   final ReleaseCommand command;
 
@@ -166,6 +208,7 @@ class ReleaseBoardState extends Equatable {
     List<Credential>? credentials,
     ReleaseNotes? Function()? notes,
     String? Function()? notesError,
+    List<ReleaseEvent>? history,
     ReleaseCommand? command,
     String? Function()? error,
     Run? Function()? builtRun,
@@ -178,6 +221,7 @@ class ReleaseBoardState extends Equatable {
     credentials: credentials ?? this.credentials,
     notes: notes == null ? this.notes : notes(),
     notesError: notesError == null ? this.notesError : notesError(),
+    history: history ?? this.history,
     command: command ?? this.command,
     error: error == null ? this.error : error(),
     builtRun: builtRun == null ? this.builtRun : builtRun(),
@@ -193,6 +237,7 @@ class ReleaseBoardState extends Equatable {
     credentials,
     notes,
     notesError,
+    history,
     command,
     error,
     builtRun,
@@ -217,6 +262,9 @@ class ReleaseBoardBloc extends Bloc<ReleaseBoardEvent, ReleaseBoardState> {
           _show(emit, state.copyWith(selectedId: () => event.releaseId)),
     );
     on<_ReleaseBoardNotesRequested>(_onNotes, transformer: restartable());
+    on<_ReleaseBoardHistoryRequested>(_onHistory, transformer: restartable());
+    on<ReleaseBoardTextsSaved>(_onTexts, transformer: droppable());
+    on<ReleaseBoardPatchMoved>(_onPatch, transformer: droppable());
     on<ReleaseBoardRefreshRequested>(_onRefresh, transformer: droppable());
     on<ReleaseBoardStoreMarked>(_onMark, transformer: droppable());
     on<ReleaseBoardMergeRequested>(_onMerge, transformer: droppable());
@@ -231,10 +279,21 @@ class ReleaseBoardBloc extends Bloc<ReleaseBoardEvent, ReleaseBoardState> {
   /// The release and commit the notes were read for.
   (String, String)? _notesOf;
 
-  /// Emits [next], and reads the notes of its release when that release or
-  /// its commit changed. A release without a commit has no notes yet.
-  void _show(Emitter<ReleaseBoardState> emit, ReleaseBoardState next) {
+  /// The release and its last change the history was read for.
+  (String, DateTime)? _historyOf;
+
+  /// Emits [shown], and reads the history of its release when that release
+  /// changed and its notes when that release or its commit changed. A
+  /// release without a commit has no notes yet.
+  void _show(Emitter<ReleaseBoardState> emit, ReleaseBoardState shown) {
+    var next = shown;
     final release = next.release;
+    final changed = release == null ? null : (release.id, release.updatedAt);
+    if (changed != _historyOf) {
+      if (changed?.$1 != _historyOf?.$1) next = next.copyWith(history: []);
+      _historyOf = changed;
+      if (changed != null) add(_ReleaseBoardHistoryRequested(changed.$1));
+    }
     final sha = release?.headSha;
     final key = release == null || sha == null ? null : (release.id, sha);
     if (key == _notesOf) {
@@ -270,7 +329,14 @@ class ReleaseBoardBloc extends Bloc<ReleaseBoardEvent, ReleaseBoardState> {
     );
     final approvals = emit.forEach<Snapshot<List<Approval>>>(
       _approvals.watchApprovals(projectId: event.projectId),
-      onData: (snapshot) => state.copyWith(approvals: snapshot.value),
+      onData: (snapshot) {
+        // A decided approval lets a run change the release in a store or in
+        // Shorebird, which its history then tells.
+        if (state.release case final release?) {
+          add(_ReleaseBoardHistoryRequested(release.id));
+        }
+        return state.copyWith(approvals: snapshot.value);
+      },
       onError: (_, _) => state,
     );
     final credentials = emit.forEach<Snapshot<List<Credential>>>(
@@ -294,6 +360,20 @@ class ReleaseBoardBloc extends Bloc<ReleaseBoardEvent, ReleaseBoardState> {
       if (state.release?.id == event.releaseId) {
         emit(state.copyWith(notesError: () => errorMessage(error)));
       }
+    }
+  }
+
+  Future<void> _onHistory(
+    _ReleaseBoardHistoryRequested event,
+    Emitter<ReleaseBoardState> emit,
+  ) async {
+    try {
+      final history = await _releases.history(event.releaseId);
+      if (state.release?.id == event.releaseId) {
+        emit(state.copyWith(history: history.events));
+      }
+    } on Exception {
+      // The timeline keeps what it showed; the next change reads again.
     }
   }
 
@@ -361,6 +441,29 @@ class ReleaseBoardBloc extends Bloc<ReleaseBoardEvent, ReleaseBoardState> {
     ReleaseCommand.rollingOut,
     (release) => _releases.rollout(release.id, event.request),
   );
+
+  Future<void> _onTexts(
+    ReleaseBoardTextsSaved event,
+    Emitter<ReleaseBoardState> emit,
+  ) => _command(
+    emit,
+    ReleaseCommand.savingTexts,
+    (release) => _releases.setTexts(release.id, event.texts),
+  );
+
+  Future<void> _onPatch(
+    ReleaseBoardPatchMoved event,
+    Emitter<ReleaseBoardState> emit,
+  ) async {
+    await _command(
+      emit,
+      ReleaseCommand.movingPatch,
+      (release) => _releases.movePatch(release.id, event.number, event.action),
+    );
+    if (state.release case final release?) {
+      add(_ReleaseBoardHistoryRequested(release.id));
+    }
+  }
 
   Future<void> _onNewBuild(
     ReleaseBoardNewBuildRequested event,

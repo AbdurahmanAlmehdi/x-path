@@ -45,6 +45,7 @@ StepRegistry allSteps({
       playCredentials: FakePlayCredentialSource(),
       googlePlay: connect,
     ),
+    ShorebirdTrackStep(FakeShorebirdPatches()),
     VersionBumpStep(git: service, workspaces: workspace),
     BuildAndroidStep(
       toolchain: harness.toolchain,

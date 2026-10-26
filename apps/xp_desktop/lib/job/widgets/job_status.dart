@@ -126,6 +126,7 @@ extension JobLabels on AppLocalizations {
     'github.createPr' => stepCreatePr,
     'github.mergePr' => stepMergePr,
     'store.rollout' => stepRollout,
+    'shorebird.track' => stepShorebirdTrack,
     'record.manifest' => stepManifest,
     'gate' => stepGate,
     'command' => stepCommand,

@@ -141,6 +141,8 @@ void main() {
         mergeCommit: 'b' * 40,
         mergeRunId: 'run_2',
         message: 'm',
+        whatsNew: 'Faster checkout.',
+        whatToTest: 'Pay with a saved card.',
         createdAt: at,
         updatedAt: at,
       );

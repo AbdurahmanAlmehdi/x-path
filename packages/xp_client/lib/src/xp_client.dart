@@ -743,6 +743,34 @@ class XpClient {
         ),
       );
 
+  /// `GET /releases/{id}/history`: what happened to the release, oldest
+  /// first.
+  Future<ReleaseHistory> getReleaseHistory(String id) async =>
+      ReleaseHistory.fromJson(
+        await _json(await _send('GET', ['releases', id, 'history'])),
+      );
+
+  /// `PUT /releases/{id}/texts`: the texts the uploads of the release send.
+  Future<Release> setReleaseTexts(String id, ReleaseTexts texts) async =>
+      Release.fromJson(
+        await _json(
+          await _send('PUT', ['releases', id, 'texts'], body: texts.toJson()),
+        ),
+      );
+
+  /// `POST /releases/{id}/patches/{number}/{action}`: asks to promote or roll
+  /// back a Shorebird patch of the release. Returns the run that does it,
+  /// which waits for the owner.
+  Future<Run> moveReleasePatch(
+    String id,
+    int number,
+    PatchAction action,
+  ) async => Run.fromJson(
+    await _json(
+      await _send('POST', ['releases', id, 'patches', '$number', action.wire]),
+    ),
+  );
+
   /// `POST /releases/{id}/abandon`.
   Future<Release> abandonRelease(String id, {String? reason}) async =>
       Release.fromJson(

@@ -1181,7 +1181,7 @@ stages:                        # required; run in order
 
 ### Built-in workflows and versions
 
-Every project gets `dev-build`, `prod-release`, `release-merge`, `release-rollout`, `shorebird-patch`, `smoke-build` and `test` the first time its workflows
+Every project gets `dev-build`, `prod-release`, `release-merge`, `release-rollout`, `shorebird-patch`, `shorebird-track`, `smoke-build` and `test` the first time its workflows
 are listed (and a new version of one when the engine ships another document). They compose the steps in the
 order of `ship.sh`. **The job that builds has no step only the engine may run** (ADR 0010), so that it can be
 leased to a runner: the guards, the gates, the uploads, the tag and the pushes are in engine jobs of an earlier
@@ -1194,6 +1194,7 @@ or later stage, and the uploads take what the runner built from the engine's art
 | `release-merge` | `merge` | Merges the pull request of a release: `gate: merge`, then `github.mergePr`. Started by `POST /releases/{id}/merge`, no project lock. |
 | `release-rollout` | `rollout` | Changes the rollout of a release in a store: `gate: rollout`, then `store.rollout` (engine only). Inputs `store`, `action` and `userFraction`. Started by `POST /releases/{id}/rollout`, no project lock. |
 | `shorebird-patch` | `check`, `patch` (platform x flavor), `finalize` | `lock: project`. Dispatch it with `releaseVersion` (`x.y.z+build`, never `latest`). `check` (engine): the guards, and `gate: prod_patch` in front of the last of them (so that the owner is asked only about a patch that passed the others). `patch` (runner-eligible): `git.checkout`, `shorebird.patch`. `finalize` (engine): the patch tag `v<x.y.z>+<build>-p<n>` and `gate: push`. |
+| `shorebird-track` | `track` (each Shorebird flavor) | Promotes a Shorebird patch of a release to the stable track or rolls it back: `gate: prod_patch`, then `shorebird.track` (engine only, `shorebird patches promote` or `rollback`). Inputs `patchNumber` and `action`. Started by `POST /releases/{id}/patches/{number}/{promote\|rollback}`, no project lock. |
 | `smoke-build` | `build` (each flavor) | `git.checkout`, then `build.android` with `keystore: false`: an APK signed with the debug key, from the pubspec version. No credential, no store id, no upload, no build number. The app offers it after the first scan, for a green build before signing is set up. |
 | `test` | `test` | `test` and `analyze`; allocates no build number. |
 
@@ -1678,6 +1679,9 @@ draft -> building -> uploaded -> in_review -> approved -> live -> merged
 | `POST /releases/{id}/builds` | New build, same version. `202` with the run; `409` unless the release is `rejected`. |
 | `POST /releases/{id}/merge` | Request the merge. `202` with the run, which waits for approval; `409` unless the release is `live` with a pull request. |
 | `POST /releases/{id}/rollout` | `{"store", "action", "userFraction"}`: pause, resume or complete Apple's phased release; set the `fraction`, `halt` or `complete` Google Play's staged rollout. `202` with the run of `release-rollout`, which waits at `gate: rollout`; `400` for a change the store cannot make, `409` before the stores approved the release. |
+| `GET /releases/{id}/history` | What happened to the release, oldest first: its dispatch and builds, each change in a store (with the device that set a status by hand), the merge, the rollout changes and the Shorebird patches with their promotions and rollbacks. A `shorebird-patch` run of a released version is linked to its release. |
+| `PUT /releases/{id}/texts` | `{"whatsNew", "whatToTest"}`. `app` and `cli` tokens. An upload reads them when it runs: `whatsNew` goes to Google Play (`en-US`), `whatToTest` (else `whatsNew`) to Firebase testers, unless the step has release notes of its own. |
+| `POST /releases/{id}/patches/{number}/{promote\|rollback}` | Moves a Shorebird patch XPath published. `202` with the run of `shorebird-track`, which waits at `gate: prod_patch`; `400` for a patch the release has none of. |
 | `POST /releases/{id}/abandon` | `{"reason"}` optional. `app` and `cli` tokens; cancels a run that still builds it. |
 
 `release.created`, `release.state_changed` and `release.store_changed` go on `/events`.

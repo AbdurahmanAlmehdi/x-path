@@ -1,6 +1,6 @@
 ---
 name: xpath-workflows
-description: Write, change and validate XPath workflow YAML (schema 1), the documents XPath dispatches to build, test, upload and release Flutter apps. Use when creating a workflow, copying and changing a built-in one (dev-build, prod-release, release-merge, release-rollout, shorebird-patch, smoke-build, test), adding inputs with defaults (such as firebaseAppIds or appleAppIds), stages, jobs, matrix, if expressions, gates or capabilities, choosing step kinds and their `with` keys, or fixing a workflow_invalid error.
+description: Write, change and validate XPath workflow YAML (schema 1), the documents XPath dispatches to build, test, upload and release Flutter apps. Use when creating a workflow, copying and changing a built-in one (dev-build, prod-release, release-merge, release-rollout, shorebird-patch, shorebird-track, smoke-build, test), adding inputs with defaults (such as firebaseAppIds or appleAppIds), stages, jobs, matrix, if expressions, gates or capabilities, choosing step kinds and their `with` keys, or fixing a workflow_invalid error.
 license: Apache-2.0
 ---
 
@@ -144,7 +144,7 @@ platform's for Shorebird steps; `flutter` for `test` and `analyze`.
 ## Built-ins: copy, never edit
 
 Every project has `dev-build`, `prod-release`, `release-merge`, `release-rollout`,
-`shorebird-patch`, `smoke-build` and `test`.
+`shorebird-patch`, `shorebird-track`, `smoke-build` and `test`.
 They cannot be edited or deleted (`409`). Their stages and steps are in
 [references/built-in-workflows.md](references/built-in-workflows.md). To change one, copy its YAML
 into a workflow of your own:

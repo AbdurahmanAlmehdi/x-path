@@ -22,12 +22,15 @@ class ReleasesHarness {
     List<Release>? releases,
     List<Credential> credentials = const [verifiedKey, playAccount],
     List<Approval>? approvals,
+    List<ReleaseEvent> history = const [],
   }) {
     when(() => releasesRepository.watchReleases(projectId: 'prj_1')).thenAnswer(
       (_) => Stream.value(Snapshot(releases ?? [reviewRelease(), liveRelease])),
     );
     when(() => releasesRepository.notes(any()))
         .thenAnswer((_) async => reviewNotes);
+    when(() => releasesRepository.history(any()))
+        .thenAnswer((_) async => ReleaseHistory(history));
     when(() => projects.watchCredentials('prj_1'))
         .thenAnswer((_) => Stream.value(Snapshot(credentials)));
     when(

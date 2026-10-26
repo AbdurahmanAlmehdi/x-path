@@ -227,6 +227,8 @@ class Release extends Equatable {
     this.mergeCommit,
     this.mergeRunId,
     this.message,
+    this.whatsNew,
+    this.whatToTest,
   });
 
   /// Reads a release from its JSON form.
@@ -291,6 +293,13 @@ class Release extends Equatable {
   /// Why the release was abandoned, or what the owner should know.
   final String? message;
 
+  /// What is new, for Google Play's release notes (U7b).
+  final String? whatsNew;
+
+  /// What testers should try, for the release notes of Firebase App
+  /// Distribution (U7b).
+  final String? whatToTest;
+
   /// When the release was dispatched, in UTC.
   final DateTime createdAt;
 
@@ -321,6 +330,8 @@ class Release extends Equatable {
     mergeCommit,
     mergeRunId,
     message,
+    whatsNew,
+    whatToTest,
     createdAt,
     updatedAt,
   ];

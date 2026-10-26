@@ -21,11 +21,18 @@ abstract interface class ReleaseRepository {
 
   /// Replaces the stored release that has the id of [release].
   Future<void> update(ReleaseRecord release);
+
+  /// Adds [event] to the history of the release [releaseId] (U7b).
+  Future<void> addEvent(String releaseId, ReleaseEvent event);
+
+  /// The history of the release [releaseId], oldest first.
+  Future<List<ReleaseEvent>> events(String releaseId);
 }
 
 /// A [ReleaseRepository] that forgets everything on exit.
 class InMemoryReleaseRepository implements ReleaseRepository {
   final _records = <String, ReleaseRecord>{};
+  final _events = <String, List<ReleaseEvent>>{};
 
   @override
   Future<ReleaseRecord?> get(String id) async => _records[id];
@@ -58,4 +65,12 @@ class InMemoryReleaseRepository implements ReleaseRepository {
     }
     _records[release.id] = release;
   }
+
+  @override
+  Future<void> addEvent(String releaseId, ReleaseEvent event) async =>
+      _events.putIfAbsent(releaseId, () => []).add(event);
+
+  @override
+  Future<List<ReleaseEvent>> events(String releaseId) async =>
+      [...?_events[releaseId]]..sort((a, b) => a.at.compareTo(b.at));
 }

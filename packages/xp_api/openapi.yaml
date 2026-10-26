@@ -2022,6 +2022,105 @@ paths:
           $ref: "#/components/responses/SecretsLocked"
         "500":
           $ref: "#/components/responses/InternalError"
+  /releases/{id}/history:
+    parameters:
+      - $ref: "#/components/parameters/ReleaseId"
+    get:
+      operationId: getReleaseHistory
+      summary: What happened to the release, oldest first.
+      description: |
+        Its dispatch and builds, each change in a store (with the device
+        that set a status by hand), the merge, the rollout changes and the
+        Shorebird patches, each with when it happened (U7b). The approvals
+        of its runs are read from `/approvals`.
+      responses:
+        "200":
+          description: The history.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReleaseHistory"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /releases/{id}/texts:
+    parameters:
+      - $ref: "#/components/parameters/ReleaseId"
+    put:
+      operationId: setReleaseTexts
+      summary: Set the texts the uploads of the release send. Only `app` and `cli` tokens may.
+      description: |
+        `whatsNew` goes to Google Play as the release notes in `en-US`;
+        `whatToTest` (else `whatsNew`) to Firebase App Distribution's
+        testers, when the upload step gives no release notes of its own. An
+        upload reads them when it runs. A missing or blank text is cleared.
+        `409 conflict` for an abandoned release.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReleaseTexts"
+      responses:
+        "200":
+          description: The release with its texts.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Release"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /releases/{id}/patches/{number}/{action}:
+    parameters:
+      - $ref: "#/components/parameters/ReleaseId"
+      - $ref: "#/components/parameters/PatchNumber"
+      - $ref: "#/components/parameters/PatchActionName"
+    post:
+      operationId: moveReleasePatch
+      summary: Request the promotion or the rollback of a Shorebird patch.
+      description: |
+        Open once the stores approved the release, for a patch XPath
+        published (its history has it). It dispatches the `shorebird-track`
+        workflow, whose `shorebird.track` step waits at `gate: prod_patch`
+        for an `app` or `cli` token to approve it (D-13). `400
+        invalid_request` for a patch number that is not one, an action other
+        than `promote` and `rollback`, or a patch the release has none of.
+      responses:
+        "202":
+          description: The run that moves the patch.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Run"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/WorkflowInvalid"
+        "503":
+          $ref: "#/components/responses/SecretsLocked"
+        "500":
+          $ref: "#/components/responses/InternalError"
   /releases/{id}/abandon:
     parameters:
       - $ref: "#/components/parameters/ReleaseId"
@@ -2777,6 +2876,19 @@ components:
       description: The release id, for example `rel_1a2b3c4d5e6f7a8b`.
       schema:
         type: string
+    PatchNumber:
+      name: number
+      in: path
+      required: true
+      description: The Shorebird patch of the release, from 1.
+      schema:
+        type: string
+    PatchActionName:
+      name: action
+      in: path
+      required: true
+      schema:
+        $ref: "#/components/schemas/PatchAction"
     ReleaseStoreName:
       name: store
       in: path
@@ -5162,6 +5274,14 @@ components:
           type: string
         message:
           type: string
+        whatsNew:
+          type: string
+          description: What is new, for Google Play's release notes (U7b).
+        whatToTest:
+          type: string
+          description: >-
+            What testers should try, for Firebase App Distribution's release
+            notes (U7b).
         createdAt:
           type: string
           format: date-time
@@ -5186,6 +5306,65 @@ components:
           type: string
           enum: [approved, live]
           description: '`approved` or `live` for Apple, `live` for Google Play.'
+    ReleaseEventKind:
+      type: string
+      enum:
+        - created
+        - build
+        - store
+        - merge_requested
+        - merged
+        - abandoned
+        - rollout_requested
+        - rollout
+        - patch
+        - patch_requested
+        - patch_promoted
+        - patch_rolled_back
+        - texts
+    ReleaseEvent:
+      type: object
+      required: [kind, at]
+      additionalProperties: false
+      properties:
+        kind:
+          $ref: "#/components/schemas/ReleaseEventKind"
+        at:
+          type: string
+          format: date-time
+        store:
+          $ref: "#/components/schemas/ReleaseStore"
+        detail:
+          type: string
+          description: A store state, a rollout change, a build number.
+        by:
+          type: string
+          description: The device that did it; absent for the engine.
+        runId:
+          type: string
+        patchNumber:
+          type: integer
+          minimum: 1
+    ReleaseHistory:
+      type: object
+      required: [events]
+      additionalProperties: false
+      properties:
+        events:
+          type: array
+          items:
+            $ref: "#/components/schemas/ReleaseEvent"
+    ReleaseTexts:
+      type: object
+      additionalProperties: false
+      properties:
+        whatsNew:
+          type: string
+        whatToTest:
+          type: string
+    PatchAction:
+      type: string
+      enum: [promote, rollback]
     RolloutAction:
       type: string
       description: |

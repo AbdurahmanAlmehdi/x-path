@@ -177,6 +177,40 @@ void main() {
       );
     });
 
+    test('sends the texts of the release without notes of its own', () async {
+      final texts = FakeReleaseTextsSource(
+        const ReleaseTexts(whatsNew: 'New', whatToTest: 'Try checkout.'),
+      );
+      UploadFirebaseStep withTexts() => UploadFirebaseStep(
+        repository: repository,
+        store: store,
+        secrets: secrets,
+        sleep: (duration) async => slept.add(duration),
+        connect: (_) => firebase,
+        texts: texts,
+      );
+
+      await withTexts().run(_input(), NoProcessContext());
+      texts.texts = const ReleaseTexts(whatsNew: 'New');
+      firebase.uploadOperations.add(done(release: _release()));
+      await withTexts().run(_input(), NoProcessContext());
+      firebase.releasesOf[_app] = [_release(notes: 'New')];
+
+      expect(firebase.notes, [
+        '$_app/releases/rel-9 Try checkout.',
+        '$_app/releases/rel-9 New',
+      ]);
+      expect(
+        await withTexts().alreadyDone(_input(), NoProcessContext()),
+        isNotNull,
+      );
+      texts.texts = const ReleaseTexts(whatToTest: 'Other');
+      expect(
+        await withTexts().alreadyDone(_input(), NoProcessContext()),
+        isNull,
+      );
+    });
+
     test('skips empty notes and distributes to nobody', () async {
       await run(_input(overrides: {'releaseNotes': ''}));
 

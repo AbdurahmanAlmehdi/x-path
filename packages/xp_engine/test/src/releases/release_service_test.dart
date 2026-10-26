@@ -53,6 +53,14 @@ class _StaleRepository implements ReleaseRepository {
 
   @override
   Future<void> update(ReleaseRecord release) => inner.update(release);
+
+  @override
+  Future<void> addEvent(String releaseId, ReleaseEvent event) =>
+      inner.addEvent(releaseId, event);
+
+  @override
+  Future<List<ReleaseEvent>> events(String releaseId) =>
+      inner.events(releaseId);
 }
 
 void main() {

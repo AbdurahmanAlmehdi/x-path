@@ -3,6 +3,7 @@ import 'dart:math';
 
 import 'package:xp_api/xp_api.dart';
 import 'package:xp_engine/src/clock/clock.dart';
+import 'package:xp_engine/src/jobs/job_record.dart';
 import 'package:xp_engine/src/jobs/job_repository.dart';
 import 'package:xp_engine/src/releases/release_exceptions.dart';
 import 'package:xp_engine/src/releases/release_opener.dart';
@@ -18,6 +19,7 @@ import 'package:xp_engine/src/steps/step.dart';
 import 'package:xp_engine/src/steps/upload/upload_app_store_input.dart';
 import 'package:xp_engine/src/steps/upload/upload_play_input.dart';
 import 'package:xp_engine/src/tokens/device_token.dart';
+import 'package:xp_engine/src/versioning/app_version.dart';
 import 'package:xp_engine/src/workflows/workflow_service.dart';
 
 /// Dispatches the workflow [workflowId] of the project: the
@@ -36,6 +38,10 @@ const releaseMergeWorkflow = 'release-merge';
 
 /// The built-in workflow that changes the rollout of a release (U7a).
 const releaseRolloutWorkflow = 'release-rollout';
+
+/// The built-in workflow that promotes or rolls back a Shorebird patch of a
+/// release (U7b).
+const shorebirdTrackWorkflow = 'shorebird-track';
 
 /// The states of a release whose store rollouts can change: the stores
 /// approved it, or it is out.
@@ -150,6 +156,15 @@ class ReleaseService implements ReleaseOpener {
         updatedAt: now,
       );
       await _releases.create(release);
+      await _releases.addEvent(
+        release.id,
+        ReleaseEvent(
+          kind: ReleaseEventKind.created,
+          at: now,
+          detail: '${release.version}+${release.build}',
+          runId: opening.runId,
+        ),
+      );
       _events.append(
         ReleaseCreated(
           releaseId: release.id,
@@ -269,6 +284,15 @@ class ReleaseService implements ReleaseOpener {
           _move(next, ReleaseState.building),
           storeEvents: true,
         );
+        await _releases.addEvent(
+          release.id,
+          ReleaseEvent(
+            kind: ReleaseEventKind.build,
+            at: now,
+            detail: '$build',
+            runId: runId,
+          ),
+        );
       case ReleaseRunKind.merge:
         if (release.state != ReleaseState.live ||
             release.prNumber == null ||
@@ -281,6 +305,14 @@ class ReleaseService implements ReleaseOpener {
           );
         }
         await _save(release, release.copyWith(mergeRunId: runId));
+        await _releases.addEvent(
+          release.id,
+          ReleaseEvent(
+            kind: ReleaseEventKind.mergeRequested,
+            at: now,
+            runId: runId,
+          ),
+        );
       case ReleaseRunKind.rollout:
         if (!_rolledOut.contains(release.state)) {
           throw ReleaseStateException(
@@ -288,8 +320,45 @@ class ReleaseService implements ReleaseOpener {
             '${release.state.wire}.',
           );
         }
+        await _releases.addEvent(
+          release.id,
+          ReleaseEvent(
+            kind: ReleaseEventKind.rolloutRequested,
+            at: now,
+            runId: runId,
+          ),
+        );
+      case ReleaseRunKind.patch:
+        if (!_rolledOut.contains(release.state)) {
+          throw ReleaseStateException(
+            'A patch of ${release.id} cannot change: it is '
+            '${release.state.wire}. Patches apply once the stores approved '
+            'the release.',
+          );
+        }
     }
   });
+
+  @override
+  Future<String?> patchable({
+    required String projectId,
+    required String appPath,
+    required String flavor,
+    required AppVersion version,
+  }) async {
+    for (final release in await _releases.list(
+      projectId: projectId,
+      appPath: appPath,
+      states: _rolledOut,
+    )) {
+      if (release.flavor == flavor &&
+          release.version == '${version.name}' &&
+          release.build == version.build) {
+        return release.id;
+      }
+    }
+    return null;
+  }
 
   // -------------------------------------------------------------- reading
 
@@ -331,9 +400,76 @@ class ReleaseService implements ReleaseOpener {
   /// Brings up to date the release the job [jobId] belongs to, if it belongs
   /// to one. The `ReleaseWatcher` calls it when a job or step changes.
   Future<void> syncJob(String jobId) async {
-    final releaseId = (await _jobs.get(jobId))?.releaseId;
-    if (releaseId != null) await sync(releaseId);
+    final job = await _jobs.get(jobId);
+    final releaseId = job?.releaseId;
+    if (releaseId == null) return;
+    await sync(releaseId);
+    if (job!.state == JobState.succeeded) {
+      await _locked(releaseId, () => _recordOutcomes(releaseId, job));
+    }
   }
+
+  /// Adds to the history of the release [releaseId] what the steps of the
+  /// finished [job] did to it in the stores and in Shorebird, once each.
+  Future<void> _recordOutcomes(String releaseId, JobRecord job) async {
+    final known = await _releases.events(releaseId);
+    final at = job.finishedAt ?? _clock.now();
+    for (final step in await _jobs.steps(job.id)) {
+      if (step.state != StepState.succeeded) continue;
+      final event = _outcomeOf(step, job.runId, at);
+      if (event == null || known.any((old) => _sameOutcome(old, event))) {
+        continue;
+      }
+      await _releases.addEvent(releaseId, event);
+    }
+  }
+
+  /// What the succeeded [step] did to a release, if anything worth its
+  /// history.
+  static ReleaseEvent? _outcomeOf(StepRecord step, String? runId, DateTime at) {
+    switch (step.kind) {
+      case 'store.rollout':
+        final result = step.result ?? const <String, dynamic>{};
+        final fraction = result['userFraction'] as num?;
+        return ReleaseEvent(
+          kind: ReleaseEventKind.rollout,
+          at: at,
+          store: ReleaseStore.values
+              .where((store) => store.wire == result['store'])
+              .firstOrNull,
+          detail: [
+            ?result['state'] as String?,
+            if (fraction != null) '${(fraction * 100).round()} %',
+          ].join(' · '),
+          runId: runId,
+        );
+      case 'shorebird.patch':
+        return ReleaseEvent(
+          kind: ReleaseEventKind.patch,
+          at: at,
+          detail: step.input['platform'] as String?,
+          runId: runId,
+          patchNumber: step.input['patchNumber'] as int?,
+        );
+      case 'shorebird.track':
+        return ReleaseEvent(
+          kind: step.input['action'] == PatchAction.rollback.wire
+              ? ReleaseEventKind.patchRolledBack
+              : ReleaseEventKind.patchPromoted,
+          at: at,
+          runId: runId,
+          patchNumber: step.input['patchNumber'] as int?,
+        );
+    }
+    return null;
+  }
+
+  static bool _sameOutcome(ReleaseEvent a, ReleaseEvent b) =>
+      a.kind == b.kind &&
+      a.runId == b.runId &&
+      a.store == b.store &&
+      a.detail == b.detail &&
+      a.patchNumber == b.patchNumber;
 
   Future<ReleaseRecord> _sync(String id) async {
     final start = await _require(id);
@@ -621,7 +757,7 @@ class ReleaseService implements ReleaseOpener {
         },
       );
       release = _advance(release, events);
-      return await _persist(start, release, events);
+      return await _persist(start, release, events, by: by.name);
     })).toApi();
   }
 
@@ -747,6 +883,112 @@ class ReleaseService implements ReleaseOpener {
     );
   }
 
+  // ---------------------------------------------------------------- patches
+
+  /// Requests [action] on the Shorebird patch [patchNumber] of the release
+  /// [id] (U7b): runs the `shorebird-track` workflow, whose change waits for
+  /// the owner's approval at `gate: prod_patch` (D-13).
+  ///
+  /// Throws a [ReleaseNotFoundException], a [ReleaseStateException] unless
+  /// the stores approved the release, a [ReleaseRequestException] for a
+  /// patch the release has no record of, and what the dispatch throws.
+  Future<Run> requestPatch(
+    String id,
+    int patchNumber,
+    PatchAction action,
+  ) async {
+    final release = await sync(id);
+    if (!_rolledOut.contains(release.state)) {
+      throw ReleaseStateException(
+        'A patch of ${release.id} cannot move: it is ${release.state.wire}.',
+      );
+    }
+    final patched = (await _releases.events(release.id)).any(
+      (event) =>
+          event.kind == ReleaseEventKind.patch &&
+          event.patchNumber == patchNumber,
+    );
+    if (!patched) {
+      throw ReleaseRequestException(
+        'The release ${release.id} has no patch $patchNumber that XPath '
+        'published.',
+      );
+    }
+    final workflow = (await _workflows.list(release.projectId))
+        .firstWhere((workflow) => workflow.name == shorebirdTrackWorkflow);
+    final run = await _dispatch(
+      release.projectId,
+      workflow.id,
+      DispatchRequest(
+        ref: release.tag ?? release.branch,
+        app: release.appPath,
+        flavors: [release.flavor],
+        releaseVersion: '${release.version}+${release.build}',
+        release: release.id,
+        inputs: {'patchNumber': patchNumber, 'action': action.wire},
+      ),
+    );
+    await _releases.addEvent(
+      release.id,
+      ReleaseEvent(
+        kind: ReleaseEventKind.patchRequested,
+        at: _clock.now(),
+        detail: action.wire,
+        runId: run.id,
+        patchNumber: patchNumber,
+      ),
+    );
+    return run;
+  }
+
+  // ----------------------------------------------------------------- texts
+
+  /// Sets the texts the uploads of the release [id] send to the stores
+  /// (U7b), as the device [by]. A blank text is cleared.
+  ///
+  /// Throws a [ReleaseForbiddenException] unless [by] is an `app` or `cli`
+  /// token, a [ReleaseNotFoundException], and a [ReleaseStateException] for
+  /// an abandoned release.
+  Future<Release> setTexts(
+    String id,
+    ReleaseTexts texts, {
+    required DeviceToken by,
+  }) async {
+    _requireOwner(by, 'change the texts of a release');
+    String? clean(String? text) =>
+        text == null || text.trim().isEmpty ? null : text.trim();
+    return (await _locked(id, () async {
+      final start = await _require(id);
+      if (start.state == ReleaseState.abandoned) {
+        throw ReleaseStateException('The release ${start.id} is abandoned.');
+      }
+      final next = start.copyWith(
+        whatsNew: clean(texts.whatsNew),
+        whatToTest: clean(texts.whatToTest),
+      );
+      if (next == start) return start;
+      final saved = next.copyWith(updatedAt: _clock.now());
+      await _releases.update(saved);
+      await _releases.addEvent(
+        saved.id,
+        ReleaseEvent(
+          kind: ReleaseEventKind.texts,
+          at: saved.updatedAt,
+          by: by.name,
+        ),
+      );
+      return saved;
+    })).toApi();
+  }
+
+  /// What happened to the release [id], oldest first (U7b).
+  ///
+  /// Throws a [ReleaseNotFoundException] if there is none.
+  Future<ReleaseHistory> history(String id) async {
+    await _require(id);
+    return ReleaseHistory(await _releases.events(id));
+  }
+
   // --------------------------------------------------------------- abandon
 
   /// Gives the release [id] up, as the device [by]. A run that still builds it
@@ -777,6 +1019,7 @@ class ReleaseService implements ReleaseOpener {
           ),
           ReleaseState.abandoned,
         ),
+        by: by.name,
       );
     });
     await _cancelBuild(abandoned);
@@ -856,15 +1099,44 @@ class ReleaseService implements ReleaseOpener {
     return entry;
   }
 
-  /// Stores [release] if it differs from [start], then announces [events].
+  /// Stores [release] if it differs from [start], adds what changed to its
+  /// history (as done by the device named [by], when one did it), then
+  /// announces [events].
   Future<ReleaseRecord> _persist(
     ReleaseRecord start,
     ReleaseRecord release,
-    List<EngineEvent> events,
-  ) async {
+    List<EngineEvent> events, {
+    String? by,
+  }) async {
     if (release == start) return start;
     final saved = release.copyWith(updatedAt: _clock.now());
     await _releases.update(saved);
+    for (final event in events) {
+      final entry = switch (event) {
+        ReleaseStoreChanged(:final store, :final state, :final source) =>
+          ReleaseEvent(
+            kind: ReleaseEventKind.store,
+            at: saved.updatedAt,
+            store: store,
+            detail: state.wire,
+            by: source == StatusSource.manual ? by : null,
+          ),
+        ReleaseStateChanged(to: ReleaseState.merged) => ReleaseEvent(
+          kind: ReleaseEventKind.merged,
+          at: saved.updatedAt,
+          detail: saved.mergeCommit,
+          runId: start.mergeRunId,
+        ),
+        ReleaseStateChanged(to: ReleaseState.abandoned) => ReleaseEvent(
+          kind: ReleaseEventKind.abandoned,
+          at: saved.updatedAt,
+          detail: saved.message,
+          by: by,
+        ),
+        _ => null,
+      };
+      if (entry != null) await _releases.addEvent(saved.id, entry);
+    }
     events.forEach(_events.append);
     return saved;
   }
@@ -874,6 +1146,7 @@ class ReleaseService implements ReleaseOpener {
     ReleaseRecord start,
     ReleaseRecord next, {
     bool storeEvents = false,
+    String? by,
   }) async {
     final events = <EngineEvent>[
       if (next.state != start.state)
@@ -893,7 +1166,7 @@ class ReleaseService implements ReleaseOpener {
             source: entry.source,
           ),
     ];
-    return await _persist(start, next, events);
+    return await _persist(start, next, events, by: by);
   }
 
   String _newId() {

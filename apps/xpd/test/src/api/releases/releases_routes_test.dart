@@ -457,6 +457,141 @@ void main() {
     });
   });
 
+  group('GET /releases/{id}/history', () {
+    test('lists what happened, oldest first', () async {
+      final id = await client.uploaded();
+
+      final response = await client.send('GET', '/releases/$id/history');
+
+      expect(response.statusCode, 200);
+      final history = ReleaseHistory.fromJson(response.json);
+      expect(history.events.map((event) => event.kind), [
+        ReleaseEventKind.created,
+        ReleaseEventKind.store,
+        ReleaseEventKind.store,
+      ]);
+    });
+
+    test('answers 404 for a release that does not exist', () async {
+      final response = await client.send('GET', '/releases/rel_nope/history');
+
+      expect(response.statusCode, 404);
+    });
+  });
+
+  group('PUT /releases/{id}/texts', () {
+    test('keeps the texts the uploads send, by the device', () async {
+      final id = await client.open();
+
+      final response = await client.send(
+        'PUT',
+        '/releases/$id/texts',
+        body: {'whatsNew': 'Faster checkout.', 'whatToTest': 'Pay twice.'},
+        kind: DeviceTokenKind.cli,
+      );
+
+      expect(response.statusCode, 200);
+      final release = Release.fromJson(response.json);
+      expect(release.whatsNew, 'Faster checkout.');
+      expect(release.whatToTest, 'Pay twice.');
+      final history = ReleaseHistory.fromJson(
+        (await client.send('GET', '/releases/$id/history')).json,
+      );
+      expect(history.events.last.by, 'cli token');
+    });
+
+    test('is for the app and xp only (403), and checks the body', () async {
+      final id = await client.open();
+
+      final mcp = await client.send(
+        'PUT',
+        '/releases/$id/texts',
+        body: {'whatsNew': 'x'},
+        kind: DeviceTokenKind.mcp,
+      );
+      final bad = await client.send(
+        'PUT',
+        '/releases/$id/texts',
+        body: {'whatsNew': 5},
+      );
+
+      expect(mcp.statusCode, 403);
+      expect(bad.statusCode, 400);
+    });
+  });
+
+  group('POST /releases/{id}/patches/{number}/{action}', () {
+    late String id;
+
+    Future<void> patched() async {
+      id = await client.uploaded();
+      for (final store in ['apple', 'play']) {
+        await client.send(
+          'POST',
+          '/releases/$id/stores/$store/status',
+          body: {'state': 'live'},
+        );
+      }
+      await client.engine.releaseRepository.addEvent(
+        id,
+        ReleaseEvent(
+          kind: ReleaseEventKind.patch,
+          at: client.engine.clock.now(),
+          patchNumber: 1,
+        ),
+      );
+    }
+
+    test('requests the promotion, which waits for the owner', () async {
+      await patched();
+
+      final response = await client.send(
+        'POST',
+        '/releases/$id/patches/1/promote',
+        kind: DeviceTokenKind.mcp,
+      );
+
+      expect(response.statusCode, 202);
+      final approvals = await client.engine.approvals.list();
+      expect(approvals.single.action, 'prod_patch');
+    });
+
+    test('says what is wrong with the request', () async {
+      await patched();
+
+      for (final path in ['patches/0/promote', 'patches/x/promote']) {
+        expect(
+          (await client.send('POST', '/releases/$id/$path')).statusCode,
+          400,
+          reason: path,
+        );
+      }
+      expect(
+        (await client.send(
+          'POST',
+          '/releases/$id/patches/1/delete',
+        )).statusCode,
+        400,
+      );
+      expect(
+        (await client.send(
+          'POST',
+          '/releases/$id/patches/2/rollback',
+        )).statusCode,
+        400,
+        reason: 'no patch 2',
+      );
+      expect(
+        (await client.send(
+          'POST',
+          '/releases/$id/patches/1/rollback',
+          kind: DeviceTokenKind.runner,
+        )).statusCode,
+        403,
+      );
+    });
+  });
+
   group('POST /releases/{id}/abandon', () {
     test('gives the release up, with a reason', () async {
       final id = await client.open();

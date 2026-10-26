@@ -135,6 +135,7 @@ void main() {
         'record.manifest',
         'shorebird.patch',
         'shorebird.release',
+        'shorebird.track',
         'store.rollout',
         'symbols.archive',
         'test',

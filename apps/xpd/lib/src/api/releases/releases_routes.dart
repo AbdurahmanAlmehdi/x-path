@@ -11,14 +11,17 @@ import 'package:xpd/src/api/workflows/workflows_routes.dart';
 /// of one for Slack and WhatsApp (D-22), ask the stores
 /// about one now, say what a store did by hand, build the same version again
 /// after a rejection, request the merge of the pull request, request a change
-/// of the rollout in a store (U7a) and give a release up.
+/// of the rollout in a store (U7a), read the history of a release, set the
+/// texts its uploads send, promote or roll back a Shorebird patch (U7b) and
+/// give a release up.
 ///
 /// Anyone with a token may read, refresh, start a new build and request the
-/// merge or a rollout change: these are gated actions, which wait for the owner
-/// to approve them (D-13). Setting a store status and abandoning are for `app`
-/// and `cli` tokens only, because a status moves a release toward the merge
-/// of its pull request; the rules are the [ReleaseService]'s, and a token that
-/// may not answers `403 forbidden`.
+/// merge, a rollout change or a patch move: these are gated actions, which
+/// wait for the owner to approve them (D-13). Setting a store status, the
+/// texts and abandoning are for `app` and `cli` tokens only, because a status
+/// moves a release toward the merge of its pull request and the texts reach
+/// the stores; the rules are the [ReleaseService]'s, and a token that may not
+/// answers `403 forbidden`.
 class ReleasesRoutes {
   /// Creates the routes over [_releases].
   const new(this._releases, this._notes);
@@ -37,6 +40,9 @@ class ReleasesRoutes {
       ..post('/releases/<id>/builds', _newBuild)
       ..post('/releases/<id>/merge', _merge)
       ..post('/releases/<id>/rollout', _rollout)
+      ..get('/releases/<id>/history', _history)
+      ..put('/releases/<id>/texts', _setTexts)
+      ..post('/releases/<id>/patches/<number>/<action>', _patch)
       ..post('/releases/<id>/abandon', _abandon);
   }
 
@@ -102,6 +108,37 @@ class ReleasesRoutes {
   Future<Response> _rollout(Request request, String id) => _guard(() async {
     final body = await readJsonBody(request, RolloutRequest.fromJson);
     return _accepted(await _releases.requestRollout(id, body));
+  });
+
+  Future<Response> _history(Request request, String id) => _guard(() async {
+    return jsonResponse((await _releases.history(id)).toJson());
+  });
+
+  Future<Response> _setTexts(Request request, String id) => _guard(() async {
+    final body = await readJsonBody(request, ReleaseTexts.fromJson);
+    final release = await _releases.setTexts(
+      id,
+      body,
+      by: deviceTokenOf(request),
+    );
+    return jsonResponse(release.toJson());
+  });
+
+  Future<Response> _patch(
+    Request request,
+    String id,
+    String number,
+    String action,
+  ) => _guard(() async {
+    final patch = int.tryParse(number);
+    final named = PatchAction.values.where((a) => a.wire == action);
+    if (patch == null || patch < 1 || named.isEmpty) {
+      throw const BadRequestException(
+        'Ask for /releases/{id}/patches/{number}/promote or /rollback, with '
+        'a patch number from 1.',
+      );
+    }
+    return _accepted(await _releases.requestPatch(id, patch, named.single));
   });
 
   Future<Response> _abandon(Request request, String id) => _guard(() async {

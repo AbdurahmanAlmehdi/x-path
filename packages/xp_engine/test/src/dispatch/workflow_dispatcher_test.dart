@@ -793,6 +793,7 @@ stages:
       expect(patch['version'], '1.2.0+30');
       expect(patch['platform'], 'android');
       expect(patch['allowNativeDiffs'], isFalse);
+      expect(patch['patchNumber'], 3);
       final tagJob = jobs.last;
       expect((await harness.input(tagJob, 'git.tag'))['name'], 'v1.2.0+30-p3');
       expect(

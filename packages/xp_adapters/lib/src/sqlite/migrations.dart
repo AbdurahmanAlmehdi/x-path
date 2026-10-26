@@ -24,6 +24,7 @@ const engineMigrations = <Migration>[
   Migration(version: 17, sql: _v17),
   Migration(version: 18, sql: _v18),
   Migration(version: 19, sql: _v19),
+  Migration(version: 20, sql: _v20),
 ];
 
 // Timestamps are integer microseconds since the Unix epoch (UTC), so that
@@ -587,4 +588,25 @@ ALTER TABLE workflow ADD COLUMN based_on_builtin TEXT;
 ALTER TABLE workflow ADD COLUMN based_on_version INTEGER
   CHECK (based_on_version IS NULL OR based_on_version > 0);
 ALTER TABLE workflow ADD COLUMN archived_at INTEGER;
+''';
+
+// UX U7b: the texts the uploads of a release send to the stores ("What's
+// new" for Google Play, "What to test" for Firebase), and the
+// history of each release: what happened, when, and which device did it.
+const _v20 = '''
+ALTER TABLE release ADD COLUMN whats_new TEXT;
+ALTER TABLE release ADD COLUMN what_to_test TEXT;
+
+CREATE TABLE release_event (
+  id INTEGER PRIMARY KEY,
+  release_id TEXT NOT NULL REFERENCES release (id),
+  kind TEXT NOT NULL,
+  at INTEGER NOT NULL,
+  store TEXT,
+  detail TEXT,
+  by_name TEXT,
+  run_id TEXT,
+  patch_number INTEGER CHECK (patch_number IS NULL OR patch_number > 0)
+) STRICT;
+CREATE INDEX idx_release_event_release ON release_event (release_id, at);
 ''';

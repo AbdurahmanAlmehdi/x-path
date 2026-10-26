@@ -44,6 +44,17 @@ class FakeReleaseOpener implements ReleaseOpener {
       throw error;
     }
   }
+
+  /// The release a patch of each flavor applies to, by flavor.
+  final patchables = <String, String>{};
+
+  @override
+  Future<String?> patchable({
+    required String projectId,
+    required String appPath,
+    required String flavor,
+    required AppVersion version,
+  }) async => patchables[flavor];
 }
 
 /// The commit `main` resolves to.

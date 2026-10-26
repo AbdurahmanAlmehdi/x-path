@@ -901,6 +901,38 @@ void main() {
       body: {'store': 'play', 'action': 'fraction', 'userFraction': 0.2},
     ),
     _Endpoint(
+      'getReleaseHistory',
+      method: 'GET',
+      path: '/releases/rel_1/history',
+      response: ReleaseHistory([
+        ReleaseEvent(kind: ReleaseEventKind.created, at: DateTime.utc(2026)),
+      ]).toJson(),
+      call: (client) => client.getReleaseHistory('rel_1'),
+      expected: ReleaseHistory([
+        ReleaseEvent(kind: ReleaseEventKind.created, at: DateTime.utc(2026)),
+      ]),
+    ),
+    _Endpoint(
+      'setReleaseTexts',
+      method: 'PUT',
+      path: '/releases/rel_1/texts',
+      response: sample.release.toJson(),
+      call: (client) =>
+          client.setReleaseTexts('rel_1', const ReleaseTexts(whatsNew: 'New')),
+      expected: sample.release,
+      body: {'whatsNew': 'New'},
+    ),
+    _Endpoint(
+      'moveReleasePatch',
+      method: 'POST',
+      path: '/releases/rel_1/patches/2/rollback',
+      status: 202,
+      response: sample.run.toJson(),
+      call: (client) =>
+          client.moveReleasePatch('rel_1', 2, PatchAction.rollback),
+      expected: sample.run,
+    ),
+    _Endpoint(
       'abandonRelease',
       method: 'POST',
       path: '/releases/rel_1/abandon',

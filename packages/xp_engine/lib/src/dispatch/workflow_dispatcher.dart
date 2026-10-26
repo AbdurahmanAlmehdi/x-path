@@ -48,6 +48,7 @@ const _unversionedKinds = {
   'git.checkout',
   'github.mergePr',
   'guard',
+  'shorebird.track',
   'store.rollout',
   'test',
 };
@@ -465,8 +466,46 @@ class WorkflowDispatcher {
     );
   }
 
+  /// The release each job of a Shorebird patch works on: the release of its
+  /// flavor at the patched version, when the engine tracks one the stores
+  /// approved (U7b). A patch of a release the engine does not know is
+  /// dispatched all the same.
+  Future<Map<String, String>> _linkPatches(
+    ReleaseOpener opener,
+    RunContext context,
+    List<_PlannedJob> jobs,
+  ) async {
+    // Planning a "shorebird.patch" step needed a release version.
+    final version = context.releaseVersion!;
+    final byFlavor = <String, String?>{};
+    final links = <String, String>{};
+    for (final job in jobs) {
+      final flavor = job.cell['flavor'];
+      if (flavor == null) continue;
+      if (!byFlavor.containsKey(flavor)) {
+        final id = byFlavor[flavor] = await opener.patchable(
+          projectId: context.project.id,
+          appPath: context.app.path,
+          flavor: flavor,
+          version: version,
+        );
+        if (id != null) {
+          await opener.attach(
+            releaseId: id,
+            projectId: context.project.id,
+            kind: ReleaseRunKind.patch,
+            runId: context.runId,
+          );
+        }
+      }
+      if (byFlavor[flavor] case final id?) links[job.id] = id;
+    }
+    return links;
+  }
+
   /// The release of each job, by job id: the releases a workflow that cuts a
-  /// release branch makes (one per flavor), or the release the request names.
+  /// release branch makes (one per flavor), the release the request names,
+  /// or the release each flavor of a Shorebird patch applies to.
   ///
   /// Throws a [DispatchException] if the request names a release that cannot
   /// take this run.
@@ -489,11 +528,14 @@ class WorkflowDispatcher {
         kind = ReleaseRunKind.build;
       } else if (kinds.contains('store.rollout')) {
         kind = ReleaseRunKind.rollout;
+      } else if (kinds.contains('shorebird.track')) {
+        kind = ReleaseRunKind.patch;
       } else {
         throw const DispatchException(
           'A run of a release has to build it again (a "version.bump" step), '
-          'merge its pull request (a "github.mergePr" step) or change its '
-          'rollout (a "store.rollout" step).',
+          'merge its pull request (a "github.mergePr" step), change its '
+          'rollout (a "store.rollout" step) or move a patch (a '
+          '"shorebird.track" step).',
         );
       }
       try {
@@ -508,6 +550,9 @@ class WorkflowDispatcher {
         throw DispatchException(error.message);
       }
       return {for (final job in jobs) job.id: named};
+    }
+    if (opener != null && kinds.contains('shorebird.patch')) {
+      return await _linkPatches(opener, context, jobs);
     }
     if (opener == null || !kinds.contains('git.releaseBranch')) {
       return const {};

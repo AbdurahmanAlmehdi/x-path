@@ -19,6 +19,7 @@ targets:
           - lib/src/project.dart
           - lib/src/project_profile.dart
           - lib/src/release.dart
+          - lib/src/release_history.dart
           - lib/src/release_notes.dart
           - lib/src/run.dart
           - lib/src/runner.dart

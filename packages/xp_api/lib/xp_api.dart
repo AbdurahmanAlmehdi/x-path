@@ -23,6 +23,7 @@ export 'src/profile_edits.dart';
 export 'src/project.dart';
 export 'src/project_profile.dart';
 export 'src/release.dart';
+export 'src/release_history.dart';
 export 'src/release_notes.dart';
 export 'src/run.dart';
 export 'src/runner.dart';

@@ -278,6 +278,10 @@ class ServeCommand extends XpdCommand {
         clock: const SystemClock(),
         resume: (projectId) => scheduler.resumeWaiting(projectId: projectId),
       );
+      final releaseTexts = JobReleaseTexts(
+        jobs: jobRepository,
+        releases: releaseRepository,
+      );
       final registry = StepRegistry([
         GateStep(approvals),
         GitCheckoutStep(git: git, jobs: jobRepository),
@@ -367,11 +371,16 @@ class ServeCommand extends XpdCommand {
           repository: artifactRepository,
           store: artifactStore,
           secrets: secrets,
+          texts: releaseTexts,
         ),
         firebase.uploadStep(
           repository: artifactRepository,
           store: artifactStore,
           secrets: secrets,
+          texts: releaseTexts,
+        ),
+        ShorebirdTrackStep(
+          ShorebirdCliPatches(runner: runner, secrets: secrets),
         ),
         StoreRolloutStep(
           releases: releaseRepository,

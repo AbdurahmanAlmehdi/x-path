@@ -9,6 +9,7 @@ const builtinWorkflows = <String, String>{
   'release-merge': _releaseMerge,
   'release-rollout': _releaseRollout,
   'shorebird-patch': _shorebirdPatch,
+  'shorebird-track': _shorebirdTrack,
   'smoke-build': _smokeBuild,
   'test': _test,
 };
@@ -375,6 +376,39 @@ stages:
 // and the tag comes last (`finalize`). The approval is asked in front of the
 // last check, so that the owner is asked only about a patch that passed the
 // others.
+// U7b: a patch the owner tried on a staging track goes to every user, or a
+// patch that went wrong is rolled back, from the release page. Either way
+// every user of the release gets the change, so it waits for the same
+// approval as a production patch.
+const _shorebirdTrack = r'''
+schema: 1
+name: Move a Shorebird patch
+description: >-
+  Promotes a Shorebird patch of a release to the stable track, or rolls it
+  back. Started from the release; the change waits for the owner's approval.
+inputs:
+  patchNumber:
+    type: json
+    description: The patch of the release, a number from 1.
+  action:
+    type: choice
+    options: [promote, rollback]
+stages:
+  - name: track
+    jobs:
+      track:
+        name: ${{ inputs.action }} patch ${{ inputs.patchNumber }} of ${{ flavor.name }}
+        matrix:
+          flavor: ${{ flavors }}
+        if: flavor.shorebird
+        steps:
+          - kind: shorebird.track
+            gate: prod_patch
+            with:
+              patchNumber: ${{ inputs.patchNumber }}
+              action: ${{ inputs.action }}
+''';
+
 const _shorebirdPatch = r'''
 schema: 1
 name: Shorebird patch
