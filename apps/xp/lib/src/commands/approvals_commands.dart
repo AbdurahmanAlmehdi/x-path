@@ -210,7 +210,7 @@ class GatesShowCommand extends XpCommand {
 
   @override
   Future<int> execute(XpClient client) async {
-    final [reference] = positionals(['project']);
+    final [reference] = await projectPositionals(client, ['project']);
     final gates = await client.getGates(
       await resolveProject(client, reference),
     );

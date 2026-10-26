@@ -207,6 +207,14 @@ class TestEngine {
       VersionBumpStep(git: git, workspaces: (_) => InMemoryWorkspace(const {})),
       GitHubCreatePrStep(github),
       GitHubMergePrStep(github: github, releases: releaseRepository),
+      StoreRolloutStep(
+        releases: releaseRepository,
+        ascCredentials: FakeAscCredentialSource(),
+        appStoreConnect: (_) => FakeAppStoreConnect(),
+        playCredentials: FakePlayCredentialSource(),
+        googlePlay: (_) => FakeGooglePlay(),
+      ),
+      ShorebirdTrackStep(FakeShorebirdPatches()),
     ]);
     final jobs = JobRunner(
       jobs: jobRepository,
@@ -343,6 +351,12 @@ class TestEngine {
     final runnerBundles = InMemoryRunnerBundles();
     final githubCli = FakeGitHubCliToken();
     final issued = await tokens.issue(name: 'test', kind: DeviceTokenKind.app);
+    final githubToken = GitHubTokenService(
+      secrets: credentialSecrets,
+      verifier: credentialVerifiers[CredentialKind.github]!,
+      cli: githubCli,
+      masker: masker,
+    );
     final credentialService = CredentialService(
       repository: credentialRepository,
       projects: projects,
@@ -397,12 +411,7 @@ class TestEngine {
         connect: (_) => appStoreConnect,
         keys: const RsaDistributionKeys(bits: 512),
       ),
-      githubToken: GitHubTokenService(
-        secrets: credentialSecrets,
-        verifier: credentialVerifiers[CredentialKind.github]!,
-        cli: githubCli,
-        masker: masker,
-      ),
+      githubToken: githubToken,
       workflows: workflows,
       dispatcher: dispatcher,
       runs: runService,
@@ -426,6 +435,26 @@ class TestEngine {
         holdsLease: runnerHub.holdsLease,
       ),
       runnerBundles: runnerBundles,
+      // The engine's own runner: Android and Flutter, no iOS signing.
+      doctor: EngineDoctor(
+        local: const ProbeFindings(
+          capabilities: {Capability.android, Capability.flutter},
+          missing: [
+            MissingCapability(
+              capability: 'ios-sign',
+              reason: 'not macOS',
+              fix: 'run the engine on a Mac',
+            ),
+          ],
+        ),
+        github: githubToken,
+        credentials: credentialRepository,
+        projects: projects,
+        runner: FakeProcessRunner(
+          (call) => const ProcessOutput(exitCode: 1, stderr: 'Hi octo!\n'),
+        ),
+      ),
+      secrets: credentialSecrets,
       clock: clock,
       engineVersion: '9.9.9',
       onError: (error, _) => errors.add(error),

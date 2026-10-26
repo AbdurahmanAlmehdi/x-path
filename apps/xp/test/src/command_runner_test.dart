@@ -397,10 +397,11 @@ void main() {
         (await failure(const ApiException('Down.', statusCode: 502)))['code'],
         'unknown',
       );
-      expect(
-        (await failure(const ConnectionException('Away.')))['code'],
-        'unreachable',
-      );
+      expect(await failure(const ConnectionException('Away.')), {
+        'code': 'unreachable',
+        'message': 'Away.',
+        'hint': 'See docs/guide/troubleshooting.md#the-engine-does-not-answer.',
+      });
       expect(
         (await failure(const DownloadException('Torn.')))['code'],
         'download_failed',

@@ -4,6 +4,7 @@ import 'package:equatable/equatable.dart';
 import 'package:file_selector/file_selector.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
+import 'package:xp_desktop/app/app_preferences.dart';
 import 'package:xp_macos_services/xp_macos_services.dart';
 import 'package:xp_repositories/xp_repositories.dart';
 
@@ -94,6 +95,7 @@ class AppServices {
     required this.appMenu,
     required this.keychainWiper,
     required this.dataWiper,
+    required this.preferences,
   });
 
   /// The services of this Mac: the engine list and the offline cache in the
@@ -155,6 +157,9 @@ class AppServices {
       // "Remove XPath" with "Also delete engine data": the engine's data
       // folder, and the app's engine list and offline cache.
       dataWiper: FileSystemDataWiper([engineDataDirectory(home), support]),
+      preferences: await AppPreferences.load(
+        p.join(support, 'preferences.json'),
+      ),
     );
   }
 
@@ -193,4 +198,7 @@ class AppServices {
 
   /// Deletes the data of the engine and of the app ("Remove XPath").
   final DataWiper dataWiper;
+
+  /// What the app remembers between launches.
+  final AppPreferences preferences;
 }

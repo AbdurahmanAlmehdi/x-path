@@ -22,7 +22,12 @@ enum GateAction {
   merge('merge', 'Merge'),
 
   /// Deleting something.
-  delete('delete', 'Delete');
+  delete('delete', 'Delete'),
+
+  /// Changing how a release reaches users in a store: pausing, resuming or
+  /// completing Apple's phased release, or Google Play's staged rollout
+  /// (U7a).
+  rollout('rollout', 'Rollout change');
 
   new(this.wire, this.label);
 
@@ -144,3 +149,11 @@ class FakeApprovalGate implements ApprovalGate {
     return decision;
   }
 }
+
+/// The gate a step type always runs behind, whatever its workflow says
+/// (D-13): a change every user of a release gets is never made unapproved,
+/// in a workflow an agent wrote too.
+const Map<String, GateAction> requiredGates = {
+  'store.rollout': GateAction.rollout,
+  'shorebird.track': GateAction.prodPatch,
+};

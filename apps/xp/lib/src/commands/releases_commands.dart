@@ -19,6 +19,7 @@ XpGroup releasesCommand(XpContext context) => XpGroup(
     ReleasesStatusCommand(context),
     ReleasesBuildCommand(context),
     ReleasesMergeCommand(context),
+    ReleasesRolloutCommand(context),
     ReleasesAbandonCommand(context),
     ReleasesNotesCommand(context),
   ],
@@ -244,6 +245,95 @@ class ReleasesMergeCommand extends XpCommand {
   Future<int> execute(XpClient client) async {
     final [id] = positionals(['release']);
     final run = await client.mergeRelease(id);
+    emit(run.toJson(), () => 'Started ${run.id}.\n\n${describeRun(run)}');
+    return XpExit.ok;
+  }
+}
+
+/// `xp releases rollout <release> --store <apple|play> <change>` (U7a).
+class ReleasesRolloutCommand extends XpCommand {
+  /// Creates the command.
+  new(super.context) {
+    argParser
+      ..addOption(
+        'store',
+        allowed: [for (final store in ReleaseStore.values) store.wire],
+        help: 'The store whose rollout changes.',
+      )
+      ..addFlag(
+        'pause',
+        negatable: false,
+        help: "Pause Apple's phased release.",
+      )
+      ..addFlag(
+        'resume',
+        negatable: false,
+        help: "Resume Apple's phased release.",
+      )
+      ..addFlag(
+        'complete',
+        negatable: false,
+        help: 'Release to every user, in either store.',
+      )
+      ..addFlag(
+        'halt',
+        negatable: false,
+        help: "Halt Google Play's staged rollout.",
+      )
+      ..addOption(
+        'percent',
+        help: "Set Google Play's staged rollout to this share of users.",
+        valueHelp: '1-100',
+      );
+  }
+
+  @override
+  String get name => 'rollout';
+
+  @override
+  String get description =>
+      'Change how a release reaches users in a store (waits for the rollout '
+      'approval).';
+
+  @override
+  String get invocation =>
+      'xp releases rollout <release> --store <apple|play> '
+      '(--pause | --resume | --complete | --halt | --percent <n>)';
+
+  @override
+  Future<int> execute(XpClient client) async {
+    final [id] = positionals(['release']);
+    final args = argResults!;
+    final store = ReleaseStore.values.where((s) => s.wire == args['store']);
+    if (store.isEmpty) usageException('Give --store apple or --store play.');
+    final percent = args.option('percent');
+    final actions = [
+      for (final action in [
+        RolloutAction.pause,
+        RolloutAction.resume,
+        RolloutAction.complete,
+        RolloutAction.halt,
+      ])
+        if (args.flag(action.wire)) action,
+      if (percent != null) RolloutAction.fraction,
+    ];
+    if (actions.length != 1) {
+      usageException(
+        'Give one change: --pause, --resume, --complete, --halt or --percent.',
+      );
+    }
+    final share = percent == null ? null : num.tryParse(percent);
+    if (percent != null && share == null) {
+      usageException('--percent takes a number, such as 50.');
+    }
+    final run = await client.requestRollout(
+      id,
+      RolloutRequest(
+        store: store.single,
+        action: actions.single,
+        userFraction: share == null ? null : share / 100,
+      ),
+    );
     emit(run.toJson(), () => 'Started ${run.id}.\n\n${describeRun(run)}');
     return XpExit.ok;
   }

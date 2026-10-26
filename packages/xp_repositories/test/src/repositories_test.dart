@@ -714,6 +714,35 @@ void main() {
       );
     });
 
+    test('watches the runs of every project that have not finished', () async {
+      final finished = Run.fromJson({..._run.toJson(), 'state': 'succeeded'});
+      when(() => harness.client.listRuns(limit: 50))
+          .thenAnswer((_) async => RunsResponse([_run, finished]));
+      final loads = await _loadsFor(
+        harness: harness,
+        stream: repository.watchActiveRuns(),
+        events: const [
+          RunDispatched(
+            runId: 'run_2',
+            projectId: 'prj_9',
+            workflowId: 'wf_1',
+            jobIds: ['job_3'],
+          ),
+          JobStateChanged(
+            jobId: 'job_9',
+            projectId: 'prj_9',
+            state: JobState.running,
+          ),
+          ProjectEdited(projectId: 'prj_1'),
+        ],
+      );
+      expect(loads, 3);
+      expect(
+        await repository.watchActiveRuns().first,
+        Snapshot([_run], cached: true),
+      );
+    });
+
     test('runs a run again', () async {
       when(() => harness.client.runAgain('run_1'))
           .thenAnswer((_) async => _run);
@@ -1021,6 +1050,20 @@ void main() {
       when(() => client.startReleaseBuild('rel_1'))
           .thenAnswer((_) async => _run);
       when(() => client.mergeRelease('rel_1')).thenAnswer((_) async => _run);
+      const pause = RolloutRequest(
+        store: ReleaseStore.apple,
+        action: RolloutAction.pause,
+      );
+      when(() => client.requestRollout('rel_1', pause))
+          .thenAnswer((_) async => _run);
+      const history = ReleaseHistory([]);
+      const texts = ReleaseTexts(whatsNew: 'New');
+      when(() => client.getReleaseHistory('rel_1'))
+          .thenAnswer((_) async => history);
+      when(() => client.setReleaseTexts('rel_1', texts))
+          .thenAnswer((_) async => _release);
+      when(() => client.moveReleasePatch('rel_1', 2, PatchAction.promote))
+          .thenAnswer((_) async => _run);
       when(() => client.abandonRelease('rel_1', reason: 'no'))
           .thenAnswer((_) async => _release);
       when(() => client.getReleaseNotes('rel_1'))
@@ -1037,6 +1080,10 @@ void main() {
       );
       expect(await repository.startBuild('rel_1'), _run);
       expect(await repository.merge('rel_1'), _run);
+      expect(await repository.rollout('rel_1', pause), _run);
+      expect(await repository.history('rel_1'), history);
+      expect(await repository.setTexts('rel_1', texts), _release);
+      expect(await repository.movePatch('rel_1', 2, PatchAction.promote), _run);
       expect(await repository.abandon('rel_1', reason: 'no'), _release);
       expect(await repository.notes('rel_1'), notes);
     });
@@ -1342,6 +1389,42 @@ void main() {
     });
   });
 
+  group('NoticesRepository', () {
+    test('passes on what the owner should hear about', () async {
+      final notices = <EngineEvent>[];
+      final subscription = NoticesRepository(harness.session)
+          .watchNotices()
+          .listen(notices.add);
+      const events = <EngineEvent>[
+        NotificationRaised(
+          kind: NotificationKind.jobFailed,
+          level: NotificationLevel.error,
+          title: 'Build failed',
+          body: 'prod',
+        ),
+        RunnerLeaseLost(
+          runnerId: 'rnr_1',
+          jobId: 'job_1',
+          projectId: 'prj_1',
+          reason: 'lapsed',
+          state: JobState.queued,
+        ),
+        RunnerCapabilitiesChanged(
+          runnerId: 'rnr_1',
+          name: 'mac',
+          from: ['flutter', 'ios-sign'],
+          to: ['flutter'],
+        ),
+        ProjectEdited(projectId: 'prj_1'),
+      ];
+      events.forEach(harness.send);
+      await settle();
+      await subscription.cancel();
+
+      expect(notices, events.take(3));
+    });
+  });
+
   group('SettingsRepository', () {
     late SettingsRepository repository;
 
@@ -1369,6 +1452,26 @@ void main() {
       expect(await repository.importGitHubToken(), stored);
       await repository.clearGitHubToken();
       verify(client.deleteGitHubToken).called(1);
+    });
+
+    test('makes a token for xp or an agent', () async {
+      final created = CreatedToken(
+        info: TokenInfo(
+          id: 'tok_1',
+          name: 'xp',
+          kind: DeviceTokenKind.cli,
+          createdAt: DateTime.utc(2026, 10, 25),
+        ),
+        token: 'xpt_x',
+      );
+      when(
+        () => harness.client.createToken(name: 'xp', kind: DeviceTokenKind.cli),
+      ).thenAnswer((_) async => created);
+
+      expect(
+        await repository.createToken(name: 'xp', kind: DeviceTokenKind.cli),
+        created,
+      );
     });
   });
 }

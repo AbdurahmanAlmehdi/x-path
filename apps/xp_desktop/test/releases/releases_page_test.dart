@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart' show Locale;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:material_ui/material_ui.dart' show TextField;
 import 'package:mocktail/mocktail.dart';
 import 'package:xp_api/xp_api.dart';
 import 'package:xp_client/xp_client.dart';
@@ -48,6 +49,14 @@ void main() {
   setUpAll(() {
     registerFallbackValue(ReleaseStore.apple);
     registerFallbackValue(StoreState.live);
+    registerFallbackValue(PatchAction.promote);
+    registerFallbackValue(const ReleaseTexts());
+    registerFallbackValue(
+      const RolloutRequest(
+        store: ReleaseStore.apple,
+        action: RolloutAction.pause,
+      ),
+    );
   });
 
   setUp(() {
@@ -79,9 +88,7 @@ void main() {
       expect(find.text('Waits for both stores to go live'), findsOneWidget);
       expect(find.text('Live now 5.3.7'), findsNWidgets(2));
 
-      await tester.tap(find.text('5.4.1 (3283) · prod · In review'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('5.3.7 (3200) · prod · Live').last);
+      await tester.tap(find.text('5.3.7 (3200)'));
       await tester.pumpAndSettle();
       expect(find.text('Release 5.3.7 (3200)'), findsOneWidget);
       expect(find.text('No commit yet.'), findsOneWidget);
@@ -228,6 +235,178 @@ void main() {
       await tester.pump();
       expect(find.text('GitHub said no.'), findsOneWidget);
       expect(find.text('Release branch merged'), findsNothing);
+    });
+
+    testWidgets('changes the rollout of a live release in each store', (
+      tester,
+    ) async {
+      final harness = ReleasesHarness(
+        releases: [
+          reviewRelease(
+            state: ReleaseState.live,
+            stores: [
+              lane(
+                ReleaseStore.apple,
+                StoreState.live,
+                changedAt: oct12(20, 0),
+              ),
+              lane(ReleaseStore.play, StoreState.live, changedAt: oct12(20, 0)),
+            ],
+          ),
+        ],
+      );
+      final repository = harness.releasesRepository;
+      when(() => repository.rollout('rel_2', any()))
+          .thenAnswer((_) async => runningRun().run);
+      await harness.pump(tester);
+      expect(
+        find.text('Each change waits for your approval.'),
+        findsNWidgets(2),
+      );
+
+      await tester.tap(find.text('Pause'));
+      await tester.pump();
+      expect(
+        find.text('Rollout change requested: approve it to apply'),
+        findsOneWidget,
+      );
+      await tester.tap(find.text('Roll out to'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('50 % of users'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Halt'));
+      await tester.pump();
+
+      expect(
+        verify(() => repository.rollout('rel_2', captureAny())).captured,
+        const [
+          RolloutRequest(
+            store: ReleaseStore.apple,
+            action: RolloutAction.pause,
+          ),
+          RolloutRequest(
+            store: ReleaseStore.play,
+            action: RolloutAction.fraction,
+            userFraction: 0.5,
+          ),
+          RolloutRequest(store: ReleaseStore.play, action: RolloutAction.halt),
+        ],
+      );
+    });
+
+    testWidgets('offers no rollout change for a store it cannot read', (
+      tester,
+    ) async {
+      await ReleasesHarness(
+        credentials: const [],
+        releases: [
+          reviewRelease(
+            state: ReleaseState.live,
+            stores: [
+              lane(ReleaseStore.apple, StoreState.live),
+              lane(ReleaseStore.play, StoreState.live),
+            ],
+          ),
+        ],
+      ).pump(tester);
+
+      expect(find.text('Pause'), findsNothing);
+      expect(find.text('Roll out to'), findsNothing);
+    });
+
+    testWidgets('saves the store texts of the release', (tester) async {
+      final harness = ReleasesHarness(releases: [reviewRelease(), liveRelease]);
+      final repository = harness.releasesRepository;
+      when(() => repository.setTexts('rel_2', any()))
+          .thenAnswer((_) async => reviewRelease());
+      await harness.pump(tester);
+      final save = find.widgetWithText(XpButton, 'Save texts');
+      expect(tester.widget<XpButton>(save).onPressed, isNull);
+      await tester.ensureVisible(save);
+      await tester.pump();
+
+      await tester.enterText(
+        find
+            .descendant(
+              of: find.byType(ReleaseTextsPanel),
+              matching: find.byType(TextField),
+            )
+            .first,
+        'Faster checkout.',
+      );
+      await tester.pump();
+      await tester.tap(save);
+      await tester.pump();
+
+      expect(
+        verify(() => repository.setTexts('rel_2', captureAny())).captured,
+        [const ReleaseTexts(whatsNew: 'Faster checkout.', whatToTest: '')],
+      );
+      expect(find.text('Store texts saved'), findsOneWidget);
+    });
+
+    testWidgets('shows the texts of the release picked', (tester) async {
+      await ReleasesHarness(
+        releases: [
+          reviewRelease(),
+          release(
+            'rel_1',
+            '5.3.7',
+            3200,
+            ReleaseState.live,
+            whatsNew: 'Old notes',
+          ),
+        ],
+      ).pump(tester);
+
+      await tester.tap(find.text('5.3.7 (3200)'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Old notes'), findsOneWidget);
+    });
+
+    testWidgets('promotes and rolls back the patches of the release', (
+      tester,
+    ) async {
+      ReleaseEvent patch(ReleaseEventKind kind, int number) =>
+          ReleaseEvent(kind: kind, at: oct12(20, number), patchNumber: number);
+      final harness = ReleasesHarness(
+        releases: [reviewRelease(state: ReleaseState.live)],
+        history: [
+          patch(ReleaseEventKind.patch, 1),
+          patch(ReleaseEventKind.patch, 2),
+          patch(ReleaseEventKind.patchPromoted, 2),
+          patch(ReleaseEventKind.patch, 3),
+          patch(ReleaseEventKind.patchRolledBack, 3),
+        ],
+      );
+      final repository = harness.releasesRepository;
+      when(() => repository.movePatch('rel_2', any(), any()))
+          .thenAnswer((_) async => runningRun().run);
+      await harness.pump(tester);
+      expect(find.text('Patch 1 · Published'), findsOneWidget);
+      expect(find.text('Patch 2 · On stable'), findsOneWidget);
+      expect(find.text('Patch 3 · Rolled back'), findsOneWidget);
+      expect(find.text('Promote'), findsNWidgets(2));
+      expect(find.text('Roll back'), findsNWidgets(2));
+
+      await tester.ensureVisible(find.text('Promote').first);
+      await tester.pump();
+      await tester.tap(find.text('Promote').first);
+      await tester.pump();
+      expect(
+        find.text('Patch change requested: approve it to apply'),
+        findsOneWidget,
+      );
+      await tester.ensureVisible(find.text('Roll back').last);
+      await tester.pump();
+      await tester.tap(find.text('Roll back').last);
+      await tester.pump();
+
+      verify(() => repository.movePatch('rel_2', 1, PatchAction.promote))
+          .called(1);
+      verify(() => repository.movePatch('rel_2', 2, PatchAction.rollback))
+          .called(1);
     });
 
     testWidgets('says why the releases cannot be read, and reads again', (
@@ -625,6 +804,106 @@ void main() {
         ),
         'Uploaded:done: | In review:done: | Approved:now:since 09:05 | '
         'Ready for sale:todo:',
+      );
+    });
+
+    test('releaseTimeline tells the history of the release', () {
+      final release = reviewRelease(state: ReleaseState.merged);
+      var minute = 0;
+      ReleaseEvent event(
+        ReleaseEventKind kind, {
+        ReleaseStore? store,
+        String? detail,
+        String? by,
+        int? patchNumber,
+      }) => ReleaseEvent(
+        kind: kind,
+        at: oct12(20, minute++),
+        store: store,
+        detail: detail,
+        by: by,
+        runId: 'run_9',
+        patchNumber: patchNumber,
+      );
+
+      final entries = releaseTimeline(
+        release,
+        [mergeApproval],
+        l10n,
+        history: [
+          event(ReleaseEventKind.created),
+          event(ReleaseEventKind.build, detail: '3284'),
+          event(
+            ReleaseEventKind.store,
+            store: ReleaseStore.apple,
+            detail: 'live',
+            by: 'MacBook',
+          ),
+          event(
+            ReleaseEventKind.store,
+            store: ReleaseStore.play,
+            detail: 'later',
+          ),
+          event(ReleaseEventKind.mergeRequested),
+          event(ReleaseEventKind.merged, detail: 'c' * 40),
+          event(ReleaseEventKind.rolloutRequested),
+          event(
+            ReleaseEventKind.rollout,
+            store: ReleaseStore.play,
+            detail: 'halted',
+          ),
+          event(ReleaseEventKind.rollout),
+          event(ReleaseEventKind.patch, detail: 'ios', patchNumber: 1),
+          event(
+            ReleaseEventKind.patchRequested,
+            detail: 'promote',
+            patchNumber: 1,
+          ),
+          event(
+            ReleaseEventKind.patchRequested,
+            detail: 'rollback',
+            patchNumber: 1,
+          ),
+          event(ReleaseEventKind.patchPromoted, patchNumber: 1),
+          event(ReleaseEventKind.patchRolledBack, patchNumber: 1),
+          event(ReleaseEventKind.abandoned, detail: 'Wrong', by: 'MacBook'),
+          event(ReleaseEventKind.texts, by: 'MacBook'),
+          event(ReleaseEventKind.merged),
+          event(ReleaseEventKind.store, detail: 'live'),
+        ],
+      );
+
+      expect(entries.map((entry) => entry.title).toList().reversed, [
+        'Release dispatched',
+        'Build 3284 started',
+        'App Store: ready for sale',
+        'Google Play: later',
+        'Merge requested',
+        'Merged into main',
+        'Rollout change requested',
+        'Google Play rollout changed',
+        'Rollout changed',
+        'Patch 1 published',
+        'Promotion of patch 1 requested',
+        'Rollback of patch 1 requested',
+        'Patch 1 promoted to stable',
+        'Patch 1 rolled back',
+        'Abandoned',
+        'Store texts changed',
+        'Merged into main',
+        'live',
+      ]);
+      expect(entries.reversed.map((entry) => entry.detail).take(6), [
+        'prod',
+        null,
+        'MacBook',
+        null,
+        null,
+        shortSha('c' * 40),
+      ]);
+      expect(
+        entries.firstWhere((entry) => entry.title == 'Abandoned').detail,
+        'Wrong · MacBook',
       );
     });
 

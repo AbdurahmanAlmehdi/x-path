@@ -1,4 +1,5 @@
 import 'package:xp_engine/src/steps/step.dart';
+import 'package:xp_engine/src/versioning/app_version.dart';
 
 /// The planned steps of one flavor of a run that makes a release.
 class FlavorSteps {
@@ -59,6 +60,12 @@ enum ReleaseRunKind {
 
   /// It merges the pull request.
   merge,
+
+  /// It changes the rollout in a store (U7a).
+  rollout,
+
+  /// It publishes a Shorebird patch of the release, or moves one (U7b).
+  patch,
 }
 
 /// What a dispatch tells the releases. `ReleaseService` implements it; the
@@ -82,5 +89,16 @@ abstract interface class ReleaseOpener {
     required ReleaseRunKind kind,
     required String runId,
     int? build,
+  });
+
+  /// The release of [flavor] of the app at [appPath] at [version]
+  /// (`x.y.z+build`) that a Shorebird patch applies to: one the stores
+  /// approved. `null` when the engine has none, for example a release made
+  /// before the engine tracked releases.
+  Future<String?> patchable({
+    required String projectId,
+    required String appPath,
+    required String flavor,
+    required AppVersion version,
   });
 }

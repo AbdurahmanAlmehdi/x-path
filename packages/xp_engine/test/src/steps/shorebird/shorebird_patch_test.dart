@@ -15,6 +15,7 @@ void main() {
     ShorebirdPlatform platform = ShorebirdPlatform.android,
     bool obfuscate = false,
     bool allowNativeDiffs = false,
+    int? patchNumber,
   }) => ShorebirdPatchInput(
     settings: BuildSettings(
       worktree: buildWorktree,
@@ -33,6 +34,7 @@ void main() {
         : null,
     allowNativeDiffs: allowNativeDiffs,
     tokenSecret: 'shorebird.token',
+    patchNumber: patchNumber,
   );
 
   ShorebirdPatchStep stepFor({bool isMacOS = true}) => ShorebirdPatchStep(
@@ -80,6 +82,7 @@ void main() {
       for (final value in [
         input(),
         input(platform: ShorebirdPlatform.ios, allowNativeDiffs: true),
+        input(patchNumber: 3),
       ]) {
         expect(step.decodeInput(step.encodeInput(value)), value);
       }
@@ -99,6 +102,7 @@ void main() {
         {...android, 'platform': 'web'},
         {...android}..remove('shorebirdAppId'),
         {...android, 'allowNativeDiffs': 'yes'},
+        {...android, 'patchNumber': '3'},
         {...ios}..remove('exportOptionsPlist'),
       ]) {
         expect(() => step.decodeInput(bad), throwsFormatException);

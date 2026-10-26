@@ -2037,6 +2037,150 @@ paths:
           $ref: "#/components/responses/SecretsLocked"
         "500":
           $ref: "#/components/responses/InternalError"
+  /releases/{id}/rollout:
+    parameters:
+      - $ref: "#/components/parameters/ReleaseId"
+    post:
+      operationId: rolloutRelease
+      summary: Request a change of the rollout of the release in a store.
+      description: |
+        Open once the stores approved the release (`approved`, `live` or
+        `merged`), for a store it went to. Apple's phased release pauses,
+        resumes or completes; Google Play's staged rollout takes a new
+        `userFraction`, halts or completes. It dispatches the
+        `release-rollout` workflow, whose change is a gated action (D-13):
+        the run waits for an `app` or `cli` token to approve it, and then
+        the engine changes the rollout with the store credentials of the
+        app. `400 invalid_request` for a change the store cannot make,
+        `409 conflict` before the stores approved the release.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RolloutRequest"
+      responses:
+        "202":
+          description: The run that changes the rollout.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Run"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/WorkflowInvalid"
+        "503":
+          $ref: "#/components/responses/SecretsLocked"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /releases/{id}/history:
+    parameters:
+      - $ref: "#/components/parameters/ReleaseId"
+    get:
+      operationId: getReleaseHistory
+      summary: What happened to the release, oldest first.
+      description: |
+        Its dispatch and builds, each change in a store (with the device
+        that set a status by hand), the merge, the rollout changes and the
+        Shorebird patches, each with when it happened (U7b). The approvals
+        of its runs are read from `/approvals`.
+      responses:
+        "200":
+          description: The history.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReleaseHistory"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /releases/{id}/texts:
+    parameters:
+      - $ref: "#/components/parameters/ReleaseId"
+    put:
+      operationId: setReleaseTexts
+      summary: Set the texts the uploads of the release send. Only `app` and `cli` tokens may.
+      description: |
+        `whatsNew` goes to Google Play as the release notes in `en-US`;
+        `whatToTest` (else `whatsNew`) to Firebase App Distribution's
+        testers, when the upload step gives no release notes of its own. An
+        upload reads them when it runs. A missing or blank text is cleared.
+        `409 conflict` for an abandoned release.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReleaseTexts"
+      responses:
+        "200":
+          description: The release with its texts.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Release"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /releases/{id}/patches/{number}/{action}:
+    parameters:
+      - $ref: "#/components/parameters/ReleaseId"
+      - $ref: "#/components/parameters/PatchNumber"
+      - $ref: "#/components/parameters/PatchActionName"
+    post:
+      operationId: moveReleasePatch
+      summary: Request the promotion or the rollback of a Shorebird patch.
+      description: |
+        Open once the stores approved the release, for a patch XPath
+        published (its history has it). It dispatches the `shorebird-track`
+        workflow, whose `shorebird.track` step waits at `gate: prod_patch`
+        for an `app` or `cli` token to approve it (D-13). `400
+        invalid_request` for a patch number that is not one, an action other
+        than `promote` and `rollback`, or a patch the release has none of.
+      responses:
+        "202":
+          description: The run that moves the patch.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Run"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/WorkflowInvalid"
+        "503":
+          $ref: "#/components/responses/SecretsLocked"
+        "500":
+          $ref: "#/components/responses/InternalError"
   /releases/{id}/abandon:
     parameters:
       - $ref: "#/components/parameters/ReleaseId"
@@ -2311,6 +2455,87 @@ paths:
           $ref: "#/components/responses/UpstreamError"
         "503":
           $ref: "#/components/responses/SecretsLocked"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /tokens:
+    post:
+      operationId: createToken
+      summary: Make a token for `xp` or `xp mcp`. Only `app` tokens may.
+      description: |
+        The app makes the token of the CLI or of an agent (U5b), so
+        connecting `xp` needs no access to the `xpd` binary. `kind` is
+        `cli` or `mcp`; app and runner tokens come from `xpd token create`
+        and pairing only. The secret is in this response only and never
+        again; only its hash is kept. Any other token kind answers `403
+        forbidden`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateTokenRequest"
+      responses:
+        "201":
+          description: The token made, with its secret.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreatedToken"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /status:
+    get:
+      operationId: getStatus
+      summary: The token that asks, and whether the engine can reach its secrets.
+      description: |
+        What `xp status` shows beyond `GET /health` and `GET /version`:
+        the name and kind of the token that asks (never its secret), and
+        whether the engine could not reach its secrets at its last try
+        (D-10). It asks GitHub and the stores nothing, so it answers at
+        once; `GET /doctor` checks more.
+      responses:
+        "200":
+          description: The status.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StatusResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /doctor:
+    get:
+      operationId: getDoctor
+      summary: What the engine finds about the machine it runs on.
+      description: |
+        The checks `xp doctor` prints (U5b), made by the engine itself
+        rather than in the shell of the CLI, which may be on another
+        machine with another `PATH`: the capabilities of its own runner
+        (with the reason and fix of each one missing), whether it can read
+        its secrets, what GitHub says of its token, the credentials
+        refused at their last check, and SSH to the git host of each
+        project not on GitHub. `state` is `ok`, `missing` or `skipped`.
+        Closed to `runner` tokens.
+      responses:
+        "200":
+          description: The checks, in the order they ran.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DoctorResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "500":
           $ref: "#/components/responses/InternalError"
   /runners:
@@ -2711,6 +2936,19 @@ components:
       description: The release id, for example `rel_1a2b3c4d5e6f7a8b`.
       schema:
         type: string
+    PatchNumber:
+      name: number
+      in: path
+      required: true
+      description: The Shorebird patch of the release, from 1.
+      schema:
+        type: string
+    PatchActionName:
+      name: action
+      in: path
+      required: true
+      schema:
+        $ref: "#/components/schemas/PatchAction"
     ReleaseStoreName:
       name: store
       in: path
@@ -4398,6 +4636,82 @@ components:
           type: string
           description: What to do about `message`.
       additionalProperties: false
+    CreateTokenRequest:
+      type: object
+      required: [name, kind]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          description: What the owner calls the client, for example `xp on MacBook`.
+        kind:
+          type: string
+          enum: [cli, mcp]
+      additionalProperties: false
+    TokenInfo:
+      type: object
+      description: A device token, never its secret.
+      required: [id, name, kind, createdAt]
+      properties:
+        id:
+          type: string
+          pattern: "^tok_"
+        name:
+          type: string
+        kind:
+          type: string
+          enum: [app, cli, mcp, runner]
+        createdAt:
+          type: string
+          format: date-time
+      additionalProperties: false
+    CreatedToken:
+      type: object
+      required: [info, token]
+      properties:
+        info:
+          $ref: "#/components/schemas/TokenInfo"
+        token:
+          type: string
+          pattern: "^xpt_"
+          description: The bearer secret. Shown here only, never again.
+      additionalProperties: false
+    StatusResponse:
+      type: object
+      required: [token, secretsLocked]
+      properties:
+        token:
+          $ref: "#/components/schemas/TokenInfo"
+        secretsLocked:
+          type: boolean
+          description: Whether the engine could not reach its secrets at its last try.
+      additionalProperties: false
+    EngineCheck:
+      type: object
+      required: [name, state]
+      properties:
+        name:
+          type: string
+          description: What was checked, for example `android`, `secrets` or `ssh bitbucket.org`.
+        state:
+          type: string
+          enum: [ok, missing, skipped]
+        detail:
+          type: string
+          description: What was found, one sentence without its full stop.
+        fix:
+          type: string
+          description: What to do about it, one sentence without its full stop.
+      additionalProperties: false
+    DoctorResponse:
+      type: object
+      required: [checks]
+      properties:
+        checks:
+          type: array
+          items:
+            $ref: "#/components/schemas/EngineCheck"
+      additionalProperties: false
     SetGitHubTokenRequest:
       type: object
       required: [token]
@@ -4924,6 +5238,7 @@ components:
         - push
         - merge
         - delete
+        - rollout
     ApprovalsResponse:
       type: object
       required: [approvals]
@@ -5082,6 +5397,14 @@ components:
           type: string
         message:
           type: string
+        whatsNew:
+          type: string
+          description: What is new, for Google Play's release notes (U7b).
+        whatToTest:
+          type: string
+          description: >-
+            What testers should try, for Firebase App Distribution's release
+            notes (U7b).
         createdAt:
           type: string
           format: date-time
@@ -5106,6 +5429,85 @@ components:
           type: string
           enum: [approved, live]
           description: '`approved` or `live` for Apple, `live` for Google Play.'
+    ReleaseEventKind:
+      type: string
+      enum:
+        - created
+        - build
+        - store
+        - merge_requested
+        - merged
+        - abandoned
+        - rollout_requested
+        - rollout
+        - patch
+        - patch_requested
+        - patch_promoted
+        - patch_rolled_back
+        - texts
+    ReleaseEvent:
+      type: object
+      required: [kind, at]
+      additionalProperties: false
+      properties:
+        kind:
+          $ref: "#/components/schemas/ReleaseEventKind"
+        at:
+          type: string
+          format: date-time
+        store:
+          $ref: "#/components/schemas/ReleaseStore"
+        detail:
+          type: string
+          description: A store state, a rollout change, a build number.
+        by:
+          type: string
+          description: The device that did it; absent for the engine.
+        runId:
+          type: string
+        patchNumber:
+          type: integer
+          minimum: 1
+    ReleaseHistory:
+      type: object
+      required: [events]
+      additionalProperties: false
+      properties:
+        events:
+          type: array
+          items:
+            $ref: "#/components/schemas/ReleaseEvent"
+    ReleaseTexts:
+      type: object
+      additionalProperties: false
+      properties:
+        whatsNew:
+          type: string
+        whatToTest:
+          type: string
+    PatchAction:
+      type: string
+      enum: [promote, rollback]
+    RolloutAction:
+      type: string
+      description: |
+        Apple: `pause`, `resume` or `complete`. Google Play: `fraction`,
+        `halt` or `complete`.
+      enum: [pause, resume, complete, halt, fraction]
+    RolloutRequest:
+      type: object
+      required: [store, action]
+      additionalProperties: false
+      properties:
+        store:
+          $ref: "#/components/schemas/ReleaseStore"
+        action:
+          $ref: "#/components/schemas/RolloutAction"
+        userFraction:
+          type: number
+          exclusiveMinimum: 0
+          maximum: 1
+          description: For `fraction`, the share of users to reach.
     AbandonRequest:
       type: object
       additionalProperties: false

@@ -13,7 +13,7 @@ import 'package:xp_client/xp_client.dart';
 const mcpInstructions = '''
 XPath releases Flutter apps. These tools read projects, workflows, runs, jobs, logs, releases, approvals, test runs, storage, credentials (never a secret) and runners; create and edit projects and workflows (a workflow is checked first and its errors come back with their lines); and dispatch workflows.
 
-Gated actions (a production release, a production OTA patch, a store submission, a push, a merge, a delete) wait for the owner's approval. This server can never approve or deny: when a dispatched run reaches a gate, get_run shows it as waiting_for_approval with the pending approval ids; tell the owner, who approves in the XPath app or with `xp approvals approve <id>`, and wait_for_approval (or poll get_approval) until its state is no longer pending. Expired counts as denied. wait_for_run waits for a run to end or reach a gate; list_runs finds runs dispatched anywhere.
+Gated actions (a production release, a production OTA patch, a store submission, a push, a merge, a rollout change, a delete) wait for the owner's approval. This server can never approve or deny: when a dispatched run reaches a gate, get_run shows it as waiting_for_approval with the pending approval ids; tell the owner, who approves in the XPath app or with `xp approvals approve <id>`, and wait_for_approval (or poll get_approval) until its state is no longer pending. Expired counts as denied. wait_for_run waits for a run to end or reach a gate; list_runs finds runs dispatched anywhere.
 
 Projects can be named by id (prj_...), owner/name or just name. Workflows by id (wf_...) or name.''';
 
@@ -606,6 +606,49 @@ List<McpTool> buildXpTools(
           (await client.getReleaseNotes(args.string('release'))).toJson(),
       required: ['release'],
       readOnly: true,
+    ),
+    tool(
+      'request_rollout',
+      'Ask to change how a release reaches users in a store: pause, resume or '
+          "complete Apple's phased release; set the percent of, halt or "
+          "complete Google Play's staged rollout. Returns the run, which waits "
+          'for the owner to approve the rollout change; only the owner can.',
+      {
+        'release': text('The release id (rel_...).'),
+        'store': text(
+          'The store.',
+          values: [for (final store in ReleaseStore.values) store.wire],
+        ),
+        'action': text(
+          'Apple: pause, resume or complete. Google Play: fraction, halt or '
+          'complete.',
+          values: [for (final action in RolloutAction.values) action.wire],
+        ),
+        'percent': integer('For "fraction", the share of users from 1 to 100.'),
+      },
+      (args) async {
+        final store = args.string('store');
+        final action = args.string('action');
+        final percent = args.optionalInt('percent');
+        final run = await client.requestRollout(
+          args.string('release'),
+          RolloutRequest(
+            store:
+                ReleaseStore.values.where((s) => s.wire == store).firstOrNull ??
+                (throw const McpArgumentError('"store" is apple or play.')),
+            action:
+                RolloutAction.values
+                    .where((a) => a.wire == action)
+                    .firstOrNull ??
+                (throw const McpArgumentError(
+                  '"action" is pause, resume, complete, halt or fraction.',
+                )),
+            userFraction: percent == null ? null : percent / 100,
+          ),
+        );
+        return await _runWithApprovals(client, run);
+      },
+      required: ['release', 'store', 'action'],
     ),
     tool(
       'list_approvals',

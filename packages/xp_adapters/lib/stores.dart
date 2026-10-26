@@ -17,5 +17,6 @@ export 'src/stores/play/play_token_provider.dart';
 export 'src/stores/play/rs256_signer.dart';
 export 'src/stores/play/sqlite_play_credential_source.dart';
 export 'src/stores/shorebird/shorebird_cli.dart';
+export 'src/stores/shorebird/shorebird_cli_patches.dart';
 export 'src/stores/shorebird/shorebird_cli_releases.dart';
 export 'src/stores/shorebird/shorebird_cli_verifier.dart';

@@ -9,11 +9,19 @@ import 'package:xp_client/xp_client.dart';
 import 'package:xp_desktop/app/app.dart';
 import 'package:xp_desktop/credentials/credentials.dart';
 import 'package:xp_desktop/projects/bloc/projects_bloc.dart';
+import 'package:xp_desktop/settings/widgets/github_token_section.dart';
 import 'package:xp_desktop/shell/cubit/shell_cubit.dart';
 import 'package:xp_repositories/xp_repositories.dart';
 
 import '../helpers/fakes.dart';
 import '../helpers/pump_app.dart';
+
+/// The save button of the credential form, not the one of the GitHub token
+/// section below it (U6d).
+final Finder _formSave = find.descendant(
+  of: find.byType(CredentialForm),
+  matching: find.text('Check and save'),
+);
 
 void main() {
   setUpAll(() {
@@ -70,9 +78,10 @@ void main() {
     String? projectId,
     EngineStatus status = EngineStatus.connected,
     FilePicker? pickFile,
+    bool github = false,
   }) async {
     await tester.pumpApp(
-      CredentialsPage(projectId: projectId),
+      CredentialsPage(projectId: projectId, github: github),
       shell: shell,
       credentialsRepository: credentials,
       projectsRepository: projects,
@@ -86,6 +95,19 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  testWidgets('has the GitHub token, focused when it is what was asked', (
+    tester,
+  ) async {
+    await pump(tester, github: true);
+
+    final section = find.byType(GitHubTokenSection);
+    expect(section, findsOneWidget);
+    final input = tester.widget<EditableText>(
+      find.descendant(of: section, matching: find.byType(EditableText)),
+    );
+    expect(input.focusNode.hasFocus, isTrue);
+  });
+
   Finder field(String name) => find.byKey(Key('credentialForm.$name'));
 
   Future<void> choose(WidgetTester tester, Finder select, String label) async {
@@ -95,10 +117,21 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  /// Taps [label] in the row of [id]: a button, or an item of its menu
+  /// (U6c), which a disabled More does not open.
   Future<void> tapIn(WidgetTester tester, String id, String label) async {
-    await tester.tap(
-      find.descendant(of: find.byKey(ValueKey(id)), matching: find.text(label)),
+    Finder inRow(String text) => find.descendant(
+      of: find.byKey(ValueKey(id)),
+      matching: find.text(text),
     );
+    if (const {'Rename…', 'Replace secret…', 'Delete…'}.contains(label)) {
+      await tester.tap(inRow('More'));
+      await tester.pumpAndSettle();
+      if (find.text(label).evaluate().isEmpty) return;
+      await tester.tap(find.text(label).last);
+    } else {
+      await tester.tap(inRow(label));
+    }
     await tester.pumpAndSettle();
   }
 
@@ -144,7 +177,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Add a credential'), findsOneWidget);
 
-      await tester.tap(find.text('Check and save'));
+      await tester.tap(_formSave);
       expect(sent, isEmpty, reason: 'the fields are empty');
 
       await tester.enterText(field('name'), '  Team key ');
@@ -153,7 +186,7 @@ void main() {
       await tester.tap(find.text('Choose file…'));
       await tester.pumpAndSettle();
       await choose(tester, field('keyKind'), 'Individual key');
-      await tester.tap(find.text('Check and save'));
+      await tester.tap(_formSave);
       await tester.pumpAndSettle();
 
       expect(sent, [
@@ -168,7 +201,7 @@ void main() {
           },
         ),
       ]);
-      expect(find.text('Check and save'), findsNothing, reason: 'closed');
+      expect(_formSave, findsNothing, reason: 'closed');
       expect(find.text('Credential saved'), findsOneWidget);
     });
 
@@ -188,7 +221,7 @@ void main() {
       await tester.enterText(field('storePassword'), 'fake-store-pass');
       await tester.enterText(field('keyAlias'), 'upload');
       await tester.pump();
-      await tester.tap(find.text('Check and save'));
+      await tester.tap(_formSave);
       await tester.pumpAndSettle();
       expect((sent.single as CreateCredentialRequest).material, {
         'keystore': 'AQID',
@@ -224,7 +257,7 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('Cancel'));
       await tester.pumpAndSettle();
-      expect(find.text('Check and save'), findsNothing);
+      expect(_formSave, findsNothing);
     });
 
     testWidgets('shows why the engine refused, and replaces a secret', (
@@ -249,7 +282,7 @@ void main() {
       await tester.enterText(field('issuerId'), 'I');
       await tester.enterText(field('privateKey'), 'P');
       await tester.pump();
-      await tester.tap(find.text('Check and save'));
+      await tester.tap(_formSave);
       await tester.pumpAndSettle();
       expect(find.text('Not saved: The key was revoked.'), findsOneWidget);
 
@@ -258,7 +291,7 @@ void main() {
             sent.add(invocation.positionalArguments[1] as Object);
             return teamKey;
           });
-      await tester.tap(find.text('Check and save'));
+      await tester.tap(_formSave);
       await tester.pumpAndSettle();
       expect(sent, [
         const ReplaceCredentialRequest({
@@ -268,7 +301,7 @@ void main() {
           'keyKind': 'team',
         }),
       ]);
-      expect(find.text('Check and save'), findsNothing, reason: 'closed');
+      expect(_formSave, findsNothing, reason: 'closed');
     });
 
     testWidgets('renames a credential', (tester) async {
@@ -372,7 +405,7 @@ void main() {
       );
       await tester.tap(find.text('Add credential…').last);
       await tester.pumpAndSettle();
-      expect(find.text('Check and save'), findsOneWidget);
+      expect(_formSave, findsOneWidget);
       await pump(tester, projectList: const []);
       expect(
         find.text('Add a project to give its flavors credentials.'),
@@ -444,7 +477,7 @@ void main() {
       ]) {
         await tapIn(tester, 'crd_1', label);
       }
-      expect(find.text('Check and save'), findsNothing);
+      expect(_formSave, findsNothing);
       expect(find.text('Rename Team App Store key'), findsNothing);
       verifyNever(() => credentials.verifyCredential(any()));
     });

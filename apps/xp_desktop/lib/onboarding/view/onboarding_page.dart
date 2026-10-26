@@ -74,6 +74,13 @@ class _OnboardingViewState extends State<OnboardingView> {
                 l10n.onboardingSubtitle,
                 style: type.body.copyWith(color: colors.textSecondary),
               ),
+              if (widget.firstRun) ...[
+                const SizedBox(height: 8),
+                Text(
+                  l10n.onboardingFirstRelease,
+                  style: type.body.copyWith(color: colors.textSecondary),
+                ),
+              ],
               const SizedBox(height: 32),
               if (_remote) ...[
                 const AddEngineForm(),

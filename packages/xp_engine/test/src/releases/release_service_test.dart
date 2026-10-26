@@ -53,6 +53,14 @@ class _StaleRepository implements ReleaseRepository {
 
   @override
   Future<void> update(ReleaseRecord release) => inner.update(release);
+
+  @override
+  Future<void> addEvent(String releaseId, ReleaseEvent event) =>
+      inner.addEvent(releaseId, event);
+
+  @override
+  Future<List<ReleaseEvent>> events(String releaseId) =>
+      inner.events(releaseId);
 }
 
 void main() {
@@ -927,6 +935,123 @@ void main() {
           runId: 'run_9',
         ),
         _throws<ReleaseStateException>('release is draft'),
+      );
+    });
+
+    test('refuses a rollout run before the stores approved', () async {
+      final id = await h.open();
+
+      await expectLater(
+        h.service.attach(
+          releaseId: id,
+          projectId: 'prj_1',
+          kind: ReleaseRunKind.rollout,
+          runId: 'run_9',
+        ),
+        _throws<ReleaseStateException>('cannot change: it is draft'),
+      );
+      await h.finishBuild(id);
+      await h.service.sync(id);
+      for (final store in ReleaseStore.values) {
+        await h.service.setStoreStatus(id, store, StoreState.live, by: owner());
+      }
+      await h.service.attach(
+        releaseId: id,
+        projectId: 'prj_1',
+        kind: ReleaseRunKind.rollout,
+        runId: 'run_9',
+      );
+    });
+  });
+
+  group('the rollout', () {
+    late String id;
+
+    Future<void> live() async {
+      id = await h.open();
+      await h.finishBuild(id);
+      await h.service.sync(id);
+      for (final store in ReleaseStore.values) {
+        await h.service.setStoreStatus(id, store, StoreState.live, by: owner());
+      }
+    }
+
+    test('is requested through the release-rollout workflow', () async {
+      await live();
+
+      final run = await h.service.requestRollout(
+        id,
+        const RolloutRequest(
+          store: ReleaseStore.play,
+          action: RolloutAction.fraction,
+          userFraction: 0.5,
+        ),
+      );
+
+      expect(run.id, 'run_2');
+      final call = h.dispatched.single;
+      final workflow = (await h.workflows.list('prj_1'))
+          .firstWhere((w) => w.name == 'release-rollout');
+      final release = await h.record(id);
+      expect(call.workflow, workflow.id);
+      expect(call.request.ref, release.tag ?? release.branch);
+      expect(call.request.flavors, ['prod']);
+      expect(call.request.releaseVersion, '1.2.0+5');
+      expect(call.request.release, id);
+      expect(call.request.inputs, {
+        'store': 'play',
+        'action': 'fraction',
+        'userFraction': 0.5,
+      });
+    });
+
+    test('refuses a change the store cannot make', () async {
+      await live();
+
+      await expectLater(
+        h.service.requestRollout(
+          id,
+          const RolloutRequest(
+            store: ReleaseStore.apple,
+            action: RolloutAction.halt,
+          ),
+        ),
+        _throws<ReleaseRequestException>('pauses, resumes or completes'),
+      );
+    });
+
+    test('waits for the stores, and for a store the release went to', () async {
+      id = await h.open();
+      await expectLater(
+        h.service.requestRollout(
+          id,
+          const RolloutRequest(
+            store: ReleaseStore.apple,
+            action: RolloutAction.pause,
+          ),
+        ),
+        _throws<ReleaseStateException>('once the stores approved'),
+      );
+      await h.finishBuild(id);
+      await h.service.sync(id);
+      for (final store in ReleaseStore.values) {
+        await h.service.setStoreStatus(id, store, StoreState.live, by: owner());
+      }
+      final record = await h.record(id);
+      await h.releases.update(
+        record.copyWith(
+          stores: {ReleaseStore.play: record.stores[ReleaseStore.play]!},
+        ),
+      );
+      await expectLater(
+        h.service.requestRollout(
+          id,
+          const RolloutRequest(
+            store: ReleaseStore.apple,
+            action: RolloutAction.pause,
+          ),
+        ),
+        _throws<ReleaseStateException>('did not go to apple'),
       );
     });
   });

@@ -159,6 +159,8 @@ class ReleaseRecord extends Equatable {
     this.mergeCommit,
     this.mergeRunId,
     this.message,
+    this.whatsNew,
+    this.whatToTest,
   });
 
   /// The engine's id, for example `rel_1a2b3c4d5e6f7a8b`.
@@ -215,6 +217,13 @@ class ReleaseRecord extends Equatable {
   /// Why the release was abandoned, or what the owner should know.
   final String? message;
 
+  /// What is new, for Google Play's release notes (U7b).
+  final String? whatsNew;
+
+  /// What testers should try, for the release notes of Firebase App
+  /// Distribution (U7b).
+  final String? whatToTest;
+
   /// When the release was dispatched.
   final DateTime createdAt;
 
@@ -230,8 +239,8 @@ class ReleaseRecord extends Equatable {
       state == ReleaseState.live && prNumber != null && mergeRunId == null;
 
   /// This record with the given fields replaced. Pass `null` to [branch],
-  /// [tag], [headSha], [prNumber], [prUrl], [mergeCommit], [mergeRunId] or
-  /// [message] to clear them.
+  /// [tag], [headSha], [prNumber], [prUrl], [mergeCommit], [mergeRunId],
+  /// [message], [whatsNew] or [whatToTest] to clear them.
   ReleaseRecord copyWith({
     int? build,
     ReleaseState? state,
@@ -246,6 +255,8 @@ class ReleaseRecord extends Equatable {
     Object? mergeCommit = _unset,
     Object? mergeRunId = _unset,
     Object? message = _unset,
+    Object? whatsNew = _unset,
+    Object? whatToTest = _unset,
   }) => ReleaseRecord(
     id: id,
     projectId: projectId,
@@ -271,6 +282,10 @@ class ReleaseRecord extends Equatable {
         ? this.mergeRunId
         : mergeRunId as String?,
     message: identical(message, _unset) ? this.message : message as String?,
+    whatsNew: identical(whatsNew, _unset) ? this.whatsNew : whatsNew as String?,
+    whatToTest: identical(whatToTest, _unset)
+        ? this.whatToTest
+        : whatToTest as String?,
   );
 
   /// The stored form of [stores]: the `store_status` column.
@@ -311,6 +326,8 @@ class ReleaseRecord extends Equatable {
     mergeCommit: mergeCommit,
     mergeRunId: mergeRunId,
     message: message,
+    whatsNew: whatsNew,
+    whatToTest: whatToTest,
     createdAt: createdAt,
     updatedAt: updatedAt,
   );
@@ -335,6 +352,8 @@ class ReleaseRecord extends Equatable {
     mergeCommit,
     mergeRunId,
     message,
+    whatsNew,
+    whatToTest,
     createdAt,
     updatedAt,
   ];

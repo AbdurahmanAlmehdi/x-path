@@ -164,19 +164,27 @@ class FlavorLedger extends StatelessWidget {
       ),
       children: [
         _Cell(
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                flavor.name,
-                style: type.titleSm.copyWith(color: colors.textPrimary),
-              ),
-              Text(
-                {?flavor.iosBundleId, ?flavor.androidAppId}.join(' · '),
-                overflow: TextOverflow.ellipsis,
-                style: type.code.copyWith(color: colors.textSecondary),
-              ),
-            ],
+          GestureDetector(
+            // A right click copies a bundle ID (U6c).
+            onSecondaryTapUp: (details) =>
+                showXpContextMenu(context, details.globalPosition, [
+                  for (final id in {?flavor.iosBundleId, ?flavor.androidAppId})
+                    XpMenuAction.copy(l10n.menuCopyBundleId(id), id),
+                ]),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  flavor.name,
+                  style: type.titleSm.copyWith(color: colors.textPrimary),
+                ),
+                Text(
+                  {?flavor.iosBundleId, ?flavor.androidAppId}.join(' · '),
+                  overflow: TextOverflow.ellipsis,
+                  style: type.code.copyWith(color: colors.textSecondary),
+                ),
+              ],
+            ),
           ),
         ),
         _Cell(
@@ -298,14 +306,11 @@ class FlavorLedger extends StatelessWidget {
     if (onCredentials == null) return summary;
     return Tooltip(
       message: l10n.ledgerCredentialsManage,
-      child: MouseRegion(
-        cursor: SystemMouseCursors.click,
-        child: GestureDetector(
-          key: Key('ledger.credentials.${app.path}.${flavor.name}'),
-          behavior: HitTestBehavior.opaque,
-          onTap: () => onCredentials(flavor.name),
-          child: summary,
-        ),
+      child: XpTappable(
+        key: Key('ledger.credentials.${app.path}.${flavor.name}'),
+        label: l10n.ledgerCredentialsManage,
+        onTap: () => onCredentials(flavor.name),
+        child: summary,
       ),
     );
   }

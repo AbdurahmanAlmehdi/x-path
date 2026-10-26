@@ -24,6 +24,20 @@ const _menu = MenuBarContent(
   openApp: 'Open XPath',
 );
 
+const _engineNotice = EngineNotice(
+  target: 'job:job_1',
+  title: 'Job failed',
+  body: 'Build prod',
+);
+
+const _running = MenuBarRun(
+  target: 'run:run_1:prj_1',
+  title: 'Prod release 5.4.1',
+  detail: 'mataa · 3 of 5 jobs',
+);
+
+const _project = MenuBarProject(projectId: 'prj_1', name: 'mataa');
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   const channel = MethodChannel(needsYouChannelName);
@@ -58,7 +72,12 @@ void main() {
   test('the values compare by value', () {
     expect(_notice.props, hasLength(5));
     expect(_menu.items.single.props, hasLength(3));
-    expect(_menu.props, hasLength(4));
+    expect(_menu.props, hasLength(8));
+    expect(_engineNotice.props, ['job:job_1', 'Job failed', 'Build prod']);
+    expect(_running.props, hasLength(3));
+    expect(_project.props, ['prj_1', 'mataa']);
+    expect(const ShowNotice('runners').props, ['runners']);
+    expect(const DispatchProject('prj_1').props, ['prj_1']);
     expect(const ReviewApproval('a'), const ReviewApproval('a'));
     expect(const ShowApproval('a').props, ['a']);
     expect(const OpenApp().props, isEmpty);
@@ -71,11 +90,50 @@ void main() {
       await alerts.notify(_notice);
       await alerts.withdraw('apr_1');
       await alerts.updateMenuBar(_menu);
+      await alerts.notifyNotice(_engineNotice);
+      await alerts.updateMenuBar(
+        const MenuBarContent(
+          tooltip: 't',
+          header: 'h',
+          items: [],
+          openApp: 'o',
+          runningHeader: 'Running · 1',
+          running: [_running],
+          dispatch: 'Dispatch…',
+          projects: [_project],
+        ),
+      );
       expect(calls.map((call) => call.method), [
         'notify',
         'withdraw',
         'menuBar',
+        'notice',
+        'menuBar',
       ]);
+      expect(calls[3].arguments, {
+        'id': 'notice:job:job_1',
+        'title': 'Job failed',
+        'body': 'Build prod',
+      });
+      expect(calls[4].arguments, {
+        'tooltip': 't',
+        'header': 'h',
+        'needsYou': false,
+        'openApp': 'o',
+        'items': <Object?>[],
+        'runningHeader': 'Running · 1',
+        'running': [
+          {
+            'id': 'notice:run:run_1:prj_1',
+            'title': 'Prod release 5.4.1',
+            'detail': 'mataa · 3 of 5 jobs',
+          },
+        ],
+        'dispatch': 'Dispatch…',
+        'projects': [
+          {'id': 'prj_1', 'title': 'mataa'},
+        ],
+      });
       expect(calls[0].arguments, {
         'id': 'apr_1',
         'title': 'Submit 5.4.1 (3283) to the stores',
@@ -96,6 +154,8 @@ void main() {
             'detail': 'mataa_new_app · prod',
           },
         ],
+        'running': <Object?>[],
+        'projects': <Object?>[],
       });
     });
 
@@ -106,6 +166,8 @@ void main() {
       await fromRunner('review', {'id': 'apr_1'});
       await fromRunner('show', {'id': 'apr_2'});
       await fromRunner('open');
+      await fromRunner('show', {'id': 'notice:job:job_1'});
+      await fromRunner('dispatch', {'id': 'prj_1'});
       await fromRunner('review');
       await fromRunner('approve', {'id': 'apr_1'});
       await subscription.cancel();
@@ -113,6 +175,8 @@ void main() {
         ReviewApproval('apr_1'),
         ShowApproval('apr_2'),
         OpenApp(),
+        ShowNotice('job:job_1'),
+        DispatchProject('prj_1'),
       ]);
     });
   });
@@ -124,12 +188,14 @@ void main() {
     await alerts.notify(_notice);
     await alerts.withdraw('apr_1');
     await alerts.updateMenuBar(_menu);
+    await alerts.notifyNotice(_engineNotice);
     alerts.act(const OpenApp());
     await pumpEventQueue();
     await subscription.cancel();
     expect(alerts.notices, [_notice]);
     expect(alerts.withdrawn, ['apr_1']);
     expect(alerts.menus, [_menu]);
+    expect(alerts.engineNotices, [_engineNotice]);
     expect(actions, const [OpenApp()]);
   });
 }

@@ -110,7 +110,11 @@ void main() {
     expect(await app.version(), '0.0.1 (1)');
     expect(await app.moveToTrash(), isTrue);
     await app.quit();
-    expect((app.movedToTrash, app.quitted), (true, true));
+    await app.setKeepRunning(keep: true);
+    expect(
+      (app.movedToTrash, app.quitted, app.keepRunning),
+      (true, true, true),
+    );
 
     final menu = FakeAppMenu();
     final chosen = menu.settingsRequests.first;

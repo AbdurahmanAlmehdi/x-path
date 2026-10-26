@@ -19,6 +19,7 @@ import 'package:xpd/src/api/runs/runs_routes.dart';
 import 'package:xpd/src/api/storage/storage_routes.dart';
 import 'package:xpd/src/api/system_routes.dart';
 import 'package:xpd/src/api/tests/tests_routes.dart';
+import 'package:xpd/src/api/tokens/tokens_routes.dart';
 import 'package:xpd/src/api/workflows/workflows_routes.dart';
 
 /// Routes that need no device token: a client can probe an engine, and read
@@ -52,6 +53,8 @@ Handler buildApiHandler({
   required RunnerConnectRoute runnerConnect,
   required RunnerArtifacts runnerArtifacts,
   required RunnerBundles runnerBundles,
+  required EngineDoctor engineDoctor,
+  required SecretStore secrets,
   required String engineVersion,
   void Function(Object error, StackTrace stackTrace)? onError,
   void Function(String address, String why)? onRunnerRefused,
@@ -65,6 +68,8 @@ Handler buildApiHandler({
         )
         ..get('/health', health)
         ..get('/version', version(engineVersion))
+        ..get('/doctor', doctor(engineDoctor))
+        ..get('/status', status(secrets))
         ..get('/events', events.handle)
         ..get('/jobs/<id>/logs', jobLogs.handle)
         ..get('/runners/connect', runnerConnect.handle);
@@ -80,6 +85,7 @@ Handler buildApiHandler({
   ReleasesRoutes(releases, releaseNotes).addTo(router);
   StorageRoutes(housekeeping).addTo(router);
   RunnersRoutes(runners, runnerArtifacts, runnerBundles).addTo(router);
+  TokensRoutes(tokens).addTo(router);
   return const Pipeline()
       .addMiddleware(errorMiddleware(onError: onError))
       .addMiddleware(runnerRefusalMiddleware(onRunnerRefused ?? (_, _) {}))

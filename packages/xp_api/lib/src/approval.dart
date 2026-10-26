@@ -91,7 +91,7 @@ class Approval extends Equatable {
   final String projectId;
 
   /// What is to be approved: `prod_release`, `prod_patch`,
-  /// `store_submission`, `push`, `merge` or `delete`.
+  /// `store_submission`, `push`, `merge`, `delete` or `rollout`.
   final String action;
 
   /// The commit the action happens on, in full.

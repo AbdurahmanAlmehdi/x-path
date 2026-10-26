@@ -42,5 +42,6 @@ Response secretsLockedResponse() => errorResponse(
   'The engine cannot read its secrets right now.',
   hint:
       'Unlock them in the XPath app on the engine machine, or start xpd '
-      'with its key, then try again.',
+      'with its key, then try again. See '
+      'docs/guide/troubleshooting.md#secrets-are-locked.',
 );

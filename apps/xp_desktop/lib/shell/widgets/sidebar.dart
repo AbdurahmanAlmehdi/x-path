@@ -29,17 +29,8 @@ class Sidebar extends StatelessWidget {
     final reclaimable = context.select<StorageBloc, int?>(
       (bloc) => bloc.state.report?.reclaimableBytes,
     );
-    final selectedProject = switch (destination) {
-      ProjectDestination(:final projectId) => projectId,
-      ReleasesDestination(:final projectId) => projectId,
-      TestsDestination(:final projectId) => projectId,
-      WorkflowsDestination(:final projectId) => projectId,
-      RunsDestination(:final projectId) => projectId,
-      JobDestination(:final projectId) => projectId,
-      HomeDestination() when projects.projects.isNotEmpty =>
-        projects.projects.first.id,
-      _ => null,
-    };
+    // The project shown last stays open on the pages of the engine (U6d).
+    final selectedProject = context.read<ShellCubit>().lastProjectId;
     void show(ShellDestination destination) =>
         context.read<ShellCubit>().show(destination);
 
@@ -57,6 +48,14 @@ class Sidebar extends StatelessWidget {
           Expanded(
             child: ListView(
               children: [
+                SidebarRow(
+                  icon: PhosphorIconsRegular.house,
+                  selectedIcon: PhosphorIconsFill.house,
+                  label: l10n.homeTitle,
+                  selected: destination is HomeDestination,
+                  onTap: () => show(const HomeDestination()),
+                ),
+                const SizedBox(height: 12),
                 _Caption(l10n.sidebarProjects),
                 if (projects.projects.isEmpty)
                   Padding(
@@ -86,9 +85,7 @@ class Sidebar extends StatelessWidget {
                       selectedIcon: PhosphorIconsFill.treeStructure,
                       label: l10n.sidebarOverview,
                       indent: 12,
-                      selected:
-                          destination is ProjectDestination ||
-                          destination is HomeDestination,
+                      selected: destination is ProjectDestination,
                       onTap: () => show(ProjectDestination(project.id)),
                     ),
                     SidebarRow(
@@ -124,6 +121,14 @@ class Sidebar extends StatelessWidget {
                       indent: 12,
                       selected: destination is WorkflowsDestination,
                       onTap: () => show(WorkflowsDestination(project.id)),
+                    ),
+                    SidebarRow(
+                      icon: PhosphorIconsRegular.sliders,
+                      selectedIcon: PhosphorIconsFill.sliders,
+                      label: l10n.sidebarProjectSettings,
+                      indent: 12,
+                      selected: destination is ProjectSettingsDestination,
+                      onTap: () => show(ProjectSettingsDestination(project.id)),
                     ),
                   ],
                 ],
@@ -280,7 +285,12 @@ class _SidebarRowState extends State<SidebarRow> {
       hovered: _hovered,
       onHover: (value) => setState(() => _hovered = value),
       onTap: widget.onTap,
-      label: widget.label,
+      // The count and the fact are read out, not only drawn (U6c).
+      label: [
+        widget.label,
+        ?widget.meta,
+        if (widget.count > 0) context.l10n.sidebarNeedsYouCount(widget.count),
+      ].join(', '),
       child: SizedBox(
         height: context.xpSizes.rowSidebar,
         child: Row(
@@ -375,30 +385,27 @@ class _ProjectRowState extends State<_ProjectRow> {
         .where((finding) => finding.severity == FindingSeverity.warning)
         .length;
     final apps = l10n.projectApps(project.profile.apps.length);
-    final Widget meta = widget.needsYou > 0
-        ? XpStatusLabel(
+    final (status, metaText) = widget.needsYou > 0
+        ? (
             XpStatus.approvalPending,
             '$apps · ${l10n.overviewNeedsYou(widget.needsYou)}',
           )
         : errors > 0
-        ? XpStatusLabel(
-            XpStatus.scanError,
-            '$apps · ${l10n.projectErrors(errors)}',
-          )
+        ? (XpStatus.scanError, '$apps · ${l10n.projectErrors(errors)}')
         : warnings > 0
-        ? XpStatusLabel(
-            XpStatus.scanWarning,
-            '$apps · ${l10n.projectWarnings(warnings)}',
-          )
-        : Text(apps, style: type.caption.copyWith(color: colors.textSecondary));
+        ? (XpStatus.scanWarning, '$apps · ${l10n.projectWarnings(warnings)}')
+        : (null, apps);
+    final Widget meta = status == null
+        ? Text(apps, style: type.caption.copyWith(color: colors.textSecondary))
+        : XpStatusLabel(status, metaText);
     return _Hoverable(
       selected: widget.selected,
       hovered: _hovered,
       onHover: (value) => setState(() => _hovered = value),
       onTap: widget.onTap,
-      label: project.fullName,
-      child: SizedBox(
-        height: 40,
+      label: '${project.fullName}, $metaText',
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: 40),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -433,41 +440,34 @@ class _Hoverable extends StatelessWidget {
   final bool hovered;
   final ValueChanged<bool> onHover;
   final VoidCallback onTap;
+
+  /// What a screen reader says: the name, then any count or fact.
   final String label;
   final Widget child;
 
   @override
   Widget build(BuildContext context) {
     final colors = context.xpColors;
-    return Semantics(
-      button: true,
+    return XpTappable(
       selected: selected,
+      onHover: onHover,
+      onTap: onTap,
       label: label,
-      excludeSemantics: true,
-      child: MouseRegion(
-        cursor: SystemMouseCursors.click,
-        onEnter: (_) => onHover(true),
-        onExit: (_) => onHover(false),
-        child: GestureDetector(
-          onTap: onTap,
-          behavior: HitTestBehavior.opaque,
-          child: AnimatedContainer(
-            duration: context.xpMotion.durationFast,
-            padding: const EdgeInsets.symmetric(horizontal: 10),
-            decoration: BoxDecoration(
-              color: selected
-                  ? colors.surfaceSelected
-                  : hovered
-                  ? colors.surfaceHover
-                  : Colors.transparent,
-              borderRadius: BorderRadius.circular(context.xpRadii.md),
-              border: Border.all(
-                color: selected ? colors.borderStrong : Colors.transparent,
-              ),
-            ),
-            child: child,
+      child: AnimatedContainer(
+        duration: context.xpMotion.durationFast,
+        padding: const EdgeInsets.symmetric(horizontal: 10),
+        decoration: BoxDecoration(
+          color: selected
+              ? colors.surfaceSelected
+              : hovered
+              ? colors.surfaceHover
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(context.xpRadii.md),
+          border: Border.all(
+            color: selected ? colors.borderStrong : Colors.transparent,
           ),
         ),
+        child: child,
       ),
     );
   }

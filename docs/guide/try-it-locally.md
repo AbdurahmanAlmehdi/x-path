@@ -1,7 +1,7 @@
 # Try XPath locally
 
 This guide gets XPath running on your own Mac, connects your own accounts and runs a first dev
-build of `mataa_new_app`. Everything stays on this Mac; nothing in the repository
+build of your own Flutter app. Everything stays on this Mac; nothing in the repository
 of your app is written except the release tags and commits a prod release makes.
 
 You need macOS 13 or later, Xcode, git, and the Flutter toolchain your app uses (fvm if the app pins
@@ -36,10 +36,16 @@ tool/release/build_mac.sh --install
 ```
 
 It builds the `xpd` engine and the `xp` CLI, builds `XPath.app` in release mode, puts both tools
-inside the app (`Contents/Helpers/xpd` and `Contents/Helpers/xp`), signs everything with your Apple
-Development identity (Hardened Runtime, team AFBD5TBR5U) and replaces `/Applications/XPath.app`.
-Another identity can be named with `XPATH_SIGN_IDENTITY`; `--reuse-bundles` skips rebuilding the
-tools when only the app changed.
+inside the app (`Contents/Helpers/xpd` and `Contents/Helpers/xp`), signs everything with an Apple
+Development identity (Hardened Runtime) and replaces `/Applications/XPath.app`. The default
+identity is the repository owner's, so set `XPATH_SIGN_IDENTITY` to your own before you run it:
+its SHA-1 or its full name, as `security find-identity -v -p codesigning` lists them:
+
+```bash
+export XPATH_SIGN_IDENTITY="Apple Development: Your Name (YOUR_CERT_ID)"
+```
+
+`--reuse-bundles` skips rebuilding the tools when only the app changed.
 
 When you install over a running engine, restart it so it picks up the new `xpd`:
 
@@ -95,10 +101,10 @@ From a terminal the same import is:
 /Applications/XPath.app/Contents/Helpers/xpd/bin/xpd secrets import-gh
 ```
 
-## 4. Add mataa_new_app
+## 4. Add your app
 
 1. In the sidebar choose **Add project…**.
-2. **Choose folder…** and pick your clone of `mataa_new_app`, then **Add and scan**. XPath reads the
+2. **Choose folder…** and pick your clone of `<your-app>`, then **Add and scan**. XPath reads the
    folder and never writes to it; builds run from the engine's own copy of the repository.
 3. **Review the scan.** It lists the apps, flavors, iOS bundle IDs, Android application IDs and
    Shorebird. Errors must be fixed in the repository and scanned again; warnings can wait. Press
@@ -114,7 +120,7 @@ their names. The secrets stay on this Mac.
    **Name** you will recognise (for example "Personal Apple Dev Account"), pick the **Kind**, fill
    the fields and press **Check and save**. The engine checks it with the service it is for and
    stores nothing if the check fails.
-2. Under **Flavors**, pick **mataa_new_app** and press **Manage…** on a flavor (or click the
+2. Under **Flavors**, pick `<your-app>` and press **Manage…** on a flavor (or click the
    credentials of a flavor on the project overview). For each kind, **Assign…** picks an existing
    credential or **Add new…**. **Use for** says whether it is for **This flavor** or **Every flavor
    of** the app; flavors that already have a credential of that kind keep it unless **Replace
@@ -143,13 +149,13 @@ From a terminal, `xp credentials` does the same, without ever taking a secret as
 ```sh
 xp credentials add --kind asc_key --name "Personal Apple Dev Account" \
   --key-id ABC123DEF4 --issuer-id <issuer id> --p8 ~/keys/AuthKey_ABC123DEF4.p8
-xp credentials assign "Personal Apple Dev Account" --project mataa_new_app --all-flavors
+xp credentials assign "Personal Apple Dev Account" --project <your-app> --all-flavors
 xp credentials list
 ```
 
 ## 6. Run a dev build
 
-1. Select **mataa_new_app** in the sidebar. The overview shows each flavor's local, testing and live
+1. Select `<your-app>` in the sidebar. The overview shows each flavor's local, testing and live
    versions.
 2. Press **Dispatch…** (⌘N), pick the **Dev build** workflow, the dev flavor and the platforms, and
    check **Will run**: it lists every job, where it runs and which approvals it waits for.
@@ -169,7 +175,7 @@ To upload, either:
   ```
 
   (`xp` needs a CLI token once: `xpd token create --name "My Mac" --kind cli` with the `xpd` inside
-  the app, then `xp connect http://127.0.0.1:7480 --token <token>`), or
+  the app, then `xp connect http://127.0.0.1:7480`, which asks for the token), or
 - open **Workflows**, pick **Dev build**, **Save as…** a copy, set the default of
   `firebaseAppIds` / `appleAppIds` in the YAML and dispatch that copy from the app.
 

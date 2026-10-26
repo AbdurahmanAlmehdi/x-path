@@ -37,6 +37,25 @@ class JobsRepository {
     },
   );
 
+  /// The runs of every project that have not finished, newest first, out
+  /// of the newest [limit]: what the menu bar extra shows as running (U6b).
+  /// Kept up to date by every run dispatched and every job that changes.
+  Stream<Snapshot<List<Run>>> watchActiveRuns({int limit = 50}) =>
+      _session.watch(
+        key: 'runs.active.$limit',
+        fetch: (client) async => [
+          for (final run in (await client.listRuns(limit: limit)).runs)
+            if (!run.state.isFinished) run,
+        ],
+        encode: (runs) => [for (final run in runs) run.toJson()],
+        decode: (json) => [
+          for (final run in json! as List<Object?>)
+            Run.fromJson(run! as Map<String, dynamic>),
+        ],
+        refreshOn: (event) =>
+            event is RunDispatched || event is JobStateChanged,
+      );
+
   /// Dispatches the run [id] again: a new run of the same workflow version,
   /// commit and request. The new run.
   Future<Run> runAgain(String id) =>

@@ -7,6 +7,10 @@ import 'package:flutter/services.dart';
 /// extra (`MacosServicesChannel.swift`, ADR 0005).
 const needsYouChannelName = 'ly.abdurahman.xpath/needs_you';
 
+/// What starts the id of a notification or menu row that is not an
+/// approval: the rest is its target.
+const noticePrefix = 'notice:';
+
 /// A macOS notification of an approval that waits
 /// (`Approval-Notification.dc.html`). Its buttons are [review] and [later];
 /// neither approves anything.
@@ -37,6 +41,60 @@ class ApprovalNotice extends Equatable {
 
   @override
   List<Object?> get props => [approvalId, title, body, review, later];
+}
+
+/// A macOS notification of something the engine says happened (a failed
+/// job, a release the stores rejected, a lost runner, ...), without buttons.
+/// Clicking it opens [target] in the main window.
+class EngineNotice extends Equatable {
+  /// Creates the notice.
+  const new({required this.target, required this.title, required this.body});
+
+  /// What clicking it opens, as the app names it (for example
+  /// `job:job_1a2b`). It also names the notification.
+  final String target;
+
+  /// One line.
+  final String title;
+
+  /// The details.
+  final String body;
+
+  @override
+  List<Object?> get props => [target, title, body];
+}
+
+/// A run that works now, in the menu bar extra.
+class MenuBarRun extends Equatable {
+  /// Creates the row.
+  const new({required this.target, required this.title, required this.detail});
+
+  /// What clicking it opens, as for [EngineNotice.target].
+  final String target;
+
+  /// The workflow and the version, for example `Prod release 5.4.1`.
+  final String title;
+
+  /// The project and the progress, for example `mataa · 3 of 5 jobs`.
+  final String detail;
+
+  @override
+  List<Object?> get props => [target, title, detail];
+}
+
+/// A project in the "Dispatch…" menu of the menu bar extra.
+class MenuBarProject extends Equatable {
+  /// Creates the row.
+  const new({required this.projectId, required this.name});
+
+  /// The project.
+  final String projectId;
+
+  /// Its name.
+  final String name;
+
+  @override
+  List<Object?> get props => [projectId, name];
 }
 
 /// One approval in the menu bar extra.
@@ -71,6 +129,10 @@ class MenuBarContent extends Equatable {
     required this.header,
     required this.items,
     required this.openApp,
+    this.runningHeader,
+    this.running = const [],
+    this.dispatch,
+    this.projects = const [],
   });
 
   /// The tooltip of the icon, for example `XPath: 1 needs you`.
@@ -86,6 +148,19 @@ class MenuBarContent extends Equatable {
   /// The label of the item that brings the window forward ("Open XPath").
   final String openApp;
 
+  /// The line over [running], for example `Running · 2`; no section without
+  /// it.
+  final String? runningHeader;
+
+  /// The runs that work now, each opening its job view.
+  final List<MenuBarRun> running;
+
+  /// The label of the quick dispatch menu ("Dispatch…"); none without it.
+  final String? dispatch;
+
+  /// The projects quick dispatch offers.
+  final List<MenuBarProject> projects;
+
   /// Whether something waits for the owner.
   bool get needsYou => items.isNotEmpty;
 
@@ -99,10 +174,33 @@ class MenuBarContent extends Equatable {
       for (final item in items)
         {'id': item.approvalId, 'title': item.title, 'detail': item.detail},
     ],
+    'runningHeader': ?runningHeader,
+    'running': [
+      for (final run in running)
+        {
+          'id': '$noticePrefix${run.target}',
+          'title': run.title,
+          'detail': run.detail,
+        },
+    ],
+    'dispatch': ?dispatch,
+    'projects': [
+      for (final project in projects)
+        {'id': project.projectId, 'title': project.name},
+    ],
   };
 
   @override
-  List<Object?> get props => [tooltip, header, items, openApp];
+  List<Object?> get props => [
+    tooltip,
+    header,
+    items,
+    openApp,
+    runningHeader,
+    running,
+    dispatch,
+    projects,
+  ];
 }
 
 /// What the owner did with a notification or the menu bar extra. None of it
@@ -140,6 +238,30 @@ final class ShowApproval extends NeedsYouAction {
   List<Object?> get props => [approvalId];
 }
 
+/// A notice, or a run of the menu bar extra, was clicked: open [target].
+final class ShowNotice extends NeedsYouAction {
+  /// Creates the action.
+  const new(this.target);
+
+  /// What to open, as [EngineNotice.target] names it.
+  final String target;
+
+  @override
+  List<Object?> get props => [target];
+}
+
+/// A project of the menu bar extra's "Dispatch…" was chosen.
+final class DispatchProject extends NeedsYouAction {
+  /// Creates the action.
+  const new(this.projectId);
+
+  /// The project.
+  final String projectId;
+
+  @override
+  List<Object?> get props => [projectId];
+}
+
 /// "Open XPath": bring the window forward.
 final class OpenApp extends NeedsYouAction {
   /// Creates the action.
@@ -152,6 +274,9 @@ abstract interface class NeedsYouAlerts {
   /// Shows [notice]. The first notice asks macOS for permission to notify;
   /// nothing is shown if the owner refused.
   Future<void> notify(ApprovalNotice notice);
+
+  /// Shows [notice], a notification without buttons.
+  Future<void> notifyNotice(EngineNotice notice);
 
   /// Takes the notification of [approvalId] away (it was decided).
   Future<void> withdraw(String approvalId);
@@ -180,7 +305,11 @@ class MethodChannelNeedsYouAlerts implements NeedsYouAlerts {
     final id = arguments is Map ? arguments['id'] as String? : null;
     final action = switch ((call.method, id)) {
       ('review', final String id) => ReviewApproval(id),
+      ('show', final String id) when id.startsWith(noticePrefix) => ShowNotice(
+        id.substring(noticePrefix.length),
+      ),
       ('show', final String id) => ShowApproval(id),
+      ('dispatch', final String id) => DispatchProject(id),
       ('open', _) => const OpenApp(),
       _ => null,
     };
@@ -195,6 +324,14 @@ class MethodChannelNeedsYouAlerts implements NeedsYouAlerts {
         'body': notice.body,
         'review': notice.review,
         'later': notice.later,
+      });
+
+  @override
+  Future<void> notifyNotice(EngineNotice notice) =>
+      channel.invokeMethod<void>('notice', {
+        'id': '$noticePrefix${notice.target}',
+        'title': notice.title,
+        'body': notice.body,
       });
 
   @override

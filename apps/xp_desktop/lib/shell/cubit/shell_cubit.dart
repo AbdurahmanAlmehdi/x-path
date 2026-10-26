@@ -84,6 +84,17 @@ final class WorkflowsDestination extends ShellDestination {
   List<Object?> get props => [projectId, workflowId];
 }
 
+/// The settings of [projectId]: base branch, gates, store ids, git host,
+/// remove (U6d).
+final class ProjectSettingsDestination extends ShellDestination {
+  const new(this.projectId);
+
+  final String projectId;
+
+  @override
+  List<Object?> get props => [projectId];
+}
+
 /// The runners of the engine.
 final class RunnersDestination extends ShellDestination {
   const new();
@@ -109,14 +120,20 @@ final class AddProjectDestination extends ShellDestination {
   const new();
 }
 
-/// The credentials, of [projectId] if given (else the first project).
+/// The credentials, of [projectId] if given (else the first project), and
+/// the engine's GitHub token (U6d). [github] puts the cursor in the GitHub
+/// token field.
 final class CredentialsDestination extends ShellDestination {
-  const new([this.projectId]);
+  const new([this.projectId]) : github = false;
+
+  /// The credentials with the cursor in the GitHub token field.
+  const new gitHub() : projectId = null, github = true;
 
   final String? projectId;
+  final bool github;
 
   @override
-  List<Object?> get props => [projectId];
+  List<Object?> get props => [projectId, github];
 }
 
 /// The engine list.
@@ -129,42 +146,140 @@ final class OnboardingDestination extends ShellDestination {
   const new();
 }
 
-/// The settings: the versions, the engine's GitHub token and "Remove
-/// XPath". [github] puts the cursor in the GitHub token field.
+/// The settings of the app and of this Mac: the versions, the `xp` link,
+/// tokens, notifications, the runner URL and "Remove XPath".
 final class SettingsDestination extends ShellDestination {
-  const new({this.github = false});
-
-  final bool github;
-
-  @override
-  List<Object?> get props => [github];
+  const new();
 }
+
+/// [destination] as the app remembers it between launches (U6b), or `null`
+/// for one it does not restore (onboarding, Add project).
+String? encodeDestination(ShellDestination destination) =>
+    switch (destination) {
+      HomeDestination() => 'home',
+      ProjectDestination(:final projectId) => 'project:$projectId',
+      JobDestination(:final runId, :final projectId) => [
+        'job',
+        runId,
+        ?projectId,
+      ].join(':'),
+      ReleasesDestination(:final projectId) => 'releases:$projectId',
+      TestsDestination(:final projectId) => 'tests:$projectId',
+      RunsDestination(:final projectId) => 'runs:$projectId',
+      WorkflowsDestination(:final projectId) => 'workflows:$projectId',
+      ProjectSettingsDestination(:final projectId) =>
+        'project-settings:$projectId',
+      RunnersDestination() => 'runners',
+      StorageDestination() => 'storage',
+      ApprovalsDestination() => 'approvals',
+      CredentialsDestination(:final projectId) => [
+        'credentials',
+        ?projectId,
+      ].join(':'),
+      EnginesDestination() => 'engines',
+      SettingsDestination() => 'settings',
+      AddProjectDestination() || OnboardingDestination() => null,
+    };
+
+/// The destination [encoded] names, or `null` when it names none.
+ShellDestination? decodeDestination(String? encoded) =>
+    switch (encoded?.split(':')) {
+      ['home'] => const HomeDestination(),
+      ['project', final id] => ProjectDestination(id),
+      ['job', final runId] => JobDestination(runId),
+      ['job', final runId, final projectId] => JobDestination(
+        runId,
+        projectId: projectId,
+      ),
+      ['releases', final id] => ReleasesDestination(id),
+      ['tests', final id] => TestsDestination(id),
+      ['runs', final id] => RunsDestination(id),
+      ['workflows', final id] => WorkflowsDestination(id),
+      ['project-settings', final id] => ProjectSettingsDestination(id),
+      ['runners'] => const RunnersDestination(),
+      ['storage'] => const StorageDestination(),
+      ['approvals'] => const ApprovalsDestination(),
+      ['credentials'] => const CredentialsDestination(),
+      ['credentials', final id] => CredentialsDestination(id),
+      ['engines'] => const EnginesDestination(),
+      ['settings'] => const SettingsDestination(),
+      _ => null,
+    };
 
 /// Whether the shown destination may be left; `false` keeps it (the owner
 /// chose to keep a draft).
 typedef CanLeave = Future<bool> Function();
 
-/// Where the shell is. It lives inside the engine's subtree, so switching
-/// engines starts over at [HomeDestination].
+/// Where the shell is, and where it was: ⌘[ goes back to the destination
+/// shown before, ⌘] forward again, as in Safari. It lives inside the
+/// engine's subtree, so switching engines starts over at
+/// [HomeDestination] with no history.
 class ShellCubit extends Cubit<ShellDestination> {
   new([super.initialState = const HomeDestination()]);
 
+  /// The most destinations kept to go back to.
+  static const historyLimit = 50;
+
   CanLeave? _canLeave;
+  final _back = <ShellDestination>[];
+  final _forward = <ShellDestination>[];
+
+  /// Whether ⌘[ has somewhere to go.
+  bool get canGoBack => _back.isNotEmpty;
+
+  /// Whether ⌘] has somewhere to go.
+  bool get canGoForward => _forward.isNotEmpty;
 
   /// Shows [destination], once the guard of the shown one (if any) lets it
-  /// go.
+  /// go. The shown one goes on the back stack; the forward stack empties.
   void show(ShellDestination destination) {
     if (destination == state) return;
+    _go(destination, () {
+      _back.add(state);
+      if (_back.length > historyLimit) _back.removeAt(0);
+      _forward.clear();
+    });
+  }
+
+  /// ⌘[: shows the destination shown before this one.
+  void back() {
+    if (_back.isEmpty) return;
+    _go(_back.last, () {
+      _back.removeLast();
+      _forward.add(state);
+    });
+  }
+
+  /// ⌘]: shows again the destination [back] left.
+  void forward() {
+    if (_forward.isEmpty) return;
+    _go(_forward.last, () {
+      _forward.removeLast();
+      _back.add(state);
+    });
+  }
+
+  /// Moves to [destination] and runs [record] just before, once the guard
+  /// of the shown destination (if any) lets it go.
+  void _go(ShellDestination destination, void Function() record) {
     final canLeave = _canLeave;
     if (canLeave == null) {
+      record();
       emit(destination);
       return;
     }
-    unawaited(_leave(canLeave, destination));
+    unawaited(_leave(canLeave, destination, record));
   }
 
-  Future<void> _leave(CanLeave canLeave, ShellDestination destination) async {
-    if (await canLeave() && !isClosed) emit(destination);
+  Future<void> _leave(
+    CanLeave canLeave,
+    ShellDestination destination,
+    void Function() record,
+  ) async {
+    if (await canLeave() && !isClosed) {
+      record();
+      emit(destination);
+    }
   }
 
   /// Asks [canLeave] before every later [show] that leaves the shown
@@ -177,12 +292,22 @@ class ShellCubit extends Cubit<ShellDestination> {
   }
 
   /// The project the destination shows, if it shows one.
-  String? get projectId => switch (state) {
-    ProjectDestination(:final projectId) ||
-    ReleasesDestination(:final projectId) ||
-    TestsDestination(:final projectId) ||
-    WorkflowsDestination(:final projectId) => projectId,
-    JobDestination(:final projectId) => projectId,
-    _ => null,
-  };
+  String? get projectId => _projectOf(state);
+
+  /// The project the shell showed last, also from a page of the engine: the
+  /// sidebar keeps it open (U6d).
+  String? get lastProjectId =>
+      projectId ?? _back.reversed.map(_projectOf).nonNulls.firstOrNull;
+
+  static String? _projectOf(ShellDestination destination) =>
+      switch (destination) {
+        ProjectDestination(:final projectId) ||
+        ReleasesDestination(:final projectId) ||
+        TestsDestination(:final projectId) ||
+        RunsDestination(:final projectId) ||
+        WorkflowsDestination(:final projectId) ||
+        ProjectSettingsDestination(:final projectId) => projectId,
+        JobDestination(:final projectId) => projectId,
+        _ => null,
+      };
 }

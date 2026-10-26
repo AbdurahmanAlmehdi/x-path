@@ -4,6 +4,7 @@ import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:xp_api/xp_api.dart';
@@ -19,6 +20,7 @@ import 'package:xp_desktop/onboarding/view/onboarding_page.dart';
 import 'package:xp_desktop/project_overview/view/project_overview_page.dart';
 import 'package:xp_desktop/projects/bloc/projects_bloc.dart';
 import 'package:xp_desktop/projects/view/no_projects_page.dart';
+import 'package:xp_desktop/projects/view/project_settings_page.dart';
 import 'package:xp_desktop/releases/view/releases_page.dart';
 import 'package:xp_desktop/runners/runners.dart';
 import 'package:xp_desktop/runs/view/runs_page.dart';
@@ -151,10 +153,11 @@ void main() {
       expect(shell.state, ProjectDestination(mataa.id));
     });
 
-    testWidgets('shows the first project at home', (tester) async {
+    testWidgets('shows every project at home', (tester) async {
       await pumpShell(tester);
-      expect(find.byType(ProjectOverviewPage), findsOneWidget);
-      expect(find.text('main · 1 app'), findsOneWidget);
+      expect(find.byType(HomePage), findsOneWidget);
+      expect(find.text('acme/mataa_captain'), findsOneWidget);
+      expect(find.text('2 projects'), findsOneWidget);
     });
 
     testWidgets('shows nothing before the projects load', (tester) async {
@@ -190,7 +193,9 @@ void main() {
       (const CredentialsDestination('prj_1'), CredentialsPage),
       (const EnginesDestination(), EnginesPage),
       (const OnboardingDestination(), OnboardingPage),
-      (const SettingsDestination(github: true), SettingsPage),
+      (const SettingsDestination(), SettingsPage),
+      (const ProjectSettingsDestination('prj_1'), ProjectSettingsPage),
+      (const HomeDestination(), HomePage),
     ]) {
       testWidgets('shows $page for $destination', (tester) async {
         await pumpShell(tester, shell: ShellCubit(destination));
@@ -272,6 +277,101 @@ void main() {
       expect: () => [const StorageDestination()],
     );
 
+    blocTest<ShellCubit, ShellDestination>(
+      'goes back and forward through what it showed',
+      build: ShellCubit.new,
+      act: (shell) {
+        expect(shell.canGoBack, isFalse);
+        shell
+          ..show(const RunnersDestination())
+          ..show(const StorageDestination())
+          ..back();
+        expect(shell.canGoForward, isTrue);
+        shell
+          ..back()
+          ..back()
+          ..forward()
+          ..show(const EnginesDestination());
+        expect(shell.canGoForward, isFalse, reason: 'a new page clears it');
+        shell.forward();
+      },
+      expect: () => const [
+        RunnersDestination(),
+        StorageDestination(),
+        RunnersDestination(),
+        HomeDestination(),
+        RunnersDestination(),
+        EnginesDestination(),
+      ],
+    );
+
+    blocTest<ShellCubit, ShellDestination>(
+      'asks the guard before going back, and keeps at most the limit',
+      build: ShellCubit.new,
+      act: (shell) async {
+        for (var i = 0; i <= ShellCubit.historyLimit; i++) {
+          shell.show(JobDestination('run_$i'));
+        }
+        shell
+          ..guard(() async => false)
+          ..back();
+        await Future<void>.delayed(Duration.zero);
+        expect(
+          shell.state,
+          const JobDestination('run_${ShellCubit.historyLimit}'),
+        );
+        shell.guard(() async => true);
+        for (var i = 0; i < ShellCubit.historyLimit + 1; i++) {
+          shell.back();
+          await Future<void>.delayed(Duration.zero);
+        }
+        expect(shell.state, const JobDestination('run_0'));
+      },
+    );
+
+    test('remembers the project shown last on the pages of the engine', () {
+      final shell = ShellCubit()..show(const RunnersDestination());
+      expect(shell.lastProjectId, isNull);
+      shell
+        ..show(const ProjectSettingsDestination('prj_2'))
+        ..show(const RunnersDestination())
+        ..show(const CredentialsDestination.gitHub());
+      expect(shell.projectId, isNull);
+      expect(shell.lastProjectId, 'prj_2');
+      expect(const CredentialsDestination.gitHub().props, [null, true]);
+    });
+
+    test('encodes the destinations it restores, and decodes them', () {
+      for (final destination in const [
+        HomeDestination(),
+        ProjectDestination('prj_1'),
+        JobDestination('run_1'),
+        JobDestination('run_1', projectId: 'prj_1'),
+        ReleasesDestination('prj_1'),
+        TestsDestination('prj_1'),
+        RunsDestination('prj_1'),
+        WorkflowsDestination('prj_1'),
+        RunnersDestination(),
+        StorageDestination(),
+        ApprovalsDestination(),
+        CredentialsDestination(),
+        CredentialsDestination('prj_1'),
+        ProjectSettingsDestination('prj_1'),
+        EnginesDestination(),
+        SettingsDestination(),
+      ]) {
+        expect(
+          decodeDestination(encodeDestination(destination)),
+          destination,
+          reason: '$destination',
+        );
+      }
+      expect(encodeDestination(const AddProjectDestination()), isNull);
+      expect(encodeDestination(const OnboardingDestination()), isNull);
+      expect(decodeDestination(null), isNull);
+      expect(decodeDestination('nonsense:1:2:3'), isNull);
+    });
+
     test('does not leave once closed', () async {
       final answer = Completer<bool>();
       final shell = ShellCubit()
@@ -281,6 +381,110 @@ void main() {
       answer.complete(true);
       await Future<void>.delayed(Duration.zero);
       expect(shell.state, const HomeDestination());
+    });
+  });
+
+  group('the commands of the shell', () {
+    Future<void> press(WidgetTester tester, SingleActivator activator) async {
+      final modifiers = [
+        if (activator.control) LogicalKeyboardKey.controlLeft,
+        if (activator.shift) LogicalKeyboardKey.shiftLeft,
+        if (activator.meta) LogicalKeyboardKey.metaLeft,
+      ];
+      for (final key in modifiers) {
+        await tester.sendKeyDownEvent(key);
+      }
+      await tester.sendKeyEvent(activator.trigger);
+      for (final key in modifiers.reversed) {
+        await tester.sendKeyUpEvent(key);
+      }
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('⌘[ and ⌘] go back and forward; ⌘, opens the settings', (
+      tester,
+    ) async {
+      final shell = ShellCubit(const ApprovalsDestination());
+      await pumpShell(tester, shell: shell);
+      await tester.pump();
+
+      expect(runCommand(XpCommand.settings), isTrue);
+      await tester.pumpAndSettle();
+      expect(shell.state, const SettingsDestination());
+      await press(tester, XpCommand.back.activator);
+      expect(shell.state, const ApprovalsDestination());
+      await press(tester, XpCommand.forward.activator);
+      expect(shell.state, const SettingsDestination());
+    });
+
+    testWidgets('⌃⌘= switches to compact rows and back', (tester) async {
+      await pumpShell(tester, shell: ShellCubit(const ApprovalsDestination()));
+      await tester.pump();
+      final density = tester
+          .element(find.byType(AppShell))
+          .read<DensityCubit>();
+
+      runCommand(XpCommand.compact);
+      await tester.pump();
+      expect(density.state, isTrue);
+      runCommand(XpCommand.compact);
+      await tester.pump();
+      expect(density.state, isFalse);
+    });
+
+    testWidgets('the sidebar reads out what waits', (tester) async {
+      await tester.pumpApp(
+        const Sidebar(),
+        shell: ShellCubit(const ProjectDestination('prj_1')),
+        projects: projectsIn(
+          const ProjectsState(loaded: true, projects: [mataa, captain]),
+        ),
+        pendingApprovals: pendingIn(
+          PendingApprovalsState(loaded: true, approvals: [pendingApproval]),
+        ),
+      );
+
+      expect(find.bySemanticsLabel('Approvals, 1 needs you'), findsOneWidget);
+      expect(
+        find.bySemanticsLabel(RegExp('acme/mataa_new_app, 1 app')),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('⌃⌘S hides and shows the sidebar', (tester) async {
+      await pumpShell(tester, shell: ShellCubit(const ApprovalsDestination()));
+      await tester.pump();
+
+      runCommand(XpCommand.sidebar);
+      await tester.pump();
+      expect(find.byType(Sidebar), findsNothing);
+      runCommand(XpCommand.sidebar);
+      await tester.pump();
+      expect(find.byType(Sidebar), findsOneWidget);
+    });
+
+    testWidgets('⌘/ lists every shortcut of the keyboard guide', (
+      tester,
+    ) async {
+      await pumpShell(tester, shell: ShellCubit(const ApprovalsDestination()));
+      await tester.pump();
+
+      runCommand(XpCommand.shortcuts);
+      await tester.pumpAndSettle();
+
+      expect(find.byType(ShortcutSheet), findsOneWidget);
+      for (final command in XpCommand.values) {
+        expect(find.text(command.keys), findsWidgets, reason: command.name);
+      }
+      expect(find.text('⌘1 – ⌘9'), findsOneWidget);
+      expect(
+        runCommand(XpCommand.settings),
+        isFalse,
+        reason: 'the sheet covers the shell',
+      );
+      await tester.tap(find.text('Close'));
+      await tester.pumpAndSettle();
+      expect(find.byType(ShortcutSheet), findsNothing);
     });
   });
 
@@ -321,7 +525,11 @@ void main() {
       await tester.tap(find.text('Approvals'));
       await tester.pump();
       expect(shell.state, const ApprovalsDestination());
-      expect(find.text('Releases'), findsNothing);
+      expect(
+        find.text('Releases'),
+        findsOneWidget,
+        reason: 'the project stays open on the pages of the engine (U6d)',
+      );
     });
 
     testWidgets('says how many runners are busy and what storage frees', (
@@ -355,7 +563,7 @@ void main() {
     testWidgets('lists the projects with what their scan found', (
       tester,
     ) async {
-      await pumpShell(tester);
+      await pumpShell(tester, shell: ShellCubit(const RunnersDestination()));
       expect(
         find.descendant(
           of: find.byType(Sidebar),
@@ -397,7 +605,7 @@ void main() {
     });
 
     testWidgets('navigates', (tester) async {
-      final shell = ShellCubit();
+      final shell = ShellCubit(const RunnersDestination());
       await pumpShell(tester, shell: shell);
       await tester.tap(find.text('mataa_captain'));
       await tester.pump();
@@ -417,7 +625,7 @@ void main() {
     });
 
     testWidgets('highlights a row under the mouse', (tester) async {
-      await pumpShell(tester);
+      await pumpShell(tester, shell: ShellCubit(const RunnersDestination()));
       final gesture = await tester.createGesture(kind: PointerDeviceKind.mouse);
       await gesture.addPointer(location: Offset.zero);
       addTearDown(gesture.removePointer);

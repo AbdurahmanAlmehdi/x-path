@@ -56,6 +56,9 @@ MockApprovalsRepository quietApprovals() {
       state: any(named: 'state'),
     ),
   ).thenAnswer((_) => const Stream.empty());
+  when(() => repository.getGates(any())).thenAnswer(
+    (_) async => const ProjectGates({'prod_release': true, 'push': true}),
+  );
   return repository;
 }
 
@@ -87,6 +90,7 @@ MockJobsRepository quietJobs() {
       limit: any(named: 'limit'),
     ),
   ).thenAnswer((_) => const Stream.empty());
+  when(repository.watchActiveRuns).thenAnswer((_) => const Stream.empty());
   return repository;
 }
 
@@ -362,6 +366,8 @@ class SessionHarness {
     when(() => client.listReleases(projectId: any(named: 'projectId')))
         .thenAnswer((_) async => []);
     when(client.listRunners).thenAnswer((_) async => []);
+    when(client.getGitHubToken)
+        .thenAnswer((_) async => const GitHubTokenStatus(stored: false));
     when(() => client.listWorkflows(any())).thenAnswer((_) async => []);
     when(
       () => client.listRuns(
@@ -431,6 +437,7 @@ AppServices testServices({
   FakeAppMenu? appMenu,
   FakeKeychainWiper? keychainWiper,
   FakeDataWiper? dataWiper,
+  AppPreferences? preferences,
 }) => AppServices(
   engines: engines ?? noEngines(),
   openSession:
@@ -452,4 +459,5 @@ AppServices testServices({
   appMenu: appMenu ?? FakeAppMenu(),
   keychainWiper: keychainWiper ?? FakeKeychainWiper(),
   dataWiper: dataWiper ?? FakeDataWiper(),
+  preferences: preferences ?? AppPreferences(),
 );

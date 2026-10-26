@@ -5,15 +5,24 @@ import 'package:xp_desktop/widgets/xp_spinner.dart';
 /// The icon of [status] in its pair's on-container colour; the running arc
 /// and the reconnecting arrows turn.
 class XpStatusIcon extends StatelessWidget {
-  const new(this.status, {this.size, super.key});
+  const new(this.status, {this.size, this.semanticLabel, super.key});
 
   final XpStatus status;
 
   /// Defaults to `size.icon.sm`.
   final double? size;
 
+  /// What a screen reader says; the status's own label by default (U6c).
+  final String? semanticLabel;
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => Semantics(
+    label: semanticLabel ?? status.label,
+    excludeSemantics: true,
+    child: _icon(context),
+  );
+
+  Widget _icon(BuildContext context) {
     final color = context.xpColors.onContainer(status.pair);
     final iconSize = size ?? context.xpSizes.iconSm;
     return switch (status.motion) {

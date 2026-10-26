@@ -10,6 +10,8 @@ import 'package:xp_desktop/projects/widgets/project_host.dart';
 import 'package:xp_desktop/releases/bloc/release_board_bloc.dart';
 import 'package:xp_desktop/releases/widgets/release_hero.dart';
 import 'package:xp_desktop/releases/widgets/release_panels.dart';
+import 'package:xp_desktop/releases/widgets/release_patches_panel.dart';
+import 'package:xp_desktop/releases/widgets/release_texts_panel.dart';
 import 'package:xp_desktop/releases/widgets/release_timeline.dart';
 import 'package:xp_desktop/releases/widgets/store_lane.dart';
 import 'package:xp_desktop/shell/cubit/shell_cubit.dart';
@@ -81,6 +83,9 @@ class ReleasesView extends StatelessWidget {
         for (final (command, toast) in [
           (ReleaseCommand.marking, l10n.releaseMarkedToast),
           (ReleaseCommand.merging, l10n.releaseMergedToast),
+          (ReleaseCommand.rollingOut, l10n.releaseRolloutToast),
+          (ReleaseCommand.savingTexts, l10n.releaseTextsToast),
+          (ReleaseCommand.movingPatch, l10n.releasePatchToast),
         ])
           BlocListener<ReleaseBoardBloc, ReleaseBoardState>(
             listenWhen: (previous, current) =>
@@ -99,20 +104,6 @@ class ReleasesView extends StatelessWidget {
             ? name
             : [name, release.flavor, ?release.tag].join(' · '),
         actions: [
-          if (release != null && state.releases.length > 1)
-            XpSelect<String>(
-              value: release.id,
-              values: [for (final release in state.releases) release.id],
-              labelOf: (id) {
-                final item = state.releases.firstWhere((r) => r.id == id);
-                return [
-                  versionLabel(item.version, item.build),
-                  item.flavor,
-                  l10n.releaseState(item.state),
-                ].join(' · ');
-              },
-              onChanged: (id) => bloc.add(ReleaseBoardReleaseSelected(id)),
-            ),
           if (release != null)
             XpButton(
               label: l10n.releaseRefresh,
@@ -139,29 +130,53 @@ class ReleasesView extends StatelessWidget {
             if (release != null && release.state == ReleaseState.live)
               MinVersionBanner(release: release),
             Expanded(
-              child: ListView(
-                padding: const EdgeInsets.all(20),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  if (state.error case final error? when release == null)
-                    XpErrorState(
-                      error,
-                      onRetry: () => bloc.add(
-                        ReleaseBoardSubscriptionRequested(
-                          project.id,
-                          releaseId: state.selectedId,
-                        ),
-                      ),
-                    )
-                  else if (state.error case final error?) ...[
-                    XpMessage.error(error),
-                    const SizedBox(height: 12),
+                  // Every release with its state, to search and pick (U6d).
+                  if (state.releases.length > 1) ...[
+                    XpPickList<Release>(
+                      items: state.releases,
+                      selected: release,
+                      titleOf: (item) => versionLabel(item.version, item.build),
+                      subtitleOf: (item) => [
+                        item.flavor,
+                        l10n.releaseState(item.state),
+                      ].join(' · '),
+                      statusOf: (item) => releaseStatus(item.state),
+                      searchHint: l10n.releasesSearch,
+                      onSelected: (item) =>
+                          bloc.add(ReleaseBoardReleaseSelected(item.id)),
+                    ),
+                    const XpHairline(vertical: true),
                   ],
-                  if (release != null)
-                    _Board(release: release, state: state)
-                  else if (!state.loaded)
-                    const XpLoading()
-                  else if (state.error == null)
-                    _NoRelease(project),
+                  Expanded(
+                    child: ListView(
+                      padding: const EdgeInsets.all(20),
+                      children: [
+                        if (state.error case final error? when release == null)
+                          XpErrorState(
+                            error,
+                            onRetry: () => bloc.add(
+                              ReleaseBoardSubscriptionRequested(
+                                project.id,
+                                releaseId: state.selectedId,
+                              ),
+                            ),
+                          )
+                        else if (state.error case final error?) ...[
+                          XpMessage.error(error),
+                          const SizedBox(height: 12),
+                        ],
+                        if (release != null)
+                          _Board(release: release, state: state)
+                        else if (!state.loaded)
+                          const XpLoading()
+                        else if (state.error == null)
+                          _NoRelease(project),
+                      ],
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -206,10 +221,21 @@ class _Board extends StatelessWidget {
             child: ReleaseTimeline(
               release: release,
               approvals: state.approvals,
+              history: state.history,
             ),
           ),
           const SizedBox(width: 16),
-          Expanded(flex: 4, child: ReleaseNotesPanel(release: release)),
+          Expanded(
+            flex: 4,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                ReleaseNotesPanel(release: release),
+                const SizedBox(height: 16),
+                ReleaseTextsPanel(release: release),
+              ],
+            ),
+          ),
           const SizedBox(width: 16),
           Expanded(
             flex: 4,
@@ -219,6 +245,11 @@ class _Board extends StatelessWidget {
                 MinVersionPanel(release: release),
                 const SizedBox(height: 16),
                 ReleasePrPanel(release: release),
+                if (releasePatches(state.history) case final patches
+                    when patches.isNotEmpty) ...[
+                  const SizedBox(height: 16),
+                  ReleasePatchesPanel(patches: patches),
+                ],
               ],
             ),
           ),

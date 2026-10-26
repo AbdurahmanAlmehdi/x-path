@@ -11,6 +11,8 @@ import 'package:xp_desktop/credentials/widgets/credential_form.dart';
 import 'package:xp_desktop/credentials/widgets/credential_labels.dart';
 import 'package:xp_desktop/l10n/l10n.dart';
 import 'package:xp_desktop/projects/bloc/projects_bloc.dart';
+import 'package:xp_desktop/settings/bloc/github_token_bloc.dart';
+import 'package:xp_desktop/settings/widgets/github_token_section.dart';
 import 'package:xp_desktop/shell/cubit/shell_cubit.dart';
 import 'package:xp_desktop/shell/widgets/shell_page.dart';
 import 'package:xp_desktop/theme/theme.dart';
@@ -23,17 +25,29 @@ import 'package:xp_repositories/xp_repositories.dart';
 /// one or replace its secret; and the flavors of one project with the
 /// credentials they use.
 class CredentialsPage extends StatelessWidget {
-  const new({this.projectId, super.key});
+  const new({this.projectId, this.github = false, super.key});
 
   /// The project whose flavors to show; the first one when `null`.
   final String? projectId;
 
+  /// Puts the cursor in the GitHub token field.
+  final bool github;
+
   @override
-  Widget build(BuildContext context) => BlocProvider(
-    create: (context) =>
-        CredentialsBloc(credentials: context.read<CredentialsRepository>())
-          ..add(const CredentialsSubscriptionRequested()),
-    child: CredentialsView(projectId: projectId),
+  Widget build(BuildContext context) => MultiBlocProvider(
+    providers: [
+      BlocProvider(
+        create: (context) =>
+            CredentialsBloc(credentials: context.read<CredentialsRepository>())
+              ..add(const CredentialsSubscriptionRequested()),
+      ),
+      BlocProvider(
+        create: (context) =>
+            GitHubTokenBloc(settings: context.read<SettingsRepository>())
+              ..add(const GitHubTokenRequested()),
+      ),
+    ],
+    child: CredentialsView(projectId: projectId, github: github),
   );
 }
 
@@ -42,9 +56,10 @@ class CredentialsPage extends StatelessWidget {
 typedef _FormMode = ({NamedCredential? replacing});
 
 class CredentialsView extends StatefulWidget {
-  const new({this.projectId, super.key});
+  const new({this.projectId, this.github = false, super.key});
 
   final String? projectId;
+  final bool github;
 
   @override
   State<CredentialsView> createState() => _CredentialsViewState();
@@ -194,6 +209,15 @@ class _CredentialsViewState extends State<CredentialsView> {
                   ),
                   const SizedBox(height: 28),
                   _FlavorsSection(projectId: widget.projectId),
+                  const SizedBox(height: 28),
+                  // The engine's GitHub token, moved here from Settings
+                  // (U6d): it is a credential of the engine.
+                  XpSectionLabel(l10n.settingsGitHub),
+                  const SizedBox(height: 8),
+                  XpPanel(
+                    padding: const EdgeInsets.all(16),
+                    child: GitHubTokenSection(autofocus: widget.github),
+                  ),
                 ],
               ),
             ),
@@ -326,20 +350,28 @@ class _CredentialTable extends StatelessWidget {
                             : null,
                       ),
                       const SizedBox(width: 6),
-                      for (final (label, action) in [
-                        (l10n.credentialsRename, onRename),
-                        (l10n.credentialsReplace, onReplace),
-                        (l10n.credentialsDelete, onDelete),
-                      ]) ...[
-                        XpButton(
-                          label: label,
-                          size: XpButtonSize.small,
-                          kind: XpButtonKind.tertiary,
-                          onPressed: canCommand
-                              ? () => action(credential)
-                              : null,
-                        ),
-                      ],
+                      // Rename and Replace in a menu, Delete last and in the
+                      // negative colour (U6c).
+                      XpMenuButton(
+                        label: l10n.credentialsMore,
+                        actions: canCommand
+                            ? [
+                                XpMenuAction(
+                                  l10n.credentialsRename,
+                                  () => onRename(credential),
+                                ),
+                                XpMenuAction(
+                                  l10n.credentialsReplace,
+                                  () => onReplace(credential),
+                                ),
+                                XpMenuAction(
+                                  l10n.credentialsDelete,
+                                  () => onDelete(credential),
+                                  destructive: true,
+                                ),
+                              ]
+                            : null,
+                      ),
                     ],
                   ),
                 ),

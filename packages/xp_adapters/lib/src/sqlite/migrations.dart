@@ -25,6 +25,7 @@ const engineMigrations = <Migration>[
   Migration(version: 18, sql: _v18),
   Migration(version: 19, sql: _v19),
   Migration(version: 20, sql: _v20, foreignKeysOff: true),
+  Migration(version: 21, sql: _v21),
 ];
 
 // Timestamps are integer microseconds since the Unix epoch (UTC), so that
@@ -622,4 +623,25 @@ FROM credential ORDER BY rowid;
 DROP TABLE credential;
 ALTER TABLE new_credential RENAME TO credential;
 CREATE UNIQUE INDEX idx_credential_name ON credential (name COLLATE NOCASE);
+''';
+
+// UX U7b: the texts the uploads of a release send to the stores ("What's
+// new" for Google Play, "What to test" for Firebase), and the
+// history of each release: what happened, when, and which device did it.
+const _v21 = '''
+ALTER TABLE release ADD COLUMN whats_new TEXT;
+ALTER TABLE release ADD COLUMN what_to_test TEXT;
+
+CREATE TABLE release_event (
+  id INTEGER PRIMARY KEY,
+  release_id TEXT NOT NULL REFERENCES release (id),
+  kind TEXT NOT NULL,
+  at INTEGER NOT NULL,
+  store TEXT,
+  detail TEXT,
+  by_name TEXT,
+  run_id TEXT,
+  patch_number INTEGER CHECK (patch_number IS NULL OR patch_number > 0)
+) STRICT;
+CREATE INDEX idx_release_event_release ON release_event (release_id, at);
 ''';

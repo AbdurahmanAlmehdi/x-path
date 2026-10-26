@@ -13,6 +13,54 @@ import 'package:flutter/widgets.dart';
 const _package = 'phosphor_flutter';
 
 abstract final class PhosphorIconsRegular {
+  static const sliders = IconData(
+    0xe432,
+    fontFamily: 'PhosphorRegular',
+    fontPackage: _package,
+    matchTextDirection: true,
+  );
+  static const house = IconData(
+    0xe2c2,
+    fontFamily: 'PhosphorRegular',
+    fontPackage: _package,
+    matchTextDirection: true,
+  );
+  static const rocketLaunch = IconData(
+    0xe3fe,
+    fontFamily: 'PhosphorRegular',
+    fontPackage: _package,
+    matchTextDirection: true,
+  );
+  static const stop = IconData(
+    0xe46c,
+    fontFamily: 'PhosphorRegular',
+    fontPackage: _package,
+    matchTextDirection: true,
+  );
+  static const arrowRight = IconData(
+    0xe06c,
+    fontFamily: 'PhosphorRegular',
+    fontPackage: _package,
+    matchTextDirection: true,
+  );
+  static const keyboard = IconData(
+    0xe2d8,
+    fontFamily: 'PhosphorRegular',
+    fontPackage: _package,
+    matchTextDirection: true,
+  );
+  static const circle = IconData(
+    0xe18a,
+    fontFamily: 'PhosphorRegular',
+    fontPackage: _package,
+    matchTextDirection: true,
+  );
+  static const arrowSquareOut = IconData(
+    0xe5de,
+    fontFamily: 'PhosphorRegular',
+    fontPackage: _package,
+    matchTextDirection: true,
+  );
   static const playCircle = IconData(
     0xe3d2,
     fontFamily: 'PhosphorRegular',
@@ -460,6 +508,18 @@ abstract final class PhosphorIconsRegular {
 }
 
 abstract final class PhosphorIconsFill {
+  static const sliders = IconData(
+    0xe432,
+    fontFamily: 'PhosphorFill',
+    fontPackage: _package,
+    matchTextDirection: true,
+  );
+  static const house = IconData(
+    0xe2c2,
+    fontFamily: 'PhosphorFill',
+    fontPackage: _package,
+    matchTextDirection: true,
+  );
   static const playCircle = IconData(
     0xe3d2,
     fontFamily: 'PhosphorFill',

@@ -89,7 +89,8 @@ void main() {
       expect(play.connect(account), same(play.connect(account)));
     });
 
-    test('uploads a bundle end to end through the step', () async {
+    test('uploads a bundle end to end through the step, with the texts of '
+        'its release', () async {
       server.apps[_package]!.tracks.clear();
       final repository = InMemoryArtifactRepository();
       final store = InMemoryArtifactStore();
@@ -107,6 +108,9 @@ void main() {
         repository: repository,
         store: store,
         secrets: secrets,
+        texts: FakeReleaseTextsSource(
+          const ReleaseTexts(whatsNew: 'Faster checkout.'),
+        ),
       );
 
       final input = <String, dynamic>{
@@ -134,6 +138,9 @@ void main() {
         server.commits.single.changesInReviewBehavior,
         'ERROR_IF_IN_REVIEW',
       );
+      expect(server.apps[_package]!.tracks['internal']!.single.releaseNotes, [
+        {'language': 'en-US', 'text': 'Faster checkout.'},
+      ]);
     });
   });
 

@@ -7,7 +7,10 @@ const builtinWorkflows = <String, String>{
   'dev-build': _devBuild,
   'prod-release': _prodRelease,
   'release-merge': _releaseMerge,
+  'release-rollout': _releaseRollout,
   'shorebird-patch': _shorebirdPatch,
+  'shorebird-track': _shorebirdTrack,
+  'smoke-build': _smokeBuild,
   'test': _test,
 };
 
@@ -329,6 +332,40 @@ stages:
             gate: merge
 ''';
 
+// The rollout of a release once it is in a store (U7a): Apple's phased
+// release and Google Play's staged rollout. The change is a gated action
+// (D-13), and only the engine reaches the stores.
+const _releaseRollout = r'''
+schema: 1
+name: Change the rollout of a release
+description: >-
+  Pauses, resumes or completes Apple's phased release, or sets, halts or
+  completes Google Play's staged rollout. Started from the release; the change
+  waits for the owner's approval.
+inputs:
+  store:
+    type: choice
+    options: [apple, play]
+  action:
+    type: choice
+    options: [pause, resume, complete, halt, fraction]
+  userFraction:
+    type: json
+    description: For "fraction", the share of users, above 0, at most 1.
+stages:
+  - name: rollout
+    jobs:
+      rollout:
+        name: ${{ inputs.store }} rollout, ${{ inputs.action }} ${{ inputs.userFraction }}
+        steps:
+          - kind: store.rollout
+            gate: rollout
+            with:
+              store: ${{ inputs.store }}
+              action: ${{ inputs.action }}
+              userFraction: ${{ inputs.userFraction }}
+''';
+
 // A patch is ship.sh `patch prod`: an over-the-air code patch against an
 // exact release, with the Flutter version of that release. It changes no
 // version, so every job builds the dispatched commit.
@@ -339,6 +376,39 @@ stages:
 // and the tag comes last (`finalize`). The approval is asked in front of the
 // last check, so that the owner is asked only about a patch that passed the
 // others.
+// U7b: a patch the owner tried on a staging track goes to every user, or a
+// patch that went wrong is rolled back, from the release page. Either way
+// every user of the release gets the change, so it waits for the same
+// approval as a production patch.
+const _shorebirdTrack = r'''
+schema: 1
+name: Move a Shorebird patch
+description: >-
+  Promotes a Shorebird patch of a release to the stable track, or rolls it
+  back. Started from the release; the change waits for the owner's approval.
+inputs:
+  patchNumber:
+    type: json
+    description: The patch of the release, a number from 1.
+  action:
+    type: choice
+    options: [promote, rollback]
+stages:
+  - name: track
+    jobs:
+      track:
+        name: ${{ inputs.action }} patch ${{ inputs.patchNumber }} of ${{ flavor.name }}
+        matrix:
+          flavor: ${{ flavors }}
+        if: flavor.shorebird
+        steps:
+          - kind: shorebird.track
+            gate: prod_patch
+            with:
+              patchNumber: ${{ inputs.patchNumber }}
+              action: ${{ inputs.action }}
+''';
+
 const _shorebirdPatch = r'''
 schema: 1
 name: Shorebird patch
@@ -411,6 +481,31 @@ stages:
           - kind: git.tag
           - kind: git.push
             gate: push
+''';
+
+// A smoke build is the first green build of a new project: an APK of each
+// flavor, signed with the debug key instead of the flavor's keystore, so it
+// needs no credential, no store id and no version bump. It uploads nothing
+// and runs on any runner with Android (U5a).
+const _smokeBuild = r'''
+schema: 1
+name: Smoke build
+description: >-
+  Builds an Android APK of each flavor without its keystore, to see a green
+  build before signing and the stores are set up. Nothing is uploaded.
+stages:
+  - name: build
+    jobs:
+      build:
+        name: Build ${{ flavor.name }}
+        matrix:
+          flavor: ${{ flavors }}
+        steps:
+          - kind: git.checkout
+          - kind: build.android
+            with:
+              artifact: apk
+              keystore: false
 ''';
 
 // The tests: flutter test --machine against the baseline, then the analyzer.

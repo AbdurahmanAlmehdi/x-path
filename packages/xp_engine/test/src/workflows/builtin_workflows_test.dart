@@ -11,7 +11,10 @@ void main() {
       'dev-build',
       'prod-release',
       'release-merge',
+      'release-rollout',
       'shorebird-patch',
+      'shorebird-track',
+      'smoke-build',
       'test',
     ]);
   });
@@ -35,6 +38,9 @@ void main() {
       expect(locks('shorebird-patch'), isTrue);
       expect(locks('dev-build'), isFalse);
       expect(locks('release-merge'), isFalse);
+      expect(locks('release-rollout'), isFalse);
+      expect(locks('shorebird-track'), isFalse);
+      expect(locks('smoke-build'), isFalse);
       expect(locks('test'), isFalse);
     },
   );
@@ -48,13 +54,21 @@ void main() {
 
     expect(gates('prod-release'), {GateAction.prodRelease, GateAction.push});
     expect(gates('release-merge'), {GateAction.merge});
+    expect(gates('release-rollout'), {GateAction.rollout});
+    expect(gates('shorebird-track'), {GateAction.prodPatch});
     expect(gates('shorebird-patch'), {GateAction.prodPatch, GateAction.push});
     expect(gates('dev-build'), isEmpty);
+    expect(gates('smoke-build'), isEmpty);
     expect(gates('test'), isEmpty);
   });
 
   test('keep the engine-only steps out of the jobs that build (ADR 0010)', () {
-    for (final name in ['dev-build', 'prod-release', 'shorebird-patch']) {
+    for (final name in [
+      'dev-build',
+      'prod-release',
+      'shorebird-patch',
+      'smoke-build',
+    ]) {
       final jobs = parser.parse(builtinWorkflows[name]!).definition!.jobs;
       var builds = 0;
       for (final job in jobs) {
@@ -77,6 +91,23 @@ void main() {
       expect(builds, 1, reason: '$name has one job that builds');
     }
   });
+
+  test(
+    'smoke-build builds an APK without the keystore and uploads nothing',
+    () {
+      final jobs = parser
+          .parse(builtinWorkflows['smoke-build']!)
+          .definition!
+          .jobs;
+      final steps = [for (final job in jobs) ...job.steps];
+
+      expect(
+        [for (final step in steps) step.kind],
+        ['git.checkout', 'build.android'],
+      );
+      expect(steps.last.withValues, containsPair('keystore', false));
+    },
+  );
 
   test('cut the release branch and push it before anything is built', () {
     final jobs = parser
