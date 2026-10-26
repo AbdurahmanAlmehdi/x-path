@@ -17,6 +17,7 @@ void main() {
     sources: ['gradle'],
     firebaseAppId: {'android': '1:1:android:a'},
     appleAppId: '123',
+    iosLinuxLimits: ['its configuration Release-dev uses a multi-size set'],
   );
 
   group('FlavorProfile', () {
@@ -34,6 +35,7 @@ void main() {
       expect(read.prod, isFalse);
       expect(read.shorebird, isFalse);
       expect(read.versionFiles, isEmpty);
+      expect(read.iosLinuxLimits, isEmpty);
       expect(read.toJson().keys, [
         'name',
         'implicit',
@@ -68,6 +70,17 @@ void main() {
       expect(changed.sources, ['gradle']);
       expect(changed.firebaseAppId, {'android': '1:1:android:a'});
       expect(changed.appleAppId, '123');
+      expect(changed.iosLinuxLimits, flavor.iosLinuxLimits);
+    });
+
+    test('writes its Linux iOS limits only when it has some', () {
+      expect(flavor.toJson()['iosLinuxLimits'], [
+        'its configuration Release-dev uses a multi-size set',
+      ]);
+      expect(
+        const FlavorProfile(name: 'x', entrypoint: 'lib/main.dart').toJson(),
+        isNot(contains('iosLinuxLimits')),
+      );
     });
 
     test('copyWith sets or clears the store ids', () {

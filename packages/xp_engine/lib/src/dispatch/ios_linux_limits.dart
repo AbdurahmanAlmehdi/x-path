@@ -3,7 +3,8 @@ import 'package:xp_engine/src/steps/step.dart';
 
 /// Why omarchy-apple-dev cannot build the iOS app of a job on Linux (ADR
 /// 0014), from the planned [steps] of the job and its [app] (what the scan
-/// found, `AppProfile.iosLinuxLimits`, and its extensions): one reason for
+/// found, `AppProfile.iosLinuxLimits`, the `FlavorProfile.iosLinuxLimits` of
+/// the flavor a step builds, and its extensions): one reason for
 /// each thing the job uses that Linux iOS builds lack, with the work that
 /// would lift it, led by [iosLinuxOff] when the owner turned Linux iOS
 /// builds off for the app (`AppProfile.iosLinux`). Empty when nothing rules
@@ -20,6 +21,7 @@ List<String> iosLinuxLimits(List<StepPlan> steps, AppProfile app) {
         if (input['flavor'] case final String flavor) {
           reasons.add(flavorsLimit([flavor]));
         }
+        reasons.addAll(_flavorOf(app, input['flavor'])?.iosLinuxLimits ?? []);
         if (input['target'] case final String target) {
           reasons.add(
             'the flavor builds $target, and Linux iOS builds build '
@@ -55,6 +57,12 @@ List<String> iosLinuxLimits(List<StepPlan> steps, AppProfile app) {
   }
   return reasons.toList();
 }
+
+/// The flavor of [app] named [name], or its implicit flavor when a step
+/// names none.
+FlavorProfile? _flavorOf(AppProfile app, Object? name) => app.flavors
+    .where((flavor) => name == null ? flavor.implicit : flavor.name == name)
+    .firstOrNull;
 
 /// Why an app whose owner turned Linux iOS builds off builds on a Mac.
 const iosLinuxOff = 'Linux iOS builds are turned off for this app';

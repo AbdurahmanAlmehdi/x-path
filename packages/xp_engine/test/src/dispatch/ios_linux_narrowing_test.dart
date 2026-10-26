@@ -158,6 +158,36 @@ void main() {
     expect(job.narrowing, ['the app builds its iOS plugins with CocoaPods']);
   });
 
+  test("a flavor's own reason from the scan narrows its job, in the dry "
+      'run too', () async {
+    const icon = 'its configuration Release uses a multi-size icon set';
+    final h = await harness(
+      app: _plain.copyWith(
+        flavors: [
+          const FlavorProfile(
+            name: 'main',
+            implicit: true,
+            entrypoint: 'lib/main.dart',
+            iosBundleId: 'ly.demo',
+            iosLinuxLimits: [icon],
+          ),
+        ],
+      ),
+    );
+
+    final plan = await h.dispatcher.plan(
+      'prj_1',
+      await h.custom(_workflow('', flavors: true)),
+      const DispatchRequest(),
+    );
+    final run = await h.dispatchCustom(_workflow('', flavors: true));
+
+    expect(plan.stages.single.jobs.single.narrowing, [icon]);
+    final job = await only(h, run);
+    expect(job.capabilities, ['flutter', 'ios-sign']);
+    expect(job.narrowing, [icon]);
+  });
+
   test('an app the owner turned Linux iOS builds off for narrows every iOS '
       'job, in the dry run too', () async {
     final h = await harness();

@@ -87,6 +87,67 @@ void main() {
     );
   });
 
+  test("the scan's own reasons for the flavor a step builds", () {
+    const icon = 'its configuration Release-dev uses a multi-size icon set';
+    const app = AppProfile(
+      name: 'demo',
+      path: '.',
+      flavors: [
+        FlavorProfile(
+          name: 'dev',
+          entrypoint: 'lib/main_dev.dart',
+          iosLinuxLimits: [icon],
+        ),
+        FlavorProfile(name: 'prod', entrypoint: 'lib/main_prod.dart'),
+      ],
+    );
+
+    expect(
+      iosLinuxLimits([
+        _step('build.ios', {'flavor': 'dev', ..._signing}),
+        _step('ios.stripAndReexport', {'flavor': 'dev'}),
+      ], app),
+      [
+        contains('the flavor dev'),
+        icon,
+        contains('the job strips frameworks after the build'),
+      ],
+    );
+    expect(
+      iosLinuxLimits([
+        _step('build.ios', {'flavor': 'prod', ..._signing}),
+      ], app),
+      [_flavor],
+    );
+    expect(
+      iosLinuxLimits([
+        _step('build.ios', {'flavor': 'staging', ..._signing}),
+      ], app),
+      [contains('the flavor staging')],
+    );
+    expect(iosLinuxLimits([_step('build.ios', _signing)], app), isEmpty);
+  });
+
+  test("the scan's own reasons for the flavor of an app without flavors", () {
+    const app = AppProfile(
+      name: 'demo',
+      path: '.',
+      flavors: [
+        FlavorProfile(
+          name: 'default',
+          implicit: true,
+          entrypoint: 'lib/main.dart',
+          iosLinuxLimits: ['its configuration Release uses a multi-size set'],
+        ),
+      ],
+    );
+
+    expect(iosLinuxLimits([_step('build.ios', _signing)], app), [
+      'its configuration Release uses a multi-size set',
+    ]);
+    expect(iosLinuxLimits([_step('git.checkout')], app), isEmpty);
+  });
+
   test('a build the flavor cannot sign on Linux, with a flavor too', () {
     expect(iosLinuxLimits([_step('build.ios')], _app), [_unsigned]);
     expect(

@@ -60,6 +60,38 @@ void main() {
       expect(edited.apps.last, profile.apps.last);
     });
 
+    test("keeps a flavor's Linux iOS limits through its edits", () {
+      final limited = profile.copyWith(
+        apps: [
+          profile.apps.first.copyWith(
+            flavors: const [
+              FlavorProfile(
+                name: 'dev',
+                entrypoint: 'lib/main_dev.dart',
+                iosLinuxLimits: ['a multi-size icon set'],
+              ),
+            ],
+          ),
+        ],
+      );
+
+      final edited = applyEdits(
+        limited,
+        const ProfileEdits(
+          apps: [
+            AppEdit(
+              path: '.',
+              flavors: [FlavorEdit(name: 'dev', prod: true)],
+            ),
+          ],
+        ),
+      );
+
+      final dev = edited.apps.single.flavors.single;
+      expect(dev.prod, isTrue);
+      expect(dev.iosLinuxLimits, ['a multi-size icon set']);
+    });
+
     test('turns Linux iOS builds off and on again', () {
       ProfileEdits turn({required bool on}) => ProfileEdits(
         apps: [AppEdit(path: 'apps/two', iosLinux: on)],

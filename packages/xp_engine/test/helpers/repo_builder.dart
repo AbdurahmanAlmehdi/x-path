@@ -5,16 +5,35 @@ import 'package:xp_engine/xp_engine.dart';
 /// [runner] maps a configuration name to the target's settings for it,
 /// [project] does the same for the project. [spm] adds a Swift package
 /// reference, [extensions] app extension targets of those names.
+/// [scripts] are Run Script phases of the Runner target (name to script),
+/// [resources] what its Copy Bundle Resources phase copies, and [xcconfigs]
+/// the `.xcconfig` a configuration of the target is based on, both relative
+/// to `ios`.
 String pbxproj({
   Map<String, Map<String, String>> runner = const {},
   Map<String, Map<String, String>> project = const {},
   bool spm = false,
   List<String> extensions = const [],
+  Map<String, String> scripts = const {},
+  List<String> resources = const [],
+  Map<String, String> xcconfigs = const {},
 }) {
   var next = 0;
   String id() => (0xA000 + next++).toRadixString(16).toUpperCase();
   final blocks = StringBuffer();
-  String list(Map<String, Map<String, String>> configs) {
+  String file(String path) {
+    final fileId = id();
+    blocks.writeln(
+      '$fileId = { isa = PBXFileReference; path = "$path"; '
+      'sourceTree = SOURCE_ROOT; };',
+    );
+    return fileId;
+  }
+
+  String list(
+    Map<String, Map<String, String>> configs, {
+    Map<String, String> bases = const {},
+  }) {
     final listId = id();
     final ids = <String>[];
     for (final entry in configs.entries) {
@@ -23,9 +42,11 @@ String pbxproj({
       final settings = entry.value.entries
           .map((setting) => '${setting.key} = "${setting.value}";')
           .join('\n');
+      final base = bases[entry.key];
       blocks.writeln('''
 $configId = {
 isa = XCBuildConfiguration;
+${base == null ? '' : 'baseConfigurationReference = ${file(base)};'}
 buildSettings = {
 $settings
 };
@@ -42,7 +63,33 @@ ${ids.map((configId) => '$configId,').join('\n')}
     return listId;
   }
 
-  final runnerList = list(runner);
+  final runnerList = list(runner, bases: xcconfigs);
+  final phases = <String>[];
+  for (final entry in scripts.entries) {
+    final phaseId = id();
+    phases.add(phaseId);
+    final script = entry.value.replaceAll('"', r'\"').replaceAll('\n', r'\n');
+    blocks.writeln(
+      '$phaseId = { isa = PBXShellScriptBuildPhase; name = "${entry.key}"; '
+      'shellScript = "$script"; };',
+    );
+  }
+  if (resources.isNotEmpty) {
+    final phaseId = id();
+    phases.add(phaseId);
+    String buildFile(String path) {
+      final buildFileId = id();
+      blocks.writeln(
+        '$buildFileId = { isa = PBXBuildFile; fileRef = ${file(path)}; };',
+      );
+      return buildFileId;
+    }
+
+    blocks.writeln(
+      '$phaseId = { isa = PBXResourcesBuildPhase; '
+      'files = ( ${resources.map(buildFile).join(', ')} ); };',
+    );
+  }
   final projectList = list(project);
   final extensionIds = [
     for (final name in extensions) 'EXT_${name.toUpperCase()}',
@@ -70,6 +117,7 @@ objects = {
 RUNNER = {
 isa = PBXNativeTarget;
 buildConfigurationList = $runnerList;
+buildPhases = ( ${phases.map((phaseId) => '$phaseId, ').join()});
 name = Runner;
 productType = "com.apple.product-type.application";
 };

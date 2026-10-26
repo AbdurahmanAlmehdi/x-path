@@ -1,0 +1,16 @@
+flavors:
+  dev:
+    app:
+      name: "Shop Dev"
+    ios:
+      bundleId: "com.example.shop.dev"
+  staging:
+    app:
+      name: "Shop Staging"
+    ios:
+      bundleId: "com.example.shop.staging"
+  prod:
+    app:
+      name: "Shop"
+    ios:
+      bundleId: "com.example.shop"

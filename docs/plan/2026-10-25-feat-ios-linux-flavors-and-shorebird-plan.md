@@ -171,7 +171,7 @@ support, and C and D keep a Mac for it.
 
 ### Phase 2: Per-flavor limits in the scan
 
-- **Status:** Not started
+- **Status:** Done
 - **Scope:** The scan finds the two narrowing cases (non-Flutter Run Script phases, app-wide;
   a multi-size icon set, per flavor) and the warnings (no or several configurations for a
   flavor, a missing icon set), as `ios_needs_mac` findings with `Finding.flavor`, and
