@@ -647,10 +647,12 @@ void main() {
       expect(verifiers[CredentialKind.playSa]!.targets, [
         const CredentialTarget(),
         const CredentialTarget(
+          flavorId: 'flv_2',
           iosBundleId: 'com.mataa.app.dev',
           androidAppId: 'com.mataa.app.dev',
         ),
         const CredentialTarget(
+          flavorId: 'flv_1',
           iosBundleId: 'com.mataa.app',
           androidAppId: 'com.mataa.app',
         ),
@@ -1016,7 +1018,7 @@ void main() {
       expect(result.assigned.single.app, 'apps/captain');
       expect(
         verifiers[CredentialKind.ascKey]!.targets.single,
-        const CredentialTarget(),
+        const CredentialTarget(flavorId: 'flv_3'),
       );
     });
 

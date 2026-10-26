@@ -98,7 +98,7 @@ once and opens one pull request.
 
 ### Phase 4a: Signing identity and profile on a Linux runner
 
-- **Status:** Not started
+- **Status:** Done
 - **Scope:** A Linux runner signs with an Apple Distribution identity, and a profile made per
   the engine (decision (b)), that it receives for the job only.
 - **Files touched:** `packages/xp_api/lib/src/credential.dart`, `packages/xp_api/openapi.yaml`,
@@ -117,18 +117,33 @@ once and opens one pull request.
   assigned.
 - **Validation:** `melos run test:coverage && melos run test:contract`
 
-- [ ] A new credential kind for the Apple Distribution identity (`.p12`, or `key.pem` +
+- [x] A new credential kind for the Apple Distribution identity (`.p12`, or `key.pem` +
       `cert.der`), named and assigned per flavor (ADR 0013), imported with
       `xp credentials add` or in the app, checked against App Store Connect's certificate list.
-- [ ] Grant it to an `ios-linux` job in its tmpfs secret area, wiped at job end and at runner
-      start (D-09).
-- [ ] The engine creates the App Store profile with its App Store Connect client and grants it
+      Built as `apple_distribution`: `privateKey` (PEM) and `certificate` (DER or PEM); a
+      `.p12` is converted with `openssl pkcs12` (the field help says how), since parsing every
+      Keychain export cipher in the engine is not worth it. Migration v20 rebuilds `credential`
+      (foreign keys off). The assignment check lists the team's distribution certificates with
+      the flavor's ASC key and refuses a serial number it does not find.
+- [x] Grant it to an `ios-linux` job in its tmpfs secret area, wiped at job end and at runner
+      start (D-09). `build.ios` carries `linuxSigning` (`ASC_SIGNING_KEY`, `ASC_SIGNING_CERT`,
+      `ASC_PROFILE` to secret keys), which `RunnerSecretGrants` grants; the runner keeps them
+      in its existing secret area.
+- [x] The engine creates the App Store profile with its App Store Connect client and grants it
       with the identity; the ASC key never reaches the runner (decision (b)).
-- [ ] Until this lands, a job without an assigned identity narrows to `ios-sign` (a 3a rule).
+      `AppStoreProfiles` makes (or reuses) `XPath <bundle id> <serial>` when the runner asks
+      for the profile key.
+- [x] Until this lands, a job without an assigned identity narrows to `ios-sign` (a 3a rule).
+      The reason names `xp credentials add --kind apple_distribution`.
+- [x] Upstream: `flutter/ship.sh` signs with a given identity and profile (`ASC_PROFILE`,
+      `asc.py given-identity`, no API call, no certificate made). It is on the fork branch
+      `AbdurahmanAlmehdi/omarchy-apple-dev` `xpath/pin` (upstream `955127b` + #81 + #82 + this
+      change), which XPath pins until upstream #81 and #82 (and this change) merge; the pin then
+      moves to an upstream commit.
 
 ### Phase 3b: The Linux build backend and toolchain preparation
 
-- **Status:** Not started
+- **Status:** Done
 - **Scope:** `build.ios` runs on an `ios-linux` runner through omarchy-apple-dev; the runner
   prepares and cleans up a dedicated Flutter install per version. This is the PR that lets
   `build.ios` accept `ios-linux`. Amends D-20.
@@ -144,32 +159,42 @@ once and opens one pull request.
   behaviour is unchanged.
 - **Validation:** `(cd packages/xp_engine && dart test test/src/steps/build test/src/scheduler) && tool/e2e/runner_ios_linux_e2e.sh && tool/e2e/release_e2e.sh prod`
 
-- [ ] `build.ios` picks its backend by host. On Linux it runs `flutter/build.sh`, then
+- [x] `build.ios` picks its backend by host. On Linux it runs `flutter/build.sh`, then
       `flutter/ship.sh` without `--upload`:
   - `--build-name`/`--build-number` → `BUILD_NAME`/`BUILD_NUMBER`;
   - `--dart-define-from-file` → `KEY=VALUE` arguments (JSON and `.env` forms);
   - `--obfuscate --split-debug-info` → `DART_OBFUSCATION=true`, `SPLIT_DEBUG_INFO` (after
     upstream #73 is merged and pinned; until then obfuscated builds narrow to `ios-sign`);
   - `exportOptionsPlist` → `ASC_EXPORT_OPTIONS`;
-  - `ios/Runner/Runner.entitlements`, when present → `ASC_ENTITLEMENTS_PATH`.
-- [ ] Outputs: the artifact is `build/ios-linux/Runner-store.ipa`; `symbols.archive` takes
+  - `ios/Runner/Runner.entitlements`, when present → `ASC_ENTITLEMENTS_PATH`;
+  - the identity and the engine-made profile (4a's `linuxSigning`) → `ASC_SIGNING_KEY`,
+    `ASC_SIGNING_CERT`, `ASC_PROFILE` (the pinned fork's given-identity signing).
+  - `build.sh` builds `lib/main.dart` only, so a flavor with another entry point narrows
+    to `ios-sign` too (a new 3a reason).
+- [x] Outputs: the artifact is `build/ios-linux/Runner-store.ipa`; `symbols.archive` takes
       `build/ios-linux/dSYMs` and the Dart symbols directory.
-- [ ] **Toolchain preparation.** A prepare step runs `flutter/setup.sh` in a Flutter install
+- [x] **Toolchain preparation.** A prepare step runs `flutter/setup.sh` in a Flutter install
       dedicated to that version under `<data dir>/toolchains/flutter-ios-linux/<version>`
       (the script replaces `gen_snapshot_arm64` in the install it runs on), checks that
       `gen_snapshot` is ELF, and caches it. Housekeeping knows these installs and frees the
-      ones no recent job used.
-- [ ] `ios.stripAndReexport` keeps requiring `ios-sign` until upstream #77 is merged and
+      ones no recent job used. Built into `build.ios` on Linux: a `FlutterResolver` without
+      fvm over `toolchains/flutter-ios-linux`, `IosLinuxToolchain` (ELF check, commit, and
+      `markUsed`, which frees installs no job used for 30 days; the runner has no
+      housekeeping of its own, so this is it).
+- [x] `ios.stripAndReexport` keeps requiring `ios-sign` until upstream #77 is merged and
       pinned; then a small follow-up runs `flutter/tools/strip-frameworks.py` on the payload
-      and `flutter/ship.sh` again.
-- [ ] The job's toolchain record says "Linux, omarchy-apple-dev `<commit>`" next to Flutter's
+      and `flutter/ship.sh` again. #77 is in the pin now; the step narrows its job to
+      `ios-sign` with a reason until that follow-up.
+- [x] The job's toolchain record says "Linux, omarchy-apple-dev `<commit>`" next to Flutter's
       version (`build_toolchain.dart`).
-- [ ] Tests: unit tests for the argument mapping; e2e on a Linux runner with stubbed scripts
-      (as upstream's `tests/flutter-ship/run.sh` stubs its tools).
+- [x] Tests: unit tests for the argument mapping; e2e on a Linux runner with stubbed scripts
+      (as upstream's `tests/flutter-ship/run.sh` stubs its tools). `runner_ios_linux_e2e.sh`
+      is Linux only and was not run while building this (on a Mac); the pin moved to the
+      fork's `xpath/pin` (`4e170a0`).
 
 ### Phase 4b: Signing set-up without a Mac
 
-- **Status:** Not started
+- **Status:** Done
 - **Scope:** An owner without a Mac (so without the desktop app) creates the distribution
   certificate from the CLI.
 - **Files touched:** `apps/xpd/lib/src/api/credentials/**` (a certificate-creation route),
@@ -184,17 +209,21 @@ once and opens one pull request.
   leaves the engine.
 - **Validation:** `melos run test:coverage && melos run test:contract`
 
-- [ ] The engine makes a key and a CSR and creates the certificate through the App Store
+- [x] The engine makes a key and a CSR and creates the certificate through the App Store
       Connect API with the flavor's ASC key, which stays on the engine (D-09). The CLI and the
-      app call that route.
-- [ ] Before creating one, the route reads the team's distribution certificates and refuses
+      app call that route. `POST /projects/{id}/flavors/{flavor}/distribution-certificate`
+      (`DistributionCertificates`, RSA 2048 and PKCS#10 by `RsaDistributionKeys`), which saves
+      the identity and assigns it to the flavor; `xp credentials add --kind
+      apple-distribution --create --project --flavor`, and "Create certificate" in the
+      flavor's credentials sheet.
+- [x] Before creating one, the route reads the team's distribution certificates and refuses
       with the count and Apple's limit when the team is at it, naming the ones it could
-      revoke.
-- [ ] The ASC key and the runner URL (runner plan R4) are already settable from the CLI.
+      revoke (`409 conflict`, `details.reason` `certificate_limit`).
+- [x] The ASC key and the runner URL (runner plan R4) are already settable from the CLI.
 
 ### Phase 5: Scan, dry run and docs
 
-- **Status:** Not started
+- **Status:** Done
 - **Scope:** Owners learn before any job whether an app can build iOS on Linux, and the docs
   cover the setup.
 - **Files touched:** `packages/xp_engine/lib/src/scan/**` (`app_scanner.dart`,
@@ -206,14 +235,35 @@ once and opens one pull request.
   reports "needs a Mac for iOS" with the reason; the dry run shows the same narrowing reasons.
 - **Validation:** `melos run test:coverage`
 
-- [ ] **Project level (scan and the UX plan's U2c dry run):** plugins without a
+- [x] **Project level (scan and the UX plan's U2c dry run):** plugins without a
       `Package.swift`, Flutter flavors, non-template storyboards, extensions, and whether the
       project's Flutter version is 3.47 or later. These depend on the project, not the machine.
-- [ ] Docs: a "Linux iOS" section in `docs/guide/runners.md`, `skills/xpath-setup`,
+      The scan adds the info finding `ios_needs_mac` with every reason and keeps those only the
+      project shows in `AppProfile.iosLinuxLimits` (CocoaPods: a Podfile without SwiftPM, or the
+      plugins `ios/Podfile.lock` installs from `.symlinks/plugins`; storyboards in
+      `ios/Runner/Base.lproj` besides `Main` and `LaunchScreen`; a pin older than 3.47), which
+      the planner narrows on too. `PlannedJob.narrowing` carries the reasons to the dry run (the
+      app's dispatch sheet and `xp dispatch --dry-run`).
+- [x] Docs: a "Linux iOS" section in `docs/guide/runners.md`, `skills/xpath-setup`,
       `skills/xpath-workflows`, `docs/design/PRODUCT.md` and the capability table. They say
       XPath never downloads `Xcode.xip`; the user supplies it, and Apple SDK licensing
       questions are the user's. They also say that iOS device tests and screenshots are not
       offered on Linux (see below).
+
+## Follow-ups
+
+Left out of this pull request on purpose; each is its own change.
+
+- Move the omarchy-apple-dev pin (`RunnerProbe.iosLinuxPin`, now the fork's `xpath/pin`) back
+  to an upstream commit once #81, #82 and the given-identity signing merge upstream.
+- Run `tool/e2e/runner_ios_linux_e2e.sh` on Linux (it was written on a Mac and not run), and the
+  manual end-to-end check of the success criteria on a real app.
+- Let the engine enable the capabilities an app's entitlements need (App Groups, push, Sign in
+  with Apple) on its bundle id before it makes the profile, as `asc.py identity` does. Today the
+  bundle id must have them already; `ship.sh` stops with the missing one otherwise.
+- One profile per bundle id (app extensions), once Linux iOS builds can build extensions.
+- `ios.stripAndReexport` on Linux: `flutter/tools/strip-frameworks.py` on the payload and
+  `flutter/ship.sh` again (#77 is in the pin).
 
 ## Success Criteria
 

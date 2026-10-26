@@ -134,7 +134,7 @@ class CredentialService {
     CreateCredentialRequest request, {
     required DeviceToken by,
   }) => _serial(() async {
-    _requireOwner(by, 'add credentials');
+    requireOwner(by, 'add credentials');
     _requireNamedKind(request.kind);
     final name = _name(request.name);
     await _requireFreeName(name);
@@ -153,7 +153,7 @@ class CredentialService {
     String name, {
     required DeviceToken by,
   }) => _serial(() async {
-    _requireOwner(by, 'rename credentials');
+    requireOwner(by, 'rename credentials');
     final record = await _require(id);
     final newName = _name(name);
     await _requireFreeName(newName, except: id);
@@ -178,7 +178,7 @@ class CredentialService {
     ReplaceCredentialRequest request, {
     required DeviceToken by,
   }) => _serial(() async {
-    _requireOwner(by, 'replace the secret of credentials');
+    requireOwner(by, 'replace the secret of credentials');
     final record = await _require(id);
     final material = CredentialMaterial.fromFields(
       record.kind,
@@ -215,7 +215,7 @@ class CredentialService {
   /// and a [SecretStoreException] if the secrets cannot be read.
   Future<NamedCredential> verify(String id, {required DeviceToken by}) =>
       _serial(() async {
-        _requireOwner(by, 'check credentials');
+        requireOwner(by, 'check credentials');
         return await _named(await _checkWithAssignments(await _require(id)));
       });
 
@@ -231,7 +231,7 @@ class CredentialService {
     required DeviceToken by,
     bool force = false,
   }) => _serial(() async {
-    _requireOwner(by, 'delete credentials');
+    requireOwner(by, 'delete credentials');
     final record = await _require(id);
     final usages = await _repository.assignments(credentialId: id);
     if (usages.isNotEmpty && !force) {
@@ -267,7 +267,7 @@ class CredentialService {
     required AssignCredentialRequest request,
     required DeviceToken by,
   }) => _serial(() async {
-    _requireOwner(by, 'assign credentials');
+    requireOwner(by, 'assign credentials');
     await _requireProject(projectId);
     _requireNamedKind(kind);
     final target = await _requireFlavor(projectId, app, flavor);
@@ -329,7 +329,7 @@ class CredentialService {
     required CredentialKind kind,
     required DeviceToken by,
   }) => _serial(() async {
-    _requireOwner(by, 'unassign credentials');
+    requireOwner(by, 'unassign credentials');
     await _requireProject(projectId);
     final target = await _requireFlavor(projectId, app, flavor);
     final existing = await _repository.assignment(target.id, kind);
@@ -360,7 +360,7 @@ class CredentialService {
     SaveCredentialRequest request, {
     required DeviceToken by,
   }) => _serial(() async {
-    _requireOwner(by, 'save credentials');
+    requireOwner(by, 'save credentials');
     await _requireProject(projectId);
     final flavor = await _requireFlavor(projectId, request.app, request.flavor);
     if (request.kind == CredentialKind.github) {
@@ -442,7 +442,7 @@ class CredentialService {
     String credentialId, {
     required DeviceToken by,
   }) => _serial(() async {
-    _requireOwner(by, 'check credentials');
+    requireOwner(by, 'check credentials');
     await _requireProject(projectId);
     final record = await _require(credentialId);
     await _requireUsedIn(projectId, record);
@@ -465,7 +465,7 @@ class CredentialService {
     String credentialId, {
     required DeviceToken by,
   }) => _serial(() async {
-    _requireOwner(by, 'delete credentials');
+    requireOwner(by, 'delete credentials');
     await _requireProject(projectId);
     final record = await _require(credentialId);
     for (final usage in await _requireUsedIn(projectId, record)) {
@@ -852,7 +852,9 @@ class CredentialService {
     }
   }
 
-  static void _requireOwner(DeviceToken by, String what) {
+  /// Throws a [CredentialForbiddenException] unless [by] may [what]: only
+  /// `app` and `cli` tokens change credentials.
+  static void requireOwner(DeviceToken by, String what) {
     if (by.kind != DeviceTokenKind.app && by.kind != DeviceTokenKind.cli) {
       throw CredentialForbiddenException(
         'A ${by.kind.name} token cannot $what: only the app or `xp` do.',

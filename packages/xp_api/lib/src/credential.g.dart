@@ -54,6 +54,7 @@ Map<String, dynamic> _$CredentialToJson(Credential instance) =>
 const _$CredentialKindEnumMap = {
   CredentialKind.ascKey: 'asc_key',
   CredentialKind.appleId: 'apple_id',
+  CredentialKind.appleDistribution: 'apple_distribution',
   CredentialKind.playSa: 'play_sa',
   CredentialKind.firebaseSa: 'firebase_sa',
   CredentialKind.keystore: 'keystore',

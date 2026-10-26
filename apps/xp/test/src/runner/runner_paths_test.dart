@@ -12,6 +12,10 @@ void main() {
     expect(paths.jobs, '/data/runner/jobs');
     expect(paths.jobDirectory('job_1'), '/data/runner/jobs/job_1');
     expect(paths.flutterToolchains, '/data/runner/toolchains/flutter');
+    expect(
+      paths.iosLinuxToolchains,
+      '/data/runner/toolchains/flutter-ios-linux',
+    );
     expect(paths.fallbackSecrets, '/data/runner/secrets');
     expect(paths.keychains, '/data/runner/keychains');
     expect(paths.state, '/data/runner/state');

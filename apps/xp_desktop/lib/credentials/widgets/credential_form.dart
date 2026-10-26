@@ -40,6 +40,10 @@ final Map<CredentialKind, List<_Field>> _fields = {
     _field('appleId', (l) => l.fieldAppleId),
     _field('password', (l) => l.fieldAppPassword, _Input.secret),
   ],
+  CredentialKind.appleDistribution: [
+    _field('privateKey', (l) => l.fieldSigningKey, _Input.multiline),
+    _field('certificate', (l) => l.fieldCertificate, _Input.file),
+  ],
   CredentialKind.playSa: [
     _field('serviceAccount', (l) => l.fieldServiceAccount, _Input.multiline),
   ],

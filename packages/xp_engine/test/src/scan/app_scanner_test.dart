@@ -15,6 +15,13 @@ AppProfile only(ScanResult result) => result.profile.apps.single;
 Finding finding(ScanResult result, String code) =>
     result.findings.singleWhere((finding) => finding.code == code);
 
+/// The findings but `ios_needs_mac`, which every app here with a Podfile
+/// gets: its plugins build with CocoaPods, which Linux iOS builds cannot.
+List<Finding> besidesMac(ScanResult result) => [
+  for (final finding in result.findings)
+    if (finding.code != 'ios_needs_mac') finding,
+];
+
 List<String> codes(ScanResult result) => [
   for (final finding in result.findings) finding.code,
 ];
@@ -80,7 +87,7 @@ void main() {
       expect(only(result).version, '1.0.0+1');
       expect(only(result).flutterVersion, '3.47.4');
       expect(only(result).flutterVersionSource, '.fvmrc');
-      expect(result.findings, isEmpty);
+      expect(besidesMac(result), isEmpty);
     });
 
     test('has the paths of an app below the root', () async {
@@ -112,11 +119,11 @@ void main() {
       expect(only(androidOnly).hasAndroid, isTrue);
       expect(only(androidOnly).flavors.single.iosBundleId, isNull);
       expect(only(androidOnly).iosPackageManager, IosPackageManager.none);
-      expect(androidOnly.findings, isEmpty);
+      expect(besidesMac(androidOnly), isEmpty);
       expect(only(iosOnly).hasAndroid, isFalse);
       expect(only(iosOnly).keystore, isNull);
       expect(only(iosOnly).flavors.single.androidAppId, isNull);
-      expect(iosOnly.findings, isEmpty);
+      expect(besidesMac(iosOnly), isEmpty);
     });
 
     test('is an error when the pubspec has no usable version', () async {
@@ -149,7 +156,7 @@ void main() {
         'pubspec.yaml': pubspec(version: '2.1.0'),
       });
 
-      expect(result.findings, isEmpty);
+      expect(besidesMac(result), isEmpty);
     });
   });
 
@@ -167,7 +174,7 @@ void main() {
       expect(dev.prod, isFalse);
       expect(dev.sources, ['gradle', 'xcscheme', 'entrypoint']);
       expect(only(result).flavors.last.prod, isTrue);
-      expect(result.findings, isEmpty);
+      expect(besidesMac(result), isEmpty);
     });
 
     test('count production by name', () async {
@@ -463,6 +470,122 @@ flavors:
     });
   });
 
+  group('iOS on Linux (ADR 0014)', () {
+    String needsMac(ScanResult result) =>
+        finding(result, 'ios_needs_mac').message;
+    final spm = pbxproj(
+      runner: configurations(
+        null,
+        iosSettings(bundleId: 'com.example.demo', team: 'T'),
+      ),
+      spm: true,
+    );
+
+    test('a SwiftPM app without flavors on a recent Flutter needs no '
+        'Mac', () async {
+      final result = await scanApp1({
+        'ios/Podfile': null,
+        'ios/Runner.xcodeproj/project.pbxproj': spm,
+        '.fvmrc': '{"flutter": "3.47.6"}',
+        'ios/Runner/Base.lproj/Main.storyboard': '<document/>',
+        'ios/Runner/Base.lproj/LaunchScreen.storyboard': '<document/>',
+      });
+
+      expect(codes(result), isNot(contains('ios_needs_mac')));
+      expect(only(result).iosLinuxLimits, isEmpty);
+    });
+
+    test('plugins that build with CocoaPods need a Mac', () async {
+      final pods = await scanApp1({});
+      final both = await scanApp1({
+        'ios/Runner.xcodeproj/project.pbxproj': spm,
+        'ios/Podfile.lock': '''
+PODS:
+  - Flutter (1.0.0)
+  - GoogleUtilities (8.0.0)
+  - legacy_maps (2.0.0)
+
+DEPENDENCIES:
+  - Flutter (from `Flutter`)
+  - legacy_maps (from `.symlinks/plugins/legacy_maps/ios`)
+  - old_camera (from `.symlinks/plugins/old_camera/ios`)
+''',
+      });
+      final one = await scanApp1({
+        'ios/Runner.xcodeproj/project.pbxproj': spm,
+        'ios/Podfile.lock':
+            'DEPENDENCIES:\n'
+            '  - legacy_maps (from `.symlinks/plugins/legacy_maps/ios`)\n',
+      });
+
+      expect(
+        needsMac(pods),
+        contains('the app builds its iOS plugins with CocoaPods'),
+      );
+      expect(only(pods).iosLinuxLimits, [
+        contains('--enable-swift-package-manager'),
+      ]);
+      expect(
+        only(both).iosLinuxLimits.single,
+        startsWith(
+          'the plugins legacy_maps, old_camera build with CocoaPods, without '
+          'a Package.swift',
+        ),
+      );
+      expect(
+        only(one).iosLinuxLimits.single,
+        startsWith('the plugin legacy_maps builds with CocoaPods'),
+      );
+    });
+
+    test('storyboards beyond the template, flavors, extensions and an old '
+        'Flutter need a Mac', () async {
+      final result = await scanApp1({
+        ...flavored(),
+        'ios/Podfile': null,
+        '.fvmrc': '{"flutter": "3.44.2"}',
+        'ios/Runner/Base.lproj/LaunchScreen.storyboard': '<document/>',
+        'ios/Runner/Base.lproj/LaunchScreenDev.storyboard': '<document/>',
+        'ios/Runner.xcodeproj/project.pbxproj': pbxproj(
+          runner: flavoredRunner(),
+          extensions: ['Widgets'],
+        ),
+      });
+
+      expect(only(result).iosLinuxLimits, [
+        startsWith(
+          'the app has the storyboard LaunchScreenDev.storyboard beyond '
+          "Flutter's template",
+        ),
+        'the app pins Flutter 3.44.2, and Linux iOS builds need 3.47 or later',
+      ]);
+      final mac = finding(result, 'ios_needs_mac');
+      expect(mac.severity, FindingSeverity.info);
+      expect(mac.path, 'ios');
+      expect(
+        mac.message,
+        allOf(
+          startsWith('Needs a Mac for iOS: Linux runners cannot build it '),
+          contains('the flavors dev, prod'),
+          contains('the app extension Widgets'),
+          contains('LaunchScreenDev.storyboard'),
+          contains('Flutter 3.44.2'),
+        ),
+      );
+      expect(mac.fix, contains('wait for a Mac (ios-sign)'));
+    });
+
+    test('an Android-only app is not asked about', () async {
+      final result = await scanApp1({
+        'ios/Runner.xcodeproj/project.pbxproj': null,
+        'ios/Podfile': null,
+        'ios/Runner/Info.plist': null,
+      });
+
+      expect(codes(result), isNot(contains('ios_needs_mac')));
+    });
+  });
+
   group('signing teams', () {
     test('missing or variable are a warning', () async {
       for (final team in [null, r'$(TEAM)']) {
@@ -711,7 +834,7 @@ flavors:
         'id-prod',
       ]);
       expect(only(result).flavors.every((f) => f.shorebird), isTrue);
-      expect(result.findings, isEmpty);
+      expect(besidesMac(result), isEmpty);
     });
 
     test('app id of a plain app belongs to its only build', () async {
@@ -719,7 +842,7 @@ flavors:
 
       expect(only(result).flavors.single.shorebird, isTrue);
       expect(only(result).flavors.single.shorebirdAppId, 'the-id');
-      expect(result.findings, isEmpty);
+      expect(besidesMac(result), isEmpty);
     });
 
     test('app id without flavors is a warning for a flavored app', () async {
@@ -789,7 +912,7 @@ flavors:
           storeFile: 'release.jks',
         ),
       );
-      expect(result.findings, isEmpty);
+      expect(besidesMac(result), isEmpty);
     });
 
     test('has no store file when key.properties does not name one', () async {
@@ -884,7 +1007,9 @@ flavors:
 
       expect(only(result).flutterVersion, isNull);
       expect(only(result).flutterVersionSource, '.fvmrc');
-      expect(codes(result), ['fvmrc_invalid']);
+      expect(besidesMac(result).map((finding) => finding.code), [
+        'fvmrc_invalid',
+      ]);
     });
   });
 

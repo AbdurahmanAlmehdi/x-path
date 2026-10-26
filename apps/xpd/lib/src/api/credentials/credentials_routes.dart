@@ -10,7 +10,8 @@ import 'package:xpd/src/api/responses.dart';
 
 /// The credential endpoints: the named credentials of the engine (list,
 /// create, rename, replace the secret, verify, delete), the credentials each
-/// flavor of a project uses (list, assign, unassign) and the deprecated
+/// flavor of a project uses (list, assign, unassign), a distribution
+/// certificate the engine creates for a flavor (ADR 0014) and the deprecated
 /// per-flavor routes of before credentials had names (ADR 0013).
 ///
 /// Only `app` and `cli` tokens change credentials; `mcp` tokens read them.
@@ -18,10 +19,11 @@ import 'package:xpd/src/api/responses.dart';
 /// deprecated save does, so nothing here logs a request, and a failure says
 /// which field is wrong but never what it holds.
 class CredentialsRoutes {
-  /// Creates the routes over [_credentials].
-  const new(this._credentials);
+  /// Creates the routes over [_credentials] and [_certificates].
+  const new(this._credentials, this._certificates);
 
   final CredentialService _credentials;
+  final DistributionCertificates _certificates;
 
   /// Registers the routes on [router].
   void addTo(Router router) {
@@ -37,6 +39,10 @@ class CredentialsRoutes {
       ..put('/projects/<id>/credentials', _save)
       ..put('/projects/<id>/flavors/<flavor>/credentials/<kind>', _assign)
       ..delete('/projects/<id>/flavors/<flavor>/credentials/<kind>', _unassign)
+      ..post(
+        '/projects/<id>/flavors/<flavor>/distribution-certificate',
+        _createCertificate,
+      )
       ..post('/projects/<id>/credentials/<credentialId>/verify', _verify)
       ..delete('/projects/<id>/credentials/<credentialId>', _remove);
   }
@@ -161,6 +167,30 @@ class CredentialsRoutes {
     return jsonResponse(result.toJson());
   });
 
+  Future<Response> _createCertificate(
+    Request request,
+    String id,
+    String flavor,
+  ) => _guard(() async {
+    final body = await readJsonBody(
+      request,
+      (json) =>
+          _parse(() => CreateDistributionCertificateRequest.fromJson(json)),
+    );
+    final created = await _certificates.create(
+      id,
+      app: _app(request),
+      flavor: flavor,
+      name: body.name,
+      by: deviceTokenOf(request),
+    );
+    return jsonResponse(
+      created.toJson(),
+      statusCode: 201,
+      headers: {'location': '/credentials/${created.id}'},
+    );
+  });
+
   Future<Response> _unassign(
     Request request,
     String id,
@@ -265,6 +295,25 @@ Future<Response> _guard(Future<Response> Function() action) async {
     return errorResponse(ApiErrorCode.notFound, error.message);
   } on CredentialConflictException catch (error) {
     return errorResponse(ApiErrorCode.conflict, error.message);
+  } on CertificateLimitException catch (error) {
+    return errorResponse(
+      ApiErrorCode.conflict,
+      error.message,
+      hint: error.fix,
+      details: {
+        'reason': ErrorReason.certificateLimit,
+        'limit': DistributionCertificates.limit,
+        'certificates': [
+          for (final certificate in error.certificates)
+            {
+              'id': certificate.id,
+              'serialNumber': certificate.serialNumber,
+              'name': ?certificate.name,
+              'expirationDate': ?certificate.expirationDate?.toIso8601String(),
+            },
+        ],
+      },
+    );
   } on CredentialInUseException catch (error) {
     return Response(
       ApiErrorCode.credentialInUse.statusCode,

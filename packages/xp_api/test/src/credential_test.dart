@@ -9,6 +9,7 @@ void main() {
         [
           'asc_key',
           'apple_id',
+          'apple_distribution',
           'play_sa',
           'firebase_sa',
           'keystore',
@@ -383,6 +384,25 @@ void main() {
       expect(RenameCredentialRequest.fromJson(request.toJson()), request);
       expect(
         () => RenameCredentialRequest.fromJson(const {}),
+        throwsFormatException,
+      );
+    });
+  });
+
+  group('CreateDistributionCertificateRequest', () {
+    test('reads a usable name', () {
+      final request = CreateDistributionCertificateRequest.fromJson(const {
+        'name': ' Linux signing ',
+      });
+
+      expect(request.name, 'Linux signing');
+      expect(request.toJson(), {'name': 'Linux signing'});
+      expect(
+        CreateDistributionCertificateRequest.fromJson(request.toJson()),
+        request,
+      );
+      expect(
+        () => CreateDistributionCertificateRequest.fromJson(const {}),
         throwsFormatException,
       );
     });

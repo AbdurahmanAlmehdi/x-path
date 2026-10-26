@@ -218,6 +218,13 @@ Future<RunnerProcess> buildRunner(RunnerSetup setup) async {
     flutterToolchains: paths.flutterToolchains,
     isMacOS: host.isMacOS,
     queues: SerialQueues(),
+    iosLinux: switch (host.iosLinuxDirectory) {
+      final directory? => (
+        directory: directory,
+        installs: paths.iosLinuxToolchains,
+      ),
+      null => null,
+    },
     testSourceUrl: environment[testSourceUrlVariable],
   );
   final jobEnvironment = JobEnvironment(

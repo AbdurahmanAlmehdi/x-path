@@ -2,6 +2,7 @@
 /// scripts.
 library;
 
+export 'src/fake_asc_certificate.dart';
 export 'src/fake_asc_key.dart';
 export 'src/fake_asc_server.dart';
 export 'src/fake_asc_state.dart';

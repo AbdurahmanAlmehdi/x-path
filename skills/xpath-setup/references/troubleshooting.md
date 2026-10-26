@@ -94,7 +94,14 @@ launchd's short `PATH` (`~/.shorebird/bin`, `~/.pub-cache/bin`, `~/fvm/default/b
 - **Android SDK**: `android` needs `ANDROID_HOME`, `ANDROID_SDK_ROOT` or Android Studio's default
   location. Flutter ships no Android release compiler for Linux on ARM.
 - A job that waits with "No runner can do ios-sign." (or `android`) has nowhere to run: add the
-  tool to the engine machine or pair a runner that has it.
+  tool to the engine machine or pair a runner that has it. An iOS job that says "It needs
+  ios-sign: ..." could have run on a Linux `ios-linux` runner but for the reasons it gives (a
+  flavor, CocoaPods plugins, no Apple Distribution identity for the flavor, ...); the scan's
+  `ios_needs_mac` finding lists the project's.
+- **omarchy-apple-dev** (`ios-linux`, Linux only): `xp runner doctor` lists each missing piece with
+  its fix: the checkout at the pinned commit, Swift, the darwin SDK bundle, rcodesign, the LLVM
+  tools and the pymobile3 python. The first iOS job of a Flutter version runs `flutter/setup.sh`
+  (about 7 GB, a few minutes) in `toolchains/flutter-ios-linux/<version>` of the runner.
 
 ## Runners
 

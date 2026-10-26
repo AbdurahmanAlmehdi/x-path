@@ -424,8 +424,9 @@ void main() {
         expect(missing(findings), [
           (
             'omarchy-apple-dev is at 0123456789ab; this XPath needs '
-                '955127bf7d27',
-            'git -C $dir fetch && git -C $dir checkout $pin',
+                '4e170a0ce5f2',
+            'git -C $dir fetch ${RunnerProbe.iosLinuxRepository} $pin && '
+                'git -C $dir checkout $pin',
           ),
         ]);
       });
@@ -445,7 +446,7 @@ void main() {
           (
             '$dir is not an omarchy-apple-dev checkout: fatal: not a git '
                 'repository',
-            'git clone https://github.com/joshuaswarren/omarchy-apple-dev '
+            'git clone ${RunnerProbe.iosLinuxRepository} '
                 '$dir && git -C $dir checkout $pin',
           ),
         ]);
@@ -466,8 +467,9 @@ void main() {
 
         expect(missing(findings), [
           (
-            'omarchy-apple-dev is at nothing; this XPath needs 955127bf7d27',
-            'git -C $dir fetch && git -C $dir checkout $pin',
+            'omarchy-apple-dev is at nothing; this XPath needs 4e170a0ce5f2',
+            'git -C $dir fetch ${RunnerProbe.iosLinuxRepository} $pin && '
+                'git -C $dir checkout $pin',
           ),
           ('no Swift: swift not found', setup),
           (
@@ -512,8 +514,9 @@ void main() {
         expect(missing(findings), [
           (
             'omarchy-apple-dev is at ffffffffffff; this XPath needs '
-                '955127bf7d27',
-            'git -C $quoted fetch && git -C $quoted checkout $pin',
+                '4e170a0ce5f2',
+            'git -C $quoted fetch ${RunnerProbe.iosLinuxRepository} $pin && '
+                'git -C $quoted checkout $pin',
           ),
           (
             'no llvm-ar: omarchy-apple-dev needs it',

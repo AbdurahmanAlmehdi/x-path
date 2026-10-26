@@ -45,12 +45,16 @@ class VerificationResult extends Equatable {
 /// An empty target is the check of the credential on its own.
 class CredentialTarget extends Equatable {
   /// Creates a target.
-  const new({this.iosBundleId, this.androidAppId});
+  const new({this.flavorId, this.iosBundleId, this.androidAppId});
 
   /// The target of the flavor [flavor].
   new of(CredentialFlavor flavor)
-    : iosBundleId = flavor.iosBundleId,
+    : flavorId = flavor.id,
+      iosBundleId = flavor.iosBundleId,
       androidAppId = flavor.androidAppId;
+
+  /// The flavor, for a check that uses another credential of it.
+  final String? flavorId;
 
   /// The iOS bundle id of the flavor.
   final String? iosBundleId;
@@ -59,7 +63,7 @@ class CredentialTarget extends Equatable {
   final String? androidAppId;
 
   @override
-  List<Object?> get props => [iosBundleId, androidAppId];
+  List<Object?> get props => [flavorId, iosBundleId, androidAppId];
 }
 
 /// Checks the credentials of one kind with the store or tool they are for,
