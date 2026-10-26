@@ -72,7 +72,7 @@ void main() {
 
     expect(find.text('Connect GitHub'), findsOneWidget);
     await tester.tap(find.text('Connect…'));
-    expect(shell.state, const SettingsDestination(github: true));
+    expect(shell.state, const CredentialsDestination.gitHub());
   });
 
   testWidgets('opens the credentials and the store ids of the flavor', (

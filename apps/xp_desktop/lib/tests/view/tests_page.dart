@@ -82,16 +82,6 @@ class TestsView extends StatelessWidget {
         ?run?.branch,
       ].join(' · '),
       actions: [
-        if (shown != null && runs.length > 1)
-          XpSelect<String>(
-            value: shown,
-            values: [for (final run in runs) run.jobId],
-            labelOf: (jobId) => knownRunLabel(
-              runs.firstWhere((run) => run.jobId == jobId),
-              l10n,
-            ),
-            onChanged: (jobId) => bloc.add(TestsRunSelected(jobId)),
-          ),
         if (job?.runId case final runId?)
           XpButton(
             label: l10n.overviewOpenJob,
@@ -101,46 +91,67 @@ class TestsView extends StatelessWidget {
             ),
           ),
       ],
-      child: ListView(
-        padding: const EdgeInsets.all(20),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (state.error case final error?) ...[
-            XpErrorState(
-              error,
-              onRetry: () => bloc.add(
-                TestsSubscriptionRequested(project.id, jobId: shown),
-              ),
+          // Every test run, to search and pick (U6d).
+          if (runs.length > 1) ...[
+            XpPickList<KnownTestRun>(
+              items: runs,
+              selected: runs.where((run) => run.jobId == shown).firstOrNull,
+              titleOf: (run) => run.branch ?? run.jobId,
+              subtitleOf: (run) => knownRunLabel(run, l10n),
+              searchHint: l10n.testsSearch,
+              onSelected: (run) => bloc.add(TestsRunSelected(run.jobId)),
             ),
-            const SizedBox(height: 12),
+            const XpHairline(vertical: true),
           ],
-          if (state.runError case final error? when shown != null) ...[
-            XpErrorState(
-              error,
-              onRetry: () => bloc.add(TestsRunSelected(shown)),
+          Expanded(
+            child: ListView(
+              key: const Key('tests.body'),
+              padding: const EdgeInsets.all(20),
+              children: [
+                if (state.error case final error?) ...[
+                  XpErrorState(
+                    error,
+                    onRetry: () => bloc.add(
+                      TestsSubscriptionRequested(project.id, jobId: shown),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                ],
+                if (state.runError case final error? when shown != null) ...[
+                  XpErrorState(
+                    error,
+                    onRetry: () => bloc.add(TestsRunSelected(shown)),
+                  ),
+                  const SizedBox(height: 12),
+                ],
+                if (response != null) ...[
+                  TestRunSummary(
+                    response: response,
+                    duration: state.duration,
+                    baseline: state.comparedBaseline,
+                  ),
+                  const SizedBox(height: 24),
+                  TestLists(response: response),
+                ] else if (state.error == null &&
+                    (!state.loaded ||
+                        (shown != null && state.runError == null)))
+                  const XpLoading()
+                else if (state.loaded && runs.isEmpty)
+                  _NoRuns(project: project),
+                if (state.baselines.isNotEmpty) ...[
+                  const SizedBox(height: 24),
+                  BaselinesPanel(
+                    baselines: state.baselines,
+                    shownJobId: shown,
+                    onShow: (jobId) => bloc.add(TestsRunSelected(jobId)),
+                  ),
+                ],
+              ],
             ),
-            const SizedBox(height: 12),
-          ],
-          if (response != null) ...[
-            TestRunSummary(
-              response: response,
-              duration: state.duration,
-              baseline: state.comparedBaseline,
-            ),
-            const SizedBox(height: 24),
-            TestLists(response: response),
-          ] else if (state.error == null &&
-              (!state.loaded || (shown != null && state.runError == null)))
-            const XpLoading()
-          else if (state.loaded && runs.isEmpty)
-            _NoRuns(project: project),
-          if (state.baselines.isNotEmpty) ...[
-            const SizedBox(height: 24),
-            BaselinesPanel(
-              baselines: state.baselines,
-              shownJobId: shown,
-              onShow: (jobId) => bloc.add(TestsRunSelected(jobId)),
-            ),
-          ],
+          ),
         ],
       ),
     );

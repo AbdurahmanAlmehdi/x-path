@@ -1,5 +1,6 @@
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:xp_api/xp_api.dart';
@@ -45,14 +46,13 @@ void main() {
 
   Future<void> pump(
     WidgetTester tester, {
-    bool github = false,
     EngineStatus status = EngineStatus.connected,
     LocalEngineBloc? localEngine,
     List<EngineProfile>? engineList,
     RunnersRepository? runners,
   }) async {
     await tester.pumpApp(
-      SettingsPage(github: github),
+      const SettingsPage(),
       settingsRepository: settings,
       runnersRepository: runners,
       connection: connectionIn(
@@ -438,6 +438,29 @@ void main() {
     final field = find.byKey(const Key('settings.githubToken'));
     final save = find.byKey(const Key('settings.githubSave'));
 
+    // The section lives on the credentials page now (U6d).
+    Widget section({bool github = false}) => BlocProvider(
+      create: (_) =>
+          GitHubTokenBloc(settings: settings)
+            ..add(const GitHubTokenRequested()),
+      child: SingleChildScrollView(
+        child: GitHubTokenSection(autofocus: github),
+      ),
+    );
+
+    Future<void> pump(
+      WidgetTester tester, {
+      bool github = false,
+      EngineStatus status = EngineStatus.connected,
+    }) async {
+      await tester.pumpApp(
+        section(github: github),
+        settingsRepository: settings,
+        connection: connectionIn(connectedTo(status: status)),
+      );
+      await tester.pumpAndSettle();
+    }
+
     testWidgets('saves a pasted token and clears the field', (tester) async {
       when(() => settings.setGitHubToken('ghp_new'))
           .thenAnswer((_) async => connected);
@@ -556,7 +579,7 @@ void main() {
       when(settings.gitHubToken).thenAnswer(
         (_) => Future.delayed(const Duration(seconds: 1), () => missing),
       );
-      await tester.pumpApp(const SettingsPage(), settingsRepository: settings);
+      await tester.pumpApp(section(), settingsRepository: settings);
       await tester.pump();
 
       expect(find.text('Asking GitHub…'), findsOneWidget);

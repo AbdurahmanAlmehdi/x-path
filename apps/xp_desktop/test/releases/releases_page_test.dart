@@ -79,9 +79,7 @@ void main() {
       expect(find.text('Waits for both stores to go live'), findsOneWidget);
       expect(find.text('Live now 5.3.7'), findsNWidgets(2));
 
-      await tester.tap(find.text('5.4.1 (3283) · prod · In review'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('5.3.7 (3200) · prod · Live').last);
+      await tester.tap(find.text('5.3.7 (3200)'));
       await tester.pumpAndSettle();
       expect(find.text('Release 5.3.7 (3200)'), findsOneWidget);
       expect(find.text('No commit yet.'), findsOneWidget);

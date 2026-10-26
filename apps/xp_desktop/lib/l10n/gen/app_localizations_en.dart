@@ -3929,4 +3929,89 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get credentialsMore => 'More';
+
+  @override
+  String get releasesSearch => 'Find a release';
+
+  @override
+  String get testsSearch => 'Find a test run';
+
+  @override
+  String get homeTitle => 'Home';
+
+  @override
+  String homeSubtitle(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count projects',
+      one: '1 project',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String homeLive(String version) {
+    return 'Live: $version';
+  }
+
+  @override
+  String get homeNothingLive => 'Nothing live yet';
+
+  @override
+  String homeInReview(String version, String state) {
+    return '$version: $state';
+  }
+
+  @override
+  String get sidebarProjectSettings => 'Project settings';
+
+  @override
+  String get projectGitHost => 'Git host';
+
+  @override
+  String get projectBaseBranch => 'Base branch';
+
+  @override
+  String get projectBaseBranchSave => 'Save';
+
+  @override
+  String projectBaseBranchSaved(String branch) {
+    return 'Releases are based on $branch now';
+  }
+
+  @override
+  String get projectGates => 'Gates';
+
+  @override
+  String get projectGatesBody =>
+      'These actions wait for your approval before they happen. Agents can never turn a gate off.';
+
+  @override
+  String get projectStoreIds => 'Store ids';
+
+  @override
+  String get projectRemove => 'Remove the project';
+
+  @override
+  String get projectRemoveBody =>
+      'The engine forgets the project, its workflows and runs. The repository and the stores are not touched.';
+
+  @override
+  String get projectRemoveButton => 'Remove…';
+
+  @override
+  String projectRemoveTitle(String name) {
+    return 'Remove $name?';
+  }
+
+  @override
+  String get projectRemovePoint =>
+      'Its workflows, runs and releases go from this engine. Credentials stay.';
+
+  @override
+  String get projectRemoveKeep => 'Keep';
+
+  @override
+  String get projectRemoveConfirm => 'Remove';
 }

@@ -84,6 +84,17 @@ final class WorkflowsDestination extends ShellDestination {
   List<Object?> get props => [projectId, workflowId];
 }
 
+/// The settings of [projectId]: base branch, gates, store ids, git host,
+/// remove (U6d).
+final class ProjectSettingsDestination extends ShellDestination {
+  const new(this.projectId);
+
+  final String projectId;
+
+  @override
+  List<Object?> get props => [projectId];
+}
+
 /// The runners of the engine.
 final class RunnersDestination extends ShellDestination {
   const new();
@@ -109,14 +120,20 @@ final class AddProjectDestination extends ShellDestination {
   const new();
 }
 
-/// The credentials, of [projectId] if given (else the first project).
+/// The credentials, of [projectId] if given (else the first project), and
+/// the engine's GitHub token (U6d). [github] puts the cursor in the GitHub
+/// token field.
 final class CredentialsDestination extends ShellDestination {
-  const new([this.projectId]);
+  const new([this.projectId]) : github = false;
+
+  /// The credentials with the cursor in the GitHub token field.
+  const new gitHub() : projectId = null, github = true;
 
   final String? projectId;
+  final bool github;
 
   @override
-  List<Object?> get props => [projectId];
+  List<Object?> get props => [projectId, github];
 }
 
 /// The engine list.
@@ -129,15 +146,10 @@ final class OnboardingDestination extends ShellDestination {
   const new();
 }
 
-/// The settings: the versions, the engine's GitHub token and "Remove
-/// XPath". [github] puts the cursor in the GitHub token field.
+/// The settings of the app and of this Mac: the versions, the `xp` link,
+/// tokens, notifications, the runner URL and "Remove XPath".
 final class SettingsDestination extends ShellDestination {
-  const new({this.github = false});
-
-  final bool github;
-
-  @override
-  List<Object?> get props => [github];
+  const new();
 }
 
 /// [destination] as the app remembers it between launches (U6b), or `null`
@@ -155,6 +167,8 @@ String? encodeDestination(ShellDestination destination) =>
       TestsDestination(:final projectId) => 'tests:$projectId',
       RunsDestination(:final projectId) => 'runs:$projectId',
       WorkflowsDestination(:final projectId) => 'workflows:$projectId',
+      ProjectSettingsDestination(:final projectId) =>
+        'project-settings:$projectId',
       RunnersDestination() => 'runners',
       StorageDestination() => 'storage',
       ApprovalsDestination() => 'approvals',
@@ -181,6 +195,7 @@ ShellDestination? decodeDestination(String? encoded) =>
       ['tests', final id] => TestsDestination(id),
       ['runs', final id] => RunsDestination(id),
       ['workflows', final id] => WorkflowsDestination(id),
+      ['project-settings', final id] => ProjectSettingsDestination(id),
       ['runners'] => const RunnersDestination(),
       ['storage'] => const StorageDestination(),
       ['approvals'] => const ApprovalsDestination(),
@@ -277,12 +292,22 @@ class ShellCubit extends Cubit<ShellDestination> {
   }
 
   /// The project the destination shows, if it shows one.
-  String? get projectId => switch (state) {
-    ProjectDestination(:final projectId) ||
-    ReleasesDestination(:final projectId) ||
-    TestsDestination(:final projectId) ||
-    WorkflowsDestination(:final projectId) => projectId,
-    JobDestination(:final projectId) => projectId,
-    _ => null,
-  };
+  String? get projectId => _projectOf(state);
+
+  /// The project the shell showed last, also from a page of the engine: the
+  /// sidebar keeps it open (U6d).
+  String? get lastProjectId =>
+      projectId ?? _back.reversed.map(_projectOf).nonNulls.firstOrNull;
+
+  static String? _projectOf(ShellDestination destination) =>
+      switch (destination) {
+        ProjectDestination(:final projectId) ||
+        ReleasesDestination(:final projectId) ||
+        TestsDestination(:final projectId) ||
+        RunsDestination(:final projectId) ||
+        WorkflowsDestination(:final projectId) ||
+        ProjectSettingsDestination(:final projectId) => projectId,
+        JobDestination(:final projectId) => projectId,
+        _ => null,
+      };
 }

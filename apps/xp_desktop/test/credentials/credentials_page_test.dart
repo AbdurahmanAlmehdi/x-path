@@ -15,6 +15,13 @@ import 'package:xp_repositories/xp_repositories.dart';
 import '../helpers/fakes.dart';
 import '../helpers/pump_app.dart';
 
+/// The save button of the credential form, not the one of the GitHub token
+/// section below it (U6d).
+final Finder _formSave = find.descendant(
+  of: find.byType(CredentialForm),
+  matching: find.text('Check and save'),
+);
+
 void main() {
   setUpAll(() {
     registerFallbackValue(
@@ -155,7 +162,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Add a credential'), findsOneWidget);
 
-      await tester.tap(find.text('Check and save'));
+      await tester.tap(_formSave);
       expect(sent, isEmpty, reason: 'the fields are empty');
 
       await tester.enterText(field('name'), '  Team key ');
@@ -164,7 +171,7 @@ void main() {
       await tester.tap(find.text('Choose file…'));
       await tester.pumpAndSettle();
       await choose(tester, field('keyKind'), 'Individual key');
-      await tester.tap(find.text('Check and save'));
+      await tester.tap(_formSave);
       await tester.pumpAndSettle();
 
       expect(sent, [
@@ -179,7 +186,7 @@ void main() {
           },
         ),
       ]);
-      expect(find.text('Check and save'), findsNothing, reason: 'closed');
+      expect(_formSave, findsNothing, reason: 'closed');
       expect(find.text('Credential saved'), findsOneWidget);
     });
 
@@ -199,7 +206,7 @@ void main() {
       await tester.enterText(field('storePassword'), 'fake-store-pass');
       await tester.enterText(field('keyAlias'), 'upload');
       await tester.pump();
-      await tester.tap(find.text('Check and save'));
+      await tester.tap(_formSave);
       await tester.pumpAndSettle();
       expect((sent.single as CreateCredentialRequest).material, {
         'keystore': 'AQID',
@@ -235,7 +242,7 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('Cancel'));
       await tester.pumpAndSettle();
-      expect(find.text('Check and save'), findsNothing);
+      expect(_formSave, findsNothing);
     });
 
     testWidgets('shows why the engine refused, and replaces a secret', (
@@ -260,7 +267,7 @@ void main() {
       await tester.enterText(field('issuerId'), 'I');
       await tester.enterText(field('privateKey'), 'P');
       await tester.pump();
-      await tester.tap(find.text('Check and save'));
+      await tester.tap(_formSave);
       await tester.pumpAndSettle();
       expect(find.text('Not saved: The key was revoked.'), findsOneWidget);
 
@@ -269,7 +276,7 @@ void main() {
             sent.add(invocation.positionalArguments[1] as Object);
             return teamKey;
           });
-      await tester.tap(find.text('Check and save'));
+      await tester.tap(_formSave);
       await tester.pumpAndSettle();
       expect(sent, [
         const ReplaceCredentialRequest({
@@ -279,7 +286,7 @@ void main() {
           'keyKind': 'team',
         }),
       ]);
-      expect(find.text('Check and save'), findsNothing, reason: 'closed');
+      expect(_formSave, findsNothing, reason: 'closed');
     });
 
     testWidgets('renames a credential', (tester) async {
@@ -383,7 +390,7 @@ void main() {
       );
       await tester.tap(find.text('Add credential…').last);
       await tester.pumpAndSettle();
-      expect(find.text('Check and save'), findsOneWidget);
+      expect(_formSave, findsOneWidget);
       await pump(tester, projectList: const []);
       expect(
         find.text('Add a project to give its flavors credentials.'),
@@ -455,7 +462,7 @@ void main() {
       ]) {
         await tapIn(tester, 'crd_1', label);
       }
-      expect(find.text('Check and save'), findsNothing);
+      expect(_formSave, findsNothing);
       expect(find.text('Rename Team App Store key'), findsNothing);
       verifyNever(() => credentials.verifyCredential(any()));
     });

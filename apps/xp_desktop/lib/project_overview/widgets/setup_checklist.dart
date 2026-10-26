@@ -195,7 +195,7 @@ class _StepRow extends StatelessWidget {
       SetupStepKind.gitHub => [
         button(
           l10n.setupConnect,
-          () => shell.show(const SettingsDestination(github: true)),
+          () => shell.show(const CredentialsDestination.gitHub()),
         ),
       ],
       SetupStepKind.project => [

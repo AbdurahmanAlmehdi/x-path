@@ -20,6 +20,7 @@ import 'package:xp_desktop/onboarding/view/onboarding_page.dart';
 import 'package:xp_desktop/project_overview/view/project_overview_page.dart';
 import 'package:xp_desktop/projects/bloc/projects_bloc.dart';
 import 'package:xp_desktop/projects/view/no_projects_page.dart';
+import 'package:xp_desktop/projects/view/project_settings_page.dart';
 import 'package:xp_desktop/releases/view/releases_page.dart';
 import 'package:xp_desktop/runners/runners.dart';
 import 'package:xp_desktop/runs/view/runs_page.dart';
@@ -152,10 +153,11 @@ void main() {
       expect(shell.state, ProjectDestination(mataa.id));
     });
 
-    testWidgets('shows the first project at home', (tester) async {
+    testWidgets('shows every project at home', (tester) async {
       await pumpShell(tester);
-      expect(find.byType(ProjectOverviewPage), findsOneWidget);
-      expect(find.text('main · 1 app'), findsOneWidget);
+      expect(find.byType(HomePage), findsOneWidget);
+      expect(find.text('acme/mataa_captain'), findsOneWidget);
+      expect(find.text('2 projects'), findsOneWidget);
     });
 
     testWidgets('shows nothing before the projects load', (tester) async {
@@ -191,7 +193,9 @@ void main() {
       (const CredentialsDestination('prj_1'), CredentialsPage),
       (const EnginesDestination(), EnginesPage),
       (const OnboardingDestination(), OnboardingPage),
-      (const SettingsDestination(github: true), SettingsPage),
+      (const SettingsDestination(), SettingsPage),
+      (const ProjectSettingsDestination('prj_1'), ProjectSettingsPage),
+      (const HomeDestination(), HomePage),
     ]) {
       testWidgets('shows $page for $destination', (tester) async {
         await pumpShell(tester, shell: ShellCubit(destination));
@@ -325,6 +329,18 @@ void main() {
       },
     );
 
+    test('remembers the project shown last on the pages of the engine', () {
+      final shell = ShellCubit()..show(const RunnersDestination());
+      expect(shell.lastProjectId, isNull);
+      shell
+        ..show(const ProjectSettingsDestination('prj_2'))
+        ..show(const RunnersDestination())
+        ..show(const CredentialsDestination.gitHub());
+      expect(shell.projectId, isNull);
+      expect(shell.lastProjectId, 'prj_2');
+      expect(const CredentialsDestination.gitHub().props, [null, true]);
+    });
+
     test('encodes the destinations it restores, and decodes them', () {
       for (final destination in const [
         HomeDestination(),
@@ -340,6 +356,7 @@ void main() {
         ApprovalsDestination(),
         CredentialsDestination(),
         CredentialsDestination('prj_1'),
+        ProjectSettingsDestination('prj_1'),
         EnginesDestination(),
         SettingsDestination(),
       ]) {
@@ -508,7 +525,11 @@ void main() {
       await tester.tap(find.text('Approvals'));
       await tester.pump();
       expect(shell.state, const ApprovalsDestination());
-      expect(find.text('Releases'), findsNothing);
+      expect(
+        find.text('Releases'),
+        findsOneWidget,
+        reason: 'the project stays open on the pages of the engine (U6d)',
+      );
     });
 
     testWidgets('says how many runners are busy and what storage frees', (
@@ -542,7 +563,7 @@ void main() {
     testWidgets('lists the projects with what their scan found', (
       tester,
     ) async {
-      await pumpShell(tester);
+      await pumpShell(tester, shell: ShellCubit(const RunnersDestination()));
       expect(
         find.descendant(
           of: find.byType(Sidebar),
@@ -584,7 +605,7 @@ void main() {
     });
 
     testWidgets('navigates', (tester) async {
-      final shell = ShellCubit();
+      final shell = ShellCubit(const RunnersDestination());
       await pumpShell(tester, shell: shell);
       await tester.tap(find.text('mataa_captain'));
       await tester.pump();
@@ -604,7 +625,7 @@ void main() {
     });
 
     testWidgets('highlights a row under the mouse', (tester) async {
-      await pumpShell(tester);
+      await pumpShell(tester, shell: ShellCubit(const RunnersDestination()));
       final gesture = await tester.createGesture(kind: PointerDeviceKind.mouse);
       await gesture.addPointer(location: Offset.zero);
       addTearDown(gesture.removePointer);

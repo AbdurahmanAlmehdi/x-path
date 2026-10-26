@@ -6429,6 +6429,138 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'More'**
   String get credentialsMore;
+
+  /// Search field of the release list.
+  ///
+  /// In en, this message translates to:
+  /// **'Find a release'**
+  String get releasesSearch;
+
+  /// Search field of the test run list.
+  ///
+  /// In en, this message translates to:
+  /// **'Find a test run'**
+  String get testsSearch;
+
+  /// The cross-project dashboard (U6d).
+  ///
+  /// In en, this message translates to:
+  /// **'Home'**
+  String get homeTitle;
+
+  /// No description provided for @homeSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 project} other{{count} projects}}'**
+  String homeSubtitle(int count);
+
+  /// No description provided for @homeLive.
+  ///
+  /// In en, this message translates to:
+  /// **'Live: {version}'**
+  String homeLive(String version);
+
+  /// Home card of a project with no live release.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing live yet'**
+  String get homeNothingLive;
+
+  /// No description provided for @homeInReview.
+  ///
+  /// In en, this message translates to:
+  /// **'{version}: {state}'**
+  String homeInReview(String version, String state);
+
+  /// Sidebar row and page title (U6d).
+  ///
+  /// In en, this message translates to:
+  /// **'Project settings'**
+  String get sidebarProjectSettings;
+
+  /// Project settings section.
+  ///
+  /// In en, this message translates to:
+  /// **'Git host'**
+  String get projectGitHost;
+
+  /// Project settings section.
+  ///
+  /// In en, this message translates to:
+  /// **'Base branch'**
+  String get projectBaseBranch;
+
+  /// Saves the base branch.
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get projectBaseBranchSave;
+
+  /// No description provided for @projectBaseBranchSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Releases are based on {branch} now'**
+  String projectBaseBranchSaved(String branch);
+
+  /// Project settings section.
+  ///
+  /// In en, this message translates to:
+  /// **'Gates'**
+  String get projectGates;
+
+  /// Above the gates.
+  ///
+  /// In en, this message translates to:
+  /// **'These actions wait for your approval before they happen. Agents can never turn a gate off.'**
+  String get projectGatesBody;
+
+  /// Project settings section.
+  ///
+  /// In en, this message translates to:
+  /// **'Store ids'**
+  String get projectStoreIds;
+
+  /// Project settings section.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove the project'**
+  String get projectRemove;
+
+  /// Project settings.
+  ///
+  /// In en, this message translates to:
+  /// **'The engine forgets the project, its workflows and runs. The repository and the stores are not touched.'**
+  String get projectRemoveBody;
+
+  /// Removes the project after a confirmation.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove…'**
+  String get projectRemoveButton;
+
+  /// No description provided for @projectRemoveTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove {name}?'**
+  String projectRemoveTitle(String name);
+
+  /// Confirmation point.
+  ///
+  /// In en, this message translates to:
+  /// **'Its workflows, runs and releases go from this engine. Credentials stay.'**
+  String get projectRemovePoint;
+
+  /// Confirmation keep button.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep'**
+  String get projectRemoveKeep;
+
+  /// Confirmation remove button.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove'**
+  String get projectRemoveConfirm;
 }
 
 class _AppLocalizationsDelegate

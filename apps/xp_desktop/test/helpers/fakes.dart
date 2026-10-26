@@ -56,6 +56,9 @@ MockApprovalsRepository quietApprovals() {
       state: any(named: 'state'),
     ),
   ).thenAnswer((_) => const Stream.empty());
+  when(() => repository.getGates(any())).thenAnswer(
+    (_) async => const ProjectGates({'prod_release': true, 'push': true}),
+  );
   return repository;
 }
 
@@ -87,6 +90,7 @@ MockJobsRepository quietJobs() {
       limit: any(named: 'limit'),
     ),
   ).thenAnswer((_) => const Stream.empty());
+  when(repository.watchActiveRuns).thenAnswer((_) => const Stream.empty());
   return repository;
 }
 

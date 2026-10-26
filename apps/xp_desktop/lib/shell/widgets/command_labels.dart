@@ -40,6 +40,7 @@ String pageLabel(AppLocalizations l10n, ShellDestination destination) =>
       StorageDestination() => l10n.storageTitle,
       EnginesDestination() => l10n.enginesTitle,
       SettingsDestination() => l10n.settingsTitle,
+      ProjectSettingsDestination() => l10n.sidebarProjectSettings,
       AddProjectDestination() => l10n.sidebarAddProject,
       OnboardingDestination() => l10n.onboardingTitle,
       HomeDestination() ||

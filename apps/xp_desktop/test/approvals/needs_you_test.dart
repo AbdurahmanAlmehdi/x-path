@@ -127,7 +127,9 @@ void main() {
     );
 
     testWidgets('reviews what the shown project waits for', (tester) async {
-      await pump(tester, ShellCubit(), [pendingApproval]);
+      await pump(tester, ShellCubit(const ProjectDestination('prj_1')), [
+        pendingApproval,
+      ]);
       await tester.pump();
       await sendShortcut(tester);
       expect(find.text('Return never approves. ⌘↩ approves.'), findsOne);
@@ -136,7 +138,7 @@ void main() {
     testWidgets('opens the inbox when the project waits for nothing', (
       tester,
     ) async {
-      final shell = ShellCubit();
+      final shell = ShellCubit(const ProjectDestination('prj_1'));
       await pump(tester, shell, [mergeApproval]);
       await tester.pump();
       await sendShortcut(tester);

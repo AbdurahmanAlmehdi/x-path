@@ -13,19 +13,18 @@ import 'package:xp_desktop/credentials/view/credentials_page.dart';
 import 'package:xp_desktop/dispatch/view/dispatch_sheet.dart';
 import 'package:xp_desktop/engines/view/engines_page.dart';
 import 'package:xp_desktop/job/view/job_page.dart';
-import 'package:xp_desktop/l10n/l10n.dart';
 import 'package:xp_desktop/onboarding/view/onboarding_page.dart';
 import 'package:xp_desktop/project_overview/view/project_overview_page.dart';
 import 'package:xp_desktop/projects/bloc/projects_bloc.dart';
-import 'package:xp_desktop/projects/view/no_projects_page.dart';
+import 'package:xp_desktop/projects/view/project_settings_page.dart';
 import 'package:xp_desktop/releases/view/releases_page.dart';
 import 'package:xp_desktop/runners/view/runners_page.dart';
 import 'package:xp_desktop/runs/view/runs_page.dart';
 import 'package:xp_desktop/settings/view/settings_page.dart';
 import 'package:xp_desktop/shell/cubit/shell_cubit.dart';
+import 'package:xp_desktop/shell/view/home_page.dart';
 import 'package:xp_desktop/shell/widgets/app_menu_bar.dart';
 import 'package:xp_desktop/shell/widgets/command_palette.dart';
-import 'package:xp_desktop/shell/widgets/shell_page.dart';
 import 'package:xp_desktop/shell/widgets/shortcut_sheet.dart';
 import 'package:xp_desktop/shell/widgets/sidebar.dart';
 import 'package:xp_desktop/storage/view/storage_page.dart';
@@ -34,15 +33,9 @@ import 'package:xp_desktop/theme/theme.dart';
 import 'package:xp_desktop/widgets/widgets.dart';
 import 'package:xp_desktop/workflow_builder/view/workflow_builder_page.dart';
 
-/// The project the shell shows: the destination's, or the first one on
-/// the home page.
-String? shownProjectId(BuildContext context) {
-  final shell = context.read<ShellCubit>();
-  return shell.projectId ??
-      (shell.state is HomeDestination
-          ? context.read<ProjectsBloc>().state.projects.firstOrNull?.id
-          : null);
-}
+/// The project the shell shows, if it shows one.
+String? shownProjectId(BuildContext context) =>
+    context.read<ShellCubit>().projectId;
 
 /// ⇧⌘A (Keyboard guide): reviews the approval of the shown project that
 /// expires first, else opens the approvals inbox.
@@ -144,7 +137,7 @@ class _AppShellState extends State<AppShell> {
         Expanded(
           child: BlocBuilder<ShellCubit, ShellDestination>(
             builder: (context, destination) => switch (destination) {
-              HomeDestination() => const _Home(),
+              HomeDestination() => const HomePage(),
               ProjectDestination(:final projectId) => ProjectOverviewPage(
                 projectId,
               ),
@@ -166,41 +159,23 @@ class _AppShellState extends State<AppShell> {
                   projectId: projectId,
                   workflowId: workflowId,
                 ),
+              ProjectSettingsDestination(:final projectId) =>
+                ProjectSettingsPage(projectId),
               RunnersDestination() => const RunnersPage(),
               StorageDestination() => const StoragePage(),
               ApprovalsDestination(:final approvalId) => ApprovalsPage(
                 approvalId: approvalId,
               ),
               AddProjectDestination() => const AddProjectPage(),
-              CredentialsDestination(:final projectId) => CredentialsPage(
-                projectId: projectId,
-              ),
+              CredentialsDestination(:final projectId, :final github) =>
+                CredentialsPage(projectId: projectId, github: github),
               EnginesDestination() => const EnginesPage(),
               OnboardingDestination() => const OnboardingPage(),
-              SettingsDestination(:final github) => SettingsPage(
-                github: github,
-              ),
+              SettingsDestination() => const SettingsPage(),
             },
           ),
         ),
       ],
     ),
   );
-}
-
-class _Home extends StatelessWidget {
-  const new();
-
-  @override
-  Widget build(BuildContext context) {
-    final state = context.watch<ProjectsBloc>().state;
-    if (!state.loaded) {
-      return ShellPage(
-        title: context.l10n.appTitle,
-        child: const Padding(padding: EdgeInsets.all(20), child: XpLoading()),
-      );
-    }
-    if (state.projects.isEmpty) return const NoProjectsPage();
-    return ProjectOverviewPage(state.projects.first.id);
-  }
 }

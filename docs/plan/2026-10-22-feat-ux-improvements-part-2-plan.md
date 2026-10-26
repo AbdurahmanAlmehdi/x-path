@@ -207,7 +207,7 @@ Details:
 
 ### Phase U6d: Information architecture
 
-- **Status:** Not started
+- **Status:** Done
 - **Scope:** A cross-project Home, a project settings page, and lists instead of dropdowns.
 - **Files touched:** `apps/xp_desktop/lib/{shell,projects,project_overview,releases,tests,credentials,settings}/**`
 - **Acceptance criteria:** an owner with three projects sees each one's live and in-review
@@ -220,7 +220,9 @@ Details:
   project" (`shell/view/app_shell.dart:150`).
 - Keep the selected project expanded while on engine pages (`shell/widgets/sidebar.dart:38-40`).
 - Project settings page: rename, base branch, gates (`/projects/{id}/gates`), flavor store ids,
-  git host (read-only, once the runner plan's R10 lands), remove project.
+  git host (read-only, once the runner plan's R10 lands), remove project. Rename is left out:
+  the engine names a project after its repository (`fullName`) and has no name of its own to
+  change.
 - The GitHub token moves from Settings to Credentials.
 - Releases and test runs become lists with status and search instead of `XpSelect` dropdowns
   (`releases/view/releases_page.dart:84`, `tests/view/tests_page.dart`).

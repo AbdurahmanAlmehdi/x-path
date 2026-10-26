@@ -1,4 +1,4 @@
-import 'package:flutter/widgets.dart' show Brightness, Scrollable;
+import 'package:flutter/widgets.dart' show Brightness, Key, Scrollable;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:xp_api/xp_api.dart';
@@ -76,6 +76,14 @@ class TestsHarness {
   }
 }
 
+/// The scrollable of the run shown, not of the run list (U6d).
+final Finder _body = find
+    .descendant(
+      of: find.byKey(const Key('tests.body')),
+      matching: find.byType(Scrollable),
+    )
+    .first;
+
 void main() {
   group('TestsPage', () {
     testWidgets('shows a run against its baseline, new failures first', (
@@ -106,9 +114,12 @@ void main() {
         const JobDestination('run_tests', jobId: 'job_dev', projectId: 'prj_1'),
       );
       await tester.scrollUntilVisible(
-        find.text('release/5.4.1'),
+        find.descendant(
+          of: find.byKey(const Key('tests.body')),
+          matching: find.text('release/5.4.1'),
+        ),
         300,
-        scrollable: find.byType(Scrollable).first,
+        scrollable: _body,
       );
       expect(find.text('BASELINES'), findsOneWidget);
     });
@@ -116,9 +127,12 @@ void main() {
     testWidgets('switches to a baseline run', (tester) async {
       await TestsHarness().pump(tester);
       await tester.scrollUntilVisible(
-        find.text('release/5.4.1'),
+        find.descendant(
+          of: find.byKey(const Key('tests.body')),
+          matching: find.text('release/5.4.1'),
+        ),
         300,
-        scrollable: find.byType(Scrollable).first,
+        scrollable: _body,
       );
       await tester.tap(find.text('Show').first);
       await tester.pump();
@@ -133,8 +147,6 @@ void main() {
       );
       expect(find.text('Open job'), findsNothing);
 
-      await tester.tap(find.textContaining('main · '));
-      await tester.pumpAndSettle();
       await tester.tap(find.textContaining('dev · ').last);
       await tester.pumpAndSettle();
       expect(find.text('1 new failure'), findsOneWidget);

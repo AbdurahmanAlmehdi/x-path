@@ -29,17 +29,8 @@ class Sidebar extends StatelessWidget {
     final reclaimable = context.select<StorageBloc, int?>(
       (bloc) => bloc.state.report?.reclaimableBytes,
     );
-    final selectedProject = switch (destination) {
-      ProjectDestination(:final projectId) => projectId,
-      ReleasesDestination(:final projectId) => projectId,
-      TestsDestination(:final projectId) => projectId,
-      WorkflowsDestination(:final projectId) => projectId,
-      RunsDestination(:final projectId) => projectId,
-      JobDestination(:final projectId) => projectId,
-      HomeDestination() when projects.projects.isNotEmpty =>
-        projects.projects.first.id,
-      _ => null,
-    };
+    // The project shown last stays open on the pages of the engine (U6d).
+    final selectedProject = context.read<ShellCubit>().lastProjectId;
     void show(ShellDestination destination) =>
         context.read<ShellCubit>().show(destination);
 
@@ -57,6 +48,14 @@ class Sidebar extends StatelessWidget {
           Expanded(
             child: ListView(
               children: [
+                SidebarRow(
+                  icon: PhosphorIconsRegular.house,
+                  selectedIcon: PhosphorIconsFill.house,
+                  label: l10n.homeTitle,
+                  selected: destination is HomeDestination,
+                  onTap: () => show(const HomeDestination()),
+                ),
+                const SizedBox(height: 12),
                 _Caption(l10n.sidebarProjects),
                 if (projects.projects.isEmpty)
                   Padding(
@@ -86,9 +85,7 @@ class Sidebar extends StatelessWidget {
                       selectedIcon: PhosphorIconsFill.treeStructure,
                       label: l10n.sidebarOverview,
                       indent: 12,
-                      selected:
-                          destination is ProjectDestination ||
-                          destination is HomeDestination,
+                      selected: destination is ProjectDestination,
                       onTap: () => show(ProjectDestination(project.id)),
                     ),
                     SidebarRow(
@@ -124,6 +121,14 @@ class Sidebar extends StatelessWidget {
                       indent: 12,
                       selected: destination is WorkflowsDestination,
                       onTap: () => show(WorkflowsDestination(project.id)),
+                    ),
+                    SidebarRow(
+                      icon: PhosphorIconsRegular.sliders,
+                      selectedIcon: PhosphorIconsFill.sliders,
+                      label: l10n.sidebarProjectSettings,
+                      indent: 12,
+                      selected: destination is ProjectSettingsDestination,
+                      onTap: () => show(ProjectSettingsDestination(project.id)),
                     ),
                   ],
                 ],

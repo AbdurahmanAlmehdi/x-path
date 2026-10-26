@@ -1,6 +1,8 @@
 export 'bloc/command_palette_bloc.dart';
+export 'bloc/home_bloc.dart';
 export 'cubit/shell_cubit.dart';
 export 'view/app_shell.dart';
+export 'view/home_page.dart';
 export 'widgets/app_menu_bar.dart';
 export 'widgets/command_labels.dart';
 export 'widgets/command_palette.dart';

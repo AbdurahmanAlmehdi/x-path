@@ -7,6 +7,7 @@ export 'xp_context_menu.dart';
 export 'xp_feedback.dart';
 export 'xp_format.dart';
 export 'xp_layout.dart';
+export 'xp_pick_list.dart';
 export 'xp_segmented.dart';
 export 'xp_select.dart';
 export 'xp_sha.dart';

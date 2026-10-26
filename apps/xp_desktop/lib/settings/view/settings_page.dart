@@ -8,14 +8,12 @@ import 'package:xp_desktop/l10n/l10n.dart';
 import 'package:xp_desktop/local_engine/local_engine.dart';
 import 'package:xp_desktop/settings/bloc/cli_token_bloc.dart';
 import 'package:xp_desktop/settings/bloc/command_line_tool_bloc.dart';
-import 'package:xp_desktop/settings/bloc/github_token_bloc.dart';
 import 'package:xp_desktop/settings/bloc/notice_settings_cubit.dart';
 import 'package:xp_desktop/settings/bloc/remove_xpath_bloc.dart';
 import 'package:xp_desktop/settings/bloc/runner_url_bloc.dart';
 import 'package:xp_desktop/settings/bloc/settings_bloc.dart';
 import 'package:xp_desktop/settings/widgets/cli_token_section.dart';
 import 'package:xp_desktop/settings/widgets/command_line_tool_section.dart';
-import 'package:xp_desktop/settings/widgets/github_token_section.dart';
 import 'package:xp_desktop/settings/widgets/notice_settings_section.dart';
 import 'package:xp_desktop/settings/widgets/remove_xpath_sheet.dart';
 import 'package:xp_desktop/settings/widgets/runner_url_section.dart';
@@ -27,13 +25,10 @@ import 'package:xp_macos_services/xp_macos_services.dart';
 import 'package:xp_repositories/xp_repositories.dart';
 
 /// The settings (XPath ▸ Settings…, ⌘,): the versions and the engine's
-/// login item, the `xp` link, tokens for `xp` and agents, the engine's
-/// GitHub token, the runner URL, and "Remove XPath". [github]
-/// puts the cursor in the GitHub token field.
+/// login item, the `xp` link, tokens for `xp` and agents, the runner URL,
+/// notifications, and "Remove XPath". The GitHub token is in Credentials.
 class SettingsPage extends StatelessWidget {
-  const new({this.github = false, super.key});
-
-  final bool github;
+  const new({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -62,11 +57,6 @@ class SettingsPage extends StatelessWidget {
         ),
         BlocProvider(
           create: (_) =>
-              GitHubTokenBloc(settings: settings)
-                ..add(const GitHubTokenRequested()),
-        ),
-        BlocProvider(
-          create: (_) =>
               RunnerUrlBloc(runners: context.read<RunnersRepository>())
                 ..add(const RunnerUrlRequested()),
         ),
@@ -81,15 +71,13 @@ class SettingsPage extends StatelessWidget {
           ),
         ),
       ],
-      child: SettingsView(github: github),
+      child: const SettingsView(),
     );
   }
 }
 
 class SettingsView extends StatelessWidget {
-  const new({this.github = false, super.key});
-
-  final bool github;
+  const new({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -113,13 +101,6 @@ class SettingsView extends StatelessWidget {
           XpSectionLabel(l10n.settingsTokens),
           const SizedBox(height: 8),
           const XpPanel(padding: EdgeInsets.all(16), child: CliTokenSection()),
-          const SizedBox(height: 20),
-          XpSectionLabel(l10n.settingsGitHub),
-          const SizedBox(height: 8),
-          XpPanel(
-            padding: const EdgeInsets.all(16),
-            child: GitHubTokenSection(autofocus: github),
-          ),
           const SizedBox(height: 20),
           XpSectionLabel(l10n.settingsRunners),
           const SizedBox(height: 8),

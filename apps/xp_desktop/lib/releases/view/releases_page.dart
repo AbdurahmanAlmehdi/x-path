@@ -99,20 +99,6 @@ class ReleasesView extends StatelessWidget {
             ? name
             : [name, release.flavor, ?release.tag].join(' · '),
         actions: [
-          if (release != null && state.releases.length > 1)
-            XpSelect<String>(
-              value: release.id,
-              values: [for (final release in state.releases) release.id],
-              labelOf: (id) {
-                final item = state.releases.firstWhere((r) => r.id == id);
-                return [
-                  versionLabel(item.version, item.build),
-                  item.flavor,
-                  l10n.releaseState(item.state),
-                ].join(' · ');
-              },
-              onChanged: (id) => bloc.add(ReleaseBoardReleaseSelected(id)),
-            ),
           if (release != null)
             XpButton(
               label: l10n.releaseRefresh,
@@ -139,29 +125,53 @@ class ReleasesView extends StatelessWidget {
             if (release != null && release.state == ReleaseState.live)
               MinVersionBanner(release: release),
             Expanded(
-              child: ListView(
-                padding: const EdgeInsets.all(20),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  if (state.error case final error? when release == null)
-                    XpErrorState(
-                      error,
-                      onRetry: () => bloc.add(
-                        ReleaseBoardSubscriptionRequested(
-                          project.id,
-                          releaseId: state.selectedId,
-                        ),
-                      ),
-                    )
-                  else if (state.error case final error?) ...[
-                    XpMessage.error(error),
-                    const SizedBox(height: 12),
+                  // Every release with its state, to search and pick (U6d).
+                  if (state.releases.length > 1) ...[
+                    XpPickList<Release>(
+                      items: state.releases,
+                      selected: release,
+                      titleOf: (item) => versionLabel(item.version, item.build),
+                      subtitleOf: (item) => [
+                        item.flavor,
+                        l10n.releaseState(item.state),
+                      ].join(' · '),
+                      statusOf: (item) => releaseStatus(item.state),
+                      searchHint: l10n.releasesSearch,
+                      onSelected: (item) =>
+                          bloc.add(ReleaseBoardReleaseSelected(item.id)),
+                    ),
+                    const XpHairline(vertical: true),
                   ],
-                  if (release != null)
-                    _Board(release: release, state: state)
-                  else if (!state.loaded)
-                    const XpLoading()
-                  else if (state.error == null)
-                    _NoRelease(project),
+                  Expanded(
+                    child: ListView(
+                      padding: const EdgeInsets.all(20),
+                      children: [
+                        if (state.error case final error? when release == null)
+                          XpErrorState(
+                            error,
+                            onRetry: () => bloc.add(
+                              ReleaseBoardSubscriptionRequested(
+                                project.id,
+                                releaseId: state.selectedId,
+                              ),
+                            ),
+                          )
+                        else if (state.error case final error?) ...[
+                          XpMessage.error(error),
+                          const SizedBox(height: 12),
+                        ],
+                        if (release != null)
+                          _Board(release: release, state: state)
+                        else if (!state.loaded)
+                          const XpLoading()
+                        else if (state.error == null)
+                          _NoRelease(project),
+                      ],
+                    ),
+                  ),
                 ],
               ),
             ),
