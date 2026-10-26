@@ -16,7 +16,8 @@ whether the secrets are locked. `xp doctor` checks the saved config, that the en
 that it accepts the token. Then it prints the engine's own checks (`GET /doctor`): what the
 engine's machine can build and the fix for each missing tool, the secrets, the GitHub token, the
 credentials refused at their last check, and SSH to each git host that is not GitHub. It exits
-with 1 when something is missing. Both take `--json`.
+with 1 when something is missing. A tool the engine's machine lacks is listed as skipped, not
+missing: a job that needs it goes to a runner that has it. Both take `--json`.
 
 Two routes need no token, so they work even when the token does not:
 

@@ -13,6 +13,11 @@ import 'package:xp_engine/src/secrets/secret_store.dart';
 /// the capabilities of its own runner, its secrets, its GitHub token, its
 /// credentials, and SSH to the git hosts of projects not on GitHub.
 ///
+/// A capability the engine's own runner lacks is `skipped`, with why and the
+/// fix: a job that needs it goes to a runner that has it, so the engine is
+/// not unhealthy for it (an engine on Linux builds no iOS app, one in Docker
+/// builds nothing).
+///
 /// `xp doctor` prints it, rather than probing in the shell of the CLI,
 /// which may be on another machine and has another `PATH` and `JAVA_HOME`
 /// than the engine's service. The words follow UX-09: no HTTP path or CLI
@@ -58,7 +63,7 @@ class EngineDoctor {
           case final missing when missing.isNotEmpty)
         EngineCheck(
           name: capability.wire,
-          state: CheckState.missing,
+          state: CheckState.skipped,
           detail: missing.map((m) => m.reason).join('; '),
           fix: missing.map((m) => m.fix).join('; '),
         ),

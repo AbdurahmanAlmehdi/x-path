@@ -1083,10 +1083,7 @@ void main() {
       expect(await repository.rollout('rel_1', pause), _run);
       expect(await repository.history('rel_1'), history);
       expect(await repository.setTexts('rel_1', texts), _release);
-      expect(
-        await repository.movePatch('rel_1', 2, PatchAction.promote),
-        _run,
-      );
+      expect(await repository.movePatch('rel_1', 2, PatchAction.promote), _run);
       expect(await repository.abandon('rel_1', reason: 'no'), _release);
       expect(await repository.notes('rel_1'), notes);
     });

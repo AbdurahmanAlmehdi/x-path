@@ -87,21 +87,21 @@ void main() {
   };
 
   test(
-    'lists the capabilities of its runner, with why one is missing',
+    'lists the capabilities of its runner, with why one is not there',
     () async {
       final checks = await doctor.examine();
 
       expect(checks.checks.take(3), [
         const EngineCheck(
           name: 'ios-sign',
-          state: CheckState.missing,
+          state: CheckState.skipped,
           detail: 'no Xcode: xcodebuild not found; not macOS',
           fix: 'install Xcode; use a Mac',
         ),
         const EngineCheck(name: 'android', state: CheckState.ok),
         const EngineCheck(name: 'flutter', state: CheckState.ok),
       ]);
-      expect(checks.healthy, isFalse);
+      expect(checks.healthy, isTrue, reason: 'a runner can take ios-sign');
     },
   );
 

@@ -134,7 +134,7 @@ void main() {
       checks.first,
       const EngineCheck(
         name: 'ios-sign',
-        state: CheckState.missing,
+        state: CheckState.skipped,
         detail: 'not macOS',
         fix: 'run the engine on a Mac',
       ),
