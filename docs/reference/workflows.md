@@ -97,11 +97,13 @@ stages:                        # required; run in order
   `build.android`, `ios-sign` and `flutter` for `build.ios`, `ios-sign` for `upload.appStore` with an Apple
   ID (nothing with an API key), the platform's for Shorebird steps, `flutter` for `test` and `analyze`. A
   need can be any of several capabilities, written `ios-sign|ios-linux` in the job's `capabilities`, the
-  first preferred. Once Linux iOS builds exist (part 2 of ADR 0014), `build.ios` needs any of `ios-sign`
-  and `ios-linux`, and the planner narrows a job Linux cannot build (a flavor, Shorebird iOS, a debug or
-  profile build, an app extension, the iOS Simulator) to `ios-sign` with the reasons (`iosLinuxLimits`),
-  which its queue message repeats; with no paired runner that offers `ios-sign` the dispatch fails. A
-  workflow cannot name `ios-linux` yet.
+  first preferred. `build.ios` and `ios.stripAndReexport` need any of `ios-sign` and `ios-linux` (ADR 0014),
+  and the planner narrows a job Linux cannot build to `ios-sign` with the reasons (`iosLinuxLimits`): a
+  flavor, an entry point other than `lib/main.dart`, Shorebird iOS, a debug or profile build, an app
+  extension, the iOS Simulator, the strip step, a flavor without an Apple Distribution identity and an ASC
+  key, and what the scan found (`AppProfile.iosLinuxLimits`: plugins that build with CocoaPods, storyboards
+  beyond Flutter's template, a Flutter older than 3.47). The queue message and the dry run repeat them;
+  with no paired runner that offers `ios-sign` the dispatch fails. A workflow cannot name `ios-linux`.
 
 ### Built-in workflows and versions
 
@@ -244,3 +246,9 @@ local fake Firebase) stay on the engine, and the APK in the engine store is the 
 origin is a `file://` bare repository, on an engine with no GitHub token. The engine adds it without GitHub, the
 runner fetches the commit from the URL of the lease into a cache named by the source key, and `prod-release` is
 refused at dispatch with the host and its `git.push` step.
+
+`tool/e2e/runner_ios_linux_e2e.sh` (ADR 0014, Linux only) runs it with `--mode runner-ios-linux`: an iOS-only copy of
+the fixture built twice on a runner set up for Linux iOS builds, whose omarchy-apple-dev scripts and tools are stubs.
+The first job prepares the dedicated Flutter install, the second reuses it; `flutter/ship.sh` signs with the identity
+and the App Store profile the engine made with its fake App Store Connect and never sees the API key; the IPA, the
+dSYMs and the manifest reach the engine.

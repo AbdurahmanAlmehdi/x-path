@@ -334,6 +334,7 @@ class AppProfile extends Equatable {
     this.hasAndroid = false,
     this.iosPackageManager = IosPackageManager.none,
     this.iosAppExtensions = const [],
+    this.iosLinuxLimits = const [],
     this.flavors = const [],
     this.plists = const [],
     this.keystore,
@@ -380,6 +381,13 @@ class AppProfile extends Equatable {
   /// notification service).
   final List<String> iosAppExtensions;
 
+  /// Why Linux runners cannot build the iOS app, from the project alone
+  /// (ADR 0014): plugins that build with CocoaPods, storyboards beyond
+  /// Flutter's template, a Flutter older than Linux iOS builds need. Its
+  /// flavors and [iosAppExtensions] are reasons too, which the planner reads
+  /// from the job. Empty when the project does not rule Linux out.
+  final List<String> iosLinuxLimits;
+
   /// The build variants.
   final List<FlavorProfile> flavors;
 
@@ -407,6 +415,7 @@ class AppProfile extends Equatable {
         hasAndroid: hasAndroid,
         iosPackageManager: iosPackageManager,
         iosAppExtensions: iosAppExtensions,
+        iosLinuxLimits: iosLinuxLimits,
         flavors: flavors ?? this.flavors,
         plists: plists,
         keystore: keystore,
@@ -429,6 +438,7 @@ class AppProfile extends Equatable {
     hasAndroid,
     iosPackageManager,
     iosAppExtensions,
+    iosLinuxLimits,
     flavors,
     plists,
     keystore,

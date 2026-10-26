@@ -706,6 +706,158 @@ void main() {
     });
   });
 
+  group('signing for Linux builds', () {
+    setUp(() {
+      server
+        ..certificates['cert-1'] = FakeAscCertificate(
+          id: 'cert-1',
+          serialNumber: '0A1B2C3D4E5F',
+          certificateType: 'DISTRIBUTION',
+          content: [1, 2, 3],
+          expirationDate: DateTime.utc(2027, 3),
+        )
+        ..certificates['cert-2'] = FakeAscCertificate(
+          id: 'cert-2',
+          serialNumber: '99',
+          certificateType: 'DEVELOPMENT',
+          content: [4],
+        )
+        ..bundleIds['ly.example.app.widget'] = 'bundle-widget'
+        ..bundleIds['ly.example.app'] = 'bundle-1';
+    });
+
+    test('distribution certificates are listed, the others left out', () async {
+      final listed = await client().distributionCertificates();
+
+      expect(listed, [
+        AscCertificate(
+          id: 'cert-1',
+          serialNumber: '0A1B2C3D4E5F',
+          name: 'Apple Distribution: Fake Team',
+          expirationDate: DateTime.utc(2027, 3),
+          content: const [1, 2, 3],
+        ),
+      ]);
+      expect(
+        server.requests.single.uri.queryParameters['filter[certificateType]'],
+        'DISTRIBUTION',
+      );
+    });
+
+    test('a distribution certificate is created for a request, with its '
+        'content', () async {
+      const csr =
+          '-----BEGIN CERTIFICATE REQUEST-----\nMIIC\n'
+          '-----END CERTIFICATE REQUEST-----\n';
+
+      final created = await client().createDistributionCertificate(csr);
+
+      expect(created.serialNumber, fakeDistributionSerial);
+      expect(created.content, base64.decode(fakeDistributionCertificate));
+      expect(server.certificates[created.id]?.csr, csr);
+      expect(server.certificates[created.id]?.certificateType, 'DISTRIBUTION');
+      await expectLater(
+        client().createDistributionCertificate('not a request'),
+        throwsA(isA<AscConflictException>()),
+      );
+    });
+
+    test('a bundle id is found only by its exact identifier', () async {
+      final api = client();
+
+      expect(await api.bundleIdOf('ly.example.app'), 'bundle-1');
+      expect(await api.bundleIdOf('ly.example'), isNull);
+    });
+
+    test('an App Store profile is created, then found by name', () async {
+      final api = client();
+
+      final created = await api.createAppStoreProfile(
+        name: 'XPath ly.example.app 0A1B2C3D4E5F',
+        bundleId: 'bundle-1',
+        certificateId: 'cert-1',
+      );
+      final found = await api.appStoreProfiles(created.name);
+
+      expect(found, [created]);
+      expect(
+        utf8.decode(created.content),
+        'fake profile XPath ly.example.app 0A1B2C3D4E5F bundle-1 cert-1',
+      );
+      expect(created.expirationDate, DateTime.utc(2027, 10, 13, 12));
+      expect(server.profiles.values.single.profileType, 'IOS_APP_STORE');
+      expect(await api.appStoreProfiles('XPath other'), isEmpty);
+      server.profiles.values.single.state = 'INVALID';
+      expect(await api.appStoreProfiles(created.name), isEmpty);
+    });
+
+    test('a profile is deleted and a certificate revoked', () async {
+      final api = client();
+      final profile = await api.createAppStoreProfile(
+        name: 'XPath ly.example.app',
+        bundleId: 'bundle-1',
+        certificateId: 'cert-1',
+      );
+
+      await api.deleteProfile(profile.id);
+      await api.revokeCertificate('cert-1');
+
+      expect(server.profiles, isEmpty);
+      expect(server.certificates.keys, ['cert-2']);
+      await expectLater(
+        api.deleteProfile(profile.id),
+        throwsA(isA<AscNotFoundException>()),
+      );
+      await expectLater(
+        api.revokeCertificate('cert-1'),
+        throwsA(isA<AscNotFoundException>()),
+      );
+    });
+
+    test('a second profile of the same name is a conflict', () async {
+      final api = client();
+      Future<AscProfile> create() => api.createAppStoreProfile(
+        name: 'XPath ly.example.app',
+        bundleId: 'bundle-1',
+        certificateId: 'cert-1',
+      );
+      await create();
+
+      await expectLater(create(), throwsA(isA<AscConflictException>()));
+    });
+
+    test('a profile Apple sends without base64 content is a server '
+        'error', () async {
+      final api = client(
+        httpClient: MockClient(
+          (_) async => http.Response(
+            jsonEncode({
+              'data': [
+                {
+                  'type': 'profiles',
+                  'id': 'p',
+                  'attributes': {'name': 'n', 'profileContent': '!!'},
+                },
+              ],
+            }),
+            200,
+          ),
+        ),
+      );
+
+      await expectLater(
+        api.appStoreProfiles('n'),
+        throwsA(
+          isA<AscServerException>().having(
+            (e) => e.message,
+            'message',
+            contains('not base64'),
+          ),
+        ),
+      );
+    });
+  });
+
   group('errors', () {
     Future<Object?> failure(Future<Object?> call) =>
         call.then<Object?>((_) => null, onError: (Object e) => e);

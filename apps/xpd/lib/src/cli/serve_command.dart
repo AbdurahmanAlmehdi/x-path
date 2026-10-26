@@ -461,7 +461,8 @@ class ServeCommand extends XpdCommand {
         onError: (error, stackTrace) =>
             context.err.writeln('error: scheduler: $error\n$stackTrace'),
       );
-      final planners = StepPlanners(registry);
+      // iOS builds may run on a Linux runner set up for them (ADR 0014).
+      final planners = StepPlanners(registry, linuxIosBuilds: true);
       final workflows = WorkflowService(
         repository: SqliteWorkflowRepository(database),
         projects: projectRepository,
@@ -587,6 +588,7 @@ class ServeCommand extends XpdCommand {
         secrets: secrets,
         masker: masker,
         grants: RunnerSecretGrants(credentialChecks.repository),
+        profiles: credentialChecks.profiles,
         engineVersion: packageVersion,
         onError: (error, stackTrace) =>
             context.err.writeln('error: runner hub: $error\n$stackTrace'),
@@ -633,6 +635,7 @@ class ServeCommand extends XpdCommand {
           projects: projectRepository,
         ),
         credentials: credentialChecks.service,
+        certificates: credentialChecks.certificates,
         githubToken: githubToken,
         workflows: workflows,
         dispatcher: dispatcher,

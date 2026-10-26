@@ -60,6 +60,9 @@ void main() {
       expect(tools.toJson(), {'flutter': '3.47.6', 'gh': '2.96.0'});
       expect(JobTools.fromJson(tools.toJson()), tools);
       expect(JobTools.fromJson(const {}), const JobTools());
+      const linux = JobTools(iosLinux: 'Linux, omarchy-apple-dev abc');
+      expect(linux.toJson(), {'iosLinux': 'Linux, omarchy-apple-dev abc'});
+      expect(JobTools.fromJson(linux.toJson()), linux);
     });
 
     test('ignores unknown keys and rejects a field that is not text', () {

@@ -213,6 +213,69 @@ void main() {
     );
 
     blocTest<ProjectCredentialsBloc, ProjectCredentialsState>(
+      'has the engine create a distribution certificate for a flavor',
+      build: build,
+      seed: () => listed,
+      setUp: () => when(
+        () => credentials.createDistributionCertificate(
+          'prj_1',
+          app: '.',
+          flavor: 'prod',
+          name: 'Linux signing',
+        ),
+      ).thenAnswer((_) async => slackWebhook),
+      act: (bloc) => bloc.add(
+        const ProjectCertificateCreateRequested(
+          app: '.',
+          flavor: 'prod',
+          name: 'Linux signing',
+        ),
+      ),
+      expect: () => [
+        listed.copyWith(
+          assign: AssignStatus.working,
+          busy: () => CredentialKind.appleDistribution,
+        ),
+        listed.copyWith(assign: AssignStatus.done),
+      ],
+    );
+
+    blocTest<ProjectCredentialsBloc, ProjectCredentialsState>(
+      "says why the engine made no certificate, as at Apple's limit",
+      build: build,
+      seed: () => listed,
+      setUp: () =>
+          when(
+            () => credentials.createDistributionCertificate(
+              'prj_1',
+              app: '.',
+              flavor: 'prod',
+              name: 'Linux signing',
+            ),
+          ).thenThrow(
+            const ApiException(
+              'The team has 3 distribution certificates.',
+              statusCode: 409,
+              code: ApiErrorCode.conflict,
+            ),
+          ),
+      act: (bloc) => bloc.add(
+        const ProjectCertificateCreateRequested(
+          app: '.',
+          flavor: 'prod',
+          name: 'Linux signing',
+        ),
+      ),
+      skip: 1,
+      expect: () => [
+        listed.copyWith(
+          assign: AssignStatus.failed,
+          error: () => 'The team has 3 distribution certificates.',
+        ),
+      ],
+    );
+
+    blocTest<ProjectCredentialsBloc, ProjectCredentialsState>(
       'unassigns a credential from a flavor',
       build: build,
       seed: () => listed,
@@ -306,6 +369,14 @@ void main() {
           kind: CredentialKind.slack,
         ).props,
         ['.', 'dev', CredentialKind.slack],
+      );
+      expect(
+        const ProjectCertificateCreateRequested(
+          app: '.',
+          flavor: 'prod',
+          name: 'n',
+        ).props,
+        ['.', 'prod', 'n'],
       );
       expect(const ProjectCredentialEditorReset().props, isEmpty);
     });

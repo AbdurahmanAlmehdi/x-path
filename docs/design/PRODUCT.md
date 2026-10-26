@@ -52,7 +52,7 @@ jobs and steps with live logs.
 | Workflow | A recipe: stages that run in order, each with jobs that run in parallel, each with steps. Built-ins: Dev build, Prod release, Shorebird patch, Tests. |
 | Job | One run of a workflow job on one machine. Has steps and a live log. |
 | Step | One action inside a job: "Check source", "Bump version", "Build iOS", "Upload to App Store", "Tag release". |
-| Runner | A machine that runs jobs. Has capabilities (`ios-sign`, `android`, `flutter`, `swift-linux`) and slots. |
+| Runner | A machine that runs jobs. Has capabilities (`ios-sign`, `android`, `flutter`, `swift-linux`, and the opt-in `ios-linux` of a Linux runner that builds iOS through omarchy-apple-dev, ADR 0014) and slots. |
 | Release | A version heading to the stores, e.g. `5.4.1 (3283)`, with its own lifecycle. |
 | Patch | An over-the-air code update (Shorebird) to an existing release, e.g. `5.4.1-p2`. |
 | Approval | A request to do something risky (prod release, store submission, merge) that a human must approve. |
@@ -96,7 +96,10 @@ Every status needs a label and an icon, never colour alone.
 7. **Tests:** latest run against the baseline; new failures first.
 8. **Runners:** machines, capabilities, slots, current jobs, pairing a new one.
 9. **Workflows:** list, visual builder with a live YAML view.
-10. **Credentials:** per team / app / flavor, with verification state.
+10. **Credentials:** per team / app / flavor, with verification state. For iOS builds on a Linux
+    runner, the engine creates the flavor's Apple Distribution certificate with its App Store
+    Connect key ("Create certificate"); the scan and the dry run say when an app still needs a Mac
+    for iOS, and why. XPath never downloads Xcode; the owner supplies `Xcode.xip` (ADR 0014).
 11. **Storage:** artifacts by app and flavor, retention, "free up space".
 12. **Onboarding and Add project:** install the engine, pick a folder, review the scan.
 13. **Menu bar extra:** running jobs, pending approvals, quick dispatch.

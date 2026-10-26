@@ -32,12 +32,12 @@ CREATE TABLE artifact (
   pinned INTEGER NOT NULL DEFAULT 0 CHECK (pinned IN (0, 1))
 , created_at INTEGER NOT NULL DEFAULT 0) STRICT;
 
-CREATE TABLE credential (
+CREATE TABLE "credential" (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL CHECK (length(name) BETWEEN 1 AND 80),
   kind TEXT NOT NULL CHECK (kind IN (
-    'asc_key', 'apple_id', 'play_sa', 'firebase_sa', 'keystore', 'shorebird',
-    'slack'
+    'asc_key', 'apple_id', 'apple_distribution', 'play_sa', 'firebase_sa',
+    'keystore', 'shorebird', 'slack'
   )),
   secret_key TEXT NOT NULL,
   account TEXT,
@@ -171,19 +171,7 @@ CREATE TABLE release (
   pr_url TEXT,
   store_status TEXT NOT NULL DEFAULT '{}' CHECK (json_valid(store_status))
 , flavor TEXT NOT NULL DEFAULT '', base_branch TEXT NOT NULL DEFAULT '', branch TEXT, head_sha TEXT, pr_number INTEGER, merge_sha TEXT, merge_run_id TEXT, message TEXT, builds TEXT NOT NULL DEFAULT '[]'
-  CHECK (json_valid(builds)), created_at INTEGER NOT NULL DEFAULT 0, updated_at INTEGER NOT NULL DEFAULT 0, whats_new TEXT, what_to_test TEXT) STRICT;
-
-CREATE TABLE release_event (
-  id INTEGER PRIMARY KEY,
-  release_id TEXT NOT NULL REFERENCES release (id),
-  kind TEXT NOT NULL,
-  at INTEGER NOT NULL,
-  store TEXT,
-  detail TEXT,
-  by_name TEXT,
-  run_id TEXT,
-  patch_number INTEGER CHECK (patch_number IS NULL OR patch_number > 0)
-) STRICT;
+  CHECK (json_valid(builds)), created_at INTEGER NOT NULL DEFAULT 0, updated_at INTEGER NOT NULL DEFAULT 0) STRICT;
 
 CREATE TABLE run (
   id TEXT PRIMARY KEY,
@@ -280,8 +268,6 @@ CREATE INDEX idx_job_workflow_version ON job (workflow_version_id);
 CREATE INDEX idx_pairing_token_expires ON pairing_token (expires_at);
 
 CREATE INDEX idx_release_app ON release (app_id, state);
-
-CREATE INDEX idx_release_event_release ON release_event (release_id, at);
 
 CREATE INDEX idx_run_project ON run (project_id, created_at);
 

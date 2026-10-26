@@ -275,7 +275,7 @@ Details:
   that cannot merge (the runner plan's R10).
 - Shorebird: promote a patch between tracks and roll back from the release page (gated).
 - Release notes and "What to test" text kept on the release and sent with uploads.
-- As built: the history is a `release_event` table (migration v20) the engine writes as things
+- As built: the history is a `release_event` table (migration v21; main took v20 for iOS on Linux) the engine writes as things
   happen; a `shorebird-patch` run of a released version is linked to its release, and the
   `shorebird-track` built-in moves a patch behind `gate: prod_patch`. There is no fake Shorebird
   server: the `shorebird patches` adapter is tested against a fake CLI. "What to test" reaches

@@ -114,6 +114,10 @@ abstract final class ErrorReason {
   /// The engine's copy of the repository has no such ref yet; a dispatch
   /// fetches before it looks again.
   static const refUnknown = 'ref_unknown';
+
+  /// The team has as many distribution certificates as Apple allows; the
+  /// details list them (`certificates`) with the `limit`.
+  static const certificateLimit = 'certificate_limit';
 }
 
 /// The body of an error: a code, a human-readable message and, where it

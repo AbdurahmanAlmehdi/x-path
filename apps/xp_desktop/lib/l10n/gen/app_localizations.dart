@@ -1228,6 +1228,12 @@ abstract class AppLocalizations {
   /// **'Apple ID'**
   String get kindAppleId;
 
+  /// Credential kind: a private key and its certificate, for Linux runners.
+  ///
+  /// In en, this message translates to:
+  /// **'Apple Distribution identity'**
+  String get kindAppleDistribution;
+
   /// Credential kind.
   ///
   /// In en, this message translates to:
@@ -1341,6 +1347,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Private key (.p8)'**
   String get fieldPrivateKey;
+
+  /// Button: the engine creates an Apple Distribution certificate for the flavor.
+  ///
+  /// In en, this message translates to:
+  /// **'Create certificate'**
+  String get flavorCredentialsCreateCertificate;
+
+  /// Tooltip of the create certificate button.
+  ///
+  /// In en, this message translates to:
+  /// **'The engine creates a new Apple Distribution certificate with this flavor\'s App Store Connect key and assigns it. Apple allows a team three.'**
+  String get flavorCredentialsCreateCertificateTooltip;
+
+  /// Name of the identity the engine creates.
+  ///
+  /// In en, this message translates to:
+  /// **'Apple Distribution · {project} {flavor}'**
+  String flavorCredentialsCertificateName(String project, String flavor);
+
+  /// Field label: the private key of an Apple Distribution identity.
+  ///
+  /// In en, this message translates to:
+  /// **'Private key (PEM)'**
+  String get fieldSigningKey;
+
+  /// Field label: an Apple Distribution certificate file.
+  ///
+  /// In en, this message translates to:
+  /// **'Certificate (.cer)'**
+  String get fieldCertificate;
 
   /// Field label.
   ///
@@ -2511,6 +2547,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{engine} first, else {runner}'**
   String dispatchOnRunner(String engine, String runner);
+
+  /// Where a job runs, and why it needs a Mac where a Linux runner could have built iOS (the engine's words).
+  ///
+  /// In en, this message translates to:
+  /// **'{where} · needs a Mac for iOS: {reasons}'**
+  String dispatchNeedsMac(String where, String reasons);
 
   /// A job the run leaves out, and why (the engine's words).
   ///

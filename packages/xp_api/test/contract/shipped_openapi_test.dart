@@ -365,6 +365,7 @@ void main() {
         ('PUT', '/projects/prj_1/credentials'),
         ('PUT', '/projects/prj_1/flavors/prod/credentials/asc_key'),
         ('DELETE', '/projects/prj_1/flavors/prod/credentials/asc_key'),
+        ('POST', '/projects/prj_1/flavors/prod/distribution-certificate'),
         ('POST', '/projects/prj_1/credentials/crd_1/verify'),
         ('DELETE', '/projects/prj_1/credentials/crd_1'),
       ]) {
@@ -386,6 +387,28 @@ void main() {
           path: '/projects/prj_1/credentials',
           statusCode: 422,
           body: rejected,
+          contentType: 'application/json',
+        ),
+        isEmpty,
+      );
+      expect(
+        shipped.validateResponse(
+          method: 'POST',
+          path: '/projects/prj_1/flavors/prod/distribution-certificate',
+          statusCode: 409,
+          body: jsonEncode(
+            ErrorResponse.of(
+              ApiErrorCode.conflict,
+              'm',
+              details: const {
+                'reason': ErrorReason.certificateLimit,
+                'limit': 3,
+                'certificates': [
+                  {'id': 'c', 'serialNumber': '0A'},
+                ],
+              },
+            ).toJson(),
+          ),
           contentType: 'application/json',
         ),
         isEmpty,
@@ -506,6 +529,12 @@ void main() {
         },
         {'name': 'n', 'kind': 'shorebird', 'token': 'sb_api_x'},
         {'name': 'n', 'kind': 'slack', 'webhookUrl': 'https://h'},
+        {
+          'name': 'n',
+          'kind': 'apple_distribution',
+          'privateKey': 'pem',
+          'certificate': 'der',
+        },
       ]) {
         expect(
           shipped.validateSchema('CreateCredentialRequest', request),
@@ -523,6 +552,7 @@ void main() {
         {'kind': 'shorebird', 'token': 'x'},
         {'name': 'n', 'kind': 'github', 'token': 'x'},
         {'name': 'n', 'kind': 'shorebird', 'token': 'x', 'extra': 1},
+        {'name': 'n', 'kind': 'apple_distribution', 'privateKey': 'pem'},
       ]) {
         expect(
           shipped.validateSchema('CreateCredentialRequest', request),
@@ -533,6 +563,23 @@ void main() {
       expect(
         shipped.validateSchema('ReplaceCredentialRequest', {
           'token': 'x',
+          'extra': 1,
+        }),
+        isNotEmpty,
+      );
+    });
+
+    test('describes the request that creates a distribution certificate', () {
+      expect(
+        shipped.validateSchema(
+          'CreateDistributionCertificateRequest',
+          const CreateDistributionCertificateRequest('n').toJson(),
+        ),
+        isEmpty,
+      );
+      expect(
+        shipped.validateSchema('CreateDistributionCertificateRequest', {
+          'name': 'n',
           'extra': 1,
         }),
         isNotEmpty,
@@ -1096,6 +1143,12 @@ void main() {
         },
         {'flavor': 'prod', 'kind': 'shorebird', 'token': 'sb_api_x'},
         {'flavor': 'prod', 'kind': 'github', 'token': 'ghp_x'},
+        {
+          'flavor': 'prod',
+          'kind': 'apple_distribution',
+          'privateKey': 'pem',
+          'certificate': 'der',
+        },
         {
           'flavor': 'prod',
           'kind': 'slack',

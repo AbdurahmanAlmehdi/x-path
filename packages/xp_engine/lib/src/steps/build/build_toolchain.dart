@@ -17,15 +17,20 @@ class BuildToolchain {
   final JobRepository _jobs;
 
   /// The Flutter SDK for the pin [flutterVersion] (`.fvmrc`), with the tool
-  /// versions of this machine saved for the job [jobId].
+  /// versions of this machine saved for the job [jobId], and [iosLinux], what
+  /// builds iOS on Linux, when that is how the job builds.
   ///
   /// Throws a `FlutterResolutionException` if there is no SDK for the pin.
-  Future<ResolvedFlutter> prepare(String jobId, String? flutterVersion) async {
+  Future<ResolvedFlutter> prepare(
+    String jobId,
+    String? flutterVersion, {
+    String? iosLinux,
+  }) async {
     final flutter = await _resolver.resolve(flutterVersion);
     final reports = await _prober.probeAll();
     await _jobs.saveTools(
       jobId,
-      JobTools.from(flutter: flutter, reports: reports),
+      JobTools.from(flutter: flutter, reports: reports, iosLinux: iosLinux),
     );
     return flutter;
   }

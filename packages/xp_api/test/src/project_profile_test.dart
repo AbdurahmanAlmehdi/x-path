@@ -94,6 +94,7 @@ void main() {
       hasAndroid: true,
       iosPackageManager: IosPackageManager.cocoapods,
       iosAppExtensions: ['Widgets'],
+      iosLinuxLimits: ['the app builds its iOS plugins with CocoaPods'],
       flavors: [flavor],
       plists: [
         PlistVersion(
@@ -122,6 +123,7 @@ void main() {
       expect(read.storeCountry, 'us');
       expect(read.iosPackageManager, IosPackageManager.none);
       expect(read.iosAppExtensions, isEmpty);
+      expect(read.iosLinuxLimits, isEmpty);
       expect(read.flavors, isEmpty);
       expect(read.hasIos, isFalse);
     });
@@ -136,6 +138,7 @@ void main() {
       expect(changed.name, 'my_app');
       expect(changed.keystore, app.keystore);
       expect(changed.iosAppExtensions, ['Widgets']);
+      expect(changed.iosLinuxLimits, app.iosLinuxLimits);
     });
 
     test('names the package managers', () {

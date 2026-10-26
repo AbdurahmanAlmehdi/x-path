@@ -18,6 +18,7 @@ String credentialKindLabel(AppLocalizations l10n, CredentialKind kind) =>
     switch (kind) {
       CredentialKind.ascKey => l10n.kindAscKey,
       CredentialKind.appleId => l10n.kindAppleId,
+      CredentialKind.appleDistribution => l10n.kindAppleDistribution,
       CredentialKind.playSa => l10n.kindPlaySa,
       CredentialKind.firebaseSa => l10n.kindFirebaseSa,
       CredentialKind.keystore => l10n.kindKeystore,

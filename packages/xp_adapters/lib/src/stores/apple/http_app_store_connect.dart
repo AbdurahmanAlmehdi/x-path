@@ -293,6 +293,100 @@ class HttpAppStoreConnect implements AppStoreConnect {
     await _send('GET', _url('/v1/apps', {'limit': '1'}));
   }
 
+  @override
+  Future<List<AscCertificate>> distributionCertificates() async {
+    final documents = await _list('/v1/certificates', {
+      'filter[certificateType]': 'DISTRIBUTION',
+    });
+    return [for (final resource in documents.data) _certificate(resource)];
+  }
+
+  @override
+  Future<AscCertificate> createDistributionCertificate(String csr) async =>
+      _certificate(
+        _one(
+          await _send(
+            'POST',
+            _url('/v1/certificates'),
+            body: {
+              'data': {
+                'type': 'certificates',
+                'attributes': {
+                  'certificateType': 'DISTRIBUTION',
+                  'csrContent': csr,
+                },
+              },
+            },
+          ),
+        ),
+      );
+
+  @override
+  Future<String?> bundleIdOf(String identifier) async {
+    // The filter also matches longer identifiers; only the exact one counts.
+    final documents = await _list('/v1/bundleIds', {
+      'filter[identifier]': identifier,
+    });
+    for (final resource in documents.data) {
+      if (_optional(_attributes(resource), 'identifier') == identifier) {
+        return _string(resource, 'id');
+      }
+    }
+    return null;
+  }
+
+  @override
+  Future<List<AscProfile>> appStoreProfiles(String name) async {
+    final documents = await _list('/v1/profiles', {
+      'filter[name]': name,
+      'filter[profileType]': 'IOS_APP_STORE',
+      'filter[profileState]': 'ACTIVE',
+    });
+    return [
+      for (final resource in documents.data)
+        if (_optional(_attributes(resource), 'name') == name)
+          _profile(resource),
+    ];
+  }
+
+  @override
+  Future<void> deleteProfile(String id) async {
+    await _send('DELETE', _url('/v1/profiles/$id'));
+  }
+
+  @override
+  Future<void> revokeCertificate(String id) async {
+    await _send('DELETE', _url('/v1/certificates/$id'));
+  }
+
+  @override
+  Future<AscProfile> createAppStoreProfile({
+    required String name,
+    required String bundleId,
+    required String certificateId,
+  }) async => _profile(
+    _one(
+      await _send(
+        'POST',
+        _url('/v1/profiles'),
+        body: {
+          'data': {
+            'type': 'profiles',
+            'attributes': {'name': name, 'profileType': 'IOS_APP_STORE'},
+            'relationships': {
+              'bundleId': _link('bundleIds', bundleId),
+              'certificates': {
+                'data': [
+                  {'type': 'certificates', 'id': certificateId},
+                ],
+              },
+            },
+          },
+        },
+      ),
+    ),
+  );
+
   Uri _url(String path, [Map<String, String>? query]) => _baseUrl.replace(
     path: path,
     queryParameters: query == null || query.isEmpty ? null : query,
@@ -682,6 +776,40 @@ class HttpAppStoreConnect implements AppStoreConnect {
       errors: issues('errors'),
       buildId: _optional(_object(build['data']), 'id'),
     );
+  }
+
+  AscCertificate _certificate(Map<String, dynamic> resource) {
+    final attributes = _attributes(resource);
+    final content = _optional(attributes, 'certificateContent');
+    return AscCertificate(
+      id: _string(resource, 'id'),
+      serialNumber: _string(attributes, 'serialNumber'),
+      name:
+          _optional(attributes, 'displayName') ?? _optional(attributes, 'name'),
+      expirationDate: _date(attributes, 'expirationDate'),
+      content: content == null ? null : _base64(content, 'certificate'),
+    );
+  }
+
+  AscProfile _profile(Map<String, dynamic> resource) {
+    final attributes = _attributes(resource);
+    return AscProfile(
+      id: _string(resource, 'id'),
+      name: _string(attributes, 'name'),
+      content: _base64(_string(attributes, 'profileContent'), 'profile'),
+      expirationDate: _date(attributes, 'expirationDate'),
+    );
+  }
+
+  List<int> _base64(String text, String what) {
+    try {
+      return base64.decode(text);
+    } on FormatException {
+      throw AscServerException(
+        0,
+        'App Store Connect sent a $what that is not base64.',
+      );
+    }
   }
 
   AscPhasedRelease _phased(Map<String, dynamic> resource) {

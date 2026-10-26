@@ -2,6 +2,7 @@ import 'package:xp_api/xp_api.dart';
 import 'package:xp_engine/src/credentials/credential_material.dart';
 import 'package:xp_engine/src/credentials/credential_repository.dart';
 import 'package:xp_engine/src/jobs/job_record.dart';
+import 'package:xp_engine/src/stores/apple/app_store_profiles.dart';
 
 /// Which secrets a runner may be given for the job it leases (D-09, ADR 0012).
 ///
@@ -15,12 +16,17 @@ import 'package:xp_engine/src/jobs/job_record.dart';
 ///   names it in `secretFiles`, `secretEnvironment` or `tokenSecret` (the
 ///   `shorebird.release` and `shorebird.patch` steps) **and** it is the
 ///   `sb_api_*` key of a Shorebird credential of the project.
+/// - **The Linux iOS signing (ADR 0014):** a secret key is granted when a
+///   step names it (`build.ios` in `linuxSigning`) **and** it is an Apple
+///   Distribution identity of the project, its certificate, or the App Store
+///   profile the engine makes for it and a bundle id of a flavor that uses
+///   it (`AppStoreProfiles`).
 ///
-/// Every other secret (the GitHub token, store credentials, a key a
-/// `command` step names that is none of these) stays on the engine.
+/// Every other secret (the GitHub token, store credentials and the App Store
+/// Connect key above all, a key a `command` step names that is none of these)
+/// stays on the engine.
 ///
-/// The Apple signing identities are in the keychain of the Mac that builds;
-/// the engine has no copy to hand out.
+/// A Mac signs with the identities in its own keychain.
 class RunnerSecretGrants {
   /// Creates the grants over the credentials of the projects.
   const new(this._credentials);
@@ -35,7 +41,11 @@ class RunnerSecretGrants {
   ) async {
     final named = <String>{
       for (final step in steps) ...[
-        for (final field in const ['secretFiles', 'secretEnvironment'])
+        for (final field in const [
+          'secretFiles',
+          'secretEnvironment',
+          'linuxSigning',
+        ])
           if (step.input[field] case final Map<dynamic, dynamic> map)
             for (final value in map.values)
               if (value is String) value,
@@ -52,7 +62,13 @@ class RunnerSecretGrants {
           KeystoreMaterial.storePasswordKey(credential.secretKey),
           KeystoreMaterial.keyPasswordKey(credential.secretKey),
         ] else if (credential.kind == CredentialKind.shorebird)
+          credential.secretKey
+        else if (credential.kind == CredentialKind.appleDistribution) ...[
           credential.secretKey,
+          AppleDistributionMaterial.certificateKey(credential.secretKey),
+          if (credential.flavor.iosBundleId case final bundleId?)
+            AppStoreProfiles.keyFor(credential.secretKey, bundleId),
+        ],
     };
     return named.intersection(grantable);
   }

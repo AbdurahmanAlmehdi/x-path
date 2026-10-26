@@ -286,6 +286,7 @@ class RunnerHarness {
     required this.pairing,
     required this.tokens,
     required this.secrets,
+    required this.asc,
     required this.credentials,
     required this.projects,
     required this.hub,
@@ -334,6 +335,7 @@ class RunnerHarness {
       clock: jobs.clock,
     );
     final secrets = BytesSecretStore();
+    final asc = FakeAppStoreConnect();
     final credentials = InMemoryCredentialRepository();
     final projects = InMemoryProjectRepository();
     await projects.add(
@@ -363,6 +365,12 @@ class RunnerHarness {
       secrets: secrets,
       masker: jobs.masker,
       grants: RunnerSecretGrants(credentials),
+      profiles: AppStoreProfiles(
+        credentials: credentials,
+        secrets: secrets,
+        connect: (_) => asc,
+        clock: jobs.clock,
+      ),
       engineVersion: '9.9.9',
       onError: (error, _) => errors.add(error),
       onRefused: (name, why) => refused.add('$name: $why'),
@@ -391,6 +399,7 @@ class RunnerHarness {
       pairing: pairing,
       tokens: tokens,
       secrets: secrets,
+      asc: asc,
       credentials: credentials,
       projects: projects,
       hub: hub,
@@ -410,6 +419,9 @@ class RunnerHarness {
   final InMemoryPairingTokenRepository pairing;
   final TokenService tokens;
   final BytesSecretStore secrets;
+
+  /// The App Store Connect the engine makes profiles with.
+  final FakeAppStoreConnect asc;
   final InMemoryCredentialRepository credentials;
   final InMemoryProjectRepository projects;
   final RunnerHub hub;

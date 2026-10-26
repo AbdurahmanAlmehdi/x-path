@@ -184,7 +184,14 @@ The built-ins upload to these when a dispatch gives no `firebaseAppIds` or `appl
 ## Runners
 
 A runner is another machine that runs build jobs: a Mac for `ios-sign`, a Linux box for
-`android`, `flutter` and `swift-linux`.
+`android`, `flutter` and `swift-linux`, and, opt-in, `ios-linux`: iOS builds on Linux through
+omarchy-apple-dev (ADR 0014). For that the user installs omarchy-apple-dev at the commit
+`xp runner doctor` names, runs its `install-toolchain.sh` with an `Xcode.xip` they downloaded
+themselves (XPath never downloads Apple software; Apple SDK licensing is theirs), and sets
+`XP_IOS_LINUX_DIR` before `xp runner install-service`. The flavor then needs an `asc_key` and an
+Apple Distribution identity: `xp credentials add --kind apple-distribution --name <name> --create
+--project <p> --flavor <f>` has the engine create it (Apple allows three per team). The full
+recipe: `docs/guide/runners.md#linux-ios`.
 
 ```sh
 xp runners url https://mac.tailnet.ts.net   # once: the address runners reach the engine at

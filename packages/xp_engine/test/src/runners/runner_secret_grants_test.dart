@@ -11,12 +11,14 @@ void main() {
     CredentialKind kind,
     String secretKey, {
     String project = 'prj_1',
+    String? bundleId,
   }) => AssignedCredential(
     flavor: CredentialFlavor(
       id: 'flv_$id',
       projectId: project,
       appPath: '.',
       name: id,
+      iosBundleId: bundleId,
     ),
     credential: CredentialRecord(
       id: id,
@@ -138,6 +140,49 @@ void main() {
     final granted = await grants.forSteps('prj_1', [
       step({
         'secretFiles': {'F': 'ks-b'},
+      }),
+    ]);
+
+    expect(granted, isEmpty);
+  });
+
+  test('grants the identity, its certificate and its profile that a Linux '
+      'build names, never the ASC key', () async {
+    await credentials.put(
+      record(
+        'f',
+        CredentialKind.appleDistribution,
+        'id-f',
+        bundleId: 'com.mataa.app',
+      ),
+    );
+    final profile = AppStoreProfiles.keyFor('id-f', 'com.mataa.app');
+
+    final granted = await grants.forSteps('prj_1', [
+      step({
+        'linuxSigning': {
+          'ASC_SIGNING_KEY': 'id-f',
+          'ASC_SIGNING_CERT': 'id-f.certificate',
+          'ASC_PROFILE': profile,
+          'ASC_KEY': 'asc',
+        },
+      }),
+    ]);
+
+    expect(granted, {'id-f', 'id-f.certificate', profile});
+  });
+
+  test('never grants a profile for a bundle id the identity does not '
+      'sign', () async {
+    await credentials.put(
+      record('g', CredentialKind.appleDistribution, 'id-g'),
+    );
+
+    final granted = await grants.forSteps('prj_1', [
+      step({
+        'linuxSigning': {
+          'ASC_PROFILE': AppStoreProfiles.keyFor('id-g', 'com.mataa.app'),
+        },
       }),
     ]);
 

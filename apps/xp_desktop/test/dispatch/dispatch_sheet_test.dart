@@ -222,6 +222,7 @@ void main() {
                   engineOnly: false,
                   local: false,
                   waitReason: 'No runner can do ios-sign.',
+                  narrowing: ['the app uses the flavor prod'],
                 ),
                 PlannedJob(
                   name: 'Build prod on mini',
@@ -244,7 +245,13 @@ void main() {
       );
       await harness.open(tester);
 
-      expect(find.text('No runner can do ios-sign.'), findsOneWidget);
+      expect(
+        find.text(
+          'No runner can do ios-sign. · needs a Mac for iOS: the app uses the '
+          'flavor prod',
+        ),
+        findsOneWidget,
+      );
       expect(find.text('mac-mini'), findsOneWidget);
       expect(
         find.text('cannot run: The flavor has no App Store Connect key.'),

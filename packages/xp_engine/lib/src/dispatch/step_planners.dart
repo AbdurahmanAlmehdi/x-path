@@ -6,6 +6,7 @@ import 'package:xp_engine/src/scheduler/capability.dart';
 import 'package:xp_engine/src/steps/guard/guard_check.dart';
 import 'package:xp_engine/src/steps/step.dart';
 import 'package:xp_engine/src/steps/step_registry.dart';
+import 'package:xp_engine/src/stores/apple/app_store_profiles.dart';
 import 'package:xp_engine/src/versioning/app_version.dart';
 import 'package:xp_engine/src/workflows/gate_action.dart';
 import 'package:xp_engine/src/workflows/step_catalog.dart';
@@ -65,9 +66,8 @@ class StepPlanners implements StepCatalog {
   ///
   /// With [linuxIosBuilds], `build.ios` and `ios.stripAndReexport` need any
   /// of `ios-sign` and `ios-linux`, and the dispatcher narrows a job Linux
-  /// cannot build to `ios-sign` (ADR 0014). It stays off until the Linux
-  /// backend of those steps exists, so that no runner gets an iOS job it
-  /// cannot build.
+  /// cannot build to `ios-sign` (ADR 0014). `xpd` turns it on: `build.ios`
+  /// has a Linux backend. Off, iOS builds need a Mac, as before.
   new(this._registry, {this.linuxIosBuilds = false}) {
     for (final spec in _specs) {
       _bySpec[spec.kind] = spec;
@@ -344,6 +344,7 @@ class StepPlanners implements StepCatalog {
       (p) async => {
         ..._settings(p),
         'exportOptionsPlist': p.requireText('exportOptionsPlist'),
+        'linuxSigning': ?_linuxSigning(p),
       },
       needs: linuxIosBuilds
           ? const [
@@ -1122,6 +1123,31 @@ class StepPlanners implements StepCatalog {
         );
   }
 
+  /// What a Linux runner signs the iOS build with (ADR 0014): the flavor's
+  /// Apple Distribution identity and the App Store profile the engine makes
+  /// for it with the flavor's App Store Connect key, by the variable
+  /// omarchy-apple-dev's `flutter/ship.sh` reads. `null` unless the flavor
+  /// has both and a bundle id; the job then cannot sign on Linux.
+  static Map<String, String>? _linuxSigning(StepPlanning p) {
+    final identity = p.job.credential(CredentialKind.appleDistribution);
+    final bundleId = identity?.flavor.iosBundleId;
+    if (identity == null ||
+        bundleId == null ||
+        p.job.credential(CredentialKind.ascKey) == null) {
+      return null;
+    }
+    return {
+      linuxSigningKeyVariable: identity.secretKey,
+      linuxSigningCertificateVariable: AppleDistributionMaterial.certificateKey(
+        identity.secretKey,
+      ),
+      linuxSigningProfileVariable: AppStoreProfiles.keyFor(
+        identity.secretKey,
+        bundleId,
+      ),
+    };
+  }
+
   static String? _blankToNull(String? text) =>
       text == null || text.trim().isEmpty ? null : text;
 
@@ -1175,6 +1201,17 @@ const keystoreStorePasswordVariable = 'XPATH_KEYSTORE_STORE_PASSWORD';
 
 /// The variable that holds the key password of the keystore.
 const keystoreKeyPasswordVariable = 'XPATH_KEYSTORE_KEY_PASSWORD';
+
+/// The variable that holds the path of the private key of the Apple
+/// Distribution identity on a Linux runner (omarchy-apple-dev).
+const linuxSigningKeyVariable = 'ASC_SIGNING_KEY';
+
+/// The variable that holds the path of the identity's certificate (DER).
+const linuxSigningCertificateVariable = 'ASC_SIGNING_CERT';
+
+/// The variable that holds the path of the App Store profile the engine
+/// made for the job.
+const linuxSigningProfileVariable = 'ASC_PROFILE';
 
 /// What each step type is, for people: the schema gives it to editors.
 const stepAbout = <String, StepAbout>{

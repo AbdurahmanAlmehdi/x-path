@@ -487,6 +487,27 @@ class XpClient {
     ),
   );
 
+  /// `POST /projects/{id}/flavors/{flavor}/distribution-certificate`: the
+  /// engine creates an Apple Distribution certificate with the flavor's App
+  /// Store Connect key and assigns the identity, called [name], to the
+  /// flavor. At Apple's limit it throws an [ApiException] whose `details`
+  /// list the team's certificates.
+  Future<NamedCredential> createDistributionCertificate(
+    String projectId, {
+    required String flavor,
+    required String name,
+    String app = '.',
+  }) async => NamedCredential.fromJson(
+    await _json(
+      await _send(
+        'POST',
+        ['projects', projectId, 'flavors', flavor, 'distribution-certificate'],
+        query: {if (app != '.') 'app': app},
+        body: CreateDistributionCertificateRequest(name).toJson(),
+      ),
+    ),
+  );
+
   /// `DELETE /projects/{id}/flavors/{flavor}/credentials/{kind}`: the flavor
   /// stops using its credential of [kind].
   Future<void> unassignCredential(

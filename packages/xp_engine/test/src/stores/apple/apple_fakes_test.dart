@@ -179,6 +179,18 @@ void main() {
       },
     );
 
+    test('refuses a second App Store profile of the same name', () async {
+      final asc = FakeAppStoreConnect();
+      Future<AscProfile> create() => asc.createAppStoreProfile(
+        name: 'XPath app',
+        bundleId: 'bundle-1',
+        certificateId: 'cert-1',
+      );
+      await create();
+
+      await expectLater(create(), throwsA(isA<AscConflictException>()));
+    });
+
     test('reports the rate limit it was given', () {
       connect.rateLimit = const AscRateLimit(limit: 10, remaining: 9);
 

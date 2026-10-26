@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 /// An app of the fake server.
 class FakeAscApp {
   /// Creates an app.
@@ -304,4 +306,78 @@ class FakeAscRequest {
 
   @override
   String toString() => '$method ${uri.path}';
+}
+
+/// A certificate of the fake server's team.
+class FakeAscCertificate {
+  /// Creates a certificate.
+  new({
+    required this.id,
+    required this.serialNumber,
+    required this.certificateType,
+    required this.content,
+    this.name = 'Apple Distribution: Fake Team',
+    this.csr,
+    DateTime? expirationDate,
+  }) : expirationDate = expirationDate ?? DateTime.utc(2027);
+
+  /// The id.
+  final String id;
+
+  /// The serial number, hexadecimal.
+  final String serialNumber;
+
+  /// `DISTRIBUTION`, `DEVELOPMENT`, ...
+  final String certificateType;
+
+  /// The certificate, DER.
+  final List<int> content;
+
+  /// The name.
+  final String name;
+
+  /// When it expires.
+  final DateTime expirationDate;
+
+  /// The certificate signing request it was made for, if it was made here.
+  final String? csr;
+}
+
+/// A provisioning profile of the fake server.
+class FakeAscProfile {
+  /// Creates a profile.
+  new({
+    required this.id,
+    required this.name,
+    required this.profileType,
+    required this.bundleIdId,
+    required this.certificateIds,
+    required this.expirationDate,
+    this.state = 'ACTIVE',
+  });
+
+  /// The id.
+  final String id;
+
+  /// The name, unique in the team.
+  final String name;
+
+  /// `IOS_APP_STORE`, ...
+  final String profileType;
+
+  /// The bundle id resource it is for.
+  final String bundleIdId;
+
+  /// The certificates it lists.
+  final List<String> certificateIds;
+
+  /// When it expires.
+  final DateTime expirationDate;
+
+  /// `ACTIVE` or `INVALID`.
+  String state;
+
+  /// The `.mobileprovision` the fake hands out: names what it was made from.
+  List<int> get content =>
+      utf8.encode('fake profile $name $bundleIdId ${certificateIds.join(',')}');
 }

@@ -7,6 +7,7 @@ import 'package:xp_engine/src/artifacts/artifact_summary.dart';
 import 'package:xp_engine/src/json_fields.dart';
 import 'package:xp_engine/src/steps/build/build_directories.dart';
 import 'package:xp_engine/src/steps/build/build_files.dart';
+import 'package:xp_engine/src/steps/build/build_outputs.dart';
 import 'package:xp_engine/src/steps/build/build_settings.dart';
 import 'package:xp_engine/src/steps/build/stored_artifacts.dart';
 import 'package:xp_engine/src/steps/build/strip_and_reexport.dart';
@@ -89,14 +90,16 @@ class _Symbol {
   const new({
     required this.kind,
     required this.name,
-    required this.path,
+    required this.paths,
     required this.isFolder,
     required this.missing,
   });
 
   final ArtifactKind kind;
   final String name;
-  final String path;
+
+  /// Where it may be, the first that is there taken.
+  final List<String> paths;
 
   /// Whether it is a folder, which is zipped.
   final bool isFolder;
@@ -111,7 +114,8 @@ class _Symbol {
 /// - the R8 `mapping.txt` of the release build, as an artifact of kind
 ///   `mapping`. R8 renames classes differently on every run, so an Android
 ///   patch can only be built by applying the mapping of its release;
-/// - the dSYMs of the iOS archive, zipped, as `dsym`;
+/// - the dSYMs of the iOS archive, zipped, as `dsym`, or those a Linux build
+///   left in `build/ios-linux/dSYMs` (ADR 0014);
 /// - the debug info of an obfuscated build, zipped, as `shorebird_symbols`
 ///   (the kind list has no other for it).
 ///
@@ -175,7 +179,7 @@ class SymbolsArchiveStep
         _Symbol(
           kind: ArtifactKind.mapping,
           name: '$label.mapping.txt',
-          path: '$app/build/app/outputs/mapping/$variant/mapping.txt',
+          paths: ['$app/build/app/outputs/mapping/$variant/mapping.txt'],
           isFolder: false,
           missing:
               'No R8 mapping at build/app/outputs/mapping/$variant/mapping.txt; '
@@ -186,17 +190,17 @@ class SymbolsArchiveStep
         _Symbol(
           kind: ArtifactKind.dsym,
           name: '$label.dSYMs.zip',
-          path: '$app/$iosArchivePath/dSYMs',
+          paths: ['$app/$iosArchivePath/dSYMs', '$app/$iosLinuxDsymsPath'],
           isFolder: true,
           missing:
-              'No dSYMs in $iosArchivePath/dSYMs; crashes of '
-              '${settings.version} cannot be symbolicated.',
+              'No dSYMs in $iosArchivePath/dSYMs or $iosLinuxDsymsPath; '
+              'crashes of ${settings.version} cannot be symbolicated.',
         ),
       if (debugInfo != null)
         _Symbol(
           kind: ArtifactKind.shorebirdSymbols,
           name: '$label.debug-info.zip',
-          path: '$app/$debugInfo',
+          paths: ['$app/$debugInfo'],
           isFolder: true,
           missing:
               'No debug info in $debugInfo; crashes of ${settings.version} '
@@ -205,9 +209,17 @@ class SymbolsArchiveStep
     ];
   }
 
-  Future<bool> _present(_Symbol symbol) async => symbol.isFolder
-      ? await directories.exists(symbol.path)
-      : await files.stat(symbol.path) != null;
+  /// Where [symbol] is, or `null` if it is not there.
+  Future<String?> _find(_Symbol symbol) async {
+    for (final path in symbol.paths) {
+      if (symbol.isFolder
+          ? await directories.exists(path)
+          : await files.stat(path) != null) {
+        return path;
+      }
+    }
+    return null;
+  }
 
   @override
   Future<SymbolsArchiveResult?> alreadyDone(
@@ -225,7 +237,7 @@ class SymbolsArchiveStep
       );
       if (record != null) {
         stored.add(ArtifactSummary.of(record));
-      } else if (await _present(symbol)) {
+      } else if (await _find(symbol) != null) {
         return null;
       }
     }
@@ -244,7 +256,8 @@ class SymbolsArchiveStep
     final stored = <ArtifactSummary>[];
     final warnings = <String>[];
     for (final symbol in wanted) {
-      if (!await _present(symbol)) {
+      final path = await _find(symbol);
+      if (path == null) {
         warnings.add(symbol.missing);
         continue;
       }
@@ -252,9 +265,7 @@ class SymbolsArchiveStep
         jobId: context.jobId,
         kind: symbol.kind,
         name: symbol.name,
-        content: symbol.isFolder
-            ? directories.zip(symbol.path)
-            : files.open(symbol.path),
+        content: symbol.isFolder ? directories.zip(path) : files.open(path),
       );
       stored.add(ArtifactSummary.of(record));
     }

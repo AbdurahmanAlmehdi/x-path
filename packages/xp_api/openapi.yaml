@@ -986,6 +986,66 @@ paths:
           $ref: "#/components/responses/NotFound"
         "500":
           $ref: "#/components/responses/InternalError"
+  /projects/{id}/flavors/{flavor}/distribution-certificate:
+    parameters:
+      - $ref: "#/components/parameters/ProjectId"
+      - $ref: "#/components/parameters/FlavorName"
+      - name: app
+        in: query
+        required: false
+        description: The path of the app of the flavor; `.` unless given.
+        schema:
+          type: string
+    post:
+      operationId: createDistributionCertificate
+      summary: Create an Apple Distribution certificate for a flavor, on the engine.
+      description: |
+        For an owner without a Mac (ADR 0014): the engine makes an RSA key and
+        a certificate signing request, App Store Connect creates the
+        distribution certificate with the flavor's `asc_key` credential, and
+        the identity is saved as the `apple_distribution` credential `name`
+        and assigned to the flavor. The App Store Connect key never leaves the
+        engine (D-09).
+
+        First the team's distribution certificates are read: at Apple's
+        limit the request is refused with `conflict`, `details.reason`
+        `certificate_limit`, the `limit` and the `certificates` that could be
+        revoked. Only `app` and `cli` tokens.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateDistributionCertificateRequest"
+      responses:
+        "201":
+          description: The identity, assigned to the flavor.
+          headers:
+            Location:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NamedCredential"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/CredentialRejected"
+        "502":
+          $ref: "#/components/responses/UpstreamError"
+        "503":
+          $ref: "#/components/responses/SecretsLocked"
+        "500":
+          $ref: "#/components/responses/InternalError"
   /projects/{id}/credentials/{credentialId}/verify:
     parameters:
       - $ref: "#/components/parameters/ProjectId"
@@ -3096,7 +3156,9 @@ components:
                 Facts of the error a client can act on, for example the `kind`
                 of a missing credential. `reason` tells the errors a client
                 answers differently apart: `archived`, `has_runs`,
-                `credential_unassigned`, `production_flavor`, `ref_unknown`.
+                `credential_unassigned`, `production_flavor`, `ref_unknown`,
+                `certificate_limit` (with `limit` and `certificates`: `id`,
+                `serialNumber`, `name`, `expirationDate`).
     AlreadyDecidedResponse:
       type: object
       required: [error, approval]
@@ -3383,6 +3445,14 @@ components:
           description: >-
             The app extension targets of the Xcode project, which Linux iOS
             builds cannot make yet (ADR 0014).
+          items:
+            type: string
+        iosLinuxLimits:
+          type: array
+          description: >-
+            Why Linux runners cannot build the iOS app, from the project alone
+            (ADR 0014): plugins that build with CocoaPods, storyboards beyond
+            Flutter's template, a Flutter older than 3.47.
           items:
             type: string
         flavors:
@@ -3850,6 +3920,13 @@ components:
         waitReason:
           type: string
           description: Why it would wait to start.
+        narrowing:
+          type: array
+          description: |
+            Why it needs a Mac for iOS where a Linux runner could have built
+            it (ADR 0014).
+          items:
+            type: string
     SkippedJob:
       type: object
       required: [name, stage, reason, blocks]
@@ -4523,6 +4600,7 @@ components:
       enum:
         - asc_key
         - apple_id
+        - apple_distribution
         - play_sa
         - firebase_sa
         - keystore
@@ -4848,6 +4926,20 @@ components:
           description: |
             An app-specific password (`abcd-efgh-ijkl-mnop`), not the password
             of the Apple ID.
+    AppleDistributionFields:
+      type: object
+      required: [privateKey, certificate]
+      description: |
+        An Apple Distribution identity, for Linux runners that sign iOS
+        builds (ADR 0014). From a `.p12`: `openssl pkcs12 -in identity.p12
+        -nodes -nocerts` gives the key, `-clcerts -nokeys` the certificate.
+      properties:
+        privateKey:
+          type: string
+          description: The RSA private key, PEM (PKCS#8 or PKCS#1), unencrypted.
+        certificate:
+          type: string
+          description: The Apple Distribution certificate, DER as base64, or PEM.
     ServiceAccountFields:
       type: object
       required: [serviceAccount]
@@ -4882,6 +4974,15 @@ components:
       properties:
         webhookUrl:
           type: string
+    CreateDistributionCertificateRequest:
+      type: object
+      required: [name]
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+          maxLength: 80
+          description: The name of the Apple Distribution identity.
     CreateCredentialRequest:
       description: |
         The name, the kind and the secret fields of that kind. `github` is not
@@ -4906,6 +5007,16 @@ components:
                   type: string
                 kind:
                   const: apple_id
+          unevaluatedProperties: false
+        - allOf:
+            - $ref: "#/components/schemas/AppleDistributionFields"
+            - type: object
+              required: [name, kind]
+              properties:
+                name:
+                  type: string
+                kind:
+                  const: apple_distribution
           unevaluatedProperties: false
         - allOf:
             - $ref: "#/components/schemas/ServiceAccountFields"
@@ -4961,6 +5072,10 @@ components:
             - $ref: "#/components/schemas/OptionalKind"
           unevaluatedProperties: false
         - allOf:
+            - $ref: "#/components/schemas/AppleDistributionFields"
+            - $ref: "#/components/schemas/OptionalKind"
+          unevaluatedProperties: false
+        - allOf:
             - $ref: "#/components/schemas/ServiceAccountFields"
             - $ref: "#/components/schemas/OptionalKind"
           unevaluatedProperties: false
@@ -5002,6 +5117,14 @@ components:
               properties:
                 kind:
                   const: apple_id
+          unevaluatedProperties: false
+        - allOf:
+            - $ref: "#/components/schemas/AppleDistributionFields"
+            - $ref: "#/components/schemas/FlavorSelector"
+            - type: object
+              properties:
+                kind:
+                  const: apple_distribution
           unevaluatedProperties: false
         - allOf:
             - $ref: "#/components/schemas/ServiceAccountFields"

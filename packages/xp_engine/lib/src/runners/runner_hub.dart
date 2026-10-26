@@ -27,6 +27,7 @@ import 'package:xp_engine/src/scheduler/scheduler.dart';
 import 'package:xp_engine/src/scheduler/scheduler_runner.dart';
 import 'package:xp_engine/src/secrets/secret_store.dart';
 import 'package:xp_engine/src/steps/git/git_checkout.dart';
+import 'package:xp_engine/src/stores/apple/app_store_profiles.dart';
 
 /// What the service that lists and revokes runners asks of the live part.
 abstract interface class RunnerPresence {
@@ -118,7 +119,9 @@ class _Session {
 ///   and gaps never reach the log.
 /// - **Secrets.** A runner can ask for the signing material and the
 ///   Shorebird key the steps of its job name, once per lease (D-09, ADR 0012,
-///   `RunnerSecretGrants`).
+///   `RunnerSecretGrants`), and for a Linux iOS build the Apple Distribution
+///   identity and the App Store profile the engine makes (ADR 0014,
+///   `AppStoreProfiles`).
 ///
 /// Every state change of a job is done under a per-job lock, so heartbeats,
 /// reports, cancels and the sweep never interleave.
@@ -148,6 +151,7 @@ class RunnerHub
     this.onError,
     this.onRefused,
     this._probe = const RunnerProbe(),
+    this._profiles,
     Random? random,
   }) : _random = random ?? Random.secure();
 
@@ -187,6 +191,7 @@ class RunnerHub
   final RunnerSecretGrants _grants;
   final String _engineVersion;
   final RunnerProbe _probe;
+  final AppStoreProfiles? _profiles;
   final Random _random;
   final _sessions = <String, _Session>{};
   final _leases = <String, _Lease>{};
@@ -688,6 +693,13 @@ class RunnerHub
         await _stepState(session, frame);
       case JobDoneFrame():
         await _done(session, frame);
+      case SecretRequestFrame(:final key)
+          when AppStoreProfiles.isProfileKey(key):
+        // App Store Connect may take a while to make a profile: it is
+        // answered aside, so the heartbeats behind it keep the lease.
+        unawaited(
+          _secretRequested(session, frame).catchError(onError ?? (Object _) {}),
+        );
       case SecretRequestFrame():
         await _secretRequested(session, frame);
       case DrainFrame():
@@ -1177,12 +1189,19 @@ class RunnerHub
     }
     final List<int>? bytes;
     try {
-      bytes = await _secrets.readBytes(frame.key);
+      bytes = AppStoreProfiles.isProfileKey(frame.key)
+          ? await _profiles?.profile(lease.projectId, frame.key)
+          : await _secrets.readBytes(frame.key);
     } on SecretStoreException {
       lease.delivered.remove(frame.key);
       return deny('The engine cannot read its secrets right now.');
+    } on AppStoreProfileException catch (error) {
+      lease.delivered.remove(frame.key);
+      return deny(error.message);
     }
     if (bytes == null) return deny('There is no such secret.');
+    // A profile is made while other frames are handled: the lease may be gone.
+    if (!_holds(session, frame.jobId, frame.leaseId)) return;
     // The runner masks what it holds; the engine masks what comes back too.
     try {
       final text = utf8.decode(bytes);
