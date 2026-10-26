@@ -96,13 +96,32 @@ void main() {
     ) async {
       await pump(tester);
 
+      final copied = <String?>[];
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        (call) async {
+          if (call.method == 'Clipboard.setData') {
+            copied.add((call.arguments as Map)['text'] as String?);
+          }
+          return null;
+        },
+      );
+      addTearDown(
+        () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          SystemChannels.platform,
+          null,
+        ),
+      );
+
       await tester.tap(find.text('New xp token'));
       await tester.pumpAndSettle();
-      expect(
-        find.text('xp connect http://127.0.0.1:7480 --token xpt_cli'),
-        findsOne,
-      );
-      expect(find.text('Copy command'), findsOne);
+      expect(find.text('xp connect http://127.0.0.1:7480'), findsOne);
+      await tester.tap(find.text('Copy command'));
+      await tester.pump();
+      await tester.tap(find.text('Copy token'));
+      await tester.pump();
+      expect(copied, ['xp connect http://127.0.0.1:7480', 'xpt_cli']);
+      await tester.pump(const Duration(seconds: 2));
 
       await tester.tap(find.text('Done'));
       await tester.pumpAndSettle();
@@ -133,13 +152,10 @@ void main() {
     });
   });
 
-  test('connectCommand and mcpConfig put the URL and token in place', () {
+  test('connectCommand leaves the token out, mcpConfig puts it in', () {
     final url = Uri.parse('https://mac.example');
 
-    expect(
-      connectCommand(url, 'xpt_x'),
-      'xp connect https://mac.example --token xpt_x',
-    );
+    expect(connectCommand(url), 'xp connect https://mac.example');
     expect(
       mcpConfig(url, 'xpt_y'),
       contains('"XP_ENGINE_URL": "https://mac.example"'),

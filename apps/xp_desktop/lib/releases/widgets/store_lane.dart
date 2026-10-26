@@ -31,13 +31,6 @@ const Set<StoreState> _markable = {
   StoreState.approved,
 };
 
-/// The release states whose rollout can change: the stores approved it.
-const Set<ReleaseState> _rolledOut = {
-  ReleaseState.approved,
-  ReleaseState.live,
-  ReleaseState.merged,
-};
-
 /// The shares of users, in percent, Google Play's staged rollout offers.
 const List<int> _shares = [5, 10, 20, 50];
 
@@ -312,10 +305,10 @@ class StoreLane extends StatelessWidget {
     }
     if (!manual &&
         status.state == StoreState.live &&
-        _rolledOut.contains(release.state)) {
+        release.state.storesApproved) {
       if (widgets.isNotEmpty) widgets.add(const SizedBox(height: 8));
       widgets
-        ..add(_rollout(context, bloc, enabled: canCommand && !busy))
+        ..add(_rollout(context, bloc, board, enabled: canCommand && !busy))
         ..add(const SizedBox(height: 6))
         ..add(Text(l10n.laneRolloutCaption, style: caption));
     }
@@ -339,11 +332,11 @@ class StoreLane extends StatelessWidget {
   /// a share of users, halts or goes to everyone.
   Widget _rollout(
     BuildContext context,
-    ReleaseBoardBloc bloc, {
+    ReleaseBoardBloc bloc,
+    ReleaseBoardState board, {
     required bool enabled,
   }) {
     final l10n = context.l10n;
-    final board = bloc.state;
     final tooltip = context.canCommand ? null : l10n.readOnlyHint;
     VoidCallback? request(RolloutAction action, [double? fraction]) => enabled
         ? () => bloc.add(

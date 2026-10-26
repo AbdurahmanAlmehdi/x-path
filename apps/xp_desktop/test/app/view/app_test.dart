@@ -52,12 +52,16 @@ void main() {
     });
   });
 
-  Future<void> pumpApp(WidgetTester tester) async {
+  Future<void> pumpApp(
+    WidgetTester tester, {
+    AppPreferences? preferences,
+  }) async {
     desktopWindow(tester);
     await tester.pumpWidget(
       App(
         services: testServices(
           engines: engines,
+          preferences: preferences,
           openSession: (profile, token) =>
               (harnesses[profile.id] = SessionHarness(
                 profile,
@@ -77,6 +81,37 @@ void main() {
       expect(find.byType(AppShell), findsNothing);
       await tester.pumpAndSettle();
       expect(find.text('Set up XPath on this Mac'), findsOneWidget);
+    });
+
+    testWidgets('opens the page shown last on the engine, and keeps the next', (
+      tester,
+    ) async {
+      final preferences = AppPreferences();
+      await preferences.setLastDestination(
+        localEngineId,
+        encodeDestination(const RunnersDestination()),
+      );
+      await preferences.setLastDestination(
+        macMini.id,
+        encodeDestination(const SettingsDestination()),
+      );
+
+      await pumpApp(tester, preferences: preferences);
+      await tester.pumpAndSettle();
+      final shell = tester.element(find.byType(AppShell)).read<ShellCubit>();
+      expect(shell.state, const RunnersDestination());
+
+      shell.show(const ProjectDestination('prj_1'));
+      await tester.pumpAndSettle();
+      expect(
+        preferences.lastDestination(localEngineId),
+        encodeDestination(const ProjectDestination('prj_1')),
+      );
+      expect(
+        preferences.lastDestination(macMini.id),
+        encodeDestination(const SettingsDestination()),
+        reason: 'each engine keeps its own',
+      );
     });
 
     testWidgets('shows the shell of the active engine', (tester) async {

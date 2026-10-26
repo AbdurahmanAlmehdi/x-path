@@ -48,6 +48,10 @@ enum ReleaseState {
 
   /// Whether the release is over: it never changes again.
   bool get isTerminal => this == merged || this == abandoned;
+
+  /// Whether every store approved the release: its rollouts and Shorebird
+  /// patches can change.
+  bool get storesApproved => this == approved || this == live || this == merged;
 }
 
 /// A store a release is uploaded to.

@@ -77,3 +77,5 @@ stage (the build job), which is how an upload runs on the engine while the build
 
 `gate` is not written as a step: `gate: <action>` on a step puts a gate step in front of it.
 Actions: `prod_release`, `prod_patch`, `store_submission`, `push`, `merge`, `rollout`, `delete`. Engine only.
+`store.rollout` must carry `gate: rollout` and `shorebird.track` `gate: prod_patch`: a workflow
+without them is invalid.

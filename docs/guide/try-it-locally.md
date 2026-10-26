@@ -175,7 +175,7 @@ To upload, either:
   ```
 
   (`xp` needs a CLI token once: `xpd token create --name "My Mac" --kind cli` with the `xpd` inside
-  the app, then `xp connect http://127.0.0.1:7480 --token <token>`), or
+  the app, then `xp connect http://127.0.0.1:7480`, which asks for the token), or
 - open **Workflows**, pick **Dev build**, **Save as…** a copy, set the default of
   `firebaseAppIds` / `appleAppIds` in the YAML and dispatch that copy from the app.
 

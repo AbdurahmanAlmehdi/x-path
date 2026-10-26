@@ -8,6 +8,8 @@ const _catalog = MapStepCatalog({
   'upload.play': {'artifactsFrom'},
   'guard': {'checks'},
   'version.bump': {},
+  'store.rollout': {},
+  'shorebird.track': {},
 });
 
 const _valid = r'''
@@ -661,7 +663,7 @@ stages:
       expect(
         issues(step('          - kind: nope')).single,
         '7:19 Unknown step type "nope". Known: build.android, git.checkout, '
-        'guard, upload.play, version.bump.',
+        'guard, shorebird.track, store.rollout, upload.play, version.bump.',
       );
     });
 
@@ -720,6 +722,32 @@ stages:
       expect(
         issues(step('          - kind: guard\n            if: a ==')).single,
         '8:21 Expected a value, not the end of the expression.',
+      );
+    });
+
+    test('of a rollout or a patch move run behind their gate', () {
+      expect(
+        issues(
+          step(
+            '          - kind: store.rollout\n'
+            '            gate: rollout',
+          ),
+        ),
+        isEmpty,
+      );
+      expect(
+        issues(step('          - kind: store.rollout')).single,
+        '7:13 "store.rollout" runs only behind "gate: rollout". '
+        'Add "gate: rollout" to the step.',
+      );
+      expect(
+        issues(
+          step('          - kind: shorebird.track\n            gate: push'),
+        ).single,
+        startsWith(
+          '8:19 "shorebird.track" runs only behind '
+          '"gate: prod_patch".',
+        ),
       );
     });
 

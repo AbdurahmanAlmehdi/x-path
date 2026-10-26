@@ -206,7 +206,7 @@ class EngineNoticesBloc extends Bloc<EngineNoticesEvent, EngineNoticesState> {
   final _waitingSince = <String, DateTime>{};
 
   /// The waiting jobs already told about.
-  final _told = <String>{};
+  final _toldJobs = <String>{};
 
   Future<void> _onStarted(
     EngineNoticesStarted event,
@@ -261,6 +261,7 @@ class EngineNoticesBloc extends Bloc<EngineNoticesEvent, EngineNoticesState> {
       }
     }
     _waitingSince.removeWhere((id, _) => !waiting.contains(id));
+    _toldJobs.retainAll(waiting);
     emit(
       EngineNoticesState(
         running: event.runs,
@@ -277,11 +278,11 @@ class EngineNoticesBloc extends Bloc<EngineNoticesEvent, EngineNoticesState> {
       for (final job in run.jobs) {
         final since = _waitingSince[job.id];
         if (since == null ||
-            _told.contains(job.id) ||
+            _toldJobs.contains(job.id) ||
             now.difference(since) < waitLimit) {
           continue;
         }
-        _told.add(job.id);
+        _toldJobs.add(job.id);
         emit(
           state._told(
             JobWaitingNotice(

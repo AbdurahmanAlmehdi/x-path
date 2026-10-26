@@ -117,6 +117,7 @@ change touches:
 | `release_e2e.sh dev` | `dev-build` for Android through the real engine to a fake Firebase | Android SDK; minutes |
 | `release_e2e.sh prod` | a whole production release from `draft` to `merged`, no secret in any log, argv or file | macOS with Xcode, Android SDK; several minutes |
 | `mcp_gate_e2e.sh` | `xp mcp` dispatches, stops at a gate, gets `403` on approve | about half a minute |
+| `quickstart_cli.sh` | the CLI path of `docs/guide/quickstart.md`: connect, status, doctor, a `file://` project, a green `test` run (CI runs it) | Flutter; about a minute |
 | `runner_loss_e2e.sh` | a runner killed mid-job: the 90 second lease rule, no secret left | about four minutes |
 | `runner_build_e2e.sh` | a build job leased to a runner, upload from the engine | Android SDK on the runner side |
 | `build_fixture_apk.sh` | builds the fixture app's APK through a job | Android SDK |

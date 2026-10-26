@@ -53,6 +53,39 @@ void main() {
     expect(await env.run(['workflows', 'list']), 64);
   });
 
+  group('a project left out', () {
+    setUp(() => env.remote = 'git@github.com:acme/app.git');
+
+    test('is the one of the folder for a command of two arguments', () async {
+      when(() => env.client.listProjects())
+          .thenAnswer((_) async => [sample.project, sample.bareProject]);
+      when(() => env.client.getWorkflow('prj_1', 'wf_1'))
+          .thenAnswer((_) async => sample.workflow);
+
+      await env.runOk(['workflows', 'show', 'dev-build']);
+
+      expect(env.logger.infos, ['name: dev-build']);
+    });
+
+    test('is not looked for when the command names one', () async {
+      await env.runOk(['workflows', 'list', 'prj_1']);
+
+      verifyNever(() => env.client.listProjects());
+    });
+
+    test('is asked for when two projects share the folder', () async {
+      when(() => env.client.listProjects()).thenAnswer(
+        (_) async => [
+          sample.project,
+          Project.fromJson({...sample.project.toJson(), 'id': 'prj_3'}),
+        ],
+      );
+
+      expect(await env.run(['workflows', 'list']), 64);
+      expect(await env.run(['workflows', 'show', 'dev-build']), 64);
+    });
+  });
+
   test('list with --json prints them as JSON', () async {
     await env.runOk(['--json', 'workflows', 'list', 'prj_1']);
 

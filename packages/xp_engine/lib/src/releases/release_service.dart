@@ -43,14 +43,6 @@ const releaseRolloutWorkflow = 'release-rollout';
 /// release (U7b).
 const shorebirdTrackWorkflow = 'shorebird-track';
 
-/// The states of a release whose store rollouts can change: the stores
-/// approved it, or it is out.
-const Set<ReleaseState> _rolledOut = {
-  ReleaseState.approved,
-  ReleaseState.live,
-  ReleaseState.merged,
-};
-
 /// The states in which the stores still decide where a release goes.
 const Set<ReleaseState> _waitingOnStores = {
   ReleaseState.uploaded,
@@ -314,12 +306,7 @@ class ReleaseService implements ReleaseOpener {
           ),
         );
       case ReleaseRunKind.rollout:
-        if (!_rolledOut.contains(release.state)) {
-          throw ReleaseStateException(
-            'The rollout of ${release.id} cannot change: it is '
-            '${release.state.wire}.',
-          );
-        }
+        _requireRolledOut(release, 'The rollout');
         await _releases.addEvent(
           release.id,
           ReleaseEvent(
@@ -329,13 +316,7 @@ class ReleaseService implements ReleaseOpener {
           ),
         );
       case ReleaseRunKind.patch:
-        if (!_rolledOut.contains(release.state)) {
-          throw ReleaseStateException(
-            'A patch of ${release.id} cannot change: it is '
-            '${release.state.wire}. Patches apply once the stores approved '
-            'the release.',
-          );
-        }
+        _requireRolledOut(release, 'A patch');
     }
   });
 
@@ -349,7 +330,10 @@ class ReleaseService implements ReleaseOpener {
     for (final release in await _releases.list(
       projectId: projectId,
       appPath: appPath,
-      states: _rolledOut,
+      states: {
+        for (final state in ReleaseState.values)
+          if (state.storesApproved) state,
+      },
     )) {
       if (release.flavor == flavor &&
           release.version == '${version.name}' &&
@@ -821,19 +805,7 @@ class ReleaseService implements ReleaseOpener {
         'Merging opens once every store is live.',
       );
     }
-    final workflow = (await _workflows.list(release.projectId))
-        .firstWhere((workflow) => workflow.name == releaseMergeWorkflow);
-    return await _dispatch(
-      release.projectId,
-      workflow.id,
-      DispatchRequest(
-        ref: branch,
-        app: release.appPath,
-        flavors: [release.flavor],
-        releaseVersion: '${release.version}+${release.build}',
-        release: release.id,
-      ),
-    );
+    return await _dispatchBuiltIn(release, releaseMergeWorkflow, ref: branch);
   }
 
   // --------------------------------------------------------------- rollout
@@ -851,35 +823,20 @@ class ReleaseService implements ReleaseOpener {
       throw ReleaseRequestException(problem);
     }
     final release = await sync(id);
-    if (!_rolledOut.contains(release.state)) {
-      throw ReleaseStateException(
-        'The rollout of ${release.id} cannot change: it is '
-        '${release.state.wire}. A rollout changes once the stores approved '
-        'the release.',
-      );
-    }
+    _requireRolledOut(release, 'The rollout');
     if (!release.stores.containsKey(request.store)) {
       throw ReleaseStateException(
         'The release ${release.id} did not go to ${request.store.wire}.',
       );
     }
-    final workflow = (await _workflows.list(release.projectId))
-        .firstWhere((workflow) => workflow.name == releaseRolloutWorkflow);
-    return await _dispatch(
-      release.projectId,
-      workflow.id,
-      DispatchRequest(
-        ref: release.tag ?? release.branch,
-        app: release.appPath,
-        flavors: [release.flavor],
-        releaseVersion: '${release.version}+${release.build}',
-        release: release.id,
-        inputs: {
-          'store': request.store.wire,
-          'action': request.action.wire,
-          'userFraction': ?request.userFraction,
-        },
-      ),
+    return await _dispatchBuiltIn(
+      release,
+      releaseRolloutWorkflow,
+      inputs: {
+        'store': request.store.wire,
+        'action': request.action.wire,
+        'userFraction': ?request.userFraction,
+      },
     );
   }
 
@@ -898,11 +855,7 @@ class ReleaseService implements ReleaseOpener {
     PatchAction action,
   ) async {
     final release = await sync(id);
-    if (!_rolledOut.contains(release.state)) {
-      throw ReleaseStateException(
-        'A patch of ${release.id} cannot move: it is ${release.state.wire}.',
-      );
-    }
+    _requireRolledOut(release, 'A patch');
     final patched = (await _releases.events(release.id)).any(
       (event) =>
           event.kind == ReleaseEventKind.patch &&
@@ -914,19 +867,10 @@ class ReleaseService implements ReleaseOpener {
         'published.',
       );
     }
-    final workflow = (await _workflows.list(release.projectId))
-        .firstWhere((workflow) => workflow.name == shorebirdTrackWorkflow);
-    final run = await _dispatch(
-      release.projectId,
-      workflow.id,
-      DispatchRequest(
-        ref: release.tag ?? release.branch,
-        app: release.appPath,
-        flavors: [release.flavor],
-        releaseVersion: '${release.version}+${release.build}',
-        release: release.id,
-        inputs: {'patchNumber': patchNumber, 'action': action.wire},
-      ),
+    final run = await _dispatchBuiltIn(
+      release,
+      shorebirdTrackWorkflow,
+      inputs: {'patchNumber': patchNumber, 'action': action.wire},
     );
     await _releases.addEvent(
       release.id,
@@ -1035,6 +979,42 @@ class ReleaseService implements ReleaseOpener {
   }
 
   // --------------------------------------------------------------- helpers
+
+  /// Throws a [ReleaseStateException] unless the stores approved [release]:
+  /// [what] (its rollout, a patch) changes only then.
+  static void _requireRolledOut(ReleaseRecord release, String what) {
+    if (!release.state.storesApproved) {
+      throw ReleaseStateException(
+        '$what of ${release.id} cannot change: it is ${release.state.wire}. '
+        'It changes once the stores approved the release.',
+      );
+    }
+  }
+
+  /// Runs the built-in [workflow] of the project of [release] on its commit
+  /// ([ref], else its tag or branch) for its flavor and version, with
+  /// [inputs].
+  Future<Run> _dispatchBuiltIn(
+    ReleaseRecord release,
+    String workflow, {
+    String? ref,
+    Map<String, Object?> inputs = const {},
+  }) async {
+    final builtIn = (await _workflows.list(release.projectId))
+        .firstWhere((candidate) => candidate.name == workflow);
+    return await _dispatch(
+      release.projectId,
+      builtIn.id,
+      DispatchRequest(
+        ref: ref ?? release.tag ?? release.branch,
+        app: release.appPath,
+        flavors: [release.flavor],
+        releaseVersion: '${release.version}+${release.build}',
+        release: release.id,
+        inputs: inputs,
+      ),
+    );
+  }
 
   static void _requireOwner(DeviceToken by, String what) {
     if (by.kind != DeviceTokenKind.app && by.kind != DeviceTokenKind.cli) {

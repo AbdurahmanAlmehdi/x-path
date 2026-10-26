@@ -151,8 +151,35 @@ final class CommandPaletteQueryChanged extends CommandPaletteEvent {
   List<Object?> get props => [query];
 }
 
+/// Runs the workflow of [run] again, as it was dispatched.
+final class CommandPaletteRunAgainRequested extends CommandPaletteEvent {
+  const new(this.run);
+
+  final Run run;
+
+  @override
+  List<Object?> get props => [run];
+}
+
+/// Cancels the jobs of [run] that have not ended; the owner confirmed it.
+final class CommandPaletteCancelRequested extends CommandPaletteEvent {
+  const new(this.run);
+
+  final Run run;
+
+  @override
+  List<Object?> get props => [run];
+}
+
 class CommandPaletteState extends Equatable {
-  const new({this.loading = false, this.entries = const [], this.query = ''});
+  const new({
+    this.loading = false,
+    this.entries = const [],
+    this.query = '',
+    this.done = 0,
+    this.startedRun,
+    this.error,
+  });
 
   /// Whether the entries are being read.
   final bool loading;
@@ -163,7 +190,17 @@ class CommandPaletteState extends Equatable {
   /// What the owner typed.
   final String query;
 
-  /// The entries whose [labelOf] has every word of [query], in order.
+  /// How many commands of the palette (run again, cancel) ended; it grows
+  /// with each, so the same result twice is told twice.
+  final int done;
+
+  /// The run the last "Run again" started.
+  final Run? startedRun;
+
+  /// What the engine said when the last command failed.
+  final String? error;
+
+  /// The entries whose [labelOf] has every word of [query], in any order.
   List<PaletteEntry> matches(String Function(PaletteEntry entry) labelOf) {
     final words = query.toLowerCase().split(' ').where((w) => w.isNotEmpty);
     return [
@@ -180,10 +217,25 @@ class CommandPaletteState extends Equatable {
     loading: loading ?? this.loading,
     entries: entries ?? this.entries,
     query: query ?? this.query,
+    done: done,
+    startedRun: startedRun,
+    error: error,
   );
 
+  /// This state after a command ended, with the run it started or the
+  /// [error] it failed with.
+  CommandPaletteState _ended({Run? startedRun, String? error}) =>
+      CommandPaletteState(
+        loading: loading,
+        entries: entries,
+        query: query,
+        done: done + 1,
+        startedRun: startedRun,
+        error: error,
+      );
+
   @override
-  List<Object?> get props => [loading, entries, query];
+  List<Object?> get props => [loading, entries, query, done, startedRun, error];
 }
 
 /// The command palette (⌘K): go to a project, release, run, workflow or
@@ -202,6 +254,29 @@ class CommandPaletteBloc
     on<CommandPaletteQueryChanged>(
       (event, emit) => emit(state.copyWith(query: event.query)),
     );
+    on<CommandPaletteRunAgainRequested>(
+      (event, emit) => _command(emit, () => _jobs.runAgain(event.run.id)),
+      transformer: droppable(),
+    );
+    on<CommandPaletteCancelRequested>(
+      (event, emit) => _command(emit, () async {
+        await _jobs.cancelRun(event.run.id);
+        return null;
+      }),
+      transformer: droppable(),
+    );
+  }
+
+  /// Sends a command to the engine, and tells how it ended.
+  Future<void> _command(
+    Emitter<CommandPaletteState> emit,
+    Future<Run?> Function() send,
+  ) async {
+    try {
+      emit(state._ended(startedRun: await send()));
+    } on Exception catch (error) {
+      emit(state._ended(error: errorMessage(error)));
+    }
   }
 
   final ProjectsRepository _projects;

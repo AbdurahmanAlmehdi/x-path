@@ -4,6 +4,7 @@ import 'package:bloc/bloc.dart';
 import 'package:bloc_concurrency/bloc_concurrency.dart';
 import 'package:equatable/equatable.dart';
 import 'package:xp_api/xp_api.dart';
+import 'package:xp_desktop/credentials/flavor_target.dart';
 import 'package:xp_repositories/xp_repositories.dart';
 
 sealed class SetupChecklistEvent extends Equatable {
@@ -55,7 +56,7 @@ class SetupStep extends Equatable {
 
   /// The first flavor still missing what [kind] needs, for
   /// [SetupStepKind.credentials] and [SetupStepKind.storeIds].
-  final ({String app, String appName, String flavor})? target;
+  final FlavorTarget? target;
 
   /// Why no runner can run a build, for [SetupStepKind.runners].
   final List<String>? reasons;
@@ -105,6 +106,10 @@ class SetupChecklistState extends Equatable {
   /// an engine with no project yet), never for one on another host.
   List<SetupStep> get steps {
     final project = this.project;
+    final withoutCredentials = project == null
+        ? null
+        : _withoutCredentials(project);
+    final withoutStoreIds = project == null ? null : _withoutStoreIds(project);
     return [
       const SetupStep(SetupStepKind.engine, done: true),
       if (project == null || project.isOnGitHub)
@@ -112,13 +117,13 @@ class SetupChecklistState extends Equatable {
       SetupStep(SetupStepKind.project, done: project != null),
       SetupStep(
         SetupStepKind.credentials,
-        done: project != null && _withoutCredentials(project) == null,
-        target: project == null ? null : _withoutCredentials(project),
+        done: project != null && withoutCredentials == null,
+        target: withoutCredentials,
       ),
       SetupStep(
         SetupStepKind.storeIds,
-        done: project != null && _withoutStoreIds(project) == null,
-        target: project == null ? null : _withoutStoreIds(project),
+        done: project != null && withoutStoreIds == null,
+        target: withoutStoreIds,
       ),
       if (waitReasons.isNotEmpty)
         SetupStep(SetupStepKind.runners, done: false, reasons: waitReasons),
@@ -137,9 +142,7 @@ class SetupChecklistState extends Equatable {
   /// How many steps are done.
   int get doneCount => steps.where((step) => step.done).length;
 
-  ({String app, String appName, String flavor})? _withoutCredentials(
-    Project project,
-  ) => _firstFlavor(
+  FlavorTarget? _withoutCredentials(Project project) => _firstFlavor(
     project,
     (app, flavor) => !credentials.any(
       (credential) =>
@@ -147,16 +150,14 @@ class SetupChecklistState extends Equatable {
     ),
   );
 
-  static ({String app, String appName, String flavor})? _withoutStoreIds(
-    Project project,
-  ) => _firstFlavor(
+  static FlavorTarget? _withoutStoreIds(Project project) => _firstFlavor(
     project,
     (app, flavor) =>
         (app.hasAndroid && flavor.firebaseAppId?['android'] == null) ||
         (app.hasIos && flavor.appleAppId == null),
   );
 
-  static ({String app, String appName, String flavor})? _firstFlavor(
+  static FlavorTarget? _firstFlavor(
     Project project,
     bool Function(AppProfile app, FlavorProfile flavor) missing,
   ) {

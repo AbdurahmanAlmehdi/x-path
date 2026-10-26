@@ -63,13 +63,6 @@ class UploadFirebaseStep
   /// (U7b).
   final ReleaseTextsSource? texts;
 
-  /// The release notes of [input], else the texts of the release of the job.
-  Future<String?> _notes(UploadFirebaseInput input, StepContext context) async {
-    if (input.releaseNotes case final notes?) return notes;
-    final release = await texts?.ofJob(context.jobId);
-    return release?.whatToTest ?? release?.whatsNew;
-  }
-
   /// How long to wait between two polls of the upload.
   final Duration pollInterval;
 
@@ -78,6 +71,13 @@ class UploadFirebaseStep
 
   /// Waits for a [Duration].
   final Future<void> Function(Duration) sleep;
+
+  /// The release notes of [input], else the texts of the release of the job.
+  Future<String?> _notes(UploadFirebaseInput input, StepContext context) async {
+    if (input.releaseNotes case final notes?) return notes;
+    final release = await texts?.ofJob(context.jobId);
+    return release?.whatToTest ?? release?.whatsNew;
+  }
 
   @override
   String get kind => 'upload.firebase';

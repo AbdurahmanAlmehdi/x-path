@@ -21,6 +21,7 @@ import 'package:xp_desktop/releases/view/releases_page.dart';
 import 'package:xp_desktop/runners/view/runners_page.dart';
 import 'package:xp_desktop/runs/view/runs_page.dart';
 import 'package:xp_desktop/settings/view/settings_page.dart';
+import 'package:xp_desktop/shell/bloc/command_palette_bloc.dart';
 import 'package:xp_desktop/shell/cubit/shell_cubit.dart';
 import 'package:xp_desktop/shell/view/home_page.dart';
 import 'package:xp_desktop/shell/widgets/app_menu_bar.dart';
@@ -30,6 +31,7 @@ import 'package:xp_desktop/shell/widgets/sidebar.dart';
 import 'package:xp_desktop/storage/view/storage_page.dart';
 import 'package:xp_desktop/tests/view/tests_page.dart';
 import 'package:xp_desktop/theme/theme.dart';
+import 'package:xp_desktop/toast/cubit/toast_cubit.dart';
 import 'package:xp_desktop/widgets/widgets.dart';
 import 'package:xp_desktop/workflow_builder/view/workflow_builder_page.dart';
 
@@ -102,28 +104,40 @@ class _AppShellState extends State<AppShell> {
   @override
   Widget build(BuildContext context) {
     final shell = context.read<ShellCubit>();
-    return XpCommands(
-      handlers: {
-        XpCommand.palette: () => unawaited(
-          showCommandPalette(context, projectId: shownProjectId(context)),
-        ),
-        XpCommand.dispatch: () => unawaited(dispatchShown(context)),
-        XpCommand.approvals: () => reviewApprovals(context),
-        XpCommand.back: shell.back,
-        XpCommand.forward: shell.forward,
-        XpCommand.sidebar: () => setState(() => _sidebar = !_sidebar),
-        XpCommand.shortcuts: () => unawaited(showShortcutSheet(context)),
-        XpCommand.compact: () =>
-            unawaited(context.read<DensityCubit>().toggle()),
-        XpCommand.settings: () => shell.show(const SettingsDestination()),
+    return BlocListener<CommandPaletteBloc, CommandPaletteState>(
+      // A command of the palette ended: open the run it started, or say
+      // why it failed.
+      listenWhen: (previous, current) => current.done != previous.done,
+      listener: (context, state) {
+        if (state.error case final error?) {
+          context.read<ToastCubit>().show(error);
+        } else if (state.startedRun case final run?) {
+          shell.show(JobDestination(run.id, projectId: run.projectId));
+        }
       },
-      child: CallbackShortcuts(
-        bindings: {
-          for (final (index, digit) in projectDigits.indexed)
-            SingleActivator(digit, meta: true): () =>
-                showProjectAt(context, index),
+      child: XpCommands(
+        handlers: {
+          XpCommand.palette: () => unawaited(
+            showCommandPalette(context, projectId: shownProjectId(context)),
+          ),
+          XpCommand.dispatch: () => unawaited(dispatchShown(context)),
+          XpCommand.approvals: () => reviewApprovals(context),
+          XpCommand.back: shell.back,
+          XpCommand.forward: shell.forward,
+          XpCommand.sidebar: () => setState(() => _sidebar = !_sidebar),
+          XpCommand.shortcuts: () => unawaited(showShortcutSheet(context)),
+          XpCommand.compact: () =>
+              unawaited(context.read<DensityCubit>().toggle()),
+          XpCommand.settings: () => shell.show(const SettingsDestination()),
         },
-        child: AppMenuBar(child: _content(context)),
+        child: CallbackShortcuts(
+          bindings: {
+            for (final (index, digit) in projectDigits.indexed)
+              SingleActivator(digit, meta: true): () =>
+                  showProjectAt(context, index),
+          },
+          child: AppMenuBar(child: _content(context)),
+        ),
       ),
     );
   }

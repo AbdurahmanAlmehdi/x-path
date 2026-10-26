@@ -3628,6 +3628,12 @@ abstract class AppLocalizations {
   /// **'{store} rollout changed'**
   String timelineRollout(String store);
 
+  /// Timeline entry: a rollout changed in a store the engine did not name.
+  ///
+  /// In en, this message translates to:
+  /// **'Rollout changed'**
+  String get timelineRolloutChanged;
+
   /// Timeline entry: a Shorebird patch.
   ///
   /// In en, this message translates to:
@@ -6175,7 +6181,7 @@ abstract class AppLocalizations {
   /// No description provided for @settingsTokensCliMade.
   ///
   /// In en, this message translates to:
-  /// **'Made \"{name}\". Run this in a terminal to connect xp:'**
+  /// **'Made \"{name}\". Run this in a terminal to connect xp, then paste the token when it asks:'**
   String settingsTokensCliMade(String name);
 
   /// No description provided for @settingsTokensMcpMade.
@@ -6201,6 +6207,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Copy config'**
   String get settingsTokensCopyConfig;
+
+  /// Copies the new token, to paste when xp connect asks for it.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy token'**
+  String get settingsTokensCopyToken;
 
   /// Hides the new token for good.
   ///
@@ -6723,6 +6735,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'These actions wait for your approval before they happen. Agents can never turn a gate off.'**
   String get projectGatesBody;
+
+  /// No description provided for @projectGateOffTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Turn the {action} gate off?'**
+  String projectGateOffTitle(String action);
+
+  /// No description provided for @projectGateOffNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Every {action} of this project then happens without asking you.'**
+  String projectGateOffNow(String action);
+
+  /// No description provided for @projectGateOffWaiting.
+  ///
+  /// In en, this message translates to:
+  /// **'Jobs that wait for a {action} approval go on at once, without review.'**
+  String projectGateOffWaiting(String action);
+
+  /// Keeps a project gate on.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep the gate'**
+  String get projectGateOffKeep;
+
+  /// Turns a project gate off.
+  ///
+  /// In en, this message translates to:
+  /// **'Turn off'**
+  String get projectGateOff;
 
   /// Project settings section.
   ///

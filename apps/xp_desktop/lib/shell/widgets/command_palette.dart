@@ -44,7 +44,7 @@ Future<void> performPaletteEntry(
 ) async {
   final shell = context.read<ShellCubit>();
   final toasts = context.read<ToastCubit>();
-  final jobs = context.read<JobsRepository>();
+  final palette = context.read<CommandPaletteBloc>();
   if (entry.destination case final destination?) {
     shell.show(destination);
     return;
@@ -54,10 +54,12 @@ Future<void> performPaletteEntry(
       case DispatchEntry(:final project):
         await dispatchFor(context, project);
       case RunAgainEntry(:final run):
-        final again = await jobs.runAgain(run.id);
-        shell.show(JobDestination(again.id, projectId: again.projectId));
+        palette.add(CommandPaletteRunAgainRequested(run));
       case CancelEntry(:final run, :final workflow):
-        final runJobs = (await jobs.watchRunJobs(run.id).first).value;
+        // What the confirmation lists: the jobs that would stop.
+        final runJobs =
+            (await context.read<JobsRepository>().watchRunJobs(run.id).first)
+                .value;
         if (!context.mounted) return;
         final cancel = await confirmCancelRun(
           context,
@@ -70,7 +72,7 @@ Future<void> performPaletteEntry(
               runner.id: runner.name,
           },
         );
-        if (cancel) await jobs.cancelRun(run.id);
+        if (cancel) palette.add(CommandPaletteCancelRequested(run));
       case ApproveEntry(:final approval):
         await showApprovalReview(context, approval.id);
       case GoToProject() ||

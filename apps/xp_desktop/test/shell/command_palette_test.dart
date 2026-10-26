@@ -104,6 +104,8 @@ void main() {
     test('events and entries compare by value', () {
       expect(const CommandPaletteOpened(projectId: 'p').props, ['p']);
       expect(const CommandPaletteQueryChanged('q').props, ['q']);
+      expect(CommandPaletteRunAgainRequested(failed).props, [failed]);
+      expect(CommandPaletteCancelRequested(failed).props, [failed]);
       expect(const GoToProject(mataa).props, [mataa]);
       expect(GoToRelease(liveRelease).props, [liveRelease]);
       expect(GoToRun(failed, workflow: 'w').props, [failed, 'w']);
@@ -194,7 +196,7 @@ void main() {
     );
 
     blocTest<CommandPaletteBloc, CommandPaletteState>(
-      'keeps the query, and matches every word of it in order',
+      'keeps the query, and matches every word of it, in any order',
       build: build,
       act: (bloc) => bloc.add(const CommandPaletteQueryChanged('run DEV')),
       expect: () => [const CommandPaletteState(query: 'run DEV')],
@@ -323,6 +325,9 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byType(ApprovalReviewSheet), findsOneWidget);
+      // The palette opens the review; only the owner decides (D-13).
+      verifyNever(() => approvals.approve(any(), reason: any(named: 'reason')));
+      verifyNever(() => approvals.deny(any(), reason: any(named: 'reason')));
     });
 
     testWidgets('dispatches for the shown project', (tester) async {

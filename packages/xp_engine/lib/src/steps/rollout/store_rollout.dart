@@ -21,11 +21,16 @@ class StoreRolloutInput extends Equatable {
 
   /// Reads the input from its stored form.
   ///
-  /// Throws a [FormatException] if a field is missing or of the wrong type.
-  factory fromJson(Map<String, dynamic> json) => StoreRolloutInput(
-    releaseId: requiredString(json, 'releaseId'),
-    request: RolloutRequest.fromJson(json),
-  );
+  /// Throws a [FormatException] if a field is missing or of the wrong type,
+  /// or the store cannot make the change.
+  factory fromJson(Map<String, dynamic> json) {
+    final request = RolloutRequest.fromJson(json);
+    if (request.problem case final problem?) throw FormatException(problem);
+    return StoreRolloutInput(
+      releaseId: requiredString(json, 'releaseId'),
+      request: request,
+    );
+  }
 
   /// The release whose rollout changes.
   final String releaseId;
@@ -145,36 +150,31 @@ class StoreRolloutStep extends Step<StoreRolloutInput, StoreRolloutResult> {
     StepContext context,
   ) async {
     try {
-      final found = await _find(input);
-      if (found case _Apple(:final phased)) {
-        return phased.state == _appleTarget(input.request.action)
-            ? StoreRolloutResult(
-                store: ReleaseStore.apple,
-                state: phased.state.wire,
-                alreadyDone: true,
-              )
-            : null;
+      switch (await _find(input)) {
+        case _Missing():
+          return null;
+        case _Apple(:final phased):
+          return phased.state == _appleTarget(input.request.action)
+              ? StoreRolloutResult(
+                  store: ReleaseStore.apple,
+                  state: phased.state.wire,
+                  alreadyDone: true,
+                )
+              : null;
+        case final _Play play:
+          final release = await _playRelease(play);
+          if (release == null) return null;
+          final target = _playTarget(release, input.request);
+          return release.status == target.status &&
+                  release.userFraction == target.userFraction
+              ? StoreRolloutResult(
+                  store: ReleaseStore.play,
+                  state: release.status.wire,
+                  userFraction: release.userFraction,
+                  alreadyDone: true,
+                )
+              : null;
       }
-      if (found case _Play(
-        :final client,
-        :final packageName,
-        :final track,
-        :final build,
-      )) {
-        final release = await _playRelease(client, packageName, track, build);
-        if (release == null) return null;
-        final target = _playTarget(release, input.request);
-        return release.status == target.status &&
-                release.userFraction == target.userFraction
-            ? StoreRolloutResult(
-                store: ReleaseStore.play,
-                state: release.status.wire,
-                userFraction: release.userFraction,
-                alreadyDone: true,
-              )
-            : null;
-      }
-      return null;
     } on Exception {
       // The store cannot be asked now: the step runs, and says why.
       return null;
@@ -225,9 +225,7 @@ class StoreRolloutStep extends Step<StoreRolloutInput, StoreRolloutResult> {
     final edit = await client.insertEdit(packageName);
     try {
       final current = await client.track(packageName, edit.id, track);
-      final release = current.releases
-          .where((release) => release.versionCodes.contains(build))
-          .firstOrNull;
+      final release = _releaseOf(current, build);
       if (release == null) {
         await client.deleteEdit(packageName, edit.id);
         return StepFailed(
@@ -280,22 +278,22 @@ class StoreRolloutStep extends Step<StoreRolloutInput, StoreRolloutResult> {
     );
   }
 
-  Future<PlayRelease?> _playRelease(
-    GooglePlay client,
-    String packageName,
-    String track,
-    int build,
-  ) async {
+  /// The release of [play]'s track that holds its build, read in an edit
+  /// that is deleted again.
+  Future<PlayRelease?> _playRelease(_Play play) async {
+    final _Play(:client, :packageName, :track, :build) = play;
     final edit = await client.insertEdit(packageName);
     try {
-      final current = await client.track(packageName, edit.id, track);
-      return current.releases
-          .where((release) => release.versionCodes.contains(build))
-          .firstOrNull;
+      return _releaseOf(await client.track(packageName, edit.id, track), build);
     } finally {
       await client.deleteEdit(packageName, edit.id);
     }
   }
+
+  /// The release of [track] that holds the version code [build].
+  static PlayRelease? _releaseOf(PlayTrack track, int build) => track.releases
+      .where((release) => release.versionCodes.contains(build))
+      .firstOrNull;
 
   /// The store client and what in it the rollout is, or why there is none.
   Future<_Found> _find(StoreRolloutInput input) async {

@@ -58,7 +58,7 @@ with a `cli` token from **Settings** ▸ **CLI and agents** in the app, or from
 `xpd token create --name <name> --kind cli`:
 
 ```sh
-xp connect http://127.0.0.1:7480 --token <cli token>
+xp connect http://127.0.0.1:7480   # asks for the CLI token
 ```
 
 - **"speaks API v..."**: `xp` and the engine are different versions. Install the `xp` that

@@ -135,6 +135,8 @@ class SqliteReleaseRepository implements ReleaseRepository {
     );
   }
 
+  /// The history of [releaseId], oldest first. A row of a kind or a store
+  /// this engine does not know (one a newer engine wrote) is left out.
   @override
   Future<List<ReleaseEvent>> events(String releaseId) async => [
     for (final row in _db.select(
@@ -142,21 +144,28 @@ class SqliteReleaseRepository implements ReleaseRepository {
       'FROM release_event WHERE release_id = ? ORDER BY at, id',
       [releaseId],
     ))
-      ReleaseEvent(
-        kind: ReleaseEventKind.values.firstWhere((k) => k.wire == row['kind']),
-        at: fromDatabaseTime(row['at'] as int),
-        store: switch (row['store']) {
-          final String wire => ReleaseStore.values.firstWhere(
-            (store) => store.wire == wire,
-          ),
-          _ => null,
-        },
-        detail: row['detail'] as String?,
-        by: row['by_name'] as String?,
-        runId: row['run_id'] as String?,
-        patchNumber: row['patch_number'] as int?,
-      ),
+      ?_eventOf(row),
   ];
+
+  static ReleaseEvent? _eventOf(Row row) {
+    final kind = ReleaseEventKind.values
+        .where((kind) => kind.wire == row['kind'])
+        .firstOrNull;
+    final storeWire = row['store'] as String?;
+    final store = ReleaseStore.values
+        .where((store) => store.wire == storeWire)
+        .firstOrNull;
+    if (kind == null || (storeWire != null && store == null)) return null;
+    return ReleaseEvent(
+      kind: kind,
+      at: fromDatabaseTime(row['at'] as int),
+      store: store,
+      detail: row['detail'] as String?,
+      by: row['by_name'] as String?,
+      runId: row['run_id'] as String?,
+      patchNumber: row['patch_number'] as int?,
+    );
+  }
 
   static ReleaseRecord _fromRow(Row row) => ReleaseRecord(
     id: row['id'] as String,

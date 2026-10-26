@@ -45,7 +45,7 @@ app or the command line:
 
 ```sh
 xpd token create --name laptop --kind cli
-xp connect http://127.0.0.1:7480 --token xpt_...
+xp connect http://127.0.0.1:7480   # asks for the token
 xp projects add ~/code/my_app
 xp dispatch my_app test --follow
 ```

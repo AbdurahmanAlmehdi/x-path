@@ -45,10 +45,11 @@ Docker image ([Install](install.md)).
    xpd token create --name laptop --kind cli
    ```
 
-3. Connect `xp` to the engine. The token goes to the OS secret store, never to a file:
+3. Connect `xp` to the engine. It asks for the token, so the token stays out of your shell
+   history, and saves it in the OS secret store, never in a file:
 
    ```sh
-   xp connect http://127.0.0.1:7480 --token xpt_...
+   xp connect http://127.0.0.1:7480
    xp status
    xp doctor
    ```
@@ -79,7 +80,7 @@ Flutter of its own, so builds go to [runners](runners.md).
 ```sh
 docker run -d --name xpath -p 127.0.0.1:7480:7480 -v xpath-data:/data ghcr.io/abdurahmanalmehdi/xpath
 docker exec xpath xpd token create --name laptop --kind cli
-xp connect http://127.0.0.1:7480 --token xpt_...
+xp connect http://127.0.0.1:7480
 ```
 
 Then add a project from GitHub or a git URL (a folder must be inside the container) and pair a

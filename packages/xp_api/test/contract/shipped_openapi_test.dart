@@ -911,6 +911,8 @@ void main() {
         mergeCommit: 'b' * 40,
         mergeRunId: 'run_2',
         message: 'm',
+        whatsNew: 'New',
+        whatToTest: 'Try it',
         createdAt: at,
         updatedAt: at,
       );
@@ -944,6 +946,120 @@ void main() {
       expect(
         shipped.validateSchema('Release', {...release.toJson(), 'state': 'x'}),
         isNotEmpty,
+      );
+    });
+
+    test('describes the rollout, history, texts and patch models', () {
+      final at = DateTime.utc(2026, 10, 26);
+      for (final request in [
+        for (final action in RolloutAction.values)
+          RolloutRequest(
+            store: ReleaseStore.play,
+            action: action,
+            userFraction: action == RolloutAction.fraction ? 0.5 : null,
+          ),
+        const RolloutRequest(
+          store: ReleaseStore.play,
+          action: RolloutAction.fraction,
+          userFraction: 1,
+        ),
+      ]) {
+        expect(
+          shipped.validateSchema('RolloutRequest', request.toJson()),
+          isEmpty,
+          reason: '$request',
+        );
+      }
+      for (final fraction in [0, 1.5]) {
+        expect(
+          shipped.validateSchema('RolloutRequest', {
+            'store': 'play',
+            'action': 'fraction',
+            'userFraction': fraction,
+          }),
+          isNotEmpty,
+          reason: '$fraction',
+        );
+      }
+      final history = ReleaseHistory([
+        for (final kind in ReleaseEventKind.values)
+          ReleaseEvent(
+            kind: kind,
+            at: at,
+            store: ReleaseStore.apple,
+            detail: 'd',
+            by: 'MacBook',
+            runId: 'run_1',
+            patchNumber: 1,
+          ),
+      ]);
+      expect(
+        shipped.validateSchema('ReleaseHistory', history.toJson()),
+        isEmpty,
+      );
+      expect(
+        shipped.validateSchema('ReleaseEvent', {
+          'kind': 'launched',
+          'at': '$at',
+        }),
+        isNotEmpty,
+      );
+      expect(
+        shipped.validateSchema(
+          'ReleaseTexts',
+          const ReleaseTexts(whatsNew: 'New', whatToTest: 'Try').toJson(),
+        ),
+        isEmpty,
+      );
+      for (final action in PatchAction.values) {
+        expect(
+          shipped.validateSchema('PatchAction', action.wire),
+          isEmpty,
+          reason: action.wire,
+        );
+      }
+    });
+
+    test('describes the token, status and doctor models', () {
+      final info = TokenInfo(
+        id: 'tok_1',
+        name: 'xp on MacBook',
+        kind: DeviceTokenKind.cli,
+        createdAt: DateTime.utc(2026, 10, 26),
+      );
+      expect(
+        shipped.validateSchema(
+          'CreateTokenRequest',
+          const CreateTokenRequest(
+            name: 'xp on MacBook',
+            kind: DeviceTokenKind.mcp,
+          ).toJson(),
+        ),
+        isEmpty,
+      );
+      expect(
+        shipped.validateSchema(
+          'CreatedToken',
+          CreatedToken(info: info, token: 'xpt_x').toJson(),
+        ),
+        isEmpty,
+      );
+      expect(
+        shipped.validateSchema(
+          'StatusResponse',
+          StatusResponse(token: info, secretsLocked: false).toJson(),
+        ),
+        isEmpty,
+      );
+      expect(
+        shipped.validateSchema(
+          'DoctorResponse',
+          DoctorResponse([
+            for (final state in CheckState.values)
+              EngineCheck(name: 'git', state: state, detail: 'd', fix: 'f'),
+          ]).toJson(),
+        ),
+        isEmpty,
       );
     });
 

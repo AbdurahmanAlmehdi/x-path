@@ -259,6 +259,22 @@ void main() {
     );
 
     blocTest<EngineNoticesBloc, EngineNoticesState>(
+      'tells the same notice twice when it comes twice',
+      build: build,
+      act: (bloc) async {
+        bloc.add(const EngineNoticesStarted());
+        await Future<void>.delayed(Duration.zero);
+        events
+          ..add(_raised(NotificationKind.jobFailed, jobId: 'job_1'))
+          ..add(_raised(NotificationKind.jobFailed, jobId: 'job_1'));
+      },
+      expect: () => [
+        isA<EngineNoticesState>().having((s) => s.count, 'count', 1),
+        isA<EngineNoticesState>().having((s) => s.count, 'count', 2),
+      ],
+    );
+
+    blocTest<EngineNoticesBloc, EngineNoticesState>(
       'forgets a job that stopped waiting before the limit',
       build: build,
       act: (bloc) async {

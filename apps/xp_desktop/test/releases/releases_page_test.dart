@@ -869,6 +869,7 @@ void main() {
           event(ReleaseEventKind.abandoned, detail: 'Wrong', by: 'MacBook'),
           event(ReleaseEventKind.texts, by: 'MacBook'),
           event(ReleaseEventKind.merged),
+          event(ReleaseEventKind.store, detail: 'live'),
         ],
       );
 
@@ -881,7 +882,7 @@ void main() {
         'Merged into main',
         'Rollout change requested',
         'Google Play rollout changed',
-        ' rollout changed',
+        'Rollout changed',
         'Patch 1 published',
         'Promotion of patch 1 requested',
         'Rollback of patch 1 requested',
@@ -890,6 +891,7 @@ void main() {
         'Abandoned',
         'Store texts changed',
         'Merged into main',
+        'live',
       ]);
       expect(entries.reversed.map((entry) => entry.detail).take(6), [
         'prod',
@@ -899,7 +901,10 @@ void main() {
         null,
         shortSha('c' * 40),
       ]);
-      expect(entries.reversed.elementAt(14).detail, 'Wrong · MacBook');
+      expect(
+        entries.firstWhere((entry) => entry.title == 'Abandoned').detail,
+        'Wrong · MacBook',
+      );
     });
 
     test('releaseTimeline tells decisions, merges and abandonment', () {

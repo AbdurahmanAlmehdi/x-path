@@ -9,6 +9,7 @@ import 'package:xp_client/xp_client.dart';
 import 'package:xp_desktop/app/app.dart';
 import 'package:xp_desktop/credentials/credentials.dart';
 import 'package:xp_desktop/projects/bloc/projects_bloc.dart';
+import 'package:xp_desktop/settings/widgets/github_token_section.dart';
 import 'package:xp_desktop/shell/cubit/shell_cubit.dart';
 import 'package:xp_repositories/xp_repositories.dart';
 
@@ -77,9 +78,10 @@ void main() {
     String? projectId,
     EngineStatus status = EngineStatus.connected,
     FilePicker? pickFile,
+    bool github = false,
   }) async {
     await tester.pumpApp(
-      CredentialsPage(projectId: projectId),
+      CredentialsPage(projectId: projectId, github: github),
       shell: shell,
       credentialsRepository: credentials,
       projectsRepository: projects,
@@ -92,6 +94,19 @@ void main() {
     assignments.add(Snapshot(assigned));
     await tester.pumpAndSettle();
   }
+
+  testWidgets('has the GitHub token, focused when it is what was asked', (
+    tester,
+  ) async {
+    await pump(tester, github: true);
+
+    final section = find.byType(GitHubTokenSection);
+    expect(section, findsOneWidget);
+    final input = tester.widget<EditableText>(
+      find.descendant(of: section, matching: find.byType(EditableText)),
+    );
+    expect(input.focusNode.hasFocus, isTrue);
+  });
 
   Finder field(String name) => find.byKey(Key('credentialForm.$name'));
 

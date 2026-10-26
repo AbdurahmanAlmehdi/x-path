@@ -101,7 +101,7 @@ token** shows the command to run. Or, on the engine machine:
 
 ```sh
 xpd token create --name "My Mac" --kind cli
-xp connect http://127.0.0.1:7480 --token <token>
+xp connect http://127.0.0.1:7480   # asks for the token
 xp status
 ```
 

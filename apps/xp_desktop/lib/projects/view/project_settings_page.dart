@@ -79,6 +79,32 @@ class _ProjectSettingsViewState extends State<ProjectSettingsView> {
     if (confirmed) bloc.add(const ProjectRemoveRequested());
   }
 
+  /// Turns the gate of [action] on at once; asks first before turning it
+  /// off, because jobs that wait at it then go on without review (D-13).
+  Future<void> _changeGate(
+    BuildContext context,
+    String action, {
+    required bool on,
+  }) async {
+    final bloc = context.read<ProjectSettingsBloc>();
+    if (!on) {
+      final l10n = context.l10n;
+      final name = l10n.gateAction(action);
+      final confirmed = await confirmAction(
+        context,
+        title: l10n.projectGateOffTitle(name),
+        points: [
+          l10n.projectGateOffNow(name),
+          l10n.projectGateOffWaiting(name),
+        ],
+        keep: l10n.projectGateOffKeep,
+        confirm: l10n.projectGateOff,
+      );
+      if (!confirmed) return;
+    }
+    bloc.add(ProjectGateChanged(action, on: on));
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
@@ -176,8 +202,7 @@ class _ProjectSettingsViewState extends State<ProjectSettingsView> {
                         label: l10n.gateAction(action),
                         value: on,
                         onChanged: canCommand
-                            ? (on) =>
-                                  bloc.add(ProjectGateChanged(action, on: on))
+                            ? (on) => _changeGate(context, action, on: on)
                             : null,
                       )
                   else

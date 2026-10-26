@@ -149,3 +149,11 @@ class FakeApprovalGate implements ApprovalGate {
     return decision;
   }
 }
+
+/// The gate a step type always runs behind, whatever its workflow says
+/// (D-13): a change every user of a release gets is never made unapproved,
+/// in a workflow an agent wrote too.
+const Map<String, GateAction> requiredGates = {
+  'store.rollout': GateAction.rollout,
+  'shorebird.track': GateAction.prodPatch,
+};

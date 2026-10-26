@@ -265,6 +265,18 @@ void main() {
       );
 
       expect(releases.attached, ['rel_1 prj_1 rollout ${run.id} null']);
+      expect(run.jobs.single.name, 'play rollout, fraction 0.2');
+      final pause = await harness.dispatchBuiltin(
+        'release-rollout',
+        const DispatchRequest(
+          ref: 'main',
+          flavors: ['prod'],
+          releaseVersion: '1.2.0+5',
+          release: 'rel_1',
+          inputs: {'store': 'apple', 'action': 'pause'},
+        ),
+      );
+      expect(pause.jobs.single.name, 'apple rollout, pause');
       expect(run.locksProject, isFalse);
       final job = await harness.job(run.jobs.single.id);
       expect(harness.kinds(job), ['gate', 'store.rollout']);
@@ -378,6 +390,7 @@ void main() {
         harness.dispatchCustom(
           _workflow('''
           - kind: shorebird.track
+            gate: prod_patch
             with:
               patchNumber: 1
               action: promote

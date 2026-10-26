@@ -144,7 +144,13 @@ TimelineEntry _entryOf(
       l10n.timelineBuild(event.detail ?? ''),
       null,
     ),
-    ReleaseEventKind.store => _storeLine(store!, event.detail, l10n),
+    ReleaseEventKind.store when store != null => _storeLine(
+      store,
+      event.detail,
+      l10n,
+    ),
+    // A store change says which store; one from a newer engine may not.
+    ReleaseEventKind.store => (XpStatus.releaseDraft, event.detail ?? '', null),
     ReleaseEventKind.mergeRequested => (
       XpStatus.approvalPending,
       l10n.timelineMergeRequested,
@@ -167,7 +173,9 @@ TimelineEntry _entryOf(
     ),
     ReleaseEventKind.rollout => (
       XpStatus.releaseLive,
-      l10n.timelineRollout(store == null ? '' : l10n.storeName(store)),
+      store == null
+          ? l10n.timelineRolloutChanged
+          : l10n.timelineRollout(l10n.storeName(store)),
       event.detail,
     ),
     ReleaseEventKind.patch => (
@@ -236,7 +244,7 @@ class ReleaseTimeline extends StatelessWidget {
   const new({
     required this.release,
     required this.approvals,
-    this.history = const [],
+    required this.history,
     super.key,
   });
 

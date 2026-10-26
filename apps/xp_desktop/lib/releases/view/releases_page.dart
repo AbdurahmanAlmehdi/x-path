@@ -10,6 +10,7 @@ import 'package:xp_desktop/projects/widgets/project_host.dart';
 import 'package:xp_desktop/releases/bloc/release_board_bloc.dart';
 import 'package:xp_desktop/releases/widgets/release_hero.dart';
 import 'package:xp_desktop/releases/widgets/release_panels.dart';
+import 'package:xp_desktop/releases/widgets/release_patches_panel.dart';
 import 'package:xp_desktop/releases/widgets/release_texts_panel.dart';
 import 'package:xp_desktop/releases/widgets/release_timeline.dart';
 import 'package:xp_desktop/releases/widgets/store_lane.dart';

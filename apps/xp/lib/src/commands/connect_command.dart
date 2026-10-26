@@ -6,8 +6,9 @@ import 'package:xp/src/exit_codes.dart';
 import 'package:xp_api/xp_api.dart';
 import 'package:xp_client/xp_client.dart';
 
-/// `xp connect <url> --token <token> [--mcp-token <token>]`: saves the engine
-/// and the tokens to use with it.
+/// `xp connect <url> [--token <token>] [--mcp-token <token>]`: saves the
+/// engine and the tokens to use with it. Without a token it asks for the CLI
+/// token, which then stays out of the arguments and the shell history.
 ///
 /// Before it saves anything it checks that the URL is an XPath engine
 /// (`GET /health` and `GET /version`, which need no token) and that each token
@@ -45,7 +46,7 @@ class ConnectCommand extends Command<int> {
   String get description => 'Connect to an engine and save the tokens.';
 
   @override
-  String get invocation => 'xp connect [<url>] --token <token>';
+  String get invocation => 'xp connect [<url>] [--token <token>]';
 
   @override
   void printUsage() => _context.logger.info(usage);
@@ -58,10 +59,17 @@ class ConnectCommand extends Command<int> {
       final logger = _context.logger;
       final rest = argResults!.rest;
       if (rest.length > 1) usageException('Unexpected "${rest[1]}".');
-      final token = argResults!.option('token');
+      var token = argResults!.option('token');
       final mcpToken = argResults!.option('mcp-token');
       if (token == null && mcpToken == null) {
-        usageException('Give --token, --mcp-token or both.');
+        // Asked for, the token stays out of the arguments and the shell
+        // history.
+        final prompt = _context.secretPrompt;
+        if (!prompt.interactive) {
+          usageException('Give --token, --mcp-token or both.');
+        }
+        token = prompt.ask('The token of this CLI (it is not shown)').trim();
+        if (token.isEmpty) usageException('No token given.');
       }
       final Uri url;
       try {

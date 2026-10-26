@@ -356,7 +356,7 @@ stages:
   - name: rollout
     jobs:
       rollout:
-        name: Change the ${{ inputs.store }} rollout
+        name: ${{ inputs.store }} rollout, ${{ inputs.action }} ${{ inputs.userFraction }}
         steps:
           - kind: store.rollout
             gate: rollout

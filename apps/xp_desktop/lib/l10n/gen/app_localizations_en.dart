@@ -2221,6 +2221,9 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get timelineRolloutChanged => 'Rollout changed';
+
+  @override
   String timelinePatch(int number) {
     return 'Patch $number published';
   }
@@ -3769,7 +3772,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String settingsTokensCliMade(String name) {
-    return 'Made \"$name\". Run this in a terminal to connect xp:';
+    return 'Made \"$name\". Run this in a terminal to connect xp, then paste the token when it asks:';
   }
 
   @override
@@ -3786,6 +3789,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsTokensCopyConfig => 'Copy config';
+
+  @override
+  String get settingsTokensCopyToken => 'Copy token';
 
   @override
   String get settingsTokensDone => 'Done';
@@ -4109,6 +4115,27 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get projectGatesBody =>
       'These actions wait for your approval before they happen. Agents can never turn a gate off.';
+
+  @override
+  String projectGateOffTitle(String action) {
+    return 'Turn the $action gate off?';
+  }
+
+  @override
+  String projectGateOffNow(String action) {
+    return 'Every $action of this project then happens without asking you.';
+  }
+
+  @override
+  String projectGateOffWaiting(String action) {
+    return 'Jobs that wait for a $action approval go on at once, without review.';
+  }
+
+  @override
+  String get projectGateOffKeep => 'Keep the gate';
+
+  @override
+  String get projectGateOff => 'Turn off';
 
   @override
   String get projectStoreIds => 'Store ids';

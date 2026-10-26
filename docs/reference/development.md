@@ -137,8 +137,9 @@ The workflows in `.github/workflows`:
   the CI matrix check), `coverage` (one job per package, each running the `test:coverage:*` script that
   `melos run test:coverage` runs it with, so it keeps its threshold), `contract` (`melos run test:contract`),
   `smoke` (`tool/e2e/smoke_bundle.sh`, which builds the `xpd` AOT bundle, starts it and checks `/health`, the
-  SQLite build hook, token authentication and a clean shutdown) and `runner-offline`
-  (`tool/e2e/runner_offline_e2e.sh`). The last job, `gate`, waits for all of them and fails unless every one
+  SQLite build hook, token authentication and a clean shutdown), `runner-offline`
+  (`tool/e2e/runner_offline_e2e.sh`) and `quickstart` (`tool/e2e/quickstart_cli.sh`, the CLI path of the
+  quickstart page). The last job, `gate`, waits for all of them and fails unless every one
   passed; it is the check branch protection requires. A pull request takes about as long as the slowest package.
 - `macos.yaml`: on every pull request and every push to `main`, on GitHub-hosted macOS runners, only while the
   repository is public (macOS minutes are free for public repositories only; on a private one the jobs are

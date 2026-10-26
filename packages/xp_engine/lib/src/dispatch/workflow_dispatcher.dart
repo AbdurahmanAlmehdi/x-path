@@ -996,7 +996,8 @@ class WorkflowDispatcher {
     Map<String, Object?> scope,
   ) {
     final name = definition.name?.evaluate(scope);
-    if (name is String && name.isNotEmpty) return name;
+    // An input left out leaves a blank where it was.
+    if (name is String && name.trim().isNotEmpty) return name.trim();
     return '${definition.id}'
         '${cell.isEmpty ? '' : ' (${cell.values.join(', ')})'}';
   }

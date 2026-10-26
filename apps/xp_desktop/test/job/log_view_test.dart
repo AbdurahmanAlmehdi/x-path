@@ -115,25 +115,40 @@ void main() {
     testWidgets('⌘G and ⇧⌘G go from match to match of the filter', (
       tester,
     ) async {
-      await pumpLog(tester);
+      await pumpLog(
+        tester,
+        lines: [for (var i = 1; i <= 200; i++) line(i, 0, 'match $i')],
+      );
       expect(runCommand(XpCommand.findNext), isTrue, reason: 'no filter yet');
 
-      await tester.enterText(find.byType(TextField), 'pod');
+      await tester.enterText(find.byType(TextField), 'match');
       await tester.pump();
+      final scroll = tester
+          .stateList<ScrollableState>(find.byType(Scrollable))
+          .firstWhere((state) => state.position.maxScrollExtent > 0)
+          .position;
+      final at = <double>[];
       for (final command in [
         XpCommand.findNext,
         XpCommand.findNext,
         XpCommand.findPrevious,
+        XpCommand.findPrevious,
       ]) {
         runCommand(command);
         await tester.pump();
+        at.add(scroll.pixels);
       }
+
+      expect(at[1], greaterThan(at[0]), reason: 'the next match is lower');
+      expect(at[2], at[0], reason: 'the previous match is the first again');
+      expect(at[3], greaterThan(at[1] * 10), reason: 'round to the last');
+      expect(find.text('Follow'), findsOneWidget, reason: 'following stops');
+
       await tester.enterText(find.byType(TextField), 'nothing like it');
       await tester.pump();
       runCommand(XpCommand.findNext);
       await tester.pump();
-
-      expect(find.text('Follow'), findsOneWidget);
+      expect(scroll.pixels, at[3], reason: 'no match, no move');
     });
 
     testWidgets('toggles timestamps, wrap and follow', (tester) async {

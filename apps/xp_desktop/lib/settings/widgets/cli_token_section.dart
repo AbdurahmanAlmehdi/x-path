@@ -11,9 +11,9 @@ import 'package:xp_desktop/shell/widgets/shell_page.dart';
 import 'package:xp_desktop/theme/theme.dart';
 import 'package:xp_desktop/widgets/widgets.dart';
 
-/// The command that connects `xp` to the engine at [url] with [token].
-String connectCommand(Uri url, String token) =>
-    'xp connect $url --token $token';
+/// The command that connects `xp` to the engine at [url]. It asks for the
+/// token, so that the token stays out of the shell history.
+String connectCommand(Uri url) => 'xp connect $url';
 
 /// The MCP config that runs `xp mcp` on the engine at [url] with [token], as
 /// agents read it (`mcpServers`).
@@ -102,9 +102,7 @@ class _Created extends StatelessWidget {
     final l10n = context.l10n;
     final colors = context.xpColors;
     final cli = created.info.kind == DeviceTokenKind.cli;
-    final text = cli
-        ? connectCommand(url, created.token)
-        : mcpConfig(url, created.token);
+    final text = cli ? connectCommand(url) : mcpConfig(url, created.token);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -145,6 +143,13 @@ class _Created extends StatelessWidget {
                   : l10n.settingsTokensCopyConfig,
               text: text,
             ),
+            if (cli) ...[
+              const SizedBox(width: 8),
+              CopyButton(
+                label: l10n.settingsTokensCopyToken,
+                text: created.token,
+              ),
+            ],
             const SizedBox(width: 8),
             XpButton(
               label: l10n.settingsTokensDone,

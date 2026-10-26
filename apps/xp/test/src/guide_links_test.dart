@@ -9,12 +9,23 @@ import 'package:test/test.dart';
 void main() {
   final root = _repositoryRoot();
 
-  /// The anchors GitHub gives the headings of the Markdown file [path].
-  Set<String> anchorsOf(String path) => {
-    for (final line in File(path).readAsLinesSync())
-      if (RegExp('^#{1,6} ').hasMatch(line))
-        _slug(line.replaceFirst(RegExp('^#+ '), '')),
-  };
+  /// The anchors GitHub gives the headings of the Markdown file [path]:
+  /// outside code fences, a repeated one with `-1`, `-2` and so on.
+  Set<String> anchorsOf(String path) {
+    final anchors = <String>{};
+    var fenced = false;
+    for (final line in File(path).readAsLinesSync()) {
+      if (line.trimLeft().startsWith('```')) fenced = !fenced;
+      if (fenced || !RegExp('^#{1,6} ').hasMatch(line)) continue;
+      final slug = _slug(line.replaceFirst(RegExp('^#+ '), ''));
+      var anchor = slug;
+      for (var n = 1; anchors.contains(anchor); n++) {
+        anchor = '$slug-$n';
+      }
+      anchors.add(anchor);
+    }
+    return anchors;
+  }
 
   /// Why the link to [target] from [from] does not resolve, or `null`.
   String? problemOf(String from, String target) {

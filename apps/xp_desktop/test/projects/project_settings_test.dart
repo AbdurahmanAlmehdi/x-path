@@ -159,6 +159,15 @@ void main() {
 
       await tester.tap(find.text('push'));
       await tester.pumpAndSettle();
+      expect(find.text('Turn the push gate off?'), findsOneWidget);
+      await tester.tap(find.text('Keep the gate'));
+      await tester.pumpAndSettle();
+      verifyNever(() => approvals.setGates(any(), any()));
+
+      await tester.tap(find.text('push'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Turn off'));
+      await tester.pumpAndSettle();
       verify(
         () => approvals.setGates(
           'prj_1',

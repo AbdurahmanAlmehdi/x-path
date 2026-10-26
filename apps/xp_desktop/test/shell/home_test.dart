@@ -129,7 +129,13 @@ void main() {
 
     expect(find.text('Nothing live yet'), findsOneWidget);
     expect(find.text('away'), findsOneWidget);
+    when(releases.watchReleases)
+        .thenAnswer((_) => Stream.value(const Snapshot(<Release>[])));
     await tester.tap(find.text('Retry'));
+    await tester.pump();
+
+    verify(releases.watchReleases).called(2);
+    expect(find.text('away'), findsNothing);
   });
 
   testWidgets('waits for the projects, and shows NoProjects without', (

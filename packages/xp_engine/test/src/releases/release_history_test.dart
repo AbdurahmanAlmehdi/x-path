@@ -279,7 +279,7 @@ void main() {
           1,
           PatchAction.rollback,
         ),
-        _throws<ReleaseStateException>('cannot move'),
+        _throws<ReleaseStateException>('cannot change: it is draft'),
       );
       await patched();
       await expectLater(
@@ -314,7 +314,7 @@ void main() {
           kind: ReleaseRunKind.patch,
           runId: 'run_9',
         ),
-        _throws<ReleaseStateException>('Patches apply once'),
+        _throws<ReleaseStateException>('once the stores approved'),
       );
     });
   });

@@ -21,6 +21,14 @@ void main() {
       ]);
     });
 
+    test('has the approval of the stores from approved on', () {
+      expect(ReleaseState.values.where((state) => state.storesApproved), [
+        ReleaseState.approved,
+        ReleaseState.live,
+        ReleaseState.merged,
+      ]);
+    });
+
     test('ends at merged and abandoned', () {
       expect(ReleaseState.values.where((state) => state.isTerminal), [
         ReleaseState.merged,

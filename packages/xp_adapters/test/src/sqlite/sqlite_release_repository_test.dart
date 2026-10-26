@@ -112,7 +112,17 @@ void main() {
         ReleaseEvent(kind: ReleaseEventKind.merged, at: created),
       );
 
-      expect(await repository.events('rel_1'), [first, later]);
+      for (final (kind, store) in [('launched', null), ('store', 'huawei')]) {
+        database.connection.execute(
+          'INSERT INTO release_event (release_id, kind, at, store) '
+          'VALUES (?, ?, 0, ?)',
+          ['rel_1', kind, store],
+        );
+      }
+      expect(await repository.events('rel_1'), [
+        first,
+        later,
+      ], reason: 'what a newer engine wrote is left out');
       expect(await repository.events('rel_3'), isEmpty);
     });
 

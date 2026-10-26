@@ -92,6 +92,14 @@ void main() {
     final input = _input(ReleaseStore.play, RolloutAction.fraction, 0.5);
 
     expect(step.decodeInput(step.encodeInput(input)), input);
+    expect(
+      () => step.decodeInput({
+        'releaseId': 'rel_1',
+        'store': 'apple',
+        'action': 'halt',
+      }),
+      throwsFormatException,
+    );
     expect(input.props, ['rel_1', input.request]);
     expect(step.kind, 'store.rollout');
     expect(step.sideEffectOf(input), isTrue);
