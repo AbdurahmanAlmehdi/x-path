@@ -136,10 +136,18 @@ until the owner decides with an `app` or `cli` token. Which gates a project enfo
 owner's setting (`xp gates show <project>`; only the app turns a gate off). Never remove a gate
 from a copy of a built-in to get past an approval; ask the owner.
 
-Capabilities are `ios-sign`, `android`, `flutter` and `swift-linux`. A job needs what it
-declares plus what its steps imply: `android` and `flutter` for `build.android`; `ios-sign` and
-`flutter` for `build.ios`; `ios-sign` for `upload.appStore` and `ios.stripAndReexport`; the
-platform's for Shorebird steps; `flutter` for `test` and `analyze`.
+Capabilities are `ios-sign`, `android`, `flutter` and `swift-linux`, plus `ios-linux`, which a
+workflow cannot name. A job needs what it declares plus what its steps imply: `android` and
+`flutter` for `build.android`; `flutter` and any of `ios-sign` (a Mac) or `ios-linux` (a Linux
+runner with omarchy-apple-dev, ADR 0014) for `build.ios`; `ios-sign` for `upload.appStore` with an
+Apple ID only; the platform's for Shorebird steps; `flutter` for `test` and `analyze`. The planner
+sends an iOS build to a Mac (narrows it to `ios-sign`, with the reasons in the dry run and the queue
+message) when Linux cannot build it: a flavor, an entry point other than `lib/main.dart`, Shorebird
+iOS, a debug or profile build, an app extension, the iOS Simulator, `ios.stripAndReexport`, a flavor
+without an Apple Distribution identity and an ASC key, or what the scan found (CocoaPods plugins,
+storyboards beyond the template, Flutter older than 3.47). A Linux workflow has no iOS Simulator:
+device tests and screenshots run on an Android emulator; a `command` step calling `xcrun simctl`
+needs a Mac.
 
 ## Built-ins: copy, never edit
 

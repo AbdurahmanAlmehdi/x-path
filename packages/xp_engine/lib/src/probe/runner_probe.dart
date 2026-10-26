@@ -66,11 +66,17 @@ class RunnerProbe {
 
   /// The omarchy-apple-dev commit this release of XPath builds iOS apps on
   /// Linux with. A checkout at another commit does not count.
-  static const iosLinuxPin = '955127bf7d27fffa65abbef22e4c750e6c2f7055';
+  ///
+  /// It is the fork's `xpath/pin` branch: upstream `955127b` with #81
+  /// (Info.plist values from the app's xcconfig), #82 (installer) and the
+  /// signing with a given identity and profile that `build.ios` needs
+  /// (`ASC_PROFILE`, ADR 0014). Once those merge upstream, the pin moves to
+  /// an upstream commit and [iosLinuxRepository] back to upstream.
+  static const iosLinuxPin = '4e170a0ce5f294ecc7b94458772c4fa0aea61d2f';
 
-  /// Where omarchy-apple-dev is.
+  /// Where [iosLinuxPin] is.
   static const iosLinuxRepository =
-      'https://github.com/joshuaswarren/omarchy-apple-dev';
+      'https://github.com/AbdurahmanAlmehdi/omarchy-apple-dev';
 
   /// The shell script of the `ios_linux_sdk` command: exits 0 if the darwin
   /// Swift SDK bundle that omarchy-apple-dev's `install-toolchain.sh` makes
@@ -367,8 +373,8 @@ exit 1
         (
           'omarchy-apple-dev is at ${_short(at)}; this XPath needs '
               '${_short(iosLinuxPin)}',
-          'git -C $quoted fetch && git -C $quoted checkout '
-              '$iosLinuxPin',
+          'git -C $quoted fetch $iosLinuxRepository $iosLinuxPin && '
+              'git -C $quoted checkout $iosLinuxPin',
         ),
       if (swift != null) ('no Swift: $swift', setup),
       if (!(byId['ios_linux_sdk']?.succeeded ?? false))

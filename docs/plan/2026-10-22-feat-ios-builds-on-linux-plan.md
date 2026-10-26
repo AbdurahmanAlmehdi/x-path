@@ -309,6 +309,8 @@ and the matching narrowing case is removed.
       posted on #81).
 - [ ] #81 (Info.plist settings from the app's xcconfig) and #82 (installer) merged, then pinned.
 - [ ] `asc.py identity` or `flutter/ship.sh` takes a given profile (profile decision (b)).
+      Written as `asc.py given-identity` (`ASC_PROFILE`, `ASC_SIGNING_KEY`, `ASC_SIGNING_CERT`)
+      on the fork branch `xpath/pin`, which XPath pins; not yet proposed upstream.
 - [ ] #73 and #77 pinned (both merged).
 
 ### Shorebird iOS on Linux (to decide)

@@ -104,7 +104,7 @@ abstract class FlutterBuildStep<I> extends Step<I, BuildResult> {
       artifact: ArtifactSummary.of(record),
       flutter: tools?.flutter,
       dart: tools?.dart,
-      debugInfoDirectory: _debugInfoOf(settingsOf(input)),
+      debugInfoDirectory: debugInfoOf(settingsOf(input)),
     );
   }
 
@@ -132,7 +132,7 @@ abstract class FlutterBuildStep<I> extends Step<I, BuildResult> {
           subcommand,
           ...platformArguments(input),
           ...settings.flutterArguments(
-            debugInfoDirectory: _debugInfoOf(settings),
+            debugInfoDirectory: debugInfoOf(settings),
           ),
         ],
         workingDirectory: appDirectory,
@@ -152,10 +152,29 @@ abstract class FlutterBuildStep<I> extends Step<I, BuildResult> {
         'The step log has its output.',
       );
     }
+    return await keep(
+      input,
+      context,
+      found: await locate(input, appDirectory, since: since),
+      flutter: flutter,
+      missing:
+          'flutter build succeeded but no .${artifactKindOf(input).wire} '
+          'was found under $appDirectory/build.',
+    );
+  }
 
-    final kind = artifactKindOf(input);
+  /// Stores the file the build left, [found], as the job's artifact, with
+  /// the versions of [flutter]. [missing] says what is wrong when there is
+  /// none.
+  Future<StepOutcome<BuildResult>> keep(
+    I input,
+    StepContext context, {
+    required BuiltFile found,
+    required ResolvedFlutter flutter,
+    required String missing,
+  }) async {
     final BuildFile file;
-    switch (await locate(input, appDirectory, since: since)) {
+    switch (found) {
       case Fresh(file: final fresh):
         file = fresh;
       case Stale(file: final leftover):
@@ -165,14 +184,11 @@ abstract class FlutterBuildStep<I> extends Step<I, BuildResult> {
           'the app, and build again.',
         );
       case Missing():
-        return StepFailed(
-          'flutter build succeeded but no .${kind.wire} was found under '
-          '$appDirectory/build.',
-        );
+        return StepFailed(missing);
     }
     final record = await recorder.record(
       jobId: context.jobId,
-      kind: kind,
+      kind: artifactKindOf(input),
       name: fileNameOf(input),
       content: files.open(file.path),
     );
@@ -181,11 +197,13 @@ abstract class FlutterBuildStep<I> extends Step<I, BuildResult> {
         artifact: ArtifactSummary.of(record),
         flutter: flutter.version,
         dart: flutter.dartVersion,
-        debugInfoDirectory: _debugInfoOf(settings),
+        debugInfoDirectory: debugInfoOf(settingsOf(input)),
       ),
     );
   }
 
-  String? _debugInfoOf(BuildSettings settings) =>
+  /// Where an obfuscated build leaves its Dart debug info, relative to the
+  /// app; `null` when it is not obfuscated.
+  String? debugInfoOf(BuildSettings settings) =>
       settings.obfuscate ? 'build/xpath/debug-info/$platform' : null;
 }

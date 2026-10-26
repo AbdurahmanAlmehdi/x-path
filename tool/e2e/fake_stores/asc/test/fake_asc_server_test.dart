@@ -919,4 +919,112 @@ void main() {
       expect(json(sa), {'resultCount': 0, 'results': <Object?>[]});
     });
   });
+
+  group('profiles', () {
+    Map<String, Object?> profile({
+      String name = 'XPath app',
+      String bundleId = 'bundle-1',
+      String certificate = 'cert-1',
+    }) => {
+      'data': {
+        'type': 'profiles',
+        'attributes': {'name': name, 'profileType': 'IOS_APP_STORE'},
+        'relationships': {
+          'bundleId': {
+            'data': {'type': 'bundleIds', 'id': bundleId},
+          },
+          'certificates': {
+            'data': [
+              {'type': 'certificates', 'id': certificate},
+            ],
+          },
+        },
+      },
+    };
+
+    setUp(() {
+      server
+        ..certificates['cert-1'] = FakeAscCertificate(
+          id: 'cert-1',
+          serialNumber: '0A',
+          certificateType: 'DISTRIBUTION',
+          content: [1],
+        )
+        ..bundleIds['ly.app'] = 'bundle-1';
+    });
+
+    test('are created for a bundle id and certificate, and listed', () async {
+      final created = await call('POST', '/v1/profiles', body: profile());
+
+      expect(created.statusCode, 201);
+      expect(
+        ids(
+          await call(
+            'GET',
+            '/v1/profiles',
+            query: {'filter[name]': 'XPath app'},
+          ),
+        ),
+        [server.profiles.keys.single],
+      );
+      expect(ids(await call('GET', '/v1/certificates')), ['cert-1']);
+      expect(
+        ids(
+          await call(
+            'GET',
+            '/v1/bundleIds',
+            query: {'filter[identifier]': 'ly'},
+          ),
+        ),
+        ['bundle-1'],
+      );
+    });
+
+    test('certificates are created from a PEM request', () async {
+      Map<String, Object?> certificate(String csr) => {
+        'data': {
+          'type': 'certificates',
+          'attributes': {'certificateType': 'DISTRIBUTION', 'csrContent': csr},
+        },
+      };
+
+      final created = await call(
+        'POST',
+        '/v1/certificates',
+        body: certificate('-----BEGIN CERTIFICATE REQUEST-----\nx'),
+      );
+      final refused = await call(
+        'POST',
+        '/v1/certificates',
+        body: certificate('x'),
+      );
+
+      expect(created.statusCode, 201);
+      expect(
+        ((json(created)['data'] as Map)['attributes'] as Map)['serialNumber'],
+        fakeDistributionSerial,
+      );
+      expect(refused.statusCode, 409);
+    });
+
+    test('refuse what does not exist or is not complete', () async {
+      for (final (body, status) in [
+        (
+          {
+            'data': {'type': 'profiles'},
+          },
+          409,
+        ),
+        (profile(bundleId: 'nope'), 404),
+        (profile(certificate: 'nope'), 404),
+      ]) {
+        expect(
+          (await call('POST', '/v1/profiles', body: body)).statusCode,
+          status,
+          reason: '$body',
+        );
+      }
+      expect(server.profiles, isEmpty);
+    });
+  });
 }

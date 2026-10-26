@@ -244,6 +244,10 @@ String describePlan(DispatchPlan plan) {
     for (final stage in plan.stages)
       if (stage.gates.isNotEmpty)
         '${stage.name} waits for approval: ${stage.gates.join(', ')}',
+    for (final stage in plan.stages)
+      for (final job in stage.jobs)
+        if (job.narrowing.isNotEmpty)
+          '${job.name} needs a Mac for iOS: ${job.narrowing.join('; ')}',
     if (plan.skipped.isNotEmpty) ...[
       '',
       for (final job in plan.skipped)

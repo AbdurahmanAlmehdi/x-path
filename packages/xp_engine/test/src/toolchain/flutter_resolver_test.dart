@@ -217,6 +217,21 @@ void main() {
       }
     });
 
+    test('is not asked without useFvm: the installer cache is used', () async {
+      final machine = _Machine(fvmList: fixture('fvm_3.2.1_api_list.json'));
+      installer.installed.add('3.47.6');
+
+      final flutter = await FlutterResolver(
+        runner: machine.runner,
+        installer: installer,
+        useFvm: false,
+      ).resolve('3.47.6');
+
+      expect(flutter.source, FlutterSource.cache);
+      final executable = '${installer.pathFor('3.47.6')}/bin/flutter';
+      expect(machine.commands, ['$executable --version --machine']);
+    });
+
     test('uses the fvm it was given', () async {
       final runner = FakeProcessRunner(
         (_) => ProcessOutput(

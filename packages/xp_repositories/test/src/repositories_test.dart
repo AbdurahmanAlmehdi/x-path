@@ -415,6 +415,14 @@ void main() {
           .thenAnswer((_) async => _named);
       when(() => client.renameCredential('crd_1', 'New name'))
           .thenAnswer((_) async => _named);
+      when(
+        () => client.createDistributionCertificate(
+          'prj_1',
+          app: 'apps/x',
+          flavor: 'prod',
+          name: 'Linux signing',
+        ),
+      ).thenAnswer((_) async => _named);
       when(() => client.replaceCredentialSecret('crd_1', replace))
           .thenAnswer((_) async => _named);
       when(() => client.verifyNamedCredential('crd_1'))
@@ -423,6 +431,15 @@ void main() {
           .thenAnswer((_) async {});
 
       expect(await repository.createCredential(create), _named);
+      expect(
+        await repository.createDistributionCertificate(
+          'prj_1',
+          app: 'apps/x',
+          flavor: 'prod',
+          name: 'Linux signing',
+        ),
+        _named,
+      );
       expect(await repository.renameCredential('crd_1', 'New name'), _named);
       expect(await repository.replaceSecret('crd_1', replace), _named);
       expect(await repository.verifyCredential('crd_1'), _named);

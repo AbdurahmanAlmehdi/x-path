@@ -59,6 +59,25 @@ class CredentialsRepository {
   Future<NamedCredential> createCredential(CreateCredentialRequest request) =>
       _session.call((client) => client.createCredential(request));
 
+  /// Has the engine create an Apple Distribution certificate with the App
+  /// Store Connect key of the flavor [flavor] of the app at [app] of
+  /// [projectId], and assign the identity, called [name], to the flavor.
+  /// Throws an `ApiException` with `conflict` and the team's certificates in
+  /// its `details` when the team is at Apple's limit.
+  Future<NamedCredential> createDistributionCertificate(
+    String projectId, {
+    required String app,
+    required String flavor,
+    required String name,
+  }) => _session.call(
+    (client) => client.createDistributionCertificate(
+      projectId,
+      app: app,
+      flavor: flavor,
+      name: name,
+    ),
+  );
+
   /// Gives [id] a new [name]. Its secret and assignments stay.
   Future<NamedCredential> renameCredential(String id, String name) =>
       _session.call((client) => client.renameCredential(id, name));

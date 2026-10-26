@@ -241,6 +241,50 @@ void main() {
     });
   });
 
+  group('an Apple Distribution identity (ADR 0014)', () {
+    Map<String, Object?> identity() => {
+      'kind': 'apple_distribution',
+      'privateKey':
+          '-----BEGIN PRIVATE KEY-----\nMIIE\n-----END PRIVATE KEY-----\n',
+      'certificate': fakeDistributionCertificate,
+    };
+
+    void listCertificate() => asc.certificates['cert-1'] = FakeAscCertificate(
+      id: 'cert-1',
+      serialNumber: fakeDistributionSerial,
+      certificateType: 'DISTRIBUTION',
+      content: base64.decode(fakeDistributionCertificate),
+    );
+
+    test('is accepted for a flavor when its team lists the certificate, and '
+        'the engine makes its profile', () async {
+      await save(ascKey());
+      listCertificate();
+      asc.bundleIds[_bundleId] = 'bundle-1';
+
+      final credential = await save(identity());
+      final stored = (await checks.repository.get(credential.id))!;
+      final profile = await checks.profiles.profile(
+        'prj_1',
+        AppStoreProfiles.keyFor(stored.secretKey, _bundleId),
+      );
+
+      expect(credential.status, CredentialStatus.verified);
+      expect(credential.account, 'Apple Distribution: XPath Test (TEAM123456)');
+      expect(utf8.decode(profile), contains('bundle-1 cert-1'));
+      expect(asc.profiles.values.single.name, 'XPath $_bundleId A1B2C3D4E5F');
+    });
+
+    test('is refused for a flavor when the certificate was revoked', () async {
+      await save(ascKey());
+
+      final credential = await save(identity());
+
+      expect(credential.status, CredentialStatus.rejected);
+      expect(credential.message, contains('it was revoked'));
+    });
+  });
+
   group('an Apple ID', () {
     Map<String, Object?> appleId() => {
       'kind': 'apple_id',

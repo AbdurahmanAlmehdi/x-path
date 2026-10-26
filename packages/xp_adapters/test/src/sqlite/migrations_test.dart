@@ -412,6 +412,102 @@ INSERT INTO job (id, workflow_version_id, project_id, state)
     );
   });
 
+  test('v20 rebuilds credential, keeps its rows and assignments, and takes '
+      'Apple Distribution identities', () {
+    final path = '${tempDirectory().path}/xpath.db';
+    sqlite3.open(path)
+      ..execute(_golden(19))
+      ..userVersion = 19
+      ..execute('''
+INSERT INTO project (id, host, source_key, github_repo_id, remote,
+  default_base_branch) VALUES ('prj_1', 'github.com', '1', 1, 'r', 'main');
+INSERT INTO app (id, project_id, path, framework, store_country)
+  VALUES ('app_1', 'prj_1', '.', 'flutter', 'us');
+INSERT INTO flavor (id, app_id, name, entrypoint)
+  VALUES ('flv_1', 'app_1', 'prod', 'lib/main.dart');
+INSERT INTO credential (id, name, kind, secret_key, account, status,
+  verified_at, checked_at, message, fix) VALUES
+  ('crd_1', 'ASC', 'asc_key', 'credential.crd_1', 'KEY1', 'verified', 5, 6,
+    NULL, NULL),
+  ('crd_2', 'Slack', 'slack', 'credential.crd_2', NULL, 'rejected', NULL, 7,
+    'gone', 'replace it');
+INSERT INTO credential_assignment (flavor_id, kind, credential_id, status)
+  VALUES ('flv_1', 'asc_key', 'crd_1', 'verified');
+''')
+      ..close();
+
+    final database = SqliteDatabase.open(path);
+    addTearDown(database.close);
+    final db = database.connection;
+
+    expect(db.userVersion, latest);
+    expect(
+      [
+        for (final row in db.select(
+          'SELECT id, name, kind, secret_key, account, status, verified_at, '
+          'checked_at, message, fix FROM credential ORDER BY rowid',
+        ))
+          row.values,
+      ],
+      [
+        [
+          'crd_1',
+          'ASC',
+          'asc_key',
+          'credential.crd_1',
+          'KEY1',
+          'verified',
+          5,
+          6,
+          null,
+          null,
+        ],
+        [
+          'crd_2',
+          'Slack',
+          'slack',
+          'credential.crd_2',
+          null,
+          'rejected',
+          null,
+          7,
+          'gone',
+          'replace it',
+        ],
+      ],
+    );
+    expect(db.select('PRAGMA foreign_key_check'), isEmpty);
+    db.execute(
+      'INSERT INTO credential (id, name, kind, secret_key) '
+      "VALUES ('crd_3', 'Identity', 'apple_distribution', 'k')",
+    );
+    expect(
+      () => db.execute(
+        'INSERT INTO credential (id, name, kind, secret_key) '
+        "VALUES ('crd_4', 'asc', 'nope', 'k')",
+      ),
+      throwsA(isA<SqliteException>()),
+      reason: 'the kind is still checked',
+    );
+    expect(
+      () => db.execute(
+        'INSERT INTO credential (id, name, kind, secret_key) '
+        "VALUES ('crd_5', 'IDENTITY', 'slack', 'k')",
+      ),
+      throwsA(isA<SqliteException>()),
+      reason: 'names are still unique regardless of case',
+    );
+    db.execute("DELETE FROM credential WHERE id = 'crd_1'");
+    expect(
+      db
+          .select('SELECT count(*) FROM credential_assignment')
+          .single
+          .columnAt(0),
+      0,
+      reason: 'the cascade to the assignments still works',
+    );
+  });
+
   group('snapshot', () {
     for (var version = 1; version <= latest; version++) {
       test('v$version is what the first $version migration(s) build', () {

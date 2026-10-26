@@ -120,6 +120,7 @@ class PlannedJob extends Equatable {
     this.platform,
     this.runner,
     this.waitReason,
+    this.narrowing = const [],
   });
 
   /// Reads a job from its JSON form.
@@ -153,6 +154,10 @@ class PlannedJob extends Equatable {
   /// ios-sign."; `null` when the engine or [runner] can run it.
   final String? waitReason;
 
+  /// Why it needs a Mac for iOS where a Linux runner could have built it
+  /// (ADR 0014): the job or the app uses something Linux iOS builds lack.
+  final List<String> narrowing;
+
   /// The JSON form.
   Map<String, dynamic> toJson() => _$PlannedJobToJson(this);
 
@@ -166,6 +171,7 @@ class PlannedJob extends Equatable {
     local,
     runner,
     waitReason,
+    narrowing,
   ];
 }
 

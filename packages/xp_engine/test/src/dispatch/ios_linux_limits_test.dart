@@ -20,6 +20,13 @@ const _profile =
 const _simulator =
     'the job uses the iOS Simulator, which needs macOS (Linux workflows test '
     'on an Android emulator)';
+const _unsigned =
+    'the flavor has no Apple Distribution identity with an App Store Connect '
+    'API key assigned, which Linux runners sign with (xp credentials add '
+    '--kind apple_distribution)';
+const _signing = {
+  'linuxSigning': {'ASC_PROFILE': 'identity.profile:ly.demo'},
+};
 const _widgets =
     'the app has the app extension Widgets, which Linux iOS builds do not '
     'support yet (omarchy-apple-dev: app extensions)';
@@ -35,8 +42,7 @@ void main() {
     expect(
       iosLinuxLimits([
         _step('git.checkout'),
-        _step('build.ios', {'version': '1.0.0+1'}),
-        _step('ios.stripAndReexport'),
+        _step('build.ios', {'version': '1.0.0+1', ..._signing}),
         _step('shorebird.release', {'platform': 'android'}),
         _command('flutter', ['build', 'ios', '--release']),
       ], _app),
@@ -47,10 +53,47 @@ void main() {
   test('a flavor of the build or the strip step, once', () {
     expect(
       iosLinuxLimits([
-        _step('build.ios', {'flavor': 'prod'}),
-        _step('ios.stripAndReexport', {'flavor': 'prod'}),
+        _step('build.ios', {'flavor': 'prod', ..._signing}),
+        _step('build.ios', {'flavor': 'prod', ..._signing}),
       ], _app),
       [_flavor],
+    );
+  });
+
+  test('an entry point other than lib/main.dart, and the strip step', () {
+    expect(
+      iosLinuxLimits([
+        _step('build.ios', {'target': 'lib/main_prod.dart', ..._signing}),
+        _step('ios.stripAndReexport'),
+      ], _app),
+      [
+        contains('the flavor builds lib/main_prod.dart'),
+        contains('the job strips frameworks after the build'),
+      ],
+    );
+  });
+
+  test('what the scan found about the project', () {
+    expect(
+      iosLinuxLimits(
+        [_step('build.ios', _signing)],
+        const AppProfile(
+          name: 'demo',
+          path: '.',
+          iosLinuxLimits: ['the app pins Flutter 3.44.2'],
+        ),
+      ),
+      ['the app pins Flutter 3.44.2'],
+    );
+  });
+
+  test('a build the flavor cannot sign on Linux, with a flavor too', () {
+    expect(iosLinuxLimits([_step('build.ios')], _app), [_unsigned]);
+    expect(
+      iosLinuxLimits([
+        _step('build.ios', {'flavor': 'prod'}),
+      ], _app),
+      [_flavor, _unsigned],
     );
   });
 

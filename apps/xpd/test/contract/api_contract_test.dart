@@ -7,6 +7,7 @@ import 'package:test/test.dart';
 import 'package:xp_api/testing.dart';
 import 'package:xp_api/xp_api.dart';
 import 'package:xp_engine/xp_engine.dart';
+import 'package:xp_fake_asc/xp_fake_asc.dart';
 
 import '../helpers/test_engine.dart';
 import '../helpers/test_run_fakes.dart';
@@ -793,6 +794,117 @@ void main() {
         )).statusCode,
         503,
       );
+    });
+
+    test('POST /credentials takes an Apple Distribution identity, 201 and '
+        '422', () async {
+      const template = '/credentials';
+      Map<String, Object?> identity(String name, String certificate) => {
+        'name': name,
+        'kind': 'apple_distribution',
+        'privateKey':
+            '-----BEGIN PRIVATE KEY-----\nMIIE\n-----END PRIVATE KEY-----\n',
+        'certificate': certificate,
+      };
+
+      final created = await check(
+        'POST',
+        template,
+        template,
+        body: identity('Linux signing', fakeDistributionCertificate),
+      );
+      final refused = await check(
+        'POST',
+        template,
+        template,
+        body: identity('Broken', 'bm90IGEgY2VydGlmaWNhdGU='),
+      );
+
+      expect(created.statusCode, 201);
+      expect(created.json['kind'], 'apple_distribution');
+      expect(
+        created.json['account'],
+        'Apple Distribution: XPath Test (TEAM123456)',
+      );
+      expect(created.body, isNot(contains('PRIVATE KEY')));
+      expect(refused.statusCode, 422);
+    });
+
+    test('POST /projects/{id}/flavors/{flavor}/distribution-certificate 201, '
+        '400, 403, 404, 409', () async {
+      const template =
+          '/projects/{id}/flavors/{flavor}/distribution-certificate';
+      String path([String flavor = 'default']) =>
+          '/projects/$projectId/flavors/$flavor/distribution-certificate';
+      engine.appStoreConnect.createdContent = base64.decode(
+        fakeDistributionCertificate,
+      );
+
+      final noKey = await check('POST', path(), template, body: {'name': 'A'});
+      final key = await send(
+        'POST',
+        '/credentials',
+        body: {
+          'name': 'ASC',
+          'kind': 'asc_key',
+          'keyId': fakeAscKeyId,
+          'issuerId': fakeAscIssuerId,
+          'privateKey': fakeAscPrivateKeyPem,
+        },
+      );
+      await send(
+        'PUT',
+        '/projects/$projectId/flavors/default/credentials/asc_key',
+        body: {'credentialId': key.json['id']},
+      );
+      final created = await check(
+        'POST',
+        path(),
+        template,
+        body: {'name': 'Linux signing'},
+      );
+      final statuses = [
+        for (final (flavor, body, token) in [
+          ('default', <String, Object?>{'name': ''}, null),
+          ('default', <String, Object?>{'name': 'B'}, mcp),
+          ('nope', <String, Object?>{'name': 'B'}, null),
+          ('default', <String, Object?>{'name': 'linux SIGNING'}, null),
+        ])
+          (await check(
+            'POST',
+            path(flavor),
+            template,
+            body: body,
+            token: token,
+          )).statusCode,
+      ];
+      engine.appStoreConnect.certificates.addAll(const [
+        AscCertificate(id: 'b', serialNumber: '0B'),
+        AscCertificate(id: 'c', serialNumber: '0C'),
+      ]);
+      final limit = await check(
+        'POST',
+        path(),
+        template,
+        body: {'name': 'Another'},
+      );
+
+      expect(noKey.statusCode, 400);
+      expect(created.statusCode, 201);
+      expect(created.json['kind'], 'apple_distribution');
+      expect(
+        (created.json['usedBy']! as List).single,
+        containsPair('flavor', 'default'),
+      );
+      expect(created.body, isNot(contains('PRIVATE KEY')));
+      expect(statuses, [400, 403, 404, 409]);
+      expect(limit.statusCode, 409);
+      final details =
+          (limit.json['error']! as Map<String, Object?>)['details']!
+              as Map<String, Object?>;
+      expect(details['reason'], 'certificate_limit');
+      expect(details['limit'], 3);
+      expect(details['certificates'], hasLength(3));
     });
 
     test('GET /credentials and /credentials/{id} 200 and 404', () async {

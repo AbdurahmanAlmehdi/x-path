@@ -89,16 +89,21 @@ class FlutterResolutionException extends ToolchainException {
 class FlutterResolver {
   /// Creates a resolver.
   ///
-  /// [fvmExecutable] is the fvm to use. [commandTimeout] is how long fvm and
-  /// `flutter --version` have to answer; [fvmInstallTimeout] how long fvm has
-  /// to install an SDK.
+  /// [fvmExecutable] is the fvm to use; without [useFvm] only the
+  /// installer's cache is (the installs Linux iOS builds prepare, ADR 0014).
+  /// [commandTimeout] is how long fvm and `flutter --version` have to answer;
+  /// [fvmInstallTimeout] how long fvm has to install an SDK.
   const new({
     required this._runner,
     required this._installer,
+    this.useFvm = true,
     this.fvmExecutable = 'fvm',
     this.commandTimeout = const Duration(minutes: 2),
     this.fvmInstallTimeout = const Duration(minutes: 30),
   });
+
+  /// Whether fvm's SDKs are used.
+  final bool useFvm;
 
   /// The fvm program.
   final String fvmExecutable;
@@ -141,7 +146,7 @@ class FlutterResolver {
         'Pin an exact version such as 3.47.6 in ${pinSource ?? '.fvmrc'}.',
       );
     }
-    final fromFvm = await _fromFvm(version);
+    final fromFvm = useFvm ? await _fromFvm(version) : null;
     if (fromFvm != null) return fromFvm;
     if (!isExactFlutterVersion(version)) {
       throw FlutterResolutionException(

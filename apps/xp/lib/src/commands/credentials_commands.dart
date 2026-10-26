@@ -115,6 +115,17 @@ class CredentialsAddCommand extends XpCommand {
         valueHelp: 'name',
       );
     _addMaterialOptions(argParser);
+    argParser
+      ..addSeparator('apple_distribution --create (no Mac needed; ADR 0014):')
+      ..addFlag(
+        'create',
+        negatable: false,
+        help:
+            "The engine creates a new certificate with the flavor's App "
+            'Store Connect key and assigns the identity to the flavor. Apple '
+            'allows a team 3; the engine refuses at the limit and lists them.',
+      );
+    _addFlavorOptions(argParser, 'With --create: the flavor to assign it to.');
   }
 
   @override
@@ -127,7 +138,9 @@ class CredentialsAddCommand extends XpCommand {
 
   @override
   String get invocation =>
-      'xp credentials add --kind <kind> --name <name> [options of the kind]';
+      'xp credentials add --kind <kind> --name <name> [options of the kind]\n'
+      '       xp credentials add --kind apple-distribution --name <name> '
+      '--create --project <project> --flavor <flavor> [--app <path>]';
 
   @override
   String get usageFooter => _secretsFooter;
@@ -140,10 +153,21 @@ class CredentialsAddCommand extends XpCommand {
       this,
       argResults!.option('name') ?? usageException('Missing --name.'),
     );
-    final material = await _material(this, kind);
-    final credential = await client.createCredential(
-      CreateCredentialRequest(name: name, kind: kind, material: material),
-    );
+    final create = argResults!.flag('create');
+    for (final option in const ['project', 'app', 'flavor']) {
+      if (!create && argResults!.wasParsed(option)) {
+        usageException('--$option goes with --create.');
+      }
+    }
+    final credential = create
+        ? await _create(client, kind, name)
+        : await client.createCredential(
+            CreateCredentialRequest(
+              name: name,
+              kind: kind,
+              material: await _material(this, kind),
+            ),
+          );
     emit(
       credential.toJson(),
       () =>
@@ -153,13 +177,41 @@ class CredentialsAddCommand extends XpCommand {
     return XpExit.ok;
   }
 
+  /// Has the engine create an Apple Distribution certificate for a flavor.
+  Future<NamedCredential> _create(
+    XpClient client,
+    CredentialKind kind,
+    String name,
+  ) async {
+    final args = argResults!;
+    if (kind != CredentialKind.appleDistribution) {
+      usageException('--create is for --kind apple-distribution only.');
+    }
+    for (final option in _kindOptions[kind]!) {
+      if (args.wasParsed(option)) {
+        usageException('Give --create or --$option, not both.');
+      }
+    }
+    final flavor =
+        args.option('flavor') ??
+        usageException('Missing --flavor (the flavor to assign it to).');
+    final projectId = await resolveProject(client, _project(this));
+    return await client.createDistributionCertificate(
+      projectId,
+      app: args.option('app')!,
+      flavor: flavor,
+      name: name,
+    );
+  }
+
   CredentialKind _kind(String? wire) {
     if (wire == null) {
       usageException(
         'Missing --kind (${_namedKinds.map((k) => k.wire).join(', ')}).',
       );
     }
-    final kind = CredentialKind.fromWire(wire);
+    // `apple-distribution` reads as well as `apple_distribution`.
+    final kind = CredentialKind.fromWire(wire.replaceAll('-', '_'));
     if (kind == CredentialKind.github) usageException(_githubHint);
     if (kind == null) {
       usageException(
@@ -684,6 +736,7 @@ const _secrets = <CredentialKind, List<_Secret>>{
 const _kindOptions = <CredentialKind, List<String>>{
   CredentialKind.ascKey: ['key-id', 'issuer-id', 'p8', 'key-kind'],
   CredentialKind.appleId: ['apple-id', 'password-stdin'],
+  CredentialKind.appleDistribution: ['private-key', 'certificate'],
   CredentialKind.playSa: ['service-account'],
   CredentialKind.firebaseSa: ['service-account'],
   CredentialKind.keystore: [
@@ -700,6 +753,7 @@ const _kindOptions = <CredentialKind, List<String>>{
 const _requiredOptions = <CredentialKind, List<String>>{
   CredentialKind.ascKey: ['key-id', 'issuer-id', 'p8'],
   CredentialKind.appleId: ['apple-id'],
+  CredentialKind.appleDistribution: ['private-key', 'certificate'],
   CredentialKind.playSa: ['service-account'],
   CredentialKind.firebaseSa: ['service-account'],
   CredentialKind.keystore: ['keystore', 'key-alias'],
@@ -742,6 +796,21 @@ void _addMaterialOptions(ArgParser parser) {
     'Read the app-specific password from standard input.',
   );
   parser
+    ..addSeparator(
+      'apple_distribution (Apple Distribution identity, for Linux runners):',
+    )
+    ..addOption(
+      'private-key',
+      help:
+          'The PEM private key of the identity (from a .p12: openssl pkcs12 '
+          '-in identity.p12 -nodes -nocerts).',
+      valueHelp: 'path',
+    )
+    ..addOption(
+      'certificate',
+      help: 'The Apple Distribution certificate, .cer (DER) or PEM.',
+      valueHelp: 'path',
+    )
     ..addSeparator('play_sa, firebase_sa (service account):')
     ..addOption(
       'service-account',
@@ -822,6 +891,10 @@ Future<Map<String, dynamic>> _material(
         'keyKind': ?args.option('key-kind'),
       },
       CredentialKind.appleId => {'appleId': required('apple-id')},
+      CredentialKind.appleDistribution => {
+        'privateKey': _readText(required('private-key')),
+        'certificate': _certificateText(required('certificate')),
+      },
       CredentialKind.playSa || CredentialKind.firebaseSa => {
         'serviceAccount': _readText(required('service-account')),
       },
@@ -857,6 +930,13 @@ Future<Map<String, dynamic>> _material(
 }
 
 String _readText(String path) => _read(path, File(path).readAsStringSync);
+
+/// A certificate file as the engine takes it: PEM as it is, DER as base64.
+String _certificateText(String path) {
+  final bytes = _readBytes(path);
+  final text = latin1.decode(bytes);
+  return text.startsWith('-----BEGIN') ? text : base64Encode(bytes);
+}
 
 List<int> _readBytes(String path) => _read(path, File(path).readAsBytesSync);
 

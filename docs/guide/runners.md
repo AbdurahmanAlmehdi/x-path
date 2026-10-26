@@ -77,6 +77,66 @@ docker run -d --name xpath-runner --restart on-failure -v xpath-runner:/data \
   container. A runner the engine revoked, that another connection replaced, or that is not paired
   exits with 0 and says why, so `--restart on-failure` does not start it again.
 
+## Linux iOS
+
+Experimental, and opt-in per runner (ADR 0014): a Linux runner can build, sign and hand back iOS
+apps through [omarchy-apple-dev](https://github.com/joshuaswarren/omarchy-apple-dev), so a release
+with iOS needs no Mac, setup included. Macs keep working as before, and are preferred when both
+are free.
+
+**What you supply.** XPath never downloads, bundles or redistributes Apple software. Download
+`Xcode.xip` yourself, in a browser on any machine, from Apple's developer site. Using the Xcode SDK
+on hardware that is not Apple's is likely outside Apple's SDK agreement: that question is yours,
+not XPath's. omarchy-apple-dev is tested on Arch Linux (Omarchy), x86_64 and arm64.
+
+1. Check out omarchy-apple-dev at the commit this XPath pins. `xp runner doctor` prints it; until
+   upstream merges the fixes XPath needs, it is the `xpath/pin` branch of a fork:
+
+   ```sh
+   git clone https://github.com/AbdurahmanAlmehdi/omarchy-apple-dev ~/omarchy-apple-dev
+   git -C ~/omarchy-apple-dev checkout <the commit xp runner doctor names>
+   ```
+
+2. Run its `install-toolchain.sh` with your `Xcode.xip`, as the user the runner runs as. It
+   installs Swift, rcodesign, the LLVM tools and the pymobile3 python, and cuts the darwin SDK
+   bundle from the `.xip`.
+3. Set `XP_IOS_LINUX_DIR` to the checkout before you start or install the runner, so the service
+   keeps it:
+
+   ```sh
+   export XP_IOS_LINUX_DIR=~/omarchy-apple-dev
+   xp runner doctor             # ios-linux, or each missing piece with its fix
+   xp runner install-service
+   ```
+
+   Each Flutter version needs about 7 GB more for its own install, which the first iOS job of that
+   version prepares (`flutter/setup.sh`, a few minutes). Installs no job used for 30 days are
+   deleted.
+
+**Signing without a Mac.** The flavor needs an App Store Connect API key (`asc_key`) and an Apple
+Distribution identity. The engine creates the identity with the key:
+
+```sh
+xp credentials add --kind asc_key --name "ASC" --key-id ... --issuer-id ... --p8 AuthKey.p8
+xp credentials assign "ASC" --project acme/app --flavor prod
+xp credentials add --kind apple-distribution --name "Linux signing" --create \
+  --project acme/app --flavor prod
+```
+
+Apple allows a team three distribution certificates; at the limit the engine refuses and lists
+them, so you can revoke one in App Store Connect. You can also import an identity you have:
+`--private-key key.pem --certificate cert.cer` (from a `.p12`: `openssl pkcs12 -in id.p12 -nodes
+-nocerts` gives the key, `-clcerts -nokeys` the certificate). The engine makes the App Store profile
+for each build with the API key; the runner gets the identity and the profile for the job only, in
+its tmpfs secret folder, and never the API key. Runners never create certificates.
+
+**What still needs a Mac.** The scan says "Needs a Mac for iOS" with the reasons, the dry run shows
+them, and such a job waits for a Mac: Flutter flavors, an entry point other than `lib/main.dart`,
+Shorebird iOS, debug and profile builds, app extensions, plugins that build with CocoaPods (enable
+Swift Package Manager), storyboards beyond Flutter's template, Flutter older than 3.47, and the
+`ios.stripAndReexport` step. There is no iOS Simulator on Linux: iOS device tests and screenshots
+are not offered there; run them on an Android emulator, or on a Mac.
+
 ## When the engine is away
 
 A runner may be cut off from the engine for hours: the engine's Mac sleeps, the tunnel drops, the

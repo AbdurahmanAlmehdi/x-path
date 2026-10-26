@@ -28,6 +28,7 @@ void main() {
             engineOnly: false,
             local: false,
             waitReason: 'No runner can do ios-sign.',
+            narrowing: ['the app uses the flavor dev'],
           ),
         ],
       ),
@@ -56,6 +57,14 @@ void main() {
         'platforms': <String>[],
       }),
       const DispatchPlan(flavors: [], platforms: []),
+    );
+    expect(
+      PlannedJob.fromJson(const {
+        'name': 'j',
+        'engineOnly': false,
+        'local': true,
+      }).narrowing,
+      isEmpty,
     );
   });
 

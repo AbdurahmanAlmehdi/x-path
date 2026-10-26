@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:xp_engine/src/stores/apple/asc_exceptions.dart';
 import 'package:xp_engine/src/stores/apple/asc_key.dart';
 import 'package:xp_engine/src/stores/apple/asc_models.dart';
@@ -77,6 +79,35 @@ abstract interface class AppStoreConnect {
   /// a limit of 1). Credential checks use it; a `401` is an expired or revoked
   /// key.
   Future<void> verifyAccess();
+
+  /// The distribution certificates of the team (`DISTRIBUTION`, which Apple
+  /// shows as Apple Distribution), revoked ones left out.
+  Future<List<AscCertificate>> distributionCertificates();
+
+  /// Creates an Apple Distribution certificate (`DISTRIBUTION`) for the
+  /// certificate signing request [csr] (PEM) and returns it with its content.
+  Future<AscCertificate> createDistributionCertificate(String csr);
+
+  /// The id of the bundle id resource registered for [identifier], or
+  /// `null` if the team has none.
+  Future<String?> bundleIdOf(String identifier);
+
+  /// The active App Store profiles called [name].
+  Future<List<AscProfile>> appStoreProfiles(String name);
+
+  /// Deletes the profile [id].
+  Future<void> deleteProfile(String id);
+
+  /// Revokes the certificate [id].
+  Future<void> revokeCertificate(String id);
+
+  /// Creates the App Store profile [name] for the bundle id resource
+  /// [bundleId] with the certificate [certificateId].
+  Future<AscProfile> createAppStoreProfile({
+    required String name,
+    required String bundleId,
+    required String certificateId,
+  });
 }
 
 /// Makes the client for an API key.
@@ -108,6 +139,24 @@ class FakeAppStoreConnect implements AppStoreConnect {
 
   /// The bytes of each upload, by its id.
   final uploads = <String, List<int>>{};
+
+  /// The distribution certificates of the team.
+  final certificates = <AscCertificate>[];
+
+  /// The content of the certificates [createDistributionCertificate] makes.
+  List<int> createdContent = const [0x30];
+
+  /// The certificate signing requests [createDistributionCertificate] got.
+  final requests = <String>[];
+
+  /// The bundle id resources, by identifier.
+  final bundleIds = <String, String>{};
+
+  /// The active App Store profiles.
+  final profiles = <AscProfile>[];
+
+  /// The expiry of the profiles [createAppStoreProfile] makes.
+  DateTime profileExpiry = DateTime.utc(2027);
 
   /// What the next call throws, once; `null` for nothing.
   AppStoreConnectException? failure;
@@ -249,6 +298,72 @@ class FakeAppStoreConnect implements AppStoreConnect {
 
   @override
   Future<void> verifyAccess() async => _call('verifyAccess');
+
+  @override
+  Future<List<AscCertificate>> distributionCertificates() async {
+    _call('distributionCertificates');
+    return [...certificates];
+  }
+
+  @override
+  Future<AscCertificate> createDistributionCertificate(String csr) async {
+    _call('createDistributionCertificate');
+    requests.add(csr);
+    final certificate = AscCertificate(
+      id: 'certificate-${calls.length}',
+      serialNumber: '${calls.length}',
+      content: createdContent,
+    );
+    certificates.add(certificate);
+    return certificate;
+  }
+
+  @override
+  Future<String?> bundleIdOf(String identifier) async {
+    _call('bundleIdOf $identifier');
+    return bundleIds[identifier];
+  }
+
+  @override
+  Future<List<AscProfile>> appStoreProfiles(String name) async {
+    _call('appStoreProfiles $name');
+    return [
+      for (final profile in profiles)
+        if (profile.name == name) profile,
+    ];
+  }
+
+  @override
+  Future<void> deleteProfile(String id) async {
+    _call('deleteProfile $id');
+    profiles.removeWhere((profile) => profile.id == id);
+  }
+
+  @override
+  Future<void> revokeCertificate(String id) async {
+    _call('revokeCertificate $id');
+    certificates.removeWhere((certificate) => certificate.id == id);
+  }
+
+  @override
+  Future<AscProfile> createAppStoreProfile({
+    required String name,
+    required String bundleId,
+    required String certificateId,
+  }) async {
+    _call('createAppStoreProfile $name $bundleId $certificateId');
+    if (profiles.any((profile) => profile.name == name)) {
+      throw AscConflictException('There is a profile named $name already.');
+    }
+    final profile = AscProfile(
+      id: 'profile-${calls.length}',
+      name: name,
+      content: utf8.encode('profile $name $bundleId $certificateId'),
+      expirationDate: profileExpiry,
+    );
+    profiles.add(profile);
+    return profile;
+  }
 
   AscReviewSubmission _submission(String id) =>
       [for (final list in submissionsOf.values) ...list]

@@ -429,3 +429,59 @@ class AscRateLimit extends Equatable {
   @override
   List<Object?> get props => [limit, remaining];
 }
+
+/// A signing certificate of the team in App Store Connect.
+class AscCertificate extends Equatable {
+  /// Creates a certificate.
+  const new({
+    required this.id,
+    required this.serialNumber,
+    this.name,
+    this.expirationDate,
+    this.content,
+  });
+
+  /// The id of the certificate resource.
+  final String id;
+
+  /// The serial number, in hexadecimal as Apple writes it.
+  final String serialNumber;
+
+  /// What App Store Connect calls it ("Apple Distribution: Acme Ltd").
+  final String? name;
+
+  /// When it expires, in UTC.
+  final DateTime? expirationDate;
+
+  /// The certificate, DER, when App Store Connect sent it.
+  final List<int>? content;
+
+  @override
+  List<Object?> get props => [id, serialNumber, name, expirationDate, content];
+}
+
+/// A provisioning profile in App Store Connect.
+class AscProfile extends Equatable {
+  /// Creates a profile.
+  const new({
+    required this.id,
+    required this.name,
+    required this.content,
+    this.expirationDate,
+  });
+
+  /// The id of the profile resource.
+  final String id;
+
+  /// Its name, unique in the team.
+  final String name;
+
+  /// The `.mobileprovision` file.
+  final List<int> content;
+
+  /// When it expires, in UTC.
+  final DateTime? expirationDate;
+
+  @override
+  List<Object?> get props => [id, name, content, expirationDate];
+}

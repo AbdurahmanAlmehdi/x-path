@@ -16,6 +16,10 @@ enum CredentialKind {
   /// An Apple ID with an app-specific password, for `altool`.
   appleId('apple_id', 'Apple ID'),
 
+  /// An Apple Distribution identity (a private key and its certificate),
+  /// with which Linux runners sign iOS builds (ADR 0014).
+  appleDistribution('apple_distribution', 'Apple Distribution identity'),
+
   /// A Google Play service account.
   playSa('play_sa', 'Google Play service account'),
 
@@ -410,6 +414,8 @@ class NamedCredentialsResponse extends Equatable {
 /// - `asc_key`: `keyId`, `issuerId`, `privateKey` (the `.p8` text) and
 ///   `keyKind` (`team` or `individual`, default `team`);
 /// - `apple_id`: `appleId` and `password` (an app-specific password);
+/// - `apple_distribution`: `privateKey` (PEM) and `certificate` (base64 DER,
+///   or PEM);
 /// - `play_sa` and `firebase_sa`: `serviceAccount` (the text of the JSON key
 ///   file);
 /// - `keystore`: `keystore` (base64), `storePassword`, `keyAlias` and
@@ -494,6 +500,30 @@ class RenameCredentialRequest extends Equatable {
       RenameCredentialRequest(credentialName(json['name']));
 
   /// The new name.
+  final String name;
+
+  /// The JSON form.
+  Map<String, dynamic> toJson() => {'name': name};
+
+  @override
+  List<Object?> get props => [name];
+}
+
+/// The body of `POST /projects/{id}/flavors/{flavor}/distribution-certificate`:
+/// the [name] of the Apple Distribution identity the engine creates with the
+/// flavor's App Store Connect key (ADR 0014).
+class CreateDistributionCertificateRequest extends Equatable {
+  /// Creates a request.
+  const new(this.name);
+
+  /// Reads a request from its JSON form.
+  ///
+  /// Throws a [FormatException] if `name` is not a usable name.
+  factory CreateDistributionCertificateRequest.fromJson(
+    Map<String, dynamic> json,
+  ) => CreateDistributionCertificateRequest(credentialName(json['name']));
+
+  /// The name of the identity.
   final String name;
 
   /// The JSON form.

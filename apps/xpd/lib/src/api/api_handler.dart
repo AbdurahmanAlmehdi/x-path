@@ -39,6 +39,7 @@ Handler buildApiHandler({
   required ArtifactService artifacts,
   required TestRunService tests,
   required CredentialService credentials,
+  required DistributionCertificates certificates,
   required GitHubTokenService githubToken,
   required WorkflowService workflows,
   required WorkflowDispatcher dispatcher,
@@ -71,7 +72,7 @@ Handler buildApiHandler({
   JobsRoutes(jobs).addTo(router);
   ArtifactsRoutes(artifacts).addTo(router);
   TestsRoutes(tests).addTo(router);
-  CredentialsRoutes(credentials).addTo(router);
+  CredentialsRoutes(credentials, certificates).addTo(router);
   GitHubTokenRoutes(githubToken).addTo(router);
   WorkflowsRoutes(workflows, dispatcher).addTo(router);
   RunsRoutes(runs, projects, dispatcher).addTo(router);

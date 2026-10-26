@@ -277,6 +277,7 @@ void main() {
                 engineOnly: false,
                 local: false,
                 waitReason: 'No runner can do ios-sign.',
+                narrowing: ['the app uses the flavor dev'],
               ),
             ],
           ),
@@ -303,6 +304,10 @@ void main() {
       expect(out, contains('Here           engine'));
       expect(out, contains('waits: No runner can do ios-sign.'));
       expect(out, contains('build waits for approval: push'));
+      expect(
+        out,
+        contains('Build ios needs a Mac for iOS: the app uses the flavor dev'),
+      );
       expect(
         out,
         contains('skipped  Upload dev for ios: no App Store app id for dev'),

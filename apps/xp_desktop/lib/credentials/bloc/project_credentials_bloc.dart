@@ -71,6 +71,20 @@ final class ProjectCredentialCreateRequested extends ProjectCredentialsEvent {
   List<Object?> get props => [scope, request];
 }
 
+/// The engine creates an Apple Distribution certificate with the App Store
+/// Connect key of the flavor [flavor] of the app at [app], and assigns the
+/// identity, called [name], to the flavor (ADR 0014).
+final class ProjectCertificateCreateRequested extends ProjectCredentialsEvent {
+  const new({required this.app, required this.flavor, required this.name});
+
+  final String app;
+  final String flavor;
+  final String name;
+
+  @override
+  List<Object?> get props => [app, flavor, name];
+}
+
 /// The flavor [flavor] of the app at [app] stops using its credential of
 /// [kind].
 final class ProjectCredentialUnassignRequested extends ProjectCredentialsEvent {
@@ -173,7 +187,7 @@ class ProjectCredentialsState extends Equatable {
 /// The credentials of the flavors of one project: which named credential
 /// each flavor uses for each kind, with what the checks found, and
 /// assigning (to one flavor or every flavor of an app), creating and
-/// assigning, and unassigning.
+/// assigning, creating a distribution certificate, and unassigning.
 class ProjectCredentialsBloc
     extends Bloc<ProjectCredentialsEvent, ProjectCredentialsState> {
   new({required this._projects, required this._credentials})
@@ -195,6 +209,19 @@ class ProjectCredentialsBloc
         final credential = await _credentials.createCredential(event.request);
         return await _assignTo(event.scope, credential.kind, credential.id);
       }),
+      transformer: droppable(),
+    );
+    on<ProjectCertificateCreateRequested>(
+      (event, emit) =>
+          _assign(emit, CredentialKind.appleDistribution, () async {
+            await _credentials.createDistributionCertificate(
+              state.projectId!,
+              app: event.app,
+              flavor: event.flavor,
+              name: event.name,
+            );
+            return const AssignCredentialResponse(assigned: []);
+          }),
       transformer: droppable(),
     );
     on<ProjectCredentialUnassignRequested>(

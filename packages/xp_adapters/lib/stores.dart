@@ -7,6 +7,7 @@ export 'src/stores/apple/asc_token_provider.dart';
 export 'src/stores/apple/es256_signer.dart';
 export 'src/stores/apple/http_app_store_connect.dart';
 export 'src/stores/apple/http_itunes_lookup.dart';
+export 'src/stores/apple/rsa_distribution_keys.dart';
 export 'src/stores/apple/sqlite_asc_credential_source.dart';
 export 'src/stores/firebase/http_firebase_app_distribution.dart';
 export 'src/stores/play/configured_play_requirements.dart';

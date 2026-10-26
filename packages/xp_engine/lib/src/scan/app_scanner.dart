@@ -1,4 +1,5 @@
 import 'package:xp_api/xp_api.dart';
+import 'package:xp_engine/src/dispatch/ios_linux_limits.dart';
 import 'package:xp_engine/src/scan/firebase_files.dart';
 import 'package:xp_engine/src/scan/gradle_parser.dart';
 import 'package:xp_engine/src/scan/ios_files.dart';
@@ -193,6 +194,22 @@ class _AppScan {
       );
     }
 
+    final packageManager = await _packageManager();
+    final extensions = [
+      for (final target in _xcode?.targets ?? const <XcodeTarget>[])
+        if (target.isAppExtension) target.name,
+    ];
+    final linuxLimits = hasIos
+        ? await _iosLinuxLimits(packageManager, pin?.version)
+        : const <String>[];
+    if (hasIos) {
+      _checkIosLinux(
+        flavors: implicit ? const [] : names,
+        extensions: extensions,
+        limits: linuxLimits,
+      );
+    }
+
     return AppProfile(
       name: name,
       path: app,
@@ -201,11 +218,9 @@ class _AppScan {
       flutterVersionSource: pin?.source,
       hasIos: hasIos,
       hasAndroid: hasAndroid,
-      iosPackageManager: await _packageManager(),
-      iosAppExtensions: [
-        for (final target in _xcode?.targets ?? const <XcodeTarget>[])
-          if (target.isAppExtension) target.name,
-      ],
+      iosPackageManager: packageManager,
+      iosAppExtensions: extensions,
+      iosLinuxLimits: linuxLimits,
       flavors: [
         for (final flavor in flavors)
           flavor.copyWith(
@@ -224,6 +239,108 @@ class _AppScan {
       plists: _plists.values.toList(),
       keystore: await _keystore(),
       shorebird: shorebird,
+    );
+  }
+
+  // ------------------------------------------------------- iOS on Linux
+
+  /// The Flutter version Linux iOS builds need at least (omarchy-apple-dev
+  /// builds with `flutter assemble` of 3.47).
+  static const _linuxMinimumFlutter = (3, 47);
+
+  /// The storyboards of Flutter's template, which Linux iOS builds compile.
+  static const _templateStoryboards = {
+    'Main.storyboard',
+    'LaunchScreen.storyboard',
+  };
+
+  /// Why Linux runners cannot build the iOS app, from the project alone
+  /// (ADR 0014): plugins that build with CocoaPods, storyboards beyond
+  /// Flutter's template, a Flutter older than 3.47.
+  Future<List<String>> _iosLinuxLimits(
+    IosPackageManager packageManager,
+    String? flutterVersion,
+  ) async {
+    final pods = await _cocoaPodsPlugins();
+    final storyboards = [
+      for (final entry in await _source.list(_at('ios/Runner/Base.lproj')))
+        if (entry.name.endsWith('.storyboard') &&
+            !_templateStoryboards.contains(entry.name))
+          entry.name,
+    ];
+    final (major, minor) = _linuxMinimumFlutter;
+    final version = RegExp(r'^(\d+)\.(\d+)').firstMatch(flutterVersion ?? '');
+    final (pinMajor, pinMinor) = version == null
+        ? (major, minor)
+        : (int.parse(version[1]!), int.parse(version[2]!));
+    final tooOld = pinMajor < major || (pinMajor == major && pinMinor < minor);
+    final reasons = <String>[];
+    if (packageManager == IosPackageManager.cocoapods) {
+      reasons.add(
+        'the app builds its iOS plugins with CocoaPods, and Linux iOS builds '
+        'need Swift Package Manager (flutter config '
+        '--enable-swift-package-manager)',
+      );
+    } else if (pods.isNotEmpty) {
+      final one = pods.length == 1;
+      reasons.add(
+        'the plugin${one ? '' : 's'} ${pods.join(', ')} '
+        '${one ? 'builds' : 'build'} with CocoaPods, without a Package.swift, '
+        'which Linux iOS builds cannot (omarchy-apple-dev: SwiftPM plugins '
+        'only)',
+      );
+    }
+    if (storyboards.isNotEmpty) {
+      reasons.add(
+        'the app has the storyboard${storyboards.length == 1 ? '' : 's'} '
+        "${storyboards.join(', ')} beyond Flutter's template, which Linux iOS "
+        'builds do not compile yet (omarchy-apple-dev: storyboards)',
+      );
+    }
+    if (tooOld) {
+      reasons.add(
+        'the app pins Flutter $flutterVersion, and Linux iOS builds need '
+        '$major.$minor or later',
+      );
+    }
+    return reasons;
+  }
+
+  /// The plugins `ios/Podfile.lock` installs with CocoaPods: those of its
+  /// `DEPENDENCIES` from `.symlinks/plugins`.
+  Future<List<String>> _cocoaPodsPlugins() async {
+    final lock = await _source.read(_at('ios/Podfile.lock'));
+    if (lock == null) return const [];
+    return [
+      for (final match in RegExp(
+        r'^  - (\S+) \(from `\.symlinks/plugins/',
+        multiLine: true,
+      ).allMatches(lock))
+        match[1]!,
+    ]..sort();
+  }
+
+  /// Says that the iOS app needs a Mac, and why, when it has [flavors],
+  /// [extensions] or other [limits].
+  void _checkIosLinux({
+    required List<String> flavors,
+    required List<String> extensions,
+    required List<String> limits,
+  }) {
+    final reasons = [
+      if (flavors.isNotEmpty) flavorsLimit(flavors),
+      if (extensions.isNotEmpty) extensionsLimit(extensions),
+      ...limits,
+    ];
+    if (reasons.isEmpty) return;
+    _add(
+      FindingSeverity.info,
+      'ios_needs_mac',
+      'Needs a Mac for iOS: Linux runners cannot build it because '
+          '${reasons.join('; ')}.',
+      'Nothing to do to build on a Mac. To build on Linux (ADR 0014), lift '
+          'each reason; until then its iOS jobs wait for a Mac (ios-sign).',
+      path: _at('ios'),
     );
   }
 

@@ -4,6 +4,7 @@ import 'package:test/test.dart';
 import 'package:xp_api/xp_api.dart';
 import 'package:xp_engine/xp_engine.dart';
 
+import '../../helpers/apple_identity_fixtures.dart';
 import '../../helpers/credential_harness.dart';
 
 CredentialMaterial _read(CredentialKind kind, [Map<String, dynamic>? over]) =>
@@ -32,6 +33,54 @@ void main() {
       expect(material.account, 'dev@example.com');
       expect(material.secretValues, ['abcd-efgh-ijkl-mnop']);
       expect(material.kind, CredentialKind.appleId);
+    });
+
+    test('reads an Apple Distribution identity, PEM or base64', () {
+      final material =
+          _read(CredentialKind.appleDistribution) as AppleDistributionMaterial;
+      final pem = _read(CredentialKind.appleDistribution, {
+        'privateKey':
+            '  -----BEGIN RSA PRIVATE KEY-----\nMIIE\n'
+            '-----END RSA PRIVATE KEY-----',
+        'certificate':
+            '-----BEGIN CERTIFICATE-----\n$testDistributionCertificate\n'
+            '-----END CERTIFICATE-----',
+      }) as AppleDistributionMaterial;
+
+      expect(material.kind, CredentialKind.appleDistribution);
+      expect(material.account, 'Apple Distribution: XPath Test (TEAM123456)');
+      expect(material.certificate.serialNumber, 'A1B2C3D4E5F');
+      expect(material.privateKey, testSigningKey);
+      expect(material.secretValues, contains(testSigningKey.trim()));
+      expect(pem.certificate, material.certificate);
+      expect(
+        pem.privateKey,
+        '-----BEGIN RSA PRIVATE KEY-----\nMIIE\n'
+        '-----END RSA PRIVATE KEY-----\n',
+      );
+    });
+
+    test('refuses an encrypted key or a certificate that is not one', () {
+      for (final (fields, message) in [
+        (
+          {
+            'privateKey':
+                '-----BEGIN ENCRYPTED PRIVATE KEY-----\nMIIE\n'
+                '-----END ENCRYPTED PRIVATE KEY-----',
+          },
+          'The private key is not an unencrypted PEM key.',
+        ),
+        ({'certificate': 'bm90IGEgY2VydGlmaWNhdGU='}, 'not X.509'),
+      ]) {
+        expect(
+          () => _read(CredentialKind.appleDistribution, fields),
+          throwsA(
+            isA<CredentialRejectedException>()
+                .having((e) => e.message, 'message', contains(message))
+                .having((e) => e.fix, 'fix', contains('openssl pkcs12')),
+          ),
+        );
+      }
     });
 
     test('reads a service account for Play and for Firebase', () {
@@ -192,6 +241,30 @@ void main() {
       expect(loaded.alias, 'upload');
     });
 
+    test('an identity is its key, with the certificate beside it', () async {
+      final loaded =
+          (await roundTrip(CredentialKind.appleDistribution))!
+              as AppleDistributionMaterial;
+
+      expect(secrets.text('credential.crd_1'), testSigningKey);
+      expect(
+        secrets.values['credential.crd_1.certificate'],
+        base64.decode(testDistributionCertificate),
+      );
+      expect(loaded.certificate.serialNumber, 'A1B2C3D4E5F');
+
+      secrets.values.remove('credential.crd_1.certificate');
+      expect(
+        await CredentialMaterial.load(
+          CredentialKind.appleDistribution,
+          'credential.crd_1',
+          null,
+          secrets,
+        ),
+        isNull,
+      );
+    });
+
     test('tokens and webhooks are stored as they are', () async {
       expect(await roundTrip(CredentialKind.shorebird), isA<TokenMaterial>());
       expect(secrets.text('credential.crd_1'), 'sb_api_abc123');
@@ -255,9 +328,15 @@ void main() {
     test('erase removes the secret and the extras of a keystore', () async {
       await _read(CredentialKind.keystore).write(secrets, 'ks');
       await _read(CredentialKind.github).write(secrets, 'gh');
+      await _read(CredentialKind.appleDistribution).write(secrets, 'id');
 
       await CredentialMaterial.erase(CredentialKind.keystore, 'ks', secrets);
       await CredentialMaterial.erase(CredentialKind.github, 'gh', secrets);
+      await CredentialMaterial.erase(
+        CredentialKind.appleDistribution,
+        'id',
+        secrets,
+      );
 
       expect(secrets.values, isEmpty);
     });

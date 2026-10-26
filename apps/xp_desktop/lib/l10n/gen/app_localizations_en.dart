@@ -699,6 +699,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get kindAppleId => 'Apple ID';
 
   @override
+  String get kindAppleDistribution => 'Apple Distribution identity';
+
+  @override
   String get kindPlaySa => 'Google Play service account';
 
   @override
@@ -758,6 +761,24 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get fieldPrivateKey => 'Private key (.p8)';
+
+  @override
+  String get flavorCredentialsCreateCertificate => 'Create certificate';
+
+  @override
+  String get flavorCredentialsCreateCertificateTooltip =>
+      'The engine creates a new Apple Distribution certificate with this flavor\'s App Store Connect key and assigns it. Apple allows a team three.';
+
+  @override
+  String flavorCredentialsCertificateName(String project, String flavor) {
+    return 'Apple Distribution · $project $flavor';
+  }
+
+  @override
+  String get fieldSigningKey => 'Private key (PEM)';
+
+  @override
+  String get fieldCertificate => 'Certificate (.cer)';
 
   @override
   String get fieldAppleId => 'Apple ID';
@@ -1485,6 +1506,11 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String dispatchOnRunner(String engine, String runner) {
     return '$engine first, else $runner';
+  }
+
+  @override
+  String dispatchNeedsMac(String where, String reasons) {
+    return '$where · needs a Mac for iOS: $reasons';
   }
 
   @override

@@ -284,7 +284,7 @@ void main() {
       await tester.tap(find.byKey(const Key('ledger.credentials...dev')));
       await tester.pumpAndSettle();
       expect(find.text('Credentials of dev'), findsOneWidget);
-      expect(find.text('Not assigned'), findsNWidgets(7));
+      expect(find.text('Not assigned'), findsNWidgets(8));
     });
 
     testWidgets('says what it cannot show', (tester) async {

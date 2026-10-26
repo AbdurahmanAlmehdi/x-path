@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:async/async.dart';
 import 'package:test/test.dart';
+import 'package:xp_adapters/xp_adapters.dart';
 import 'package:xp_api/xp_api.dart';
 import 'package:xp_engine/xp_engine.dart';
 import 'package:xpd/xpd.dart';
@@ -122,6 +123,7 @@ class TestEngine {
     required this.credentialRepository,
     required this.credentialSecrets,
     required this.credentialVerifiers,
+    required this.appStoreConnect,
     required this.masker,
     required this.scheduler,
     required this.runRepository,
@@ -341,6 +343,16 @@ class TestEngine {
     final runnerBundles = InMemoryRunnerBundles();
     final githubCli = FakeGitHubCliToken();
     final issued = await tokens.issue(name: 'test', kind: DeviceTokenKind.app);
+    final credentialService = CredentialService(
+      repository: credentialRepository,
+      projects: projects,
+      secrets: credentialSecrets,
+      verifiers: credentialVerifiers.values,
+      masker: masker,
+      events: events,
+      clock: clock,
+    );
+    final appStoreConnect = FakeAppStoreConnect();
     final server = await XpdServer.start(
       tokens: tokens,
       events: events,
@@ -377,14 +389,13 @@ class TestEngine {
         jobs: jobRepository,
         projects: projects,
       ),
-      credentials: CredentialService(
+      credentials: credentialService,
+      certificates: DistributionCertificates(
+        credentials: credentialService,
         repository: credentialRepository,
-        projects: projects,
         secrets: credentialSecrets,
-        verifiers: credentialVerifiers.values,
-        masker: masker,
-        events: events,
-        clock: clock,
+        connect: (_) => appStoreConnect,
+        keys: const RsaDistributionKeys(bits: 512),
       ),
       githubToken: GitHubTokenService(
         secrets: credentialSecrets,
@@ -441,6 +452,7 @@ class TestEngine {
       credentialRepository: credentialRepository,
       credentialSecrets: credentialSecrets,
       credentialVerifiers: credentialVerifiers,
+      appStoreConnect: appStoreConnect,
       masker: masker,
       scheduler: scheduler,
       runRepository: runRepository,
@@ -484,6 +496,10 @@ class TestEngine {
 
   /// The check of each kind of credential; they accept everything by default.
   final Map<CredentialKind, FakeCredentialVerifier> credentialVerifiers;
+
+  /// The App Store Connect the engine creates distribution certificates
+  /// with.
+  final FakeAppStoreConnect appStoreConnect;
 
   /// What the engine was told to hide in logs.
   final RecordingMasker masker;
