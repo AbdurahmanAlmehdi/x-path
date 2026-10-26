@@ -80,7 +80,7 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
 YAML
-git init -q --bare "$origin"
+git init -q --bare -b main "$origin"
 (
   cd "$app"
   git init -q -b main
