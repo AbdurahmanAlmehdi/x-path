@@ -142,10 +142,12 @@ workflow cannot name. A job needs what it declares plus what its steps imply: `a
 runner with omarchy-apple-dev, ADR 0014) for `build.ios`; `ios-sign` for `upload.appStore` with an
 Apple ID only; the platform's for Shorebird steps; `flutter` for `test` and `analyze`. The planner
 sends an iOS build to a Mac (narrows it to `ios-sign`, with the reasons in the dry run and the queue
-message) when Linux cannot build it: a flavor, an entry point other than `lib/main.dart`, Shorebird
-iOS, a debug or profile build, an app extension, the iOS Simulator, `ios.stripAndReexport`, a flavor
-without an Apple Distribution identity and an ASC key, or what the scan found (CocoaPods plugins,
-storyboards beyond the template, Flutter older than 3.47). A Linux workflow has no iOS Simulator:
+message) when Linux cannot build it: Linux iOS turned off for the app (`xp projects set <p>
+--no-ios-linux`), Shorebird iOS, a debug or profile build, an app extension, the iOS Simulator,
+`ios.stripAndReexport`, a flavor without an Apple Distribution identity and an ASC key, or what the
+scan found (CocoaPods plugins, a Run Script phase beyond Flutter's own, Flutter older than 3.47, and
+per flavor a multi-size icon set, an Info.plist other than `Runner/Info.plist` or an icon set outside
+`Runner/Assets.xcassets`). Flavors and entry points build on Linux. A Linux workflow has no iOS Simulator:
 device tests and screenshots run on an Android emulator; a `command` step calling `xcrun simctl`
 needs a Mac.
 

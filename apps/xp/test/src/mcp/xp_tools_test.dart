@@ -243,6 +243,7 @@ void main() {
           'apps': [
             {
               'path': '.',
+              'iosLinux': false,
               'flavors': [
                 {'name': 'prod', 'prod': true},
               ],
@@ -257,6 +258,7 @@ void main() {
                   .single
               as ProfileEdits;
       expect(edits.defaultBaseBranch, 'develop');
+      expect(edits.apps.single.iosLinux, isFalse);
       expect(edits.apps.single.flavors.single.name, 'prod');
     });
 

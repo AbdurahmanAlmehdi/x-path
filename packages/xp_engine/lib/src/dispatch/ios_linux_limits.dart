@@ -3,27 +3,22 @@ import 'package:xp_engine/src/steps/step.dart';
 
 /// Why omarchy-apple-dev cannot build the iOS app of a job on Linux (ADR
 /// 0014), from the planned [steps] of the job and its [app] (what the scan
-/// found, `AppProfile.iosLinuxLimits`, and its extensions): one reason for
+/// found, `AppProfile.iosLinuxLimits`, the `FlavorProfile.iosLinuxLimits` of
+/// the flavor a step builds, and its extensions): one reason for
 /// each thing the job uses that Linux iOS builds lack, with the work that
-/// would lift it. Empty when nothing rules Linux out.
+/// would lift it, led by [iosLinuxOff] when the owner turned Linux iOS
+/// builds off for the app (`AppProfile.iosLinux`). Empty when nothing rules
+/// Linux out.
 ///
 /// The dispatcher narrows a job with reasons to `ios-sign` (a Mac), at plan
 /// time, so that no job fails on Linux part-way through. Each case is
 /// removed once omarchy-apple-dev can build it and XPath pins that commit.
 List<String> iosLinuxLimits(List<StepPlan> steps, AppProfile app) {
-  final reasons = <String>{};
+  final reasons = <String>{if (!app.iosLinux) iosLinuxOff};
   for (final StepPlan(:kind, :input) in steps) {
     switch (kind) {
       case 'build.ios' || 'ios.stripAndReexport':
-        if (input['flavor'] case final String flavor) {
-          reasons.add(flavorsLimit([flavor]));
-        }
-        if (input['target'] case final String target) {
-          reasons.add(
-            'the flavor builds $target, and Linux iOS builds build '
-            'lib/main.dart only (omarchy-apple-dev: entry points)',
-          );
-        }
+        reasons.addAll(_flavorOf(app, input['flavor'])?.iosLinuxLimits ?? []);
         if (kind == 'ios.stripAndReexport') {
           reasons.add(
             'the job strips frameworks after the build, which XPath does not '
@@ -54,12 +49,14 @@ List<String> iosLinuxLimits(List<StepPlan> steps, AppProfile app) {
   return reasons.toList();
 }
 
-/// Why Linux iOS builds cannot build an app with the Flutter [flavors]: one
-/// a job builds, or all a scan found.
-String flavorsLimit(List<String> flavors) =>
-    'the app uses the flavor${flavors.length == 1 ? '' : 's'} '
-    '${flavors.join(', ')}, which Linux iOS builds do not support yet '
-    '(omarchy-apple-dev: flavors)';
+/// The flavor of [app] named [name], or its implicit flavor when a step
+/// names none.
+FlavorProfile? _flavorOf(AppProfile app, Object? name) => app.flavors
+    .where((flavor) => name == null ? flavor.implicit : flavor.name == name)
+    .firstOrNull;
+
+/// Why an app whose owner turned Linux iOS builds off builds on a Mac.
+const iosLinuxOff = 'Linux iOS builds are turned off for this app';
 
 /// Why Linux iOS builds cannot build an app with the app [extensions].
 String extensionsLimit(List<String> extensions) =>

@@ -513,6 +513,48 @@ void main() {
       },
     );
 
+    test('turns Linux iOS builds of an app off, and on again', () async {
+      await env.runOk(['projects', 'set', 'prj_1', '--no-ios-linux']);
+
+      expect(sent().apps.single, const AppEdit(path: '.', iosLinux: false));
+
+      await env.runOk(['projects', 'set', 'prj_1', '--ios-linux']);
+
+      expect(
+        verify(() => env.client.updateProject('prj_1', captureAny())).captured
+            .cast<ProfileEdits>()
+            .single
+            .apps
+            .single
+            .iosLinux,
+        isTrue,
+      );
+    });
+
+    test('says when Linux iOS builds of an app are off', () async {
+      when(() => env.client.updateProject('prj_1', any())).thenAnswer(
+        (_) async => const Project(
+          id: 'prj_1',
+          githubRepoId: 7,
+          host: 'github.com',
+          sourceKey: '7',
+          fullName: 'acme/app',
+          remote: 'r',
+          defaultBaseBranch: 'main',
+          profile: ProjectProfile(
+            apps: [AppProfile(name: 'app', path: '.', iosLinux: false)],
+          ),
+        ),
+      );
+
+      await env.runOk(['projects', 'set', 'prj_1', '--no-ios-linux']);
+
+      expect(
+        env.logger.out,
+        contains('app app (.), flutter, Linux iOS builds off'),
+      );
+    });
+
     test('asks for --app when the project has more than one', () async {
       when(() => env.client.getProject('prj_1')).thenAnswer(
         (_) async => const Project(

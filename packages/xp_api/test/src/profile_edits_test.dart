@@ -10,6 +10,7 @@ void main() {
         AppEdit(
           path: '.',
           storeCountry: 'ly',
+          iosLinux: false,
           flavors: [
             FlavorEdit(
               name: 'prod',
@@ -57,6 +58,7 @@ void main() {
       expect(merged.apps.map((a) => a.path), ['.', 'apps/b']);
       final root = merged.apps.first;
       expect(root.storeCountry, 'ly');
+      expect(root.iosLinux, isFalse);
       final prod = root.flavors.firstWhere((f) => f.name == 'prod');
       expect(prod.prod, isFalse);
       expect(prod.entrypoint, 'lib/main_prod.dart');
@@ -93,16 +95,33 @@ void main() {
       );
     });
 
-    test('merge takes a newer base branch and store country', () {
+    test('merge takes a newer base branch, store country and Linux iOS '
+        'builds', () {
       final merged = edits.merge(
         const ProfileEdits(
           defaultBaseBranch: 'main',
-          apps: [AppEdit(path: '.', storeCountry: 'us')],
+          apps: [AppEdit(path: '.', storeCountry: 'us', iosLinux: true)],
         ),
       );
 
       expect(merged.defaultBaseBranch, 'main');
       expect(merged.apps.single.storeCountry, 'us');
+      expect(merged.apps.single.iosLinux, isTrue);
+    });
+
+    test('reads edits stored before Linux iOS builds could be turned off', () {
+      final read = ProfileEdits.fromJson(const {
+        'apps': [
+          {'path': '.', 'storeCountry': 'ly'},
+        ],
+      });
+
+      expect(read.apps.single.iosLinux, isNull);
+      expect(read.apps.single.toJson(), {
+        'path': '.',
+        'storeCountry': 'ly',
+        'flavors': <Object?>[],
+      });
     });
   });
 

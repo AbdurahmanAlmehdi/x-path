@@ -74,7 +74,7 @@ only `Base.lproj` storyboards.
 Done on the fork with the project's own tests (Python `unittest` fixtures; extracted-block bash
 tests with stub tools in `tests/run.sh`). Not built by `/build` in this repository.
 
-- [ ] **U1. Build the chosen configuration.** Read the Runner target's `XCBuildConfiguration`
+- [x] **U1. Build the chosen configuration.** Read the Runner target's `XCBuildConfiguration`
       by name (target over project, with its `baseConfigurationReference` xcconfig and
       includes) by reusing `tools/xcodeproj2xtool.py`'s parser, whose `config_settings`
       hardcodes `"Release"` (`:348`). `FLAVOR` selects the configuration with Flutter's own
@@ -86,22 +86,27 @@ tests with stub tools in `tests/run.sh`). Not built by `/build` in this reposito
       the configuration's `FLUTTER_TARGET`, else `lib/main.dart`, becomes `-dTargetFile`.
       Likely two or three upstream PRs (settings, Info.plist, flavor and target). The
       CHANGELOG notes the change for projects whose first match was not Release.
-- [ ] **U2. Icon set and storyboards per configuration.** `actool --app-icon` from the
+- [x] **U2. Icon set and storyboards per configuration.** `actool --app-icon` from the
       configuration's expanded `ASSETCATALOG_COMPILER_APPICON_NAME` (flavorizr writes
       `AppIcon-$(ASSET_PREFIX)`). Compile the storyboards the Runner target's
       `PBXResourcesBuildPhase` lists instead of globbing `Base.lproj`, and fail when the
       resolved `UILaunchStoryboardName` is not among them.
-- [ ] **U3. Entitlements per configuration.** `ship.sh` uses the configuration's
+- [x] **U3. Entitlements per configuration.** `ship.sh` uses the configuration's
       `CODE_SIGN_ENTITLEMENTS` when `ASC_ENTITLEMENTS_PATH` is not set.
-- [ ] **U4. Signing with a given identity and profile.** The `ASC_PROFILE` mode PR 6 pins on
+- [x] **U4. Signing with a given identity and profile.** The `ASC_PROFILE` mode PR 6 pins on
       the fork (`probe/runner_probe.dart:70-74` on #20), sent upstream like the rest.
 - [ ] **U5. ibtool forms B and C use, only if they need them.** Check B's and C's launch
       screens against the Linux `ibtool` first. Candidates: flavorizr's opaque
       `genericGamma22GrayColorSpace` white (`tools/ibtool:345-360`) and flutter_native_splash's
       per-flavor background/branding storyboard. Each needs a golden made by Apple's ibtool on
       the owner's Mac (`tests/ibtool/compile-golden.sh`).
-- [ ] **Pin.** A fork branch with these items and #82 on upstream main, pinned by full SHA
-      with a tag, so a force-push or a deleted branch cannot lose it.
+- [x] **Pin.** A fork branch with these items and #82 on upstream main, pinned by full SHA
+      with a tag, so a force-push or a deleted branch cannot lose it. Done:
+      `2d03f766859e6e4549b949b4afbb8e66d851b18d` on `xpath/pin-flavors` of
+      `AbdurahmanAlmehdi/omarchy-apple-dev`, tag `xpath-pin-flavors-1`: upstream main `ceda63a`
+      with U4, U1 (in two parts), U2 and U3; U5 skipped. The upstream PRs are
+      joshuaswarren/omarchy-apple-dev #85-#89, still open; once they merge, the pin moves to an
+      upstream commit and `RunnerProbe.iosLinuxRepository` back to upstream.
 
 ### Shorebird iOS
 
@@ -151,7 +156,7 @@ support, and C and D keep a Mac for it.
 
 ### Phase 1: Per-app opt-out
 
-- **Status:** Not started
+- **Status:** Done
 - **Scope:** `AppEdit.iosLinux` (bool, default on) in `ProfileEdits`, applied to
   `AppProfile.iosLinux`; when off, `iosLinuxLimits` narrows every iOS job of the app with
   "Linux iOS builds are turned off for this app". Edits are stored as JSON in the project's
@@ -171,7 +176,7 @@ support, and C and D keep a Mac for it.
 
 ### Phase 2: Per-flavor limits in the scan
 
-- **Status:** Not started
+- **Status:** Done
 - **Scope:** The scan finds the two narrowing cases (non-Flutter Run Script phases, app-wide;
   a multi-size icon set, per flavor) and the warnings (no or several configurations for a
   flavor, a missing icon set), as `ios_needs_mac` findings with `Finding.flavor`, and
@@ -191,31 +196,45 @@ support, and C and D keep a Mac for it.
 
 ### Phase 3: Flavor and target reach the Linux backend
 
-- **Status:** Not started
-- **Scope:** The Linux `build.ios` passes `FLAVOR` and `TARGET` to `flutter/build.sh` and
-  `FLAVOR` to `flutter/ship.sh`, and stops passing `ios/Runner/Runner.entitlements` (U3). The
-  pin moves to the fork commit with U1-U4. The flavor and entry-point narrowing cases, the
-  scan's `flavorsLimit` and its blanket non-template storyboard limit are removed: an
-  unsupported storyboard now fails the build with ibtool's error, and the opt-out is the escape
-  hatch. The wait reason for runners at an old pin names the fix.
+- **Status:** Done
+- **Scope:** The Linux `build.ios` passes `FLAVOR` and `TARGET` to `flutter/build.sh` (the pin's
+  `ship.sh` reads the configuration `build.sh` recorded, so it gets no `FLAVOR`), and stops
+  passing `ios/Runner/Runner.entitlements` (U3). The pin moves to the fork commit with U1-U4
+  (`2d03f76`, see Pin above; it moves upstream once #85-#89 merge). The flavor and entry-point
+  narrowing cases, the scan's `flavorsLimit` and its blanket non-template storyboard limit are
+  removed: an unsupported storyboard now fails the build with ibtool's error, and the opt-out
+  is the escape hatch. Two per-flavor limits are added, since the pin's `build.sh` stops on
+  them where a Mac builds: a configuration whose `INFOPLIST_FILE` is not `Runner/Info.plist`,
+  and an icon set outside `ios/Runner/Assets.xcassets`. The wait reason names the connected
+  runners whose probe lacks a needed capability, with the fix (for an old pin, the checkout
+  command), in the queue message and the dry run.
 - **Files touched:** `packages/xp_engine/lib/src/steps/build/build_ios.dart`,
   `packages/xp_engine/lib/src/dispatch/ios_linux_limits.dart`,
   `packages/xp_engine/lib/src/scan/app_scanner.dart`, `packages/xp_engine/lib/src/probe/runner_probe.dart`,
-  `packages/xp_engine/lib/src/scheduler/scheduler.dart`, `tool/e2e/runner_ios_linux_e2e.sh` and
-  `tool/e2e/build_app` (a flavored stub app), tests
+  `packages/xp_engine/lib/src/scheduler/scheduler.dart` (with `paired_runners.dart` and
+  `runners/runner_hub.dart`, which carry each runner's missing capabilities),
+  `tool/e2e/runner_ios_linux_e2e.sh` and `apps/xpd/tool/release_e2e.dart` (the e2e makes its
+  iOS-only copy of `tool/e2e/build_app` a flavored stub app; the committed fixture keeps one
+  Xcode configuration, which the prod e2e relies on), scan goldens, tests
 - **Acceptance criteria:** a flavored job with no limits plans onto `ios-linux` with `FLAVOR`
   and `TARGET` in the stubbed scripts' environment; two flavors of one app on one runner
   (slots 2) build in separate directories; a job waiting only on old-pin runners says which
   runners and the checkout command.
 - **Validation:** `melos run test:coverage && tool/e2e/runner_ios_linux_e2e.sh`
+  (`runner_ios_linux_e2e.sh` is Linux only and not in CI yet: not run for this phase.)
 
 ### Phase 4: Docs and receipts
 
-- **Status:** Not started
+- **Status:** In progress
 - **Scope:** Docs say what flavors on Linux support and what still needs a Mac; ADR 0014's
   amendment records that a Shorebird fork is not viable; the parent plan's upstream items are
   ticked; one TestFlight build per flavor of B and C (C as plain builds; its releases use
   Shorebird), recorded in the PR description.
+  - [x] `docs/guide/runners.md`: flavors and entry points on Linux, what still needs a Mac, the
+        per-app opt-out, and the per-flavor check after a TestFlight install.
+  - [x] ADR 0014's amendment: a Shorebird fork is not viable; Shorebird iOS stays on `ios-sign`.
+  - [x] The parent plan's upstream items done on the fork pin are ticked.
+  - [ ] TestFlight receipts for each flavor of B and C (needs the owner's apps; done later).
 - **Files touched:** `docs/guide/runners.md`, `docs/adr/0014-ios-builds-on-linux.md`,
   `docs/plan/2026-10-22-feat-ios-builds-on-linux-plan.md`, this plan
 - **Acceptance criteria:** each flavor of B and C installs from TestFlight built on Linux with

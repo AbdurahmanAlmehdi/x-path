@@ -1,0 +1,5 @@
+#include? "Pods/Target Support Files/Pods-Runner/Pods-Runner.release-staging.xcconfig"
+#include "Generated.xcconfig"
+#include "stagingShared.xcconfig"
+FLUTTER_TARGET=lib/main_staging.dart
+BUNDLE_DISPLAY_NAME=Shop Staging // shown under the icon

@@ -1,0 +1,115 @@
+{
+  "profile": {
+    "layout": "single",
+    "apps": [
+      {
+        "name": "flavorizr_shop",
+        "path": ".",
+        "framework": "flutter",
+        "version": "2.4.0+31",
+        "storeCountry": "us",
+        "flutterVersion": "3.47.4",
+        "flutterVersionSource": ".fvmrc",
+        "hasIos": true,
+        "hasAndroid": false,
+        "iosPackageManager": "spm",
+        "iosAppExtensions": [],
+        "iosLinuxLimits": [],
+        "flavors": [
+          {
+            "name": "dev",
+            "implicit": false,
+            "entrypoint": "lib/main_dev.dart",
+            "iosBundleId": "com.example.shop.dev",
+            "iosTeam": "FAKETEAM07",
+            "iosScheme": "dev",
+            "infoPlist": "ios/Runner/Info.plist",
+            "shorebird": false,
+            "prod": false,
+            "versionFiles": [
+              "pubspec.yaml"
+            ],
+            "sources": [
+              "flavorizr",
+              "xcscheme",
+              "entrypoint"
+            ]
+          },
+          {
+            "name": "staging",
+            "implicit": false,
+            "entrypoint": "lib/main_staging.dart",
+            "iosBundleId": "com.example.shop.staging",
+            "iosTeam": "FAKETEAM07",
+            "iosScheme": "staging",
+            "infoPlist": "ios/Runner/Info.plist",
+            "shorebird": false,
+            "prod": false,
+            "versionFiles": [
+              "pubspec.yaml"
+            ],
+            "sources": [
+              "flavorizr",
+              "xcscheme",
+              "entrypoint"
+            ],
+            "iosLinuxLimits": [
+              "its configuration Release-staging uses the app icon set AppIcon-staging, which has several sizes, and App Store processing of a Linux build can get stuck on one without an error (omarchy-apple-dev: single-size app icons; a single 1024x1024 icon lifts it)"
+            ]
+          },
+          {
+            "name": "prod",
+            "implicit": false,
+            "entrypoint": "lib/main_prod.dart",
+            "iosBundleId": "com.example.shop",
+            "iosTeam": "FAKETEAM07",
+            "iosScheme": "prod",
+            "infoPlist": "ios/Runner/Info.plist",
+            "shorebird": false,
+            "prod": true,
+            "versionFiles": [
+              "pubspec.yaml"
+            ],
+            "sources": [
+              "flavorizr",
+              "xcscheme",
+              "entrypoint"
+            ]
+          }
+        ],
+        "plists": [
+          {
+            "path": "ios/Runner/Info.plist",
+            "shortVersion": "$(FLUTTER_BUILD_NAME)",
+            "buildNumber": "$(FLUTTER_BUILD_NUMBER)",
+            "literal": false
+          }
+        ]
+      }
+    ],
+    "branches": {
+      "releaseBranches": []
+    },
+    "workflows": []
+  },
+  "findings": [
+    {
+      "severity": "warning",
+      "code": "ios_app_icon_missing",
+      "message": "The configuration Release-prod of flavor prod uses the app icon set AppIcon-prod, which no asset catalog of the Runner target has.",
+      "fix": "Add AppIcon-prod.appiconset to ios/Runner/Assets.xcassets, or set ASSETCATALOG_COMPILER_APPICON_NAME of Release-prod to an icon set it has.",
+      "path": "ios/Runner/Assets.xcassets",
+      "app": ".",
+      "flavor": "prod"
+    },
+    {
+      "severity": "info",
+      "code": "ios_needs_mac",
+      "message": "Flavor staging needs a Mac for iOS: Linux runners cannot build it because its configuration Release-staging uses the app icon set AppIcon-staging, which has several sizes, and App Store processing of a Linux build can get stuck on one without an error (omarchy-apple-dev: single-size app icons; a single 1024x1024 icon lifts it).",
+      "fix": "Nothing to do to build on a Mac. To build on Linux (ADR 0014), lift each reason; until then its iOS jobs wait for a Mac (ios-sign).",
+      "path": "ios",
+      "app": ".",
+      "flavor": "staging"
+    }
+  ]
+}

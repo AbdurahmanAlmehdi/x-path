@@ -203,6 +203,7 @@ class FlavorProfile extends Equatable {
     this.sources = const [],
     this.firebaseAppId,
     this.appleAppId,
+    this.iosLinuxLimits = const [],
   });
 
   /// Reads a flavor from its JSON form.
@@ -266,6 +267,13 @@ class FlavorProfile extends Equatable {
   /// input gives one.
   final String? appleAppId;
 
+  /// Why Linux runners cannot build the iOS app of this flavor, from its
+  /// own Xcode configuration (ADR 0014): a multi-size app icon set. Added to
+  /// the app's [AppProfile.iosLinuxLimits] for its jobs. Written to JSON
+  /// only when not empty, so a profile from before it reads the same.
+  @JsonKey(toJson: _nonEmpty)
+  final List<String> iosLinuxLimits;
+
   /// A copy with the editable fields replaced where given. A function sets
   /// a field that may become `null`.
   FlavorProfile copyWith({
@@ -293,6 +301,7 @@ class FlavorProfile extends Equatable {
     sources: sources,
     firebaseAppId: firebaseAppId == null ? this.firebaseAppId : firebaseAppId(),
     appleAppId: appleAppId == null ? this.appleAppId : appleAppId(),
+    iosLinuxLimits: iosLinuxLimits,
   );
 
   /// The JSON form.
@@ -315,6 +324,7 @@ class FlavorProfile extends Equatable {
     sources,
     firebaseAppId,
     appleAppId,
+    iosLinuxLimits,
   ];
 }
 
@@ -335,6 +345,7 @@ class AppProfile extends Equatable {
     this.iosPackageManager = IosPackageManager.none,
     this.iosAppExtensions = const [],
     this.iosLinuxLimits = const [],
+    this.iosLinux = true,
     this.flavors = const [],
     this.plists = const [],
     this.keystore,
@@ -383,10 +394,18 @@ class AppProfile extends Equatable {
 
   /// Why Linux runners cannot build the iOS app, from the project alone
   /// (ADR 0014): plugins that build with CocoaPods, storyboards beyond
-  /// Flutter's template, a Flutter older than Linux iOS builds need. Its
-  /// flavors and [iosAppExtensions] are reasons too, which the planner reads
-  /// from the job. Empty when the project does not rule Linux out.
+  /// Flutter's template, Run Script phases beyond Flutter's own, a Flutter
+  /// older than Linux iOS builds need. Its flavors, their own
+  /// [FlavorProfile.iosLinuxLimits] and [iosAppExtensions] are reasons too,
+  /// which the planner reads from the job. Empty when the project does not
+  /// rule Linux out.
   final List<String> iosLinuxLimits;
+
+  /// Whether Linux runners may build the iOS app (ADR 0014). The owner turns
+  /// it off to send every iOS job of the app to a Mac. Written to JSON only
+  /// when off, so a profile from before it reads the same.
+  @JsonKey(toJson: _offOnly)
+  final bool iosLinux;
 
   /// The build variants.
   final List<FlavorProfile> flavors;
@@ -402,25 +421,29 @@ class AppProfile extends Equatable {
   final ShorebirdProfile? shorebird;
 
   /// A copy with the editable fields replaced where given.
-  AppProfile copyWith({String? storeCountry, List<FlavorProfile>? flavors}) =>
-      AppProfile(
-        name: name,
-        path: path,
-        framework: framework,
-        version: version,
-        storeCountry: storeCountry ?? this.storeCountry,
-        flutterVersion: flutterVersion,
-        flutterVersionSource: flutterVersionSource,
-        hasIos: hasIos,
-        hasAndroid: hasAndroid,
-        iosPackageManager: iosPackageManager,
-        iosAppExtensions: iosAppExtensions,
-        iosLinuxLimits: iosLinuxLimits,
-        flavors: flavors ?? this.flavors,
-        plists: plists,
-        keystore: keystore,
-        shorebird: shorebird,
-      );
+  AppProfile copyWith({
+    String? storeCountry,
+    bool? iosLinux,
+    List<FlavorProfile>? flavors,
+  }) => AppProfile(
+    name: name,
+    path: path,
+    framework: framework,
+    version: version,
+    storeCountry: storeCountry ?? this.storeCountry,
+    flutterVersion: flutterVersion,
+    flutterVersionSource: flutterVersionSource,
+    hasIos: hasIos,
+    hasAndroid: hasAndroid,
+    iosPackageManager: iosPackageManager,
+    iosAppExtensions: iosAppExtensions,
+    iosLinuxLimits: iosLinuxLimits,
+    iosLinux: iosLinux ?? this.iosLinux,
+    flavors: flavors ?? this.flavors,
+    plists: plists,
+    keystore: keystore,
+    shorebird: shorebird,
+  );
 
   /// The JSON form.
   Map<String, dynamic> toJson() => _$AppProfileToJson(this);
@@ -439,12 +462,19 @@ class AppProfile extends Equatable {
     iosPackageManager,
     iosAppExtensions,
     iosLinuxLimits,
+    iosLinux,
     flavors,
     plists,
     keystore,
     shorebird,
   ];
 }
+
+/// `false`, or `null` to leave the default out of the JSON.
+bool? _offOnly(bool on) => on ? null : false;
+
+/// [list], or `null` to leave an empty one out of the JSON.
+List<String>? _nonEmpty(List<String> list) => list.isEmpty ? null : list;
 
 /// What a scan learned about a repository: its apps, flavors, identifiers
 /// and branches.

@@ -90,7 +90,7 @@ on hardware that is not Apple's is likely outside Apple's SDK agreement: that qu
 not XPath's. omarchy-apple-dev is tested on Arch Linux (Omarchy), x86_64 and arm64.
 
 1. Check out omarchy-apple-dev at the commit this XPath pins. `xp runner doctor` prints it; until
-   upstream merges the fixes XPath needs, it is the `xpath/pin` branch of a fork:
+   upstream merges the fixes XPath needs, it is the `xpath/pin-flavors` branch of a fork:
 
    ```sh
    git clone https://github.com/AbdurahmanAlmehdi/omarchy-apple-dev ~/omarchy-apple-dev
@@ -113,6 +113,11 @@ not XPath's. omarchy-apple-dev is tested on Arch Linux (Omarchy), x86_64 and arm
    version prepares (`flutter/setup.sh`, a few minutes). Installs no job used for 30 days are
    deleted.
 
+When a new XPath moves the pin, a runner still at the old commit loses `ios-linux` until you check
+out the new one. An iOS job that no connected runner can take then waits, and its queue message and
+the dry run name the runners at another commit, each with the `git -C <dir> checkout <commit>` that
+fixes it.
+
 **Signing without a Mac.** The flavor needs an App Store Connect API key (`asc_key`) and an Apple
 Distribution identity. The engine creates the identity with the key:
 
@@ -130,12 +135,53 @@ them, so you can revoke one in App Store Connect. You can also import an identit
 for each build with the API key; the runner gets the identity and the profile for the job only, in
 its tmpfs secret folder, and never the API key. Runners never create certificates.
 
-**What still needs a Mac.** The scan says "Needs a Mac for iOS" with the reasons, the dry run shows
-them, and such a job waits for a Mac: Flutter flavors, an entry point other than `lib/main.dart`,
-Shorebird iOS, debug and profile builds, app extensions, plugins that build with CocoaPods (enable
-Swift Package Manager), storyboards beyond Flutter's template, Flutter older than 3.47, and the
-`ios.stripAndReexport` step. There is no iOS Simulator on Linux: iOS device tests and screenshots
-are not offered there; run them on an Android emulator, or on a Mac.
+**Flavors and entry points.** A Linux runner builds a flavored app (`--flavor`) and an entry point
+other than `lib/main.dart` (`--target`). It picks the flavor's Release configuration the way
+`flutter build ios --flavor` does, and takes from it the bundle id, display name, xcconfig settings,
+app icon set, the launch screen and other storyboards the Runner target's Copy Bundle Resources
+phase lists, and the entitlements file (`CODE_SIGN_ENTITLEMENTS`). Without `--target`, the
+configuration's `FLUTTER_TARGET` is the entry point, else `lib/main.dart`. Each flavor is checked on
+its own, so in a matrix over flavors some may build on Linux and others wait for a Mac. What fails on
+a Mac fails on Linux too, and the scan warns about it: no configuration matching a flavor, or
+several, and an icon set no asset catalog has. A storyboard the Linux `ibtool` cannot compile
+fails the build with its error; turn Linux iOS off for the app (below) until it is fixed.
+
+**What still needs a Mac.** The scan says "Needs a Mac for iOS" with the reasons, per flavor where
+they differ, the dry run shows them, and such a job waits for a Mac:
+
+- Shorebird iOS (`shorebird release ios`, `shorebird patch ios`).
+- A Run Script build phase in the Runner target other than Flutter's own, such as one that copies
+  the flavor's `GoogleService-Info.plist`. Linux builds skip it, so the build would ship the wrong
+  Firebase config or none. It applies to every flavor of the app.
+- An app icon set with several sizes: App Store processing of a Linux build can get stuck on one
+  without an error. A single 1024x1024 icon lifts it.
+- A configuration whose `INFOPLIST_FILE` is not `Runner/Info.plist`.
+- An app icon set outside `ios/Runner/Assets.xcassets`.
+- Plugins that build with CocoaPods (enable Swift Package Manager).
+- App extensions.
+- Debug and profile builds, Flutter older than 3.47, and the `ios.stripAndReexport` step.
+
+There is no iOS Simulator on Linux: iOS device tests and screenshots are not offered there; run
+them on an Android emulator, or on a Mac.
+
+**Turn Linux iOS off for one app.** When a Linux build of an app goes wrong, for example after a
+new XPath moves the pin, send that app's iOS jobs to a Mac without touching the others:
+
+```sh
+xp projects set acme/app --no-ios-linux
+```
+
+Every iOS job of the app then waits for a Mac, with the reason "Linux iOS builds are turned off for
+this app". `--ios-linux` turns it back on. The setting survives rescans.
+
+**Check each flavor after its first Linux build.** Install it from TestFlight and look at:
+
+- the app icon on the home screen;
+- the launch screen;
+- the display name under the icon;
+- the Firebase project it reports to (a test event or crash shows up in that flavor's project);
+- push notifications (send one to the device);
+- deep links and universal links (open one from Notes or Safari).
 
 ## When the engine is away
 

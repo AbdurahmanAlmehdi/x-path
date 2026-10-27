@@ -46,13 +46,15 @@ echo "Starting $xpd on a free port..."
 server_pid=$!
 
 url=""
-for _ in $(seq 1 150); do
+# xpd listens once its tool probes finish, and a tool that hangs (such as
+# `swift --version` on a fresh CI runner) takes the probe's 30 s timeout.
+for _ in $(seq 1 300); do
   kill -0 "$server_pid" 2>/dev/null || fail "xpd exited before it was listening"
   url="$(grep -Eo 'http://[^ ]+' "$work/server.log" | head -1 || true)"
   [[ -n "$url" ]] && break
   sleep 0.2
 done
-[[ -n "$url" ]] || fail "xpd did not report an address within 30 s"
+[[ -n "$url" ]] || fail "xpd did not report an address within 60 s"
 echo "xpd is listening on $url"
 
 status="$(curl -sS --max-time 5 -o "$work/health.json" -w '%{http_code}' "$url/health")"

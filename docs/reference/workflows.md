@@ -98,12 +98,14 @@ stages:                        # required; run in order
   ID (nothing with an API key), the platform's for Shorebird steps, `flutter` for `test` and `analyze`. A
   need can be any of several capabilities, written `ios-sign|ios-linux` in the job's `capabilities`, the
   first preferred. `build.ios` and `ios.stripAndReexport` need any of `ios-sign` and `ios-linux` (ADR 0014),
-  and the planner narrows a job Linux cannot build to `ios-sign` with the reasons (`iosLinuxLimits`): a
-  flavor, an entry point other than `lib/main.dart`, Shorebird iOS, a debug or profile build, an app
+  and the planner narrows a job Linux cannot build to `ios-sign` with the reasons (`iosLinuxLimits`): the
+  owner turned Linux iOS builds off for the app, Shorebird iOS, a debug or profile build, an app
   extension, the iOS Simulator, the strip step, a flavor without an Apple Distribution identity and an ASC
-  key, and what the scan found (`AppProfile.iosLinuxLimits`: plugins that build with CocoaPods, storyboards
-  beyond Flutter's template, a Flutter older than 3.47). The queue message and the dry run repeat them;
-  with no paired runner that offers `ios-sign` the dispatch fails. A workflow cannot name `ios-linux`.
+  key, and what the scan found (`AppProfile.iosLinuxLimits`: plugins that build with CocoaPods, a Run
+  Script phase beyond Flutter's own, a Flutter older than 3.47; `FlavorProfile.iosLinuxLimits`: a
+  multi-size app icon set, an `INFOPLIST_FILE` other than `Runner/Info.plist`, an icon set outside
+  `Runner/Assets.xcassets`). Flavors and entry points build on Linux. The queue message and the dry run
+  repeat them; with no paired runner that offers `ios-sign` the dispatch fails. A workflow cannot name `ios-linux`.
 
 ### Built-in workflows and versions
 

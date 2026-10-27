@@ -67,12 +67,14 @@ class RunnerProbe {
   /// The omarchy-apple-dev commit this release of XPath builds iOS apps on
   /// Linux with. A checkout at another commit does not count.
   ///
-  /// It is the fork's `xpath/pin` branch: upstream `955127b` with #81
-  /// (Info.plist values from the app's xcconfig), #82 (installer) and the
-  /// signing with a given identity and profile that `build.ios` needs
-  /// (`ASC_PROFILE`, ADR 0014). Once those merge upstream, the pin moves to
-  /// an upstream commit and [iosLinuxRepository] back to upstream.
-  static const iosLinuxPin = '4e170a0ce5f294ecc7b94458772c4fa0aea61d2f';
+  /// It is the fork's `xpath/pin-flavors` branch (tag
+  /// `xpath-pin-flavors-1`): upstream `ceda63a` with the signing with a given
+  /// identity and profile that `build.ios` needs (`ASC_PROFILE`, ADR 0014),
+  /// the build settings of the Release configuration, `FLAVOR` and `TARGET`,
+  /// the icon set and storyboards of the configuration, and its
+  /// entitlements (upstream #85-#89). Once those merge upstream, the pin
+  /// moves to an upstream commit and [iosLinuxRepository] back to upstream.
+  static const iosLinuxPin = '2d03f766859e6e4549b949b4afbb8e66d851b18d';
 
   /// Where [iosLinuxPin] is.
   static const iosLinuxRepository =

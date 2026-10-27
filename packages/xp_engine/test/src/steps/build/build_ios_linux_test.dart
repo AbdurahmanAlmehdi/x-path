@@ -19,7 +19,7 @@ const _signing = {
 class _Checkout implements IosLinuxToolchain {
   final prepared = <String>{};
   final used = <String>[];
-  String? at = '4e170a0ce5f294ecc7b94458772c4fa0aea61d2f';
+  String? at = '2d03f766859e6e4549b949b4afbb8e66d851b18d';
 
   @override
   String get directory => _checkout;
@@ -45,6 +45,8 @@ void main() {
   late BuildContext context;
 
   BuildIosInput input({
+    String? flavor,
+    String? target,
     String? dartDefineFile,
     bool obfuscate = false,
     Map<String, String> signing = _signing,
@@ -52,6 +54,8 @@ void main() {
     settings: BuildSettings(
       worktree: buildWorktree,
       version: AppVersion.parse('1.2.3+45'),
+      flavor: flavor,
+      target: target,
       flutterVersion: '3.47.6',
       dartDefineFile: dartDefineFile,
       obfuscate: obfuscate,
@@ -122,7 +126,7 @@ void main() {
     expect(checkout.used, [_flutter]);
     expect(
       (await harness.jobs.tools('job_1'))?.iosLinux,
-      'Linux, omarchy-apple-dev 4e170a0ce5f294ecc7b94458772c4fa0aea61d2f',
+      'Linux, omarchy-apple-dev 2d03f766859e6e4549b949b4afbb8e66d851b18d',
     );
   });
 
@@ -156,7 +160,29 @@ void main() {
     );
   });
 
-  test('maps the defines, obfuscation and entitlements', () async {
+  test('passes the flavor and the entrypoint to build.sh alone', () async {
+    final outcome = await step.run(
+      input(flavor: 'prod', target: 'lib/main_prod.dart'),
+      context,
+    );
+
+    expect(outcome, isA<StepSucceeded<BuildResult>>());
+    expect(named('build.sh').environment, {
+      'CI': 'true',
+      'FLUTTER': '$_flutter/bin/flutter',
+      'BUILD_NAME': '1.2.3',
+      'BUILD_NUMBER': '45',
+      'FLAVOR': 'prod',
+      'TARGET': 'lib/main_prod.dart',
+    });
+    expect(
+      named('ship.sh').environment.keys,
+      isNot(anyOf(contains('FLAVOR'), contains('TARGET'))),
+      reason: 'ship.sh reads the configuration build.sh recorded',
+    );
+  });
+
+  test('maps the defines and obfuscation', () async {
     harness.files
       ..put(
         '$appDirectory/config/prod.json',
@@ -187,8 +213,11 @@ void main() {
       containsPair('DART_OBFUSCATION', 'true'),
     );
     expect(
-      named('ship.sh').environment['ASC_ENTITLEMENTS_PATH'],
-      '$appDirectory/ios/Runner/Runner.entitlements',
+      named('ship.sh').environment.keys,
+      isNot(contains('ASC_ENTITLEMENTS_PATH')),
+      reason:
+          "ship.sh signs with the configuration's CODE_SIGN_ENTITLEMENTS, "
+          'as Xcode does, not whatever file is there',
     );
   });
 

@@ -1,0 +1,83 @@
+{
+  "profile": {
+    "layout": "single",
+    "apps": [
+      {
+        "name": "firebase_shop",
+        "path": ".",
+        "framework": "flutter",
+        "version": "1.0.2+12",
+        "storeCountry": "us",
+        "flutterVersion": "3.47.4",
+        "flutterVersionSource": ".fvmrc",
+        "hasIos": true,
+        "hasAndroid": false,
+        "iosPackageManager": "spm",
+        "iosAppExtensions": [],
+        "iosLinuxLimits": [
+          "the Runner target runs the Run Script phase \"Copy GoogleService-Info.plist\", which Linux iOS builds skip, so what it does (such as copying the flavor's GoogleService-Info.plist) would be missing from the build"
+        ],
+        "flavors": [
+          {
+            "name": "dev",
+            "implicit": false,
+            "entrypoint": "lib/main_dev.dart",
+            "iosBundleId": "com.example.firebase.dev",
+            "iosTeam": "FAKETEAM08",
+            "iosScheme": "dev",
+            "infoPlist": "ios/Runner/Info.plist",
+            "shorebird": false,
+            "prod": false,
+            "versionFiles": [
+              "pubspec.yaml"
+            ],
+            "sources": [
+              "xcscheme",
+              "entrypoint"
+            ]
+          },
+          {
+            "name": "prod",
+            "implicit": false,
+            "entrypoint": "lib/main_prod.dart",
+            "iosBundleId": "com.example.firebase",
+            "iosTeam": "FAKETEAM08",
+            "iosScheme": "prod",
+            "infoPlist": "ios/Runner/Info.plist",
+            "shorebird": false,
+            "prod": true,
+            "versionFiles": [
+              "pubspec.yaml"
+            ],
+            "sources": [
+              "xcscheme",
+              "entrypoint"
+            ]
+          }
+        ],
+        "plists": [
+          {
+            "path": "ios/Runner/Info.plist",
+            "shortVersion": "$(FLUTTER_BUILD_NAME)",
+            "buildNumber": "$(FLUTTER_BUILD_NUMBER)",
+            "literal": false
+          }
+        ]
+      }
+    ],
+    "branches": {
+      "releaseBranches": []
+    },
+    "workflows": []
+  },
+  "findings": [
+    {
+      "severity": "info",
+      "code": "ios_needs_mac",
+      "message": "Needs a Mac for iOS: Linux runners cannot build it because the Runner target runs the Run Script phase \"Copy GoogleService-Info.plist\", which Linux iOS builds skip, so what it does (such as copying the flavor's GoogleService-Info.plist) would be missing from the build.",
+      "fix": "Nothing to do to build on a Mac. To build on Linux (ADR 0014), lift each reason; until then its iOS jobs wait for a Mac (ios-sign).",
+      "path": "ios",
+      "app": "."
+    }
+  ]
+}

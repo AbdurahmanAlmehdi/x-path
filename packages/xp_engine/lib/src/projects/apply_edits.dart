@@ -21,6 +21,7 @@ AppProfile _applyToApp(AppProfile app, AppEdit edit) {
   final byName = {for (final flavor in edit.flavors) flavor.name: flavor};
   return app.copyWith(
     storeCountry: edit.storeCountry,
+    iosLinux: edit.iosLinux,
     flavors: [
       for (final flavor in app.flavors)
         if (byName[flavor.name] case final change?)
@@ -134,6 +135,7 @@ AppEdit _validateApp(AppEdit edit, AppProfile? app) {
   return AppEdit(
     path: edit.path,
     storeCountry: country?.toLowerCase(),
+    iosLinux: edit.iosLinux,
     flavors: edit.flavors,
   );
 }

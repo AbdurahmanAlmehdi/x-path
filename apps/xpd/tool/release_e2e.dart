@@ -58,10 +58,11 @@
 // dispatch with the host and the step: see `_runnerAnyHost`.
 //
 // `--mode runner-ios-linux` (iOS on Linux 3b, ADR 0014,
-// tool/e2e/runner_ios_linux_e2e.sh, Linux only) builds an iOS-only copy of the
-// fixture on a real `xp runner` set up for Linux iOS builds, whose
-// omarchy-apple-dev scripts and tools are stubs: the runner prepares a
-// dedicated Flutter install once, builds, signs with the identity and the
+// tool/e2e/runner_ios_linux_e2e.sh, Linux only) builds the flavors of an
+// iOS-only copy of the fixture on a real `xp runner` set up for Linux iOS
+// builds, whose omarchy-apple-dev scripts and tools are stubs: the runner
+// prepares a dedicated Flutter install once, builds each flavor with FLAVOR
+// and TARGET in a directory of its own, signs with the identity and the
 // profile the engine made with its fake App Store Connect, and uploads the IPA
 // and the dSYMs: see `_runnerIosLinux`.
 //
@@ -1261,18 +1262,82 @@ class _E2e {
   /// The bundle id of the fixture's iOS app.
   static const _iosBundleId = 'ly.abdurahman.xpath.buildApp';
 
-  /// Makes the fixture at [clone] an iOS-only app without flavors, which
-  /// Linux iOS builds support: no Android flavors, `lib/main.dart` the entry
-  /// point.
+  /// The iOS bundle id of the flavor [flavor] of the iOS-only fixture.
+  static String _flavorBundleId(String flavor) =>
+      flavor == 'prod' ? _iosBundleId : '$_iosBundleId.$flavor';
+
+  /// Makes the fixture at [clone] an iOS-only app with the flavors dev and
+  /// prod (iOS flavors on Linux, Phase 3): no Android project; per flavor a
+  /// scheme archiving `Release-<flavor>`, that Runner configuration with its
+  /// own bundle id, and `lib/main_<flavor>.dart` as its entry point (the
+  /// fixture's). Its icon set is a single 1024x1024 one, so that nothing
+  /// narrows a flavor to a Mac. The committed fixture keeps one Xcode
+  /// configuration for the app, which the other modes rely on.
   void _iosOnly(String clone) {
     Directory(p.join(clone, 'android')).deleteSync(recursive: true);
-    for (final name in ['main_dev.dart', 'main_prod.dart']) {
-      File(p.join(clone, 'lib', name)).deleteSync();
+    final project = p.join(clone, 'ios', 'Runner.xcodeproj');
+    final pbxproj = File(p.join(project, 'project.pbxproj'));
+    var text = pbxproj.readAsStringSync();
+    const release = '97C147071CF9000F007C117D';
+    final block = RegExp(
+      '\t\t$release /\\* Release \\*/ = \\{.*?\n\t\t\\};\n',
+      dotAll: true,
+    ).firstMatch(text)![0]!;
+    const ids = {
+      'dev': 'E2E0F1A5000000000000D001',
+      'prod': 'E2E0F1A5000000000000D002',
+    };
+    final configurations = StringBuffer();
+    final references = StringBuffer();
+    for (final MapEntry(key: flavor, value: id) in ids.entries) {
+      configurations.write(
+        block
+            .replaceFirst('$release /* Release */', '$id /* Release-$flavor */')
+            .replaceFirst('name = Release;', 'name = "Release-$flavor";')
+            .replaceFirst(
+              'PRODUCT_BUNDLE_IDENTIFIER = $_iosBundleId;',
+              'PRODUCT_BUNDLE_IDENTIFIER = ${_flavorBundleId(flavor)};',
+            ),
+      );
+      references.write('\t\t\t\t$id /* Release-$flavor */,\n');
     }
-    File(p.join(clone, 'lib', 'main.dart')).writeAsStringSync(
-      "import 'package:build_app/app.dart';\n"
-      "import 'package:flutter/widgets.dart';\n\n"
-      "void main() => runApp(const BuildApp(flavor: 'default'));\n",
+    const end = '/* End XCBuildConfiguration section */';
+    const last = '\t\t\t\t249021D4217E4FDB00AE95B9 /* Profile */,\n';
+    text = text
+        .replaceFirst(end, '$configurations$end')
+        .replaceFirst(last, '$last$references');
+    pbxproj.writeAsStringSync(text);
+    final schemes = p.join(project, 'xcshareddata', 'xcschemes');
+    final runner = File(p.join(schemes, 'Runner.xcscheme')).readAsStringSync();
+    for (final flavor in ids.keys) {
+      File(p.join(schemes, '$flavor.xcscheme')).writeAsStringSync(
+        runner.replaceAll(
+          'buildConfiguration = "Release"',
+          'buildConfiguration = "Release-$flavor"',
+        ),
+      );
+    }
+    File(
+      p.join(
+        clone,
+        'ios',
+        'Runner',
+        'Assets.xcassets',
+        'AppIcon.appiconset',
+        'Contents.json',
+      ),
+    ).writeAsStringSync(
+      jsonEncode({
+        'images': [
+          {
+            'filename': 'Icon-App-1024x1024@1x.png',
+            'idiom': 'universal',
+            'platform': 'ios',
+            'size': '1024x1024',
+          },
+        ],
+        'info': {'author': 'xcode', 'version': 1},
+      }),
     );
     File(p.join(clone, 'ios', 'ExportOptions.plist')).writeAsStringSync(
       '<?xml version="1.0" encoding="UTF-8"?>\n'
@@ -1289,24 +1354,29 @@ class _E2e {
     Process.runSync('chmod', ['+x', path]);
   }
 
-  /// iOS on Linux 3b (ADR 0014): `build.ios` on a Linux runner set up for
-  /// iOS builds, with omarchy-apple-dev's scripts and tools as stubs.
+  /// iOS on Linux 3b (ADR 0014) and iOS flavors on Linux (Phase 3):
+  /// `build.ios` of a flavored app on a Linux runner set up for iOS builds,
+  /// with omarchy-apple-dev's scripts and tools as stubs.
   ///
-  ///   1. the runner reports `ios-linux` (a stub `git` reports the pinned
-  ///      commit, stubs stand in for Swift, rcodesign, the LLVM tools, the
-  ///      pymobile3 python and the darwin SDK bundle),
-  ///   2. the flavor has an App Store Connect key and an Apple Distribution
-  ///      identity, which the engine accepts against its fake App Store
-  ///      Connect,
+  ///   1. the runner (slots 2) reports `ios-linux` (a stub `git` reports the
+  ///      pinned commit, stubs stand in for Swift, rcodesign, the LLVM tools,
+  ///      the pymobile3 python and the darwin SDK bundle),
+  ///   2. the flavors dev and prod each have an App Store Connect key and an
+  ///      Apple Distribution identity, which the engine accepts against its
+  ///      fake App Store Connect,
   ///   3. a workflow of checkout, version bump, `build.ios`,
-  ///      `symbols.archive` and `record.manifest` runs twice on the runner.
-  ///      What it checks:
+  ///      `symbols.archive` and `record.manifest` runs for both flavors in
+  ///      one run, then for dev again. What it checks:
   ///
+  ///   - the flavored jobs were not narrowed to a Mac and ran on the runner,
   ///   - the first job runs `flutter/setup.sh` in a Flutter install of its
-  ///     own, the second reuses it,
-  ///   - `flutter/build.sh` gets the build name and number, `flutter/ship.sh`
-  ///     no `--upload` and the identity and the profile the engine made (the
-  ///     fake made one), never the App Store Connect key,
+  ///     own, the others reuse it,
+  ///   - `flutter/build.sh` gets the build name and number, `FLAVOR` and
+  ///     `TARGET` (`lib/main_<flavor>.dart`), the two flavors of the run in
+  ///     separate app directories; `flutter/ship.sh` no `--upload`, no
+  ///     `ASC_ENTITLEMENTS_PATH`, the configuration `build.sh` recorded in
+  ///     its directory, and the identity and the profile the engine made for
+  ///     the flavor's bundle id (one each), never the App Store Connect key,
   ///   - the IPA and the dSYMs the stubs wrote are in the engine's store, the
   ///     manifest records "Linux, omarchy-apple-dev `<pin>`",
   ///   - the runner left no secret behind.
@@ -1319,18 +1389,21 @@ class _E2e {
       throw const _Failure('--mode runner-ios-linux needs Linux');
     }
     _expect(
-      flavors.length == 1 && flavors.single == 'default',
-      'the iOS-only fixture has no flavors: $flavors',
+      flavors.toSet().containsAll(['dev', 'prod']) && flavors.length == 2,
+      'the iOS-only fixture has the flavors dev and prod: $flavors',
     );
-    final asc = _asc!
-      ..addApp(_iosBundleId)
-      ..bundleIds[_iosBundleId] = 'bundle-e2e'
-      ..certificates['cert-e2e'] = FakeAscCertificate(
-        id: 'cert-e2e',
-        serialNumber: fakeDistributionSerial,
-        certificateType: 'DISTRIBUTION',
-        content: base64.decode(fakeDistributionCertificate),
-      );
+    final asc = _asc!;
+    for (final flavor in ['dev', 'prod']) {
+      asc
+        ..addApp(_flavorBundleId(flavor))
+        ..bundleIds[_flavorBundleId(flavor)] = 'bundle-e2e-$flavor';
+    }
+    asc.certificates['cert-e2e'] = FakeAscCertificate(
+      id: 'cert-e2e',
+      serialNumber: fakeDistributionSerial,
+      certificateType: 'DISTRIBUTION',
+      content: base64.decode(fakeDistributionCertificate),
+    );
     final runnerData = p.join(work, 'runner-data');
     final pin =
         (jsonDecode(File(p.join(fixture, '.fvmrc')).readAsStringSync())
@@ -1348,6 +1421,8 @@ mkdir -p "\$root/bin/cache/artifacts/engine/ios-release"
 printf '\\177ELF' >"\$root/bin/cache/artifacts/engine/ios-release/gen_snapshot_arm64"
 echo "setup \$root" >>'$log'
 ''');
+    // build.sh records the configuration it built, as the real one does
+    // (build/ios-linux/configuration), and ship.sh signs with it.
     _script(p.join(checkout, 'flutter', 'build.sh'), '''
 #!/bin/sh
 set -eu
@@ -1355,16 +1430,18 @@ out="\$1/build/ios-linux"
 mkdir -p "\$out/Payload/Runner.app" "\$out/dSYMs/Runner.app.dSYM/Contents"
 echo "\$BUILD_NAME+\$BUILD_NUMBER" >"\$out/Payload/Runner.app/Info.plist"
 echo dwarf >"\$out/dSYMs/Runner.app.dSYM/Contents/Info.plist"
-echo "build \$BUILD_NAME \$BUILD_NUMBER \$#" >>'$log'
+echo "Release-\${FLAVOR:-}" >"\$out/configuration"
+echo "build \$BUILD_NAME \$BUILD_NUMBER \$# \${FLAVOR:-} \${TARGET:-} \$1" >>'$log'
 ''');
     _script(p.join(checkout, 'flutter', 'ship.sh'), '''
 #!/bin/sh
 set -eu
 [ "\$#" = 1 ] || { echo "ship.sh got \$*" >&2; exit 2; }
 [ -z "\${ASC_KEY_ID:-}\${ASC_KEY_PATH:-}" ] || { echo "an ASC key reached the runner" >&2; exit 3; }
+[ -z "\${ASC_ENTITLEMENTS_PATH:-}" ] || { echo "ship.sh got ASC_ENTITLEMENTS_PATH" >&2; exit 4; }
 grep -q 'BEGIN PRIVATE KEY' "\$ASC_SIGNING_KEY"
 [ -s "\$ASC_SIGNING_CERT" ] && [ -f "\$ASC_EXPORT_OPTIONS" ]
-echo "ship \$(cat "\$ASC_PROFILE")" >>'$log'
+echo "ship \$(cat "\$1/build/ios-linux/configuration") \$(cat "\$ASC_PROFILE")" >>'$log'
 printf 'PK\\003\\004 signed ipa' >"\$1/build/ios-linux/Runner-store.ipa"
 ''');
 
@@ -1426,28 +1503,30 @@ exec '${_real('git')}' "\$@"
     await _startRunner(xp, runnerData, environment, capability: 'ios-linux');
     _log('the runner is online and builds iOS on Linux');
 
-    await _addCredential(
-      projectId,
-      flavor: 'default',
-      name: 'ASC · e2e',
-      fields: {
-        'kind': 'asc_key',
-        'keyId': fakeAscKeyId,
-        'issuerId': fakeAscIssuerId,
-        'privateKey': fakeAscPrivateKeyPem,
-      },
-    );
-    await _addCredential(
-      projectId,
-      flavor: 'default',
-      name: 'Linux signing · e2e',
-      fields: {
-        'kind': 'apple_distribution',
-        'privateKey':
-            '-----BEGIN PRIVATE KEY-----\nMIIE\n-----END PRIVATE KEY-----\n',
-        'certificate': fakeDistributionCertificate,
-      },
-    );
+    for (final flavor in ['dev', 'prod']) {
+      await _addCredential(
+        projectId,
+        flavor: flavor,
+        name: 'ASC · e2e · $flavor',
+        fields: {
+          'kind': 'asc_key',
+          'keyId': fakeAscKeyId,
+          'issuerId': fakeAscIssuerId,
+          'privateKey': fakeAscPrivateKeyPem,
+        },
+      );
+      await _addCredential(
+        projectId,
+        flavor: flavor,
+        name: 'Linux signing · e2e · $flavor',
+        fields: {
+          'kind': 'apple_distribution',
+          'privateKey':
+              '-----BEGIN PRIVATE KEY-----\nMIIE\n-----END PRIVATE KEY-----\n',
+          'certificate': fakeDistributionCertificate,
+        },
+      );
+    }
     final workflow = await _post('/projects/$projectId/workflows', {
       'name': 'ios-linux',
       'yaml': r'''
@@ -1472,32 +1551,42 @@ stages:
 ''',
     }, expect: 201);
 
-    Future<Map<String, dynamic>> build() async {
+    /// Dispatches [flavors] in one run and waits for its jobs: each must
+    /// run on the runner, as a job Linux may build.
+    Future<List<Map<String, dynamic>>> build(List<String> flavors) async {
       final run = await _post(
         '/projects/$projectId/workflows/${workflow['id']}/dispatch',
         {
           'platforms': ['ios'],
-          'flavors': ['default'],
+          'flavors': flavors,
         },
         expect: 202,
       );
       _lastRun = run['id'] as String?;
-      final id = _lastJob = _jobOf(run, 0);
-      final job = await _waitForJob(id, const Duration(minutes: 10), {
-        'succeeded',
-        'failed',
-        'cancelled',
-      });
-      _expect(
-        job['state'] == 'succeeded' && job['runnerId'] == identity['runnerId'],
-        'the iOS build ran on the runner ${identity['runnerId']}: '
-        '${job['state']} ${job['runnerId']} ${job['message']}',
-      );
-      return {...job, 'build': run['build']};
+      final jobs = <Map<String, dynamic>>[];
+      for (var index = 0; index < flavors.length; index++) {
+        final id = _lastJob = _jobOf(run, index);
+        final job = await _waitForJob(id, const Duration(minutes: 10), {
+          'succeeded',
+          'failed',
+          'cancelled',
+        });
+        _expect(
+          job['state'] == 'succeeded' &&
+              job['runnerId'] == identity['runnerId'] &&
+              (job['capabilities'] as List).contains('ios-sign|ios-linux'),
+          'the iOS build ran on the runner ${identity['runnerId']}, not '
+          'narrowed to a Mac: ${job['state']} ${job['runnerId']} '
+          '${job['capabilities']} ${job['message']}',
+        );
+        jobs.add({...job, 'build': run['build']});
+      }
+      return jobs;
     }
 
-    final first = await build();
-    final second = await build();
+    final both = await build(['dev', 'prod']);
+    final again = await build(['dev']);
+    final first = both.first;
 
     // --- the scripts, as the stubs logged them
     final lines = File(log).readAsLinesSync();
@@ -1507,24 +1596,51 @@ stages:
       setups.length == 1 && setups.single == 'setup ${p.join(installs, pin)}',
       'setup.sh ran once, in the dedicated install: $lines',
     );
+    // build <name> <number> <arguments> <FLAVOR> <TARGET> <app directory>
+    final builds = [
+      for (final line in lines)
+        if (line.startsWith('build ')) line.split(' '),
+    ];
+    String? directoryOf(String flavor, Object? number) => builds
+        .where(
+          (words) =>
+              words.length == 7 &&
+              words[1] == '1.0.0' &&
+              words[2] == '$number' &&
+              words[3] == '1' &&
+              words[4] == flavor &&
+              words[5] == 'lib/main_$flavor.dart',
+        )
+        .map((words) => words[6])
+        .singleOrNull;
+    final dev = directoryOf('dev', first['build']);
+    final prod = directoryOf('prod', first['build']);
     _expect(
-      lines.contains('build 1.0.0 ${first['build']} 1') &&
-          lines.contains('build 1.0.0 ${second['build']} 1'),
-      'build.sh got the build name and number, and the app alone: $lines',
+      builds.length == 3 &&
+          dev != null &&
+          prod != null &&
+          directoryOf('dev', again.single['build']) != null,
+      'build.sh got the build name and number, FLAVOR and TARGET, and the '
+      'app alone: $lines',
+    );
+    _expect(
+      dev != prod,
+      'the two flavors of one run built in separate directories: $dev, $prod',
     );
     final shipped = lines.where((line) => line.startsWith('ship ')).toList();
-    _expect(
-      shipped.length == 2 &&
-          shipped.every(
-            (line) => line.contains(
-              'fake profile XPath $_iosBundleId A1B2C3D4E5F bundle-e2e',
-            ),
-          ),
-      'ship.sh signed with the profile the engine made: $shipped',
+    bool signed(String flavor) => shipped.contains(
+      'ship Release-$flavor fake profile XPath ${_flavorBundleId(flavor)} '
+      'A1B2C3D4E5F bundle-e2e-$flavor',
     );
     _expect(
-      asc.profiles.length == 1,
-      'the engine made the profile once and reused it: ${asc.profiles.length}',
+      shipped.length == 3 && signed('dev') && signed('prod'),
+      'ship.sh signed the configuration build.sh recorded with the profile '
+      'the engine made for its flavor: $shipped',
+    );
+    _expect(
+      asc.profiles.length == 2,
+      'the engine made one profile per flavor and reused it: '
+      '${asc.profiles.length}',
     );
 
     // --- what the runner uploaded
@@ -1562,8 +1678,9 @@ stages:
       'no secret file is left on the runner',
     );
     _log(
-      'build.ios ran twice on the Linux runner: one setup, the profile the '
-      'engine made, the IPA and the dSYMs uploaded',
+      'build.ios ran three times on the Linux runner: the flavors dev and '
+      'prod in separate directories with FLAVOR and TARGET, one setup, the '
+      'profiles the engine made, the IPA and the dSYMs uploaded',
     );
   }
 

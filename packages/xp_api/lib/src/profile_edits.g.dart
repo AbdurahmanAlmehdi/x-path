@@ -48,6 +48,7 @@ AppEdit _$AppEditFromJson(Map<String, dynamic> json) =>
       final val = AppEdit(
         path: $checkedConvert('path', (v) => v as String),
         storeCountry: $checkedConvert('storeCountry', (v) => v as String?),
+        iosLinux: $checkedConvert('iosLinux', (v) => v as bool?),
         flavors: $checkedConvert(
           'flavors',
           (v) =>
@@ -63,6 +64,7 @@ AppEdit _$AppEditFromJson(Map<String, dynamic> json) =>
 Map<String, dynamic> _$AppEditToJson(AppEdit instance) => <String, dynamic>{
   'path': instance.path,
   'storeCountry': ?instance.storeCountry,
+  'iosLinux': ?instance.iosLinux,
   'flavors': instance.flavors.map((e) => e.toJson()).toList(),
 };
 

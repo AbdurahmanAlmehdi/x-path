@@ -3399,6 +3399,15 @@ components:
           description: |
             The App Store Connect app id of the flavor. The built-in
             workflows upload iOS builds to it when no input gives one.
+        iosLinuxLimits:
+          type: array
+          description: >-
+            Why Linux runners cannot build the iOS app of this flavor, from
+            its own Xcode configuration (ADR 0014): a multi-size app icon set.
+            Its jobs also get the app's iosLinuxLimits. Present only when not
+            empty.
+          items:
+            type: string
     IosPackageManager:
       type: string
       enum: [cocoapods, spm, both, none]
@@ -3452,9 +3461,18 @@ components:
           description: >-
             Why Linux runners cannot build the iOS app, from the project alone
             (ADR 0014): plugins that build with CocoaPods, storyboards beyond
-            Flutter's template, a Flutter older than 3.47.
+            Flutter's template, Run Script phases beyond Flutter's own, a
+            Flutter older than 3.47. A flavor's own reasons are in its
+            iosLinuxLimits.
           items:
             type: string
+        iosLinux:
+          type: boolean
+          default: true
+          description: >-
+            Whether Linux runners may build the iOS app (ADR 0014). Present,
+            and false, only when the owner turned Linux iOS builds off, which
+            sends every iOS job of the app to a Mac.
         flavors:
           type: array
           items:
@@ -3642,6 +3660,11 @@ components:
         storeCountry:
           type: string
           pattern: "^[A-Za-z]{2}$"
+        iosLinux:
+          type: boolean
+          description: >-
+            Whether Linux runners may build the iOS app; false sends every iOS
+            job of the app to a Mac (ADR 0014), true lets Linux build it again.
         flavors:
           type: array
           items:

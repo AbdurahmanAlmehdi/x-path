@@ -3,7 +3,7 @@ import 'package:equatable/equatable.dart';
 /// One build configuration, for example `Release-dev`, with its settings.
 class XcodeBuildConfiguration extends Equatable {
   /// Creates a configuration.
-  const new(this.name, this.settings);
+  const new(this.name, this.settings, {this.baseConfiguration});
 
   /// The configuration name.
   final String name;
@@ -11,8 +11,44 @@ class XcodeBuildConfiguration extends Equatable {
   /// The build settings that are plain strings. Lists are left out.
   final Map<String, String> settings;
 
+  /// The `.xcconfig` it is based on (`baseConfigurationReference`), relative
+  /// to the folder of the `.xcodeproj`, for example
+  /// `Flutter/devRelease.xcconfig`.
+  final String? baseConfiguration;
+
   @override
-  List<Object?> get props => [name, settings];
+  List<Object?> get props => [name, settings, baseConfiguration];
+}
+
+/// A Run Script build phase of a target.
+class XcodeScriptPhase extends Equatable {
+  /// Creates a phase.
+  const new(this.name, this.script);
+
+  /// The phase name, for example `Thin Binary`; `Run Script` when unnamed.
+  final String name;
+
+  /// The shell script.
+  final String script;
+
+  /// Whether it is one of Flutter's own phases, every line of which runs
+  /// `xcode_backend.sh` (`build`, `embed_and_thin`).
+  bool get isFlutter {
+    final lines = [
+      for (final line in script.split('\n'))
+        if (line.trim() case final line
+            when line.isNotEmpty && !line.startsWith('#'))
+          line,
+    ];
+    return lines.isNotEmpty &&
+        lines.every((line) => line.contains('xcode_backend.sh'));
+  }
+
+  /// Whether CocoaPods added it (`[CP] Embed Pods Frameworks`, ...).
+  bool get isCocoaPods => name.startsWith('[CP');
+
+  @override
+  List<Object?> get props => [name, script];
 }
 
 /// A native target with its build configurations.
@@ -22,6 +58,8 @@ class XcodeTarget extends Equatable {
     required this.name,
     required this.productType,
     required this.configurations,
+    this.scriptPhases = const [],
+    this.resources = const [],
   });
 
   /// The target name, for example `Runner`.
@@ -33,6 +71,13 @@ class XcodeTarget extends Equatable {
   /// The configurations of the target.
   final List<XcodeBuildConfiguration> configurations;
 
+  /// Its Run Script build phases, in build order.
+  final List<XcodeScriptPhase> scriptPhases;
+
+  /// What its Copy Bundle Resources phase copies, relative to the folder of
+  /// the `.xcodeproj`, for example `Runner/Assets.xcassets`.
+  final List<String> resources;
+
   /// Whether the target builds an app, as opposed to a test bundle or an app
   /// extension.
   bool get isApplication => productType == 'com.apple.product-type.application';
@@ -42,7 +87,13 @@ class XcodeTarget extends Equatable {
   bool get isAppExtension => productType.contains('extension');
 
   @override
-  List<Object?> get props => [name, productType, configurations];
+  List<Object?> get props => [
+    name,
+    productType,
+    configurations,
+    scriptPhases,
+    resources,
+  ];
 }
 
 /// The parts of a `project.pbxproj` the scanner needs.
@@ -80,6 +131,53 @@ class XcodeProject extends Equatable {
     final inherited = _named(projectConfigurations, name);
     if (own == null && inherited == null) return null;
     return {...?inherited?.settings, ...?own?.settings};
+  }
+
+  /// The configurations of [target] or the project that
+  /// `flutter build --flavor` may build [flavor] with (flutter_tools
+  /// `xcodeproj.dart`): `Release-<flavor>` when there is one, else those
+  /// whose name is that ignoring case; `Release` without a flavor. One is the
+  /// configuration it builds; none or several fail the build.
+  List<String> releaseConfigurationsFor(XcodeTarget target, String? flavor) {
+    final expected = flavor == null ? 'Release' : 'Release-$flavor';
+    final names = {
+      for (final configuration in [
+        ...target.configurations,
+        ...projectConfigurations,
+      ])
+        configuration.name,
+    };
+    if (names.contains(expected)) return [expected];
+    return [
+      for (final name in names)
+        if (name.toLowerCase() == expected.toLowerCase()) name,
+    ];
+  }
+
+  /// The `.xcconfig` files the configuration [name] of [target] is based on:
+  /// the project's, then the target's.
+  List<String> baseConfigurationsOf(XcodeTarget target, String name) => [
+    ?_named(projectConfigurations, name)?.baseConfiguration,
+    ?_named(target.configurations, name)?.baseConfiguration,
+  ];
+
+  /// The settings of [target] for the configuration [name] as Xcode layers
+  /// them, each layer over the one before: the project's `.xcconfig`, the
+  /// project, the target's `.xcconfig`, the target. [xcconfigs] holds the
+  /// settings of each file of [baseConfigurationsOf].
+  Map<String, String> layeredSettingsOf(
+    XcodeTarget target,
+    String name,
+    Map<String, Map<String, String>> xcconfigs,
+  ) {
+    final project = _named(projectConfigurations, name);
+    final own = _named(target.configurations, name);
+    return {
+      ...?xcconfigs[project?.baseConfiguration],
+      ...?project?.settings,
+      ...?xcconfigs[own?.baseConfiguration],
+      ...?own?.settings,
+    };
   }
 
   static XcodeBuildConfiguration? _named(
@@ -120,27 +218,69 @@ XcodeProject? parseXcodeProject(String pbxproj) {
     return found is Map<String, Object?> ? found : const {};
   }
 
-  List<XcodeBuildConfiguration> configurations(Object? listId) {
-    final ids = object(listId)['buildConfigurations'];
-    return [
-      if (ids is List<Object?>)
-        for (final id in ids) _configuration(object(id)),
-    ];
+  List<Object?> list(Object? value) =>
+      value is List<Object?> ? value : const [];
+
+  // Groups and files are found by path through the groups that hold them.
+  final parents = <Object?, Object?>{
+    for (final entry in objects.entries)
+      if (entry.value case {'children': final List<Object?> children})
+        for (final child in children) child: entry.key,
+  };
+  String? pathOf(Object? id, [int depth = 0]) {
+    final item = object(id);
+    final own = item['path'] ?? (item['isa'] == 'PBXGroup' ? '' : item['name']);
+    if (own is! String || depth > 64) return null;
+    if (item['sourceTree'] == 'SOURCE_ROOT') return own;
+    if (item['sourceTree'] != '<group>') return null;
+    if (!parents.containsKey(id)) return own;
+    final parent = pathOf(parents[id], depth + 1);
+    if (parent == null) return null;
+    return [parent, own].where((part) => part.isNotEmpty).join('/');
   }
 
-  final targetIds = project['targets'];
+  List<XcodeBuildConfiguration> configurations(Object? listId) => [
+    for (final id in list(object(listId)['buildConfigurations']))
+      _configuration(
+        object(id),
+        baseConfiguration: pathOf(object(id)['baseConfigurationReference']),
+      ),
+  ];
+
+  XcodeTarget target(Object? id) {
+    final target = object(id);
+    final phases = list(target['buildPhases']).map(object);
+    return XcodeTarget(
+      name: '${target['name']}',
+      productType: '${target['productType']}',
+      configurations: configurations(target['buildConfigurationList']),
+      scriptPhases: [
+        for (final phase in phases)
+          if (phase['isa'] == 'PBXShellScriptBuildPhase')
+            XcodeScriptPhase(
+              switch (phase['name']) {
+                final String name => name,
+                _ => 'Run Script',
+              },
+              switch (phase['shellScript']) {
+                final String script => script,
+                _ => '',
+              },
+            ),
+      ],
+      resources: [
+        for (final phase in phases)
+          if (phase['isa'] == 'PBXResourcesBuildPhase')
+            for (final file in list(phase['files']))
+              ?pathOf(object(file)['fileRef']),
+      ],
+    );
+  }
+
   return XcodeProject(
     targets: [
-      if (targetIds is List<Object?>)
-        for (final id in targetIds)
-          if (object(id)['isa'] == 'PBXNativeTarget')
-            XcodeTarget(
-              name: '${object(id)['name']}',
-              productType: '${object(id)['productType']}',
-              configurations: configurations(
-                object(id)['buildConfigurationList'],
-              ),
-            ),
+      for (final id in list(project['targets']))
+        if (object(id)['isa'] == 'PBXNativeTarget') target(id),
     ],
     projectConfigurations: configurations(project['buildConfigurationList']),
     usesSwiftPackages: objects.values.any(
@@ -153,13 +293,71 @@ XcodeProject? parseXcodeProject(String pbxproj) {
   );
 }
 
-XcodeBuildConfiguration _configuration(Map<String, Object?> object) {
+XcodeBuildConfiguration _configuration(
+  Map<String, Object?> object, {
+  String? baseConfiguration,
+}) {
   final settings = object['buildSettings'];
   return XcodeBuildConfiguration('${object['name']}', {
     if (settings is Map<String, Object?>)
       for (final entry in settings.entries)
         if (entry.value case final String value) entry.key: value,
-  });
+  }, baseConfiguration: baseConfiguration);
+}
+
+/// The parts of an `.xcconfig` file the scanner needs.
+class Xcconfig extends Equatable {
+  /// Creates one.
+  const new({this.includes = const [], this.settings = const {}});
+
+  /// The files its `#include` and `#include?` lines name, relative to it.
+  final List<String> includes;
+
+  /// Its settings. Conditional ones (`KEY[sdk=...]`) are left out.
+  final Map<String, String> settings;
+
+  @override
+  List<Object?> get props => [includes, settings];
+}
+
+final _include = RegExp(r'^#include\??\s+"([^"]+)"');
+final _setting = RegExp(r'^([A-Za-z_][A-Za-z0-9_]*)\s*=(.*)$');
+
+/// Reads [text], the content of an `.xcconfig`. Its includes come before its
+/// own settings, which win over theirs, as they do when the includes are at
+/// the top.
+Xcconfig parseXcconfig(String text) {
+  final includes = <String>[];
+  final settings = <String, String>{};
+  for (final raw in text.split('\n')) {
+    final line = raw.split('//').first.trim();
+    if (_include.firstMatch(line) case final match?) {
+      includes.add(match[1]!);
+    } else if (_setting.firstMatch(line) case final match?) {
+      final value = match[2]!.trim();
+      settings[match[1]!] = value.endsWith(';')
+          ? value.substring(0, value.length - 1).trim()
+          : value;
+    }
+  }
+  return Xcconfig(includes: includes, settings: settings);
+}
+
+final _reference = RegExp(r'\$[({]([A-Za-z_][A-Za-z0-9_]*)[)}]');
+
+/// [value] with the `$(NAME)` and `${NAME}` references to [settings]
+/// replaced, as Xcode expands them; `$(inherited)` is empty. A reference to
+/// a setting that is not there is kept.
+String expandBuildSetting(String value, Map<String, String> settings) {
+  var expanded = value;
+  for (var round = 0; round < 8 && expanded.contains(r'$'); round++) {
+    expanded = expanded.replaceAllMapped(
+      _reference,
+      (match) =>
+          match[1] == 'inherited' ? '' : settings[match[1]!] ?? match[0]!,
+    );
+  }
+  return expanded;
 }
 
 /// A reader for the old-style property list that `project.pbxproj` is: dicts

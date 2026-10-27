@@ -42,12 +42,15 @@ void main() {
           .toList()
         ..sort();
 
-  test('the fixtures are the six reference apps and a drifting one', () {
+  test('the fixtures are the six reference apps, a drifting one and two '
+      'flavor setups for Linux iOS builds', () {
     expect(names, [
       'captain',
       'companion',
       'customer',
       'drift',
+      'firebase_script',
+      'flavorizr',
       'guest',
       'room_spike',
       'vendor',
@@ -129,6 +132,58 @@ void main() {
 
       expect(profile.apps.single.iosPackageManager, IosPackageManager.spm);
       expect(profile.apps.single.flavors.single.implicit, isTrue);
+    });
+
+    test('room_spike, the stock template, has no Linux iOS limits', () async {
+      final app = (await profileOf('room_spike')).apps.single;
+
+      expect(app.iosLinuxLimits, isEmpty);
+      expect(app.flavors.single.iosLinuxLimits, isEmpty);
+    });
+
+    test('flavorizr narrows only the flavor with a multi-size icon set, and '
+        'names its configuration', () async {
+      final result = await _scan(Directory('${_fixtures.path}/flavorizr'));
+      final flavors = result.profile.apps.single.flavors;
+
+      expect(
+        {for (final flavor in flavors) flavor.name: flavor.iosLinuxLimits},
+        {
+          'dev': isEmpty,
+          'staging': [
+            startsWith(
+              'its configuration Release-staging uses the app icon set '
+              'AppIcon-staging, which has several sizes',
+            ),
+          ],
+          'prod': isEmpty,
+        },
+      );
+      final staging = result.findings.singleWhere(
+        (finding) =>
+            finding.code == 'ios_needs_mac' && finding.flavor == 'staging',
+      );
+      expect(staging.message, contains('Release-staging'));
+      final missing = result.findings.singleWhere(
+        (finding) => finding.code == 'ios_app_icon_missing',
+      );
+      expect(missing.flavor, 'prod');
+      expect(missing.message, contains('AppIcon-prod'));
+    });
+
+    test('firebase_script narrows the whole app on its Run Script', () async {
+      final app = (await profileOf('firebase_script')).apps.single;
+
+      expect(app.iosLinuxLimits, [
+        startsWith(
+          'the Runner target runs the Run Script phase "Copy '
+          'GoogleService-Info.plist"',
+        ),
+      ]);
+      expect(app.flavors.map((flavor) => flavor.iosLinuxLimits), [
+        isEmpty,
+        isEmpty,
+      ]);
     });
   });
 }

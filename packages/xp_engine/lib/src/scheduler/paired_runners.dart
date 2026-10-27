@@ -1,4 +1,5 @@
 import 'package:equatable/equatable.dart';
+import 'package:xp_api/xp_api.dart';
 import 'package:xp_engine/src/scheduler/capability.dart';
 
 /// A runner paired with the engine, as the scheduler names it when a job
@@ -11,6 +12,7 @@ class PairedRunner extends Equatable {
     required this.capabilities,
     required this.connected,
     this.lastSeen,
+    this.missing = const [],
   });
 
   /// The runner's id.
@@ -28,8 +30,19 @@ class PairedRunner extends Equatable {
   /// When the engine last heard from it.
   final DateTime? lastSeen;
 
+  /// What its probe on this connection found missing, and the fixes; empty
+  /// while it is not connected or not probed yet.
+  final List<MissingCapability> missing;
+
   @override
-  List<Object?> get props => [id, name, capabilities, connected, lastSeen];
+  List<Object?> get props => [
+    id,
+    name,
+    capabilities,
+    connected,
+    lastSeen,
+    missing,
+  ];
 }
 
 /// The runners paired with the engine, revoked ones left out: what the

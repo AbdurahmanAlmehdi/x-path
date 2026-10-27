@@ -44,6 +44,29 @@ const _plain = AppProfile(
   flavors: [_main],
 );
 
+/// The demo app as a flavored one: its flavor `main` builds `lib/entry.dart`.
+const _flavored = AppProfile(
+  name: 'demo',
+  path: '.',
+  version: '1.2.3+45',
+  flutterVersion: '3.47.6',
+  hasIos: true,
+  flavors: [
+    FlavorProfile(
+      name: 'main',
+      entrypoint: 'lib/entry.dart',
+      iosBundleId: 'ly.demo',
+    ),
+  ],
+);
+
+/// What the scan found about a flavor whose configuration reads another
+/// Info.plist.
+const _plistLimit =
+    'its configuration Release-dev reads the Info.plist Runner/dev/Info.plist, '
+    'and Linux iOS builds read Runner/Info.plist only (omarchy-apple-dev: an '
+    'Info.plist per configuration)';
+
 /// A Mac that is paired and offline.
 class _AwayMac implements PairedRunners {
   @override
@@ -106,6 +129,23 @@ void main() {
     expect(job.narrowing, isEmpty);
   });
 
+  test('a flavor and its entrypoint build on Linux, passed to the build '
+      'step', () async {
+    final h = await harness(app: _flavored, mac: false);
+
+    final run = await h.dispatchCustom(
+      _workflow('', flavors: true),
+      const DispatchRequest(flavors: ['main']),
+    );
+
+    final job = await only(h, run);
+    expect(job.capabilities, ['flutter', 'ios-sign|ios-linux']);
+    expect(job.narrowing, isEmpty);
+    final build = (await h.jobs.jobs.steps(job.id)).last;
+    expect(build.input, containsPair('flavor', 'main'));
+    expect(build.input, containsPair('target', 'lib/entry.dart'));
+  });
+
   test('the build is planned with the identity and the profile the engine '
       'makes, never the ASC key', () async {
     final h = await harness(mac: false);
@@ -156,6 +196,62 @@ void main() {
     final job = plan.stages.single.jobs.single;
     expect(job.capabilities, ['flutter', 'ios-sign']);
     expect(job.narrowing, ['the app builds its iOS plugins with CocoaPods']);
+  });
+
+  test("a flavor's own reason from the scan narrows its job, in the dry "
+      'run too', () async {
+    const icon = 'its configuration Release uses a multi-size icon set';
+    final h = await harness(
+      app: _plain.copyWith(
+        flavors: [
+          const FlavorProfile(
+            name: 'main',
+            implicit: true,
+            entrypoint: 'lib/main.dart',
+            iosBundleId: 'ly.demo',
+            iosLinuxLimits: [icon],
+          ),
+        ],
+      ),
+    );
+
+    final plan = await h.dispatcher.plan(
+      'prj_1',
+      await h.custom(_workflow('', flavors: true)),
+      const DispatchRequest(),
+    );
+    final run = await h.dispatchCustom(_workflow('', flavors: true));
+
+    expect(plan.stages.single.jobs.single.narrowing, [icon]);
+    final job = await only(h, run);
+    expect(job.capabilities, ['flutter', 'ios-sign']);
+    expect(job.narrowing, [icon]);
+  });
+
+  test('an app the owner turned Linux iOS builds off for narrows every iOS '
+      'job, in the dry run too', () async {
+    final h = await harness();
+    final project = (await h.projects.get('prj_1'))!;
+    await h.projects.update(
+      project.copyWith(
+        edits: const ProfileEdits(apps: [AppEdit(path: '.', iosLinux: false)]),
+      ),
+    );
+    final workflow = await h.custom(_workflow('', flavors: true));
+
+    final plan = await h.dispatcher.plan(
+      'prj_1',
+      workflow,
+      const DispatchRequest(),
+    );
+    final run = await h.dispatchCustom(_workflow('', flavors: true));
+
+    final planned = plan.stages.single.jobs.single;
+    expect(planned.capabilities, ['flutter', 'ios-sign']);
+    expect(planned.narrowing, ['Linux iOS builds are turned off for this app']);
+    final job = await only(h, run);
+    expect(job.capabilities, ['flutter', 'ios-sign']);
+    expect(job.narrowing, ['Linux iOS builds are turned off for this app']);
   });
 
   for (final (name, kinds, bundleId) in [
@@ -240,17 +336,27 @@ void main() {
     },
   );
 
-  // Two cases through the dispatcher: a flavor, and Shorebird iOS, whose
-  // step needs ios-sign itself. iosLinuxLimits' own tests have the others.
+  // Two cases through the dispatcher: a limit the scan found for a flavor,
+  // and Shorebird iOS, whose step needs ios-sign itself. iosLinuxLimits' own
+  // tests have the others.
   for (final (name, app, steps, flavors, reason)
       in <(String, AppProfile, String, bool, String)>[
         (
-          'a Flutter flavor',
-          demoApp,
+          "a flavor's own limit",
+          demoApp.copyWith(
+            flavors: [
+              const FlavorProfile(
+                name: 'dev',
+                entrypoint: 'lib/main_dev.dart',
+                iosBundleId: 'ly.demo.dev',
+                iosLinuxLimits: [_plistLimit],
+              ),
+              demoApp.flavors.last,
+            ],
+          ),
           '',
           true,
-          'the app uses the flavor dev, which Linux iOS builds do not support '
-              'yet (omarchy-apple-dev: flavors)',
+          _plistLimit,
         ),
         (
           'Shorebird iOS',

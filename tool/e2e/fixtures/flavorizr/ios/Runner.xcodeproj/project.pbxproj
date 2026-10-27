@@ -1,0 +1,394 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 54;
+	objects = {
+
+		97C000000000000000000001 /* devRelease.xcconfig */ = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.xcconfig;
+			path = devRelease.xcconfig;
+			sourceTree = "<group>";
+		};
+		97C000000000000000000002 /* stagingRelease.xcconfig */ = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.xcconfig;
+			path = stagingRelease.xcconfig;
+			sourceTree = "<group>";
+		};
+		97C000000000000000000003 /* prodRelease.xcconfig */ = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.xcconfig;
+			path = prodRelease.xcconfig;
+			sourceTree = "<group>";
+		};
+		97C100000000000000000004 /* Assets.xcassets */ = {
+			isa = PBXFileReference;
+			lastKnownFileType = folder.assetcatalog;
+			path = Assets.xcassets;
+			sourceTree = "<group>";
+		};
+		97C200000000000000000005 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 97C100000000000000000004 /* Assets.xcassets */; };
+		97C300000000000000000006 /* Base */ = {
+			isa = PBXFileReference;
+			lastKnownFileType = file.storyboard;
+			name = Base;
+			path = Base.lproj/LaunchScreenDev.storyboard;
+			sourceTree = "<group>";
+		};
+		97C400000000000000000007 /* LaunchScreenDev.storyboard */ = {
+			isa = PBXVariantGroup;
+			children = (
+				97C300000000000000000006 /* Base */,
+			);
+			name = LaunchScreenDev.storyboard;
+			sourceTree = "<group>";
+		};
+		97C500000000000000000008 /* LaunchScreenDev.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 97C400000000000000000007 /* LaunchScreenDev.storyboard */; };
+		97C300000000000000000009 /* Base */ = {
+			isa = PBXFileReference;
+			lastKnownFileType = file.storyboard;
+			name = Base;
+			path = Base.lproj/LaunchScreenStaging.storyboard;
+			sourceTree = "<group>";
+		};
+		97C40000000000000000000A /* LaunchScreenStaging.storyboard */ = {
+			isa = PBXVariantGroup;
+			children = (
+				97C300000000000000000009 /* Base */,
+			);
+			name = LaunchScreenStaging.storyboard;
+			sourceTree = "<group>";
+		};
+		97C50000000000000000000B /* LaunchScreenStaging.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 97C40000000000000000000A /* LaunchScreenStaging.storyboard */; };
+		97C30000000000000000000C /* Base */ = {
+			isa = PBXFileReference;
+			lastKnownFileType = file.storyboard;
+			name = Base;
+			path = Base.lproj/LaunchScreenProd.storyboard;
+			sourceTree = "<group>";
+		};
+		97C40000000000000000000D /* LaunchScreenProd.storyboard */ = {
+			isa = PBXVariantGroup;
+			children = (
+				97C30000000000000000000C /* Base */,
+			);
+			name = LaunchScreenProd.storyboard;
+			sourceTree = "<group>";
+		};
+		97C50000000000000000000E /* LaunchScreenProd.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 97C40000000000000000000D /* LaunchScreenProd.storyboard */; };
+		97C30000000000000000000F /* Base */ = {
+			isa = PBXFileReference;
+			lastKnownFileType = file.storyboard;
+			name = Base;
+			path = Base.lproj/Main.storyboard;
+			sourceTree = "<group>";
+		};
+		97C400000000000000000010 /* Main.storyboard */ = {
+			isa = PBXVariantGroup;
+			children = (
+				97C30000000000000000000F /* Base */,
+			);
+			name = Main.storyboard;
+			sourceTree = "<group>";
+		};
+		97C500000000000000000011 /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 97C400000000000000000010 /* Main.storyboard */; };
+		974000000000000000000012 /* Flutter */ = {
+			isa = PBXGroup;
+			children = (
+				97C000000000000000000001,
+				97C000000000000000000002,
+				97C000000000000000000003,
+			);
+			name = Flutter;
+			path = Flutter;
+			sourceTree = "<group>";
+		};
+		97C600000000000000000013 /* Runner */ = {
+			isa = PBXGroup;
+			children = (
+				97C100000000000000000004,
+				97C400000000000000000007,
+				97C40000000000000000000A,
+				97C40000000000000000000D,
+				97C400000000000000000010,
+			);
+			path = Runner;
+			sourceTree = "<group>";
+		};
+		97C700000000000000000014 = {
+			isa = PBXGroup;
+			children = (
+				974000000000000000000012 /* Flutter */,
+				97C600000000000000000013 /* Runner */,
+			);
+			sourceTree = "<group>";
+		};
+		97C800000000000000000015 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				97C200000000000000000005,
+				97C500000000000000000008,
+				97C50000000000000000000B,
+				97C50000000000000000000E,
+				97C500000000000000000011,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		3B0600000000000000000016 /* Run Script */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+			);
+			name = "Run Script";
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "/bin/sh \"$FLUTTER_ROOT/packages/flutter_tools/bin/xcode_backend.sh\" build\n";
+		};
+		3B0600000000000000000017 /* Thin Binary */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+			);
+			name = "Thin Binary";
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "/bin/sh \"$FLUTTER_ROOT/packages/flutter_tools/bin/xcode_backend.sh\" embed_and_thin\n";
+		};
+		97C900000000000000000018 /* Debug-dev */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = "AppIcon-$(ASSET_PREFIX)";
+				DEVELOPMENT_TEAM = FAKETEAM07;
+				INFOPLIST_FILE = Runner/Info.plist;
+				PRODUCT_BUNDLE_IDENTIFIER = com.example.shop.dev;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = "Debug-dev";
+		};
+		97CA00000000000000000019 /* Debug-dev */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+			};
+			name = "Debug-dev";
+		};
+		97C90000000000000000001A /* Profile-dev */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = "AppIcon-$(ASSET_PREFIX)";
+				DEVELOPMENT_TEAM = FAKETEAM07;
+				INFOPLIST_FILE = Runner/Info.plist;
+				PRODUCT_BUNDLE_IDENTIFIER = com.example.shop.dev;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = "Profile-dev";
+		};
+		97CA0000000000000000001B /* Profile-dev */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+			};
+			name = "Profile-dev";
+		};
+		97C90000000000000000001C /* Release-dev */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 97C000000000000000000001;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = "AppIcon-$(ASSET_PREFIX)";
+				DEVELOPMENT_TEAM = FAKETEAM07;
+				INFOPLIST_FILE = Runner/Info.plist;
+				PRODUCT_BUNDLE_IDENTIFIER = com.example.shop.dev;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = "Release-dev";
+		};
+		97CA0000000000000000001D /* Release-dev */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+			};
+			name = "Release-dev";
+		};
+		97C90000000000000000001E /* Debug-staging */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = "AppIcon-$(ASSET_PREFIX)";
+				DEVELOPMENT_TEAM = FAKETEAM07;
+				INFOPLIST_FILE = Runner/Info.plist;
+				PRODUCT_BUNDLE_IDENTIFIER = com.example.shop.staging;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = "Debug-staging";
+		};
+		97CA0000000000000000001F /* Debug-staging */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+			};
+			name = "Debug-staging";
+		};
+		97C900000000000000000020 /* Profile-staging */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = "AppIcon-$(ASSET_PREFIX)";
+				DEVELOPMENT_TEAM = FAKETEAM07;
+				INFOPLIST_FILE = Runner/Info.plist;
+				PRODUCT_BUNDLE_IDENTIFIER = com.example.shop.staging;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = "Profile-staging";
+		};
+		97CA00000000000000000021 /* Profile-staging */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+			};
+			name = "Profile-staging";
+		};
+		97C900000000000000000022 /* Release-staging */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 97C000000000000000000002;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = "AppIcon-$(ASSET_PREFIX)";
+				DEVELOPMENT_TEAM = FAKETEAM07;
+				INFOPLIST_FILE = Runner/Info.plist;
+				PRODUCT_BUNDLE_IDENTIFIER = com.example.shop.staging;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = "Release-staging";
+		};
+		97CA00000000000000000023 /* Release-staging */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+			};
+			name = "Release-staging";
+		};
+		97C900000000000000000024 /* Debug-prod */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = "AppIcon-$(ASSET_PREFIX)";
+				DEVELOPMENT_TEAM = FAKETEAM07;
+				INFOPLIST_FILE = Runner/Info.plist;
+				PRODUCT_BUNDLE_IDENTIFIER = com.example.shop;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = "Debug-prod";
+		};
+		97CA00000000000000000025 /* Debug-prod */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+			};
+			name = "Debug-prod";
+		};
+		97C900000000000000000026 /* Profile-prod */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = "AppIcon-$(ASSET_PREFIX)";
+				DEVELOPMENT_TEAM = FAKETEAM07;
+				INFOPLIST_FILE = Runner/Info.plist;
+				PRODUCT_BUNDLE_IDENTIFIER = com.example.shop;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = "Profile-prod";
+		};
+		97CA00000000000000000027 /* Profile-prod */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+			};
+			name = "Profile-prod";
+		};
+		97C900000000000000000028 /* Release-prod */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 97C000000000000000000003;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = "AppIcon-$(ASSET_PREFIX)";
+				DEVELOPMENT_TEAM = FAKETEAM07;
+				INFOPLIST_FILE = Runner/Info.plist;
+				PRODUCT_BUNDLE_IDENTIFIER = com.example.shop;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = "Release-prod";
+		};
+		97CA00000000000000000029 /* Release-prod */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+			};
+			name = "Release-prod";
+		};
+		97CB0000000000000000002A /* Build configuration list for PBXNativeTarget "Runner" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				97C900000000000000000018 /* Debug-dev */,
+				97C90000000000000000001A /* Profile-dev */,
+				97C90000000000000000001C /* Release-dev */,
+				97C90000000000000000001E /* Debug-staging */,
+				97C900000000000000000020 /* Profile-staging */,
+				97C900000000000000000022 /* Release-staging */,
+				97C900000000000000000024 /* Debug-prod */,
+				97C900000000000000000026 /* Profile-prod */,
+				97C900000000000000000028 /* Release-prod */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = "Release-prod";
+		};
+		97CC0000000000000000002B /* Build configuration list for PBXProject "Runner" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				97CA00000000000000000019 /* Debug-dev */,
+				97CA0000000000000000001B /* Profile-dev */,
+				97CA0000000000000000001D /* Release-dev */,
+				97CA0000000000000000001F /* Debug-staging */,
+				97CA00000000000000000021 /* Profile-staging */,
+				97CA00000000000000000023 /* Release-staging */,
+				97CA00000000000000000025 /* Debug-prod */,
+				97CA00000000000000000027 /* Profile-prod */,
+				97CA00000000000000000029 /* Release-prod */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = "Release-prod";
+		};
+		97CD0000000000000000002C /* Runner */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 97CB0000000000000000002A;
+			buildPhases = (
+				3B0600000000000000000016,
+				97C800000000000000000015,
+				3B0600000000000000000017,
+			);
+			name = Runner;
+			productName = Runner;
+			productType = "com.apple.product-type.application";
+		};
+		97CE0000000000000000002D /* Project object */ = {
+			isa = PBXProject;
+			buildConfigurationList = 97CC0000000000000000002B;
+			mainGroup = 97C700000000000000000014;
+			targets = (
+				97CD0000000000000000002C /* Runner */,
+			);
+		};
+		78A30000000000000000002E /* XCLocalSwiftPackageReference "Flutter/ephemeral/Packages/FlutterGeneratedPluginSwiftPackage" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Flutter/ephemeral/Packages/FlutterGeneratedPluginSwiftPackage;
+		};
+	};
+	rootObject = 97CE0000000000000000002D /* Project object */;
+}
