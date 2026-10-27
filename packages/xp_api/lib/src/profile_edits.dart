@@ -92,7 +92,12 @@ class FlavorEdit extends Equatable {
 @JsonSerializable(explicitToJson: true, includeIfNull: false, checked: true)
 class AppEdit extends Equatable {
   /// Creates an edit of the app at [path].
-  const new({required this.path, this.storeCountry, this.flavors = const []});
+  const new({
+    required this.path,
+    this.storeCountry,
+    this.iosLinux,
+    this.flavors = const [],
+  });
 
   /// Reads an app edit from its JSON form.
   factory AppEdit.fromJson(Map<String, dynamic> json) =>
@@ -104,6 +109,10 @@ class AppEdit extends Equatable {
   /// The two-letter App Store storefront.
   final String? storeCountry;
 
+  /// Whether Linux runners may build the iOS app; `false` sends every iOS
+  /// job of the app to a Mac (ADR 0014).
+  final bool? iosLinux;
+
   /// Flavor corrections.
   final List<FlavorEdit> flavors;
 
@@ -111,6 +120,7 @@ class AppEdit extends Equatable {
   AppEdit merge(AppEdit newer) => AppEdit(
     path: path,
     storeCountry: newer.storeCountry ?? storeCountry,
+    iosLinux: newer.iosLinux ?? iosLinux,
     flavors: ProfileEdits.mergeFlavors(flavors, newer.flavors),
   );
 
@@ -118,7 +128,7 @@ class AppEdit extends Equatable {
   Map<String, dynamic> toJson() => _$AppEditToJson(this);
 
   @override
-  List<Object?> get props => [path, storeCountry, flavors];
+  List<Object?> get props => [path, storeCountry, iosLinux, flavors];
 }
 
 /// The owner's corrections to a scanned profile: the body of

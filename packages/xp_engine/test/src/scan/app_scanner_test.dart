@@ -538,8 +538,8 @@ DEPENDENCIES:
       );
     });
 
-    test('storyboards beyond the template, flavors, extensions and an old '
-        'Flutter need a Mac', () async {
+    test('extensions and an old Flutter need a Mac; flavors and storyboards '
+        'beyond the template do not', () async {
       final result = await scanApp1({
         ...flavored(),
         'ios/Podfile': null,
@@ -553,10 +553,6 @@ DEPENDENCIES:
       });
 
       expect(only(result).iosLinuxLimits, [
-        startsWith(
-          'the app has the storyboard LaunchScreenDev.storyboard beyond '
-          "Flutter's template",
-        ),
         'the app pins Flutter 3.44.2, and Linux iOS builds need 3.47 or later',
       ]);
       final mac = finding(result, 'ios_needs_mac');
@@ -566,10 +562,10 @@ DEPENDENCIES:
         mac.message,
         allOf(
           startsWith('Needs a Mac for iOS: Linux runners cannot build it '),
-          contains('the flavors dev, prod'),
           contains('the app extension Widgets'),
-          contains('LaunchScreenDev.storyboard'),
           contains('Flutter 3.44.2'),
+          isNot(contains('flavor')),
+          isNot(contains('storyboard')),
         ),
       );
       expect(mac.fix, contains('wait for a Mac (ios-sign)'));
@@ -583,6 +579,437 @@ DEPENDENCIES:
       });
 
       expect(codes(result), isNot(contains('ios_needs_mac')));
+    });
+  });
+
+  group('iOS on Linux, per flavor (ADR 0014)', () {
+    const backend =
+        r'/bin/sh "$FLUTTER_ROOT/packages/flutter_tools/bin/xcode_backend.sh"';
+    const catalog = 'Runner/Assets.xcassets';
+    final single = jsonEncode({
+      'images': [
+        {'filename': 'icon.png', 'idiom': 'universal', 'size': '1024x1024'},
+        {'idiom': 'universal'},
+      ],
+    });
+    final multi = jsonEncode({
+      'images': [
+        {'idiom': 'iphone', 'size': '60x60', 'scale': '3x'},
+        {'idiom': 'ios-marketing', 'size': '1024x1024'},
+      ],
+    });
+    String iconSet(String name) =>
+        'ios/$catalog/$name.appiconset/Contents.json';
+
+    /// A SwiftPM app on a recent Flutter, with flavors when [runner] has
+    /// them, whose Runner copies [resources].
+    Future<ScanResult> scan(
+      Map<String, Map<String, String>> runner, {
+      Map<String, String?> files = const {},
+      List<String> resources = const [catalog],
+      Map<String, String> xcconfigs = const {},
+      Map<String, String> scripts = const {},
+      bool flavors = true,
+    }) => scanApp1({
+      if (flavors) ...flavored(),
+      'ios/Podfile': null,
+      'ios/Runner.xcodeproj/project.pbxproj': pbxproj(
+        runner: runner,
+        spm: true,
+        resources: resources,
+        xcconfigs: xcconfigs,
+        scripts: scripts,
+      ),
+      'ios/$catalog/Contents.json': '{}',
+      ...files,
+    });
+
+    Map<String, Map<String, String>> withIcons(String dev, String prod) => {
+      ...configurations('dev', {
+        ...iosSettings(bundleId: 'com.example.dev', team: 'T'),
+        'ASSETCATALOG_COMPILER_APPICON_NAME': dev,
+      }),
+      ...configurations('prod', {
+        ...iosSettings(bundleId: 'com.example', team: 'T'),
+        'ASSETCATALOG_COMPILER_APPICON_NAME': prod,
+      }),
+    };
+
+    Finding flavorFinding(ScanResult result, String code, String? flavor) =>
+        result.findings.singleWhere(
+          (finding) => finding.code == code && finding.flavor == flavor,
+        );
+
+    test('a multi-size icon set narrows its flavor only, naming its '
+        'configuration', () async {
+      final result = await scan(
+        withIcons('AppIcon-dev', 'AppIcon'),
+        files: {iconSet('AppIcon-dev'): multi, iconSet('AppIcon'): single},
+      );
+      final flavors = only(result).flavors;
+
+      expect(
+        flavors.first.iosLinuxLimits.single,
+        'its configuration Release-dev uses the app icon set AppIcon-dev, '
+        'which has several sizes, and App Store processing of a Linux build '
+        'can get stuck on one without an error (omarchy-apple-dev: '
+        'single-size app icons; a single 1024x1024 icon lifts it)',
+      );
+      expect(flavors.last.iosLinuxLimits, isEmpty);
+      expect(only(result).iosLinuxLimits, isEmpty);
+      final dev = flavorFinding(result, 'ios_needs_mac', 'dev');
+      expect(dev.severity, FindingSeverity.info);
+      expect(dev.path, 'ios');
+      expect(
+        dev.message,
+        startsWith(
+          'Flavor dev needs a Mac for iOS: Linux runners cannot build it '
+          'because its configuration Release-dev uses the app icon set '
+          'AppIcon-dev',
+        ),
+      );
+      expect(dev.fix, contains('wait for a Mac (ios-sign)'));
+      expect(
+        result.findings.where(
+          (finding) =>
+              finding.code == 'ios_needs_mac' && finding.flavor == 'prod',
+        ),
+        isEmpty,
+      );
+    });
+
+    test('the icon set name comes from the .xcconfig files and their '
+        'includes', () async {
+      final result = await scan(
+        withIcons(r'AppIcon-$(ASSET_PREFIX)', r'AppIcon-${ASSET_PREFIX}'),
+        xcconfigs: {
+          'Release-dev': 'Flutter/devRelease.xcconfig',
+          'Release-prod': 'Flutter/prodRelease.xcconfig',
+        },
+        files: {
+          'ios/Flutter/devRelease.xcconfig':
+              '#include? "Pods/Missing.xcconfig"\n'
+              '#include "flavors/dev.xcconfig"\n',
+          'ios/Flutter/flavors/dev.xcconfig': 'ASSET_PREFIX = dev\n',
+          'ios/Flutter/prodRelease.xcconfig':
+              '#include "prodRelease.xcconfig"\nASSET_PREFIX=prod\n',
+          iconSet('AppIcon-dev'): multi,
+          iconSet('AppIcon-prod'): single,
+        },
+      );
+
+      expect(only(result).flavors.first.iosLinuxLimits, [
+        contains('the app icon set AppIcon-dev, which has several sizes'),
+      ]);
+      expect(only(result).flavors.last.iosLinuxLimits, isEmpty);
+      expect(codes(result), isNot(contains('ios_app_icon_missing')));
+    });
+
+    test('an icon set no catalog has is a warning, not a reason; one outside '
+        'Runner/Assets.xcassets is a reason', () async {
+      final result = await scan(
+        withIcons('AppIcon-dev', 'AppIcon'),
+        resources: [catalog, 'Other.xcassets', 'Runner/GoogleService.plist'],
+        files: {
+          'ios/Other.xcassets/Contents.json': '{}',
+          'ios/Other.xcassets/AppIcon.appiconset/Contents.json': single,
+        },
+      );
+
+      final missing = flavorFinding(result, 'ios_app_icon_missing', 'dev');
+      expect(missing.severity, FindingSeverity.warning);
+      expect(missing.path, 'ios/Runner/Assets.xcassets');
+      expect(
+        missing.message,
+        'The configuration Release-dev of flavor dev uses the app icon set '
+        'AppIcon-dev, which no asset catalog of the Runner target has.',
+      );
+      expect(
+        missing.fix,
+        'Add AppIcon-dev.appiconset to ios/Runner/Assets.xcassets or '
+        'ios/Other.xcassets, or set ASSETCATALOG_COMPILER_APPICON_NAME of '
+        'Release-dev to an icon set it has.',
+      );
+      const outside =
+          'its configuration Release-prod takes the app icon set AppIcon from '
+          'ios/Other.xcassets, and Linux iOS builds take app icons from '
+          'ios/Runner/Assets.xcassets only (omarchy-apple-dev: asset '
+          'catalogs beyond Runner/Assets.xcassets)';
+      expect(only(result).flavors.map((flavor) => flavor.iosLinuxLimits), [
+        isEmpty,
+        [outside],
+      ]);
+      expect(
+        flavorFinding(result, 'ios_needs_mac', 'prod').message,
+        contains('takes the app icon set AppIcon from ios/Other.xcassets'),
+      );
+    });
+
+    test('an icon set of Runner/Assets.xcassets is the one taken when '
+        'another catalog has one too', () async {
+      final result = await scan(
+        withIcons('AppIcon', 'AppIcon'),
+        resources: ['Other.xcassets', catalog],
+        files: {
+          'ios/Other.xcassets/Contents.json': '{}',
+          'ios/Other.xcassets/AppIcon.appiconset/Contents.json': multi,
+          iconSet('AppIcon'): single,
+        },
+      );
+
+      expect(only(result).flavors.map((flavor) => flavor.iosLinuxLimits), [
+        isEmpty,
+        isEmpty,
+      ]);
+    });
+
+    test('an Info.plist other than Runner/Info.plist narrows its flavor, '
+        'with or without flavors', () async {
+      final result = await scan(
+        {
+          ...configurations(
+            'dev',
+            iosSettings(
+              bundleId: 'com.example.dev',
+              team: 'T',
+              plist: r'$(SRCROOT)/Runner/$(PLIST_DIR)/Info.plist',
+            ),
+          ).map(
+            (name, settings) =>
+                MapEntry(name, {...settings, 'PLIST_DIR': 'dev'}),
+          ),
+          ...configurations(
+            'prod',
+            iosSettings(
+              bundleId: 'com.example',
+              team: 'T',
+              plist: r'$(PROJECT_DIR)/Runner/./Info.plist',
+            ),
+          ),
+        },
+        files: {'ios/Runner/dev/Info.plist': plist()},
+      );
+      final plain = await scan(
+        configurations(
+          null,
+          iosSettings(bundleId: 'a', team: 'T', plist: 'Runner/App.plist'),
+        ),
+        flavors: false,
+      );
+      final unset = await scan(
+        configurations(
+          null,
+          iosSettings(bundleId: 'a', team: 'T', plist: null),
+        ),
+        flavors: false,
+      );
+
+      const other =
+          'its configuration Release-dev reads the Info.plist '
+          'Runner/dev/Info.plist, and Linux iOS builds read Runner/Info.plist '
+          'only (omarchy-apple-dev: an Info.plist per configuration)';
+      expect(only(result).flavors.map((flavor) => flavor.iosLinuxLimits), [
+        [other],
+        isEmpty,
+      ]);
+      expect(only(plain).flavors.single.iosLinuxLimits, [
+        startsWith(
+          'its configuration Release reads the Info.plist Runner/App.plist',
+        ),
+      ]);
+      expect(only(unset).flavors.single.iosLinuxLimits, isEmpty);
+    });
+
+    test('an icon set that cannot be checked is left alone', () async {
+      final result = await scan(
+        withIcons(r'AppIcon-$(UNKNOWN)', 'AppIcon'),
+        resources: [catalog, 'Gone.xcassets'],
+        files: {iconSet('AppIcon'): '{not json'},
+      );
+      final noCatalog = await scan(
+        withIcons('AppIcon', 'AppIcon'),
+        files: {'ios/$catalog/Contents.json': null},
+      );
+
+      expect(only(result).flavors.map((flavor) => flavor.iosLinuxLimits), [
+        isEmpty,
+        isEmpty,
+      ]);
+      expect(codes(result), isNot(contains('ios_app_icon_missing')));
+      expect(codes(noCatalog), isNot(contains('ios_app_icon_missing')));
+    });
+
+    test('an icon set is multi-size only with another size than '
+        '1024x1024', () async {
+      for (final contents in [
+        '[]',
+        '{"images": "none"}',
+        '{"images": [{"idiom": "universal"}, "x"]}',
+      ]) {
+        final result = await scan(
+          withIcons('AppIcon', 'AppIcon'),
+          files: {iconSet('AppIcon'): contents},
+        );
+
+        expect(only(result).flavors.map((flavor) => flavor.iosLinuxLimits), [
+          isEmpty,
+          isEmpty,
+        ], reason: contents);
+      }
+    });
+
+    test('an app without flavors gives its icon reason in the app '
+        'finding', () async {
+      final result = await scan(
+        configurations(null, {
+          ...iosSettings(bundleId: 'com.example.demo', team: 'T'),
+          'ASSETCATALOG_COMPILER_APPICON_NAME': 'AppIcon',
+        }),
+        flavors: false,
+        files: {iconSet('AppIcon'): multi},
+      );
+
+      expect(only(result).flavors.single.iosLinuxLimits, [
+        startsWith('its configuration Release uses the app icon set AppIcon'),
+      ]);
+      expect(only(result).iosLinuxLimits, isEmpty);
+      final mac = finding(result, 'ios_needs_mac');
+      expect(mac.flavor, isNull);
+      expect(mac.message, contains('its configuration Release uses'));
+    });
+
+    test(
+      'a missing icon set of an app without flavors names the app',
+      () async {
+        final result = await scan(
+          configurations(null, {
+            ...iosSettings(bundleId: 'com.example.demo', team: 'T'),
+            'ASSETCATALOG_COMPILER_APPICON_NAME': 'AppIcon',
+          }),
+          flavors: false,
+        );
+
+        final missing = finding(result, 'ios_app_icon_missing');
+        expect(missing.flavor, isNull);
+        expect(missing.message, contains('Release of the app uses'));
+      },
+    );
+
+    test('several configurations for a flavor are a warning', () async {
+      final result = await scan(
+        {
+          ...configurations('Dev', iosSettings(bundleId: 'a.dev', team: 'T')),
+          ...configurations('DEV', iosSettings(bundleId: 'a.dev', team: 'T')),
+          ...configurations('prod', iosSettings(bundleId: 'a', team: 'T')),
+        },
+        files: {
+          'ios/Runner.xcodeproj/xcshareddata/xcschemes/dev.xcscheme': scheme(
+            'Release-Dev',
+          ),
+        },
+      );
+      final plain = await scan({
+        'release': iosSettings(bundleId: 'a', team: 'T'),
+        'RELEASE': iosSettings(bundleId: 'a', team: 'T'),
+      }, flavors: false);
+
+      final several = flavorFinding(
+        result,
+        'ios_flavor_configuration_ambiguous',
+        'dev',
+      );
+      expect(several.severity, FindingSeverity.warning);
+      expect(several.path, 'ios/Runner.xcodeproj/project.pbxproj');
+      expect(
+        several.message,
+        'flutter build --flavor dev matches the build configurations '
+        'Release-Dev, Release-DEV, and builds none of them.',
+      );
+      expect(several.fix, 'Rename them so that one is called Release-dev.');
+      expect(codes(result), isNot(contains('ios_flavor_without_scheme')));
+      final plainSeveral = finding(plain, 'ios_flavor_configuration_ambiguous');
+      expect(plainSeveral.flavor, isNull);
+      expect(plainSeveral.message, startsWith('flutter build matches'));
+      expect(plainSeveral.fix, 'Rename them so that one is called Release.');
+    });
+
+    test('a flavor whose scheme archives another configuration than flutter '
+        'build looks for is a warning', () async {
+      final result = await scan(
+        {
+          ...configurations('dev', iosSettings(bundleId: 'a.dev', team: 'T')),
+          ...configurations(
+            'production',
+            iosSettings(bundleId: 'a', team: 'T'),
+          ),
+        },
+        files: {
+          'ios/Runner.xcodeproj/xcshareddata/xcschemes/prod.xcscheme': scheme(
+            'Release-production',
+          ),
+        },
+      );
+      final none = await scan({
+        ...configurations('dev', iosSettings(bundleId: 'a.dev', team: 'T')),
+      });
+
+      final missing = flavorFinding(
+        result,
+        'ios_flavor_configuration_missing',
+        'prod',
+      );
+      expect(missing.severity, FindingSeverity.warning);
+      expect(
+        missing.message,
+        'flutter build --flavor prod looks for the build configuration '
+        'Release-prod, which the Xcode project does not have.',
+      );
+      expect(missing.fix, contains('Release-prod'));
+      expect(codes(none), contains('ios_flavor_without_scheme'));
+      expect(codes(none), isNot(contains('ios_flavor_configuration_missing')));
+    });
+
+    test("a Run Script phase beyond Flutter's own narrows the whole "
+        'app', () async {
+      final one = await scan(
+        withIcons('AppIcon', 'AppIcon'),
+        files: {iconSet('AppIcon'): single},
+        scripts: {
+          'Run Script': '$backend build',
+          'Copy GoogleService-Info.plist':
+              r'cp "config/${CONFIGURATION#*-}/GoogleService-Info.plist" .',
+          '[CP] Check Pods Manifest.lock': 'diff Podfile.lock Manifest.lock',
+          'Thin Binary': '$backend embed_and_thin',
+        },
+      );
+      final two = await scan(
+        withIcons('AppIcon', 'AppIcon'),
+        files: {iconSet('AppIcon'): single},
+        scripts: {'Crashlytics': 'upload-symbols', 'Lint': 'swiftlint'},
+      );
+
+      expect(
+        only(one).iosLinuxLimits.single,
+        'the Runner target runs the Run Script phase "Copy '
+        'GoogleService-Info.plist", which Linux iOS builds skip, so what it '
+        "does (such as copying the flavor's GoogleService-Info.plist) would "
+        'be missing from the build',
+      );
+      expect(only(one).flavors.map((flavor) => flavor.iosLinuxLimits), [
+        isEmpty,
+        isEmpty,
+      ]);
+      expect(
+        finding(one, 'ios_needs_mac').message,
+        contains('"Copy GoogleService-Info.plist"'),
+      );
+      expect(
+        only(two).iosLinuxLimits.single,
+        startsWith(
+          'the Runner target runs the Run Script phases "Crashlytics", '
+          '"Lint", which Linux iOS builds skip, so what they do',
+        ),
+      );
     });
   });
 

@@ -5,9 +5,6 @@ import 'package:xp_engine/xp_engine.dart';
 
 const _app = AppProfile(name: 'demo', path: '.', hasIos: true);
 
-const _flavor =
-    'the app uses the flavor prod, which Linux iOS builds do not support yet '
-    '(omarchy-apple-dev: flavors)';
 const _shorebird =
     'the job uses Shorebird iOS, which needs macOS (Shorebird iOS on Linux is '
     'not decided)';
@@ -50,26 +47,27 @@ void main() {
     );
   });
 
-  test('a flavor of the build or the strip step, once', () {
+  test('a flavor and an entry point build on Linux (omarchy-apple-dev '
+      'FLAVOR and TARGET)', () {
     expect(
       iosLinuxLimits([
-        _step('build.ios', {'flavor': 'prod', ..._signing}),
-        _step('build.ios', {'flavor': 'prod', ..._signing}),
+        _step('build.ios', {
+          'flavor': 'prod',
+          'target': 'lib/main_prod.dart',
+          ..._signing,
+        }),
       ], _app),
-      [_flavor],
+      isEmpty,
     );
   });
 
-  test('an entry point other than lib/main.dart, and the strip step', () {
+  test('the strip step', () {
     expect(
       iosLinuxLimits([
         _step('build.ios', {'target': 'lib/main_prod.dart', ..._signing}),
         _step('ios.stripAndReexport'),
       ], _app),
-      [
-        contains('the flavor builds lib/main_prod.dart'),
-        contains('the job strips frameworks after the build'),
-      ],
+      [contains('the job strips frameworks after the build')],
     );
   });
 
@@ -87,13 +85,71 @@ void main() {
     );
   });
 
+  test("the scan's own reasons for the flavor a step builds", () {
+    const icon = 'its configuration Release-dev uses a multi-size icon set';
+    const app = AppProfile(
+      name: 'demo',
+      path: '.',
+      flavors: [
+        FlavorProfile(
+          name: 'dev',
+          entrypoint: 'lib/main_dev.dart',
+          iosLinuxLimits: [icon],
+        ),
+        FlavorProfile(name: 'prod', entrypoint: 'lib/main_prod.dart'),
+      ],
+    );
+
+    expect(
+      iosLinuxLimits([
+        _step('build.ios', {'flavor': 'dev', ..._signing}),
+        _step('ios.stripAndReexport', {'flavor': 'dev'}),
+      ], app),
+      [icon, contains('the job strips frameworks after the build')],
+    );
+    expect(
+      iosLinuxLimits([
+        _step('build.ios', {'flavor': 'prod', ..._signing}),
+      ], app),
+      isEmpty,
+    );
+    expect(
+      iosLinuxLimits([
+        _step('build.ios', {'flavor': 'staging', ..._signing}),
+      ], app),
+      isEmpty,
+      reason: 'a flavor the scan does not know has no limits of its own',
+    );
+    expect(iosLinuxLimits([_step('build.ios', _signing)], app), isEmpty);
+  });
+
+  test("the scan's own reasons for the flavor of an app without flavors", () {
+    const app = AppProfile(
+      name: 'demo',
+      path: '.',
+      flavors: [
+        FlavorProfile(
+          name: 'default',
+          implicit: true,
+          entrypoint: 'lib/main.dart',
+          iosLinuxLimits: ['its configuration Release uses a multi-size set'],
+        ),
+      ],
+    );
+
+    expect(iosLinuxLimits([_step('build.ios', _signing)], app), [
+      'its configuration Release uses a multi-size set',
+    ]);
+    expect(iosLinuxLimits([_step('git.checkout')], app), isEmpty);
+  });
+
   test('a build the flavor cannot sign on Linux, with a flavor too', () {
     expect(iosLinuxLimits([_step('build.ios')], _app), [_unsigned]);
     expect(
       iosLinuxLimits([
         _step('build.ios', {'flavor': 'prod'}),
       ], _app),
-      [_flavor, _unsigned],
+      [_unsigned],
     );
   });
 
@@ -138,6 +194,28 @@ void main() {
         _step('command', {'executable': 'ls'}),
       ], _app),
       isEmpty,
+    );
+  });
+
+  test('an app with Linux iOS builds turned off, before every other '
+      'reason', () {
+    const off = AppProfile(
+      name: 'demo',
+      path: '.',
+      iosLinux: false,
+      iosLinuxLimits: ['the app pins Flutter 3.44.2'],
+    );
+
+    expect(iosLinuxLimits([_step('build.ios', _signing)], off), [
+      'Linux iOS builds are turned off for this app',
+      'the app pins Flutter 3.44.2',
+    ]);
+    expect(
+      iosLinuxLimits(
+        const [],
+        const AppProfile(name: 'a', path: '.', iosLinux: false),
+      ),
+      [iosLinuxOff],
     );
   });
 

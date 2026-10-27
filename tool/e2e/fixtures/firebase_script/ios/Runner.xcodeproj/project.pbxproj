@@ -1,0 +1,254 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 54;
+	objects = {
+
+		97C100000000000000000001 /* Assets.xcassets */ = {
+			isa = PBXFileReference;
+			lastKnownFileType = folder.assetcatalog;
+			path = Assets.xcassets;
+			sourceTree = "<group>";
+		};
+		97C200000000000000000002 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 97C100000000000000000001 /* Assets.xcassets */; };
+		974000000000000000000003 /* Flutter */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = Flutter;
+			path = Flutter;
+			sourceTree = "<group>";
+		};
+		97C600000000000000000004 /* Runner */ = {
+			isa = PBXGroup;
+			children = (
+				97C100000000000000000001,
+			);
+			path = Runner;
+			sourceTree = "<group>";
+		};
+		97C700000000000000000005 = {
+			isa = PBXGroup;
+			children = (
+				974000000000000000000003 /* Flutter */,
+				97C600000000000000000004 /* Runner */,
+			);
+			sourceTree = "<group>";
+		};
+		97C800000000000000000006 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				97C200000000000000000002,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		3B0600000000000000000007 /* Run Script */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+			);
+			name = "Run Script";
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "/bin/sh \"$FLUTTER_ROOT/packages/flutter_tools/bin/xcode_backend.sh\" build\n";
+		};
+		3B0600000000000000000008 /* Copy GoogleService-Info.plist */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+			);
+			name = "Copy GoogleService-Info.plist";
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "# The flavor is the part of the configuration after the dash.\ncp \"${PROJECT_DIR}/config/${CONFIGURATION#*-}/GoogleService-Info.plist\" \"${BUILT_PRODUCTS_DIR}/${PRODUCT_NAME}.app/GoogleService-Info.plist\"\n";
+		};
+		3B0600000000000000000009 /* Thin Binary */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+			);
+			name = "Thin Binary";
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "/bin/sh \"$FLUTTER_ROOT/packages/flutter_tools/bin/xcode_backend.sh\" embed_and_thin\n";
+		};
+		97C90000000000000000000A /* Debug-dev */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				DEVELOPMENT_TEAM = FAKETEAM08;
+				INFOPLIST_FILE = Runner/Info.plist;
+				PRODUCT_BUNDLE_IDENTIFIER = com.example.firebase.dev;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = "Debug-dev";
+		};
+		97CA0000000000000000000B /* Debug-dev */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+			};
+			name = "Debug-dev";
+		};
+		97C90000000000000000000C /* Profile-dev */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				DEVELOPMENT_TEAM = FAKETEAM08;
+				INFOPLIST_FILE = Runner/Info.plist;
+				PRODUCT_BUNDLE_IDENTIFIER = com.example.firebase.dev;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = "Profile-dev";
+		};
+		97CA0000000000000000000D /* Profile-dev */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+			};
+			name = "Profile-dev";
+		};
+		97C90000000000000000000E /* Release-dev */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				DEVELOPMENT_TEAM = FAKETEAM08;
+				INFOPLIST_FILE = Runner/Info.plist;
+				PRODUCT_BUNDLE_IDENTIFIER = com.example.firebase.dev;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = "Release-dev";
+		};
+		97CA0000000000000000000F /* Release-dev */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+			};
+			name = "Release-dev";
+		};
+		97C900000000000000000010 /* Debug-prod */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				DEVELOPMENT_TEAM = FAKETEAM08;
+				INFOPLIST_FILE = Runner/Info.plist;
+				PRODUCT_BUNDLE_IDENTIFIER = com.example.firebase;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = "Debug-prod";
+		};
+		97CA00000000000000000011 /* Debug-prod */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+			};
+			name = "Debug-prod";
+		};
+		97C900000000000000000012 /* Profile-prod */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				DEVELOPMENT_TEAM = FAKETEAM08;
+				INFOPLIST_FILE = Runner/Info.plist;
+				PRODUCT_BUNDLE_IDENTIFIER = com.example.firebase;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = "Profile-prod";
+		};
+		97CA00000000000000000013 /* Profile-prod */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+			};
+			name = "Profile-prod";
+		};
+		97C900000000000000000014 /* Release-prod */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				DEVELOPMENT_TEAM = FAKETEAM08;
+				INFOPLIST_FILE = Runner/Info.plist;
+				PRODUCT_BUNDLE_IDENTIFIER = com.example.firebase;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = "Release-prod";
+		};
+		97CA00000000000000000015 /* Release-prod */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+			};
+			name = "Release-prod";
+		};
+		97CB00000000000000000016 /* Build configuration list for PBXNativeTarget "Runner" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				97C90000000000000000000A /* Debug-dev */,
+				97C90000000000000000000C /* Profile-dev */,
+				97C90000000000000000000E /* Release-dev */,
+				97C900000000000000000010 /* Debug-prod */,
+				97C900000000000000000012 /* Profile-prod */,
+				97C900000000000000000014 /* Release-prod */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = "Release-prod";
+		};
+		97CC00000000000000000017 /* Build configuration list for PBXProject "Runner" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				97CA0000000000000000000B /* Debug-dev */,
+				97CA0000000000000000000D /* Profile-dev */,
+				97CA0000000000000000000F /* Release-dev */,
+				97CA00000000000000000011 /* Debug-prod */,
+				97CA00000000000000000013 /* Profile-prod */,
+				97CA00000000000000000015 /* Release-prod */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = "Release-prod";
+		};
+		97CD00000000000000000018 /* Runner */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 97CB00000000000000000016;
+			buildPhases = (
+				3B0600000000000000000007,
+				97C800000000000000000006,
+				3B0600000000000000000008,
+				3B0600000000000000000009,
+			);
+			name = Runner;
+			productName = Runner;
+			productType = "com.apple.product-type.application";
+		};
+		97CE00000000000000000019 /* Project object */ = {
+			isa = PBXProject;
+			buildConfigurationList = 97CC00000000000000000017;
+			mainGroup = 97C700000000000000000005;
+			targets = (
+				97CD00000000000000000018 /* Runner */,
+			);
+		};
+		78A30000000000000000001A /* XCLocalSwiftPackageReference "Flutter/ephemeral/Packages/FlutterGeneratedPluginSwiftPackage" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Flutter/ephemeral/Packages/FlutterGeneratedPluginSwiftPackage;
+		};
+	};
+	rootObject = 97CE00000000000000000019 /* Project object */;
+}

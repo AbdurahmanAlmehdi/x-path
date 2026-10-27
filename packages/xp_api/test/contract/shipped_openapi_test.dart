@@ -130,6 +130,47 @@ void main() {
       );
     });
 
+    test('describes the per-app switch for Linux iOS builds', () {
+      const off = AppProfile(name: 'shop', path: '.', iosLinux: false);
+      const edits = ProfileEdits(apps: [AppEdit(path: '.', iosLinux: false)]);
+
+      expect(shipped.validateSchema('AppProfile', off.toJson()), isEmpty);
+      expect(
+        shipped.validateSchema(
+          'AppProfile',
+          const AppProfile(name: 'shop', path: '.').toJson(),
+        ),
+        isEmpty,
+      );
+      expect(shipped.validateSchema('ProfileEdits', edits.toJson()), isEmpty);
+      expect(
+        shipped.validateSchema('AppEdit', {'path': '.', 'iosLinux': 'off'}),
+        isNotEmpty,
+      );
+    });
+
+    test("describes a flavor's own Linux iOS limits", () {
+      const limited = FlavorProfile(
+        name: 'dev',
+        entrypoint: 'lib/main_dev.dart',
+        iosLinuxLimits: ['its configuration Release-dev uses a multi-size set'],
+      );
+      const app = AppProfile(name: 'shop', path: '.', flavors: [limited]);
+
+      expect(
+        shipped.validateSchema('FlavorProfile', limited.toJson()),
+        isEmpty,
+      );
+      expect(shipped.validateSchema('AppProfile', app.toJson()), isEmpty);
+      expect(
+        shipped.validateSchema('FlavorProfile', {
+          ...limited.toJson(),
+          'iosLinuxLimits': 'one',
+        }),
+        isNotEmpty,
+      );
+    });
+
     test('documents the job endpoints and their error responses', () {
       final unauthorized = jsonEncode(
         ErrorResponse.of(ApiErrorCode.unauthorized, 'm').toJson(),

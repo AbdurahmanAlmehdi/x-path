@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:xp_api/xp_api.dart';
 import 'package:xp_engine/src/dispatch/ios_linux_limits.dart';
 import 'package:xp_engine/src/scan/firebase_files.dart';
@@ -204,10 +206,13 @@ class _AppScan {
         : const <String>[];
     if (hasIos) {
       _checkIosLinux(
-        flavors: implicit ? const [] : names,
         extensions: extensions,
-        limits: linuxLimits,
+        limits: [
+          ...linuxLimits,
+          if (implicit) ...flavors.single.iosLinuxLimits,
+        ],
       );
+      if (!implicit) flavors.forEach(_checkFlavorIosLinux);
     }
 
     return AppProfile(
@@ -248,26 +253,16 @@ class _AppScan {
   /// builds with `flutter assemble` of 3.47).
   static const _linuxMinimumFlutter = (3, 47);
 
-  /// The storyboards of Flutter's template, which Linux iOS builds compile.
-  static const _templateStoryboards = {
-    'Main.storyboard',
-    'LaunchScreen.storyboard',
-  };
-
   /// Why Linux runners cannot build the iOS app, from the project alone
-  /// (ADR 0014): plugins that build with CocoaPods, storyboards beyond
-  /// Flutter's template, a Flutter older than 3.47.
+  /// (ADR 0014): plugins that build with CocoaPods, Run Script phases beyond
+  /// Flutter's own, a Flutter older than 3.47. A storyboard Linux cannot
+  /// compile fails the build with ibtool's error instead; the owner can turn
+  /// Linux iOS builds off for the app.
   Future<List<String>> _iosLinuxLimits(
     IosPackageManager packageManager,
     String? flutterVersion,
   ) async {
     final pods = await _cocoaPodsPlugins();
-    final storyboards = [
-      for (final entry in await _source.list(_at('ios/Runner/Base.lproj')))
-        if (entry.name.endsWith('.storyboard') &&
-            !_templateStoryboards.contains(entry.name))
-          entry.name,
-    ];
     final (major, minor) = _linuxMinimumFlutter;
     final version = RegExp(r'^(\d+)\.(\d+)').firstMatch(flutterVersion ?? '');
     final (pinMajor, pinMinor) = version == null
@@ -290,11 +285,18 @@ class _AppScan {
         'only)',
       );
     }
-    if (storyboards.isNotEmpty) {
+    final target = _xcode?.appTarget;
+    final scripts = [
+      for (final phase in target?.scriptPhases ?? const <XcodeScriptPhase>[])
+        if (!phase.isFlutter && !phase.isCocoaPods) '"${phase.name}"',
+    ];
+    if (scripts.isNotEmpty) {
+      final one = scripts.length == 1;
       reasons.add(
-        'the app has the storyboard${storyboards.length == 1 ? '' : 's'} '
-        "${storyboards.join(', ')} beyond Flutter's template, which Linux iOS "
-        'builds do not compile yet (omarchy-apple-dev: storyboards)',
+        'the ${target!.name} target runs the Run Script phase${one ? '' : 's'} '
+        '${scripts.join(', ')}, which Linux iOS builds skip, so what '
+        "${one ? 'it does' : 'they do'} (such as copying the flavor's "
+        'GoogleService-Info.plist) would be missing from the build',
       );
     }
     if (tooOld) {
@@ -320,15 +322,17 @@ class _AppScan {
     ]..sort();
   }
 
-  /// Says that the iOS app needs a Mac, and why, when it has [flavors],
-  /// [extensions] or other [limits].
+  static const _needsMacFix =
+      'Nothing to do to build on a Mac. To build on Linux (ADR 0014), lift '
+      'each reason; until then its iOS jobs wait for a Mac (ios-sign).';
+
+  /// Says that the iOS app needs a Mac, and why, when it has [extensions] or
+  /// other [limits].
   void _checkIosLinux({
-    required List<String> flavors,
     required List<String> extensions,
     required List<String> limits,
   }) {
     final reasons = [
-      if (flavors.isNotEmpty) flavorsLimit(flavors),
       if (extensions.isNotEmpty) extensionsLimit(extensions),
       ...limits,
     ];
@@ -338,10 +342,192 @@ class _AppScan {
       'ios_needs_mac',
       'Needs a Mac for iOS: Linux runners cannot build it because '
           '${reasons.join('; ')}.',
-      'Nothing to do to build on a Mac. To build on Linux (ADR 0014), lift '
-          'each reason; until then its iOS jobs wait for a Mac (ios-sign).',
+      _needsMacFix,
       path: _at('ios'),
     );
+  }
+
+  /// Says that the iOS app of [flavor] needs a Mac, and why, when its own
+  /// configuration rules Linux out.
+  void _checkFlavorIosLinux(FlavorProfile flavor) {
+    if (flavor.iosLinuxLimits.isEmpty) return;
+    _add(
+      FindingSeverity.info,
+      'ios_needs_mac',
+      'Flavor ${flavor.name} needs a Mac for iOS: Linux runners cannot build '
+          'it because ${flavor.iosLinuxLimits.join('; ')}.',
+      _needsMacFix,
+      path: _at('ios'),
+      flavor: flavor.name,
+    );
+  }
+
+  /// Why Linux runners cannot build [flavor] from its own configuration, the
+  /// one `flutter build` picks, where a Mac builds it: an Info.plist other
+  /// than `Runner/Info.plist`, an app icon set outside
+  /// `Runner/Assets.xcassets`, a multi-size app icon set. Warns about what
+  /// fails on a Mac as much: no such configuration (unless the scan [warned]
+  /// already) or several, a missing app icon set.
+  Future<List<String>> _flavorIosLinuxLimits(
+    String flavor, {
+    required bool implicit,
+    required XcodeProject xcode,
+    required XcodeTarget target,
+    required bool warned,
+  }) async {
+    final pbxproj = _at('ios/Runner.xcodeproj/project.pbxproj');
+    final build = implicit ? 'flutter build' : 'flutter build --flavor $flavor';
+    final candidates = xcode.releaseConfigurationsFor(
+      target,
+      implicit ? null : flavor,
+    );
+    if (candidates.isEmpty && !warned) {
+      _add(
+        FindingSeverity.warning,
+        'ios_flavor_configuration_missing',
+        '$build looks for the build configuration Release-$flavor, which '
+            'the Xcode project does not have.',
+        'Name the Release configuration of $flavor Release-$flavor, for '
+            'example by running flutter_flavorizr.',
+        path: pbxproj,
+        flavor: flavor,
+      );
+    }
+    if (candidates.length > 1) {
+      _add(
+        FindingSeverity.warning,
+        'ios_flavor_configuration_ambiguous',
+        '$build matches the build configurations ${candidates.join(', ')}, '
+            'and builds none of them.',
+        'Rename them so that one is called '
+            '${implicit ? 'Release' : 'Release-$flavor'}.',
+        path: pbxproj,
+        flavor: implicit ? null : flavor,
+      );
+    }
+    if (candidates.length != 1) return const [];
+
+    final configuration = candidates.single;
+    final settings = xcode.layeredSettingsOf(target, configuration, {
+      for (final path in xcode.baseConfigurationsOf(target, configuration))
+        path: await _xcconfig(
+          normalizeScanPath(joinScanPath(_at('ios'), path)),
+        ),
+    });
+    final plist = normalizeScanPath(
+      expandBuildSetting(
+        (settings['INFOPLIST_FILE'] ?? '')
+            .replaceFirst(r'$(SRCROOT)/', '')
+            .replaceFirst(r'$(PROJECT_DIR)/', ''),
+        settings,
+      ),
+    );
+    final limits = <String>[];
+    if (plist.isNotEmpty && plist != _linuxInfoPlist) {
+      limits.add(
+        'its configuration $configuration reads the Info.plist $plist, and '
+        'Linux iOS builds read $_linuxInfoPlist only (omarchy-apple-dev: an '
+        'Info.plist per configuration)',
+      );
+    }
+    final icon = expandBuildSetting(
+      settings['ASSETCATALOG_COMPILER_APPICON_NAME'] ?? '',
+      settings,
+    );
+    if (icon.isEmpty || icon.contains(r'$')) return limits;
+    final linuxCatalog = normalizeScanPath(_at('ios/$_linuxAssetCatalog'));
+    final catalogs = [
+      for (final resource in target.resources)
+        if (resource.endsWith('.xcassets'))
+          if (normalizeScanPath(joinScanPath(_at('ios'), resource))
+              case final catalog when await _source.exists(catalog))
+            catalog,
+    ];
+    // The catalog Linux builds compile first, as the set is taken from it
+    // when several have one.
+    for (final catalog in [
+      ...catalogs.where((catalog) => catalog == linuxCatalog),
+      ...catalogs.where((catalog) => catalog != linuxCatalog),
+    ]) {
+      final contents = await _source.read(
+        joinScanPath(catalog, '$icon.appiconset/Contents.json'),
+      );
+      if (contents == null) continue;
+      if (catalog != linuxCatalog) {
+        limits.add(
+          'its configuration $configuration takes the app icon set $icon '
+          'from $catalog, and Linux iOS builds take app icons from '
+          '$linuxCatalog only (omarchy-apple-dev: asset catalogs beyond '
+          '$_linuxAssetCatalog)',
+        );
+      }
+      if (_multiSize(contents)) {
+        limits.add(
+          'its configuration $configuration uses the app icon set $icon, '
+          'which has several sizes, and App Store processing of a Linux build '
+          'can get stuck on one without an error (omarchy-apple-dev: '
+          'single-size app icons; a single 1024x1024 icon lifts it)',
+        );
+      }
+      return limits;
+    }
+    if (catalogs.isNotEmpty) {
+      _add(
+        FindingSeverity.warning,
+        'ios_app_icon_missing',
+        'The configuration $configuration of '
+            '${implicit ? 'the app' : 'flavor $flavor'} '
+            'uses the app icon set $icon, which no asset catalog of the '
+            '${target.name} target has.',
+        'Add $icon.appiconset to ${catalogs.join(' or ')}, or set '
+            'ASSETCATALOG_COMPILER_APPICON_NAME of $configuration to an icon '
+            'set it has.',
+        path: catalogs.first,
+        flavor: implicit ? null : flavor,
+      );
+    }
+    return limits;
+  }
+
+  /// The Info.plist of the Runner target, relative to `ios`, the only one
+  /// Linux iOS builds read.
+  static const _linuxInfoPlist = 'Runner/Info.plist';
+
+  /// The asset catalog of the Runner target, relative to `ios`, the only one
+  /// Linux iOS builds take app icons from.
+  static const _linuxAssetCatalog = 'Runner/Assets.xcassets';
+
+  /// The settings of the `.xcconfig` at [path] over those of its includes;
+  /// none when it cannot be read.
+  Future<Map<String, String>> _xcconfig(String path, [int depth = 0]) async {
+    final text = depth > 8 ? null : await _source.read(path);
+    if (text == null) return const {};
+    final file = parseXcconfig(text);
+    return {
+      for (final include in file.includes)
+        ...await _xcconfig(normalizeScanPath('$path/../$include'), depth + 1),
+      ...file.settings,
+    };
+  }
+
+  /// Whether the `Contents.json` of an app icon set has an icon of another
+  /// size than the single 1024x1024 one.
+  static bool _multiSize(String contents) {
+    final Object? json;
+    try {
+      json = jsonDecode(contents);
+    } on FormatException {
+      return false;
+    }
+    return switch (json) {
+      {'images': final List<Object?> images} => images.any(
+        (image) => switch (image) {
+          {'size': final String size} => size != '1024x1024',
+          _ => false,
+        },
+      ),
+      _ => false,
+    };
   }
 
   /// Says which flavor the Firebase files of a platform leave out: its
@@ -671,6 +857,15 @@ class _AppScan {
     final shorebirdId = implicit
         ? shorebird?.appId
         : shorebird?.flavorAppIds[flavor];
+    final iosLinuxLimits = xcode != null && target != null
+        ? await _flavorIosLinuxLimits(
+            flavor,
+            implicit: implicit,
+            xcode: xcode,
+            target: target,
+            warned: settings == null,
+          )
+        : const <String>[];
     return FlavorProfile(
       name: flavor,
       implicit: implicit,
@@ -691,6 +886,7 @@ class _AppScan {
           if (entrypoint != null) 'entrypoint',
         ],
       ],
+      iosLinuxLimits: iosLinuxLimits,
     );
   }
 

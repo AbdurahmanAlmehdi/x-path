@@ -170,19 +170,20 @@ List<McpTool> buildXpTools(
     tool(
       'update_project',
       "Edit the project's profile: the base branch, and per app the store "
-          'country and per flavor prod, shorebird, entrypoint, iosBundleId, '
-          'androidAppId, versionFiles, firebaseAppId ({"android": "1:..."}; '
-          'an empty id removes it) and appleAppId, which the built-in '
-          'workflows upload to when no input gives one. Edits survive '
-          'rescans.',
+          'country, iosLinux (false sends every iOS job of the app to a Mac '
+          'instead of a Linux runner) and per flavor prod, shorebird, '
+          'entrypoint, iosBundleId, androidAppId, versionFiles, '
+          'firebaseAppId ({"android": "1:..."}; an empty id removes it) and '
+          'appleAppId, which the built-in workflows upload to when no input '
+          'gives one. Edits survive rescans.',
       {
         'project': project,
         'edits': {
           'type': 'object',
           'description':
               'ProfileEdits: {"defaultBaseBranch": "main", "apps": [{"path": '
-              '".", "storeCountry": "us", "flavors": [{"name": "prod", '
-              '"prod": true}]}]}',
+              '".", "storeCountry": "us", "iosLinux": false, "flavors": '
+              '[{"name": "prod", "prod": true}]}]}',
         },
       },
       (args) async {

@@ -157,6 +157,7 @@ void main() {
               {
                 'path': '.',
                 'storeCountry': 'ly',
+                'iosLinux': false,
                 'flavors': [
                   {
                     'name': 'prod',
@@ -328,6 +329,58 @@ void main() {
       expectContract(response, path: '/projects/$id/scan', method: 'POST');
     });
 
+    test("POST /projects/{id}/scan with a flavor's own Linux iOS "
+        'limits', () async {
+      engine.folders['/work/icons'] = {
+        ...projectFiles,
+        'ios/Runner.xcodeproj/project.pbxproj': '''
+{
+  objects = {
+    T = {
+      isa = PBXNativeTarget;
+      buildConfigurationList = L;
+      buildPhases = ( P );
+      name = Runner;
+      productType = "com.apple.product-type.application";
+    };
+    P = { isa = PBXResourcesBuildPhase; files = ( B ); };
+    B = { isa = PBXBuildFile; fileRef = F; };
+    F = {
+      isa = PBXFileReference;
+      path = Runner/Assets.xcassets;
+      sourceTree = SOURCE_ROOT;
+    };
+    L = { isa = XCConfigurationList; buildConfigurations = ( C ); };
+    C = {
+      isa = XCBuildConfiguration;
+      buildSettings = {
+        ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+        PRODUCT_BUNDLE_IDENTIFIER = com.example;
+      };
+      name = Release;
+    };
+    R = { isa = PBXProject; buildConfigurationList = L; targets = ( T ); };
+  };
+  rootObject = R;
+}
+''',
+        'ios/Runner/Assets.xcassets/AppIcon.appiconset/Contents.json':
+            '{"images": [{"idiom": "iphone", "size": "60x60"}]}',
+      };
+      final added = await send('POST', '/projects', {'path': '/work/icons'});
+      final id = added.json['id']! as String;
+
+      final response = await send('POST', '/projects/$id/scan');
+
+      expect(response.statusCode, 200);
+      expectContract(response, path: '/projects/$id/scan', method: 'POST');
+      final app = ((response.json['profile'] as Map)['apps'] as List).single;
+      expect(
+        (((app as Map)['flavors'] as List).single as Map)['iosLinuxLimits'],
+        [contains('the app icon set AppIcon, which has several sizes')],
+      );
+    });
+
     test('POST /projects/{id}/scan 404', () async {
       final response = await send('POST', '/projects/prj_nope/scan');
 
@@ -389,6 +442,31 @@ void main() {
       });
       expect((flavor.single as Map)['appleAppId'], '1234567890');
       expectContract(response, path: '/projects/$id', method: 'PATCH');
+    });
+
+    test('PATCH /projects/{id} turns Linux iOS builds off and on for an '
+        'app', () async {
+      final id = await addProject();
+      Future<Map<String, Object?>> turn({required bool on}) async {
+        final response = await send('PATCH', '/projects/$id', {
+          'apps': [
+            {'path': '.', 'iosLinux': on},
+          ],
+        });
+        expect(response.statusCode, 200);
+        expectContract(response, path: '/projects/$id', method: 'PATCH');
+        return ((response.json['profile'] as Map)['apps'] as List).single
+            as Map<String, Object?>;
+      }
+
+      expect((await turn(on: false))['iosLinux'], isFalse);
+      final read = await send('GET', '/projects/$id');
+      expect(
+        (((read.json['profile'] as Map)['apps'] as List).single
+            as Map)['iosLinux'],
+        isFalse,
+      );
+      expect(await turn(on: true), isNot(contains('iosLinux')));
     });
 
     test('PATCH /projects/{id} 400 for a store id of the wrong form', () async {
