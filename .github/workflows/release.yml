@@ -24,6 +24,9 @@
 #   dmg       public repository with the signing secrets only: the Developer
 #             ID signed, notarized DMG (tool/release/build_mac.sh) and the
 #             macOS archives, uploaded to the same release.
+#   cask      with the secret HOMEBREW_TAP_TOKEN only: points the Homebrew
+#             cask (Casks/xpath.rb in AbdurahmanAlmehdi/homebrew-tap) at the
+#             DMG of the release, for `brew upgrade --cask xpath`.
 #
 # A tag vX.Y.Z pushed by hand (1.0 is tagged by hand) releases that version.
 # "Run workflow" on main runs again for its HEAD, with an optional version.
@@ -448,3 +451,79 @@ jobs:
             security delete-keychain "${XPATH_KEYCHAIN}" || true
           fi
           rm -f "${RUNNER_TEMP}/developer-id.p12" "${RUNNER_TEMP}/notary.p8"
+
+  # Writes the version and the sha256 of the published DMG into the cask and
+  # commits "xpath <version>" to the tap. A pre-release leaves the cask alone,
+  # and so does a run again for a version older than the cask's. The job skips
+  # itself, with a warning, until the secret HOMEBREW_TAP_TOKEN is set (see
+  # docs/reference/installation.md), and with a notice when the release has no
+  # DMG (no signing secrets).
+  cask:
+    needs: [version, dmg]
+    if: ${{ needs.version.outputs.prerelease != 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+      TAG: ${{ needs.version.outputs.tag }}
+      DMG: XPath-${{ needs.version.outputs.version }}.dmg
+    steps:
+      - name: Check the Tap Token and the DMG
+        id: ready
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        run: |
+          if [ -z "${TAP_TOKEN}" ]; then
+            echo "::warning title=Cask not updated for ${TAG}::Set the secret HOMEBREW_TAP_TOKEN to update the Homebrew cask (docs/reference/installation.md)."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          elif ! gh release view "${TAG}" --repo "${GITHUB_REPOSITORY}" --json assets --jq '.assets[].name' \
+            | grep -qxF "${DMG}"; then
+            echo "::notice title=Cask not updated for ${TAG}::The release has no ${DMG}."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      # The sha256 of the file users download, not of a local build.
+      - name: Download the DMG
+        if: steps.ready.outputs.ready == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release download "${TAG}" --repo "${GITHUB_REPOSITORY}" --pattern "${DMG}"
+
+      - name: Git Checkout the Tap
+        if: steps.ready.outputs.ready == 'true'
+        uses: actions/checkout@v7
+        with:
+          repository: AbdurahmanAlmehdi/homebrew-tap
+          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          path: homebrew-tap
+
+      # A run again with a new DMG (notarized again) updates the sha256 of the
+      # same version; with the same DMG there is nothing to commit.
+      - name: Update and Push the Cask
+        if: steps.ready.outputs.ready == 'true'
+        run: |
+          cask=homebrew-tap/Casks/xpath.rb
+          sha256="$(sha256sum "${DMG}" | cut -d' ' -f1)"
+          current="$(sed -n 's/^  version "\(.*\)"$/\1/p' "${cask}")"
+          if [ "$(printf '%s\n%s\n' "${current}" "${VERSION}" | sort -V | tail -n1)" != "${VERSION}" ]; then
+            echo "::notice title=Cask not updated for ${TAG}::The cask is at ${current}, newer than ${VERSION}."
+            exit 0
+          fi
+          sed -i -e "s/^  version \".*\"$/  version \"${VERSION}\"/" \
+            -e "s/^  sha256 \".*\"$/  sha256 \"${sha256}\"/" "${cask}"
+          grep -qxF "  version \"${VERSION}\"" "${cask}"
+          grep -qxF "  sha256 \"${sha256}\"" "${cask}"
+          ruby -c "${cask}"
+          cd homebrew-tap
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Casks/xpath.rb
+          if git diff --cached --quiet; then
+            echo "The cask is already at ${VERSION} with this DMG."
+            exit 0
+          fi
+          git commit -m "xpath ${VERSION}"
+          git push origin HEAD

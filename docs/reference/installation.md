@@ -63,6 +63,12 @@ merged pull request. Nothing is committed to `main`: the version lives in the ta
   release. Without the secrets it skips itself with a notice; on a private repository it does not run, and the
   macOS archives come from a Mac: `dart run tool/release_version.dart apply <version> <build>`,
   `tool/release/bundles.sh --upload v<version>`, then `git checkout -- apps` to drop the version again.
+- **Homebrew cask** (job `cask`). After the DMG, it downloads `XPath-<version>.dmg` from the release, writes the
+  version and its sha256 into `Casks/xpath.rb` of
+  [AbdurahmanAlmehdi/homebrew-tap](https://github.com/AbdurahmanAlmehdi/homebrew-tap) and pushes the commit
+  `xpath <version>`, so `brew upgrade --cask xpath` finds it. A pre-release, a release without a DMG and a run again
+  for a version older than the cask's leave the cask alone. Without the tap token below it skips itself with a
+  warning.
 - **By hand.** A tag `vX.Y.Z` pushed by hand releases that version (1.0 is tagged by hand). Actions ▸ release ▸ Run
   workflow on `main` runs again for its HEAD, optionally with the version to release. A release never comes from
   another branch.
@@ -79,6 +85,13 @@ value from stdin, or under Settings ▸ Secrets and variables ▸ Actions:
 | `MAC_NOTARY_KEY_P8_BASE64` | An App Store Connect API key (`AuthKey_<key id>.p8`) in base64, for `notarytool`. | App Store Connect ▸ Users and Access ▸ Integrations ▸ App Store Connect API ▸ Team Keys ▸ +, access Developer. The `.p8` downloads once: `base64 -i AuthKey_<key id>.p8 \| gh secret set MAC_NOTARY_KEY_P8_BASE64`. |
 | `MAC_NOTARY_KEY_ID` | The key ID of that key. | Shown in its row. |
 | `MAC_NOTARY_ISSUER_ID` | The issuer ID of the team's keys. | Shown above the list of keys. |
+
+**Tap token.** The `cask` job reads the repository secret `HOMEBREW_TAP_TOKEN`, a fine-grained personal access token
+that can push to the tap and nothing else. Create it under GitHub ▸ Settings ▸ Developer settings ▸ Personal access
+tokens ▸ Fine-grained tokens: resource owner AbdurahmanAlmehdi, repository access "Only select repositories" with
+`AbdurahmanAlmehdi/homebrew-tap` alone, and the repository permission Contents: Read and write (Metadata: Read-only
+comes with it). Then `gh secret set HOMEBREW_TAP_TOKEN` and paste it. When it expires, the job fails at the tap
+checkout; make a new one and set the secret again.
 
 **Linux install.** `tool/release/linux/install.sh` is served at `https://xpath.abdurahman.ly/install` (ADR 0005):
 
