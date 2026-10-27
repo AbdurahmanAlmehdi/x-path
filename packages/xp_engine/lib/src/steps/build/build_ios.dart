@@ -79,9 +79,12 @@ class IosLinuxBuilds {
 ///   per Flutter version in an install of its own, `flutter/build.sh`, then
 ///   `flutter/ship.sh` without `--upload`, which signs with the Apple
 ///   Distribution identity and the App Store profile in `linuxSigning`. The
-///   build name and number, the dart defines (as `KEY=VALUE` arguments),
-///   obfuscation, the export options and `ios/Runner/Runner.entitlements` are
-///   mapped onto that interface. The IPA is
+///   build name and number, the flavor (`FLAVOR`, which picks the scheme and
+///   its Release configuration as `--flavor` does), the entrypoint
+///   (`TARGET`), the dart defines (as `KEY=VALUE` arguments), obfuscation and
+///   the export options are mapped onto that interface. `ship.sh` requests
+///   the entitlements of the configuration `build.sh` built
+///   (`CODE_SIGN_ENTITLEMENTS`), as Xcode does. The IPA is
 ///   `build/ios-linux/Runner-store.ipa`.
 ///
 /// Any other machine fails the step, which is what the `ios-sign` and
@@ -104,9 +107,6 @@ class BuildIosStep extends FlutterBuildStep<BuildIosInput> {
 
   /// How this Linux machine builds iOS apps, if it can.
   final IosLinuxBuilds? linux;
-
-  /// The entitlements `flutter/ship.sh` requests, when the app has them.
-  static const _entitlements = 'ios/Runner/Runner.entitlements';
 
   @override
   String get kind => 'build.ios';
@@ -228,6 +228,8 @@ class BuildIosStep extends FlutterBuildStep<BuildIosInput> {
       environment: {
         'BUILD_NAME': '${settings.version.name}',
         'BUILD_NUMBER': '${settings.build}',
+        'FLAVOR': ?settings.flavor,
+        'TARGET': ?settings.target,
         if (debugInfo != null) ...{
           'SPLIT_DEBUG_INFO': debugInfo,
           'DART_OBFUSCATION': 'true',
@@ -241,8 +243,6 @@ class BuildIosStep extends FlutterBuildStep<BuildIosInput> {
       environment: {
         'BUILD_NUMBER': '${settings.build}',
         'ASC_EXPORT_OPTIONS': '$app/${input.exportOptionsPlist}',
-        if (await files.stat('$app/$_entitlements') != null)
-          'ASC_ENTITLEMENTS_PATH': '$app/$_entitlements',
       },
       secretFiles: input.linuxSigning,
     );

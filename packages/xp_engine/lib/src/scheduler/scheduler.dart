@@ -398,7 +398,10 @@ class Scheduler implements JobControl {
   }
 
   /// Why no connected runner can ever take a job that needs [needs] and is
-  /// made of steps of [kinds]; `null` when one can.
+  /// made of steps of [kinds]; `null` when one can. It names the connected
+  /// runners whose probe found a needed capability missing, with the fix
+  /// (such as the checkout of a runner at another omarchy-apple-dev commit
+  /// than the pin), and the offline runners that offer it.
   Future<String?> _cannotRun(
     List<CapabilityNeed> needs,
     List<String> kinds,
@@ -410,13 +413,22 @@ class Scheduler implements JobControl {
         .toList();
     if (capable.isEmpty && needs.isEmpty) return 'No runner is connected.';
     if (capable.isEmpty) {
-      final offline = [
-        for (final runner in await paired())
+      final runners = await paired();
+      final needed = {
+        for (final need in needs)
+          for (final capability in need.anyOf) capability.wire,
+      };
+      final why = [
+        for (final runner in runners)
+          if (runner.connected)
+            for (final missing in runner.missing)
+              if (needed.contains(missing.capability)) _lacks(runner, missing),
+        for (final runner in runners)
           if (!runner.connected && _rank(needs, runner.capabilities) != null)
             _offline(runner, wires),
       ];
-      if (offline.isEmpty) return 'No runner can do $wires.';
-      return 'No connected runner can do $wires. ${offline.join(' ')}';
+      if (why.isEmpty) return 'No runner can do $wires.';
+      return 'No connected runner can do $wires. ${why.join(' ')}';
     }
     if (!capable.any((runner) => runner.accepts(kinds))) {
       final engineOnly = {
@@ -469,6 +481,10 @@ class Scheduler implements JobControl {
     return 'Waiting for a free slot on '
         '${accepting.map((runner) => runner.id).join(', ')}.';
   }
+
+  static String _lacks(PairedRunner runner, MissingCapability missing) =>
+      '${runner.name} lacks ${missing.capability}: ${missing.reason}.'
+      '${missing.fix.isEmpty ? '' : ' To fix it: ${missing.fix}.'}';
 
   static String _offline(PairedRunner runner, String wires) {
     final since = runner.lastSeen;

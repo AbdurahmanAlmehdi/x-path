@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# An iOS build on a Linux runner through omarchy-apple-dev (iOS on Linux 3b,
-# ADR 0014), with the omarchy-apple-dev scripts and tools as stubs.
+# iOS builds of a flavored app on a Linux runner through omarchy-apple-dev
+# (iOS on Linux 3b, ADR 0014; iOS flavors on Linux, Phase 3), with the
+# omarchy-apple-dev scripts and tools as stubs.
 #
 #   runner_ios_linux_e2e.sh
 #
@@ -9,17 +10,23 @@
 #
 #   - starts `xpd serve` in a temporary data directory against a fake GitHub
 #     and a fake App Store Connect, and adds an iOS-only copy of the fixture
-#     app (tool/e2e/build_app without its Android flavors) as a project,
+#     app (tool/e2e/build_app without Android, given the iOS flavors dev and
+#     prod: a scheme, a Release-<flavor> configuration with its own bundle id
+#     and lib/main_<flavor>.dart each, and a single-size icon) as a project,
 #   - writes a stub omarchy-apple-dev checkout (flutter/setup.sh, build.sh and
 #     ship.sh log what they get and write what the real ones would) and stubs
 #     of the tools the probe looks for, and starts a real `xp runner` with
 #     XP_IOS_LINUX_DIR set, which reports `ios-linux`,
 #   - saves an App Store Connect key and an Apple Distribution identity for
-#     the app's flavor and runs a workflow of checkout, version bump,
-#     `build.ios`, `symbols.archive` and `record.manifest` twice,
-#   - checks that both builds ran on the runner, that setup.sh prepared the
-#     dedicated Flutter install once, that ship.sh signed with the profile the
-#     engine made and never saw the App Store Connect key, that the IPA, the
+#     each flavor and runs a workflow of checkout, version bump, `build.ios`,
+#     `symbols.archive` and `record.manifest` for both flavors in one run
+#     (the runner has 2 slots), then for dev again,
+#   - checks that every build ran on the runner without being narrowed to a
+#     Mac, that build.sh got FLAVOR and TARGET and built the two flavors of
+#     the run in separate directories, that setup.sh prepared the dedicated
+#     Flutter install once, that ship.sh got no ASC_ENTITLEMENTS_PATH, signed
+#     the configuration build.sh recorded with the profile the engine made for
+#     the flavor and never saw the App Store Connect key, that the IPA, the
 #     dSYMs and a manifest naming the omarchy-apple-dev commit reached the
 #     engine, and that the runner left no secret behind.
 #
@@ -62,4 +69,4 @@ echo "Building the iOS app on a Linux runner with stubbed omarchy-apple-dev..."
     --work "$work/run"
 ) || fail "the runner iOS on Linux e2e failed"
 
-echo "OK: build.ios ran on the Linux runner through omarchy-apple-dev's scripts, signed with the identity and the profile the engine made, and the IPA and the dSYMs reached the engine."
+echo "OK: build.ios built the flavors dev and prod on the Linux runner through omarchy-apple-dev's scripts with FLAVOR and TARGET, in separate directories, signed with the identity and the profile the engine made for each, and the IPA and the dSYMs reached the engine."

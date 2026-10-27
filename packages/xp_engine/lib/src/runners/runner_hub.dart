@@ -248,6 +248,7 @@ class RunnerHub
           capabilities: runner.capabilities,
           connected: isConnected(runner.id),
           lastSeen: runner.lastHeartbeat,
+          missing: missingOf(runner.id) ?? const [],
         ),
   ];
 

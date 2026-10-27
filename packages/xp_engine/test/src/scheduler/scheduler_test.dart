@@ -346,16 +346,30 @@ void main() {
     });
 
     test('a paired runner compares by value', () {
-      PairedRunner runner({bool connected = false}) => PairedRunner(
+      PairedRunner runner({
+        bool connected = false,
+        List<MissingCapability> missing = const [],
+      }) => PairedRunner(
         id: 'rnr_1',
         name: 'aws',
         capabilities: const {Capability.android},
         connected: connected,
         lastSeen: DateTime.utc(2026, 10, 22),
+        missing: missing,
       );
 
       expect(runner(), runner());
       expect(runner(), isNot(runner(connected: true)));
+      expect(
+        runner(),
+        isNot(
+          runner(
+            missing: const [
+              MissingCapability(capability: 'ios-linux', reason: 'r', fix: ''),
+            ],
+          ),
+        ),
+      );
     });
 
     test(
@@ -404,6 +418,70 @@ void main() {
         expect(paired.reads, 1, reason: 'read once per pass');
       },
     );
+
+    test('name the connected runners that lack a needed capability, with '
+        'the fix', () async {
+      const oldPin = MissingCapability(
+        capability: 'ios-linux',
+        reason:
+            'omarchy-apple-dev is at 4e170a0ce5f2; this XPath needs '
+            '2d03f766859e',
+        fix:
+            'git -C /srv/oad fetch https://github.com/o/oad 2d03f76 && '
+            'git -C /srv/oad checkout 2d03f76',
+      );
+      f.build([f.local()]);
+      f.scheduler.pairedRunners = _PairedRunners([
+        const PairedRunner(
+          id: 'rnr_linux',
+          name: 'hetzner',
+          capabilities: {Capability.flutter, Capability.swiftLinux},
+          connected: true,
+          missing: [
+            oldPin,
+            MissingCapability(
+              capability: 'android',
+              reason: 'no JDK: java not found',
+              fix: 'install JDK 17',
+            ),
+          ],
+        ),
+        const PairedRunner(
+          id: 'rnr_bare',
+          name: 'bare',
+          capabilities: {},
+          connected: true,
+          missing: [
+            MissingCapability(
+              capability: 'ios-sign',
+              reason: 'not macOS',
+              fix: '',
+            ),
+          ],
+        ),
+      ]);
+      final ids = await f.run([
+        const _Spec('ios', needs: ['flutter', 'ios-sign|ios-linux']),
+      ]);
+
+      await f.scheduler.pump();
+
+      const why =
+          'No connected runner can do flutter, ios-sign or ios-linux. '
+          'hetzner lacks ios-linux: omarchy-apple-dev is at 4e170a0ce5f2; '
+          'this XPath needs 2d03f766859e. To fix it: git -C /srv/oad fetch '
+          'https://github.com/o/oad 2d03f76 && git -C /srv/oad checkout '
+          '2d03f76. bare lacks ios-sign: not macOS.';
+      expect(await f.message(ids['ios']!), why);
+      expect(
+        (await f.scheduler.placement(
+          ['flutter', 'ios-sign|ios-linux'],
+          ['build.ios'],
+        )).waitReason,
+        why,
+        reason: 'the dry run says the same',
+      );
+    });
 
     test('say it once, not on every pass', () async {
       f.build([f.local()]);
@@ -660,8 +738,8 @@ void main() {
 
     test('say why Linux was ruled out while a narrowed job waits', () async {
       const flavor =
-          'the app uses the flavor prod, which Linux iOS builds do not '
-          'support yet (omarchy-apple-dev: flavors)';
+          'the job uses Shorebird iOS, which needs macOS (Shorebird iOS on '
+          'Linux is not decided)';
       final linux = spy('rnr_linux', Capability.iosLinux);
       f.build([f.local(), linux]);
       final ids = await f.run([
@@ -673,16 +751,16 @@ void main() {
       expect(linux.launched, isEmpty);
       expect(
         await f.message(ids['ios']!),
-        'No runner can do flutter, ios-sign. It needs ios-sign: the app uses '
-        'the flavor prod, which Linux iOS builds do not support yet '
-        '(omarchy-apple-dev: flavors).',
+        'No runner can do flutter, ios-sign. It needs ios-sign: the job uses '
+        'Shorebird iOS, which needs macOS (Shorebird iOS on Linux is not '
+        'decided).',
       );
     });
 
     test('say why Linux was ruled out while a busy Mac is awaited', () async {
       const flavor =
-          'the app uses the flavor prod, which Linux iOS builds do not '
-          'support yet (omarchy-apple-dev: flavors)';
+          'the job uses Shorebird iOS, which needs macOS (Shorebird iOS on '
+          'Linux is not decided)';
       final mac = spy('rnr_mac', Capability.iosSign);
       final linux = spy('rnr_linux', Capability.iosLinux);
       f.build([mac, linux]);

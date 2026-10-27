@@ -332,6 +332,12 @@ void main() {
       ]);
       expect(paired.first.capabilities, contains(Capability.flutter));
       expect(paired.first.id, online.id);
+      expect(
+        paired.first.missing,
+        h.hub.missingOf(online.id),
+        reason: 'the scheduler names what a connected runner lacks',
+      );
+      expect(paired.last.missing, isEmpty);
     });
 
     test('nothing is missing for a runner that is not connected', () async {

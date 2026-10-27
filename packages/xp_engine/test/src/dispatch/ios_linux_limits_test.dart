@@ -5,9 +5,6 @@ import 'package:xp_engine/xp_engine.dart';
 
 const _app = AppProfile(name: 'demo', path: '.', hasIos: true);
 
-const _flavor =
-    'the app uses the flavor prod, which Linux iOS builds do not support yet '
-    '(omarchy-apple-dev: flavors)';
 const _shorebird =
     'the job uses Shorebird iOS, which needs macOS (Shorebird iOS on Linux is '
     'not decided)';
@@ -50,26 +47,27 @@ void main() {
     );
   });
 
-  test('a flavor of the build or the strip step, once', () {
+  test('a flavor and an entry point build on Linux (omarchy-apple-dev '
+      'FLAVOR and TARGET)', () {
     expect(
       iosLinuxLimits([
-        _step('build.ios', {'flavor': 'prod', ..._signing}),
-        _step('build.ios', {'flavor': 'prod', ..._signing}),
+        _step('build.ios', {
+          'flavor': 'prod',
+          'target': 'lib/main_prod.dart',
+          ..._signing,
+        }),
       ], _app),
-      [_flavor],
+      isEmpty,
     );
   });
 
-  test('an entry point other than lib/main.dart, and the strip step', () {
+  test('the strip step', () {
     expect(
       iosLinuxLimits([
         _step('build.ios', {'target': 'lib/main_prod.dart', ..._signing}),
         _step('ios.stripAndReexport'),
       ], _app),
-      [
-        contains('the flavor builds lib/main_prod.dart'),
-        contains('the job strips frameworks after the build'),
-      ],
+      [contains('the job strips frameworks after the build')],
     );
   });
 
@@ -107,23 +105,20 @@ void main() {
         _step('build.ios', {'flavor': 'dev', ..._signing}),
         _step('ios.stripAndReexport', {'flavor': 'dev'}),
       ], app),
-      [
-        contains('the flavor dev'),
-        icon,
-        contains('the job strips frameworks after the build'),
-      ],
+      [icon, contains('the job strips frameworks after the build')],
     );
     expect(
       iosLinuxLimits([
         _step('build.ios', {'flavor': 'prod', ..._signing}),
       ], app),
-      [_flavor],
+      isEmpty,
     );
     expect(
       iosLinuxLimits([
         _step('build.ios', {'flavor': 'staging', ..._signing}),
       ], app),
-      [contains('the flavor staging')],
+      isEmpty,
+      reason: 'a flavor the scan does not know has no limits of its own',
     );
     expect(iosLinuxLimits([_step('build.ios', _signing)], app), isEmpty);
   });
@@ -154,7 +149,7 @@ void main() {
       iosLinuxLimits([
         _step('build.ios', {'flavor': 'prod'}),
       ], _app),
-      [_flavor, _unsigned],
+      [_unsigned],
     );
   });
 
