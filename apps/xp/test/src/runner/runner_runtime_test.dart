@@ -140,9 +140,17 @@ void main() {
     expect(hello.maxJobs, 2);
     expect(hello.leases, isEmpty);
 
-    // The probe runs the engine's commands for real.
+    // The probe runs the engine's commands for real, except `swift`: on a CI
+    // runner it can hang until the probe's 30 s timeout, as long as this test
+    // waits for the result.
     session.send(
-      ProbeFrame(probeId: 'prb_1', commands: const RunnerProbe().commands),
+      ProbeFrame(
+        probeId: 'prb_1',
+        commands: [
+          for (final command in const RunnerProbe().commands)
+            if (command.id != 'swift') command,
+        ],
+      ),
     );
     final probed = await session.next<ProbeResultFrame>();
     final os = probed.results.firstWhere((r) => r.id == 'os');
