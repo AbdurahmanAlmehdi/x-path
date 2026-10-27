@@ -70,7 +70,7 @@ creating one. Rejected: sending the ASC key to the runner for the job so omarchy
 the certificate and profile itself. It is less code, but it would widen D-09 and put a key that
 manages the whole App Store team on remote runners, the machines most likely to be lost.
 
-## Amendment (per-app opt-out)
+## Amendment (per-app opt-out, flavors, Shorebird)
 
 The owner can turn Linux iOS builds off for one app with a project edit: `iosLinux: false` on the
 app in `PATCH /projects/{id}` (`xp projects set <project> --no-ios-linux`), shown as
@@ -79,7 +79,20 @@ reason "Linux iOS builds are turned off for this app", listed before any other r
 rollback when a new omarchy-apple-dev pin breaks one app's build, short of downgrading XPath, so it
 ships before the planner stops narrowing flavors. Like every other edit it survives rescans and needs
 no migration: edits are stored as JSON, and edits stored before it leave Linux iOS builds on.
-Everything else in this ADR stands.
+
+Flavors and entry points then moved to Linux
+([iOS flavors on Linux](../plan/2026-10-25-feat-ios-linux-flavors-and-shorebird-plan.md)): the
+pinned omarchy-apple-dev builds each flavor's own configuration, icon set, storyboards and
+entitlements, and a flavor's job is narrowed to `ios-sign` only where a Linux build would succeed
+but differ from a Mac build (a Run Script phase beyond Flutter's own, a multi-size icon set, an
+`INFOPLIST_FILE` other than `Runner/Info.plist`, an icon set outside `Runner/Assets.xcassets`).
+
+The Shorebird question this ADR left open is settled: a fork of Shorebird is not viable. Lifting
+the CLI's macOS check is easy, but Shorebird's iOS `gen_snapshot` and `analyze_snapshot` are
+built from its private Dart fork, and upstream Dart's `gen_snapshot` lacks the linker flags and
+snapshot hash Shorebird's updater checks, so there is nothing to build a Linux version from.
+Shorebird iOS stays on `ios-sign` until Shorebird ships Linux support; the plan files that feature
+request. Everything else in this ADR stands.
 
 ## Consequences
 

@@ -293,27 +293,42 @@ lands, XPath's scan reports the app as needing a Mac for iOS, and the planner na
 to `ios-sign` with the reason. Each item is done when it is merged upstream, pinned by XPath,
 and the matching narrowing case is removed.
 
-- [ ] **Flavors (build configurations and schemes).** `flutter/build.sh` takes the first
+The items ticked below are done on the fork pin: `2d03f766859e6e4549b949b4afbb8e66d851b18d`
+(`2d03f76`) on the `xpath/pin-flavors` branch of `AbdurahmanAlmehdi/omarchy-apple-dev`, tag
+`xpath-pin-flavors-1`, which is upstream main `ceda63a` plus these items. XPath pins it and has
+removed their narrowing cases. They are sent upstream as joshuaswarren/omarchy-apple-dev #85-#89,
+still open; once those merge, the pin moves to an upstream commit.
+
+- [x] **Flavors (build configurations and schemes).** `flutter/build.sh` takes the first
       `PRODUCT_BUNDLE_IDENTIFIER` in the pbxproj. It needs the `Release-<flavor>` configuration
       and its xcconfig (bundle id, display name, `$(...)` settings in Info.plist) and
       `-dFlavor` for `flutter assemble`. XPath then maps `--flavor` to it. The largest blocker,
-      since every flavored app passes `--flavor`.
+      since every flavored app passes `--flavor`. Done with `FLAVOR` and `TARGET` (entry points)
+      on the fork pin.
 - [ ] **App extensions** (widgets, share, notification service) in the Flutter path: build each
       target as its own product, embed it under `PlugIns/`, sign it with its own profile.
       `asc.py identity` and the top-level `ship.sh` already handle `PlugIns/*.appex`.
+- [x] **Storyboards the Runner target lists.** The storyboards of its Copy Bundle Resources
+      phase are compiled, not only `Base.lproj`, so a launch screen per flavor builds.
 - [ ] **Storyboards beyond Flutter's template.** The Linux `ibtool` stops on a feature it does
-      not compile; each missing feature is a change there.
+      not compile; each missing feature is a change there. Such a storyboard now fails the build
+      with ibtool's error instead of narrowing the app.
+- [x] **The icon set of each configuration** (`ASSETCATALOG_COMPILER_APPICON_NAME`), not always
+      `AppIcon`.
 - [ ] **Multi-size and alternate app icons.** A multi-size AppIcon can leave App Store
       processing stuck; alternate icons are dropped. Both are `actool` work.
-- [ ] Reading `ios/Runner/Runner.entitlements` by default, and more entitlements than
-      Associated Domains, push, Sign in with Apple and app groups.
+- [x] **The entitlements of each configuration** (`CODE_SIGN_ENTITLEMENTS`), used when
+      `ASC_ENTITLEMENTS_PATH` is not set, so the default `ios/Runner/Runner.entitlements` path
+      is no longer passed.
+- [ ] More entitlements than Associated Domains, push, Sign in with Apple and app groups.
 - [ ] A checker that lists plugins without a `Package.swift`, for the scan.
 - [x] A receipt for a full-mode Flutter TestFlight upload with `flutter/ship.sh` (Phase 0;
       posted on #81).
-- [ ] #81 (Info.plist settings from the app's xcconfig) and #82 (installer) merged, then pinned.
-- [ ] `asc.py identity` or `flutter/ship.sh` takes a given profile (profile decision (b)).
+- [x] #81 (Info.plist settings from the app's xcconfig) and #82 (installer) merged, then pinned.
+      #81 merged as `7e528cc`; both are in upstream main `ceda63a`, which the fork pin is on.
+- [x] `asc.py identity` or `flutter/ship.sh` takes a given profile (profile decision (b)).
       Written as `asc.py given-identity` (`ASC_PROFILE`, `ASC_SIGNING_KEY`, `ASC_SIGNING_CERT`)
-      on the fork branch `xpath/pin`, which XPath pins; not yet proposed upstream.
+      on the fork pin, and sent upstream with the other items.
 - [ ] #73 and #77 pinned (both merged).
 
 ### Shorebird iOS on Linux (to decide)

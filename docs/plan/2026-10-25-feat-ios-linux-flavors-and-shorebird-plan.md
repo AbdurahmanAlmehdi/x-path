@@ -225,11 +225,16 @@ support, and C and D keep a Mac for it.
 
 ### Phase 4: Docs and receipts
 
-- **Status:** Not started
+- **Status:** In progress
 - **Scope:** Docs say what flavors on Linux support and what still needs a Mac; ADR 0014's
   amendment records that a Shorebird fork is not viable; the parent plan's upstream items are
   ticked; one TestFlight build per flavor of B and C (C as plain builds; its releases use
   Shorebird), recorded in the PR description.
+  - [x] `docs/guide/runners.md`: flavors and entry points on Linux, what still needs a Mac, the
+        per-app opt-out, and the per-flavor check after a TestFlight install.
+  - [x] ADR 0014's amendment: a Shorebird fork is not viable; Shorebird iOS stays on `ios-sign`.
+  - [x] The parent plan's upstream items done on the fork pin are ticked.
+  - [ ] TestFlight receipts for each flavor of B and C (needs the owner's apps; done later).
 - **Files touched:** `docs/guide/runners.md`, `docs/adr/0014-ios-builds-on-linux.md`,
   `docs/plan/2026-10-22-feat-ios-builds-on-linux-plan.md`, this plan
 - **Acceptance criteria:** each flavor of B and C installs from TestFlight built on Linux with
