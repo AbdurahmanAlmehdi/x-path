@@ -296,8 +296,8 @@ and the matching narrowing case is removed.
 The items ticked below are done on the fork pin: `2d03f766859e6e4549b949b4afbb8e66d851b18d`
 (`2d03f76`) on the `xpath/pin-flavors` branch of `AbdurahmanAlmehdi/omarchy-apple-dev`, tag
 `xpath-pin-flavors-1`, which is upstream main `ceda63a` plus these items. XPath pins it and has
-removed their narrowing cases. They are sent upstream as joshuaswarren/omarchy-apple-dev #85-#89,
-still open; once those merge, the pin moves to an upstream commit.
+removed their narrowing cases. They went upstream as joshuaswarren/omarchy-apple-dev #85-#89, all
+merged, and the pin has moved to upstream main `79bda71`.
 
 - [x] **Flavors (build configurations and schemes).** `flutter/build.sh` takes the first
       `PRODUCT_BUNDLE_IDENTIFIER` in the pbxproj. It needs the `Release-<flavor>` configuration
