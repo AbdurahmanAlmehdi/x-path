@@ -105,8 +105,9 @@ tests with stub tools in `tests/run.sh`). Not built by `/build` in this reposito
       `2d03f766859e6e4549b949b4afbb8e66d851b18d` on `xpath/pin-flavors` of
       `AbdurahmanAlmehdi/omarchy-apple-dev`, tag `xpath-pin-flavors-1`: upstream main `ceda63a`
       with U4, U1 (in two parts), U2 and U3; U5 skipped. The upstream PRs are
-      joshuaswarren/omarchy-apple-dev #85-#89, still open; once they merge, the pin moves to an
-      upstream commit and `RunnerProbe.iosLinuxRepository` back to upstream.
+      joshuaswarren/omarchy-apple-dev #85-#89, all merged. The pin has since moved to upstream
+      main `79bda716bf207924efc25bce923bda261dc67837` and `RunnerProbe.iosLinuxRepository` back to upstream. That commit also has
+      #90, which fixes two ways `given-identity` could lose or break the key and certificate links.
 
 ### Shorebird iOS
 
@@ -200,7 +201,7 @@ support, and C and D keep a Mac for it.
 - **Scope:** The Linux `build.ios` passes `FLAVOR` and `TARGET` to `flutter/build.sh` (the pin's
   `ship.sh` reads the configuration `build.sh` recorded, so it gets no `FLAVOR`), and stops
   passing `ios/Runner/Runner.entitlements` (U3). The pin moves to the fork commit with U1-U4
-  (`2d03f76`, see Pin above; it moves upstream once #85-#89 merge). The flavor and entry-point
+  (`2d03f76`, see Pin above; it has since moved to upstream `79bda71`). The flavor and entry-point
   narrowing cases, the scan's `flavorsLimit` and its blanket non-template storyboard limit are
   removed: an unsupported storyboard now fails the build with ibtool's error, and the opt-out
   is the escape hatch. Two per-flavor limits are added, since the pin's `build.sh` stops on

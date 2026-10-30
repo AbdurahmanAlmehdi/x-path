@@ -67,18 +67,16 @@ class RunnerProbe {
   /// The omarchy-apple-dev commit this release of XPath builds iOS apps on
   /// Linux with. A checkout at another commit does not count.
   ///
-  /// It is the fork's `xpath/pin-flavors` branch (tag
-  /// `xpath-pin-flavors-1`): upstream `ceda63a` with the signing with a given
-  /// identity and profile that `build.ios` needs (`ASC_PROFILE`, ADR 0014),
-  /// the build settings of the Release configuration, `FLAVOR` and `TARGET`,
-  /// the icon set and storyboards of the configuration, and its
-  /// entitlements (upstream #85-#89). Once those merge upstream, the pin
-  /// moves to an upstream commit and [iosLinuxRepository] back to upstream.
-  static const iosLinuxPin = '2d03f766859e6e4549b949b4afbb8e66d851b18d';
+  /// It is an upstream `main` commit with the signing with a given identity
+  /// and profile that `build.ios` needs (`ASC_PROFILE`, ADR 0014), the build
+  /// settings of the Release configuration, `FLAVOR` and `TARGET`, the icon
+  /// set and storyboards of the configuration, and its entitlements
+  /// (upstream #85-#90).
+  static const iosLinuxPin = '79bda716bf207924efc25bce923bda261dc67837';
 
   /// Where [iosLinuxPin] is.
   static const iosLinuxRepository =
-      'https://github.com/AbdurahmanAlmehdi/omarchy-apple-dev';
+      'https://github.com/joshuaswarren/omarchy-apple-dev';
 
   /// The shell script of the `ios_linux_sdk` command: exits 0 if the darwin
   /// Swift SDK bundle that omarchy-apple-dev's `install-toolchain.sh` makes

@@ -431,7 +431,7 @@ void main() {
         expect(missing(findings), [
           (
             'omarchy-apple-dev is at 0123456789ab; this XPath needs '
-                '2d03f766859e',
+                '79bda716bf20',
             'git -C $dir fetch ${RunnerProbe.iosLinuxRepository} $pin && '
                 'git -C $dir checkout $pin',
           ),
@@ -474,7 +474,7 @@ void main() {
 
         expect(missing(findings), [
           (
-            'omarchy-apple-dev is at nothing; this XPath needs 2d03f766859e',
+            'omarchy-apple-dev is at nothing; this XPath needs 79bda716bf20',
             'git -C $dir fetch ${RunnerProbe.iosLinuxRepository} $pin && '
                 'git -C $dir checkout $pin',
           ),
@@ -521,7 +521,7 @@ void main() {
         expect(missing(findings), [
           (
             'omarchy-apple-dev is at ffffffffffff; this XPath needs '
-                '2d03f766859e',
+                '79bda716bf20',
             'git -C $quoted fetch ${RunnerProbe.iosLinuxRepository} $pin && '
                 'git -C $quoted checkout $pin',
           ),

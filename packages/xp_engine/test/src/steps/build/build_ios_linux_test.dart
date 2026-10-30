@@ -19,7 +19,7 @@ const _signing = {
 class _Checkout implements IosLinuxToolchain {
   final prepared = <String>{};
   final used = <String>[];
-  String? at = '2d03f766859e6e4549b949b4afbb8e66d851b18d';
+  String? at = '79bda716bf207924efc25bce923bda261dc67837';
 
   @override
   String get directory => _checkout;
@@ -126,7 +126,7 @@ void main() {
     expect(checkout.used, [_flutter]);
     expect(
       (await harness.jobs.tools('job_1'))?.iosLinux,
-      'Linux, omarchy-apple-dev 2d03f766859e6e4549b949b4afbb8e66d851b18d',
+      'Linux, omarchy-apple-dev 79bda716bf207924efc25bce923bda261dc67837',
     );
   });
 

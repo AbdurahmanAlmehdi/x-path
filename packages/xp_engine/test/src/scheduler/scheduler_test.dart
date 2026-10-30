@@ -425,10 +425,10 @@ void main() {
         capability: 'ios-linux',
         reason:
             'omarchy-apple-dev is at 4e170a0ce5f2; this XPath needs '
-            '2d03f766859e',
+            '79bda716bf20',
         fix:
-            'git -C /srv/oad fetch https://github.com/o/oad 2d03f76 && '
-            'git -C /srv/oad checkout 2d03f76',
+            'git -C /srv/oad fetch https://github.com/o/oad 79bda71 && '
+            'git -C /srv/oad checkout 79bda71',
       );
       f.build([f.local()]);
       f.scheduler.pairedRunners = _PairedRunners([
@@ -469,9 +469,9 @@ void main() {
       const why =
           'No connected runner can do flutter, ios-sign or ios-linux. '
           'hetzner lacks ios-linux: omarchy-apple-dev is at 4e170a0ce5f2; '
-          'this XPath needs 2d03f766859e. To fix it: git -C /srv/oad fetch '
-          'https://github.com/o/oad 2d03f76 && git -C /srv/oad checkout '
-          '2d03f76. bare lacks ios-sign: not macOS.';
+          'this XPath needs 79bda716bf20. To fix it: git -C /srv/oad fetch '
+          'https://github.com/o/oad 79bda71 && git -C /srv/oad checkout '
+          '79bda71. bare lacks ios-sign: not macOS.';
       expect(await f.message(ids['ios']!), why);
       expect(
         (await f.scheduler.placement(
