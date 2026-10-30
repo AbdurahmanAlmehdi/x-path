@@ -455,6 +455,25 @@ void main() {
       });
     }
 
+    test('adds a dart-define file from its path', () async {
+      answerCreate();
+      final defines = file('prod.json', utf8.encode('{"API_KEY": "s3cret"}'));
+
+      await env.runOk([
+        'credentials',
+        'add',
+        '--kind',
+        'dart_defines',
+        '--name',
+        'Prod defines',
+        '--dart-defines',
+        defines,
+      ]);
+
+      expect(createdMaterial(), {'dartDefines': '{"API_KEY": "s3cret"}'});
+      expect(printed(), isNot(contains('s3cret')));
+    });
+
     test('adds a keystore, its passwords from standard input and the '
         'terminal', () async {
       answerCreate();

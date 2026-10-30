@@ -13,6 +13,7 @@ void main() {
           'play_sa',
           'firebase_sa',
           'keystore',
+          'dart_defines',
           'shorebird',
           'github',
           'slack',

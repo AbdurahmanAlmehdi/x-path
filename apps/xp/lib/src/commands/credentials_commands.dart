@@ -745,6 +745,7 @@ const _kindOptions = <CredentialKind, List<String>>{
     'store-password-stdin',
     'key-password-stdin',
   ],
+  CredentialKind.dartDefines: ['dart-defines'],
   CredentialKind.shorebird: ['token-stdin'],
   CredentialKind.slack: ['webhook-url-stdin'],
 };
@@ -757,6 +758,7 @@ const _requiredOptions = <CredentialKind, List<String>>{
   CredentialKind.playSa: ['service-account'],
   CredentialKind.firebaseSa: ['service-account'],
   CredentialKind.keystore: ['keystore', 'key-alias'],
+  CredentialKind.dartDefines: ['dart-defines'],
   CredentialKind.shorebird: [],
   CredentialKind.slack: [],
 };
@@ -823,7 +825,13 @@ void _addMaterialOptions(ArgParser parser) {
       help: 'The keystore file (.jks or .keystore).',
       valueHelp: 'path',
     )
-    ..addOption('key-alias', help: 'The alias of the key.', valueHelp: 'alias');
+    ..addOption('key-alias', help: 'The alias of the key.', valueHelp: 'alias')
+    ..addSeparator('dart_defines (Dart define file):')
+    ..addOption(
+      'dart-defines',
+      help: 'The --dart-define-from-file file: JSON or KEY=value lines.',
+      valueHelp: 'path',
+    );
   stdinFlag(
     'store-password-stdin',
     'Read the keystore password from standard input.',
@@ -901,6 +909,9 @@ Future<Map<String, dynamic>> _material(
       CredentialKind.keystore => {
         'keystore': base64Encode(_readBytes(required('keystore'))),
         'keyAlias': required('key-alias'),
+      },
+      CredentialKind.dartDefines => {
+        'dartDefines': _readText(required('dart-defines')),
       },
       _ => const <String, String>{},
     },

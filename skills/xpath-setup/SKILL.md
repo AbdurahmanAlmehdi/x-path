@@ -19,7 +19,7 @@ put one in a command you run, a file you write or a log. Tell the user **where**
   with the service it is for and stores nothing if the check fails), or `xp credentials add` in
   their own terminal, which asks for a password or token without showing it or reads it from
   standard input (`--token-stdin` and the like), and reads keys from files (`--p8`,
-  `--service-account`, `--keystore`), never from an argument;
+  `--service-account`, `--keystore`, `--dart-defines`), never from an argument;
 - the GitHub token: the app, **Settings** ▸ **GitHub**, or `xpd secrets import-gh` in their own
   terminal;
 - device tokens and pairing tokens: printed once by a command the user runs in their own

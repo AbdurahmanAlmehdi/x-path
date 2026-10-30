@@ -416,6 +416,91 @@ stages:
     });
   });
 
+  group('the define file of the flavor', () {
+    final secret = demoCredential(
+      demoFlavor('prod'),
+      CredentialKind.dartDefines,
+    ).secretKey;
+
+    Future<Map<String, Map<String, dynamic>>> inputs(String extra) async {
+      final run = await dispatch(
+        '''
+          - kind: build.android
+            with: {$extra}
+          - kind: shorebird.release
+            with: {$extra}
+          - kind: shorebird.patch
+            with: {$extra}
+          - kind: build.verifyCompiledConfig
+            with: {keys: [API], $extra}
+          - kind: record.manifest
+            with: {$extra}
+          - kind: symbols.archive
+            with: {$extra}
+          - kind: ios.stripAndReexport
+            with: {exportOptionsPlist: ios/Export.plist, frameworks: [Agora], $extra}
+''',
+        matrix: _flavorMatrix,
+        request: const DispatchRequest(
+          platforms: ['android'],
+          flavors: ['prod'],
+          releaseVersion: '1.2.0+30',
+        ),
+      );
+      final job = await harness.job(run.jobs.single.id);
+      return {
+        for (final kind in const [
+          'build.android',
+          'shorebird.release',
+          'shorebird.patch',
+          'build.verifyCompiledConfig',
+          'record.manifest',
+          'symbols.archive',
+          'ios.stripAndReexport',
+        ])
+          kind: await harness.input(job, kind),
+      };
+    }
+
+    const users = [
+      'build.android',
+      'shorebird.release',
+      'shorebird.patch',
+      'build.verifyCompiledConfig',
+      'record.manifest',
+    ];
+
+    setUp(() async {
+      await harness.saveCredential('prod', CredentialKind.dartDefines);
+    });
+
+    test('reaches the steps that read it when no file is named', () async {
+      final found = await inputs('');
+
+      for (final kind in users) {
+        expect(found[kind]!['dartDefineSecret'], secret, reason: kind);
+        expect(found[kind]!.keys, isNot(contains('dartDefineFile')));
+      }
+    });
+
+    test('stays away from the steps that do not read it', () async {
+      final found = await inputs('');
+
+      for (final kind in const ['symbols.archive', 'ios.stripAndReexport']) {
+        expect(found[kind]!.keys, isNot(contains('dartDefineSecret')));
+      }
+    });
+
+    test('gives way to a file the workflow names', () async {
+      final found = await inputs('dartDefineFile: env.json');
+
+      for (final kind in users) {
+        expect(found[kind]!['dartDefineFile'], 'env.json', reason: kind);
+        expect(found[kind]!.keys, isNot(contains('dartDefineSecret')));
+      }
+    });
+  });
+
   group('the build steps', () {
     test('pass the settings the workflow gives', () async {
       final run = await dispatch(

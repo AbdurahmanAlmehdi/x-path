@@ -84,6 +84,71 @@ void main() {
     });
   });
 
+  group('parseDartDefines reads .env values as Flutter does', () {
+    test('keeps spaces, drops wrapping quotes and trailing comments', () {
+      expect(
+        parseDartDefines(
+          'A="two words" # note\n'
+          "B='it is'\n"
+          'C=`x y`\n'
+          'D=plain # note\n'
+          'E=two words\n',
+        ),
+        {
+          'A': 'two words',
+          'B': 'it is',
+          'C': 'x y',
+          'D': 'plain',
+          'E': 'two words',
+        },
+      );
+    });
+  });
+
+  group('checkDartDefines', () {
+    test('takes what Flutter reads', () {
+      checkDartDefines('{"A": "x"}');
+      checkDartDefines('# comment\n\nA=x\n');
+    });
+
+    test('refuses what it does not, without quoting the file', () {
+      for (final (bad, message) in const [
+        ('{"A": {"secret-value": 1}}', 'not a flat JSON object'),
+        ('{"A": "secret-value"', 'not a flat JSON object'),
+        ('A=x\nsecret-value\n', 'not KEY=value'),
+        ('=secret-value\n', 'not KEY=value'),
+        ('{}', 'defines no values'),
+        ('# only a comment\n', 'defines no values'),
+      ]) {
+        expect(
+          () => checkDartDefines(bad),
+          throwsA(
+            isA<FormatException>()
+                .having((error) => error.message, 'message', contains(message))
+                .having(
+                  (error) => error.message,
+                  'message',
+                  isNot(contains('secret-value')),
+                ),
+          ),
+          reason: bad,
+        );
+      }
+    });
+  });
+
+  group('dartDefineSecrets', () {
+    test('names the file, each value and each entry as Flutter encodes it', () {
+      const text = 'API_KEY="k 12345"\n';
+
+      expect(dartDefineSecrets(text), [
+        text,
+        'k 12345',
+        base64.encode(utf8.encode('API_KEY=k 12345')),
+      ]);
+    });
+  });
+
   group('compiledNeedle', () {
     test('keeps the host of a URL', () {
       expect(compiledNeedle('https://api.x.io/v1/'), 'api.x.io');

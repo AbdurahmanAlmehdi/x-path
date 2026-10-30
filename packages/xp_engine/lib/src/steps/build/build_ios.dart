@@ -57,6 +57,21 @@ class BuildIosInput extends Equatable {
   List<Object?> get props => [settings, exportOptionsPlist, linuxSigning];
 }
 
+/// The variable that holds the path of the secret defines of a Linux build:
+/// `KEY=VALUE` entries, each ended by a NUL.
+const secretDefinesVariable = 'XPATH_DART_DEFINES_FILE';
+
+/// What `bash -c` runs for `flutter/build.sh` (`$0`) in the app (`$1`) when
+/// the defines are secret. `build.sh` takes them as arguments only, so they
+/// are read from [secretDefinesVariable] and the script is sourced with them:
+/// no process gets them as its command line. Sourcing keeps `$0`, from which
+/// the script finds its checkout.
+const buildWithSecretDefines = r'''
+defines=()
+while IFS= read -r -d '' define; do defines+=("$define"); done < "$XPATH_DART_DEFINES_FILE"
+source "$0" "$1" "${defines[@]}"
+''';
+
 /// What `build.ios` builds with on a Linux runner (ADR 0014).
 class IosLinuxBuilds {
   /// Creates the pair.
@@ -81,8 +96,9 @@ class IosLinuxBuilds {
 ///   Distribution identity and the App Store profile in `linuxSigning`. The
 ///   build name and number, the flavor (`FLAVOR`, which picks the scheme and
 ///   its Release configuration as `--flavor` does), the entrypoint
-///   (`TARGET`), the dart defines (as `KEY=VALUE` arguments), obfuscation and
-///   the export options are mapped onto that interface. `ship.sh` requests
+///   (`TARGET`), the dart defines (as `KEY=VALUE` arguments, those of a
+///   `dart_defines` credential through [buildWithSecretDefines]), obfuscation
+///   and the export options are mapped onto that interface. `ship.sh` requests
 ///   the entitlements of the configuration `build.sh` built
 ///   (`CODE_SIGN_ENTITLEMENTS`), as Xcode does. The IPA is
 ///   `build/ios-linux/Runner-store.ipa`.
@@ -191,6 +207,7 @@ class BuildIosStep extends FlutterBuildStep<BuildIosInput> {
     final commit = await linux.checkout.commit();
     final ResolvedFlutter flutter;
     final List<String> defines;
+    final String? secretDefines;
     try {
       flutter = await linux.toolchain.prepare(
         context.jobId,
@@ -199,6 +216,7 @@ class BuildIosStep extends FlutterBuildStep<BuildIosInput> {
             'Linux, omarchy-apple-dev ${commit ?? 'at an unknown commit'}',
       );
       defines = await _defines(settings);
+      secretDefines = await _writeSecretDefines(settings, context);
     } on ToolchainException catch (error) {
       return StepFailed(error.message);
     } on FormatException catch (error) {
@@ -225,6 +243,7 @@ class BuildIosStep extends FlutterBuildStep<BuildIosInput> {
     final built = await scripts.run(
       'build.sh',
       arguments: [app, ...defines],
+      secretDefines: secretDefines,
       environment: {
         'BUILD_NAME': '${settings.version.name}',
         'BUILD_NUMBER': '${settings.build}',
@@ -253,6 +272,27 @@ class BuildIosStep extends FlutterBuildStep<BuildIosInput> {
       found: await BuildOutputs(files).iosLinux(app, since: since),
       flutter: flutter,
       missing: 'flutter/ship.sh succeeded but left no $iosLinuxIpaPath.',
+    );
+  }
+
+  /// Writes the defines of the flavor's `dart_defines` credential as
+  /// [buildWithSecretDefines] reads them and returns the path of the file;
+  /// `null` when the build has no such secret.
+  ///
+  /// Throws a [FormatException] if the stored file is not a define file.
+  Future<String?> _writeSecretDefines(
+    BuildSettings settings,
+    StepContext context,
+  ) async {
+    final secret = settings.dartDefineSecret;
+    if (secret == null) return null;
+    final defines = parseDartDefines(await context.readDartDefines(secret));
+    return await context.writeSecretFile(
+      'dart-defines',
+      [
+        for (final MapEntry(:key, :value) in defines.entries)
+          '$key=$value\u0000',
+      ].join(),
     );
   }
 
@@ -297,18 +337,29 @@ class _Scripts {
   final Map<String, String> _environment;
 
   /// Runs `flutter/[name]`; `null` if it succeeded, else why the step fails.
+  ///
+  /// With [secretDefines] the first of [arguments], the app, is all it gets on
+  /// its command line ([buildWithSecretDefines]).
   Future<StepFailed?> run(
     String name, {
     List<String> arguments = const [],
     Map<String, String> environment = const {},
     Map<String, String> secretFiles = const {},
+    String? secretDefines,
   }) async {
+    final script = '$directory/flutter/$name';
     final exit = await _context.run(
       ProcessCommand(
-        '$directory/flutter/$name',
-        arguments: arguments,
+        secretDefines == null ? script : 'bash',
+        arguments: secretDefines == null
+            ? arguments
+            : ['-c', buildWithSecretDefines, script, arguments.first],
         workingDirectory: _settings.appDirectory,
-        environment: {..._environment, ...environment},
+        environment: {
+          ..._environment,
+          ...environment,
+          secretDefinesVariable: ?secretDefines,
+        },
         passThroughEnvironment: [
           ..._passThrough,
           ..._settings.passThroughEnvironment,

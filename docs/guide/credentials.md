@@ -26,6 +26,7 @@ machine.
 | `play_sa` | Google Play service account | The JSON key file | Google Cloud console: enable the Google Play Android Developer API, make the service account and a key, then invite it in Play Console with release rights. |
 | `firebase_sa` | Firebase service account | The JSON key file | A service account with the Firebase App Distribution Admin role in the app's Firebase project. |
 | `keystore` | Android keystore | The `.jks` or `.keystore`, store password, key alias, key password | Your release keystore, of any size. The key password is the store password unless you give one. |
+| `dart_defines` | Dart define file | The file you pass to `--dart-define-from-file`: a flat JSON object or `KEY=value` lines | Your own file, for apps that keep it outside git. One per flavor. The engine checks only that Flutter can read it. |
 | `shorebird` | Shorebird API key | A key that starts with `sb_api_` | `shorebird login:ci` prints one. Only for flavors with Shorebird on. |
 | `slack` | Slack webhook | The webhook URL | A Slack incoming webhook for the channel that should hear about releases. |
 
@@ -33,7 +34,7 @@ machine.
 
 Open **Credentials** in the sidebar and press **Add credential…**. Give it a **Name** you will
 recognise, such as "Personal Apple Dev Account", pick the **Kind**, fill in the fields and press
-**Check and save**. A `.p8` key, a service account or a keystore can be read from a file. The engine
+**Check and save**. A `.p8` key, a service account, a keystore or a dart-define file can be read from a file. The engine
 checks the credential with the service it is for and stores nothing if the check fails.
 
 Each row has **Rename…**, **Replace secret…** (the name and the flavors that use it stay), **Check
@@ -55,6 +56,7 @@ xp credentials add --kind asc_key --name "Personal Apple Dev Account" \
 xp credentials add --kind apple_id --name "Upload Apple ID" --apple-id dev@example.com
 xp credentials add --kind play_sa --name "Play publisher" --service-account ~/keys/play.json
 xp credentials add --kind keystore --name "Upload keystore" --keystore upload.jks --key-alias upload
+xp credentials add --kind dart_defines --name "Mataa prod defines" --dart-defines env/prod.json
 printf %s "$SHOREBIRD_TOKEN" | xp credentials add --kind shorebird --name "Studio Shorebird" --token-stdin
 xp credentials assign "Personal Apple Dev Account" --project acme/app --all-flavors
 xp credentials assign "Studio Shorebird" --project acme/app --flavor prod
@@ -111,6 +113,13 @@ job, at its `credentials` guard, before anything is built. **Check now**, or `xp
   refused.
 - `build.android` signs with the flavor's `keystore` when it has one. Shorebird steps use the
   flavor's `shorebird` key.
+- `build.android`, `build.ios`, `shorebird.release` and `shorebird.patch` use the flavor's
+  `dart_defines` file when the workflow names no `dartDefineFile`; a file the workflow names wins.
+  The file is written with mode 0600 to the job's secret folder, on the engine or on the runner that
+  has the job, and deleted when the job ends. `record.manifest` records its SHA-256 and
+  `build.verifyCompiledConfig` reads its `keys` from it.
+- Every value of a `dart_defines` file of 6 characters or more is hidden in all job output, wherever
+  it appears. A value like `MODE=release` hides that word too, so keep such settings out of the file.
 - Without a `play_sa`, or with only an `apple_id`, XPath cannot read that store's review status; you
   mark it approved or live in the app ([Releases](releases.md)).
 - A `slack` webhook assigned to a flavor makes the engine post the project's notifications there:

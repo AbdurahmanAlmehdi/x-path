@@ -23,6 +23,7 @@ void main() {
     bool obfuscate = false,
     String? flutterVersion = '3.47.6',
     String? tokenSecret = 'shorebird.token',
+    String? dartDefineSecret,
   }) => ShorebirdReleaseInput(
     settings: BuildSettings(
       worktree: buildWorktree,
@@ -30,7 +31,8 @@ void main() {
       flavor: 'prod',
       target: 'lib/main_prod.dart',
       flutterVersion: flutterVersion,
-      dartDefineFile: 'env/prod.json',
+      dartDefineFile: dartDefineSecret == null ? 'env/prod.json' : null,
+      dartDefineSecret: dartDefineSecret,
       obfuscate: obfuscate,
       secretEnvironment: const {'KEYSTORE_PASSWORD': 'keystore.password'},
       passThroughEnvironment: const ['NDK_HOME'],
@@ -531,5 +533,19 @@ void main() {
 
       expect(done!.artifacts, isEmpty);
     });
+  });
+
+  test('forwards the define file of a credential, by its path', () async {
+    context.defines['defines'] = 'API_KEY=secret-value\n';
+
+    await stepFor().run(input(dartDefineSecret: 'defines'), context);
+
+    expect(context.secretFiles['dart-defines'], 'API_KEY=secret-value\n');
+    final arguments = context.commands.single.arguments;
+    expect(arguments.sublist(arguments.indexOf('--')), [
+      '--',
+      '--dart-define-from-file=/secrets/job_1/dart-defines',
+    ]);
+    expect(arguments.join(' '), isNot(contains('secret-value')));
   });
 }

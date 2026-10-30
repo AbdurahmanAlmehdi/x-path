@@ -58,6 +58,7 @@ const _$CredentialKindEnumMap = {
   CredentialKind.playSa: 'play_sa',
   CredentialKind.firebaseSa: 'firebase_sa',
   CredentialKind.keystore: 'keystore',
+  CredentialKind.dartDefines: 'dart_defines',
   CredentialKind.shorebird: 'shorebird',
   CredentialKind.github: 'github',
   CredentialKind.slack: 'slack',

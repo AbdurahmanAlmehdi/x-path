@@ -393,6 +393,39 @@ void main() {
       Map<String, String> env,
     ) => CommandInputStub(files, env);
 
+    test('the define file is delivered, masked, passed to the build as a 0600 '
+        'file and wiped with the job', () async {
+      secretAnswers = {'defines': utf8.encode('{"API_KEY": "k-12345"}')};
+      String? path;
+      String? contents;
+      FileStat? stat;
+      final step = _DefinesStep((settings, context) async {
+        path = await settings.writeSecretDefines(context);
+        contents = File(path!).readAsStringSync();
+        stat = File(path!).statSync();
+      });
+
+      final job = start(
+        offer(
+          [
+            ('defines', {'dartDefineSecret': 'defines'}),
+          ],
+          secrets: ['defines'],
+        ),
+        registry: (_) => StepRegistry([step]),
+      );
+      await job.finished;
+
+      expect(done().state, JobState.succeeded);
+      expect(secretAsks, ['defines']);
+      expect(contents, '{"API_KEY": "k-12345"}');
+      expect(stat!.mode & 0x1ff, 0x180, reason: 'mode 0600');
+      expect(masker.secrets, contains('k-12345'));
+      expect(p.isWithin(paths.fallbackSecrets, path!), isTrue);
+      expect(File(path!).existsSync(), isFalse);
+      expect(await area.recall('job_1', 'defines'), isNull);
+    });
+
     test(
       'are asked of the engine, given to the process and wiped with the job',
       () async {
@@ -708,6 +741,49 @@ void main() {
 }
 
 LeaseServices? _services;
+
+/// A step that does what a build step does with its define file.
+class _DefinesStep extends Step<Map<String, dynamic>, Map<String, dynamic>> {
+  const new(this.onRun);
+
+  final Future<void> Function(BuildSettings settings, StepContext context)
+  onRun;
+
+  @override
+  String get kind => 'defines';
+
+  @override
+  bool sideEffectOf(Map<String, dynamic> input) => false;
+
+  @override
+  Map<String, dynamic> decodeInput(Map<String, dynamic> json) => json;
+
+  @override
+  Map<String, dynamic> encodeInput(Map<String, dynamic> input) => input;
+
+  @override
+  Map<String, dynamic> encodeResult(Map<String, dynamic> result) => result;
+
+  @override
+  Future<StepOutcome<Map<String, dynamic>>> run(
+    Map<String, dynamic> input,
+    StepContext context,
+  ) async {
+    await onRun(
+      BuildSettings(
+        worktree: const ReleaseWorktree(
+          path: '/w',
+          mirror: GitMirror(key: '42', path: '/m'),
+          sha: 'abc',
+        ),
+        version: AppVersion.parse('1.2.3+45'),
+        dartDefineSecret: input['dartDefineSecret'] as String,
+      ),
+      context,
+    );
+    return const StepSucceeded({});
+  }
+}
 
 /// The input of a `command` step that names secrets.
 class CommandInputStub {

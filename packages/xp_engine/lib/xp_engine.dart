@@ -28,6 +28,7 @@ export 'src/credentials/flavor_asc_key.dart';
 export 'src/credentials/verifiers/apple_distribution_verifier.dart';
 export 'src/credentials/verifiers/apple_id_verifier.dart';
 export 'src/credentials/verifiers/asc_key_verifier.dart';
+export 'src/credentials/verifiers/dart_defines_verifier.dart';
 export 'src/credentials/verifiers/google_service_account_verifiers.dart';
 export 'src/credentials/verifiers/keystore_verifier.dart';
 export 'src/credentials/verifiers/slack_webhook_verifier.dart';

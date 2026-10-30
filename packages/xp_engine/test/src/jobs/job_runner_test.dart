@@ -285,6 +285,51 @@ void main() {
       expect(job.steps.single.message, contains('There is no secret'));
     });
 
+    group('a define file', () {
+      late String path;
+      late bool existed;
+
+      setUp(() {
+        harness = JobHarness.create(
+          extraSteps: [
+            ScriptedStep(
+              kind: 'defines',
+              onRun: (_, context) async {
+                final text = await context.readDartDefines('defines');
+                path = await context.writeSecretFile('dart-defines', text);
+                existed = harness.secretFiles.files.containsKey(path);
+                return const StepSucceeded({});
+              },
+            ),
+          ],
+        );
+      });
+
+      Future<Job> run() => harness.run([
+        const StepPlan(kind: 'defines', input: {}, sideEffect: false),
+      ]);
+
+      test('teaches the masker its values and is wiped with the job', () async {
+        harness.secrets.values['defines'] = '{"API_KEY": "k-12345"}';
+
+        final job = await run();
+
+        expect(job.state, JobState.succeeded);
+        expect(harness.masker.secrets, contains('k-12345'));
+        expect(existed, isTrue);
+        expect(path, '/secrets/${job.id}/0-dart-defines');
+        expect(harness.secretFiles.written[path], '{"API_KEY": "k-12345"}');
+        expect(harness.secretFiles.files, isEmpty);
+      });
+
+      test('fails the job when the secret is gone', () async {
+        final job = await run();
+
+        expect(job.state, JobState.failed);
+        expect(harness.secretFiles.written, isEmpty);
+      });
+    });
+
     test('tells the masker about every secret before it starts', () async {
       harness.secrets.values['a'] = 'secret-a';
       harness.secrets.values['b'] = 'secret-b';

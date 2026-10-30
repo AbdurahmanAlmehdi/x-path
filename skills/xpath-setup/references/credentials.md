@@ -6,7 +6,7 @@ and `prod`, and two Shorebird keys are told apart by name. A flavor uses at most
 each kind. Never collect these values in the chat.
 
 **In the XPath app:** **Credentials** ▸ **Add credential…**: a **Name**, the **Kind**, the fields,
-**Check and save**. A `.p8` key, a service account or a keystore can be read from a file. Then,
+**Check and save**. A `.p8` key, a service account, a keystore or a dart-define file can be read from a file. Then,
 under **Flavors** (or by clicking a flavor's credentials on the project overview), **Manage…** a
 flavor ▸ **Assign…** a credential of each kind, or **Add new…**; **Use for** **This flavor** or
 **Every flavor of** the app; flavors that already have one of that kind keep it unless **Replace
@@ -21,6 +21,7 @@ xp credentials add --kind asc_key --name "Personal Apple Dev Account" \
 xp credentials add --kind apple_id --name "Upload Apple ID" --apple-id dev@example.com   # asks the password
 xp credentials add --kind play_sa --name "Play publisher" --service-account ~/keys/play.json
 xp credentials add --kind keystore --name "Upload keystore" --keystore upload.jks --key-alias upload
+xp credentials add --kind dart_defines --name "Mataa prod defines" --dart-defines env/prod.json
 printf %s "$SHOREBIRD_TOKEN" | xp credentials add --kind shorebird --name "Studio Shorebird" --token-stdin
 xp credentials assign "Personal Apple Dev Account" --project acme/shop --all-flavors
 xp credentials assign "Studio Shorebird" --project acme/shop --flavor prod
@@ -52,6 +53,7 @@ flavor.
 | `play_sa` | Google Play service account | Service account key (`serviceAccount`, the JSON key file) | `--service-account <file>` | Google Cloud console: enable the Google Play Android Developer API, create the service account and a JSON key (IAM ▸ Service accounts ▸ Keys), then invite its email in Play Console ▸ Users and permissions with release rights for the app. | token exchange; for each flavor, the internal track of its application id |
 | `firebase_sa` | Firebase service account | Service account key (`serviceAccount`, the JSON key file) | `--service-account <file>` | A service account with the Firebase App Distribution Admin role in the app's Firebase project. | token exchange with the `cloud-platform` scope |
 | `keystore` | Android keystore | Keystore (`keystore`, the file; base64 over the API), Store password (`storePassword`), Key alias (`keyAlias`), Key password (`keyPassword`, the store password unless given) | `--keystore <file>`, `--key-alias`; passwords asked, or `--store-password-stdin` / `--key-password-stdin` | The release `.jks` or `.keystore`. Any size. | `keytool -list` with the store password and the alias (the key password cannot be checked) |
+| `dart_defines` | Dart define file | Dart define file (`dartDefines`, the text: a flat JSON object or `KEY=value` lines) | `--dart-defines <file>` | The owner's `--dart-define-from-file` file, for apps that keep it outside git. One per flavor. Never read its values into the chat. | that Flutter can read it |
 | `shorebird` | Shorebird API key | Token (`token`, `sb_api_...`) | the token asked, or `--token-stdin` | A Shorebird API key; the guide says `shorebird login:ci` prints one. Only for flavors with Shorebird on. Keys that do not start with `sb_api_` are refused (`login:ci` tokens of the old form stopped working on 2026-10-01). | `shorebird account whoami --json` |
 | `slack` | Slack webhook | Webhook URL (`webhookUrl`, `https://hooks.slack.com/services/T/B/X`) | the URL asked, or `--webhook-url-stdin` | A Slack incoming webhook for the channel that should hear about releases. | its shape only; no message is sent |
 
@@ -79,6 +81,9 @@ check is older than a day.
   `asc_key` or `apple_id`, assigned to the flavor. Without it a dispatch that plans the step is
   refused.
 - `build.android` signs with the flavor's `keystore` when it has one.
+- Build and Shorebird steps use the flavor's `dart_defines` file when the workflow names no
+  `dartDefineFile`. It reaches a runner for the one job, as a 0600 file wiped when the job ends, and
+  every value of 6 characters or more is masked in job output.
 - Shorebird steps use the flavor's `shorebird` key when there is one.
 - Without a `play_sa` (or with only an `apple_id`), XPath cannot read that store's review status;
   the owner marks it approved or live in the app.

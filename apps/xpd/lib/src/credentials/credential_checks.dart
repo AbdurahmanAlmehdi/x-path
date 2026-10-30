@@ -55,6 +55,7 @@ class CredentialChecks {
         PlayServiceAccountVerifier(play.connect),
         FirebaseServiceAccountVerifier(firebase.connect),
         KeystoreVerifier(runner: runner, files: temporaryFiles),
+        const DartDefinesVerifier(),
         ShorebirdCliVerifier(ShorebirdCli(runner: runner)),
         _github,
         const SlackWebhookVerifier(),

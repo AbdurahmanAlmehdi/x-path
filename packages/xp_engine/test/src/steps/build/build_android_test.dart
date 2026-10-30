@@ -19,6 +19,7 @@ void main() {
     ArtifactKind artifact = ArtifactKind.apk,
     bool obfuscate = false,
     String? flutterVersion = '3.47.6',
+    String? dartDefineSecret,
   }) => BuildAndroidInput(
     settings: BuildSettings(
       worktree: buildWorktree,
@@ -26,6 +27,7 @@ void main() {
       flavor: 'dev',
       target: 'lib/main_dev.dart',
       flutterVersion: flutterVersion,
+      dartDefineSecret: dartDefineSecret,
       obfuscate: obfuscate,
       secretEnvironment: const {'KEYSTORE_PASSWORD': 'keystore.password'},
       secretFiles: const {'KEYSTORE_FILE': 'keystore.file'},
@@ -335,5 +337,20 @@ void main() {
       'flutter': '3.47.6',
       'dart': '3.13.5',
     });
+  });
+
+  test('builds with the define file of a credential, by its path', () async {
+    context.defines['defines'] = 'API_KEY=secret-value\n';
+
+    final outcome = await step.run(input(dartDefineSecret: 'defines'), context);
+
+    expect(outcome, isA<StepSucceeded<BuildResult>>());
+    expect(context.secretFiles['dart-defines'], 'API_KEY=secret-value\n');
+    final arguments = context.commands.single.arguments;
+    expect(
+      arguments,
+      contains('--dart-define-from-file=/secrets/job_1/dart-defines'),
+    );
+    expect(arguments.join(' '), isNot(contains('secret-value')));
   });
 }

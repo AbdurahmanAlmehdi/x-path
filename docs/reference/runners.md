@@ -131,11 +131,11 @@ answered with `cancel`. The sweep (`LeaseSweeper`, every 10 s) ends the leases t
   (ADR 0012). The scheduler never places a job with an engine-only step on a remote runner and the hub refuses
   it again at the offer. The built-in workflows keep these steps in jobs of their own, so their build jobs can
   go to a runner (ADR 0010).
-- **Secrets (D-09, ADR 0012).** Over the authenticated socket, on request, never in the offer: the offer lists
+- **Secrets (D-09, ADR 0012, ADR 0016).** Over the authenticated socket, on request, never in the offer: the offer lists
   **keys only**, the runner asks with `secret_request` and gets `secret_value` (the base64 of the bytes)
   **once per lease and key**. What may be asked for is what the steps of this job name in `secretFiles`,
-  `secretEnvironment` or `tokenSecret` **and** that is the keystore of the project or one of its passwords, or the
-  Shorebird key of the project (`RunnerSecretGrants`); the GitHub token, store credentials and anything else are
+  `secretEnvironment`, `tokenSecret` or `dartDefineSecret` **and** that is the keystore of the project or one of
+  its passwords, the Shorebird key of the project or a `dart_defines` file of the project (`RunnerSecretGrants`); the GitHub token, store credentials and anything else are
   `secret_denied`. Each delivery is a `runner.secret_delivered` event (key, never value), and the delivered
   text is added to the log masker. A single-use URL was the other option; the socket is already authenticated,
   bound to the lease and outbound only, and needs no second credential to leak. The socket is not encrypted by

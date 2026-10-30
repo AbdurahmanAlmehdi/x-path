@@ -27,6 +27,7 @@ class RecordManifestInput extends Equatable {
     required this.version,
     this.flavors = const [],
     this.dartDefineFile,
+    this.dartDefineSecret,
   });
 
   /// Reads the input from its stored form.
@@ -44,6 +45,7 @@ class RecordManifestInput extends Equatable {
       version: version,
       flavors: stringList(json, 'flavors'),
       dartDefineFile: dartDefineFile,
+      dartDefineSecret: optionalString(json, 'dartDefineSecret'),
     );
   }
 
@@ -60,16 +62,27 @@ class RecordManifestInput extends Equatable {
   /// the manifest records its SHA-256.
   final String? dartDefineFile;
 
+  /// The secret key of the flavor's `dart_defines` credential, when the
+  /// workflow names no [dartDefineFile]; the manifest records its SHA-256.
+  final String? dartDefineSecret;
+
   /// The stored form.
   Map<String, dynamic> toJson() => {
     'worktree': worktree.toJson(),
     'version': '$version',
     'flavors': flavors,
     'dartDefineFile': ?dartDefineFile,
+    'dartDefineSecret': ?dartDefineSecret,
   };
 
   @override
-  List<Object?> get props => [worktree, version, flavors, dartDefineFile];
+  List<Object?> get props => [
+    worktree,
+    version,
+    flavors,
+    dartDefineFile,
+    dartDefineSecret,
+  ];
 }
 
 /// What `record.manifest` stored.
@@ -89,7 +102,8 @@ class RecordManifestResult extends Equatable {
 ///
 /// It names the version, the build and the tag, the commit that was built and
 /// whether the worktree was dirty, the tool versions the job ran with, the
-/// SHA-256 of `pubspec.lock` and of the `--dart-define-from-file` file, and
+/// SHA-256 of `pubspec.lock` and of the `--dart-define-from-file` file (of a
+/// `dart_defines` credential only the SHA-256, and no name), and
 /// every artifact of the job with its SHA-256. Running it again replaces the
 /// manifest.
 class RecordManifestStep
@@ -141,7 +155,10 @@ class RecordManifestStep
     final tools = await _jobs.tools(context.jobId);
     final lock = await workspace.read(worktree.inApp('pubspec.lock'));
     final defines = input.dartDefineFile;
-    final defineText = defines == null
+    final secretDefines = input.dartDefineSecret;
+    final defineText = secretDefines != null
+        ? await context.readDartDefines(secretDefines)
+        : defines == null
         ? null
         : await workspace.read(worktree.inApp(defines));
     final built = [

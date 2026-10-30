@@ -412,6 +412,75 @@ INSERT INTO job (id, workflow_version_id, project_id, state)
     );
   });
 
+  test('v22 rebuilds credential, keeps its rows and assignments, and takes '
+      'dart-define files', () {
+    final path = '${tempDirectory().path}/xpath.db';
+    sqlite3.open(path)
+      ..execute(_golden(21))
+      ..userVersion = 21
+      ..execute('''
+INSERT INTO project (id, host, source_key, github_repo_id, remote,
+  default_base_branch) VALUES ('prj_1', 'github.com', '1', 1, 'r', 'main');
+INSERT INTO app (id, project_id, path, framework, store_country)
+  VALUES ('app_1', 'prj_1', '.', 'flutter', 'us');
+INSERT INTO flavor (id, app_id, name, entrypoint)
+  VALUES ('flv_1', 'app_1', 'prod', 'lib/main.dart');
+INSERT INTO credential (id, name, kind, secret_key, account, status,
+  verified_at, checked_at, message, fix) VALUES
+  ('crd_1', 'Keys', 'keystore', 'credential.crd_1', 'upload', 'rejected', 5, 6,
+   'gone', 'replace it');
+INSERT INTO credential_assignment (flavor_id, kind, credential_id)
+  VALUES ('flv_1', 'keystore', 'crd_1');
+''')
+      ..close();
+
+    SqliteDatabase.open(path).close();
+    final db = sqlite3.open(path);
+    addTearDown(db.close);
+
+    expect(
+      db
+          .select(
+            'SELECT id, name, kind, secret_key, account, status, verified_at, '
+            'checked_at, message, fix FROM credential',
+          )
+          .single
+          .values,
+      [
+        'crd_1',
+        'Keys',
+        'keystore',
+        'credential.crd_1',
+        'upload',
+        'rejected',
+        5,
+        6,
+        'gone',
+        'replace it',
+      ],
+    );
+    expect(
+      db
+          .select('SELECT credential_id FROM credential_assignment')
+          .single
+          .columnAt(0),
+      'crd_1',
+    );
+    expect(db.select('PRAGMA foreign_key_check'), isEmpty);
+    db.execute(
+      'INSERT INTO credential (id, name, kind, secret_key) '
+      "VALUES ('crd_2', 'Defines', 'dart_defines', 'k')",
+    );
+    expect(
+      () => db.execute(
+        'INSERT INTO credential (id, name, kind, secret_key) '
+        "VALUES ('crd_3', 'Other', 'nope', 'k')",
+      ),
+      throwsA(isA<SqliteException>()),
+      reason: 'the kind is still checked',
+    );
+  });
+
   test('v20 rebuilds credential, keeps its rows and assignments, and takes '
       'Apple Distribution identities', () {
     final path = '${tempDirectory().path}/xpath.db';

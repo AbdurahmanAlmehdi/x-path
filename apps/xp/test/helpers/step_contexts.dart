@@ -42,6 +42,14 @@ class ScriptedContext implements StepContext {
   bool get isStopping => false;
 
   @override
+  Future<String> readDartDefines(String secretKey) =>
+      throw StateError('This step reads no define file.');
+
+  @override
+  Future<String> writeSecretFile(String name, String contents) =>
+      throw StateError('This step writes no secret file.');
+
+  @override
   Future<ProcessExit> run(
     ProcessCommand command, {
     void Function(OutputLine line)? onLine,
@@ -81,6 +89,14 @@ class ProcessContext implements StepContext {
 
   @override
   bool get isStopping => false;
+
+  @override
+  Future<String> readDartDefines(String secretKey) =>
+      throw StateError('This step reads no define file.');
+
+  @override
+  Future<String> writeSecretFile(String name, String contents) =>
+      throw StateError('This step writes no secret file.');
 
   @override
   Future<ProcessExit> run(
