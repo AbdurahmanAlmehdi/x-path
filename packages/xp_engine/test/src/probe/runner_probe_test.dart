@@ -54,6 +54,13 @@ void main() {
       expect(byId['java']!.onlyOn, isNull);
     });
 
+    test('give swift less time, so a slow one does not hold up the engine', () {
+      final byId = {for (final c in probe.commands) c.id: c};
+
+      expect(byId['swift']!.timeoutSeconds, 10);
+      expect(byId['git']!.timeoutSeconds, 30);
+    });
+
     test('the Android script looks where the engine looks', () {
       for (final place in const [
         r'$ANDROID_HOME',

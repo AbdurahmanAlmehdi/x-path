@@ -186,11 +186,14 @@ exit 1
       requires: 'xcode_select',
       onlyOn: 'macos',
     ),
-    // `swift` on a Mac is a shim that can open the same dialog.
+    // `swift` on a Mac is a shim that can open the same dialog. On a cold
+    // disk `swift --version` can take most of the default 30 seconds, and
+    // the engine probes before it listens, so it gets less.
     ProbeCommand(
       id: 'swift',
       executable: 'swift',
       arguments: ['--version'],
+      timeoutSeconds: 10,
       onlyOn: 'linux',
     ),
   ];

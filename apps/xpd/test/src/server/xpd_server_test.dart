@@ -95,9 +95,13 @@ void main() {
       expect(await stream.closeCode(), 1000);
       // Refused, or reset when the freed port was already taken by another
       // test file's server running in parallel: either way nothing serves.
+      // On macOS a reset while connecting reaches the client as a bare
+      // OSError, not a SocketException.
       await expectLater(
         engine.request('/health'),
-        throwsA(anyOf(isA<SocketException>(), isA<HttpException>())),
+        throwsA(
+          anyOf(isA<SocketException>(), isA<HttpException>(), isA<OSError>()),
+        ),
       );
     });
   });
