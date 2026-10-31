@@ -118,8 +118,10 @@ job, at its `credentials` guard, before anything is built. **Check now**, or `xp
   The file is written with mode 0600 to the job's secret folder, on the engine or on the runner that
   has the job, and deleted when the job ends. `record.manifest` records its SHA-256 and
   `build.verifyCompiledConfig` reads its `keys` from it.
-- Every value of a `dart_defines` file of 6 characters or more is hidden in all job output, wherever
-  it appears. A value like `MODE=release` hides that word too, so keep such settings out of the file.
+- Every value of a `dart_defines` file of 6 characters or more is hidden in the output of every job
+  of the engine, wherever it appears. A value like `MODE=release` hides that word too, so keep such
+  settings out of the file. While Flutter compiles, the values are on the command line of its own
+  child processes, so a build machine must not have users who should not see them (ADR 0016).
 - Without a `play_sa`, or with only an `apple_id`, XPath cannot read that store's review status; you
   mark it approved or live in the app ([Releases](releases.md)).
 - A `slack` webhook assigned to a flavor makes the engine post the project's notifications there:

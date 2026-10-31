@@ -3,9 +3,7 @@ import 'package:xp_engine/src/credentials/credential_material.dart';
 import 'package:xp_engine/src/credentials/credential_verifier.dart';
 import 'package:xp_engine/src/steps/build/dart_defines.dart';
 
-/// Checks that a stored define file is one Flutter can read. Nothing else can
-/// tell whether its values are right; `build.verifyCompiledConfig` proves they
-/// reached a build.
+/// Checks that a stored define file is one Flutter can read.
 class DartDefinesVerifier implements CredentialVerifier {
   /// Creates the verifier.
   const new();

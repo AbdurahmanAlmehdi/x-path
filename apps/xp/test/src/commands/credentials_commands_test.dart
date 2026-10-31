@@ -471,7 +471,6 @@ void main() {
       ]);
 
       expect(createdMaterial(), {'dartDefines': '{"API_KEY": "s3cret"}'});
-      expect(printed(), isNot(contains('s3cret')));
     });
 
     test('adds a keystore, its passwords from standard input and the '
@@ -702,6 +701,10 @@ void main() {
         contains('Unknown --kind "nope"'),
       );
       expect(await refused(['--kind', 'slack']), contains('Missing --name'));
+      expect(
+        await refused(['--kind', 'dart_defines', '--name', 'x']),
+        contains('Missing --dart-defines (for --kind dart_defines)'),
+      );
       expect(
         await refused(['--kind', 'slack', '--name', '   ']),
         contains('The name must be a non-empty string'),

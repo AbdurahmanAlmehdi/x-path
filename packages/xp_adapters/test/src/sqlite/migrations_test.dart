@@ -467,9 +467,22 @@ INSERT INTO credential_assignment (flavor_id, kind, credential_id)
       'crd_1',
     );
     expect(db.select('PRAGMA foreign_key_check'), isEmpty);
-    db.execute(
-      'INSERT INTO credential (id, name, kind, secret_key) '
-      "VALUES ('crd_2', 'Defines', 'dart_defines', 'k')",
+    db
+      ..execute(
+        'INSERT INTO credential (id, name, kind, secret_key) '
+        "VALUES ('crd_2', 'Defines', 'dart_defines', 'k')",
+      )
+      ..execute(
+        'INSERT INTO credential_assignment (flavor_id, kind, credential_id) '
+        "VALUES ('flv_1', 'dart_defines', 'crd_2')",
+      );
+    expect(
+      () => db.execute(
+        'INSERT INTO credential (id, name, kind, secret_key) '
+        "VALUES ('crd_4', 'DEFINES', 'slack', 'k')",
+      ),
+      throwsA(isA<SqliteException>()),
+      reason: 'names are still unique regardless of case',
     );
     expect(
       () => db.execute(

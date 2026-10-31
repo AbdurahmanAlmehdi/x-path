@@ -491,6 +491,26 @@ stages:
       }
     });
 
+    test('stays away from a config check that reads no keys', () async {
+      final run = await dispatch(
+        '''
+          - kind: build.verifyCompiledConfig
+            with: {needles: [x]}
+''',
+        matrix: _flavorMatrix,
+        request: const DispatchRequest(
+          platforms: ['android'],
+          flavors: ['prod'],
+        ),
+      );
+      final input = await harness.input(
+        await harness.job(run.jobs.single.id),
+        'build.verifyCompiledConfig',
+      );
+
+      expect(input.keys, isNot(contains('dartDefineSecret')));
+    });
+
     test('gives way to a file the workflow names', () async {
       final found = await inputs('dartDefineFile: env.json');
 

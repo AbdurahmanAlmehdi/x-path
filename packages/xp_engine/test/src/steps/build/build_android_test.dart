@@ -352,5 +352,9 @@ void main() {
       contains('--dart-define-from-file=/secrets/job_1/dart-defines'),
     );
     expect(arguments.join(' '), isNot(contains('secret-value')));
+    expect(
+      context.commands.single.environment.values,
+      isNot(contains('secret-value')),
+    );
   });
 }

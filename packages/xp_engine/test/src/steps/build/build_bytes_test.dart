@@ -74,65 +74,71 @@ void main() {
       }
     });
 
-    test('reads KEY=value lines, first one wins, quotes dropped', () {
+    test('reads KEY=value lines as Flutter does', () {
       expect(
         parseDartDefines(
-          '# comment\n\n  A = "https://x.io/p"\nA=other\nnoequals\n=empty\nB=2\n',
-        ),
-        {'A': 'https://x.io/p', 'B': '2'},
-      );
-    });
-  });
-
-  group('parseDartDefines reads .env values as Flutter does', () {
-    test('keeps spaces, drops wrapping quotes and trailing comments', () {
-      expect(
-        parseDartDefines(
-          'A="two words" # note\n'
-          "B='it is'\n"
-          'C=`x y`\n'
-          'D=plain # note\n'
-          'E=two words\n',
+          '# comment\n\n'
+          '  A = "https://x.io/p"\n'
+          'A=last wins\n'
+          'B="two words" # note\n'
+          "C='it is'\n"
+          'D=`x y`\n'
+          'E=plain # note\n'
+          'F=\n'
+          'G=   \n'
+          'H=""\n'
+          'I="p"s"w"\n'
+          'J=a#b\n',
         ),
         {
-          'A': 'two words',
-          'B': 'it is',
-          'C': 'x y',
-          'D': 'plain',
-          'E': 'two words',
+          'A': 'last wins',
+          'B': 'two words',
+          'C': 'it is',
+          'D': 'x y',
+          'E': 'plain',
+          'F': '',
+          'G': '',
+          'H': '',
+          'I': 'p"s"w',
+          'J': 'a',
         },
       );
+    });
+
+    test('refuses what Flutter refuses, without quoting the file', () {
+      for (final bad in const [
+        '{"A": {"secret-value": 1}}',
+        '{"A": "secret-value"',
+        'A=x\nsecret-value\n',
+        '=secret-value\n',
+        'export A=secret-value\n',
+        'A-B=secret-value\n',
+        'A="""secret-value\n',
+      ]) {
+        expect(
+          () => parseDartDefines(bad),
+          throwsA(
+            isA<FormatException>().having(
+              (error) => error.toString(),
+              'text',
+              isNot(contains('secret-value')),
+            ),
+          ),
+          reason: bad,
+        );
+      }
     });
   });
 
   group('checkDartDefines', () {
-    test('takes what Flutter reads', () {
+    test('takes a file with a value, and an empty value is one', () {
       checkDartDefines('{"A": "x"}');
-      checkDartDefines('# comment\n\nA=x\n');
+      checkDartDefines('# comment\n\nA=\n');
     });
 
-    test('refuses what it does not, without quoting the file', () {
-      for (final (bad, message) in const [
-        ('{"A": {"secret-value": 1}}', 'not a flat JSON object'),
-        ('{"A": "secret-value"', 'not a flat JSON object'),
-        ('A=x\nsecret-value\n', 'not KEY=value'),
-        ('=secret-value\n', 'not KEY=value'),
-        ('{}', 'defines no values'),
-        ('# only a comment\n', 'defines no values'),
-      ]) {
-        expect(
-          () => checkDartDefines(bad),
-          throwsA(
-            isA<FormatException>()
-                .having((error) => error.message, 'message', contains(message))
-                .having(
-                  (error) => error.message,
-                  'message',
-                  isNot(contains('secret-value')),
-                ),
-          ),
-          reason: bad,
-        );
+    test('refuses a file that defines nothing', () {
+      for (final empty in const ['{}', '# only a comment\n', '\n']) {
+        expect(() => checkDartDefines(empty), throwsFormatException);
       }
     });
   });
@@ -146,6 +152,14 @@ void main() {
         'k 12345',
         base64.encode(utf8.encode('API_KEY=k 12345')),
       ]);
+    });
+
+    test('names the value Flutter compiles of a key defined twice', () {
+      expect(dartDefineSecrets('A=first1\nA=second2\n'), contains('second2'));
+    });
+
+    test('names only the text of a file it cannot read', () {
+      expect(dartDefineSecrets('{"A": {"b": 1}}'), ['{"A": {"b": 1}}']);
     });
   });
 

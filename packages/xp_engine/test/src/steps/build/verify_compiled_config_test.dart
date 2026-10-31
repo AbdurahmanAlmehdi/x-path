@@ -172,6 +172,24 @@ void main() {
       expect(message, isNot(contains('secret.example')));
     });
 
+    test('names every key that shares a value', () async {
+      context.defines['defines'] = jsonEncode({
+        'API_URL': 'https://api.secret.example/a',
+        'WS_URL': 'https://api.secret.example/b',
+      });
+      snapshots.snapshot = [bytes('nothing here')];
+
+      final outcome = await step.run(
+        secretInput(keys: const ['API_URL', 'WS_URL']),
+        context,
+      );
+
+      expect(
+        (outcome as StepFailed).message,
+        contains('API_URL, WS_URL are NOT compiled'),
+      );
+    });
+
     test('says which key the credential lacks', () async {
       final outcome = await step.run(
         secretInput(keys: const ['NOPE']),

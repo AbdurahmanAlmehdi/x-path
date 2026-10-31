@@ -420,7 +420,10 @@ void main() {
       expect(secretAsks, ['defines']);
       expect(contents, '{"API_KEY": "k-12345"}');
       expect(stat!.mode & 0x1ff, 0x180, reason: 'mode 0600');
-      expect(masker.secrets, contains('k-12345'));
+      expect(
+        masker.secrets,
+        containsAll(['k-12345', base64.encode(utf8.encode('API_KEY=k-12345'))]),
+      );
       expect(p.isWithin(paths.fallbackSecrets, path!), isTrue);
       expect(File(path!).existsSync(), isFalse);
       expect(await area.recall('job_1', 'defines'), isNull);

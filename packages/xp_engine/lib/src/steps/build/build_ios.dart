@@ -57,19 +57,17 @@ class BuildIosInput extends Equatable {
   List<Object?> get props => [settings, exportOptionsPlist, linuxSigning];
 }
 
-/// The variable that holds the path of the secret defines of a Linux build:
-/// `KEY=VALUE` entries, each ended by a NUL.
-const secretDefinesVariable = 'XPATH_DART_DEFINES_FILE';
-
 /// What `bash -c` runs for `flutter/build.sh` (`$0`) in the app (`$1`) when
-/// the defines are secret. `build.sh` takes them as arguments only, so they
-/// are read from [secretDefinesVariable] and the script is sourced with them:
-/// no process gets them as its command line. Sourcing keeps `$0`, from which
-/// the script finds its checkout.
+/// the defines are secret, read from the file `$2`: `KEY=VALUE` entries, each
+/// ended by a NUL. `build.sh` takes defines as arguments only, so it is sourced
+/// with them and no process gets them from XPath as its command line. Sourcing
+/// keeps `$0`, from which the script finds its checkout.
 const buildWithSecretDefines = r'''
-defines=()
-while IFS= read -r -d '' define; do defines+=("$define"); done < "$XPATH_DART_DEFINES_FILE"
-source "$0" "$1" "${defines[@]}"
+xpath_defines=()
+while IFS= read -r -d '' define; do xpath_defines+=("$define"); done < "$2"
+set -- "$1" "${xpath_defines[@]}"
+unset xpath_defines define
+source "$0" "$@"
 ''';
 
 /// What `build.ios` builds with on a Linux runner (ADR 0014).
@@ -353,13 +351,15 @@ class _Scripts {
         secretDefines == null ? script : 'bash',
         arguments: secretDefines == null
             ? arguments
-            : ['-c', buildWithSecretDefines, script, arguments.first],
+            : [
+                '-c',
+                buildWithSecretDefines,
+                script,
+                arguments.first,
+                secretDefines,
+              ],
         workingDirectory: _settings.appDirectory,
-        environment: {
-          ..._environment,
-          ...environment,
-          secretDefinesVariable: ?secretDefines,
-        },
+        environment: {..._environment, ...environment},
         passThroughEnvironment: [
           ..._passThrough,
           ..._settings.passThroughEnvironment,

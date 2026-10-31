@@ -131,6 +131,7 @@ export 'src/steps/build/build_outputs.dart';
 export 'src/steps/build/build_result.dart';
 export 'src/steps/build/build_settings.dart';
 export 'src/steps/build/build_toolchain.dart';
+export 'src/steps/build/dart_defines.dart';
 export 'src/steps/build/flutter_build_step.dart';
 export 'src/steps/build/record_manifest.dart';
 export 'src/steps/build/snapshot_reader.dart';

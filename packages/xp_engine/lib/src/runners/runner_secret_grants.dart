@@ -16,8 +16,8 @@ import 'package:xp_engine/src/stores/apple/app_store_profiles.dart';
 ///   names it in `secretFiles`, `secretEnvironment` or `tokenSecret` (the
 ///   `shorebird.release` and `shorebird.patch` steps) **and** it is the
 ///   `sb_api_*` key of a Shorebird credential of the project.
-/// - **The dart-define file (ADR 0016):** a secret key is granted when a build
-///   step names it in `dartDefineSecret` **and** it is a `dart_defines`
+/// - **The dart-define file (ADR 0016):** a secret key is granted when a step
+///   names it (`dartDefineSecret` above all) **and** it is a `dart_defines`
 ///   credential of the project.
 /// - **The Linux iOS signing (ADR 0014):** a secret key is granted when a
 ///   step names it (`build.ios` in `linuxSigning`) **and** it is an Apple
@@ -36,6 +36,12 @@ class RunnerSecretGrants {
 
   final CredentialRepository _credentials;
 
+  /// The keys the [steps] name as define files.
+  static Set<String> defineFilesOf(Iterable<StepRecord> steps) => {
+    for (final step in steps)
+      if (step.input['dartDefineSecret'] case final String defines) defines,
+  };
+
   /// The keys the runner of a job of [projectId] may ask for, given the
   /// [steps] of the job.
   Future<Set<String>> forSteps(
@@ -53,8 +59,8 @@ class RunnerSecretGrants {
             for (final value in map.values)
               if (value is String) value,
         if (step.input['tokenSecret'] case final String token) token,
-        if (step.input['dartDefineSecret'] case final String defines) defines,
       ],
+      ...defineFilesOf(steps),
     };
     if (named.isEmpty) return const {};
     final grantable = <String>{

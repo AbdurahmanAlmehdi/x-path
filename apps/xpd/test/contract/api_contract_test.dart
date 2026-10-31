@@ -901,7 +901,15 @@ void main() {
       expect(created.statusCode, 201);
       expect(created.json['kind'], 'dart_defines');
       expect(created.json['status'], 'verified');
+      final replaced = await check(
+        'PUT',
+        '/credentials/${created.json['id']}',
+        '/credentials/{credentialId}',
+        body: {'dartDefines': 'API_KEY=s3cret-value'},
+      );
       expect(refused.statusCode, 422);
+      expect(replaced.statusCode, 200);
+      expect(jsonEncode(replaced.json), isNot(contains('s3cret-value')));
       expect(jsonEncode(created.json), isNot(contains('s3cret-value')));
       expect(jsonEncode(refused.json), isNot(contains('s3cret-value')));
     });

@@ -193,13 +193,13 @@ class VerifyCompiledConfigStep
     }
 
     final String expectations;
-    final Map<String, String> needles;
+    final Map<String, Set<String>> needles;
     try {
       needles = await _needles(input, context);
     } on FormatException catch (error) {
       return StepFailed(error.message);
     }
-    expectations = needles.values.join(', ');
+    expectations = needles.values.expand((names) => names).join(', ');
 
     final snapshot = await _snapshots.snapshotOf(
       record.kind,
@@ -215,7 +215,7 @@ class VerifyCompiledConfigStep
     ]);
     await snapshot.forEach(finder.add);
     final missing = [
-      for (final bytes in finder.missing) needles[utf8.decode(bytes)]!,
+      for (final bytes in finder.missing) ...needles[utf8.decode(bytes)]!,
     ];
     if (missing.isNotEmpty) {
       return StepFailed(
@@ -230,21 +230,23 @@ class VerifyCompiledConfigStep
     return StepSucceeded(
       VerifyCompiledConfigResult(
         artifactName: name,
-        found: needles.values.toList(),
+        found: needles.values.expand((names) => names).toList(),
       ),
     );
   }
 
   /// The strings to look for, the literal ones and the values of `keys`, each
-  /// with how results and messages name it: itself, or the key of a secret.
+  /// with how results and messages name it: itself, or the keys of a secret.
   ///
   /// Throws a [FormatException] with the reason the define file cannot give
   /// them.
-  Future<Map<String, String>> _needles(
+  Future<Map<String, Set<String>>> _needles(
     VerifyCompiledConfigInput input,
     StepContext context,
   ) async {
-    final needles = {for (final needle in input.needles) needle: needle};
+    final needles = {
+      for (final needle in input.needles) needle: {needle},
+    };
     if (input.keys.isEmpty) return needles;
     final secret = input.dartDefineSecret;
     final file = input.dartDefineFile;
@@ -265,7 +267,7 @@ class VerifyCompiledConfigStep
       if (needle.isEmpty) {
         throw FormatException('$source has no value for $key.');
       }
-      needles[needle] = secret == null ? needle : key;
+      (needles[needle] ??= {}).add(secret == null ? needle : key);
     }
     return needles;
   }

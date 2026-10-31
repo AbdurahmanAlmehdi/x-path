@@ -255,8 +255,8 @@ void main() {
           buildWithSecretDefines,
           '$_checkout/flutter/build.sh',
           appDirectory,
+          '/secrets/job_1/dart-defines',
         ]);
-        expect(build.environment[secretDefinesVariable], isNotNull);
         expect(
           context.secretFiles['dart-defines'],
           'API_KEY=secret value\u0000LEVEL=3\u0000',
@@ -280,33 +280,41 @@ void main() {
       expect(context.commands, isEmpty);
     });
 
-    test('the wrapper hands the defines to the script', () async {
-      final folder = Directory.systemTemp.createTempSync('xp_defines');
-      addTearDown(() => folder.deleteSync(recursive: true));
-      final script = File('${folder.path}/build.sh')
-        ..writeAsStringSync(
-          '#!/usr/bin/env bash\n'
-          'set -euo pipefail\n'
-          r'app=$1; shift; printf "%s\n" "$0" "$app" "$@"; exit 7'
-          '\n',
-        );
-      final defines = File('${folder.path}/defines')
-        ..writeAsStringSync('A=two words\u0000B=x=y\u0000');
+    test(
+      'the wrapper hands the defines to the script, and only there',
+      () async {
+        final folder = Directory.systemTemp.createTempSync('xp_defines');
+        addTearDown(() => folder.deleteSync(recursive: true));
+        final script = File('${folder.path}/build.sh')
+          ..writeAsStringSync(
+            '#!/usr/bin/env bash\n'
+            'set -euo pipefail\n'
+            r'app=$1; shift; printf "%s\n" "$0" "$app" "$@" "${xpath_defines:-gone}"; exit 7'
+            '\n',
+          );
+        final defines = File('${folder.path}/defines')
+          ..writeAsStringSync('A=two words\u0000B=x=y\u0000C=\u0000');
 
-      final result = await Process.run(
-        'bash',
-        ['-c', buildWithSecretDefines, script.path, '/the/app'],
-        environment: {secretDefinesVariable: defines.path},
-      );
+        final result = await Process.run('bash', [
+          '-c',
+          buildWithSecretDefines,
+          script.path,
+          '/the/app',
+          defines.path,
+        ]);
 
-      expect(result.exitCode, 7, reason: 'its exit is the exit of the build');
-      expect(LineSplitter.split(result.stdout as String), [
-        script.path,
-        '/the/app',
-        'A=two words',
-        'B=x=y',
-      ]);
-    }, tags: 'process');
+        expect(result.exitCode, 7, reason: 'its exit is the exit of the build');
+        expect(LineSplitter.split(result.stdout as String), [
+          script.path,
+          '/the/app',
+          'A=two words',
+          'B=x=y',
+          'C=',
+          'gone',
+        ]);
+      },
+      tags: 'process',
+    );
   });
 
   test('fails on a define file that is missing or not one', () async {

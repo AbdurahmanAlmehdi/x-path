@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:test/test.dart';
 import 'package:xp_api/xp_api.dart';
@@ -315,7 +316,13 @@ void main() {
         final job = await run();
 
         expect(job.state, JobState.succeeded);
-        expect(harness.masker.secrets, contains('k-12345'));
+        expect(
+          harness.masker.secrets,
+          containsAll([
+            'k-12345',
+            base64.encode(utf8.encode('API_KEY=k-12345')),
+          ]),
+        );
         expect(existed, isTrue);
         expect(path, '/secrets/${job.id}/0-dart-defines');
         expect(harness.secretFiles.written[path], '{"API_KEY": "k-12345"}');
@@ -326,6 +333,7 @@ void main() {
         final job = await run();
 
         expect(job.state, JobState.failed);
+        expect(job.message, contains('There is no secret "defines"'));
         expect(harness.secretFiles.written, isEmpty);
       });
     });
