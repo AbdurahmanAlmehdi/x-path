@@ -67,4 +67,14 @@ abstract interface class StepContext {
     ProcessCommand command, {
     void Function(OutputLine line)? onLine,
   });
+
+  /// The text of the define file stored as the secret [secretKey]. Its values
+  /// are masked in all output from now on.
+  ///
+  /// Throws a `SecretStoreException` if the secret cannot be read.
+  Future<String> readDartDefines(String secretKey);
+
+  /// Writes [contents] to a file with mode 0600 in the job's secret folder,
+  /// which is deleted when the job ends, and returns its path.
+  Future<String> writeSecretFile(String name, String contents);
 }

@@ -1255,6 +1255,12 @@ abstract class AppLocalizations {
   /// Credential kind.
   ///
   /// In en, this message translates to:
+  /// **'Dart define file'**
+  String get kindDartDefines;
+
+  /// Credential kind.
+  ///
+  /// In en, this message translates to:
   /// **'Shorebird API key'**
   String get kindShorebird;
 
@@ -1401,6 +1407,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Keystore'**
   String get fieldKeystore;
+
+  /// Field label.
+  ///
+  /// In en, this message translates to:
+  /// **'Dart define file (JSON or KEY=value lines)'**
+  String get fieldDartDefines;
 
   /// Field label.
   ///

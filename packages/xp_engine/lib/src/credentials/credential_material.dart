@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:xp_api/xp_api.dart';
 import 'package:xp_engine/src/credentials/credential_exceptions.dart';
 import 'package:xp_engine/src/secrets/secret_store.dart';
+import 'package:xp_engine/src/steps/build/dart_defines.dart';
 import 'package:xp_engine/src/stores/apple/asc_key.dart';
 import 'package:xp_engine/src/stores/apple/distribution_certificate.dart';
 import 'package:xp_engine/src/stores/play/play_service_account.dart';
@@ -22,6 +23,7 @@ import 'package:xp_engine/src/stores/play/play_service_account.dart';
 /// | `apple_distribution` | `<key>`: the PEM key; `<key>.certificate`: DER |
 /// | `play_sa`, `firebase_sa` | `<key>`: the JSON key file, as it is |
 /// | `keystore` | `<key>`: bytes; `<key>.storePassword`, `<key>.keyPassword` |
+/// | `dart_defines` | `<key>`: the file's text, as it is |
 /// | `shorebird`, `github` | `<key>`: the token |
 /// | `slack` | `<key>`: the webhook URL |
 sealed class CredentialMaterial {
@@ -115,6 +117,8 @@ sealed class CredentialMaterial {
           alias: text('keyAlias').trim(),
           keyPassword: optional('keyPassword') ?? storePassword,
         );
+      case CredentialKind.dartDefines:
+        return DartDefinesMaterial.fromText(text('dartDefines'));
       case CredentialKind.shorebird:
       case CredentialKind.github:
         return TokenMaterial(kind, text('token').trim());
@@ -186,6 +190,9 @@ sealed class CredentialMaterial {
                 alias: account,
                 keyPassword: keyPassword,
               );
+      case CredentialKind.dartDefines:
+        final text = await secrets.read(secretKey);
+        return text == null ? null : DartDefinesMaterial(text);
       case CredentialKind.shorebird:
       case CredentialKind.github:
         final token = await secrets.read(secretKey);
@@ -408,6 +415,46 @@ final class KeystoreMaterial extends CredentialMaterial {
     await secrets.write(storePasswordKey(secretKey), storePassword);
     await secrets.write(keyPasswordKey(secretKey), keyPassword);
   }
+}
+
+/// The file of `--dart-define-from-file` of a flavor. Its values are secrets;
+/// its keys are not.
+final class DartDefinesMaterial extends CredentialMaterial {
+  /// Creates the material.
+  const new(this.text);
+
+  /// Reads the file as an owner sends it.
+  ///
+  /// Throws a [CredentialRejectedException] if Flutter could not read it.
+  factory fromText(String text) {
+    try {
+      checkDartDefines(text);
+    } on FormatException catch (error) {
+      throw CredentialRejectedException(
+        error.message,
+        fix:
+            'Send the file you pass to --dart-define-from-file: a flat JSON '
+            'object, or KEY=value lines.',
+      );
+    }
+    return DartDefinesMaterial(text);
+  }
+
+  /// The text of the file.
+  final String text;
+
+  @override
+  CredentialKind get kind => CredentialKind.dartDefines;
+
+  @override
+  String? get account => null;
+
+  @override
+  List<String> get secretValues => dartDefineSecrets(text);
+
+  @override
+  Future<void> write(SecretStore secrets, String secretKey) =>
+      secrets.write(secretKey, text);
 }
 
 /// A token: a Shorebird API key or a GitHub token.

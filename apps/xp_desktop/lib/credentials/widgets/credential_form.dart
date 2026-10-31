@@ -56,6 +56,9 @@ final Map<CredentialKind, List<_Field>> _fields = {
     _field('keyAlias', (l) => l.fieldKeyAlias),
     _field('keyPassword', (l) => l.fieldKeyPassword, _Input.secret, true),
   ],
+  CredentialKind.dartDefines: [
+    _field('dartDefines', (l) => l.fieldDartDefines, _Input.multiline),
+  ],
   CredentialKind.shorebird: [
     _field('token', (l) => l.fieldToken, _Input.secret),
   ],

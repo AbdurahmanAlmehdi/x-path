@@ -96,6 +96,10 @@ const testServiceAccount = PlayServiceAccount(
 const testSigningKey =
     '-----BEGIN PRIVATE KEY-----\nMIIE\n-----END PRIVATE KEY-----\n';
 
+/// A define file with values in the shape of secrets, for tests.
+const testDartDefines =
+    '{"API_URL": "https://api.x.io/v1", "API_KEY": "k-12345"}';
+
 /// The fields of a request for a credential of [kind], for tests.
 Map<String, dynamic> credentialFields(CredentialKind kind) => switch (kind) {
   CredentialKind.ascKey => {
@@ -120,6 +124,7 @@ Map<String, dynamic> credentialFields(CredentialKind kind) => switch (kind) {
     'storePassword': 'store-pass',
     'keyAlias': 'upload',
   },
+  CredentialKind.dartDefines => {'dartDefines': testDartDefines},
   CredentialKind.shorebird => {'token': 'sb_api_abc123'},
   CredentialKind.github => {'token': 'ghp_abc123'},
   CredentialKind.slack => {

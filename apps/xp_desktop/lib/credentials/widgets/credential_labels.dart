@@ -22,6 +22,7 @@ String credentialKindLabel(AppLocalizations l10n, CredentialKind kind) =>
       CredentialKind.playSa => l10n.kindPlaySa,
       CredentialKind.firebaseSa => l10n.kindFirebaseSa,
       CredentialKind.keystore => l10n.kindKeystore,
+      CredentialKind.dartDefines => l10n.kindDartDefines,
       CredentialKind.shorebird => l10n.kindShorebird,
       CredentialKind.github => l10n.kindGithub,
       CredentialKind.slack => l10n.kindSlack,

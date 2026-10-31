@@ -32,6 +32,12 @@ class BuildContext implements StepContext {
   void Function(ProcessCommand command)? onRun;
   final commands = <ProcessCommand>[];
 
+  /// The define files of the secret store, by secret key.
+  final defines = <String, String>{};
+
+  /// The secret files the step wrote, by name.
+  final secretFiles = <String, String>{};
+
   @override
   String get jobId => 'job_1';
 
@@ -40,6 +46,17 @@ class BuildContext implements StepContext {
 
   @override
   bool get isStopping => false;
+
+  @override
+  Future<String> readDartDefines(String secretKey) async =>
+      defines[secretKey] ??
+      (throw SecretStoreException('There is no secret "$secretKey".'));
+
+  @override
+  Future<String> writeSecretFile(String name, String contents) async {
+    secretFiles[name] = contents;
+    return '/secrets/job_1/$name';
+  }
 
   @override
   Future<ProcessExit> run(

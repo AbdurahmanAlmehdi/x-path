@@ -131,6 +131,78 @@ void main() {
     });
   });
 
+  group('with a dart_defines credential', () {
+    VerifyCompiledConfigInput secretInput({
+      List<String> keys = const ['API_BASE_URL'],
+    }) => VerifyCompiledConfigInput(
+      worktree: buildWorktree,
+      artifactName: 'prod-1.2.3+45.aab',
+      dartDefineSecret: 'defines',
+      keys: keys,
+    );
+
+    setUp(() {
+      context.defines['defines'] = jsonEncode({
+        'API_BASE_URL': 'https://api.secret.example/v2',
+      });
+    });
+
+    test('stores its input', () {
+      expect(step.decodeInput(step.encodeInput(secretInput())), secretInput());
+    });
+
+    test('finds the value and names only its key', () async {
+      snapshots.snapshot = [bytes('x api.secret.example y')];
+
+      final outcome = await step.run(secretInput(), context);
+
+      expect(
+        (outcome as StepSucceeded<VerifyCompiledConfigResult>).result.found,
+        ['API_BASE_URL'],
+      );
+    });
+
+    test('names only the key of a value that is missing', () async {
+      snapshots.snapshot = [bytes('nothing here')];
+
+      final outcome = await step.run(secretInput(), context);
+
+      final message = (outcome as StepFailed).message;
+      expect(message, contains('API_BASE_URL is NOT compiled'));
+      expect(message, isNot(contains('secret.example')));
+    });
+
+    test('names every key that shares a value', () async {
+      context.defines['defines'] = jsonEncode({
+        'API_URL': 'https://api.secret.example/a',
+        'WS_URL': 'https://api.secret.example/b',
+      });
+      snapshots.snapshot = [bytes('nothing here')];
+
+      final outcome = await step.run(
+        secretInput(keys: const ['API_URL', 'WS_URL']),
+        context,
+      );
+
+      expect(
+        (outcome as StepFailed).message,
+        contains('API_URL, WS_URL are NOT compiled'),
+      );
+    });
+
+    test('says which key the credential lacks', () async {
+      final outcome = await step.run(
+        secretInput(keys: const ['NOPE']),
+        context,
+      );
+
+      expect(
+        (outcome as StepFailed).message,
+        'The dart_defines credential has no value for NOPE.',
+      );
+    });
+  });
+
   group('run', () {
     test('passes when the host is in the compiled code', () async {
       final outcome = await step.run(input(), context);

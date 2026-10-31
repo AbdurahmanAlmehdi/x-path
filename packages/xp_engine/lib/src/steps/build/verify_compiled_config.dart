@@ -17,11 +17,13 @@ import 'package:xp_engine/src/versioning/workspace.dart';
 /// What the compiled app must contain.
 class VerifyCompiledConfigInput extends Equatable {
   /// Creates the input. At least one of [keys] and [needles] is needed, and
-  /// [keys] need the [dartDefineFile] they are read from.
+  /// [keys] need the [dartDefineFile] or [dartDefineSecret] they are read
+  /// from.
   const new({
     required this.worktree,
     required this.artifactName,
     this.dartDefineFile,
+    this.dartDefineSecret,
     this.keys = const [],
     this.needles = const [],
   }) : assert(
@@ -29,7 +31,7 @@ class VerifyCompiledConfigInput extends Equatable {
          'There must be something to look for.',
        ),
        assert(
-         keys.length == 0 || dartDefineFile != null,
+         keys.length == 0 || dartDefineFile != null || dartDefineSecret != null,
          'Keys are read from a define file.',
        );
 
@@ -41,19 +43,23 @@ class VerifyCompiledConfigInput extends Equatable {
     final keys = stringList(json, 'keys');
     final needles = stringList(json, 'needles');
     final dartDefineFile = optionalString(json, 'dartDefineFile');
+    final dartDefineSecret = optionalString(json, 'dartDefineSecret');
     if (keys.isEmpty && needles.isEmpty) {
       throw const FormatException('"keys" or "needles" must name something.');
     }
     if (needles.any((needle) => needle.isEmpty)) {
       throw const FormatException('"needles" must not hold an empty string.');
     }
-    if (keys.isNotEmpty && dartDefineFile == null) {
-      throw const FormatException('"keys" need a "dartDefineFile".');
+    if (keys.isNotEmpty && dartDefineFile == null && dartDefineSecret == null) {
+      throw const FormatException(
+        '"keys" need a "dartDefineFile" or a dart_defines credential.',
+      );
     }
     return VerifyCompiledConfigInput(
       worktree: ReleaseWorktree.fromJson(requiredObject(json, 'worktree')),
       artifactName: requiredString(json, 'artifactName'),
       dartDefineFile: dartDefineFile,
+      dartDefineSecret: dartDefineSecret,
       keys: keys,
       needles: needles,
     );
@@ -69,6 +75,11 @@ class VerifyCompiledConfigInput extends Equatable {
   /// The `--dart-define-from-file` file of the build, relative to the app.
   final String? dartDefineFile;
 
+  /// The secret key of the flavor's `dart_defines` credential, when the
+  /// workflow names no [dartDefineFile]. Its values are secret, so results and
+  /// messages name their keys instead.
+  final String? dartDefineSecret;
+
   /// Keys of the define file whose values must be in the compiled app, such
   /// as `API_BASE_URL`. For a URL the host is looked for.
   final List<String> keys;
@@ -81,6 +92,7 @@ class VerifyCompiledConfigInput extends Equatable {
     'worktree': worktree.toJson(),
     'artifactName': artifactName,
     'dartDefineFile': ?dartDefineFile,
+    'dartDefineSecret': ?dartDefineSecret,
     'keys': keys,
     'needles': needles,
   };
@@ -90,6 +102,7 @@ class VerifyCompiledConfigInput extends Equatable {
     worktree,
     artifactName,
     dartDefineFile,
+    dartDefineSecret,
     keys,
     needles,
   ];
@@ -180,13 +193,13 @@ class VerifyCompiledConfigStep
     }
 
     final String expectations;
-    final List<String> needles;
+    final Map<String, Set<String>> needles;
     try {
-      needles = await _needles(input);
+      needles = await _needles(input, context);
     } on FormatException catch (error) {
       return StepFailed(error.message);
     }
-    expectations = needles.join(', ');
+    expectations = needles.values.expand((names) => names).join(', ');
 
     final snapshot = await _snapshots.snapshotOf(
       record.kind,
@@ -198,10 +211,12 @@ class VerifyCompiledConfigStep
       );
     }
     final finder = BytesFinder([
-      for (final needle in needles) utf8.encode(needle),
+      for (final needle in needles.keys) utf8.encode(needle),
     ]);
     await snapshot.forEach(finder.add);
-    final missing = [for (final bytes in finder.missing) utf8.decode(bytes)];
+    final missing = [
+      for (final bytes in finder.missing) ...needles[utf8.decode(bytes)]!,
+    ];
     if (missing.isNotEmpty) {
       return StepFailed(
         '${missing.join(', ')} ${missing.length == 1 ? 'is' : 'are'} NOT '
@@ -213,30 +228,46 @@ class VerifyCompiledConfigStep
       );
     }
     return StepSucceeded(
-      VerifyCompiledConfigResult(artifactName: name, found: needles),
+      VerifyCompiledConfigResult(
+        artifactName: name,
+        found: needles.values.expand((names) => names).toList(),
+      ),
     );
   }
 
-  /// The strings to look for: the literal ones and the values of `keys`.
+  /// The strings to look for, the literal ones and the values of `keys`, each
+  /// with how results and messages name it: itself, or the keys of a secret.
   ///
   /// Throws a [FormatException] with the reason the define file cannot give
   /// them.
-  Future<List<String>> _needles(VerifyCompiledConfigInput input) async {
-    final needles = [...input.needles];
+  Future<Map<String, Set<String>>> _needles(
+    VerifyCompiledConfigInput input,
+    StepContext context,
+  ) async {
+    final needles = {
+      for (final needle in input.needles) needle: {needle},
+    };
+    if (input.keys.isEmpty) return needles;
+    final secret = input.dartDefineSecret;
     final file = input.dartDefineFile;
-    if (file != null && input.keys.isNotEmpty) {
-      final path = input.worktree.inApp(file);
-      final text = await _workspaces(input.worktree.path).read(path);
-      if (text == null) throw FormatException('$path does not exist.');
-      final defines = parseDartDefines(text);
-      for (final key in input.keys) {
-        final value = defines[key] ?? '';
-        final needle = compiledNeedle(value);
-        if (needle.isEmpty) {
-          throw FormatException('$path has no value for $key.');
-        }
-        needles.add(needle);
+    final String source;
+    final String text;
+    if (secret != null) {
+      source = 'The dart_defines credential';
+      text = await context.readDartDefines(secret);
+    } else {
+      source = input.worktree.inApp(file!);
+      text =
+          await _workspaces(input.worktree.path).read(source) ??
+          (throw FormatException('$source does not exist.'));
+    }
+    final defines = parseDartDefines(text);
+    for (final key in input.keys) {
+      final needle = compiledNeedle(defines[key] ?? '');
+      if (needle.isEmpty) {
+        throw FormatException('$source has no value for $key.');
       }
+      (needles[needle] ??= {}).add(secret == null ? needle : key);
     }
     return needles;
   }

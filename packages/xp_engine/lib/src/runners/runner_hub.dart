@@ -26,6 +26,7 @@ import 'package:xp_engine/src/scheduler/paired_runners.dart';
 import 'package:xp_engine/src/scheduler/scheduler.dart';
 import 'package:xp_engine/src/scheduler/scheduler_runner.dart';
 import 'package:xp_engine/src/secrets/secret_store.dart';
+import 'package:xp_engine/src/steps/build/dart_defines.dart';
 import 'package:xp_engine/src/steps/git/git_checkout.dart';
 import 'package:xp_engine/src/stores/apple/app_store_profiles.dart';
 
@@ -55,6 +56,7 @@ class _Lease {
     required this.projectId,
     required this.stepKinds,
     required this.grants,
+    required this.defineFiles,
   });
 
   final String id;
@@ -67,6 +69,10 @@ class _Lease {
 
   /// The secret keys the runner may ask for, once each.
   final Set<String> grants;
+
+  /// Those of [grants] that are define files, whose values are masked one by
+  /// one.
+  final Set<String> defineFiles;
 
   final delivered = <String>{};
   final stepLogs = <int, StepLog>{};
@@ -333,13 +339,17 @@ class RunnerHub
       }
       final now = _clock.now();
       final until = now.add(leaseLength);
+      final grants = await _grants.forSteps(job.projectId, steps);
       final lease = _Lease(
         id: 'lse_${_hex(8)}',
         jobId: jobId,
         runnerId: runnerId,
         projectId: job.projectId,
         stepKinds: [for (final step in steps) step.kind],
-        grants: await _grants.forSteps(job.projectId, steps),
+        grants: grants,
+        defineFiles: grants.intersection(
+          RunnerSecretGrants.defineFilesOf(steps),
+        ),
       );
       await _jobs.updateJob(
         job.copyWith(
@@ -1182,7 +1192,8 @@ class RunnerHub
     );
     if (!lease.grants.contains(frame.key)) {
       return deny(
-        'This is not signing material or a Shorebird key that the job names.',
+        'This is not signing material, a Shorebird key or a define file that '
+        'the job names.',
       );
     }
     if (!lease.delivered.add(frame.key)) {
@@ -1206,7 +1217,11 @@ class RunnerHub
     // The runner masks what it holds; the engine masks what comes back too.
     try {
       final text = utf8.decode(bytes);
-      if (text.isNotEmpty) _masker.add(text);
+      if (lease.defineFiles.contains(frame.key)) {
+        dartDefineSecrets(text).forEach(_masker.add);
+      } else if (text.isNotEmpty) {
+        _masker.add(text);
+      }
     } on FormatException {
       // Binary material, a keystore: nothing readable to mask.
     }

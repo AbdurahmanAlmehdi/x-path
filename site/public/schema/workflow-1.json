@@ -316,7 +316,7 @@
                     ]
                   },
                   "dartDefineFile": {
-                    "description": "A JSON or .env file of --dart-define values, in the app.",
+                    "description": "A JSON or .env file of --dart-define values, in the app; the flavor's dart_defines credential by default.",
                     "type": "string"
                   },
                   "obfuscate": {
@@ -378,7 +378,7 @@
                     "type": "string"
                   },
                   "dartDefineFile": {
-                    "description": "A JSON or .env file of --dart-define values, in the app.",
+                    "description": "A JSON or .env file of --dart-define values, in the app; the flavor's dart_defines credential by default.",
                     "type": "string"
                   },
                   "obfuscate": {
@@ -425,7 +425,7 @@
                     "type": "string"
                   },
                   "dartDefineFile": {
-                    "description": "A JSON or .env file of --dart-define values, in the app.",
+                    "description": "A JSON or .env file of --dart-define values, in the app; the flavor's dart_defines credential by default.",
                     "type": "string"
                   },
                   "keys": {
@@ -828,6 +828,7 @@
                             "play_sa",
                             "firebase_sa",
                             "keystore",
+                            "dart_defines",
                             "shorebird",
                             "github",
                             "slack"
@@ -917,7 +918,7 @@
                 "additionalProperties": false,
                 "properties": {
                   "dartDefineFile": {
-                    "description": "A JSON or .env file of --dart-define values, in the app.",
+                    "description": "A JSON or .env file of --dart-define values, in the app; the flavor's dart_defines credential by default.",
                     "type": "string"
                   }
                 },
@@ -965,7 +966,7 @@
                     "type": "string"
                   },
                   "dartDefineFile": {
-                    "description": "A JSON or .env file of --dart-define values, in the app.",
+                    "description": "A JSON or .env file of --dart-define values, in the app; the flavor's dart_defines credential by default.",
                     "type": "string"
                   },
                   "obfuscate": {
@@ -1063,7 +1064,7 @@
                     "type": "string"
                   },
                   "dartDefineFile": {
-                    "description": "A JSON or .env file of --dart-define values, in the app.",
+                    "description": "A JSON or .env file of --dart-define values, in the app; the flavor's dart_defines credential by default.",
                     "type": "string"
                   },
                   "obfuscate": {

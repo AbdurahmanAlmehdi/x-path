@@ -589,6 +589,51 @@ void main() {
       expect(h.jobs.masker.secrets, ['sb_api_secret']);
     });
 
+    test('gives the define file a build names and masks each value', () async {
+      await h.credentials.put(
+        const AssignedCredential(
+          flavor: CredentialFlavor(
+            id: 'flv_1',
+            projectId: 'prj_1',
+            appPath: '.',
+            name: 'prod',
+          ),
+          credential: CredentialRecord(
+            id: 'crd_3',
+            name: 'crd_3',
+            kind: CredentialKind.dartDefines,
+            secretKey: 'defines',
+          ),
+        ),
+      );
+      const text = '{"API_KEY": "k-12345"}';
+      await h.secrets.write('defines', text);
+      final (runner, _) = await leased(
+        steps: [
+          const StepPlan(
+            kind: 'build.android',
+            input: {'dartDefineSecret': 'defines'},
+            sideEffect: false,
+          ),
+        ],
+      );
+
+      expect(runner.offer.secrets, ['defines']);
+      await runner.secret('defines');
+
+      expect(
+        utf8.decode(
+          base64Decode(runner.link.sentOf<SecretValueFrame>().single.value),
+        ),
+        text,
+      );
+      expect(h.jobs.masker.secrets, [
+        text,
+        'k-12345',
+        base64.encode(utf8.encode('API_KEY=k-12345')),
+      ]);
+    });
+
     test('gives a Linux build the identity and the profile the engine makes '
         '(ADR 0014)', () async {
       const flavor = CredentialFlavor(

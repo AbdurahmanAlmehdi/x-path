@@ -320,13 +320,14 @@ class ShorebirdReleaseStep
       await files.deleteAll('$appDirectory/build/ios/ipa', extension: '.ipa');
     }
     final since = await files.markBuildStart();
+    final secretDefines = await settings.writeSecretDefines(context);
 
     final exit = await context.run(
       shorebirdCommand(
         shorebirdExecutable,
         withForwarded(
           _arguments(input, flutter.version),
-          forwardedArguments(settings),
+          forwardedArguments(settings, secretDefines: secretDefines),
         ),
         settings: settings,
         platform: platform,

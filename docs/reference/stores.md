@@ -253,6 +253,7 @@ What each kind stores and how it is checked:
 | `play_sa` | the JSON key file | token exchange | `tracks.releases.list` of the internal track of the flavor's application id |
 | `firebase_sa` | the JSON key file | token exchange with the `cloud-platform` scope | the credential's (the app ids belong to the steps) |
 | `keystore` | the bytes; `<key>.storePassword`, `<key>.keyPassword`; the alias is the `account` | `keytool -list -keystore <0600 temp file> -storepass:env XPATH_KEYSTORE_STOREPASS -alias <alias>` | the credential's |
+| `dart_defines` | the text of the file, as it is | Flutter can read it: a flat JSON object, or `KEY=value` lines with at least one value | the credential's |
 | `shorebird` | the `sb_api_*` key | `shorebird account whoami --json` with `SHOREBIRD_TOKEN` | the credential's |
 | `slack` | the webhook URL | its shape only (`https://hooks.slack.com/services/T/B/X`); no message is sent | the credential's |
 

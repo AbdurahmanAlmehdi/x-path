@@ -241,6 +241,30 @@ void main() {
     });
   });
 
+  group('a dart-define file', () {
+    test('is accepted when Flutter can read it', () async {
+      final credential = await save({
+        'kind': 'dart_defines',
+        'dartDefines': 'API_KEY=secret-value\n',
+      });
+
+      expect(credential.status, CredentialStatus.verified);
+    });
+
+    test('is refused when it cannot, without quoting it', () async {
+      await expectLater(
+        save({'kind': 'dart_defines', 'dartDefines': 'secret-value\n'}),
+        throwsA(
+          isA<CredentialRejectedException>().having(
+            (error) => error.message,
+            'message',
+            isNot(contains('secret-value')),
+          ),
+        ),
+      );
+    });
+  });
+
   group('an Apple Distribution identity (ADR 0014)', () {
     Map<String, Object?> identity() => {
       'kind': 'apple_distribution',

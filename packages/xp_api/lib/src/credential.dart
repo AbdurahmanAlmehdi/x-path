@@ -29,6 +29,10 @@ enum CredentialKind {
   /// An Android release keystore with its passwords.
   keystore('keystore', 'Android keystore'),
 
+  /// The file of `--dart-define-from-file` of a flavor: its values are secret
+  /// and live outside the app's repository.
+  dartDefines('dart_defines', 'Dart define file'),
+
   /// A Shorebird API key (`sb_api_*`).
   shorebird('shorebird', 'Shorebird API key'),
 
@@ -420,6 +424,8 @@ class NamedCredentialsResponse extends Equatable {
 ///   file);
 /// - `keystore`: `keystore` (base64), `storePassword`, `keyAlias` and
 ///   `keyPassword` (default: the store password);
+/// - `dart_defines`: `dartDefines` (the text of the file, a JSON object or
+///   `KEY=value` lines);
 /// - `shorebird`: `token`;
 /// - `slack`: `webhookUrl`.
 class CreateCredentialRequest extends Equatable {

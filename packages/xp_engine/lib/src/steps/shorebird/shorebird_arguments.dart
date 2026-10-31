@@ -32,9 +32,12 @@ List<String> shorebirdEnvironmentNames(ShorebirdPlatform platform) => [
 /// What Shorebird passes on to `flutter build`: the arguments after `--`.
 ///
 /// The app's own flags go there, as `shorebird release --help` documents.
-List<String> forwardedArguments(BuildSettings settings) => [
-  if (settings.dartDefineFile != null)
-    '--dart-define-from-file=${settings.dartDefineFile}',
+/// [secretDefines] is what [BuildSettings.writeSecretDefines] returned.
+List<String> forwardedArguments(
+  BuildSettings settings, {
+  String? secretDefines,
+}) => [
+  ?settings.defineArgument(secretDefines),
   if (settings.obfuscate) '--obfuscate',
 ];
 

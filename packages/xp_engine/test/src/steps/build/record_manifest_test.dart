@@ -88,6 +88,27 @@ void main() {
     });
   });
 
+  group('the manifest of a build with a dart_defines credential', () {
+    test('records the hash of the file and nothing of it', () async {
+      const text = 'API_KEY=secret-value\n';
+      final inputOf = RecordManifestInput(
+        worktree: buildWorktree,
+        version: AppVersion.parse('1.2.3+45'),
+        dartDefineSecret: 'defines',
+      );
+      expect(step.decodeInput(step.encodeInput(inputOf)), inputOf);
+
+      await step.run(inputOf, BuildContext()..defines['defines'] = text);
+
+      final bytes = harness.store.files['job_1/manifest.json']!;
+      final manifest = jsonDecode(utf8.decode(bytes)) as Map<String, dynamic>;
+      expect(manifest['inputs'], {
+        'dartDefineFileSha256': sha256OfBytes(utf8.encode(text)),
+      });
+      expect(utf8.decode(bytes), isNot(contains('secret-value')));
+    });
+  });
+
   group('the manifest', () {
     test('says what was built', () async {
       final manifest = await run();

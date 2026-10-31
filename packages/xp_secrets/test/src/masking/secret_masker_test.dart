@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:test/test.dart';
 import 'package:xp_engine/xp_engine.dart';
 import 'package:xp_secrets/xp_secrets.dart';
@@ -316,6 +318,23 @@ void main() {
       expect(stdout.add('2hunter2 ok'), '*** ok');
       expect(stdout.flush(), isEmpty);
       expect(stderr.flush(), isEmpty);
+    });
+  });
+
+  group('a define file', () {
+    test('hides its values, however a tool prints them', () {
+      final masker = SecretMasker(
+        secrets: dartDefineSecrets('API_KEY="long token"\nLEVEL=3\n'),
+      );
+
+      expect(masker.mask('sending long token now'), 'sending *** now');
+      expect(
+        masker.mask(
+          '-Pdart-defines=${base64.encode(utf8.encode('API_KEY=long token'))}',
+        ),
+        '-Pdart-defines=***',
+      );
+      expect(masker.mask('level 3'), 'level 3', reason: 'too short to mask');
     });
   });
 }

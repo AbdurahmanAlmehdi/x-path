@@ -205,4 +205,34 @@ void main() {
   test('asks no one when the steps name nothing', () async {
     expect(await grants.forSteps('prj_1', const []), isEmpty);
   });
+
+  test(
+    'grants the define file a build names, of its own project only',
+    () async {
+      await credentials.put(record('e', CredentialKind.dartDefines, 'defines'));
+      await credentials.put(
+        record('f', CredentialKind.dartDefines, 'other', project: 'prj_2'),
+      );
+
+      expect(
+        await grants.forSteps('prj_1', [
+          step({'dartDefineSecret': 'defines'}),
+        ]),
+        {'defines'},
+      );
+      expect(
+        await grants.forSteps('prj_1', [
+          step({'dartDefineSecret': 'other'}),
+        ]),
+        isEmpty,
+      );
+      expect(
+        await grants.forSteps('prj_1', [
+          step({'dartDefineSecret': 'asc'}),
+        ]),
+        isEmpty,
+        reason: 'the field names a define file, not any secret',
+      );
+    },
+  );
 }

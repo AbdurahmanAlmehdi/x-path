@@ -715,6 +715,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get kindKeystore => 'Android keystore';
 
   @override
+  String get kindDartDefines => 'Dart define file';
+
+  @override
   String get kindShorebird => 'Shorebird API key';
 
   @override
@@ -795,6 +798,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get fieldKeystore => 'Keystore';
+
+  @override
+  String get fieldDartDefines => 'Dart define file (JSON or KEY=value lines)';
 
   @override
   String get fieldStorePassword => 'Store password';

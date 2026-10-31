@@ -205,6 +205,26 @@ void main() {
       expect(find.text('Credential saved'), findsOneWidget);
     });
 
+    testWidgets('adds a dart-define file as its text', (tester) async {
+      await pump(
+        tester,
+        pickFile: () async =>
+            const PickedFile(name: 'prod.env', bytes: [0x41, 0x3d, 0x78]),
+      );
+      await tester.tap(find.text('Add credential…').first);
+      await tester.pumpAndSettle();
+      await choose(tester, field('kind'), 'Dart define file');
+      await tester.tap(find.text('Choose file…'));
+      await tester.pumpAndSettle();
+      await tester.enterText(field('name'), 'Prod defines');
+      await tester.pump();
+      await tester.tap(_formSave);
+      await tester.pumpAndSettle();
+      expect((sent.single as CreateCredentialRequest).material, {
+        'dartDefines': 'A=x',
+      });
+    });
+
     testWidgets('adds a keystore as base64 bytes', (tester) async {
       await pump(
         tester,

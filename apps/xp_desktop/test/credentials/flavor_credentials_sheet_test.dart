@@ -150,7 +150,7 @@ void main() {
         ),
         findsOneWidget,
       );
-      expect(find.text('Not assigned'), findsNWidgets(7));
+      expect(find.text('Not assigned'), findsNWidgets(8));
       await tap(tester, find.text('Close'));
       expect(find.text('Credentials of dev'), findsNothing);
     });

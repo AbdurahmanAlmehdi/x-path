@@ -19,8 +19,8 @@
 /// the Shorebird `sb_api_*` key reaches it for the one job, like signing
 /// material (`RunnerSecretGrants`).
 ///
-/// What a runner may be handed is signing material and the Shorebird key, and
-/// only for the one job it leases.
+/// What a runner may be handed is signing material, the Shorebird key and the
+/// flavor's dart-define file (ADR 0016), and only for the one job it leases.
 ///
 /// The built-in workflows keep the engine-only steps in jobs of their own
 /// (ADR 0010), so their build jobs can go to a runner.

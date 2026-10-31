@@ -233,10 +233,14 @@ class ShorebirdPatchStep
       return StepFailed(error.message);
     }
 
+    final secretDefines = await settings.writeSecretDefines(context);
     final exit = await context.run(
       shorebirdCommand(
         shorebirdExecutable,
-        withForwarded(_arguments(input), forwardedArguments(settings)),
+        withForwarded(
+          _arguments(input),
+          forwardedArguments(settings, secretDefines: secretDefines),
+        ),
         settings: settings,
         platform: platform,
         tokenSecret: input.tokenSecret,
