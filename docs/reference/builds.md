@@ -200,14 +200,16 @@ job made through `JobRunner` alone.
   their versions for the job (`JobRepository.saveTools`). Signing inputs never go in the arguments: the
   step input names secrets (`secretEnvironment`: variable to secret key; `secretFiles`: variable to the
   path of a 0600 file that is deleted when the job ends), which the job runner reads from the secret store.
-  Which credential maps to which variable is decided when a workflow is dispatched (the keystore reaches a build as `XPATH_KEYSTORE_*`; see Workflows and the scheduler). `build.ios` fails
+  Which credential maps to which variable is decided when a workflow is dispatched (the keystore reaches a build as `XPATH_KEYSTORE_*`; see Workflows and the scheduler). A workflow that names no `dartDefineFile` gets the flavor's `dart_defines` credential instead (`dartDefineSecret`): the step teaches the masker the values, writes the file with mode 0600 to the job's secret folder and passes its path to `--dart-define-from-file`. Flutter hands the defines to its own tools as arguments (`-DKEY=value` to the frontend server, base64 to Gradle and `flutter assemble`), as with any define file; they are masked in output, but readable in the process list while it compiles (ADR 0016). `build.ios` fails
   with "needs macOS (ios-sign), or a Linux runner set up for iOS builds (ios-linux)" on any other machine.
 - **`build.ios` on Linux** (ADR 0014). On a runner with `XP_IOS_LINUX_DIR`, `build.ios` runs
   omarchy-apple-dev instead of Xcode: `flutter/setup.sh` once per Flutter version in an install of its own
   (`toolchains/flutter-ios-linux/<version>` of the runner, resolved without fvm; the script replaces the
   iOS `gen_snapshot` of the install it runs on, so it is never the SDK other builds use, and installs no job
   used for 30 days are deleted), then `flutter/build.sh <app> KEY=VALUE...` (`BUILD_NAME`, `BUILD_NUMBER`,
-  `SPLIT_DEBUG_INFO` and `DART_OBFUSCATION` for an obfuscated build, the dart defines as arguments) and
+  `SPLIT_DEBUG_INFO` and `DART_OBFUSCATION` for an obfuscated build, the dart defines as arguments; those of a
+  `dart_defines` credential come from a 0600 file through a small `bash -c` that sources the script, so they are on
+  no command line of XPath's) and
   `flutter/ship.sh <app>` without `--upload` (`ASC_EXPORT_OPTIONS`, `ASC_ENTITLEMENTS_PATH` when
   `ios/Runner/Runner.entitlements` exists). It signs with the flavor's Apple Distribution identity and the
   App Store profile the engine made with the flavor's ASC key (`linuxSigning`: `ASC_SIGNING_KEY`,
@@ -233,7 +235,8 @@ job made through `JobRunner` alone.
   when the job has an artifact of that name whose file still has the recorded SHA-256.
 - **`record.manifest`.** Stores `manifest.json` as an artifact of kind `manifest`: version, build and
   tag, the built commit (head of the worktree) and the dispatched one, whether the worktree was dirty,
-  flavors, the tool versions of the job, the SHA-256 of `pubspec.lock` and of the dart-define file, every
+  flavors, the tool versions of the job, the SHA-256 of `pubspec.lock` and of the dart-define file (of a
+  `dart_defines` credential only the SHA-256, under `inputs.dartDefineFileSha256`, and no file name), every
   artifact of the job with its SHA-256, and when the job started and the manifest was written.
 
 | Route | What it does |
@@ -288,7 +291,8 @@ adapter parses is a fixture that follows the documented `--json` output.
   (`lib/*/libapp.so` of an APK, `base/lib/*/libapp.so` of an AAB, `App.framework/App` of an IPA) of a stored
   package and looks for the expected strings: literal `needles`, and the values of `keys` of the
   `--dart-define-from-file` file (a URL is reduced to its host). A string that is missing fails the step with
-  a message that says what was dropped; a package without a snapshot is skipped.
+  a message that says what was dropped; a package without a snapshot is skipped. With a `dart_defines`
+  credential the result and the messages name the keys, never the values.
 - **`ios.stripAndReexport`** deletes named frameworks from `build/ios/archive/Runner.xcarchive`, runs
   `xcodebuild -exportArchive` again so that Xcode signs the smaller bundle, and stores the new IPA over the
   one `build.ios` stored (same name, same artifact id).

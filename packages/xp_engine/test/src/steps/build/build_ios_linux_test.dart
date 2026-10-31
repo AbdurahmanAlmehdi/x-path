@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:test/test.dart';
 import 'package:xp_engine/xp_engine.dart';
@@ -48,6 +49,7 @@ void main() {
     String? flavor,
     String? target,
     String? dartDefineFile,
+    String? dartDefineSecret,
     bool obfuscate = false,
     Map<String, String> signing = _signing,
   }) => BuildIosInput(
@@ -58,6 +60,7 @@ void main() {
       target: target,
       flutterVersion: '3.47.6',
       dartDefineFile: dartDefineFile,
+      dartDefineSecret: dartDefineSecret,
       obfuscate: obfuscate,
     ),
     exportOptionsPlist: 'ios/ExportOptions.plist',
@@ -230,6 +233,88 @@ void main() {
     await step.run(input(dartDefineFile: '.env'), context);
 
     expect(named('build.sh').arguments, [appDirectory, 'API_URL=https://a.ly']);
+  });
+
+  group('with a dart_defines credential', () {
+    test(
+      'gives build.sh the defines in a file, not on its command line',
+      () async {
+        context.defines['defines'] = '{"API_KEY": "secret value", "LEVEL": 3}';
+
+        final outcome = await step.run(
+          input(dartDefineSecret: 'defines'),
+          context,
+        );
+
+        expect(outcome, isA<StepSucceeded<BuildResult>>());
+        final build = context.commands.firstWhere(
+          (command) => command.executable == 'bash',
+        );
+        expect(build.arguments, [
+          '-c',
+          buildWithSecretDefines,
+          '$_checkout/flutter/build.sh',
+          appDirectory,
+          '/secrets/job_1/dart-defines',
+        ]);
+        expect(
+          context.secretFiles['dart-defines'],
+          'API_KEY=secret value\u0000LEVEL=3\u0000',
+        );
+        for (final command in context.commands) {
+          expect(command.arguments.join(' '), isNot(contains('secret value')));
+          expect(command.environment.values, isNot(contains('secret value')));
+        }
+      },
+    );
+
+    test('fails on a stored file that is not one', () async {
+      context.defines['defines'] = '{"nested": {"a": 1}}';
+
+      final outcome = await step.run(
+        input(dartDefineSecret: 'defines'),
+        context,
+      );
+
+      expect((outcome as StepFailed).message, contains('flat object'));
+      expect(context.commands, isEmpty);
+    });
+
+    test(
+      'the wrapper hands the defines to the script, and only there',
+      () async {
+        final folder = Directory.systemTemp.createTempSync('xp_defines');
+        addTearDown(() => folder.deleteSync(recursive: true));
+        final script = File('${folder.path}/build.sh')
+          ..writeAsStringSync(
+            '#!/usr/bin/env bash\n'
+            'set -euo pipefail\n'
+            r'app=$1; shift; printf "%s\n" "$0" "$app" "$@" "${xpath_defines:-gone}"; exit 7'
+            '\n',
+          );
+        final defines = File('${folder.path}/defines')
+          ..writeAsStringSync('A=two words\u0000B=x=y\u0000C=\u0000');
+
+        final result = await Process.run('bash', [
+          '-c',
+          buildWithSecretDefines,
+          script.path,
+          '/the/app',
+          defines.path,
+        ]);
+
+        expect(result.exitCode, 7, reason: 'its exit is the exit of the build');
+        expect(LineSplitter.split(result.stdout as String), [
+          script.path,
+          '/the/app',
+          'A=two words',
+          'B=x=y',
+          'C=',
+          'gone',
+        ]);
+      },
+      tags: 'process',
+    );
   });
 
   test('fails on a define file that is missing or not one', () async {

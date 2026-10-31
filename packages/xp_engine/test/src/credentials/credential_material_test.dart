@@ -342,6 +342,57 @@ void main() {
     });
   });
 
+  group('a dart-define file', () {
+    test('is kept as it came, its values named for the masker', () async {
+      final material = _read(CredentialKind.dartDefines) as DartDefinesMaterial;
+      final secrets = BytesSecretStore();
+
+      expect(material.kind, CredentialKind.dartDefines);
+      expect(material.account, isNull);
+      expect(
+        material.secretValues,
+        containsAll(['https://api.x.io/v1', 'k-12345']),
+      );
+
+      await material.write(secrets, 'key');
+      expect(await secrets.read('key'), testDartDefines);
+      final loaded = await CredentialMaterial.load(
+        CredentialKind.dartDefines,
+        'key',
+        null,
+        secrets,
+      ) as DartDefinesMaterial?;
+      expect(loaded!.text, testDartDefines);
+    });
+
+    test('is missing when the secret is', () async {
+      expect(
+        await CredentialMaterial.load(
+          CredentialKind.dartDefines,
+          'key',
+          null,
+          BytesSecretStore(),
+        ),
+        isNull,
+      );
+    });
+
+    test('is refused when Flutter could not read it', () {
+      expect(
+        () => CredentialMaterial.fromFields(CredentialKind.dartDefines, {
+          'dartDefines': '{"A": {"secret-value": 1}}',
+        }),
+        throwsA(
+          isA<CredentialRejectedException>().having(
+            (error) => error.message,
+            'message',
+            isNot(contains('secret-value')),
+          ),
+        ),
+      );
+    });
+  });
+
   test('the material of every kind names its secrets for the masker', () {
     for (final kind in CredentialKind.values) {
       expect(_read(kind).secretValues, isNotEmpty, reason: '$kind');

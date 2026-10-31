@@ -17,6 +17,7 @@ import 'package:xp_engine/src/process/process_environment.dart';
 import 'package:xp_engine/src/process/process_supervisor.dart';
 import 'package:xp_engine/src/repositories/event_log.dart';
 import 'package:xp_engine/src/secrets/secret_store.dart';
+import 'package:xp_engine/src/steps/build/dart_defines.dart';
 import 'package:xp_engine/src/steps/step.dart';
 import 'package:xp_engine/src/steps/step_context.dart';
 import 'package:xp_engine/src/steps/step_registry.dart';
@@ -590,6 +591,20 @@ class _RunnerContext implements StepContext {
 
   @override
   bool get isStopping => _run.stopping;
+
+  @override
+  Future<String> readDartDefines(String secretKey) async {
+    final text = await _runner._secrets.read(secretKey);
+    if (text == null) {
+      throw SecretStoreException('There is no secret "$secretKey".');
+    }
+    dartDefineSecrets(text).forEach(_runner._supervisor.masker.add);
+    return text;
+  }
+
+  @override
+  Future<String> writeSecretFile(String name, String contents) =>
+      _runner._secretFiles.write(jobId, '$ordinal-$name', contents);
 
   @override
   Future<ProcessExit> run(

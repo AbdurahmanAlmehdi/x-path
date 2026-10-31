@@ -26,6 +26,7 @@ const engineMigrations = <Migration>[
   Migration(version: 19, sql: _v19),
   Migration(version: 20, sql: _v20, foreignKeysOff: true),
   Migration(version: 21, sql: _v21),
+  Migration(version: 22, sql: _v22, foreignKeysOff: true),
 ];
 
 // Timestamps are integer microseconds since the Unix epoch (UTC), so that
@@ -644,4 +645,37 @@ CREATE TABLE release_event (
   patch_number INTEGER CHECK (patch_number IS NULL OR patch_number > 0)
 ) STRICT;
 CREATE INDEX idx_release_event_release ON release_event (release_id, at);
+''';
+
+// A dart-define file is a credential kind: its values are secret and live
+// outside the app's repository. SQLite cannot change a CHECK, so credential is
+// rebuilt as in v20 (foreign keys off: credential_assignment refers to it).
+const _v22 = '''
+CREATE TABLE new_credential (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL CHECK (length(name) BETWEEN 1 AND 80),
+  kind TEXT NOT NULL CHECK (kind IN (
+    'asc_key', 'apple_id', 'apple_distribution', 'play_sa', 'firebase_sa',
+    'keystore', 'dart_defines', 'shorebird', 'slack'
+  )),
+  secret_key TEXT NOT NULL,
+  account TEXT,
+  status TEXT NOT NULL DEFAULT 'unverified'
+    CHECK (status IN ('unverified', 'verified', 'rejected', 'unreachable')),
+  verified_at INTEGER,
+  checked_at INTEGER,
+  message TEXT,
+  fix TEXT,
+  UNIQUE (id, kind)
+) STRICT;
+
+INSERT INTO new_credential (id, name, kind, secret_key, account, status,
+  verified_at, checked_at, message, fix)
+SELECT id, name, kind, secret_key, account, status, verified_at, checked_at,
+  message, fix
+FROM credential ORDER BY rowid;
+
+DROP TABLE credential;
+ALTER TABLE new_credential RENAME TO credential;
+CREATE UNIQUE INDEX idx_credential_name ON credential (name COLLATE NOCASE);
 ''';

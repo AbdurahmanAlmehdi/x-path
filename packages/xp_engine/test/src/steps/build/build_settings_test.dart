@@ -107,6 +107,17 @@ void main() {
       expect(BuildSettings.fromJson(settings().toJson()), settings());
     });
 
+    test('keeps the secret key of the define file', () {
+      final json = settings(dartDefineFile: null).toJson();
+
+      expect(json.keys, isNot(contains('dartDefineSecret')));
+      expect(
+        BuildSettings.fromJson({...json, 'dartDefineSecret': 'defines'})
+            .dartDefineSecret,
+        'defines',
+      );
+    });
+
     test('leaves out what is not set', () {
       final json = BuildSettings(
         worktree: buildWorktree,
@@ -157,5 +168,35 @@ void main() {
     );
     expect(() => requiredRelative({}, 'p'), throwsFormatException);
     expect(() => requiredRelative({'p': '../x'}, 'p'), throwsFormatException);
+  });
+
+  group('the define file of a credential', () {
+    final secret = BuildSettings(
+      worktree: buildWorktree,
+      version: version,
+      dartDefineSecret: 'defines',
+    );
+
+    test('is written to the secret folder and passed by its path', () async {
+      final context = BuildContext()..defines['defines'] = 'A=secret-value\n';
+
+      final path = await secret.writeSecretDefines(context);
+
+      expect(path, '/secrets/job_1/dart-defines');
+      expect(context.secretFiles['dart-defines'], 'A=secret-value\n');
+      expect(
+        secret.flutterArguments(secretDefines: path),
+        contains('--dart-define-from-file=$path'),
+      );
+    });
+
+    test('is nothing for a build without one', () async {
+      final none = BuildSettings(worktree: buildWorktree, version: version);
+      final context = BuildContext();
+
+      expect(await none.writeSecretDefines(context), isNull);
+      expect(context.secretFiles, isEmpty);
+      expect(none.defineArgument(null), isNull);
+    });
   });
 }

@@ -1,5 +1,6 @@
 import 'package:equatable/equatable.dart';
 import 'package:xp_engine/src/json_fields.dart';
+import 'package:xp_engine/src/steps/step_context.dart';
 import 'package:xp_engine/src/versioning/app_version.dart';
 import 'package:xp_engine/src/versioning/release_worktree.dart';
 
@@ -19,6 +20,7 @@ class BuildSettings extends Equatable {
     this.target,
     this.flutterVersion,
     this.dartDefineFile,
+    this.dartDefineSecret,
     this.obfuscate = false,
     this.secretEnvironment = const {},
     this.secretFiles = const {},
@@ -46,6 +48,7 @@ class BuildSettings extends Equatable {
       target: _relativePath(json, 'target'),
       flutterVersion: optionalString(json, 'flutterVersion'),
       dartDefineFile: _relativePath(json, 'dartDefineFile'),
+      dartDefineSecret: optionalString(json, 'dartDefineSecret'),
       obfuscate: optionalFlag(json, 'obfuscate'),
       secretEnvironment: stringMap(json, 'secretEnvironment'),
       secretFiles: stringMap(json, 'secretFiles'),
@@ -72,6 +75,10 @@ class BuildSettings extends Equatable {
 
   /// The file for `--dart-define-from-file`, relative to the app.
   final String? dartDefineFile;
+
+  /// The secret key of the flavor's `dart_defines` credential, when the
+  /// workflow names no [dartDefineFile].
+  final String? dartDefineSecret;
 
   /// Whether to obfuscate the Dart code and split the debug info out
   /// (`--obfuscate --split-debug-info`).
@@ -102,23 +109,48 @@ class BuildSettings extends Equatable {
   /// What names the files of this build: `dev-1.2.3+45`.
   String get label => '${flavor ?? 'app'}-$version';
 
+  /// Writes the define file of [dartDefineSecret] to the job's secret folder
+  /// and returns its path; `null` when the build has no such secret.
+  ///
+  /// Throws a `SecretStoreException` if the secret cannot be read.
+  Future<String?> writeSecretDefines(StepContext context) async {
+    final secret = dartDefineSecret;
+    if (secret == null) return null;
+    return await context.writeSecretFile(
+      'dart-defines',
+      await context.readDartDefines(secret),
+    );
+  }
+
   /// The flags that every `flutter build` of a release takes.
+  /// [secretDefines] is what [writeSecretDefines] returned.
   ///
   /// The build name and number are passed even where a platform file carries a
   /// literal version: Flutter ignores them there, and `version.bump` wrote the
   /// same numbers.
-  List<String> flutterArguments({String? debugInfoDirectory}) => [
+  List<String> flutterArguments({
+    String? debugInfoDirectory,
+    String? secretDefines,
+  }) => [
     '--release',
     if (flavor != null) ...['--flavor', flavor!],
     if (target != null) ...['--target', target!],
     '--build-name=${version.name}',
     '--build-number=$build',
-    if (dartDefineFile != null) '--dart-define-from-file=$dartDefineFile',
+    ?defineArgument(secretDefines),
     if (obfuscate && debugInfoDirectory != null) ...[
       '--obfuscate',
       '--split-debug-info=$debugInfoDirectory',
     ],
   ];
+
+  /// The `--dart-define-from-file` flag: of [secretDefines], else of
+  /// [dartDefineFile]; `null` when the build has neither.
+  String? defineArgument(String? secretDefines) =>
+      switch (secretDefines ?? dartDefineFile) {
+        final file? => '--dart-define-from-file=$file',
+        null => null,
+      };
 
   /// The stored form.
   Map<String, dynamic> toJson() => {
@@ -128,6 +160,7 @@ class BuildSettings extends Equatable {
     'target': ?target,
     'flutterVersion': ?flutterVersion,
     'dartDefineFile': ?dartDefineFile,
+    'dartDefineSecret': ?dartDefineSecret,
     'obfuscate': obfuscate,
     'secretEnvironment': secretEnvironment,
     'secretFiles': secretFiles,
@@ -142,6 +175,7 @@ class BuildSettings extends Equatable {
     target,
     flutterVersion,
     dartDefineFile,
+    dartDefineSecret,
     obfuscate,
     secretEnvironment,
     secretFiles,

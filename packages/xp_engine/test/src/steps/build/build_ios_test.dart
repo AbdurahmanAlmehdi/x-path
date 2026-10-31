@@ -11,8 +11,9 @@ void main() {
   late BuildIosStep step;
   late BuildContext context;
 
-  BuildIosInput input() => BuildIosInput(
+  BuildIosInput input({String? dartDefineSecret}) => BuildIosInput(
     settings: BuildSettings(
+      dartDefineSecret: dartDefineSecret,
       worktree: buildWorktree,
       version: AppVersion.parse('1.2.3+45'),
       flavor: 'prod',
@@ -167,4 +168,25 @@ void main() {
       expect(context.commands, isEmpty);
     });
   });
+
+  test(
+    'a Mac builds with the define file of a credential, by its path',
+    () async {
+      final context = BuildContext(
+        onRun: (_) =>
+            harness.files.put('$appDirectory/build/ios/ipa/Mataa.ipa'),
+      )..defines['defines'] = 'API_KEY=secret-value\n';
+
+      final outcome = await stepFor(isMacOS: true)
+          .run(input(dartDefineSecret: 'defines'), context);
+
+      expect(outcome, isA<StepSucceeded<BuildResult>>());
+      final arguments = context.commands.single.arguments;
+      expect(
+        arguments,
+        contains('--dart-define-from-file=/secrets/job_1/dart-defines'),
+      );
+      expect(arguments.join(' '), isNot(contains('secret-value')));
+    },
+  );
 }

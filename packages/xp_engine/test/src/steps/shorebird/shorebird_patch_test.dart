@@ -16,6 +16,7 @@ void main() {
     bool obfuscate = false,
     bool allowNativeDiffs = false,
     int? patchNumber,
+    String? dartDefineSecret,
   }) => ShorebirdPatchInput(
     settings: BuildSettings(
       worktree: buildWorktree,
@@ -24,7 +25,8 @@ void main() {
       target: 'lib/main_prod.dart',
       // The pin of today. The patch must not use it.
       flutterVersion: '3.47.6',
-      dartDefineFile: 'env/prod.json',
+      dartDefineFile: dartDefineSecret == null ? 'env/prod.json' : null,
+      dartDefineSecret: dartDefineSecret,
       obfuscate: obfuscate,
     ),
     platform: platform,
@@ -337,5 +339,20 @@ void main() {
         'The Shorebird patch was cancelled.',
       );
     });
+  });
+
+  test('forwards the define file of a credential, by its path', () async {
+    await recordRelease();
+    context.defines['defines'] = 'API_KEY=secret-value\n';
+
+    await stepFor().run(input(dartDefineSecret: 'defines'), context);
+
+    expect(context.secretFiles['dart-defines'], 'API_KEY=secret-value\n');
+    final arguments = context.commands.single.arguments;
+    expect(arguments.sublist(arguments.indexOf('--')), [
+      '--',
+      '--dart-define-from-file=/secrets/job_1/dart-defines',
+    ]);
+    expect(arguments.join(' '), isNot(contains('secret-value')));
   });
 }

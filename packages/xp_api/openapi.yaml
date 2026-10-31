@@ -4627,6 +4627,7 @@ components:
         - play_sa
         - firebase_sa
         - keystore
+        - dart_defines
         - shorebird
         - github
         - slack
@@ -4984,6 +4985,15 @@ components:
         keyPassword:
           type: string
           description: The store password unless given.
+    DartDefinesFields:
+      type: object
+      required: [dartDefines]
+      properties:
+        dartDefines:
+          type: string
+          description: |
+            The text of the `--dart-define-from-file` file: a flat JSON object
+            or `KEY=value` lines. Every value is a secret.
     TokenFields:
       type: object
       required: [token]
@@ -5062,6 +5072,16 @@ components:
                   const: keystore
           unevaluatedProperties: false
         - allOf:
+            - $ref: "#/components/schemas/DartDefinesFields"
+            - type: object
+              required: [name, kind]
+              properties:
+                name:
+                  type: string
+                kind:
+                  const: dart_defines
+          unevaluatedProperties: false
+        - allOf:
             - $ref: "#/components/schemas/TokenFields"
             - type: object
               required: [name, kind]
@@ -5104,6 +5124,10 @@ components:
           unevaluatedProperties: false
         - allOf:
             - $ref: "#/components/schemas/KeystoreFields"
+            - $ref: "#/components/schemas/OptionalKind"
+          unevaluatedProperties: false
+        - allOf:
+            - $ref: "#/components/schemas/DartDefinesFields"
             - $ref: "#/components/schemas/OptionalKind"
           unevaluatedProperties: false
         - allOf:
@@ -5164,6 +5188,14 @@ components:
               properties:
                 kind:
                   const: keystore
+          unevaluatedProperties: false
+        - allOf:
+            - $ref: "#/components/schemas/DartDefinesFields"
+            - $ref: "#/components/schemas/FlavorSelector"
+            - type: object
+              properties:
+                kind:
+                  const: dart_defines
           unevaluatedProperties: false
         - allOf:
             - $ref: "#/components/schemas/TokenFields"

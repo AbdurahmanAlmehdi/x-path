@@ -122,6 +122,7 @@ abstract class FlutterBuildStep<I> extends Step<I, BuildResult> {
     final appDirectory = settings.appDirectory;
     await prepareOutputs(appDirectory);
     final since = await files.markBuildStart();
+    final secretDefines = await settings.writeSecretDefines(context);
 
     final subcommand = subcommandOf(input);
     final exit = await context.run(
@@ -133,6 +134,7 @@ abstract class FlutterBuildStep<I> extends Step<I, BuildResult> {
           ...platformArguments(input),
           ...settings.flutterArguments(
             debugInfoDirectory: debugInfoOf(settings),
+            secretDefines: secretDefines,
           ),
         ],
         workingDirectory: appDirectory,

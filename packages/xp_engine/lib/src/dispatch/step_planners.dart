@@ -296,11 +296,7 @@ class StepPlanners implements StepCatalog {
           description: 'An APK to install, or an App Bundle for Google Play.',
           defaultValue: 'apk',
         ),
-        StepKey(
-          'dartDefineFile',
-          description:
-              'A JSON or .env file of --dart-define values, in the app.',
-        ),
+        _defineFileKey,
         StepKey(
           'obfuscate',
           value: StepValue.flag,
@@ -329,11 +325,7 @@ class StepPlanners implements StepCatalog {
           'exportOptionsPlist',
           description: 'The export options plist, in the app.',
         ),
-        StepKey(
-          'dartDefineFile',
-          description:
-              'A JSON or .env file of --dart-define values, in the app.',
-        ),
+        _defineFileKey,
         StepKey(
           'obfuscate',
           value: StepValue.flag,
@@ -367,11 +359,7 @@ class StepPlanners implements StepCatalog {
           description:
               'The artifact to look in; the one of the job by default.',
         ),
-        StepKey(
-          'dartDefineFile',
-          description:
-              'A JSON or .env file of --dart-define values, in the app.',
-        ),
+        _defineFileKey,
         StepKey(
           'keys',
           value: StepValue.texts,
@@ -388,6 +376,7 @@ class StepPlanners implements StepCatalog {
         'worktree': p.job.worktree.toJson(),
         'artifactName': p.text('artifactName') ?? _artifactName(p),
         'dartDefineFile': ?p.text('dartDefineFile'),
+        if (p.list('keys').isNotEmpty) 'dartDefineSecret': ?_defineSecret(p),
         'keys': p.list('keys'),
         'needles': p.list('needles'),
       },
@@ -404,14 +393,10 @@ class StepPlanners implements StepCatalog {
           'exportOptionsPlist',
           description: 'The export options plist, in the app.',
         ),
-        StepKey(
-          'dartDefineFile',
-          description:
-              'A JSON or .env file of --dart-define values, in the app.',
-        ),
+        _appDefineFileKey,
       ],
       (p) async => {
-        ..._settings(p),
+        ..._settings(p, defines: false),
         'exportOptionsPlist': p.requireText('exportOptionsPlist'),
         'frameworks': p.list('frameworks'),
       },
@@ -445,11 +430,7 @@ class StepPlanners implements StepCatalog {
           'exportOptionsPlist',
           description: 'For iOS, the export options plist, in the app.',
         ),
-        StepKey(
-          'dartDefineFile',
-          description:
-              'A JSON or .env file of --dart-define values, in the app.',
-        ),
+        _defineFileKey,
         StepKey(
           'obfuscate',
           value: StepValue.flag,
@@ -502,11 +483,7 @@ class StepPlanners implements StepCatalog {
           'exportOptionsPlist',
           description: 'For iOS, the export options plist, in the app.',
         ),
-        StepKey(
-          'dartDefineFile',
-          description:
-              'A JSON or .env file of --dart-define values, in the app.',
-        ),
+        _defineFileKey,
         StepKey(
           'obfuscate',
           value: StepValue.flag,
@@ -562,11 +539,7 @@ class StepPlanners implements StepCatalog {
           'debugInfoDirectory',
           description: 'Where the build wrote the Dart symbols.',
         ),
-        StepKey(
-          'dartDefineFile',
-          description:
-              'A JSON or .env file of --dart-define values, in the app.',
-        ),
+        _appDefineFileKey,
         StepKey(
           'obfuscate',
           value: StepValue.flag,
@@ -575,32 +548,23 @@ class StepPlanners implements StepCatalog {
         ),
       ],
       (p) async => {
-        ..._settings(p),
+        ..._settings(p, defines: false),
         'android': p.flag('android', otherwise: p.job.platform == 'android'),
         'ios': p.flag('ios', otherwise: p.job.platform == 'ios'),
         'debugInfoDirectory': ?p.text('debugInfoDirectory'),
       },
     ),
-    StepPlanSpec(
-      'record.manifest',
-      const [
-        StepKey(
-          'dartDefineFile',
-          description:
-              'A JSON or .env file of --dart-define values, in the app.',
-        ),
-      ],
-      (p) async {
-        final version = p.job.run.stepVersion;
-        if (version?.build == null) return _needsBuild(p);
-        return {
-          'worktree': p.job.worktree.toJson(),
-          'version': '$version',
-          'flavors': [?p.job.flavor?.name],
-          'dartDefineFile': ?p.text('dartDefineFile'),
-        };
-      },
-    ),
+    StepPlanSpec('record.manifest', const [_defineFileKey], (p) async {
+      final version = p.job.run.stepVersion;
+      if (version?.build == null) return _needsBuild(p);
+      return {
+        'worktree': p.job.worktree.toJson(),
+        'version': '$version',
+        'flavors': [?p.job.flavor?.name],
+        'dartDefineFile': ?p.text('dartDefineFile'),
+        'dartDefineSecret': ?_defineSecret(p),
+      };
+    }),
     StepPlanSpec(
       'test',
       const [
@@ -1106,6 +1070,12 @@ class StepPlanners implements StepCatalog {
   static String? _secretOf(StepPlanning p, CredentialKind kind) =>
       p.job.credential(kind)?.secretKey;
 
+  /// The flavor's define file, for a step whose workflow names none.
+  static String? _defineSecret(StepPlanning p) =>
+      p.text('dartDefineFile') == null
+      ? _secretOf(p, CredentialKind.dartDefines)
+      : null;
+
   static String _requiredSecret(StepPlanning p, CredentialKind kind) {
     final flavor = p.job.flavor?.name ?? 'default';
     return _secretOf(p, kind) ??
@@ -1165,6 +1135,7 @@ class StepPlanners implements StepCatalog {
   static Map<String, dynamic> _settings(
     StepPlanning p, {
     bool signing = false,
+    bool defines = true,
   }) {
     final flavor = p.job.flavor;
     final keystore = signing ? p.job.credential(CredentialKind.keystore) : null;
@@ -1176,6 +1147,7 @@ class StepPlanners implements StepCatalog {
       if (target != null && target != 'lib/main.dart') 'target': target,
       'flutterVersion': ?p.job.run.app.flutterVersion,
       'dartDefineFile': ?p.text('dartDefineFile'),
+      if (defines) 'dartDefineSecret': ?_defineSecret(p),
       'obfuscate': p.flag('obfuscate'),
       if (keystore != null)
         'secretFiles': {keystoreFileVariable: keystore.secretKey},
@@ -1191,6 +1163,21 @@ class StepPlanners implements StepCatalog {
     };
   }
 }
+
+/// The file of a step that reads the flavor's `dart_defines` credential when
+/// it names none.
+const _defineFileKey = StepKey(
+  'dartDefineFile',
+  description:
+      'A JSON or .env file of --dart-define values, in the app; the '
+      "flavor's dart_defines credential by default.",
+);
+
+/// The file of a step that takes the settings of a build but reads no defines.
+const _appDefineFileKey = StepKey(
+  'dartDefineFile',
+  description: 'A JSON or .env file of --dart-define values, in the app.',
+);
 
 /// The variable that holds the path of the keystore file for an Android
 /// build, when the flavor has a `keystore` credential.

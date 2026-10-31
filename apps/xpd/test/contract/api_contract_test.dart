@@ -874,6 +874,46 @@ void main() {
       );
     });
 
+    test('POST /credentials takes a dart-define file, 201 and 422, and never '
+        'repeats it', () async {
+      const template = '/credentials';
+      final created = await check(
+        'POST',
+        template,
+        template,
+        body: {
+          'name': 'Prod defines',
+          'kind': 'dart_defines',
+          'dartDefines': '{"API_KEY": "s3cret-value"}',
+        },
+      );
+      final refused = await check(
+        'POST',
+        template,
+        template,
+        body: {
+          'name': 'Broken',
+          'kind': 'dart_defines',
+          'dartDefines': '{"API_KEY": {"s3cret-value": 1}}',
+        },
+      );
+
+      expect(created.statusCode, 201);
+      expect(created.json['kind'], 'dart_defines');
+      expect(created.json['status'], 'verified');
+      final replaced = await check(
+        'PUT',
+        '/credentials/${created.json['id']}',
+        '/credentials/{credentialId}',
+        body: {'dartDefines': 'API_KEY=s3cret-value'},
+      );
+      expect(refused.statusCode, 422);
+      expect(replaced.statusCode, 200);
+      expect(jsonEncode(replaced.json), isNot(contains('s3cret-value')));
+      expect(jsonEncode(created.json), isNot(contains('s3cret-value')));
+      expect(jsonEncode(refused.json), isNot(contains('s3cret-value')));
+    });
+
     test('POST /credentials takes an Apple Distribution identity, 201 and '
         '422', () async {
       const template = '/credentials';
