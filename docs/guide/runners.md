@@ -89,11 +89,10 @@ are free.
 on hardware that is not Apple's is likely outside Apple's SDK agreement: that question is yours,
 not XPath's. omarchy-apple-dev is tested on Arch Linux (Omarchy), x86_64 and arm64.
 
-1. Check out omarchy-apple-dev at the commit this XPath pins. `xp runner doctor` prints it; until
-   upstream merges the fixes XPath needs, it is the `xpath/pin-flavors` branch of a fork:
+1. Check out omarchy-apple-dev at the commit this XPath pins. `xp runner doctor` prints it:
 
    ```sh
-   git clone https://github.com/AbdurahmanAlmehdi/omarchy-apple-dev ~/omarchy-apple-dev
+   git clone https://github.com/joshuaswarren/omarchy-apple-dev ~/omarchy-apple-dev
    git -C ~/omarchy-apple-dev checkout <the commit xp runner doctor names>
    ```
 
