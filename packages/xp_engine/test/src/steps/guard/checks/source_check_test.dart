@@ -53,6 +53,45 @@ packages:
 
       expect((await check.run(harness.request)).status, GuardStatus.passed);
     });
+
+    // Incident: Lina's own UI package, committed under packages/lina_ui,
+    // failed the guard as a local path dependency.
+    test('for a relative path package committed in the repository '
+        '(real incident)', () async {
+      final git = StubGit()
+        ..statusResult = const GitWorktreeStatus(
+          headSha: dispatchedSha,
+          untracked: ['packages/other/notes.txt'],
+        );
+      final harness = guardRequest(git: git, files: _linaApp);
+
+      final result = await check.run(harness.request);
+
+      expect(result.status, GuardStatus.passed);
+    });
+
+    test('for a monorepo app whose package sits beside it', () async {
+      final harness = guardRequest(
+        appPath: 'apps/captain',
+        files: {
+          'apps/captain/pubspec.yaml': pubspec('1.0.0+1'),
+          'apps/captain/pubspec.lock': _lock('core', '../../packages/core'),
+          'packages/core/pubspec.yaml': '',
+          'pubspec.lock': _lock('captain', './apps/captain'),
+        },
+        versionFiles: ['apps/captain/pubspec.yaml'],
+      );
+
+      expect((await check.run(harness.request)).status, GuardStatus.passed);
+    });
+
+    test('for a lock file without packages', () async {
+      final harness = guardRequest(
+        files: {...customerApp('5.4.1+3283'), 'pubspec.lock': 'sdks: {}'},
+      );
+
+      expect((await check.run(harness.request)).status, GuardStatus.passed);
+    });
   });
 
   group('fails', () {
@@ -76,7 +115,10 @@ dependency_overrides:
 
       expect(result.status, GuardStatus.failed);
       expect(result.message, contains('pubspec_overrides.yaml is active'));
-      expect(result.fix, contains('remove pubspec_overrides.yaml'));
+      expect(
+        result.fix,
+        'Remove pubspec_overrides.yaml. A release builds only what is in git.',
+      );
     });
 
     // Incident: a debug file under lib/ that was never committed was
@@ -141,20 +183,11 @@ dependency_overrides:
       );
     });
 
-    test('when the lock file resolves a package from a local path', () async {
+    test('for a path package outside the repository', () async {
       final harness = guardRequest(
         files: {
           ...customerApp('5.4.1+3283'),
-          'pubspec.lock': '''
-packages:
-  mataa_core:
-    dependency: "direct main"
-    description:
-      path: "../mataa_core"
-      relative: true
-    source: path
-    version: "2.0.0"
-''',
+          'pubspec.lock': _lock('mataa_core', '../mataa_core'),
         },
       );
 
@@ -163,7 +196,172 @@ packages:
       expect(result.status, GuardStatus.failed);
       expect(
         result.message,
-        'pubspec.lock resolves a package from a local path.',
+        'pubspec.lock resolves the path package mataa_core from '
+        '../mataa_core, outside the repository.',
+      );
+      expect(
+        result.fix,
+        'Take mataa_core from git, a hosted version or a relative path '
+        'inside the repository, and run pub get. A release builds only what '
+        'is in git.',
+      );
+    });
+
+    test('for a path that climbs out of a monorepo app', () async {
+      final harness = guardRequest(
+        appPath: 'apps/captain',
+        files: {
+          'apps/captain/pubspec.yaml': pubspec('1.0.0+1'),
+          'apps/captain/pubspec.lock': _lock('core', '../../../core'),
+        },
+        versionFiles: ['apps/captain/pubspec.yaml'],
+      );
+
+      expect(
+        (await check.run(harness.request)).message,
+        'apps/captain/pubspec.lock resolves the path package core from '
+        '../../../core, outside the repository.',
+      );
+    });
+
+    test('for a path package with an absolute path', () async {
+      final harness = guardRequest(
+        files: {
+          ...customerApp('5.4.1+3283'),
+          'pubspec.lock': _lock(
+            'mataa_core',
+            '/Users/dev/mataa_core',
+            relative: false,
+          ),
+        },
+      );
+
+      final result = await check.run(harness.request);
+
+      expect(result.status, GuardStatus.failed);
+      expect(
+        result.message,
+        'pubspec.lock resolves the path package mataa_core from the absolute '
+        'path /Users/dev/mataa_core.',
+      );
+      expect(result.fix, startsWith('Take mataa_core from git'));
+    });
+
+    test('for a relative path that starts at the root', () async {
+      final harness = guardRequest(
+        files: {
+          ...customerApp('5.4.1+3283'),
+          'pubspec.lock': _lock('ui', '/ui'),
+        },
+      );
+
+      expect(
+        (await check.run(harness.request)).message,
+        'pubspec.lock resolves the path package ui from the absolute path '
+        '/ui.',
+      );
+    });
+
+    test('for a path package whose lock entry names no path', () async {
+      final harness = guardRequest(
+        files: {
+          ...customerApp('5.4.1+3283'),
+          'pubspec.lock': '''
+packages:
+  ui:
+    dependency: "direct main"
+    description: "packages/ui"
+    source: path
+''',
+        },
+      );
+
+      final result = await check.run(harness.request);
+
+      expect(
+        result.message,
+        'pubspec.lock resolves the path package ui without naming its path.',
+      );
+      expect(result.fix, startsWith('Take ui from git'));
+    });
+
+    test('for a path package that is not in the worktree', () async {
+      final harness = guardRequest(
+        files: {
+          ...customerApp('5.4.1+3283'),
+          'pubspec.lock': _lock('lina_ui', 'packages/lina_ui'),
+        },
+      );
+
+      final result = await check.run(harness.request);
+
+      expect(result.status, GuardStatus.failed);
+      expect(
+        result.message,
+        'pubspec.lock resolves the path package lina_ui from '
+        'packages/lina_ui, which is not in the worktree.',
+      );
+      expect(
+        result.fix,
+        'Commit the folder of lina_ui, or fix its path in pubspec.yaml and '
+        'run pub get. A release builds only what is in git.',
+      );
+    });
+
+    test('for an untracked file under an in-repo path package', () async {
+      final git = StubGit()
+        ..statusResult = const GitWorktreeStatus(
+          headSha: dispatchedSha,
+          untracked: ['packages/lina_ui/lib/src/draft.dart'],
+        );
+      final harness = guardRequest(git: git, files: _linaApp);
+
+      final result = await check.run(harness.request);
+
+      expect(result.status, GuardStatus.failed);
+      expect(result.message.split('\n'), [
+        'Untracked file: packages/lina_ui/lib/src/draft.dart',
+        _linaDirty,
+      ]);
+      expect(
+        result.fix,
+        'Commit or discard the changes. A release builds only what is in git.',
+      );
+    });
+
+    test('for a modified file under an in-repo path package', () async {
+      final git = StubGit()
+        ..statusResult = const GitWorktreeStatus(
+          headSha: dispatchedSha,
+          changed: ['packages/lina_ui/lib/lina_ui.dart'],
+        );
+      final harness = guardRequest(git: git, files: _linaApp);
+
+      final result = await check.run(harness.request);
+
+      expect(result.message.split('\n'), [
+        'Uncommitted change: packages/lina_ui/lib/lina_ui.dart',
+        _linaDirty,
+      ]);
+    });
+
+    test('for a lock file that is not YAML', () async {
+      final harness = guardRequest(
+        files: {...customerApp('5.4.1+3283'), 'pubspec.lock': 'packages: ['},
+      );
+
+      final result = await check.run(harness.request);
+
+      expect(result.status, GuardStatus.failed);
+      expect(
+        result.message,
+        'pubspec.lock is not valid YAML, so its path packages cannot be '
+        'checked.',
+      );
+      expect(
+        result.fix,
+        'Run pub get to write pubspec.lock again. A release builds only what '
+        'is in git.',
       );
     });
 
@@ -208,6 +406,30 @@ packages:
     });
   });
 }
+
+const _linaDirty =
+    'pubspec.lock resolves the path package lina_ui from packages/lina_ui, '
+    'which has uncommitted or untracked files.';
+
+final Map<String, String> _linaApp = {
+  ...customerApp('5.4.1+3283'),
+  'pubspec.lock': _lock('lina_ui', 'packages/lina_ui'),
+  'packages/lina_ui/pubspec.yaml': 'name: lina_ui',
+  'packages/lina_ui/lib/lina_ui.dart': '',
+};
+
+/// A lock file with the one path package [name] at [path].
+String _lock(String name, String path, {bool relative = true}) =>
+    '''
+packages:
+  $name:
+    dependency: "direct main"
+    description:
+      path: "$path"
+      relative: $relative
+    source: path
+    version: "1.0.0"
+''';
 
 const _overridesMessage =
     'pubspec_overrides.yaml is active. Its dependency_overrides replace the '

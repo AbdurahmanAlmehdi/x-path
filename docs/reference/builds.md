@@ -144,7 +144,8 @@ endpoint exposes it; workflows call it (see Workflows and the scheduler).
   `release/<x.y.z>` at the dispatched commit and never forces.
 - **Guards.** The `guard` step runs the checks a workflow lists and fails if any fails, naming each
   problem and its fix: `source` (clean worktree on the dispatched commit, no `pubspec_overrides.yaml`,
-  no local path dependency), `appStoreTrain` (ITMS-90186 closed train), `versionSync`, `patchTarget`,
+  no path dependency outside the repository; a relative path package inside it must exist and have
+  no uncommitted or untracked file), `appStoreTrain` (ITMS-90186 closed train), `versionSync`, `patchTarget`,
   `newReleaseNumber`, `patchNativeDiff`, `playTargetSdk` and `buildNumberReuse`. What a check needs
   from a store (train state, Play's target API level, build numbers, Shorebird releases) comes from
   an interface; `xpd` registers the checks that need none and adds the others with the store
