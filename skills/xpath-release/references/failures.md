@@ -46,7 +46,7 @@ result with `get_job`.
 
 | Check | Fails when |
 |---|---|
-| `source` | the worktree is not clean on the dispatched commit, or has a `pubspec_overrides.yaml` or a local path dependency |
+| `source` | the worktree is not clean on the dispatched commit, or has a `pubspec_overrides.yaml`, a path dependency that is absolute, outside the repository or missing, or uncommitted or untracked files under an in-repo path package |
 | `credentials` | a credential the job needs was `rejected` at its last check (an `unreachable` or never-checked one only warns) |
 | `versionSync` | the pubspec and the plists disagree on the version |
 | `newReleaseNumber` | the version is not higher than every release before it |

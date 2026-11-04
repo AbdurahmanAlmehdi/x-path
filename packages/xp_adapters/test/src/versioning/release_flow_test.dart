@@ -51,6 +51,18 @@ String _plist(String version, String build) =>
 </plist>
 ''';
 
+String _pathLock(String name, String path) =>
+    '''
+packages:
+  $name:
+    dependency: "direct main"
+    description:
+      path: "$path"
+      relative: true
+    source: path
+    version: "1.0.0"
+''';
+
 void main() {
   late GitFixture fixture;
   late Directory dataDir;
@@ -87,8 +99,18 @@ void main() {
     dataDir = Directory.systemTemp.createTempSync('xp_flow_data_');
     fixture
       ..commit('pubspec.yaml', 'name: app\nversion: 5.4.0+3282\n')
-      ..commit('ios/Runner/Info.plist', _plist('5.4.0', '3282'))
-      ..commit('lib/main.dart', 'void main() {}');
+      ..commit('ios/Runner/Info.plist', _plist('5.4.0', '3282'));
+    // An in-repo path package, staged into the next commit.
+    for (final (file, content) in [
+      ('packages/ui/lib/ui.dart', 'const ui = 1;'),
+      ('pubspec.lock', _pathLock('ui', 'packages/ui')),
+    ]) {
+      File(p.join(fixture.seed, file))
+        ..parent.createSync(recursive: true)
+        ..writeAsStringSync(content);
+      fixture.git(['add', '--', file]);
+    }
+    fixture.commit('lib/main.dart', 'void main() {}');
     sha = fixture.commit('android/app/build.gradle.kts', 'android {}');
     fixture.push('main');
     git = CliGitService(
@@ -157,6 +179,45 @@ void main() {
       );
     },
   );
+
+  test(
+    'the source guard sees an untracked file in an in-repo path package',
+    () async {
+      File(p.join(worktree.path, 'packages/ui/lib/draft.dart'))
+          .writeAsStringSync('const draft = 1;');
+
+      final outcome = await runGuard([GuardCheckName.source]);
+
+      expect(
+        (outcome as StepFailed).message,
+        contains(
+          'Untracked file: packages/ui/lib/draft.dart\n'
+          'pubspec.lock resolves the path package ui from packages/ui, which '
+          'has uncommitted or untracked files.',
+        ),
+      );
+    },
+  );
+
+  test('the source guard refuses a path package behind a symbolic link that '
+      'leaves the worktree', () async {
+    final outside = Directory.systemTemp.createTempSync('xp_outside_');
+    addTearDown(() => outside.deleteSync(recursive: true));
+    File(p.join(outside.path, 'pubspec.yaml')).writeAsStringSync('name: x');
+    Link(p.join(worktree.path, 'vendor')).createSync(outside.path);
+    File(p.join(worktree.path, 'pubspec.lock'))
+        .writeAsStringSync(_pathLock('core', 'vendor'));
+
+    final outcome = await runGuard([GuardCheckName.source]);
+
+    expect(
+      (outcome as StepFailed).message,
+      contains(
+        'pubspec.lock resolves the path package core from vendor, which is '
+        'not in the worktree.',
+      ),
+    );
+  });
 
   test(
     'version.bump commits the version files, which the guards accept',
