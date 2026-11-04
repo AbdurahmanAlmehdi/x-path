@@ -479,8 +479,9 @@ class HttpAppStoreConnect implements AppStoreConnect {
     }
   }
 
-  /// The upload operations of a build upload file. They must cover the
-  /// [length] bytes of the file in order, as App Store Connect lists them.
+  /// The upload operations of a build upload file, by offset. App Store
+  /// Connect lists them in no promised order; sorted, they must cover the
+  /// [length] bytes of the file exactly, with no gap and no overlap.
   List<_UploadOperation> _operations(Object? value, int length) {
     final operations = [
       for (final operation in _resources(value))
@@ -494,22 +495,39 @@ class HttpAppStoreConnect implements AppStoreConnect {
               _string(header, 'name'): _string(header, 'value'),
           },
         ),
-    ];
-    var covered = 0;
-    for (final operation in operations) {
-      if (operation.offset != covered) break;
-      covered += operation.length;
-    }
-    if (operations.isEmpty || covered != length) {
+    ]..sort((a, b) => a.offset.compareTo(b.offset));
+    if (operations.isEmpty) {
       throw const AscServerException(
         0,
-        'App Store Connect asked for upload parts that do not cover the IPA.',
+        'App Store Connect asked for upload parts that do not cover the IPA: '
+        'it sent none.',
+      );
+    }
+    var covered = 0;
+    for (final operation in operations) {
+      if (operation.offset != covered) {
+        throw AscServerException(
+          0,
+          'App Store Connect asked for upload parts that do not cover the IPA: '
+          '${operation.offset > covered ? 'a gap' : 'an overlap'} at byte '
+          '${min(covered, operation.offset)} of $length.',
+        );
+      }
+      covered += operation.length;
+    }
+    if (covered != length) {
+      throw AscServerException(
+        0,
+        'App Store Connect asked for upload parts that do not cover the IPA: '
+        'they cover $covered of $length bytes.',
       );
     }
     return operations;
   }
 
-  /// Sends [content] in the parts of [operations] and returns its MD5.
+  /// Sends [content] in the parts of [operations] and returns its MD5. The
+  /// operations are sorted by offset and contiguous, so cutting [content] in
+  /// their order gives each part the bytes at its own offset.
   Future<String> _sendParts(
     List<_UploadOperation> operations,
     Stream<List<int>> content,
