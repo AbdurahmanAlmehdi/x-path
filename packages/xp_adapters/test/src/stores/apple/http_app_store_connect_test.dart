@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:crypto/crypto.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:test/test.dart';
@@ -616,35 +617,96 @@ void main() {
       );
     });
 
+    Map<String, Object?> operation(int offset, int length) => {
+      'method': 'PUT',
+      'url': 'https://upload.example/$offset',
+      'offset': offset,
+      'length': length,
+    };
+
+    /// A client whose App Store Connect answers every call with a file of
+    /// [operations], and whose upload host keeps each part's bytes by URL.
+    HttpAppStoreConnect listing(
+      List<Object?> operations, {
+      Map<String, List<int>>? parts,
+      List<Object?>? patches,
+    }) => client(
+      httpClient: MockClient((request) async {
+        if (request.url.host == 'upload.example') {
+          parts?['${request.url}'] = request.bodyBytes;
+          return http.Response('', 200);
+        }
+        if (request.method == 'PATCH') patches?.add(jsonDecode(request.body));
+        return http.Response(
+          jsonEncode({
+            'data': {
+              'type': request.url.path.endsWith('Files')
+                  ? 'buildUploadFiles'
+                  : 'buildUploads',
+              'id': 'x',
+              'attributes': {'uploadOperations': operations},
+            },
+          }),
+          201,
+        );
+      }),
+    );
+
+    // Incident: App Store Connect listed the parts of a real IPA out of
+    // order, and the upload stopped before sending a byte.
+    test('send parts listed in any order by their own offsets', () async {
+      final parts = <String, List<int>>{};
+      final patches = <Object?>[];
+      final api = listing(
+        [operation(20, 3), operation(0, 10), operation(10, 10)],
+        parts: parts,
+        patches: patches,
+      );
+
+      await upload(api: api);
+
+      expect(parts, {
+        'https://upload.example/0': ipa.sublist(0, 10),
+        'https://upload.example/10': ipa.sublist(10, 20),
+        'https://upload.example/20': ipa.sublist(20),
+      });
+      expect(
+        patches.single,
+        containsPair(
+          'data',
+          containsPair(
+            'attributes',
+            containsPair('sourceFileChecksums', {
+              'file': {'hash': '${md5.convert(ipa)}', 'algorithm': 'MD5'},
+            }),
+          ),
+        ),
+      );
+    });
+
     test('refuse parts that do not cover the IPA', () async {
-      Map<String, Object?> operation(int offset, int length) => {
-        'method': 'PUT',
-        'url': 'https://upload.example/$offset',
-        'offset': offset,
-        'length': length,
-      };
+      const cover =
+          'App Store Connect asked for upload parts that do not '
+          'cover the IPA: ';
       for (final (operations, problem) in [
-        (<Object?>[], 'do not cover the IPA'),
-        ([operation(0, 10), operation(12, 11)], 'do not cover the IPA'),
-        ([operation(0, 10)], 'do not cover the IPA'),
+        (<Object?>[], '${cover}it sent none.'),
+        (
+          [operation(12, 11), operation(0, 10)],
+          '${cover}a gap at byte 10 of 23.',
+        ),
+        (
+          [operation(0, 12), operation(10, 13)],
+          '${cover}an overlap at byte 10 of 23.',
+        ),
+        ([operation(0, 10)], '${cover}they cover 10 of 23 bytes.'),
+        (
+          [operation(10, 14), operation(0, 10)],
+          '${cover}they cover 24 of 23 bytes.',
+        ),
         ([operation(0, 10)..['offset'] = '0'], 'no "offset"'),
       ]) {
-        final api = client(
-          httpClient: MockClient(
-            (request) async => http.Response(
-              jsonEncode({
-                'data': {
-                  'type': request.url.path.endsWith('Files')
-                      ? 'buildUploadFiles'
-                      : 'buildUploads',
-                  'id': 'x',
-                  'attributes': {'uploadOperations': operations},
-                },
-              }),
-              201,
-            ),
-          ),
-        );
+        final parts = <String, List<int>>{};
+        final api = listing(operations, parts: parts);
 
         await expectLater(
           upload(api: api),
@@ -656,6 +718,7 @@ void main() {
             ),
           ),
         );
+        expect(parts, isEmpty, reason: 'no part is sent before the check');
       }
     });
 
