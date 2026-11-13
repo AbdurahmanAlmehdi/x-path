@@ -1,0 +1,621 @@
+---
+title: "feat: web dashboard with people and roles"
+type: feat
+date: 2026-11-13
+---
+
+## feat: web dashboard with people and roles
+
+> Plan 2 of the three plans in the
+> [CI triggers, web dashboard and containers brainstorm](../brainstorm/2026-11-12-ci-triggers-web-dashboard-containers-brainstorm-doc.md).
+> The triggers plan (Plan 1) depends on the people, roles and run origin built here. The
+> container plan (Plan 3) is independent.
+
+## Overview
+
+XPath gets people with roles, browser sign-in, and a Vue web dashboard that `xpd` serves on its
+own origin. The dashboard matches the macOS app, minus the parts that only make sense on a Mac.
+Every approval and every run then records a person, not just a device token. Linux-only teams
+get a GUI.
+
+## Problem Statement
+
+- **The only GUI is the macOS app.** An engine on Linux (bundle or Docker) can be driven only with `xp` and `xp mcp`.
+- **Identity is a device token.** A token has a kind (`app`, `cli`, `mcp`, `runner`) and a name, and nothing else. Who may do what
+  is decided by kind (`approval_service.dart:306`, `release_service.dart:1020`, `housekeeping_service.dart:268`,
+  `runner_service.dart:275`, `github_token_service.dart:157`, `credential_service.dart:858`, `tokens_routes.dart:31`).
+  So any `cli` token can approve a production release, and an approval records a device ("Mac mini"), not a person.
+- **Runs do not record who started them.** `RunRecord` has no origin field, and Plan 1 needs one to tell a person, an agent and
+  a trigger apart.
+- **Browsers are refused.** Every socket is `allowedOrigins: const []`, there is no cookie auth, and `xpd` serves no static
+  files (`xpd_server.dart`).
+
+## Proposed Solution
+
+1. **People and roles.** A `person` (name, role: `viewer` < `developer` < `releaser` < `admin`) owns every token except runner
+   tokens. One table (`AccessPolicy`) maps each mutating action to a minimum role, and the existing token-kind rules stay
+   on top of it: `mcp` and `runner` tokens never decide or change gates.
+2. **Run origin.** `RunRecord.origin` records a person or an agent. Plan 1 adds triggers.
+3. **The API under `/api/v1`.** The root paths stay as aliases for bearer clients until 1.0. The SPA owns every other path.
+4. **Browser sessions.**
+   - An admin issues a one-time sign-in code, and the browser exchanges it for a `web` token in a `__Host-` cookie
+     (HttpOnly, Secure, SameSite=Strict).
+   - Requests that change something also need a CSRF header and a matching Origin.
+   - Sockets authenticate with the cookie plus an exact Origin check, and they close when their token is revoked.
+   - Sign-in works on loopback or through an HTTPS public URL.
+5. **`apps/xp_web`.**
+   - Vue 3 + TypeScript + Pinia + Vue Router + Vite, with a typed client generated from `openapi.yaml`.
+   - It uses the `xp-tokens.css` design tokens.
+   - Tests are Vitest plus Playwright against a real `xpd`.
+   - The files are built once in CI and embedded in every `xpd` bundle, the Docker image and the Mac app's engine.
+
+## Decisions
+
+The owner's answers to the brainstorm's open questions (2026-11-12), and the defaults this plan sets for the gaps that the
+user-flow analysis and the best-practices research (OWASP Session Management, CSRF and WebSocket cheat sheets) found. The
+defaults can be changed in review without restructuring the plan.
+
+Where the brainstorm says otherwise, this plan wins:
+- The app runs on the engine's own origin (same origin).
+- Sockets use the cookie, with no ticket.
+- Runner tokens have no person.
+- Triggers screens are in Plan 1.
+
+| # | Question | Decision | Source |
+|---|---|---|---|
+| D1 | URL space | The API moves to `/api/v1`. Root paths stay as **bearer-only** aliases with `Deprecation` and `Sunset` headers, removed at 1.0. Everything else is the SPA. | owner |
+| D2 | Live updates | The existing WebSockets, authenticated by the session cookie plus an exact `Origin` match. No ticket, no SSE. | owner |
+| D3 | TLS | No TLS in `xpd`. Browser sign-in works only on loopback or through the configured HTTPS public URL. Plain HTTP from another machine gets `403` with the reason. | owner |
+| D3a | Cookie attributes | Chosen by the scheme of the origin that is signing in, never by request headers. Through the HTTPS `public_url`: `__Host-xp_session; Secure; HttpOnly; SameSite=Strict; Path=/`. On a loopback origin: `xp_session; HttpOnly; SameSite=Strict; Path=/`. Safari still refuses `Secure` cookies on `http://localhost` (WebKit bug 232088), and a loopback cookie never leaves the machine. | research |
+| D4 | Packaging | `npm run build` runs once in CI, and `bundles.sh` copies `dist/` into every `xpd` bundle as `xpd/web/`. | owner |
+| D5 | TS coverage | 100% lines for `src/api/**` and every Pinia store, 90% for the rest. This mirrors the repo's 100% client and bloc, 90% glue tiers. | plan default |
+| D6 | Runner tokens | They belong to no person (`person_id` NULL is allowed only for `kind = 'runner'`). A runner is a machine, so removing a person never breaks a runner. | plan default; refines the brainstorm's "every kind" |
+| D7 | Upgrade | Migration creates the person `Owner` (admin), who owns every non-runner token. It can be renamed later. | plan default |
+| D8 | First admin, headless | `xpd person create --name <n> --role admin` prints a sign-in code. `xpd person code <name>` issues a new one. Both write to the database directly, like `xpd token create`. | plan default |
+| D9 | Mac or CLI owner opening the dashboard | `xp dashboard` and a Settings button in the Mac app ask for a sign-in code for **their own** person and open `<origin>/sign-in#code=…`. A fragment never reaches a server log. | plan default |
+| D10 | Sign-in code | 16 Crockford base32 characters (80 bits), shown as `XXXX-XXXX-XXXX-XXXX`. It lasts 10 minutes and works once. Issuing a code deletes the person's unused codes. Only the SHA-256 is stored, and it is the primary key. 20 failures in total per 10 minutes, then `429`. Unknown, used and expired codes all get the same `401`. It is used up atomically (`UPDATE … WHERE hash = ? AND used_at IS NULL AND expires_at > ?`, then the row count is checked). | plan default |
+| D11 | Session lifetime | A `web` token expires 8 hours after sign-in, with no sliding renewal. Signing out revokes the token on the server and clears the cookie (`Max-Age=0`). Responses under `/api/v1/session` and `/api/v1/me` are `no-store`. | plan default (within OWASP's 4–8 h absolute timeout) |
+| D12 | Revocation while signed in | The role is read with the token on every request, so a role change applies to the next request. Revoking a token, signing out, removing the person or expiry closes the affected sockets with code 4401: a push on revocation, plus a sweep every 60 s for expiry. The next REST call answers `401`, and the SPA goes to `/sign-in?next=<path>`. Every tab holds its own socket, so each tab learns on its own. | plan default |
+| D13 | People removal | Soft removal (`removed_at`) that revokes all their tokens. Approvals and run origins keep the name. The last active admin cannot be demoted or removed (`409`). | plan default |
+| D14 | CSRF | Any request authenticated by cookie with a method other than GET/HEAD/OPTIONS needs both of these:<br>- an `Origin` in the D15 set (an absent `Origin` is refused);<br>- the header `X-XPath-CSRF: 1`. `xpd` sends no CORS headers, so a cross-site page cannot add it without a preflight that fails.<br>Together with `SameSite=Strict`, that makes three independent layers. `POST /session` checks `Origin`, which covers login CSRF. A request with `Authorization` is bearer: the cookie is ignored and CSRF does not apply. `xpd` never sends CORS headers. GET never changes anything. | research (OWASP CSRF); simplified in review and confirmed by the owner: no HMAC token, no `Sec-Fetch-Site` |
+| D15 | Allowed origins | Exact string matches only:<br>- the configured `public_url` origin;<br>- the loopback origins of the bound port (`http://127.0.0.1:<p>`, `http://localhost:<p>`, `http://[::1]:<p>`), but only when the `Host` header is one of those too, which blocks DNS rebinding.<br>`X-Forwarded-*` is never trusted. | research (OWASP WebSocket) |
+| D16 | Role-aware UI | `GET /api/v1/me` returns the person and their `permissions` (the four above). The SPA hides actions it may not take and never reimplements the rules. | plan default |
+| D17 | Tokens per person | Any person lists, creates (`cli`, `mcp`) and revokes their own tokens. Admins see and revoke everyone's. Creating a token needs an interactive token (`app` or `web`). | plan default |
+
+### Role matrix (`AccessPolicy`)
+
+Every role may read everything a token can read today, including secrets' metadata but never their values. Each row needs
+the role named or higher.
+
+| Permission | Min role | Routes / actions |
+|---|---|---|
+| `develop` | developer | workflow dispatch, run again, rerun failed, cancel run/job, resume job, project scan, run tests, baseline, create/update/delete project workflows, pin/unpin artifacts |
+| `decideApproval` | releaser | approve/deny any gate. Kept separate because Plan 1 lowers `pr_from_fork` to developer |
+| `release` | releaser | release merge, rollout, abandon, patch actions, notes/texts, store refresh, turn a gate on |
+| `administer` | admin | turn a gate off (also needs an `app` or `web` token; today only `app`), add/remove projects, credentials, distribution certificates, GitHub token, runners (pairing, revoke, runner URL), storage (free, retention), public URL, people, sign-in codes for others, others' tokens |
+
+Kind rules apply on top of roles:
+- `mcp` tokens never decide approvals or change gates.
+- `runner` tokens stay scoped by ADR 0011.
+- Only `app` and `web` tokens create tokens or loosen gates.
+
+## Technical Approach
+
+### Architecture
+
+- **Engine (`xp_engine`, framework-free).**
+  - `people/`: `Person`, `PersonRepository` (interface), `PersonService` (create, rename, set role, remove, last-admin rule).
+  - `access/`: `Permission`, `AccessPolicy.allows(token, permission)` and `AccessDeniedException`. It is pure, so it gets 100% coverage.
+  - `DeviceToken` gains `personId`, `role` (joined on read) and `expiresAt`.
+  - `TokenService` gains `issueWeb`, `listFor(person)` and a revocation stream (`revocations`) that the socket routes listen to.
+  - `signin/`: `SignInCodeService` (issue, redeem, rate limit with an injected clock).
+  - Approval, release, housekeeping, runner, GitHub token and credential services replace their kind checks with
+    `AccessPolicy`.
+- **Adapters (`xp_adapters`).** SQLite repositories for `person` and `sign_in_code`. Migrations go in merge order
+  (next is v23, golden `snapshots/v<N>.sql`).
+- **API (`xp_api`).**
+  - New: `Person`, `PersonRole`, `Me`, `SignInCode`, `RunOrigin`, `DeviceTokenKind.web`.
+  - `TokenInfo` gains `personId`, and `DecidedBy` gains `personId` and `personName` (optional, so old rows still parse).
+  - `openapi.yaml` gets the `servers` URL `…/api/v1` and the new paths.
+- **Server (`apps/xpd`).**
+  - `api_handler.dart` mounts the router at `/api/v1`.
+  - A `legacyAlias` dispatcher sends root requests that carry `Authorization`, plus `/health`, `/version` and `/runners/pair`, to the
+    same router, and adds `Deprecation: true` and a `Link` to the successor.
+  - Dispatch order:
+    1. `/api/v1/*` goes to the API. An unknown path gets a JSON `404`, never `index.html`.
+    2. A root path goes to the API if and only if it carries `Authorization` or is a public path.
+    3. Everything else goes to `WebAssets`.
+  - Root responses carry `Vary: Authorization`.
+  - `WebAssets` serves:
+    - hashed `/assets/*` with `Cache-Control: public, max-age=31536000, immutable`
+    - `index.html` with `no-cache` for any `GET` that accepts `text/html`
+    - `404` JSON for anything else (including `/` on an engine built without `web/`), and never the SPA for `/api/*`
+  - Headers on SPA responses:
+    - CSP: `default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self' <ws origin of public_url>; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'`
+    - `X-Content-Type-Options: nosniff`
+    - `Referrer-Policy: no-referrer`
+  - The Vue runtime-only build keeps `unsafe-eval` out.
+  - `authMiddleware` takes a bearer token **or** the session cookie (D3a). `Authorization` wins when both are present. A
+    cookie only authenticates `web` tokens and only under `/api/v1`.
+  - `csrfMiddleware` (D14) and `permissionMiddleware`:
+    - A table in `route_permissions.dart` maps every mutating route to a `Permission`.
+    - A test walks the router and fails on any mutating route missing from the table.
+    - A route missing from the table is closed (`administer`), as ADR 0011 closes new routes to runners.
+- **Sockets.**
+  - `events_route.dart` and `job_logs_route.dart` accept the cookie and check `Origin` against D15.
+  - Both keep a token id → sockets map and close with 4401 on `TokenService.revocations`.
+  - `runner_connect_route.dart` stays closed to browsers.
+- **Clients.**
+  - `xp_client._uri` prefixes `api/v1`. On connect it probes `/api/v1/version` and falls back to root paths for an engine older than
+    this change. A Homebrew or tarball `xp` can be newer than a remote engine, and no rule says the versions match, so this
+    probe stays.
+  - `xp_repositories`, the Mac app and the runner get it for free.
+- **Web (`apps/xp_web`)**:
+
+  ```text
+  apps/xp_web/
+    package.json, package-lock.json, .nvmrc (Node 24 LTS), vite.config.ts, tsconfig*.json,
+    vitest.config.ts, playwright.config.ts, eslint.config.js, index.html
+    src/
+      api/          schema.d.ts (generated), client.ts, sockets.ts (event + log feeds, reconnect)
+      app/          main.ts, router.ts (auth guard, ?next= validated as a same-origin path), App.vue
+      ui/           shared components; xp-tokens.css imported from docs/design through a Vite alias
+      features/<feature>/{stores,views,components}/
+        session, projects, dispatch, runs, jobs, approvals, releases, tests, runners,
+        storage, credentials, workflows, people, tokens, settings
+    e2e/            Playwright specs
+  ```
+
+  - Composition API only. One Pinia store per feature. Views read stores, and stores call `api/`.
+  - Pinned exact versions (checked with `npm view` on 2026-11-13):
+    - runtime: vue 3.5.45, pinia 4.1.0, and vue-router pinned exactly in `package.json` (every dependency, `@pinia/testing`
+      included, uses an exact version and no `^`)
+    - build and types: vite 8.3.8, TypeScript 5.x (openapi-typescript 7.13.0 peers on TypeScript 5, so not 7)
+    - client: openapi-typescript 7.13.0 for the types and openapi-fetch 0.17.0 for the client. Its middleware adds
+      `X-XPath-CSRF: 1` and turns `401` into the signed-out state.
+    - tests: vitest 5.1.0 with @vitest/coverage-v8 5.1.0, @vue/test-utils 2.5.1, @pinia/testing, @playwright/test 1.65.0
+  - Testing approach:
+    - Store tests mock `fetch` at the network layer, not the stores.
+    - The Vitest `coverage.include` is `src/**/*.{ts,vue}`, so files no test imports still count. `schema.d.ts` and
+      `main.ts` are excluded.
+    - Playwright runs the full suite on Chromium, and `signin.spec.ts` on WebKit too. WebKit over `http://localhost` covers
+      the cookie without `Secure` (D3a).
+  - Strings in English inside the components (the desktop app is English-only too).
+
+### Data model
+
+```mermaid
+erDiagram
+    person {
+        TEXT id PK "per_<16 hex>"
+        TEXT name
+        TEXT role "viewer|developer|releaser|admin"
+        INTEGER created_at
+        INTEGER removed_at "nullable"
+    }
+    device_token {
+        TEXT id PK
+        TEXT name
+        TEXT kind "app|cli|mcp|runner|web"
+        TEXT hash UK
+        TEXT person_id FK "NULL only for runner"
+        INTEGER created_at
+        INTEGER revoked_at
+        INTEGER expires_at "web only"
+    }
+    sign_in_code {
+        TEXT hash PK
+        TEXT person_id FK
+        INTEGER created_at
+        INTEGER expires_at
+        INTEGER used_at
+    }
+    run {
+        TEXT id PK
+        TEXT origin "JSON: {kind: person|agent, personId, personName, tokenId}"
+    }
+    person ||--o{ device_token : owns
+    person ||--o{ sign_in_code : "signs in with"
+    device_token ||--o{ run : "started (origin.tokenId)"
+```
+
+`device_token` is rebuilt (`foreignKeysOff: true`, like v20/v22) to widen the `kind` CHECK and add `person_id`, with
+`CHECK (kind = 'runner' OR person_id IS NOT NULL)`.
+
+### New API (all under `/api/v1`)
+
+| Method | Path | Who |
+|---|---|---|
+| `POST` | `/session` `{code}` → `Me` + `Set-Cookie` | public; D3, D10 |
+| `DELETE` | `/session` | cookie |
+| `GET` | `/me` | any |
+| `GET` / `POST` | `/people` | any / admin |
+| `GET` / `PATCH` / `DELETE` | `/people/{id}` | any / admin / admin |
+| `POST` | `/people/{id}/sign-in-codes` | admin; or the person themself with an `app`/`cli` token (D9) |
+| `GET` | `/tokens` | own; admin sees all |
+| `POST` | `/tokens` | `app`/`web` token, for its own person (D17) |
+| `DELETE` | `/tokens/{id}` | own; admin any |
+| `GET` / `PUT` | `/settings/public-url` | any / admin |
+
+`Run` gains `origin`. No new API events: a socket closing with 4401 is the signal, and a role change applies to the next request.
+
+## Implementation Phases
+
+`/build` runs these phases in order, one per context window. Each phase leaves the gate green, and lands its own ADR,
+migration golden, contract tests and `xp_client` methods.
+
+Scope: about 9–12k lines across Dart and Vue. The owner chose to keep one plan with phases (2026-11-13). The phase ends are
+also clean PR boundaries:
+- Phases 1–3: engine and API.
+- Phases 4–5: sessions and the web shell, not announced yet.
+- Phase 6: the first useful dashboard, where it goes public.
+- Phases 7, 8 and 9: in any order.
+
+So the branch can be cut into PRs at a phase end if review needs it. Plan 1 can start after Phase 2.
+
+Shell setup, assumed by every validation command below:
+
+```sh
+export PATH="$PWD/.fvm/flutter_sdk/bin:$HOME/.pub-cache/bin:$PATH"
+```
+
+### Phase 1: People, roles and the access policy in the engine
+
+- **Status:** Not started
+- **Scope:**
+  - The person model, plus migration v23:
+    - a `person` table;
+    - a rebuild of `device_token` (`kind` CHECK widened to `web`, plus `person_id`);
+    - a rebuild of `approval` (`decided_by_kind` CHECK widened to `web`, today `IN ('app','cli')` at `migrations.dart:338`,
+      plus `decided_by_person_id` and `decided_by_person_name`);
+    - an `Owner` admin backfilled.
+  - `PersonService` with the last-admin rule.
+  - `AccessPolicy` replaces every kind check, without changing what today's owner can do.
+  - ADR 0017 (people and roles), in the same PR.
+- **Files touched:**
+  - `packages/xp_api/lib/src/{person,device_token_kind,approval,token}.dart` and the `.g.dart` files, `packages/xp_api/lib/xp_api.dart`
+  - `packages/xp_engine/lib/src/{people,access}/**`, `packages/xp_engine/lib/xp_engine.dart`
+  - `packages/xp_engine/lib/src/tokens/{device_token,token_service}.dart`
+  - `packages/xp_engine/lib/src/{approvals/approval_service,releases/release_service,housekeeping/housekeeping_service,runners/runner_service,git/github_token_service,credentials/credential_service}.dart`
+  - `packages/xp_adapters/lib/src/sqlite/{migrations,sqlite_person_repository,sqlite_device_token_repository,sqlite_approval_repository}.dart`
+  - `packages/xp_adapters/test/src/sqlite/snapshots/v23.sql`
+  - `docs/adr/0017-people-and-roles.md`, `.github/cspell.json`
+  - the matching tests
+- **Acceptance criteria:**
+  - An upgraded database has one admin `Owner` who owns every non-runner token.
+  - `AccessPolicy` has a test row for every role × kind × permission.
+  - The approval tests still pass for `app` and `cli` tokens of an admin, and now fail with `403` for a viewer's `cli` token.
+  - An approval decided by a `web` token persists and reads back with `personName`.
+  - No kind check is left outside `access/`.
+  - ADR 0017 names what it amends: the 1.0 non-goal on multi-user accounts, and D-13's kind rule.
+- **Validation:** `(cd packages/xp_adapters && dart test test/src/sqlite/) && melos run test:coverage:strict && ! grep -rnE "kind (!=|==) DeviceTokenKind\.(app|cli)" packages/xp_engine/lib apps/xpd/lib --exclude-dir=access`
+
+### Phase 2: People, tokens, run origin and permissions over the API
+
+- **Status:** Not started
+- **Scope:**
+  - Routes for `/people`, `/me`, token list/create/revoke and sign-in codes for others.
+  - `permissionMiddleware` with the route table and the "every mutating route is listed" test.
+  - `Run.origin`, with migration v24 adding the `run.origin` column.
+  - `xpd person create|code|list`, the `xp_client` methods, `openapi.yaml` and contract tests.
+- **Files touched:**
+  - `apps/xpd/lib/src/api/people/people_routes.dart`, `apps/xpd/lib/src/api/session/me_routes.dart`, `apps/xpd/lib/src/api/tokens/tokens_routes.dart`
+  - `apps/xpd/lib/src/api/{route_permissions,permission_middleware,api_handler}.dart`
+  - `apps/xpd/lib/src/cli/person_command.dart`
+  - `packages/xp_engine/lib/src/scheduler/run_record.dart`, `packages/xp_engine/lib/src/dispatch/workflow_dispatcher.dart`
+  - `packages/xp_api/lib/src/{run,me,run_origin}.dart`, `packages/xp_api/openapi.yaml`
+  - `packages/xp_client/lib/src/xp_client.dart`
+  - `packages/xp_adapters/lib/src/sqlite/{migrations,sqlite_run_repository}.dart`, `packages/xp_adapters/test/src/sqlite/snapshots/v24.sql`
+  - `apps/xpd/test/src/api/route_permissions_test.dart`
+  - `apps/xpd/test/contract/{people,tokens,runs}_contract_test.dart` (`/me` goes in `people_contract_test.dart`)
+- **Acceptance criteria:**
+  - A viewer gets `403` on dispatch, and a developer gets `403` on approve.
+  - A run started with a `cli` token shows `origin.kind = person` with the person's name, and one started with `mcp` shows `agent`.
+  - `xpd person create --name Sam --role admin` prints a code.
+  - Demoting the last admin gets `409`.
+- **Validation:** `(cd packages/xp_adapters && dart test test/src/sqlite/) && (cd apps/xpd && dart test) && melos run test:contract && melos run test:coverage:strict`
+
+### Phase 3: The API under `/api/v1`
+
+- **Status:** Not started
+- **Scope:**
+  - Mount the router at `/api/v1`, plus the bearer-only root alias dispatcher with `Deprecation` and `Sunset` headers.
+  - `openapi.yaml` servers go to `/api/v1`.
+  - `xp_client` moves, with a probe fallback for older engines.
+  - The contract tests call `/api/v1`, plus one alias test per route group.
+  - ADR 0018 (the web dashboard: same origin, `/api/v1` with aliases until 1.0, cookie sessions, CSRF, sockets, packaging;
+    it amends the "browsers are refused" rule), in the same PR.
+- **Files touched:**
+  - `apps/xpd/lib/src/api/{api_handler,legacy_alias}.dart`, `apps/xpd/lib/src/server/xpd_server.dart`
+  - `packages/xp_client/lib/src/{xp_client,web_socket_connector}.dart`
+  - `packages/xp_api/openapi.yaml`, `apps/xpd/test/contract/**`, `tool/e2e/smoke_bundle.sh`
+  - `docs/adr/0018-web-dashboard.md`
+- **Acceptance criteria:**
+  - `curl -H 'Authorization: Bearer …' /projects` and `/api/v1/projects` give the same body, and only the first has
+    `Deprecation: true`.
+  - `/projects` with no `Authorization` header is not the API.
+  - An old runner bundle still pairs and connects through `/runners/pair` and `/runners/connect`.
+  - `xp` against an engine without `/api/v1` still works (the probe falls back to root paths).
+- **Validation:** `melos run test:contract && melos run test:coverage:strict && tool/e2e/smoke_bundle.sh && tool/e2e/quickstart_cli.sh && tool/e2e/mcp_gate_e2e.sh`
+
+### Phase 4: Browser sessions
+
+- **Status:** Not started
+- **Scope:**
+  - Sign-in codes, with migration v25 (the `sign_in_code` table).
+  - `POST`/`DELETE /session` and the cookie (D3a), with the 8-hour expiry (D11).
+  - `csrf_middleware.dart` (D14), the D15 origin set, and the `public_url` setting: the route and `xp settings public-url`. The
+    web Settings page comes in Phase 8.
+  - Sockets accept the cookie, check Origin and close on revocation (D12).
+  - `xp dashboard` and the Mac app's "Open dashboard" button (D9), which opens the browser through `AppServices.openUrl`.
+- **Files touched:**
+  - `packages/xp_engine/lib/src/signin/**`, `packages/xp_engine/lib/src/tokens/token_service.dart`
+  - `packages/xp_adapters/lib/src/sqlite/{migrations,sqlite_sign_in_code_repository}.dart`, `packages/xp_adapters/test/src/sqlite/snapshots/v25.sql`
+  - `apps/xpd/lib/src/api/session/session_routes.dart`, `apps/xpd/lib/src/api/settings/settings_routes.dart`
+  - `apps/xpd/lib/src/api/{csrf_middleware,middleware,events_route,jobs/job_logs_route}.dart`
+  - `apps/xpd/test/src/api/{session/**,csrf_middleware_test.dart,events_route_test.dart}`
+  - `apps/xpd/test/contract/{session,settings}_contract_test.dart`
+  - `packages/xp_api/openapi.yaml`, `packages/xp_client/lib/src/xp_client.dart`
+  - `packages/xp_repositories/lib/src/settings_repository.dart`
+  - `apps/xp/lib/src/commands/{dashboard_command,settings_commands}.dart`
+  - `apps/xp_desktop/lib/settings/{bloc/dashboard_bloc.dart,widgets/dashboard_section.dart,settings.dart}` (`droppable`, following
+    `runner_url_bloc.dart`)
+  - `apps/xp_desktop/lib/l10n/arb/app_en.arb` and `lib/l10n/gen` (`flutter gen-l10n`)
+  - `apps/xp_desktop/test/settings/{settings_blocs_test,settings_page_test}.dart`, with the goldens updated on macOS
+    (`flutter test --update-goldens --tags golden`)
+- **Acceptance criteria:**
+  - On loopback, a code exchanged at `/api/v1/session` sets `xp_session` (HttpOnly, SameSite=Strict, Path=/).
+  - Through an HTTPS `public_url`, it sets `__Host-xp_session` with `Secure`.
+  - A loopback origin with a foreign `Host` (DNS rebinding) is refused.
+  - The same code a second time gets `401`. The 21st bad code within 10 minutes gets `429`.
+  - A cookie `POST` gets `403 csrf` when `X-XPath-CSRF` is missing, or `Origin` is foreign or absent.
+  - A request with both a bearer token and a cookie is treated as bearer.
+  - A sign-in from a non-loopback address with no HTTPS `public_url` gets `403` with the reason.
+  - An open `/api/v1/events` socket closes with 4401 when an admin revokes the token, and within 60 s of expiry.
+  - A socket upgrade with a foreign Origin is refused.
+- **Validation:** `(cd packages/xp_adapters && dart test test/src/sqlite/) && (cd apps/xpd && dart test) && (cd apps/xp && dart test) && (cd apps/xp_desktop && flutter test test/settings) && melos run test:contract && melos run test:coverage:strict`
+
+### Phase 5: The `xp_web` scaffold, serving and packaging
+
+- **Status:** Not started
+- **Scope:**
+  - Scaffold `apps/xp_web`:
+    - the generated client, with a CI freshness check;
+    - the session store and the router guard;
+    - the sign-in page, which reads `#code=`;
+    - the shell with navigation, and the design tokens in light and dark.
+  - `package.json` scripts: `lint` (eslint), `typecheck` (`vue-tsc --noEmit`), `test`, `test:coverage`, `gen:api`,
+    `gen:api:check` (`gen:api` and then `git diff --exit-code src/api/schema.d.ts`) and `build` (`vue-tsc --noEmit && vite build`).
+  - Type definitions: `src/env.d.ts` (`/// <reference types="vite/client" />`), plus the generated `src/api/schema.d.ts`.
+  - `xpd` serves `web/` from next to its binary, or `Contents/Resources/web` in the Mac app. Without it, `/` is a JSON `404`.
+  - `bundles.sh`, `release.yml`, `build_mac.sh` and the `Dockerfile` carry the files.
+  - CI:
+    - `gate.yaml` gets a `web` output in `changes` (set by `apps/xp_web/**` or `packages/xp_api/openapi.yaml`), a `web` job,
+      and `web` in `gate.needs`.
+    - `gate` accepts `web` as skipped when `web == false`.
+    - The npm license check runs in the same job.
+  - The Playwright harness `tool/e2e/web_e2e.sh` with a sign-in spec.
+- **Files touched:**
+  - `apps/xp_web/**`, `apps/xpd/lib/src/server/{xpd_server,web_assets}.dart`, `apps/xpd/lib/src/cli/serve_command.dart`
+  - `tool/release/{bundles.sh,build_mac.sh}`, `.github/workflows/{gate.yaml,release.yml}`
+  - `tool/e2e/{web_e2e.sh,smoke_bundle.sh}`, `.gitignore`
+- **Acceptance criteria:**
+  - `GET /` on a bundled `xpd` returns the SPA with the CSP header, and `/assets/*.js` is `immutable`.
+  - Deep link `/runs/abc` while signed out lands on `/sign-in?next=%2Fruns%2Fabc`, and after sign-in returns there.
+  - `next=//evil.example` is ignored.
+  - `npm run gen:api:check` fails when `openapi.yaml` changes without regenerating.
+  - A Dart-only PR leaves `gate` green with `web` skipped.
+- **Validation:** `(cd apps/xp_web && npm ci && npm run lint && npm run typecheck && npm run test:coverage && npm run gen:api:check && npm run build) && tool/e2e/smoke_bundle.sh && tool/e2e/web_e2e.sh`
+
+### Phase 6: Projects, dispatch, runs and the job view
+
+- **Status:** Not started
+- **Scope:**
+  - Projects list and project overview (apps, flavors, last runs). This mirrors `apps/xp_desktop/lib/{projects,project_overview}`.
+  - Dispatch form (workflow, app, flavors, platforms, bump, inputs) from `/workflows/schema`. This mirrors `lib/dispatch`.
+  - Global and per-project runs list with filters in the query string, the run page, and the job view. This mirrors
+    `lib/{runs,job}`.
+  - Live logs in the job view: the text can be selected, and the view follows the tail.
+  - Live updates from the event feed.
+  - `docs/guide/dashboard.md`: signing in, roles, and the proxy recipe with `public_url`. The dashboard is announced from
+    this phase.
+- **Files touched:** `apps/xp_web/src/features/{projects,dispatch,runs,jobs}/**`, `apps/xp_web/src/api/sockets.ts`, `apps/xp_web/e2e/runs.spec.ts`, `docs/guide/dashboard.md`
+- **Acceptance criteria:**
+  - Dispatching `dev-build` from the browser creates a run whose origin is the signed-in person.
+  - The job page streams logs and survives a socket reconnect without duplicate lines.
+  - A viewer sees no Dispatch button.
+- **Validation:** `(cd apps/xp_web && npm run test:coverage && npm run typecheck) && tool/e2e/web_e2e.sh runs`
+
+### Phase 7: Approvals, releases and tests
+
+- **Status:** Not started
+- **Scope:**
+  - Approvals inbox and detail (approve or deny with a reason, and the "already decided" race).
+  - Releases list and detail (stores, builds, rollout, merge, patches, notes and texts, history).
+  - Test results with the baseline comparison.
+  - This mirrors `apps/xp_desktop/lib/{approvals,releases,tests}`.
+- **Files touched:** `apps/xp_web/src/features/{approvals,releases,tests}/**`, `apps/xp_web/e2e/approvals.spec.ts`
+- **Acceptance criteria:**
+  - A releaser approves a `prod_release` gate in the browser, the job resumes, and the approval shows the person's name.
+  - A developer sees the approval with no Approve button.
+  - A `409 already_decided` shows who won.
+- **Validation:** `(cd apps/xp_web && npm run test:coverage) && tool/e2e/web_e2e.sh approvals`
+
+### Phase 8: Runners, storage, credentials, add project, people, tokens and settings
+
+- **Status:** Not started
+- **Scope:**
+  - Runners list and pairing (the pairing token is shown once). Storage with free space and retention.
+  - Credentials, with file upload in the browser (`.p8`, `.json`, keystore, dart-define files) and verify.
+  - Add project, from a git URL or a path on the engine's machine.
+  - People admin (create, role, remove, issue a code shown once), my tokens, and settings (public URL, runner URL, GitHub token).
+  - This mirrors `apps/xp_desktop/lib/{runners,storage,credentials,add_project,settings}`.
+- **Files touched:** `apps/xp_web/src/features/{runners,storage,credentials,projects/add,people,tokens,settings}/**`, `apps/xp_web/e2e/admin.spec.ts`
+- **Acceptance criteria:**
+  - An admin creates a developer and copies the code, and a second browser context signs in with it.
+  - After the admin demotes them, the developer's next action gets `403`, and the SPA refetches `/me` and hides the button.
+  - Uploading a keystore stores a credential, and no response contains its bytes.
+  - The last-admin `409` shows a clear message.
+- **Validation:** `(cd apps/xp_web && npm run test:coverage) && tool/e2e/web_e2e.sh admin`
+
+### Phase 9: Workflow builder
+
+- **Status:** Not started
+- **Scope:**
+  - The visual builder (jobs, steps, gates, `with` keys from `/workflows/schema`) and a YAML editor (CodeMirror 6, lazy loaded).
+  - Both edit one document, with validation through `/workflows/validate`.
+  - Built-in workflows are read-only (`409`), with "Copy to edit".
+  - This mirrors `apps/xp_desktop/lib/workflow_builder`.
+- **Files touched:** `apps/xp_web/src/features/workflows/**`, `apps/xp_web/e2e/workflows.spec.ts`
+- **Note:** This is the riskiest UI in the plan: two-way sync between the visual builder and YAML. It stays because the
+  brainstorm scopes the builder (visual plus YAML) into desktop parity. If it runs long, the YAML editor alone can ship
+  first and the visual view can follow.
+- **Acceptance criteria:**
+  - Adding a step in the visual view shows up in YAML, and the reverse.
+  - Saving invalid YAML shows the validator's line and message.
+  - The CodeMirror chunk is not in the entry bundle.
+- **Validation:** `(cd apps/xp_web && npm run test:coverage && npm run build) && tool/e2e/web_e2e.sh workflows`
+
+### Phase 10: Reference docs and the proxy check
+
+- **Status:** Not started
+- **Scope:**
+  - Updates to:
+    - `approvals.md` (roles)
+    - `install.md` (bundles carry `web/`; Docker)
+    - `runners.md` (the runner URL is not the public URL)
+    - `docs/reference/{engine,clients}.md` (`/api/v1` and the aliases)
+  - README links and the cspell words.
+  - The manual proxy check.
+  - The ADRs are in Phases 1 and 3, and the guide is in Phase 6.
+- **Files touched:** `docs/guide/{approvals,install,runners}.md`, `docs/reference/{engine,clients}.md`, `README.md`, `.github/cspell.json`
+- **Acceptance criteria:** The spell check passes. The guide's proxy recipe works as written (manual check).
+- **Validation:** `npx --yes cspell@8 --config .github/cspell.json "README.md" "docs/adr/**/*.md"` — and `manual 1. Follow docs/guide/dashboard.md "Behind a proxy" with Caddy on a Linux VM 2. Sign in from another machine over https 3. Confirm plain http://<lan-ip>:7480/sign-in refuses with the documented message`
+
+## Alternative Approaches Considered
+
+- **Serving the UI under `/ui/`** would keep the API at the root with no aliases. The owner chose `/api/v1` for a clean URL space,
+  so this plan pays for the alias dispatcher and the client fallback.
+- **A socket ticket, or SSE.** With a same-origin cookie and an exact Origin check, a ticket adds an endpoint and a store and protects nothing extra.
+  SSE would be a second streaming transport next to the sockets the CLI and the Mac app already use.
+- **Native TLS in `xpd`** would make XPath manage certificates. A proxy (Caddy, `tailscale serve`, Cloudflare Tunnel) already
+  does this better, and the runner guide already recommends one.
+- **Role checks in each service only.** That spreads the matrix over seven services. One `AccessPolicy` table plus a route
+  table with an exhaustiveness test keeps the rules in one place and closed by default.
+- **Runner tokens owned by a person** (the brainstorm's wording) makes removing a person break runners or move their
+  tokens to someone else. A runner is a machine, so it has no person (D6).
+- **Flutter web from `apps/xp_desktop`** was rejected in the brainstorm because of URLs, history, text selection in logs,
+  accessibility and first-load size.
+
+## Success Criteria
+
+```success-criteria
+GOAL: A person signs in to the engine's own web dashboard with a one-time code, sees and does exactly what their role allows (at parity with the macOS app minus Mac-only parts), and every approval and run records that person.
+
+SUCCESS CRITERIA:
+- An existing database migrates to one admin "Owner" owning every non-runner token, and the migration golden matches | verify: cd packages/xp_adapters && dart test test/src/sqlite/migrations_test.dart
+- Role checks replace every token-kind check in the engine services and xpd routes | verify: ! grep -rnE "kind (!=|==) DeviceTokenKind\.(app|cli)" packages/xp_engine/lib apps/xpd/lib --exclude-dir=access
+- Every mutating route has a permission in the route table (the exhaustiveness test passes) | verify: cd apps/xpd && dart test test/src/api/route_permissions_test.dart
+- The API answers under /api/v1, bearer clients still reach the root aliases with a Deprecation header, and every response matches openapi.yaml | verify: melos run test:contract
+- Sign-in, CSRF, Origin, rate limit, expiry and socket closing on revocation behave as D3, D10–D15 say | verify: cd apps/xpd && dart test test/src/api/session test/src/api/csrf_middleware_test.dart test/src/api/events_route_test.dart
+- Engine, API, client and repositories stay at 100% line coverage, everything else at 90% or more | verify: melos run test:coverage
+- Layer rules still hold | verify: dart run tool/check_layers.dart
+- The web app lints, type-checks, meets D5 coverage, has an up-to-date generated client, and builds | verify: cd apps/xp_web && npm ci && npm run lint && npm run typecheck && npm run test:coverage && npm run gen:api:check && npm run build
+- The AOT xpd bundle serves the SPA at / and the API at /api/v1 | verify: tool/e2e/smoke_bundle.sh
+- Browser flows pass end to end against a real xpd: sign-in, dispatch with live logs, a releaser approving a gate, admin people management with a mid-session demotion, workflow builder | verify: tool/e2e/web_e2e.sh
+- xp and xp mcp keep working, including against the root aliases | verify: tool/e2e/quickstart_cli.sh && tool/e2e/mcp_gate_e2e.sh
+- The Dart workspace is analyzer- and format-clean | verify: dart analyze --fatal-infos && dart format --set-exit-if-changed .
+- A Mac owner opens the dashboard from the app and a Linux owner from the terminal | verify: manual 1. In the Mac app, Settings → Open dashboard; the browser opens signed in as Owner 2. On a Linux bundle, run `xpd person create --name Sam --role admin`, open http://127.0.0.1:7480/sign-in and enter the printed code 3. Both reach the projects page
+- The dashboard is usable in light and dark and on a 1280px and a 390px wide window | verify: manual 1. Toggle the OS appearance 2. Check the run page, job logs and approvals at both widths 3. No horizontal page scroll, logs scroll on their own
+
+NON-GOALS:
+- Triggers, the GitHub App, PR feedback and the `pr_from_fork` gate (Plan 1); Docker isolation and caching (Plan 3)
+- Passwords, OAuth or git-host login; email; SSO
+- TLS inside xpd
+- Mac-only parts in the web: local engine agent, CLI link, menu bar extra, Remove XPath
+- People management in the Mac app (it gets the "Open dashboard" button and the public URL field only)
+- Localization of the web app
+- Removing the root API aliases (scheduled for 1.0)
+
+VERIFICATION COMMAND: export PATH="$PWD/.fvm/flutter_sdk/bin:$HOME/.pub-cache/bin:$PATH" && dart analyze --fatal-infos && dart format --set-exit-if-changed . && dart run tool/check_layers.dart && (cd packages/xp_adapters && dart test test/src/sqlite/) && ! grep -rnE "kind (!=|==) DeviceTokenKind\.(app|cli)" packages/xp_engine/lib apps/xpd/lib --exclude-dir=access && (cd apps/xpd && dart test) && melos run test:coverage && melos run test:contract && (cd apps/xp_web && npm ci && npm run lint && npm run typecheck && npm run test:coverage && npm run gen:api:check && npm run build) && tool/e2e/smoke_bundle.sh && tool/e2e/web_e2e.sh && tool/e2e/quickstart_cli.sh && tool/e2e/mcp_gate_e2e.sh
+```
+
+## Success Metrics
+
+- Every mutating route is in the permission table (an exhaustiveness test, so the count is zero by construction).
+- An approval in the dashboard has the same steps as in the Mac app: no extra confirmation and no extra page.
+
+## Dependencies & Prerequisites
+
+- None in code. This plan comes first. Plan 1 waits for Phases 1–2 (people, roles, run origin) and Phase 4 (sessions, for the
+  check-run links that need `public_url`).
+- Node 24 LTS in CI (`actions/setup-node`) and on any Mac that runs `build_mac.sh`.
+- Migration numbers are v23–v25 if nothing else merges first. They are assigned in merge order, and their goldens are redone if
+  another branch takes a number.
+
+## Risk Analysis & Mitigation
+
+| Risk | Mitigation |
+|---|---|
+| A role mistake lets a viewer release | `AccessPolicy` is pure and tested across every role × kind × permission. The route table is exhaustive and closed by default. Phase 1 keeps today's owner behaviour (admin) bit-for-bit. |
+| Moving to `/api/v1` breaks an installed runner or `xp` | Bearer-only aliases until 1.0. The client probes and falls back. `quickstart_cli.sh`, `mcp_gate_e2e.sh` and an old-runner alias test cover it. |
+| CSRF or cross-site socket hijacking | SameSite=Strict plus `X-XPath-CSRF` plus an exact Origin set (D14, D15). Cookies are refused on aliases and on the runner socket. A test for each refusal. |
+| The cookie is not set on plain-HTTP LAN | D3 refuses sign-in with a message that names the fix (public URL behind HTTPS). The guide has the Caddy and `tailscale serve` recipes. |
+| A secret reaches the browser | The API already never returns secret values (contract tests). Uploads are write-only. A Playwright check asserts no credential bytes in any response during the admin spec. |
+| Node in a Dart repo slows CI | One `web` job with an npm cache. It runs only when the `changes` job's new `web` output is true (`apps/xp_web/**` or `openapi.yaml`), and `gate` accepts it as skipped otherwise. |
+| Screens drift from the Mac app | Phases 6–9 each name the desktop feature folder they mirror. The Playwright specs follow the desktop's flows. |
+
+## Resource Requirements
+
+- One developer. Dart for Phases 1–4, Vue and TypeScript for 5–9.
+- A Mac for `melos run test:coverage` (macOS and golden tags) and `build_mac.sh`. A Linux VM with a reverse proxy for the Phase 10
+  manual check.
+
+## Future Considerations
+
+- A git-host login (GitHub, GitLab) attached to the same `person`.
+- Removing the root aliases at 1.0.
+- Plan 1 reuses `public_url` for check-run links, `RunOrigin` for triggers, and `AccessPolicy` for `pr_from_fork` (developer).
+- People management in the Mac app, if Mac-only teams want it.
+
+## Documentation Plan
+
+- ADR 0017 (Phase 1), people and roles. It amends the 1.0 non-goal "multi-user accounts and roles" in
+  `docs/plan/2026-10-13-feat-xpath-release-tool-plan.md` and D-13's kind-based rule.
+- ADR 0018 (Phase 3), the web dashboard. It covers `/api/v1`, cookie sessions, CSRF, sockets and packaging, and amends `allowedOrigins: const []`.
+- `docs/guide/dashboard.md` (new, Phase 6), plus updates (Phase 10) to `approvals.md` (roles), `install.md` (bundles carry `web/`; Docker),
+  `runners.md` (the runner URL is not the public URL), `docs/reference/engine.md` and `clients.md` (`/api/v1`, aliases).
+- `packages/xp_api/openapi.yaml`, with the description amended for cookie auth and `/api/v1`.
+
+## References & Research
+
+### Internal References
+
+- Auth today: `apps/xpd/lib/src/api/middleware.dart:68` (`authMiddleware`), `:111` (`runnerScopeMiddleware`), `api_handler.dart:24` (`publicPaths`).
+- Kind checks to replace: `packages/xp_engine/lib/src/approvals/approval_service.dart:283,306`,
+  `releases/release_service.dart:1020`, `housekeeping/housekeeping_service.dart:268`, `runners/runner_service.dart:275`,
+  `git/github_token_service.dart:157`, `credentials/credential_service.dart:858`, `apps/xpd/lib/src/api/tokens/tokens_routes.dart:31`.
+- Tokens: `packages/xp_engine/lib/src/tokens/token_service.dart`, `packages/xp_api/lib/src/device_token_kind.dart`, schema `migrations.dart:37`.
+- Approval attribution: `packages/xp_api/lib/src/approval.dart:38` (`DecidedBy`).
+- Settings: `packages/xp_engine/lib/src/runners/runner_service.dart:43` (`runner_url` in `engine_setting`).
+- Server and sockets: `apps/xpd/lib/src/server/xpd_server.dart`, `api/events_route.dart`, `api/jobs/job_logs_route.dart`.
+- Client URL building: `packages/xp_client/lib/src/xp_client.dart:992` (`_uri`).
+- Packaging: `tool/release/bundles.sh`, `tool/release/build_mac.sh`, `Dockerfile`, `.github/workflows/{gate.yaml,release.yml}`.
+- Design tokens: `docs/design/system/project/assets/Handoff/xp-tokens.css`.
+- House rules: the `xpath-contributing` skill (layers, coverage, migrations with goldens, contract tests, ADRs).
+
+### External References
+
+- OWASP Session Management: https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html
+- OWASP CSRF Prevention: https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html
+- OWASP WebSocket Security: https://cheatsheetseries.owasp.org/cheatsheets/WebSocket_Security_Cheat_Sheet.html
+- `Set-Cookie`, Secure on localhost: https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Set-Cookie
+- Safari and Secure cookies on loopback (open): https://bugs.webkit.org/show_bug.cgi?id=232088
+- openapi-fetch: https://openapi-ts.dev/openapi-fetch/
+- Vitest coverage config: https://vitest.dev/config/coverage
+- Woodpecker (cookie + CSRF + SSE) and Concourse (cookie + `X-Csrf-Token`), from the brainstorm's prior art.
+
+### Related Work
+
+- Brainstorm: `docs/brainstorm/2026-11-12-ci-triggers-web-dashboard-containers-brainstorm-doc.md`.
+- ADR 0011 (runner token scope), ADR 0015 (projects on any git host).
