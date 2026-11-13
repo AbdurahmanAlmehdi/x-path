@@ -28,10 +28,13 @@ and role. Each mutating action needs a permission, and each permission a minimum
 
 | Permission | Min role | What |
 |---|---|---|
-| `develop` | developer | dispatch, run again, cancel, resume, scan, tests, workflows, pins |
+| `develop` | developer | dispatch, run again, cancel, resume, adding and editing projects, scan, tests, workflows, pins, the gated release requests (store refresh, new build, merge, rollout, patch moves) |
 | `decideApproval` | releaser | approve or deny a gate |
-| `release` | releaser | release actions, release texts, store status, turning a gate on |
-| `administer` | admin | turning a gate off, projects, credentials, certificates, the GitHub token, runners, storage, the public URL, people, others' tokens |
+| `release` | releaser | abandoning a release, release texts, store status, turning a gate on |
+| `administer` | admin | turning a gate off, removing projects, credentials, certificates, the GitHub token, runners, storage, the public URL, people, others' tokens |
+
+Adding and editing a project and the gated release requests need only `develop`, so an agent
+keeps doing what it does today; a gated request still waits for a releaser's approval.
 
 The kind rules apply on top of the role:
 

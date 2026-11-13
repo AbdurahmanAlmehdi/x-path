@@ -104,6 +104,43 @@ void main() {
       );
     });
 
+    test('an agent of a developer adds and changes a project, and only an '
+        'admin removes one', () async {
+      final fresh = await TestEngine.start();
+      addTearDown(fresh.close);
+      fresh.folders['/work/app'] = projectFiles;
+      final agent = await fresh.tokenFor(
+        PersonRole.developer,
+        kind: DeviceTokenKind.mcp,
+      );
+
+      final added = await fresh.request(
+        '/projects',
+        method: 'POST',
+        token: agent,
+        body: '{"path": "/work/app"}',
+      );
+      expect(added.statusCode, 201, reason: added.body);
+      final path = '/projects/${added.json['id']}';
+      final changed = await fresh.request(
+        path,
+        method: 'PATCH',
+        token: agent,
+        body: '{"defaultBaseBranch": "dev"}',
+      );
+      expect(changed.statusCode, 200, reason: changed.body);
+      final removed = await fresh.request(
+        path,
+        method: 'DELETE',
+        token: await fresh.tokenFor(PersonRole.releaser),
+      );
+      expect(removed.statusCode, 403);
+      expect(
+        ErrorResponse.fromJson(removed.json).error.message,
+        contains('cannot remove a project: it takes the admin role'),
+      );
+    });
+
     test(
       'a viewer still reads, and checks a workflow it cannot save',
       () async {

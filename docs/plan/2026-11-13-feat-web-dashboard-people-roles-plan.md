@@ -89,10 +89,14 @@ the role named or higher.
 
 | Permission | Min role | Routes / actions |
 |---|---|---|
-| `develop` | developer | workflow dispatch, run again, rerun failed, cancel run/job, resume job, project scan, run tests, baseline, create/update/delete project workflows, pin/unpin artifacts |
+| `develop` | developer | workflow dispatch, run again, rerun failed, cancel run/job, resume job, add/update a project, project scan, run tests, baseline, create/update/delete project workflows, pin/unpin artifacts, and the gated release requests (store refresh, new build, merge, rollout, patch moves), whose gate approval needs a releaser |
 | `decideApproval` | releaser | approve/deny any gate. Kept separate because Plan 1 lowers `pr_from_fork` to developer |
-| `release` | releaser | release merge, rollout, abandon, patch actions, notes/texts, store refresh, turn a gate on |
-| `administer` | admin | turn a gate off (also needs an `app` or `web` token; today only `app`), add/remove projects, credentials, distribution certificates, GitHub token, runners (pairing, revoke, runner URL), storage (free, retention), public URL, people, sign-in codes for others, others' tokens |
+| `release` | releaser | abandon a release, notes/texts, store status, turn a gate on |
+| `administer` | admin | turn a gate off (also needs an `app` or `web` token; today only `app`), remove projects, credentials, distribution certificates, GitHub token, runners (pairing, revoke, runner URL), storage (free, retention), public URL, people, sign-in codes for others, others' tokens |
+
+The owner confirmed two rows on 2026-11-14: adding and updating a project need `develop`, so `xp mcp`'s `add_project`
+and `update_project` keep working for agents, and the gated release requests need `develop` because the gate's approval
+(releaser or higher) is the control.
 
 Kind rules apply on top of roles:
 - `mcp` tokens never decide approvals or change gates.

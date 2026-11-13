@@ -30,9 +30,11 @@ const unlistedRouteAccess = RouteAccess.needs(
 /// A test walks the router and fails on a mutating route missing here; one
 /// that is missing all the same needs [unlistedRouteAccess].
 const routePermissions = <String, RouteAccess>{
-  // Projects.
-  'POST /projects': .needs(Permission.administer, 'add a project'),
-  'PATCH /projects/<id>': .needs(Permission.administer, 'change a project'),
+  // Projects. Adding and editing a project need `develop`, so an agent may
+  // still add and update projects (as `xp mcp`'s `add_project` and
+  // `update_project` do); removing one stays an admin's.
+  'POST /projects': .needs(Permission.develop, 'add a project'),
+  'PATCH /projects/<id>': .needs(Permission.develop, 'change a project'),
   'DELETE /projects/<id>': .needs(Permission.administer, 'remove a project'),
   'POST /projects/<id>/scan': .needs(Permission.develop, 'scan a project'),
   'PUT /projects/<id>/gates': .needs(
