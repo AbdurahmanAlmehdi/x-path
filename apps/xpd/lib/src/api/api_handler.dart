@@ -1,7 +1,7 @@
 import 'package:shelf/shelf.dart';
-import 'package:shelf_router/shelf_router.dart';
 import 'package:xp_api/xp_api.dart';
 import 'package:xp_engine/xp_engine.dart';
+import 'package:xpd/src/api/api_router.dart';
 import 'package:xpd/src/api/approvals/approvals_routes.dart';
 import 'package:xpd/src/api/artifacts/artifacts_routes.dart';
 import 'package:xpd/src/api/credentials/credentials_routes.dart';
@@ -10,12 +10,15 @@ import 'package:xpd/src/api/github/github_token_routes.dart';
 import 'package:xpd/src/api/jobs/job_logs_route.dart';
 import 'package:xpd/src/api/jobs/jobs_routes.dart';
 import 'package:xpd/src/api/middleware.dart';
+import 'package:xpd/src/api/people/people_routes.dart';
+import 'package:xpd/src/api/permission_middleware.dart';
 import 'package:xpd/src/api/projects/projects_routes.dart';
 import 'package:xpd/src/api/releases/releases_routes.dart';
 import 'package:xpd/src/api/responses.dart';
 import 'package:xpd/src/api/runners/runner_connect_route.dart';
 import 'package:xpd/src/api/runners/runners_routes.dart';
 import 'package:xpd/src/api/runs/runs_routes.dart';
+import 'package:xpd/src/api/session/me_routes.dart';
 import 'package:xpd/src/api/storage/storage_routes.dart';
 import 'package:xpd/src/api/system_routes.dart';
 import 'package:xpd/src/api/tests/tests_routes.dart';
@@ -27,12 +30,15 @@ import 'package:xpd/src/api/workflows/workflows_routes.dart';
 /// token for a credential.
 const publicPaths = {'/health', '/version', '/runners/pair'};
 
-/// The whole HTTP API of the engine as one shelf handler.
+/// The whole HTTP API of the engine as one shelf handler, and the routes it
+/// serves.
 ///
-/// Every route but [publicPaths] needs a device token. [onError] hears about
-/// exceptions that became `500` responses.
-Handler buildApiHandler({
+/// Every route but [publicPaths] needs a device token, and every mutating
+/// route the permission `route_permissions.dart` names for it. [onError]
+/// hears about exceptions that became `500` responses.
+({Handler handler, List<ApiRoute> routes}) buildApiHandler({
   required TokenService tokens,
+  required PersonService people,
   required EventsRoute events,
   required ProjectService projects,
   required JobControl jobs,
@@ -60,7 +66,7 @@ Handler buildApiHandler({
   void Function(String address, String why)? onRunnerRefused,
 }) {
   final router =
-      Router(
+      ApiRouter(
           notFoundHandler: (request) => errorResponse(
             ApiErrorCode.notFound,
             'No route for ${request.method} ${request.requestedUri.path}.',
@@ -86,10 +92,14 @@ Handler buildApiHandler({
   StorageRoutes(housekeeping).addTo(router);
   RunnersRoutes(runners, runnerArtifacts, runnerBundles).addTo(router);
   TokensRoutes(tokens).addTo(router);
-  return const Pipeline()
+  PeopleRoutes(people).addTo(router);
+  const MeRoutes().addTo(router);
+  final handler = const Pipeline()
       .addMiddleware(errorMiddleware(onError: onError))
       .addMiddleware(runnerRefusalMiddleware(onRunnerRefused ?? (_, _) {}))
       .addMiddleware(authMiddleware(tokens, publicPaths: publicPaths))
       .addMiddleware(runnerScopeMiddleware())
+      .addMiddleware(permissionMiddleware(router.routes))
       .addHandler(router.call);
+  return (handler: handler, routes: router.routes);
 }

@@ -288,8 +288,8 @@ class TestEngine {
       ),
       events: events,
       clock: clock,
-      dispatch: (projectId, workflowId, request) =>
-          dispatcher.dispatch(projectId, workflowId, request),
+      dispatch: (projectId, workflowId, request, {origin}) =>
+          dispatcher.dispatch(projectId, workflowId, request, origin: origin),
     );
     dispatcher = WorkflowDispatcher(
       workflows: workflows,
@@ -384,6 +384,7 @@ class TestEngine {
     final appStoreConnect = FakeAppStoreConnect();
     final server = await XpdServer.start(
       tokens: tokens,
+      people: PersonService(people: people, tokens: tokens, clock: clock),
       events: events,
       projects: ProjectService(
         repository: projects,
@@ -625,6 +626,26 @@ class TestEngine {
   final List<Object> errors;
 
   Uri get uri => server.uri;
+
+  /// The secret of a new [kind] token of the person with [role], called
+  /// after the role (`per_viewer`, ...), whom it adds the first time.
+  Future<String> tokenFor(
+    PersonRole role, {
+    DeviceTokenKind kind = DeviceTokenKind.cli,
+  }) async {
+    final id = 'per_${role.name}';
+    if (await people.get(id) == null) {
+      await people.add(
+        Person(id: id, name: role.name, role: role, createdAt: clock.now()),
+      );
+    }
+    final issued = await tokens.issue(
+      name: kind.name,
+      kind: kind,
+      personId: id,
+    );
+    return issued.secret;
+  }
 
   Future<void> close() => server.close();
 

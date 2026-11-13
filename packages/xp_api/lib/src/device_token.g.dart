@@ -42,6 +42,18 @@ Map<String, dynamic> _$TokenInfoToJson(TokenInfo instance) => <String, dynamic>{
   'personId': ?instance.personId,
 };
 
+TokensResponse _$TokensResponseFromJson(Map<String, dynamic> json) =>
+    TokensResponse(
+      (json['tokens'] as List<dynamic>)
+          .map((e) => TokenInfo.fromJson(e as Map<String, dynamic>))
+          .toList(),
+    );
+
+Map<String, dynamic> _$TokensResponseToJson(TokensResponse instance) =>
+    <String, dynamic>{
+      'tokens': instance.tokens.map((e) => e.toJson()).toList(),
+    };
+
 CreatedToken _$CreatedTokenFromJson(Map<String, dynamic> json) => CreatedToken(
   info: TokenInfo.fromJson(json['info'] as Map<String, dynamic>),
   token: json['token'] as String,

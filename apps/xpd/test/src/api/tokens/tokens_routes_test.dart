@@ -110,6 +110,74 @@ void main() {
     });
   });
 
+  group('GET /tokens', () {
+    test("lists the admin's app token everyone's valid tokens, never a "
+        "runner's or a secret", () async {
+      final sam = await engine.tokenFor(PersonRole.developer);
+
+      final response = await send('GET', '/tokens');
+
+      expect(response.statusCode, 200);
+      final tokens = TokensResponse.fromJson(response.json).tokens;
+      expect(
+        [for (final token in tokens) (token.name, token.kind)],
+        [
+          ('test', DeviceTokenKind.app),
+          ('cli token', DeviceTokenKind.cli),
+          ('mcp token', DeviceTokenKind.mcp),
+          ('cli', DeviceTokenKind.cli),
+        ],
+      );
+      expect(tokens.last.personId, 'per_developer');
+      expect(response.body, isNot(contains(sam)));
+    });
+
+    test('lists anyone else their own', () async {
+      final response = await engine.request(
+        '/tokens',
+        token: await engine.tokenFor(PersonRole.developer),
+      );
+
+      final tokens = TokensResponse.fromJson(response.json).tokens;
+      expect(tokens.single.personId, 'per_developer');
+    });
+  });
+
+  group('DELETE /tokens/{id}', () {
+    Future<String> idOf(String secret) async =>
+        (await engine.tokens.authenticate(secret))!.id;
+
+    test('revokes a token of your own person', () async {
+      final cli = secrets[DeviceTokenKind.cli]!;
+
+      final response = await send(
+        'DELETE',
+        '/tokens/${await idOf(cli)}',
+        kind: DeviceTokenKind.cli,
+      );
+
+      expect(response.statusCode, 204);
+      expect(await engine.tokens.authenticate(cli), isNull);
+    });
+
+    test("lets an admin revoke anyone's, and others only their own", () async {
+      final sam = await engine.tokenFor(PersonRole.developer);
+      final samId = await idOf(sam);
+
+      final refused = await engine.request(
+        '/tokens/${await idOf(engine.secret)}',
+        method: 'DELETE',
+        token: sam,
+      );
+      expect(refused.statusCode, 404);
+      expect(errorOf(refused).error.code, ApiErrorCode.notFound);
+
+      expect((await send('DELETE', '/tokens/$samId')).statusCode, 204);
+      expect(await engine.tokens.authenticate(sam), isNull);
+      expect((await send('DELETE', '/tokens/$samId')).statusCode, 404);
+    });
+  });
+
   test('GET /status names the token that asks, never its secret, and the '
       'secrets', () async {
     final response = await send('GET', '/status', kind: DeviceTokenKind.mcp);

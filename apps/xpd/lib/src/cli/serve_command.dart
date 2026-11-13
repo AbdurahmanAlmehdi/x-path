@@ -500,8 +500,8 @@ class ServeCommand extends XpdCommand {
         ),
         events: events,
         clock: const SystemClock(),
-        dispatch: (projectId, workflowId, request) =>
-            dispatcher.dispatch(projectId, workflowId, request),
+        dispatch: (projectId, workflowId, request, {origin}) =>
+            dispatcher.dispatch(projectId, workflowId, request, origin: origin),
       );
       dispatcher = WorkflowDispatcher(
         workflows: workflows,
@@ -562,9 +562,10 @@ class ServeCommand extends XpdCommand {
       );
       // Runners dial out (D-08): the hub holds their connections and leases,
       // places jobs on them through the scheduler, and cancels theirs.
+      final personRepository = SqlitePersonRepository(database);
       final tokenService = TokenService(
         tokens: SqliteDeviceTokenRepository(database),
-        people: SqlitePersonRepository(database),
+        people: personRepository,
         clock: const SystemClock(),
       );
       // The runners' comings and goings go to the engine log.
@@ -621,6 +622,11 @@ class ServeCommand extends XpdCommand {
       );
       final server = await XpdServer.start(
         tokens: tokenService,
+        people: PersonService(
+          people: personRepository,
+          tokens: tokenService,
+          clock: const SystemClock(),
+        ),
         events: events,
         projects: projects,
         jobs: scheduler,

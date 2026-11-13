@@ -1,32 +1,6 @@
 import 'package:xp_api/xp_api.dart';
 import 'package:xp_engine/src/tokens/device_token.dart';
 
-/// What a mutating action needs (ADR 0017). Reading needs nothing beyond a
-/// token.
-enum Permission {
-  /// Dispatch, run again, cancel and resume, scan, run tests, edit
-  /// workflows, pin artifacts.
-  develop(PersonRole.developer),
-
-  /// Approve or deny any gate. Separate from [release] because a trigger
-  /// may lower one gate to developers.
-  decideApproval(PersonRole.releaser),
-
-  /// Drive releases: merge, rollout, abandon, patch, texts, store refresh,
-  /// turning a gate on.
-  release(PersonRole.releaser),
-
-  /// Change the engine: turning a gate off, projects, credentials,
-  /// certificates, the GitHub token, runners, storage, the public URL,
-  /// people and others' tokens.
-  administer(PersonRole.admin);
-
-  new(this.minimumRole);
-
-  /// The lowest role that has the permission.
-  final PersonRole minimumRole;
-}
-
 /// Who may do what: the one place that reads a token's kind and role to
 /// decide (ADR 0017).
 ///
@@ -54,6 +28,13 @@ abstract final class AccessPolicy {
   /// Whether [token] has [permission].
   static bool allows(DeviceToken token, Permission permission) =>
       _kindAllows(token.kind, permission) && _roleAllows(token, permission);
+
+  /// Every permission [token] has, in the order of [Permission.values]:
+  /// what `GET /me` answers (D16).
+  static List<Permission> permissionsOf(DeviceToken token) => [
+    for (final permission in Permission.values)
+      if (allows(token, permission)) permission,
+  ];
 
   /// Why [token] lacks [permission], as an answer to the owner who tried to
   /// [what]; `null` if it has it.

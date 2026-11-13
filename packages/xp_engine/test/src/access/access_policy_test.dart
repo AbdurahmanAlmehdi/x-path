@@ -161,6 +161,24 @@ void main() {
     });
   });
 
+  group('AccessPolicy.permissionsOf', () {
+    test('lists what the token may do, in order', () {
+      expect(AccessPolicy.permissionsOf(_token(_web, PersonRole.admin)), [
+        Permission.develop,
+        Permission.decideApproval,
+        Permission.release,
+        Permission.administer,
+      ]);
+      expect(AccessPolicy.permissionsOf(_token(_mcp, PersonRole.admin)), [
+        Permission.develop,
+      ]);
+      expect(
+        AccessPolicy.permissionsOf(_token(_cli, PersonRole.viewer)),
+        isEmpty,
+      );
+    });
+  });
+
   test('each permission needs the role of the matrix', () {
     expect(
       {for (final p in Permission.values) p: p.minimumRole},

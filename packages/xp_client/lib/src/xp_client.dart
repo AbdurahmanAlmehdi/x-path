@@ -625,6 +625,66 @@ class XpClient {
     ),
   );
 
+  /// `GET /tokens`: the valid tokens of the person this client's token
+  /// belongs to, or everyone's for an admin's app token; never a secret.
+  Future<List<TokenInfo>> listTokens() async =>
+      TokensResponse.fromJson(await _json(await _send('GET', ['tokens'])))
+          .tokens;
+
+  /// `DELETE /tokens/{id}`: revokes a token of this client's person, or
+  /// anyone's for an admin.
+  Future<void> revokeToken(String id) async {
+    await _send('DELETE', ['tokens', id]);
+  }
+
+  // ---------------------------------------------------------------- people
+
+  /// `GET /me`: the person this client's token belongs to, and what it may
+  /// do.
+  Future<Me> me() async => Me.fromJson(await _json(await _send('GET', ['me'])));
+
+  /// `GET /people`: everyone, removed people included, oldest first.
+  Future<List<Person>> listPeople() async =>
+      PeopleResponse.fromJson(await _json(await _send('GET', ['people'])))
+          .people;
+
+  /// `GET /people/{id}`.
+  Future<Person> getPerson(String id) async =>
+      Person.fromJson(await _json(await _send('GET', ['people', id])));
+
+  /// `POST /people`: adds a person called [name] with [role]. Admins only.
+  Future<Person> createPerson({
+    required String name,
+    required PersonRole role,
+  }) async => Person.fromJson(
+    await _json(
+      await _send('POST', [
+        'people',
+      ], body: CreatePersonRequest(name: name, role: role).toJson()),
+    ),
+  );
+
+  /// `PATCH /people/{id}`: renames the person, changes their role, or both.
+  /// Admins only; the last admin cannot be demoted (`409`).
+  Future<Person> updatePerson(
+    String id, {
+    String? name,
+    PersonRole? role,
+  }) async => Person.fromJson(
+    await _json(
+      await _send('PATCH', [
+        'people',
+        id,
+      ], body: UpdatePersonRequest(name: name, role: role).toJson()),
+    ),
+  );
+
+  /// `DELETE /people/{id}`: removes the person and revokes their tokens.
+  /// Admins only; the last admin cannot be removed (`409`).
+  Future<void> removePerson(String id) async {
+    await _send('DELETE', ['people', id]);
+  }
+
   /// `GET /status`: the token this client holds, without its secret, and
   /// whether the engine can reach its secrets.
   Future<StatusResponse> status() async =>

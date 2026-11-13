@@ -11,6 +11,13 @@ info:
     `Authorization: Bearer <token>`. Errors are always
     `{"error": {"code": "...", "message": "..."}}`.
 
+    Every token but a runner's belongs to a person, whose role (`viewer` <
+    `developer` < `releaser` < `admin`) decides what it may change
+    (ADR 0017): any token reads; a route that changes something needs a
+    permission (`develop`, `decide_approval`, `release` or `administer`), and
+    answers `403 forbidden` otherwise. An `mcp` token may only `develop`.
+    `GET /me` says what the token that asks may do.
+
     A token of kind `runner` (a paired runner's credential) reaches only the
     three routes made for runners: `GET /runners/connect`,
     `GET /runners/bundle` and
@@ -156,6 +163,8 @@ paths:
           $ref: "#/components/responses/InvalidRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
         "409":
@@ -211,6 +220,8 @@ paths:
           $ref: "#/components/responses/InvalidRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
         "500":
@@ -227,6 +238,8 @@ paths:
           description: The project is gone.
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
         "409":
@@ -253,6 +266,8 @@ paths:
                 $ref: "#/components/schemas/Project"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
         "502":
@@ -301,6 +316,8 @@ paths:
                 $ref: "#/components/schemas/Job"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
         "409":
@@ -344,6 +361,8 @@ paths:
           $ref: "#/components/responses/InvalidRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
         "409":
@@ -490,6 +509,8 @@ paths:
                 $ref: "#/components/schemas/Artifact"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
         "500":
@@ -510,6 +531,8 @@ paths:
                 $ref: "#/components/schemas/Artifact"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
         "500":
@@ -1211,6 +1234,8 @@ paths:
           $ref: "#/components/responses/InvalidRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
         "409":
@@ -1369,6 +1394,8 @@ paths:
           $ref: "#/components/responses/InvalidRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
         "409":
@@ -1402,6 +1429,8 @@ paths:
           $ref: "#/components/responses/InvalidRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
         "409":
@@ -1419,6 +1448,8 @@ paths:
           description: The workflow is gone.
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
         "409":
@@ -1483,6 +1514,8 @@ paths:
           $ref: "#/components/responses/InvalidRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
         "409":
@@ -1598,6 +1631,8 @@ paths:
                 $ref: "#/components/schemas/Run"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
         "422":
@@ -1628,6 +1663,8 @@ paths:
                 $ref: "#/components/schemas/Run"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
         "409":
@@ -1653,6 +1690,8 @@ paths:
                 $ref: "#/components/schemas/Run"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
         "409":
@@ -1925,6 +1964,8 @@ paths:
                 $ref: "#/components/schemas/Release"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
         "500":
@@ -1991,6 +2032,8 @@ paths:
                 $ref: "#/components/schemas/Run"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
         "409":
@@ -2025,6 +2068,8 @@ paths:
                 $ref: "#/components/schemas/Run"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
         "409":
@@ -2458,9 +2503,30 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
   /tokens:
+    get:
+      operationId: listTokens
+      summary: The valid tokens of the person that asks; an admin's, everyone's.
+      description: |
+        Never a secret, and never a runner's token: a runner's token is
+        revoked with the runner (D17). An admin's `app`, `cli` or `web`
+        token sees the tokens of every person; any other token those of its
+        own person.
+      responses:
+        "200":
+          description: The tokens, oldest first.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TokensResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/InternalError"
     post:
       operationId: createToken
-      summary: Make a token for `xp` or `xp mcp`. Only `app` tokens may.
+      summary: Make a token for `xp` or `xp mcp`. Only `app` and `web` tokens may.
       description: |
         The app makes the token of the CLI or of an agent (U5b), so
         connecting `xp` needs no access to the `xpd` binary. `kind` is
@@ -2487,6 +2553,180 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /tokens/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+    delete:
+      operationId: revokeToken
+      summary: Revoke a token of the person that asks; an admin, anyone's.
+      description: |
+        The token stops working at once. A token the asker may not see
+        (`GET /tokens`), or one revoked already, answers `404`.
+      responses:
+        "204":
+          description: Revoked.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /me:
+    get:
+      operationId: getMe
+      summary: The person the token belongs to, and what it may do.
+      description: |
+        A client hides what the token may not do, and never decides it
+        itself (D16). `permissions` takes the token's kind into account: an
+        admin's `mcp` token may only `develop`. Never cached.
+      responses:
+        "200":
+          description: Who asks.
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+                const: no-store
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Me"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /people:
+    get:
+      operationId: listPeople
+      summary: Everyone who uses the engine, removed people included.
+      responses:
+        "200":
+          description: The people, oldest first.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PeopleResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/InternalError"
+    post:
+      operationId: createPerson
+      summary: Add a person with a role. Admins only.
+      description: |
+        Two active people never share a name, ignoring case (`409`).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePersonRequest"
+      responses:
+        "201":
+          description: The person added.
+          headers:
+            Location:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Person"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /people/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      operationId: getPerson
+      summary: One person, removed or not.
+      responses:
+        "200":
+          description: The person.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Person"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+    patch:
+      operationId: updatePerson
+      summary: Rename an active person or change their role. Admins only.
+      description: |
+        A new role applies to the person's next request. Demoting the last
+        admin answers `409`, as does a name another active person has.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdatePersonRequest"
+      responses:
+        "200":
+          description: The person as they are now.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Person"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "500":
+          $ref: "#/components/responses/InternalError"
+    delete:
+      operationId: removePerson
+      summary: Remove an active person and revoke their tokens. Admins only.
+      description: |
+        The person stays, marked removed, so approvals and runs keep their
+        name. Removing the last admin answers `409`.
+      responses:
+        "204":
+          description: Removed.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
         "500":
           $ref: "#/components/responses/InternalError"
   /status:
@@ -3028,8 +3268,9 @@ components:
             $ref: "#/components/schemas/ErrorResponse"
     Forbidden:
       description: |
-        The token is valid but its kind may not do this (D-13). The message
-        says what the kind may do.
+        The token is valid but may not do this: its kind (D-13) or its
+        person's role (ADR 0017) does not allow it. The message says what it
+        takes.
       content:
         application/json:
           schema:
@@ -4354,6 +4595,8 @@ components:
             $ref: "#/components/schemas/RunJob"
         request:
           $ref: "#/components/schemas/DispatchRequest"
+        origin:
+          $ref: "#/components/schemas/RunOrigin"
     RunsResponse:
       type: object
       required: [runs]
@@ -4703,6 +4946,104 @@ components:
           type: string
           pattern: "^xpt_"
           description: The bearer secret. Shown here only, never again.
+      additionalProperties: false
+    TokensResponse:
+      type: object
+      required: [tokens]
+      properties:
+        tokens:
+          type: array
+          items:
+            $ref: "#/components/schemas/TokenInfo"
+      additionalProperties: false
+    PersonRole:
+      type: string
+      enum: [viewer, developer, releaser, admin]
+      description: Each role may do everything the roles before it may (ADR 0017).
+    Person:
+      type: object
+      required: [id, name, role, createdAt]
+      properties:
+        id:
+          type: string
+          pattern: "^per_"
+        name:
+          type: string
+        role:
+          $ref: "#/components/schemas/PersonRole"
+        createdAt:
+          type: string
+          format: date-time
+        removedAt:
+          type: string
+          format: date-time
+          description: When the person was removed; absent while they are active.
+      additionalProperties: false
+    PeopleResponse:
+      type: object
+      required: [people]
+      properties:
+        people:
+          type: array
+          items:
+            $ref: "#/components/schemas/Person"
+      additionalProperties: false
+    CreatePersonRequest:
+      type: object
+      required: [name, role]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 80
+        role:
+          $ref: "#/components/schemas/PersonRole"
+      additionalProperties: false
+    UpdatePersonRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 80
+        role:
+          $ref: "#/components/schemas/PersonRole"
+      additionalProperties: false
+    Permission:
+      type: string
+      enum: [develop, decide_approval, release, administer]
+      description: What a change needs (ADR 0017).
+    Me:
+      type: object
+      required: [person, token, permissions]
+      properties:
+        person:
+          $ref: "#/components/schemas/Person"
+        token:
+          $ref: "#/components/schemas/TokenInfo"
+        permissions:
+          type: array
+          items:
+            $ref: "#/components/schemas/Permission"
+      additionalProperties: false
+    RunOrigin:
+      type: object
+      description: |
+        Who started a run (ADR 0017): a person, or an agent through `xp mcp`
+        on behalf of a person, as they were then.
+      required: [kind]
+      properties:
+        kind:
+          type: string
+          enum: [person, agent]
+        tokenId:
+          type: string
+          pattern: "^tok_"
+        personId:
+          type: string
+          pattern: "^per_"
+        personName:
+          type: string
       additionalProperties: false
     StatusResponse:
       type: object

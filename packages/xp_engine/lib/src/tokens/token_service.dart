@@ -4,6 +4,7 @@ import 'dart:math';
 import 'package:crypto/crypto.dart';
 import 'package:equatable/equatable.dart';
 import 'package:xp_api/xp_api.dart';
+import 'package:xp_engine/src/access/access_policy.dart';
 import 'package:xp_engine/src/clock/clock.dart';
 import 'package:xp_engine/src/people/person_repository.dart';
 import 'package:xp_engine/src/repositories/device_token_repository.dart';
@@ -29,6 +30,21 @@ class IssuedToken extends Equatable {
 
   @override
   List<Object?> get props => [token, secret];
+}
+
+/// There is no valid token [id] that the asker may see.
+class TokenNotFoundException implements Exception {
+  /// Creates the exception for [id].
+  const new(this.id);
+
+  /// The id that was asked for.
+  final String id;
+
+  /// What went wrong, for the owner.
+  String get message => 'There is no token $id.';
+
+  @override
+  String toString() => 'TokenNotFoundException: $message';
 }
 
 /// Issues device tokens and tells which token a bearer secret belongs to.
@@ -120,6 +136,34 @@ class TokenService {
     final person = await _people.get(personId);
     if (person == null || person.isRemoved) return null;
     return match.withPerson(person);
+  }
+
+  /// The valid tokens [asker] may see, in the order they were stored (D17):
+  /// those of its own person, or every person's for a token that may
+  /// [Permission.administer]. Runner tokens are never among them: a runner's
+  /// token is revoked with the runner.
+  Future<List<DeviceToken>> listFor(DeviceToken asker) async {
+    final everyone = AccessPolicy.allows(asker, Permission.administer);
+    return [
+      for (final token in await _tokens.list())
+        if (!token.isRevoked &&
+            token.personId != null &&
+            (everyone || token.personId == asker.personId))
+          token,
+    ];
+  }
+
+  /// Revokes the token [id] for [asker], who may revoke the tokens it may
+  /// see ([listFor]).
+  ///
+  /// Throws a [TokenNotFoundException] for a token [asker] may not see, or
+  /// one that is not valid.
+  Future<void> revokeFor(DeviceToken asker, String id) async {
+    final visible = await listFor(asker);
+    if (!visible.any((token) => token.id == id)) {
+      throw TokenNotFoundException(id);
+    }
+    await revoke(id);
   }
 
   /// Revokes the token [id]: it no longer authenticates. Returns whether it

@@ -1,7 +1,7 @@
 import 'package:shelf/shelf.dart';
-import 'package:shelf_router/shelf_router.dart';
 import 'package:xp_api/xp_api.dart';
 import 'package:xp_engine/xp_engine.dart';
+import 'package:xpd/src/api/api_router.dart';
 import 'package:xpd/src/api/middleware.dart';
 import 'package:xpd/src/api/request_body.dart';
 import 'package:xpd/src/api/responses.dart';
@@ -21,7 +21,7 @@ class ApprovalsRoutes {
   final ApprovalService _approvals;
 
   /// Registers the routes on [router].
-  void addTo(Router router) {
+  void addTo(ApiRouter router) {
     router
       ..get('/approvals', _list)
       ..get('/approvals/<id>', _get)

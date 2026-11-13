@@ -1,7 +1,8 @@
 import 'package:shelf/shelf.dart';
-import 'package:shelf_router/shelf_router.dart';
 import 'package:xp_api/xp_api.dart';
 import 'package:xp_engine/xp_engine.dart';
+import 'package:xpd/src/api/api_router.dart';
+import 'package:xpd/src/api/middleware.dart';
 import 'package:xpd/src/api/responses.dart';
 import 'package:xpd/src/api/workflows/workflows_routes.dart';
 
@@ -17,7 +18,7 @@ class RunsRoutes {
   final WorkflowDispatcher _dispatcher;
 
   /// Registers the routes on [router].
-  void addTo(Router router) {
+  void addTo(ApiRouter router) {
     router
       ..get('/runs', _list)
       ..get('/projects/<id>/runs', _listOfProject)
@@ -82,7 +83,10 @@ class RunsRoutes {
   /// dispatch does.
   Future<Response> _again(Request request, String id) =>
       guardWorkflows(() async {
-        final run = await _dispatcher.again(id);
+        final run = await _dispatcher.again(
+          id,
+          origin: deviceTokenOf(request).runOrigin,
+        );
         return jsonResponse(
           run.toJson(),
           statusCode: 202,

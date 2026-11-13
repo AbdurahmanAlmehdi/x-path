@@ -4,13 +4,14 @@ import 'package:shelf/shelf_io.dart' as shelf_io;
 import 'package:xp_api/xp_api.dart';
 import 'package:xp_engine/xp_engine.dart';
 import 'package:xpd/src/api/api_handler.dart';
+import 'package:xpd/src/api/api_router.dart';
 import 'package:xpd/src/api/events_route.dart';
 import 'package:xpd/src/api/jobs/job_logs_route.dart';
 import 'package:xpd/src/api/runners/runner_connect_route.dart';
 
 /// A running engine HTTP server.
 class XpdServer {
-  new _(this._http, this._route, this._logRoute, this._runnerRoute)
+  new _(this._http, this._route, this._logRoute, this._runnerRoute, this.routes)
     : uri = Uri(scheme: 'http', host: _http.address.host, port: _http.port);
 
   /// Binds [host]:[port] (port 0 picks a free one) and starts serving.
@@ -19,6 +20,7 @@ class XpdServer {
   /// binding another address exposes the engine to the network.
   static Future<XpdServer> start({
     required TokenService tokens,
+    required PersonService people,
     required EventLog events,
     required ProjectService projects,
     required JobControl jobs,
@@ -51,8 +53,9 @@ class XpdServer {
     final route = EventsRoute(events: events, clock: clock);
     final logRoute = JobLogsRoute(jobs: jobs, logs: logs);
     final runnerRoute = RunnerConnectRoute(runners: runners, hub: runnerHub);
-    final handler = buildApiHandler(
+    final api = buildApiHandler(
       tokens: tokens,
+      people: people,
       events: route,
       projects: projects,
       jobs: jobs,
@@ -79,11 +82,11 @@ class XpdServer {
       onError: onError,
       onRunnerRefused: onRunnerRefused,
     );
-    final http = await shelf_io.serve(handler, host, port);
+    final http = await shelf_io.serve(api.handler, host, port);
     events.append(
       EngineStarted(version: engineVersion, apiVersion: apiVersion),
     );
-    return ._(http, route, logRoute, runnerRoute);
+    return ._(http, route, logRoute, runnerRoute, api.routes);
   }
 
   final HttpServer _http;
@@ -93,6 +96,9 @@ class XpdServer {
 
   /// The address clients connect to, for example `http://127.0.0.1:7480`.
   final Uri uri;
+
+  /// Every route the API serves, in the order they were registered.
+  final List<ApiRoute> routes;
 
   /// Stops accepting connections and closes every event, log and runner
   /// stream with code 1000 (normal closure).

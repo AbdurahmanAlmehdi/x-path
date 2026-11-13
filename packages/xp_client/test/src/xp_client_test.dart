@@ -43,6 +43,19 @@ final _createdToken = CreatedToken(
   token: 'xpt_x',
 );
 
+final _sam = Person(
+  id: 'per_1',
+  name: 'Sam',
+  role: PersonRole.developer,
+  createdAt: DateTime.utc(2026, 11, 13),
+);
+
+final _me = Me(
+  person: _sam,
+  token: _createdToken.info,
+  permissions: const [Permission.develop],
+);
+
 void main() {
   late FakeEngine engine;
   late XpClient client;
@@ -747,6 +760,82 @@ void main() {
         name: 'xp',
         kind: DeviceTokenKind.cli,
       ).toJson(),
+    ),
+    _Endpoint(
+      'listTokens',
+      method: 'GET',
+      path: '/tokens',
+      response: TokensResponse([_createdToken.info]).toJson(),
+      call: (client) => client.listTokens(),
+      expected: [_createdToken.info],
+    ),
+    _Endpoint(
+      'revokeToken',
+      method: 'DELETE',
+      path: '/tokens/tok_1',
+      status: 204,
+      response: null,
+      call: (client) async {
+        await client.revokeToken('tok_1');
+        return 'revoked';
+      },
+      expected: 'revoked',
+    ),
+    _Endpoint(
+      'me',
+      method: 'GET',
+      path: '/me',
+      response: _me.toJson(),
+      call: (client) => client.me(),
+      expected: _me,
+    ),
+    _Endpoint(
+      'listPeople',
+      method: 'GET',
+      path: '/people',
+      response: PeopleResponse([_sam]).toJson(),
+      call: (client) => client.listPeople(),
+      expected: [_sam],
+    ),
+    _Endpoint(
+      'getPerson',
+      method: 'GET',
+      path: '/people/per_1',
+      response: _sam.toJson(),
+      call: (client) => client.getPerson('per_1'),
+      expected: _sam,
+    ),
+    _Endpoint(
+      'createPerson',
+      method: 'POST',
+      path: '/people',
+      status: 201,
+      response: _sam.toJson(),
+      call: (client) =>
+          client.createPerson(name: 'Sam', role: PersonRole.developer),
+      expected: _sam,
+      body: const {'name': 'Sam', 'role': 'developer'},
+    ),
+    _Endpoint(
+      'updatePerson',
+      method: 'PATCH',
+      path: '/people/per_1',
+      response: _sam.toJson(),
+      call: (client) => client.updatePerson('per_1', role: PersonRole.admin),
+      expected: _sam,
+      body: const {'role': 'admin'},
+    ),
+    _Endpoint(
+      'removePerson',
+      method: 'DELETE',
+      path: '/people/per_1',
+      status: 204,
+      response: null,
+      call: (client) async {
+        await client.removePerson('per_1');
+        return 'removed';
+      },
+      expected: 'removed',
     ),
     _Endpoint(
       'status',

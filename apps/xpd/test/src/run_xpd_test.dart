@@ -86,6 +86,65 @@ void main() {
     });
   });
 
+  group('xpd person', () {
+    Future<int> person(List<String> args) =>
+        run(['person', ...args, '--data-dir', dataDir]);
+
+    test('create prints the id alone on out and a note on err', () async {
+      final code = await person(['create', '--name', 'Sam', '--role', 'admin']);
+
+      expect(code, 0);
+      expect(out.toString(), matches(RegExp(r'^per_[0-9a-f]{16}\n$')));
+      expect(err.toString(), contains('Added Sam, admin (per_'));
+      final people = await withDatabase(
+        (database) => SqlitePersonRepository(database).list(),
+      );
+      expect(people.map((p) => (p.name, p.role)), [
+        ('Owner', PersonRole.admin),
+        ('Sam', PersonRole.admin),
+      ]);
+    });
+
+    test('create refuses a name someone has, and needs both options', () async {
+      expect(await person(['create', '-n', 'owner', '-r', 'viewer']), 1);
+      expect(err.toString(), contains('xpd: Someone is called owner'));
+      expect(await person(['create', '--role', 'viewer']), 64);
+      expect(await person(['create', '--name', 'Sam']), 64);
+      expect(await person(['create', '-n', 'Sam', '-r', 'owner']), 64);
+      expect(out.toString(), isEmpty);
+    });
+
+    test(
+      'list prints every person, oldest first, removed ones marked',
+      () async {
+        await person(['create', '--name', 'Sam', '--role', 'viewer']);
+        final sam = out.toString().trim();
+        await withDatabase(
+          (database) async => database.connection.execute(
+            'UPDATE person SET removed_at = 1 WHERE id = ?',
+            [sam],
+          ),
+        );
+        final before = out.toString().length;
+
+        expect(await person(['list']), 0);
+
+        final lines = out.toString().substring(before).trim().split('\n');
+        expect(lines, hasLength(2));
+        expect(
+          lines.first,
+          matches(RegExp(r'^per_[0-9a-f]{16}\tadmin\tOwner$')),
+        );
+        expect(lines.last, '$sam\tviewer\tSam\tremoved');
+      },
+    );
+
+    test('xpd person --help lists create and list', () async {
+      expect(await run(['person', '--help']), 0);
+      expect(out.toString(), allOf(contains('create'), contains('list')));
+    });
+  });
+
   group('xpd token create', () {
     Future<int> create(List<String> args) =>
         run(['token', 'create', '--data-dir', dataDir, ...args]);

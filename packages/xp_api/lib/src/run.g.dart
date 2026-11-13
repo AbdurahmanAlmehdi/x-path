@@ -105,6 +105,9 @@ Run _$RunFromJson(Map<String, dynamic> json) => Run(
   request: json['request'] == null
       ? null
       : DispatchRequest.fromJson(json['request'] as Map<String, dynamic>),
+  origin: json['origin'] == null
+      ? null
+      : RunOrigin.fromJson(json['origin'] as Map<String, dynamic>),
 );
 
 Map<String, dynamic> _$RunToJson(Run instance) => <String, dynamic>{
@@ -121,6 +124,7 @@ Map<String, dynamic> _$RunToJson(Run instance) => <String, dynamic>{
   'createdAt': instance.createdAt.toIso8601String(),
   'jobs': instance.jobs.map((e) => e.toJson()).toList(),
   'request': ?instance.request?.toJson(),
+  'origin': ?instance.origin?.toJson(),
 };
 
 const _$RunStateEnumMap = {

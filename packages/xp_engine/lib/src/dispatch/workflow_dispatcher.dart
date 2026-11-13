@@ -136,11 +136,13 @@ class WorkflowDispatcher {
   /// cannot be fetched.
   ///
   /// With [versionId] it runs that version of the workflow, not the newest.
+  /// The run records [origin] as who started it.
   Future<Run> dispatch(
     String projectId,
     String workflowId,
     DispatchRequest request, {
     String? versionId,
+    RunOrigin? origin,
   }) async {
     final (:stored, :definition, :context, :kinds) = await _prepare(
       projectId,
@@ -187,6 +189,7 @@ class WorkflowDispatcher {
       build: build,
       request: request.toJson(),
       createdAt: _clock.now(),
+      origin: origin,
     );
     await _runs.create(run);
     final created = <String>[];
@@ -293,10 +296,11 @@ class WorkflowDispatcher {
 
   /// Dispatches the run [runId] again: a new run of the same version of the
   /// workflow, at the same commit, with the same request (inputs, flavors,
-  /// platforms, bump). It gets a build number of its own.
+  /// platforms, bump). It gets a build number of its own, and [origin] as
+  /// who started it.
   ///
   /// Throws a [RunNotFoundException], and what [dispatch] throws.
-  Future<Run> again(String runId) async {
+  Future<Run> again(String runId, {RunOrigin? origin}) async {
     final run = await _runs.get(runId) ?? (throw RunNotFoundException(runId));
     final asked = run.dispatchRequest ?? const DispatchRequest();
     return await dispatch(
@@ -314,6 +318,7 @@ class WorkflowDispatcher {
         inputs: asked.inputs,
       ),
       versionId: run.workflowVersionId,
+      origin: origin,
     );
   }
 

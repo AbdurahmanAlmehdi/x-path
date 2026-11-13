@@ -4,6 +4,7 @@
 import 'package:equatable/equatable.dart';
 import 'package:json_annotation/json_annotation.dart';
 import 'package:xp_api/src/job.dart';
+import 'package:xp_api/src/run_origin.dart';
 
 part 'run.g.dart';
 
@@ -195,6 +196,7 @@ class Run extends Equatable {
     this.version,
     this.build,
     this.request,
+    this.origin,
   });
 
   /// Reads a run from its JSON form.
@@ -241,6 +243,10 @@ class Run extends Equatable {
   /// rest, as it was sent.
   final DispatchRequest? request;
 
+  /// Who started it. Absent for runs from before people (ADR 0017) and for
+  /// runs a release starts on its own.
+  final RunOrigin? origin;
+
   /// The JSON form.
   Map<String, dynamic> toJson() => _$RunToJson(this);
 
@@ -259,6 +265,7 @@ class Run extends Equatable {
     createdAt,
     jobs,
     request,
+    origin,
   ];
 }
 

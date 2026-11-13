@@ -102,6 +102,7 @@ void main() {
       build: 45,
       request: const {'ref': 'main'},
       createdAt: DateTime.utc(2026, 10, 13),
+      origin: const RunOrigin(kind: RunOriginKind.person, personName: 'Sam'),
     );
 
     test('shows itself and its jobs to a client', () {
@@ -115,6 +116,7 @@ void main() {
       expect(api.version, '1.2.3');
       expect(api.build, 45);
       expect(api.workflowId, 'wf_1');
+      expect(api.origin, run.origin);
       expect(api.jobs, const [
         RunJob(
           id: 'job_1',
@@ -141,6 +143,7 @@ void main() {
       expect(held.lockHeld, isTrue);
       expect(held.id, run.id);
       expect(held.request, run.request);
+      expect(held.origin, run.origin);
       expect(held, isNot(run));
       expect(held.withLockHeld(held: false), run);
     });

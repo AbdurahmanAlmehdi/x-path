@@ -76,3 +76,70 @@ class Person extends Equatable {
   @override
   List<Object?> get props => [id, name, role, createdAt, removedAt];
 }
+
+/// The body of `GET /people`: every person, removed ones included, oldest
+/// first.
+@JsonSerializable(explicitToJson: true)
+class PeopleResponse extends Equatable {
+  /// Creates the response.
+  const new(this.people);
+
+  /// Reads the response from its JSON form.
+  factory PeopleResponse.fromJson(Map<String, dynamic> json) =>
+      _$PeopleResponseFromJson(json);
+
+  /// The people, oldest first.
+  final List<Person> people;
+
+  /// The JSON form.
+  Map<String, dynamic> toJson() => _$PeopleResponseToJson(this);
+
+  @override
+  List<Object?> get props => [people];
+}
+
+/// The body of `POST /people`: a new person called [name] with [role].
+@JsonSerializable(checked: true)
+class CreatePersonRequest extends Equatable {
+  /// Creates the request.
+  const new({required this.name, required this.role});
+
+  /// Reads the request from its JSON form.
+  factory CreatePersonRequest.fromJson(Map<String, dynamic> json) =>
+      _$CreatePersonRequestFromJson(json);
+
+  /// What the person is called, 1 to 80 characters.
+  final String name;
+
+  /// What the person may do.
+  final PersonRole role;
+
+  /// The JSON form.
+  Map<String, dynamic> toJson() => _$CreatePersonRequestToJson(this);
+
+  @override
+  List<Object?> get props => [name, role];
+}
+
+/// The body of `PATCH /people/{id}`: a new [name], a new [role], or both.
+@JsonSerializable(includeIfNull: false, checked: true)
+class UpdatePersonRequest extends Equatable {
+  /// Creates the request.
+  const new({this.name, this.role});
+
+  /// Reads the request from its JSON form.
+  factory UpdatePersonRequest.fromJson(Map<String, dynamic> json) =>
+      _$UpdatePersonRequestFromJson(json);
+
+  /// The new name, 1 to 80 characters.
+  final String? name;
+
+  /// The new role. It applies to the person's next request.
+  final PersonRole? role;
+
+  /// The JSON form.
+  Map<String, dynamic> toJson() => _$UpdatePersonRequestToJson(this);
+
+  @override
+  List<Object?> get props => [name, role];
+}

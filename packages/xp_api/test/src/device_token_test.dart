@@ -43,6 +43,15 @@ void main() {
     expect(TokenInfo.fromJson(owned.toJson()), owned);
   });
 
+  test('TokensResponse round-trips through JSON', () {
+    final page = TokensResponse([info]);
+
+    expect(page.toJson(), {
+      'tokens': [info.toJson()],
+    });
+    expect(TokensResponse.fromJson(page.toJson()), page);
+  });
+
   group('CreatedToken', () {
     final created = CreatedToken(info: info, token: 'xpt_secret');
 

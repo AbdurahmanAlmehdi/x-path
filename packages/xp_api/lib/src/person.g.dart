@@ -30,3 +30,53 @@ const _$PersonRoleEnumMap = {
   PersonRole.releaser: 'releaser',
   PersonRole.admin: 'admin',
 };
+
+PeopleResponse _$PeopleResponseFromJson(Map<String, dynamic> json) =>
+    PeopleResponse(
+      (json['people'] as List<dynamic>)
+          .map((e) => Person.fromJson(e as Map<String, dynamic>))
+          .toList(),
+    );
+
+Map<String, dynamic> _$PeopleResponseToJson(PeopleResponse instance) =>
+    <String, dynamic>{
+      'people': instance.people.map((e) => e.toJson()).toList(),
+    };
+
+CreatePersonRequest _$CreatePersonRequestFromJson(Map<String, dynamic> json) =>
+    $checkedCreate('CreatePersonRequest', json, ($checkedConvert) {
+      final val = CreatePersonRequest(
+        name: $checkedConvert('name', (v) => v as String),
+        role: $checkedConvert(
+          'role',
+          (v) => $enumDecode(_$PersonRoleEnumMap, v),
+        ),
+      );
+      return val;
+    });
+
+Map<String, dynamic> _$CreatePersonRequestToJson(
+  CreatePersonRequest instance,
+) => <String, dynamic>{
+  'name': instance.name,
+  'role': _$PersonRoleEnumMap[instance.role]!,
+};
+
+UpdatePersonRequest _$UpdatePersonRequestFromJson(Map<String, dynamic> json) =>
+    $checkedCreate('UpdatePersonRequest', json, ($checkedConvert) {
+      final val = UpdatePersonRequest(
+        name: $checkedConvert('name', (v) => v as String?),
+        role: $checkedConvert(
+          'role',
+          (v) => $enumDecodeNullable(_$PersonRoleEnumMap, v),
+        ),
+      );
+      return val;
+    });
+
+Map<String, dynamic> _$UpdatePersonRequestToJson(
+  UpdatePersonRequest instance,
+) => <String, dynamic>{
+  'name': ?instance.name,
+  'role': ?_$PersonRoleEnumMap[instance.role],
+};

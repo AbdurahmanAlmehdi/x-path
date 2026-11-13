@@ -1,7 +1,7 @@
 import 'package:shelf/shelf.dart';
-import 'package:shelf_router/shelf_router.dart';
 import 'package:xp_api/xp_api.dart';
 import 'package:xp_engine/xp_engine.dart';
+import 'package:xpd/src/api/api_router.dart';
 import 'package:xpd/src/api/middleware.dart';
 import 'package:xpd/src/api/request_body.dart';
 import 'package:xpd/src/api/responses.dart';
@@ -15,13 +15,16 @@ import 'package:xpd/src/api/workflows/workflows_routes.dart';
 /// texts its uploads send, promote or roll back a Shorebird patch (U7b) and
 /// give a release up.
 ///
-/// Anyone with a token may read, refresh, start a new build and request the
-/// merge, a rollout change or a patch move: these are gated actions, which
-/// wait for the owner to approve them (D-13). Setting a store status, the
-/// texts and abandoning are for `app` and `cli` tokens only, because a status
-/// moves a release toward the merge of its pull request and the texts reach
-/// the stores; the rules are the [ReleaseService]'s, and a token that may not
-/// answers `403 forbidden`.
+/// Anyone with a token may read. A refresh, a new build and the requests of
+/// a merge, a rollout change or a patch move need the developer role, as a
+/// dispatch does: they start gated workflows, which wait for a releaser's
+/// approval (D-13), and an agent may ask for them. Setting a store status,
+/// the texts and abandoning need the releaser role and an `app`, `cli` or
+/// `web` token, because a status moves a release toward the merge of its
+/// pull request and the texts reach the stores (ADR 0017,
+/// `route_permissions.dart`; the [ReleaseService] checks them too). A token
+/// that may not answers `403 forbidden`. A run a request starts records who
+/// asked.
 class ReleasesRoutes {
   /// Creates the routes over [_releases].
   const new(this._releases, this._notes);
@@ -30,7 +33,7 @@ class ReleasesRoutes {
   final ReleaseNotesService _notes;
 
   /// Registers the routes on [router].
-  void addTo(Router router) {
+  void addTo(ApiRouter router) {
     router
       ..get('/releases', _list)
       ..get('/releases/<id>', _get)
@@ -98,16 +101,29 @@ class ReleasesRoutes {
       });
 
   Future<Response> _newBuild(Request request, String id) => _guard(() async {
-    return _accepted(await _releases.newBuild(id));
+    return _accepted(
+      await _releases.newBuild(id, origin: deviceTokenOf(request).runOrigin),
+    );
   });
 
   Future<Response> _merge(Request request, String id) => _guard(() async {
-    return _accepted(await _releases.requestMerge(id));
+    return _accepted(
+      await _releases.requestMerge(
+        id,
+        origin: deviceTokenOf(request).runOrigin,
+      ),
+    );
   });
 
   Future<Response> _rollout(Request request, String id) => _guard(() async {
     final body = await readJsonBody(request, RolloutRequest.fromJson);
-    return _accepted(await _releases.requestRollout(id, body));
+    return _accepted(
+      await _releases.requestRollout(
+        id,
+        body,
+        origin: deviceTokenOf(request).runOrigin,
+      ),
+    );
   });
 
   Future<Response> _history(Request request, String id) => _guard(() async {
@@ -138,7 +154,14 @@ class ReleasesRoutes {
         'a patch number from 1.',
       );
     }
-    return _accepted(await _releases.requestPatch(id, patch, named.single));
+    return _accepted(
+      await _releases.requestPatch(
+        id,
+        patch,
+        named.single,
+        origin: deviceTokenOf(request).runOrigin,
+      ),
+    );
   });
 
   Future<Response> _abandon(Request request, String id) => _guard(() async {

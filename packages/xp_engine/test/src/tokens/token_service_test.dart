@@ -309,6 +309,75 @@ void main() {
     );
   });
 
+  group('listFor and revokeFor', () {
+    late Person sam;
+    late IssuedToken ownerApp;
+    late IssuedToken ownerMcp;
+    late IssuedToken samCli;
+
+    setUp(() async {
+      sam = personWith(PersonRole.developer);
+      await people.add(sam);
+      ownerApp = await service.issue(name: 'a', kind: DeviceTokenKind.app);
+      ownerMcp = await service.issue(name: 'b', kind: DeviceTokenKind.mcp);
+      samCli = await service.issue(
+        name: 'c',
+        kind: DeviceTokenKind.cli,
+        personId: sam.id,
+      );
+      await service.issue(name: 'd', kind: DeviceTokenKind.runner);
+      final revoked = await service.issue(
+        name: 'e',
+        kind: DeviceTokenKind.cli,
+        personId: sam.id,
+      );
+      await service.revoke(revoked.token.id);
+    });
+
+    Future<DeviceToken> asker(IssuedToken issued) async =>
+        (await service.authenticate(issued.secret))!;
+
+    List<String> names(List<DeviceToken> tokens) => [
+      for (final token in tokens) token.name,
+    ];
+
+    test("an admin's app token sees every person's valid tokens", () async {
+      expect(names(await service.listFor(await asker(ownerApp))), [
+        'a',
+        'b',
+        'c',
+      ]);
+    });
+
+    test('anyone else sees the valid tokens of their own person', () async {
+      expect(names(await service.listFor(await asker(samCli))), ['c']);
+      expect(names(await service.listFor(await asker(ownerMcp))), ['a', 'b']);
+    });
+
+    test('revokes a token the asker sees', () async {
+      await service.revokeFor(await asker(ownerApp), samCli.token.id);
+
+      expect(await service.authenticate(samCli.secret), isNull);
+    });
+
+    test(
+      "refuses a token the asker does not see, as if it weren't there",
+      () async {
+        final sam = await asker(samCli);
+        await expectLater(
+          service.revokeFor(sam, ownerApp.token.id),
+          throwsA(
+            isA<TokenNotFoundException>()
+                .having((e) => e.id, 'id', ownerApp.token.id)
+                .having((e) => e.message, 'message', contains('no token'))
+                .having((e) => '$e', 'toString', contains('TokenNotFound')),
+          ),
+        );
+        expect(await service.authenticate(ownerApp.secret), isNotNull);
+      },
+    );
+  });
+
   test('IssuedToken compares by value', () async {
     final issued = await service.issue(name: 'n', kind: DeviceTokenKind.app);
 

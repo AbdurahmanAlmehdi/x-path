@@ -1,3 +1,4 @@
+import 'package:json_annotation/json_annotation.dart';
 import 'package:test/test.dart';
 import 'package:xp_api/xp_api.dart';
 
@@ -57,6 +58,54 @@ void main() {
           role: PersonRole.admin,
           createdAt: DateTime.utc(2026, 11, 13),
         ),
+      );
+    });
+  });
+
+  group('requests and responses', () {
+    final sam = Person(
+      id: 'per_1',
+      name: 'Sam',
+      role: PersonRole.viewer,
+      createdAt: DateTime.utc(2026, 11, 13),
+    );
+
+    test('PeopleResponse round-trips through JSON', () {
+      final page = PeopleResponse([sam]);
+
+      expect(page.toJson(), {
+        'people': [sam.toJson()],
+      });
+      expect(PeopleResponse.fromJson(page.toJson()), page);
+    });
+
+    test('CreatePersonRequest round-trips and needs a known role', () {
+      const request = CreatePersonRequest(
+        name: 'Sam',
+        role: PersonRole.developer,
+      );
+
+      expect(request.toJson(), {'name': 'Sam', 'role': 'developer'});
+      expect(CreatePersonRequest.fromJson(request.toJson()), request);
+      expect(
+        () => CreatePersonRequest.fromJson(const {
+          'name': 'Sam',
+          'role': 'owner',
+        }),
+        throwsA(isA<CheckedFromJsonException>()),
+      );
+    });
+
+    test('UpdatePersonRequest leaves out what it does not change', () {
+      const rename = UpdatePersonRequest(name: 'Sam K');
+      const promote = UpdatePersonRequest(role: PersonRole.admin);
+
+      expect(rename.toJson(), {'name': 'Sam K'});
+      expect(promote.toJson(), {'role': 'admin'});
+      expect(UpdatePersonRequest.fromJson(promote.toJson()), promote);
+      expect(
+        UpdatePersonRequest.fromJson(const {}),
+        const UpdatePersonRequest(),
       );
     });
   });

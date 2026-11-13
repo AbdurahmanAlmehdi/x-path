@@ -63,6 +63,14 @@ List<StepPlan> uploadPlans({
   ),
 ];
 
+/// One dispatch a [ReleaseHarness] saw.
+typedef Dispatched = ({
+  String project,
+  String workflow,
+  DispatchRequest request,
+  RunOrigin? origin,
+});
+
 /// A [ReleaseService] over fakes, with the jobs of a release made by hand.
 class ReleaseHarness {
   new _({
@@ -101,8 +109,7 @@ class ReleaseHarness {
     );
     final apple = FakeStoreStatusSource(ReleaseStore.apple);
     final play = FakeStoreStatusSource(ReleaseStore.play);
-    final dispatched =
-        <({String project, String workflow, DispatchRequest request})>[];
+    final dispatched = <Dispatched>[];
     late final ReleaseService service;
     service = ReleaseService(
       releases: releases,
@@ -116,11 +123,12 @@ class ReleaseHarness {
       ),
       events: events,
       clock: clock,
-      dispatch: (project, workflow, request) async {
+      dispatch: (project, workflow, request, {origin}) async {
         dispatched.add((
           project: project,
           workflow: workflow,
           request: request,
+          origin: origin,
         ));
         // What the dispatcher does: it attaches the run to the release.
         final runId = 'run_${dispatched.length + 1}';
@@ -188,8 +196,7 @@ class ReleaseHarness {
   final WorkflowService workflows;
 
   /// What the service dispatched, oldest first.
-  final List<({String project, String workflow, DispatchRequest request})>
-  dispatched;
+  final List<Dispatched> dispatched;
 
   var _jobs = 0;
 

@@ -1,14 +1,15 @@
 import 'package:shelf/shelf.dart';
-import 'package:shelf_router/shelf_router.dart';
 import 'package:xp_api/xp_api.dart';
 import 'package:xp_engine/xp_engine.dart';
+import 'package:xpd/src/api/api_router.dart';
 import 'package:xpd/src/api/middleware.dart';
 import 'package:xpd/src/api/request_body.dart';
 import 'package:xpd/src/api/responses.dart';
 
-/// Device tokens over the API (U5b): the owner's app makes a token for `xp`
-/// or `xp mcp` without the `xpd` binary. The secret of a new token is in the answer of `POST /tokens` only;
-/// no other response, log or error carries it.
+/// Device tokens over the API (U5b, D17): the app makes a token for `xp` or
+/// `xp mcp` without the `xpd` binary, and a person lists and revokes their
+/// tokens (an admin everyone's). The secret of a new token is in the answer
+/// of `POST /tokens` only; no other response, log or error carries it.
 class TokensRoutes {
   /// Creates the routes over [_tokens].
   const new(this._tokens);
@@ -23,8 +24,27 @@ class TokensRoutes {
   };
 
   /// Registers the routes on [router].
-  void addTo(Router router) {
-    router.post('/tokens', _create);
+  void addTo(ApiRouter router) {
+    router
+      ..get('/tokens', _list)
+      ..post('/tokens', _create)
+      ..delete('/tokens/<id>', _revoke);
+  }
+
+  Future<Response> _list(Request request) async {
+    final tokens = await _tokens.listFor(deviceTokenOf(request));
+    return jsonResponse(
+      TokensResponse([for (final token in tokens) infoOf(token)]).toJson(),
+    );
+  }
+
+  Future<Response> _revoke(Request request, String id) async {
+    try {
+      await _tokens.revokeFor(deviceTokenOf(request), id);
+    } on TokenNotFoundException catch (error) {
+      return errorResponse(ApiErrorCode.notFound, error.message);
+    }
+    return Response(204);
   }
 
   Future<Response> _create(Request request) async {

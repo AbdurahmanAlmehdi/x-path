@@ -718,6 +718,39 @@ INSERT INTO approval (id, project_id, action, sha, version, state, run_id,
     });
   });
 
+  test('v24 keeps every run, with no origin for the runs of before', () {
+    final path = '${tempDirectory().path}/xpath.db';
+    sqlite3.open(path)
+      ..execute(_golden(23))
+      ..userVersion = 23
+      ..execute('''
+INSERT INTO project (id, host, source_key, github_repo_id, remote,
+  default_base_branch) VALUES ('prj_1', 'github.com', '1', 1, 'r', 'main');
+INSERT INTO workflow (id, project_id, name)
+  VALUES ('wf_1', 'prj_1', 'dev');
+INSERT INTO workflow_version (id, workflow_id, version, yaml, created_at)
+  VALUES ('wfv_1', 'wf_1', 1, 'name: dev', 1);
+INSERT INTO run (id, project_id, workflow_id, workflow_version_id, sha,
+  created_at) VALUES ('run_1', 'prj_1', 'wf_1', 'wfv_1', 'abc', 2);
+''')
+      ..close();
+    final database = SqliteDatabase.open(path);
+    addTearDown(database.close);
+    final db = database.connection;
+
+    expect(db.userVersion, latest);
+    final row = db.select('SELECT id, sha, origin FROM run').single;
+    expect(row['sha'], 'abc');
+    expect(row['origin'], isNull);
+    db.execute(
+      "UPDATE run SET origin = '{\"kind\":\"person\"}' WHERE id = 'run_1'",
+    );
+    expect(
+      () => db.execute("UPDATE run SET origin = 'not json' WHERE id = 'run_1'"),
+      throwsA(isA<SqliteException>()),
+    );
+  });
+
   group('snapshot', () {
     for (var version = 1; version <= latest; version++) {
       test('v$version is what the first $version migration(s) build', () {

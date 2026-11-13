@@ -70,6 +70,29 @@ class TokenInfo extends Equatable {
   List<Object?> get props => [id, name, kind, createdAt, personId];
 }
 
+/// The body of `GET /tokens`: the valid tokens the asker may see, oldest
+/// first. A person sees their own; an admin's `app`, `cli` or `web` token
+/// sees everyone's. Runner tokens are not among them: a runner's token is
+/// revoked with the runner.
+@JsonSerializable(explicitToJson: true)
+class TokensResponse extends Equatable {
+  /// Creates the response.
+  const new(this.tokens);
+
+  /// Reads the response from its JSON form.
+  factory TokensResponse.fromJson(Map<String, dynamic> json) =>
+      _$TokensResponseFromJson(json);
+
+  /// The tokens, oldest first.
+  final List<TokenInfo> tokens;
+
+  /// The JSON form.
+  Map<String, dynamic> toJson() => _$TokensResponseToJson(this);
+
+  @override
+  List<Object?> get props => [tokens];
+}
+
 /// The answer of `POST /tokens`: the token made, with its secret. The
 /// secret is in this response only and never again.
 @JsonSerializable(explicitToJson: true)

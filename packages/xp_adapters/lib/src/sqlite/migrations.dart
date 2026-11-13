@@ -28,6 +28,7 @@ const engineMigrations = <Migration>[
   Migration(version: 21, sql: _v21),
   Migration(version: 22, sql: _v22, foreignKeysOff: true),
   Migration(version: 23, sql: _v23, foreignKeysOff: true),
+  Migration(version: 24, sql: _v24),
 ];
 
 // Timestamps are integer microseconds since the Unix epoch (UTC), so that
@@ -765,4 +766,11 @@ CREATE UNIQUE INDEX idx_approval_binding ON approval (
   COALESCE(run_id, '')
 );
 CREATE INDEX idx_approval_due ON approval (expires_at) WHERE state = 'pending';
+''';
+
+/// Who started a run (ADR 0017): the JSON of a `RunOrigin`, or NULL for the
+/// runs from before.
+const _v24 = '''
+ALTER TABLE run ADD COLUMN origin TEXT
+  CHECK (origin IS NULL OR json_valid(origin));
 ''';

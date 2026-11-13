@@ -48,6 +48,22 @@ class DeviceToken extends Equatable {
   /// Whether the token no longer authenticates.
   bool get isRevoked => revokedAt != null;
 
+  /// Who a run this token starts was started by (ADR 0017): an `mcp` token
+  /// is an agent acting for its [person], any other token its [person].
+  /// `null` without a [person] read, as for a runner token.
+  RunOrigin? get runOrigin {
+    final person = this.person;
+    if (person == null) return null;
+    return RunOrigin(
+      kind: kind == DeviceTokenKind.mcp
+          ? RunOriginKind.agent
+          : RunOriginKind.person,
+      tokenId: id,
+      personId: person.id,
+      personName: person.name,
+    );
+  }
+
   /// This token as revoked at [at].
   DeviceToken revoked(DateTime at) => _copy(revokedAt: at, person: person);
 

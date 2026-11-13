@@ -303,7 +303,31 @@ export PATH="$PWD/.fvm/flutter_sdk/bin:$HOME/.pub-cache/bin:$PATH"
 
 ### Phase 2: People, tokens, run origin and permissions over the API
 
-- **Status:** Not started
+- **Status:** Done
+- **Built (notes for later phases):**
+  - `Permission` moved to `xp_api` (`me.dart`, wire names `develop`, `decide_approval`, `release`, `administer`)
+    next to `Me`; `AccessPolicy.permissionsOf(token)` backs `GET /me` (`Cache-Control: no-store`).
+  - `ApiRouter` (`api/api_router.dart`) wraps `shelf_router`'s `Router` (which is `@sealed`) and records every
+    route; every `addTo` takes it. `XpdServer.routes` exposes them, and `route_permissions_test.dart` checks the
+    table both ways. `permissionMiddleware` runs after `runnerScopeMiddleware`, matches routes in registration
+    order, skips reads and public paths, and treats a listed route with `RouteAccess.open` as the handler's call.
+    An unknown path still gets the router's `404`. No `AccessDeniedException` was needed.
+  - Deviation: the gated release requests (`refresh`, `builds`, `merge`, `rollout`, `patches`) need `develop`,
+    not `release`, as a dispatch does, so `xp mcp`'s `request_rollout` and today's agent behaviour keep working;
+    the gate still needs a releaser. `POST /storage/free` is open (a dry run is a read; the service keeps the
+    real delete to admins). Store status, texts and abandon stay `release`.
+  - `RunOrigin` (`person` | `agent`, with `tokenId`, `personId`, `personName`) comes from
+    `DeviceToken.runOrigin`; `WorkflowDispatcher.dispatch/again` and `ReleaseService.newBuild/requestMerge/
+    requestRollout/requestPatch` take `origin:`, and `DispatchWorkflow` gained a named `origin`. Plan 1 adds
+    a trigger kind. Migration v24 adds `run.origin` (JSON, NULL for old runs).
+  - `TokenService.listFor(asker)` / `revokeFor(asker, id)` (D17): own person's valid tokens, everyone's for a
+    token that may `administer`; runner tokens are never listed (revoked with their runner); a token the asker
+    cannot see is `404`.
+  - `xpd person create|list` print the person id / a tab-separated list. Deferred to Phase 4, which owns the
+    `sign_in_code` table: `xpd person code`, the code `xpd person create` should print, and
+    `POST /people/{id}/sign-in-codes`.
+  - `openapi.yaml`: every route that now needs a permission lists `403`; `TestEngine.tokenFor(role, kind:)`
+    makes a token of a person with a role.
 - **Scope:**
   - Routes for `/people`, `/me`, token list/create/revoke and sign-in codes for others.
   - `permissionMiddleware` with the route table and the "every mutating route is listed" test.
@@ -353,7 +377,8 @@ export PATH="$PWD/.fvm/flutter_sdk/bin:$HOME/.pub-cache/bin:$PATH"
 
 - **Status:** Not started
 - **Scope:**
-  - Sign-in codes, with migration v25 (the `sign_in_code` table).
+  - Sign-in codes, with migration v25 (the `sign_in_code` table), plus what Phase 2 deferred to them:
+    `POST /people/{id}/sign-in-codes`, `xpd person code <name>`, and the code `xpd person create` prints.
   - `POST`/`DELETE /session` and the cookie (D3a), with the 8-hour expiry (D11).
   - `csrf_middleware.dart` (D14), the D15 origin set, and the `public_url` setting: the route and `xp settings public-url`. The
     web Settings page comes in Phase 8.
