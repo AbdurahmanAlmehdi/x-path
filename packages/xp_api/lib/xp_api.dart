@@ -19,6 +19,7 @@ export 'src/health_response.dart';
 export 'src/job.dart';
 export 'src/job_logs.dart';
 export 'src/notification.dart';
+export 'src/person.dart';
 export 'src/profile_edits.dart';
 export 'src/project.dart';
 export 'src/project_profile.dart';

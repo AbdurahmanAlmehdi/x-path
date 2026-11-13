@@ -4684,10 +4684,14 @@ components:
           type: string
         kind:
           type: string
-          enum: [app, cli, mcp, runner]
+          enum: [app, cli, mcp, runner, web]
         createdAt:
           type: string
           format: date-time
+        personId:
+          type: string
+          pattern: "^per_"
+          description: The person the token belongs to. Absent for a runner token (ADR 0017).
       additionalProperties: false
     CreatedToken:
       type: object
@@ -5243,7 +5247,14 @@ components:
           description: What the owner called the device or client.
         kind:
           type: string
-          enum: [app, cli]
+          enum: [app, cli, web]
+        personId:
+          type: string
+          pattern: "^per_"
+          description: The person the token belongs to. Absent for approvals decided before people existed (ADR 0017).
+        personName:
+          type: string
+          description: What the person was called when they decided.
     Approval:
       type: object
       required: [id, projectId, action, sha, state, createdAt, expiresAt]

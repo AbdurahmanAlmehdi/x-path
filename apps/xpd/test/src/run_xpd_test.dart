@@ -106,6 +106,7 @@ void main() {
       final token = await withDatabase(
         (database) => TokenService(
           tokens: SqliteDeviceTokenRepository(database),
+          people: SqlitePersonRepository(database),
           clock: const SystemClock(),
         ).authenticate(secret),
       );
@@ -288,6 +289,7 @@ void main() {
         final secret = await withDatabase(
           (database) async => (await TokenService(
             tokens: SqliteDeviceTokenRepository(database),
+            people: SqlitePersonRepository(database),
             clock: const SystemClock(),
           ).issue(name: 'late', kind: DeviceTokenKind.app)).secret,
         );
@@ -312,6 +314,7 @@ void main() {
       final secret = await withDatabase(
         (database) async => (await TokenService(
           tokens: SqliteDeviceTokenRepository(database),
+          people: SqlitePersonRepository(database),
           clock: const SystemClock(),
         ).issue(name: 'late', kind: DeviceTokenKind.app)).secret,
       );
@@ -357,6 +360,7 @@ void main() {
       final secret = await withDatabase(
         (database) async => (await TokenService(
           tokens: SqliteDeviceTokenRepository(database),
+          people: SqlitePersonRepository(database),
           clock: const SystemClock(),
         ).issue(name: 'owner', kind: DeviceTokenKind.app)).secret,
       );
@@ -462,6 +466,7 @@ void main() {
       final secret = await withDatabase(
         (database) async => (await TokenService(
           tokens: SqliteDeviceTokenRepository(database),
+          people: SqlitePersonRepository(database),
           clock: const SystemClock(),
         ).issue(name: 'late', kind: DeviceTokenKind.app)).secret,
       );
@@ -665,6 +670,7 @@ void main() {
         await approvals.findOrCreate(approval('apr_new', 'b' * 40, now));
         final service = TokenService(
           tokens: SqliteDeviceTokenRepository(database),
+          people: SqlitePersonRepository(database),
           clock: const SystemClock(),
         );
         return {
@@ -796,6 +802,7 @@ void main() {
         );
         final service = TokenService(
           tokens: SqliteDeviceTokenRepository(database),
+          people: SqlitePersonRepository(database),
           clock: const SystemClock(),
         );
         return (
@@ -888,6 +895,7 @@ void main() {
         );
         final service = TokenService(
           tokens: SqliteDeviceTokenRepository(database),
+          people: SqlitePersonRepository(database),
           clock: const SystemClock(),
         );
         return {
@@ -1030,6 +1038,7 @@ void main() {
       final secret = await withDatabase(
         (database) async => (await TokenService(
           tokens: SqliteDeviceTokenRepository(database),
+          people: SqlitePersonRepository(database),
           clock: const SystemClock(),
         ).issue(name: 'late', kind: DeviceTokenKind.app)).secret,
       );
@@ -1267,6 +1276,7 @@ void main() {
         final secret = await withDatabase(
           (database) async => (await TokenService(
             tokens: SqliteDeviceTokenRepository(database),
+            people: SqlitePersonRepository(database),
             clock: const SystemClock(),
           ).issue(name: 'late', kind: DeviceTokenKind.app)).secret,
         );

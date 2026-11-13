@@ -564,6 +564,7 @@ class ServeCommand extends XpdCommand {
       // places jobs on them through the scheduler, and cancels theirs.
       final tokenService = TokenService(
         tokens: SqliteDeviceTokenRepository(database),
+        people: SqlitePersonRepository(database),
         clock: const SystemClock(),
       );
       // The runners' comings and goings go to the engine log.

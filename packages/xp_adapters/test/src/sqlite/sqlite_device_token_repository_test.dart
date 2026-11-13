@@ -6,24 +6,34 @@ import 'package:xp_engine/xp_engine.dart';
 
 import '../../helpers/schema_dump.dart';
 
-DeviceToken _token(String id, {DeviceTokenKind? kind, DateTime? revokedAt}) =>
-    DeviceToken(
-      id: id,
-      name: 'device $id',
-      kind: kind ?? DeviceTokenKind.app,
-      hash: 'hash-$id',
-      createdAt: DateTime.utc(2026, 10, 13, 8, 30, 15, 123, 456),
-      revokedAt: revokedAt,
-    );
+/// The id of `Owner`, whom migration v23 makes in every database.
+late String _ownerId;
+
+DeviceToken _token(String id, {DeviceTokenKind? kind, DateTime? revokedAt}) {
+  final tokenKind = kind ?? DeviceTokenKind.app;
+  return DeviceToken(
+    id: id,
+    name: 'device $id',
+    kind: tokenKind,
+    hash: 'hash-$id',
+    createdAt: DateTime.utc(2026, 10, 13, 8, 30, 15, 123, 456),
+    revokedAt: revokedAt,
+    personId: tokenKind == DeviceTokenKind.runner ? null : _ownerId,
+  );
+}
+
+Future<String> _ownerOf(SqliteDatabase database) async =>
+    (await SqlitePersonRepository(database).list()).single.id;
 
 void main() {
   late SqliteDatabase database;
   late SqliteDeviceTokenRepository repository;
 
-  setUp(() {
+  setUp(() async {
     database = SqliteDatabase.openInMemory();
     addTearDown(database.close);
     repository = SqliteDeviceTokenRepository(database);
+    _ownerId = await _ownerOf(database);
   });
 
   test('starts empty', () async {
@@ -48,6 +58,42 @@ void main() {
     expect(tokens[0].isRevoked, isFalse);
     expect(tokens[2].kind, DeviceTokenKind.mcp);
     expect(tokens[0].createdAt.isUtc, isTrue);
+    expect(tokens[0].personId, _ownerId);
+    expect(tokens[1].personId, isNull);
+  });
+
+  test('refuses a token without a person unless it is a runner', () async {
+    await expectLater(
+      repository.add(
+        DeviceToken(
+          id: 'a',
+          name: 'n',
+          kind: DeviceTokenKind.cli,
+          hash: 'h',
+          createdAt: DateTime.utc(2026),
+        ),
+      ),
+      throwsA(isA<SqliteException>()),
+    );
+    expect(await repository.list(), isEmpty);
+  });
+
+  test('revokes every valid token of a person, and no other', () async {
+    final at = DateTime.utc(2026, 10, 14);
+    final earlier = DateTime.utc(2026, 10);
+    await repository.add(_token('a'));
+    await repository.add(_token('b', kind: DeviceTokenKind.mcp));
+    await repository.add(_token('c', revokedAt: earlier));
+    await repository.add(_token('d', kind: DeviceTokenKind.runner));
+
+    expect(await repository.revokeOwnedBy(_ownerId, at: at), 2);
+    expect(await repository.revokeOwnedBy(_ownerId, at: at), 0);
+
+    final tokens = {for (final t in await repository.list()) t.id: t};
+    expect(tokens['a']!.revokedAt, at);
+    expect(tokens['b']!.revokedAt, at);
+    expect(tokens['c']!.revokedAt, earlier);
+    expect(tokens['d']!.revokedAt, isNull);
   });
 
   test('stores each kind', () async {
@@ -107,6 +153,7 @@ void main() {
     addTearDown(reader.close);
     final writer = SqliteDatabase.open(path);
     addTearDown(writer.close);
+    _ownerId = await _ownerOf(writer);
 
     expect(await SqliteDeviceTokenRepository(reader).list(), isEmpty);
     await SqliteDeviceTokenRepository(writer).add(_token('late'));
@@ -117,6 +164,7 @@ void main() {
   test('works with the token service', () async {
     final service = TokenService(
       tokens: repository,
+      people: SqlitePersonRepository(database),
       clock: ManualClock(DateTime.utc(2026, 10, 13)),
     );
 
@@ -124,8 +172,11 @@ void main() {
       name: 'Mac mini',
       kind: DeviceTokenKind.cli,
     );
+    final found = await service.authenticate(issued.secret);
 
-    expect((await service.authenticate(issued.secret))?.id, issued.token.id);
+    expect(found?.id, issued.token.id);
+    expect(found?.person?.name, 'Owner');
+    expect(found?.role, PersonRole.admin);
     expect(await service.authenticate('xpt_wrong'), isNull);
   });
 }

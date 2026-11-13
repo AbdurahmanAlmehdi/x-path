@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:math';
 
 import 'package:xp_api/xp_api.dart';
+import 'package:xp_engine/src/access/access_policy.dart';
 import 'package:xp_engine/src/clock/clock.dart';
 import 'package:xp_engine/src/repositories/engine_setting_repository.dart';
 import 'package:xp_engine/src/repositories/event_log.dart';
@@ -271,13 +272,11 @@ class RunnerService {
     missing: _presence.missingOf(record.id),
   );
 
+  /// Only an admin pairs and revokes runners: a paired runner receives
+  /// signing material.
   void _requireOwner(DeviceToken by, String action) {
-    if (by.kind != DeviceTokenKind.app && by.kind != DeviceTokenKind.cli) {
-      throw RunnerForbiddenException(
-        'A ${by.kind.name} token cannot $action. Only app and cli tokens '
-        'can: a paired runner receives signing material.',
-      );
-    }
+    final refusal = AccessPolicy.refusal(by, Permission.administer, action);
+    if (refusal != null) throw RunnerForbiddenException(refusal);
   }
 
   List<int> _bytes(int length) =>

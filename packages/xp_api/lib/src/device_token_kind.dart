@@ -9,6 +9,9 @@ enum DeviceTokenKind {
   /// `xp mcp`. Can never approve or loosen gates (D-13).
   mcp,
 
-  /// `xp runner`.
+  /// `xp runner`. Belongs to no person (ADR 0017).
   runner,
+
+  /// A browser signed in to the web dashboard (ADR 0017).
+  web,
 }

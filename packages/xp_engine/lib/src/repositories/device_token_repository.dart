@@ -13,6 +13,10 @@ abstract interface class DeviceTokenRepository {
   /// Revokes the token [id] at [at]. Returns whether it was valid until now:
   /// `false` for a token that is unknown or revoked already.
   Future<bool> revoke(String id, {required DateTime at});
+
+  /// Revokes, at [at], every valid token of the person [personId]. Returns
+  /// how many there were.
+  Future<int> revokeOwnedBy(String personId, {required DateTime at});
 }
 
 /// A [DeviceTokenRepository] that forgets everything on exit.
@@ -29,15 +33,19 @@ class InMemoryDeviceTokenRepository implements DeviceTokenRepository {
   Future<bool> revoke(String id, {required DateTime at}) async {
     final index = _tokens.indexWhere((token) => token.id == id);
     if (index < 0 || _tokens[index].isRevoked) return false;
-    final token = _tokens[index];
-    _tokens[index] = DeviceToken(
-      id: token.id,
-      name: token.name,
-      kind: token.kind,
-      hash: token.hash,
-      createdAt: token.createdAt,
-      revokedAt: at,
-    );
+    _tokens[index] = _tokens[index].revoked(at);
     return true;
+  }
+
+  @override
+  Future<int> revokeOwnedBy(String personId, {required DateTime at}) async {
+    var count = 0;
+    for (var i = 0; i < _tokens.length; i++) {
+      final token = _tokens[i];
+      if (token.personId != personId || token.isRevoked) continue;
+      _tokens[i] = token.revoked(at);
+      count++;
+    }
+    return count;
   }
 }

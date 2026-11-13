@@ -69,6 +69,9 @@ class ThrowingDeviceTokenRepository implements DeviceTokenRepository {
 
   @override
   Future<bool> revoke(String id, {required DateTime at}) async => false;
+
+  @override
+  Future<int> revokeOwnedBy(String personId, {required DateTime at}) async => 0;
 }
 
 /// Build number counters for any app: the first number of an app is 1.
@@ -99,12 +102,22 @@ class _AutoCounters implements BuildCounterRepository {
   }
 }
 
+/// The admin every engine has, as migration v23 makes it: the person the
+/// tokens of a [TestEngine] belong to.
+final testOwner = Person(
+  id: 'per_owner',
+  name: 'Owner',
+  role: PersonRole.admin,
+  createdAt: DateTime.utc(2026),
+);
+
 /// An engine on a free loopback port with everything in memory.
 class TestEngine {
   new _({
     required this.server,
     required this.events,
     required this.clock,
+    required this.people,
     required this.tokens,
     required this.secret,
     required this.errors,
@@ -165,8 +178,10 @@ class TestEngine {
     final folders = <String, Map<String, String>>{};
     final clock = ManualClock(DateTime.utc(2026, 10, 13, 9));
     final log = InMemoryEventLog(clock: clock, capacity: eventCapacity);
+    final people = InMemoryPersonRepository([testOwner]);
     final tokens = TokenService(
       tokens: repository ?? InMemoryDeviceTokenRepository(),
+      people: people,
       clock: clock,
     );
     final errors = <Object>[];
@@ -463,6 +478,7 @@ class TestEngine {
       server: server,
       events: log,
       clock: clock,
+      people: people,
       tokens: tokens,
       secret: issued.secret,
       errors: errors,
@@ -597,6 +613,9 @@ class TestEngine {
   final Map<String, Map<String, String>> folders;
   final InMemoryEventLog events;
   final ManualClock clock;
+
+  /// The people, [testOwner] first.
+  final InMemoryPersonRepository people;
   final TokenService tokens;
 
   /// A valid `app` token.

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math';
 
 import 'package:xp_api/xp_api.dart';
+import 'package:xp_engine/src/access/access_policy.dart';
 import 'package:xp_engine/src/clock/clock.dart';
 import 'package:xp_engine/src/jobs/job_record.dart';
 import 'package:xp_engine/src/jobs/job_repository.dart';
@@ -1017,11 +1018,8 @@ class ReleaseService implements ReleaseOpener {
   }
 
   static void _requireOwner(DeviceToken by, String what) {
-    if (by.kind != DeviceTokenKind.app && by.kind != DeviceTokenKind.cli) {
-      throw ReleaseForbiddenException(
-        'A ${by.kind.name} token cannot $what: only the app or `xp` do.',
-      );
-    }
+    final refusal = AccessPolicy.refusal(by, Permission.release, what);
+    if (refusal != null) throw ReleaseForbiddenException(refusal);
   }
 
   Future<ReleaseRecord> _require(String id) async =>

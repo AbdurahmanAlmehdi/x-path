@@ -4,15 +4,19 @@ import 'package:test/test.dart';
 import 'package:xp_api/xp_api.dart';
 import 'package:xp_engine/xp_engine.dart';
 
+import '../../helpers/people.dart';
+
 void main() {
   late InMemoryDeviceTokenRepository repository;
+  late InMemoryPersonRepository people;
   late ManualClock clock;
   late TokenService service;
 
   setUp(() {
     repository = InMemoryDeviceTokenRepository();
+    people = InMemoryPersonRepository([owner]);
     clock = ManualClock(DateTime.utc(2026, 10, 13, 8));
-    service = TokenService(tokens: repository, clock: clock);
+    service = TokenService(tokens: repository, people: people, clock: clock);
   });
 
   group('hashToken', () {
@@ -75,6 +79,7 @@ void main() {
       Future<String> secretFrom(int seed) async {
         final seeded = TokenService(
           tokens: InMemoryDeviceTokenRepository(),
+          people: people,
           clock: clock,
           random: Random(seed),
         );
@@ -86,6 +91,76 @@ void main() {
 
       expect(await secretFrom(1), await secretFrom(1));
       expect(await secretFrom(1), isNot(await secretFrom(2)));
+    });
+
+    test('gives a runner token no person', () async {
+      final issued = await service.issue(
+        name: 'builder',
+        kind: DeviceTokenKind.runner,
+      );
+
+      expect(issued.token.personId, isNull);
+      expect(issued.token.role, isNull);
+    });
+
+    test('refuses a person for a runner token', () {
+      expect(
+        service.issue(
+          name: 'builder',
+          kind: DeviceTokenKind.runner,
+          personId: owner.id,
+        ),
+        throwsArgumentError,
+      );
+    });
+
+    test('issues for the person it is given', () async {
+      final sam = personWith(PersonRole.developer);
+      await people.add(sam);
+
+      final issued = await service.issue(
+        name: 'xp',
+        kind: DeviceTokenKind.cli,
+        personId: sam.id,
+      );
+
+      expect(issued.token.personId, sam.id);
+      expect(issued.token.person, sam);
+      expect(issued.token.role, PersonRole.developer);
+    });
+
+    test('issues for the eldest active admin without a person', () async {
+      await people.update(owner.copyWith(removedAt: DateTime.utc(2026, 2)));
+      await people.add(personWith(PersonRole.releaser));
+      final admin = personWith(PersonRole.admin);
+      await people.add(admin);
+
+      final issued = await service.issue(name: 'n', kind: DeviceTokenKind.app);
+
+      expect(issued.token.personId, admin.id);
+    });
+
+    test('refuses a removed or unknown person, or no admin at all', () async {
+      final gone = personWith(PersonRole.viewer)
+          .copyWith(removedAt: DateTime.utc(2026, 2));
+      await people.add(gone);
+
+      for (final personId in [gone.id, 'per_nobody']) {
+        await expectLater(
+          service.issue(
+            name: 'n',
+            kind: DeviceTokenKind.cli,
+            personId: personId,
+          ),
+          throwsArgumentError,
+        );
+      }
+      await people.update(owner.copyWith(role: PersonRole.viewer));
+      await expectLater(
+        service.issue(name: 'n', kind: DeviceTokenKind.cli),
+        throwsArgumentError,
+      );
+      expect(await repository.list(), isEmpty);
     });
   });
 
@@ -126,6 +201,40 @@ void main() {
       expect(await service.authenticate('xpt_revoked'), isNull);
     });
 
+    test('reads the person as they are now', () async {
+      final issued = await service.issue(name: 'me', kind: DeviceTokenKind.cli);
+      final demoted = owner.copyWith(role: PersonRole.viewer);
+      await people.update(demoted);
+
+      final found = await service.authenticate(issued.secret);
+
+      expect(found?.person, demoted);
+      expect(found?.role, PersonRole.viewer);
+    });
+
+    test('rejects the token of a removed or missing person', () async {
+      final issued = await service.issue(name: 'me', kind: DeviceTokenKind.cli);
+      await people.update(owner.copyWith(removedAt: DateTime.utc(2026, 2)));
+
+      expect(await service.authenticate(issued.secret), isNull);
+
+      final orphan = TokenService(
+        tokens: repository,
+        people: InMemoryPersonRepository(),
+        clock: clock,
+      );
+      expect(await orphan.authenticate(issued.secret), isNull);
+    });
+
+    test('returns a runner token without a person', () async {
+      final issued = await service.issue(
+        name: 'builder',
+        kind: DeviceTokenKind.runner,
+      );
+
+      expect(await service.authenticate(issued.secret), issued.token);
+    });
+
     test('rejects a stored hash of the wrong length', () async {
       await repository.add(
         DeviceToken(
@@ -162,6 +271,42 @@ void main() {
     test('knows no token it was not given', () async {
       expect(await service.revoke('tok_nope'), isFalse);
     });
+  });
+
+  group('revokeAllOf', () {
+    test(
+      "revokes every valid token of the person, and no one else's",
+      () async {
+        final sam = personWith(PersonRole.developer);
+        await people.add(sam);
+        final mine = [
+          await service.issue(name: 'a', kind: DeviceTokenKind.app),
+          await service.issue(name: 'b', kind: DeviceTokenKind.mcp),
+        ];
+        final theirs = await service.issue(
+          name: 'c',
+          kind: DeviceTokenKind.cli,
+          personId: sam.id,
+        );
+        final runner = await service.issue(
+          name: 'd',
+          kind: DeviceTokenKind.runner,
+        );
+        await service.revoke(mine.first.token.id);
+        clock.advance(const Duration(minutes: 1));
+
+        expect(await service.revokeAllOf(owner.id), 1);
+
+        for (final issued in mine) {
+          expect(await service.authenticate(issued.secret), isNull);
+        }
+        expect(await service.authenticate(theirs.secret), isNotNull);
+        expect(await service.authenticate(runner.secret), isNotNull);
+        final stored = {for (final t in await repository.list()) t.name: t};
+        expect(stored['b']!.revokedAt, DateTime.utc(2026, 10, 13, 8, 1));
+        expect(stored['a']!.revokedAt, DateTime.utc(2026, 10, 13, 8));
+      },
+    );
   });
 
   test('IssuedToken compares by value', () async {

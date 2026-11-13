@@ -1,4 +1,5 @@
 import 'package:xp_api/xp_api.dart';
+import 'package:xp_engine/src/access/access_policy.dart';
 import 'package:xp_engine/src/artifacts/artifact_repository.dart';
 import 'package:xp_engine/src/artifacts/artifact_store.dart';
 import 'package:xp_engine/src/clock/clock.dart';
@@ -265,10 +266,7 @@ class HousekeepingService {
   }
 
   static void _requireOwner(DeviceToken by, String what) {
-    if (by.kind != DeviceTokenKind.app && by.kind != DeviceTokenKind.cli) {
-      throw HousekeepingForbiddenException(
-        'A ${by.kind.name} token cannot $what: only the app or `xp` do.',
-      );
-    }
+    final refusal = AccessPolicy.refusal(by, Permission.administer, what);
+    if (refusal != null) throw HousekeepingForbiddenException(refusal);
   }
 }

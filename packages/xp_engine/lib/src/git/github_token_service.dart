@@ -1,4 +1,5 @@
 import 'package:xp_api/xp_api.dart';
+import 'package:xp_engine/src/access/access_policy.dart';
 import 'package:xp_engine/src/credentials/credential_exceptions.dart';
 import 'package:xp_engine/src/credentials/credential_material.dart';
 import 'package:xp_engine/src/credentials/credential_verifier.dart';
@@ -154,11 +155,8 @@ class GitHubTokenService {
   );
 
   static void _requireOwner(DeviceToken by, String what) {
-    if (by.kind != DeviceTokenKind.app && by.kind != DeviceTokenKind.cli) {
-      throw GitHubTokenForbiddenException(
-        'A ${by.kind.name} token cannot $what: only the app or `xp` do.',
-      );
-    }
+    final refusal = AccessPolicy.refusal(by, Permission.administer, what);
+    if (refusal != null) throw GitHubTokenForbiddenException(refusal);
   }
 }
 

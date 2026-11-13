@@ -29,6 +29,20 @@ void main() {
     expect(TokenInfo.fromJson(info.toJson()), info);
   });
 
+  test('TokenInfo carries the person it belongs to', () {
+    final owned = TokenInfo(
+      id: 'tok_2',
+      name: 'Chrome',
+      kind: DeviceTokenKind.web,
+      createdAt: DateTime.utc(2026, 11, 13),
+      personId: 'per_1',
+    );
+
+    expect(owned.toJson(), containsPair('personId', 'per_1'));
+    expect(owned.toJson()['kind'], 'web');
+    expect(TokenInfo.fromJson(owned.toJson()), owned);
+  });
+
   group('CreatedToken', () {
     final created = CreatedToken(info: info, token: 'xpt_secret');
 

@@ -5,6 +5,7 @@ import 'package:xp_engine/xp_engine.dart';
 
 import 'credential_harness.dart';
 import 'job_harness.dart';
+import 'people.dart' as people;
 
 /// The results of the probe of a Mac: `git`, and Xcode if [xcode].
 List<ProbeResult> macProbe({
@@ -332,6 +333,7 @@ class RunnerHarness {
     final storedRunners = wrapRunners == null ? runners : wrapRunners(runners);
     final tokens = TokenService(
       tokens: InMemoryDeviceTokenRepository(),
+      people: InMemoryPersonRepository([people.owner]),
       clock: jobs.clock,
     );
     final secrets = BytesSecretStore();

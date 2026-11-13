@@ -17,7 +17,7 @@ class SqliteDeviceTokenRepository implements DeviceTokenRepository {
   @override
   Future<List<DeviceToken>> list() async => [
     for (final row in _database.connection.select(
-      'SELECT id, name, kind, hash, created_at, revoked_at '
+      'SELECT id, name, kind, hash, person_id, created_at, revoked_at '
       'FROM device_token ORDER BY rowid',
     ))
       _fromRow(row),
@@ -27,13 +27,14 @@ class SqliteDeviceTokenRepository implements DeviceTokenRepository {
   Future<void> add(DeviceToken token) async {
     final revokedAt = token.revokedAt;
     _database.connection.execute(
-      'INSERT INTO device_token (id, name, kind, hash, created_at, revoked_at) '
-      'VALUES (?, ?, ?, ?, ?, ?)',
+      'INSERT INTO device_token (id, name, kind, hash, person_id, created_at, '
+      'revoked_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
       [
         token.id,
         token.name,
         token.kind.name,
         token.hash,
+        token.personId,
         toDatabaseTime(token.createdAt),
         if (revokedAt == null) null else toDatabaseTime(revokedAt),
       ],
@@ -50,6 +51,16 @@ class SqliteDeviceTokenRepository implements DeviceTokenRepository {
     return _database.connection.updatedRows > 0;
   }
 
+  @override
+  Future<int> revokeOwnedBy(String personId, {required DateTime at}) async {
+    _database.connection.execute(
+      'UPDATE device_token SET revoked_at = ? '
+      'WHERE person_id = ? AND revoked_at IS NULL',
+      [toDatabaseTime(at), personId],
+    );
+    return _database.connection.updatedRows;
+  }
+
   static DeviceToken _fromRow(Row row) {
     final revokedAt = row['revoked_at'] as int?;
     return DeviceToken(
@@ -59,6 +70,7 @@ class SqliteDeviceTokenRepository implements DeviceTokenRepository {
       hash: row['hash'] as String,
       createdAt: fromDatabaseTime(row['created_at'] as int),
       revokedAt: revokedAt == null ? null : fromDatabaseTime(revokedAt),
+      personId: row['person_id'] as String?,
     );
   }
 }

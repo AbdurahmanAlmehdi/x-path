@@ -6,6 +6,8 @@ import 'package:xp_api/xp_api.dart';
 import 'package:xp_engine/xp_engine.dart';
 import 'package:xpd/xpd.dart';
 
+import '../../helpers/test_engine.dart';
+
 Request _request(String path, {Map<String, String>? headers}) =>
     Request('GET', Uri.parse('http://localhost$path'), headers: headers);
 
@@ -99,6 +101,7 @@ void main() {
     setUp(() async {
       tokens = TokenService(
         tokens: InMemoryDeviceTokenRepository(),
+        people: InMemoryPersonRepository([testOwner]),
         clock: const SystemClock(),
       );
       secret = (await tokens.issue(

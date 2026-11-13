@@ -16,6 +16,7 @@ targets:
           - lib/src/profile_edits.dart
           - lib/src/health_response.dart
           - lib/src/job.dart
+          - lib/src/person.dart
           - lib/src/project.dart
           - lib/src/project_profile.dart
           - lib/src/release.dart

@@ -57,6 +57,7 @@ void main() {
       expect(created.info.name, 'xp on MacBook');
       expect(created.info.kind, DeviceTokenKind.cli);
       expect(created.token, startsWith('xpt_'));
+      expect(created.info.personId, testOwner.id);
       final status = await engine.request('/status', token: created.token);
       expect(StatusResponse.fromJson(status.json).token, created.info);
     });

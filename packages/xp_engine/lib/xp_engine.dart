@@ -1,6 +1,7 @@
 /// XPath engine domain and application logic. Framework-free.
 library;
 
+export 'src/access/access_policy.dart';
 export 'src/approvals/approval_exceptions.dart';
 export 'src/approvals/approval_record.dart';
 export 'src/approvals/approval_repository.dart';
@@ -65,6 +66,9 @@ export 'src/notify/notifier.dart';
 export 'src/notify/release_notes_builder.dart';
 export 'src/notify/release_notes_service.dart';
 export 'src/notify/slack_webhook.dart';
+export 'src/people/person_exceptions.dart';
+export 'src/people/person_repository.dart';
+export 'src/people/person_service.dart';
 export 'src/probe/engine_doctor.dart';
 export 'src/probe/probe_executor.dart';
 export 'src/probe/runner_probe.dart';

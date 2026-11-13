@@ -261,7 +261,18 @@ export PATH="$PWD/.fvm/flutter_sdk/bin:$HOME/.pub-cache/bin:$PATH"
 
 ### Phase 1: People, roles and the access policy in the engine
 
-- **Status:** Not started
+- **Status:** Done
+- **Built (notes for later phases):**
+  - `Person` and `PersonRole` live in `xp_api` and the engine uses them directly (no engine-side record).
+  - `DeviceToken` has `personId` (stored) and `person` (read by `TokenService.authenticate` on every request; `role`
+    is `person?.role`). A token of a removed or missing person does not authenticate.
+  - `TokenService` takes a `PersonRepository`. `issue(personId:)` defaults to the eldest active admin, which
+    `xpd token create` and the test engines rely on. `revokeAllOf(personId)` backs `PersonService.remove`.
+  - Services keep their own `…ForbiddenException` (already mapped to `403`) and build the message from
+    `AccessPolicy.refusal`. There is no `AccessDeniedException` yet; add it with `permissionMiddleware` in Phase 2 if needed.
+    `AccessPolicy.mayLoosenGates` and `mayCreateTokens` hold the `app`/`web`-only kind rules.
+  - `device_token.expires_at` is not added yet (Phase 4 can `ADD COLUMN` it).
+  - `openapi.yaml` already has `TokenInfo.personId`, `DecidedBy.personId`/`personName` and `web` in both kind enums.
 - **Scope:**
   - The person model, plus migration v23:
     - a `person` table;

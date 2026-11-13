@@ -60,6 +60,7 @@ class TokenCreateCommand extends XpdCommand {
     final issued = await withDatabase(
       (database) => TokenService(
         tokens: SqliteDeviceTokenRepository(database),
+        people: SqlitePersonRepository(database),
         clock: const SystemClock(),
       ).issue(name: name, kind: DeviceTokenKind.values.byName(kind)),
     );

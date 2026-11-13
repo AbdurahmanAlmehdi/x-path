@@ -28,7 +28,8 @@ class TokensRoutes {
   }
 
   Future<Response> _create(Request request) async {
-    if (deviceTokenOf(request).kind != DeviceTokenKind.app) {
+    final creator = deviceTokenOf(request);
+    if (!AccessPolicy.mayCreateTokens(creator)) {
       return errorResponse(
         ApiErrorCode.forbidden,
         'Only the app makes tokens: a token may not make others.',
@@ -40,7 +41,11 @@ class TokensRoutes {
     } on BadRequestException catch (error) {
       return errorResponse(ApiErrorCode.invalidRequest, error.message);
     }
-    final issued = await _tokens.issue(name: body.name, kind: body.kind);
+    final issued = await _tokens.issue(
+      name: body.name,
+      kind: body.kind,
+      personId: creator.personId,
+    );
     return jsonResponse(
       CreatedToken(info: infoOf(issued.token), token: issued.secret).toJson(),
       statusCode: 201,
@@ -53,6 +58,7 @@ class TokensRoutes {
     name: token.name,
     kind: token.kind,
     createdAt: token.createdAt,
+    personId: token.personId,
   );
 
   static CreateTokenRequest _parse(Map<String, dynamic> json) {
