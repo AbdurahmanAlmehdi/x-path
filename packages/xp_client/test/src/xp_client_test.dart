@@ -56,6 +56,12 @@ final _me = Me(
   permissions: const [Permission.develop],
 );
 
+final _code = SignInCode(
+  code: 'ABCD-EFGH-JKMN-PQRS',
+  personId: 'per_1',
+  expiresAt: DateTime.utc(2026, 11, 14, 9, 10),
+);
+
 void main() {
   late FakeEngine engine;
   late XpClient client;
@@ -838,6 +844,32 @@ void main() {
       expected: 'removed',
     ),
     _Endpoint(
+      'createSignInCode',
+      method: 'POST',
+      path: '/people/per_1/sign-in-codes',
+      status: 201,
+      response: _code.toJson(),
+      call: (client) => client.createSignInCode('per_1'),
+      expected: _code,
+    ),
+    _Endpoint(
+      'publicUrl',
+      method: 'GET',
+      path: '/settings/public-url',
+      response: const PublicUrl(url: 'https://xpath.example.com').toJson(),
+      call: (client) => client.publicUrl(),
+      expected: const PublicUrl(url: 'https://xpath.example.com'),
+    ),
+    _Endpoint(
+      'setPublicUrl',
+      method: 'PUT',
+      path: '/settings/public-url',
+      response: const PublicUrl().toJson(),
+      call: (client) => client.setPublicUrl(null),
+      expected: const PublicUrl(),
+      body: const {'url': null},
+    ),
+    _Endpoint(
       'status',
       method: 'GET',
       path: '/status',
@@ -1138,6 +1170,46 @@ void main() {
         }
       });
     }
+  });
+
+  group('dashboardSignInUrl', () {
+    setUp(() {
+      engine
+        ..json('GET', '/me', _me.toJson())
+        ..json(
+          'POST',
+          '/people/per_1/sign-in-codes',
+          _code.toJson(),
+          status: 201,
+        );
+    });
+
+    test('signs this client in where it reaches the engine', () async {
+      engine.json('GET', '/settings/public-url', const PublicUrl().toJson());
+
+      final url = await client.dashboardSignInUrl();
+
+      expect(url.toString(), endsWith('/sign-in#code=ABCD-EFGH-JKMN-PQRS'));
+      expect(url.origin, engine.url.origin);
+      expect(engine.calls.map((call) => call.path), [
+        '/me',
+        '/people/per_1/sign-in-codes',
+        '/settings/public-url',
+      ]);
+    });
+
+    test('signs in through the public URL when one is set', () async {
+      engine.json(
+        'GET',
+        '/settings/public-url',
+        const PublicUrl(url: 'https://xpath.example.com').toJson(),
+      );
+
+      expect(
+        await client.dashboardSignInUrl(),
+        Uri.parse('https://xpath.example.com/sign-in#code=ABCD-EFGH-JKMN-PQRS'),
+      );
+    });
   });
 
   group('requests', () {

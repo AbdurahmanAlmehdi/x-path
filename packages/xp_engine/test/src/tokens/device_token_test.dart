@@ -50,4 +50,34 @@ void main() {
       expect(token(DeviceTokenKind.cli).runOrigin, isNull);
     });
   });
+
+  group('expiry', () {
+    final at = DateTime.utc(2026, 11, 14, 9);
+
+    test('a token without an expiry never expires', () {
+      final valid = token(DeviceTokenKind.app);
+
+      expect(valid.isExpiredAt(at.add(const Duration(days: 999))), isFalse);
+      expect(valid.isValidAt(at), isTrue);
+      expect(valid.revoked(at).isValidAt(at), isFalse);
+    });
+
+    test('a token expires at its expiry, and keeps it when copied', () {
+      final web = DeviceToken(
+        id: 'tok_1',
+        name: 'Browser',
+        kind: DeviceTokenKind.web,
+        hash: 'h',
+        createdAt: at,
+        expiresAt: at.add(const Duration(hours: 8)),
+        personId: owner.id,
+      );
+
+      expect(web.isValidAt(at.add(const Duration(hours: 7))), isTrue);
+      expect(web.isExpiredAt(at.add(const Duration(hours: 8))), isTrue);
+      expect(web.isValidAt(at.add(const Duration(hours: 8))), isFalse);
+      expect(web.withPerson(owner).expiresAt, web.expiresAt);
+      expect(web.revoked(at).expiresAt, web.expiresAt);
+    });
+  });
 }

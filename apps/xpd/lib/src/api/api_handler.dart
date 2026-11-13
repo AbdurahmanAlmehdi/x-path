@@ -1,10 +1,12 @@
 import 'package:shelf/shelf.dart';
 import 'package:xp_api/xp_api.dart';
 import 'package:xp_engine/xp_engine.dart';
+import 'package:xpd/src/api/allowed_origins.dart';
 import 'package:xpd/src/api/api_router.dart';
 import 'package:xpd/src/api/approvals/approvals_routes.dart';
 import 'package:xpd/src/api/artifacts/artifacts_routes.dart';
 import 'package:xpd/src/api/credentials/credentials_routes.dart';
+import 'package:xpd/src/api/csrf_middleware.dart';
 import 'package:xpd/src/api/events_route.dart';
 import 'package:xpd/src/api/github/github_token_routes.dart';
 import 'package:xpd/src/api/jobs/job_logs_route.dart';
@@ -20,6 +22,8 @@ import 'package:xpd/src/api/runners/runner_connect_route.dart';
 import 'package:xpd/src/api/runners/runners_routes.dart';
 import 'package:xpd/src/api/runs/runs_routes.dart';
 import 'package:xpd/src/api/session/me_routes.dart';
+import 'package:xpd/src/api/session/session_routes.dart';
+import 'package:xpd/src/api/settings/settings_routes.dart';
 import 'package:xpd/src/api/storage/storage_routes.dart';
 import 'package:xpd/src/api/system_routes.dart';
 import 'package:xpd/src/api/tests/tests_routes.dart';
@@ -35,13 +39,18 @@ const publicPaths = {'/health', '/version', '/runners/pair'};
 /// serves.
 ///
 /// The API is served under `/api/v1`, and its root paths stay bearer-only
-/// aliases ([legacyAlias], ADR 0018). Every route but [publicPaths] needs a
-/// device token, and every mutating route the permission
-/// `route_permissions.dart` names for it. [onError] hears about exceptions
-/// that became `500` responses.
+/// aliases ([legacyAlias], ADR 0018). Every route but [publicPaths] and
+/// `POST /session` needs a device token (or, under `/api/v1`, a browser's
+/// session cookie, whose requests that change something pass the CSRF
+/// check), and every mutating route the permission `route_permissions.dart`
+/// names for it. [onError] hears about exceptions that became `500`
+/// responses.
 ({Handler handler, List<ApiRoute> routes}) buildApiHandler({
   required TokenService tokens,
   required PersonService people,
+  required SignInCodeService signIn,
+  required PublicUrlService publicUrl,
+  required AllowedOrigins origins,
   required EventsRoute events,
   required ProjectService projects,
   required JobControl jobs,
@@ -97,10 +106,19 @@ const publicPaths = {'/health', '/version', '/runners/pair'};
   TokensRoutes(tokens).addTo(router);
   PeopleRoutes(people).addTo(router);
   const MeRoutes().addTo(router);
+  SessionRoutes(signIn: signIn, tokens: tokens, origins: origins).addTo(router);
+  SettingsRoutes(publicUrl).addTo(router);
   final handler = const Pipeline()
       .addMiddleware(errorMiddleware(onError: onError))
       .addMiddleware(runnerRefusalMiddleware(onRunnerRefused ?? (_, _) {}))
-      .addMiddleware(authMiddleware(tokens, publicPaths: publicPaths))
+      .addMiddleware(
+        authMiddleware(
+          tokens,
+          publicPaths: publicPaths,
+          publicRoutes: SessionRoutes.publicRoutes,
+        ),
+      )
+      .addMiddleware(csrfMiddleware(origins))
       .addMiddleware(runnerScopeMiddleware())
       .addMiddleware(permissionMiddleware(router.routes))
       .addHandler(router.call);

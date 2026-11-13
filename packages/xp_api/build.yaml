@@ -26,6 +26,7 @@ targets:
           - lib/src/run.dart
           - lib/src/run_origin.dart
           - lib/src/runner.dart
+          - lib/src/session.dart
           - lib/src/storage.dart
           - lib/src/test_run.dart
           - lib/src/version_response.dart

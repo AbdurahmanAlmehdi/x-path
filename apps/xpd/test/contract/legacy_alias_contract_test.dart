@@ -38,6 +38,7 @@ void main() {
     ('tokens', '/tokens', 200),
     ('people', '/people', 200),
     ('people', '/me', 200),
+    ('settings', '/settings/public-url', 200),
   ];
 
   for (final (group, path, status) in groups) {

@@ -25,6 +25,12 @@ enum ApiErrorCode {
   @JsonValue('forbidden')
   forbidden(403),
 
+  /// A request authenticated by the session cookie that changes something
+  /// came without the header `X-XPath-CSRF: 1`, or from an `Origin` the
+  /// engine does not serve (ADR 0018).
+  @JsonValue('csrf')
+  csrf(403),
+
   /// No such route or resource.
   @JsonValue('not_found')
   notFound(404),
@@ -72,6 +78,11 @@ enum ApiErrorCode {
   /// The route only speaks WebSocket.
   @JsonValue('upgrade_required')
   upgradeRequired(426),
+
+  /// Too many wrong sign-in codes in a short time: the engine takes none for
+  /// a while. `Retry-After` says how many seconds.
+  @JsonValue('rate_limited')
+  rateLimited(429),
 
   /// Something went wrong in the engine.
   @JsonValue('internal')

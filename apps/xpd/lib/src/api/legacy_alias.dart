@@ -46,6 +46,10 @@ Handler legacyAlias(Handler api, {required Set<String> publicPaths}) {
   };
 }
 
+/// Whether [request] came to the API under [apiMount], not to a root alias.
+/// Only there does the session cookie authenticate (ADR 0018).
+bool isUnderApiMount(Request request) => request.handlerPath == '$apiMount/';
+
 const _vary = {'vary': 'Authorization'};
 
 /// Puts a root-relative `Location` of [response] under [apiMount].

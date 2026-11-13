@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
 
@@ -67,10 +68,19 @@ class TokenService {
   /// Marks a string as an XPath token, so that secret scanners can find it.
   static const secretPrefix = 'xpt_';
 
+  /// How long a browser session's token works (D11): there is no sliding
+  /// renewal, so a browser signs in again after it.
+  static const webSessionLifetime = Duration(hours: 8);
+
   final DeviceTokenRepository _tokens;
   final PersonRepository _people;
   final Clock _clock;
   final Random _random;
+  final _revocations = StreamController<String>.broadcast(sync: true);
+
+  /// The id of every token revoked through this service, as it is revoked:
+  /// the sockets it opened close (D12).
+  Stream<String> get revocations => _revocations.stream;
 
   /// Creates and stores a token called [name] for [kind], which belongs to
   /// the person [personId]. A runner token belongs to no person. Without a
@@ -91,13 +101,38 @@ class TokenService {
       throw ArgumentError.value(personId, 'personId', 'a runner has no person');
     }
     final person = runner ? null : await _ownerOf(personId);
+    return await _store(name: trimmed, kind: kind, person: person);
+  }
+
+  /// Creates and stores the token of a browser that signed in as the person
+  /// [personId] (ADR 0018): a `web` token that expires after
+  /// [webSessionLifetime].
+  ///
+  /// Throws an [ArgumentError] if there is no such active person.
+  Future<IssuedToken> issueWeb({required String personId}) async {
+    final person = await _ownerOf(personId);
+    return await _store(
+      name: 'Browser',
+      kind: DeviceTokenKind.web,
+      person: person,
+      expiresAt: _clock.now().add(webSessionLifetime),
+    );
+  }
+
+  Future<IssuedToken> _store({
+    required String name,
+    required DeviceTokenKind kind,
+    required Person? person,
+    DateTime? expiresAt,
+  }) async {
     final secret = secretPrefix + _base64Url(_bytes(32));
     final token = DeviceToken(
       id: 'tok_${_hex(_bytes(8))}',
-      name: trimmed,
+      name: name,
       kind: kind,
       hash: hashToken(secret),
       createdAt: _clock.now(),
+      expiresAt: expiresAt,
       personId: person?.id,
       person: person,
     );
@@ -119,17 +154,19 @@ class TokenService {
   }
 
   /// The valid token that [secret] belongs to, with its person read, or
-  /// `null`. A token whose person was removed is not valid.
+  /// `null`. A token that expired, or whose person was removed, is not
+  /// valid.
   ///
   /// Every stored hash is compared, in constant time, so the time taken does
   /// not reveal how much of a guess was right.
   Future<DeviceToken?> authenticate(String? secret) async {
     if (secret == null || !secret.startsWith(secretPrefix)) return null;
     final hash = hashToken(secret);
+    final now = _clock.now();
     DeviceToken? match;
     for (final token in await _tokens.list()) {
       final same = _constantTimeEquals(token.hash, hash);
-      if (same && !token.isRevoked) match = token;
+      if (same && token.isValidAt(now)) match = token;
     }
     final personId = match?.personId;
     if (match == null || personId == null) return match;
@@ -144,9 +181,10 @@ class TokenService {
   /// token is revoked with the runner.
   Future<List<DeviceToken>> listFor(DeviceToken asker) async {
     final everyone = AccessPolicy.allows(asker, Permission.administer);
+    final now = _clock.now();
     return [
       for (final token in await _tokens.list())
-        if (!token.isRevoked &&
+        if (token.isValidAt(now) &&
             token.personId != null &&
             (everyone || token.personId == asker.personId))
           token,
@@ -166,14 +204,25 @@ class TokenService {
     await revoke(id);
   }
 
-  /// Revokes the token [id]: it no longer authenticates. Returns whether it
-  /// was valid until now.
-  Future<bool> revoke(String id) => _tokens.revoke(id, at: _clock.now());
+  /// Revokes the token [id]: it no longer authenticates, and its sockets
+  /// close ([revocations]). Returns whether it was valid until now.
+  Future<bool> revoke(String id) async {
+    final revoked = await _tokens.revoke(id, at: _clock.now());
+    if (revoked) _revocations.add(id);
+    return revoked;
+  }
 
-  /// Revokes every valid token of the person [personId]. Returns how many
-  /// there were.
-  Future<int> revokeAllOf(String personId) =>
-      _tokens.revokeOwnedBy(personId, at: _clock.now());
+  /// Revokes every valid token of the person [personId], and closes their
+  /// sockets ([revocations]). Returns how many there were.
+  Future<int> revokeAllOf(String personId) async {
+    final owned = [
+      for (final token in await _tokens.list())
+        if (token.personId == personId && !token.isRevoked) token.id,
+    ];
+    final count = await _tokens.revokeOwnedBy(personId, at: _clock.now());
+    owned.forEach(_revocations.add);
+    return count;
+  }
 
   List<int> _bytes(int length) =>
       List.generate(length, (_) => _random.nextInt(256));

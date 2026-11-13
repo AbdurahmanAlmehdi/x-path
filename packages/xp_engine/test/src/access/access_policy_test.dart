@@ -161,6 +161,40 @@ void main() {
     });
   });
 
+  group('AccessPolicy.mayIssueSignInCode', () {
+    for (final role in PersonRole.values) {
+      for (final kind in DeviceTokenKind.values) {
+        final admin =
+            role == PersonRole.admin && {_app, _cli, _web}.contains(kind);
+        final own = admin || kind == _app || kind == _cli;
+        test('is $own for themself and $admin for others, for a '
+            '${role.name} with a ${kind.name} token', () {
+          final token = _token(kind, role);
+
+          expect(AccessPolicy.mayIssueSignInCode(token, 'per_1'), own);
+          expect(AccessPolicy.mayIssueSignInCode(token, 'per_2'), admin);
+        });
+      }
+    }
+
+    test('is false for an app token whose person was not read', () {
+      expect(
+        AccessPolicy.mayIssueSignInCode(
+          DeviceToken(
+            id: 'tok_1',
+            name: 'n',
+            kind: DeviceTokenKind.app,
+            hash: 'h',
+            createdAt: DateTime.utc(2026),
+            personId: 'per_1',
+          ),
+          'per_1',
+        ),
+        isFalse,
+      );
+    });
+  });
+
   group('AccessPolicy.permissionsOf', () {
     test('lists what the token may do, in order', () {
       expect(AccessPolicy.permissionsOf(_token(_web, PersonRole.admin)), [

@@ -22,5 +22,6 @@ export 'src/sqlite/sqlite_release_repository.dart';
 export 'src/sqlite/sqlite_run_repository.dart';
 export 'src/sqlite/sqlite_runner_repository.dart';
 export 'src/sqlite/sqlite_shorebird_release_repository.dart';
+export 'src/sqlite/sqlite_sign_in_code_repository.dart';
 export 'src/sqlite/sqlite_test_run_repository.dart';
 export 'src/sqlite/sqlite_workflow_repository.dart';

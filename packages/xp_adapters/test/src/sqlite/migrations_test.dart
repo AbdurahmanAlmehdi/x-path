@@ -751,6 +751,51 @@ INSERT INTO run (id, project_id, workflow_id, workflow_version_id, sha,
     );
   });
 
+  test('v25 keeps every token, with no expiry, and adds sign-in codes', () {
+    final path = '${tempDirectory().path}/xpath.db';
+    sqlite3.open(path)
+      ..execute(_golden(24))
+      ..userVersion = 24
+      ..execute('''
+INSERT INTO person (id, name, role, created_at)
+  VALUES ('per_1', 'Sam', 'admin', 1);
+INSERT INTO device_token (id, name, kind, hash, person_id, created_at)
+  VALUES ('tok_1', 'Mac', 'app', 'h1', 'per_1', 1);
+''')
+      ..close();
+    final database = SqliteDatabase.open(path);
+    addTearDown(database.close);
+    final db = database.connection;
+
+    expect(db.userVersion, latest);
+    final row = db.select('SELECT id, expires_at FROM device_token').single;
+    expect(row['id'], 'tok_1');
+    expect(row['expires_at'], isNull);
+    db.execute(
+      'INSERT INTO device_token (id, name, kind, hash, person_id, created_at, '
+      "expires_at) VALUES ('tok_2', 'Browser', 'web', 'h2', 'per_1', 1, 2)",
+    );
+    expect(
+      () => db.execute(
+        "UPDATE device_token SET expires_at = 2 WHERE id = 'tok_1'",
+      ),
+      throwsA(isA<SqliteException>()),
+      reason: 'only a web token expires',
+    );
+    db.execute(
+      'INSERT INTO sign_in_code (hash, person_id, created_at, expires_at) '
+      "VALUES ('h', 'per_1', 1, 2)",
+    );
+    expect(
+      () => db.execute(
+        'INSERT INTO sign_in_code (hash, person_id, created_at, expires_at) '
+        "VALUES ('h', 'per_1', 1, 2)",
+      ),
+      throwsA(isA<SqliteException>()),
+      reason: 'the hash is the primary key',
+    );
+  });
+
   group('snapshot', () {
     for (var version = 1; version <= latest; version++) {
       test('v$version is what the first $version migration(s) build', () {

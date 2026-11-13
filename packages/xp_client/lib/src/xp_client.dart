@@ -685,6 +685,43 @@ class XpClient {
     await _send('DELETE', ['people', id]);
   }
 
+  // ------------------------------------------------------- web dashboard
+
+  /// `POST /people/{id}/sign-in-codes`: a one-time code that signs the
+  /// person [personId] in to the web dashboard. An admin's for anyone; this
+  /// client's own person's with an `app` or `cli` token. Shown this once.
+  Future<SignInCode> createSignInCode(String personId) async =>
+      SignInCode.fromJson(
+        await _json(await _send('POST', ['people', personId, 'sign-in-codes'])),
+      );
+
+  /// `GET /settings/public-url`: the HTTPS address browsers reach the engine
+  /// at through a proxy.
+  Future<PublicUrl> publicUrl() async => PublicUrl.fromJson(
+    await _json(await _send('GET', ['settings', 'public-url'])),
+  );
+
+  /// `PUT /settings/public-url`: sets the public URL to [url], or clears it
+  /// for `null`. Admins only.
+  Future<PublicUrl> setPublicUrl(String? url) async => PublicUrl.fromJson(
+    await _json(
+      await _send('PUT', [
+        'settings',
+        'public-url',
+      ], body: SetPublicUrlRequest(url: url).toJson()),
+    ),
+  );
+
+  /// The page that signs this client's own person in to the web dashboard
+  /// (D9), with a new sign-in code in its fragment: on the public URL when
+  /// one is set, else on the address this client reaches the engine at.
+  Future<Uri> dashboardSignInUrl() async {
+    final me = await this.me();
+    final code = await createSignInCode(me.person.id);
+    final public = (await publicUrl()).url;
+    return code.signInUrl(public == null ? baseUrl : Uri.parse(public));
+  }
+
   /// `GET /status`: the token this client holds, without its secret, and
   /// whether the engine can reach its secrets.
   Future<StatusResponse> status() async =>

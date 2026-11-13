@@ -198,4 +198,16 @@ const routePermissions = <String, RouteAccess>{
   'DELETE /tokens/<id>': .open(
     "a token revokes its own person's tokens, an admin's any person's",
   ),
+
+  // Browser sessions and the public URL (ADR 0018).
+  'POST /session': .open('it needs no token: a sign-in code signs in'),
+  'DELETE /session': .open('a browser signs itself out'),
+  'POST /people/<id>/sign-in-codes': .open(
+    'an admin issues codes for anyone; a person, from the app or `xp`, for '
+    'themself',
+  ),
+  'PUT /settings/public-url': .needs(
+    Permission.administer,
+    'set the public URL',
+  ),
 };

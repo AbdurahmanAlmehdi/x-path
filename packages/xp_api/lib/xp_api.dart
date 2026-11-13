@@ -31,6 +31,7 @@ export 'src/run.dart';
 export 'src/run_origin.dart';
 export 'src/runner.dart';
 export 'src/runner_protocol.dart';
+export 'src/session.dart';
 export 'src/storage.dart';
 export 'src/test_run.dart';
 export 'src/text_diff.dart';

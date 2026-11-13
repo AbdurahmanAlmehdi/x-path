@@ -1,11 +1,13 @@
 /// xpd, the XPath engine daemon.
 library;
 
+export 'src/api/allowed_origins.dart';
 export 'src/api/api_handler.dart';
 export 'src/api/api_router.dart';
 export 'src/api/approvals/approvals_routes.dart';
 export 'src/api/artifacts/artifacts_routes.dart';
 export 'src/api/credentials/credentials_routes.dart';
+export 'src/api/csrf_middleware.dart';
 export 'src/api/events_route.dart';
 export 'src/api/github/github_token_routes.dart';
 export 'src/api/jobs/job_logs_route.dart';
@@ -21,9 +23,13 @@ export 'src/api/responses.dart';
 export 'src/api/route_permissions.dart';
 export 'src/api/runs/runs_routes.dart';
 export 'src/api/session/me_routes.dart';
+export 'src/api/session/session_cookie.dart';
+export 'src/api/session/session_routes.dart';
+export 'src/api/settings/settings_routes.dart';
 export 'src/api/storage/storage_routes.dart';
 export 'src/api/system_routes.dart';
 export 'src/api/tests/tests_routes.dart';
+export 'src/api/token_sockets.dart';
 export 'src/api/workflows/workflows_routes.dart';
 export 'src/cli/gh_executable.dart';
 export 'src/cli/person_command.dart';

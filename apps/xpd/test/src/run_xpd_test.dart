@@ -96,6 +96,12 @@ void main() {
       expect(code, 0);
       expect(out.toString(), matches(RegExp(r'^per_[0-9a-f]{16}\n$')));
       expect(err.toString(), contains('Added Sam, admin (per_'));
+      expect(
+        err.toString(),
+        matches(
+          RegExp(r'Sign-in code for Sam: ([0-9A-Z]{4}-){3}[0-9A-Z]{4}\.'),
+        ),
+      );
       final people = await withDatabase(
         (database) => SqlitePersonRepository(database).list(),
       );
@@ -139,9 +145,56 @@ void main() {
       },
     );
 
-    test('xpd person --help lists create and list', () async {
+    test('code prints a sign-in code that signs the person in', () async {
+      await person(['create', '--name', 'Sam', '--role', 'admin']);
+      final sam = out.toString().trim();
+      final before = out.toString().length;
+
+      expect(await person(['code', 'sam']), 0);
+
+      final code = out.toString().substring(before).trim();
+      expect(code, matches(RegExp(r'^([0-9A-Z]{4}-){3}[0-9A-Z]{4}$')));
+      expect(err.toString(), contains('Sign-in code for Sam: $code.'));
+      expect(await person(['code', sam]), 0);
+      final again = out.toString().substring(before + code.length + 1).trim();
+      final signedIn = await withDatabase((database) async {
+        final people = SqlitePersonRepository(database);
+        final tokens = TokenService(
+          tokens: SqliteDeviceTokenRepository(database),
+          people: people,
+          clock: const SystemClock(),
+        );
+        final service = SignInCodeService(
+          codes: SqliteSignInCodeRepository(database),
+          people: people,
+          tokens: tokens,
+          clock: const SystemClock(),
+        );
+        await expectLater(
+          service.signIn(code),
+          throwsA(isA<SignInRejectedException>()),
+          reason: 'a new code replaces the unused one',
+        );
+        return await service.signIn(again);
+      });
+      expect(signedIn.token.personId, sam);
+      expect(signedIn.token.kind, DeviceTokenKind.web);
+    });
+
+    test('code refuses an unknown person, and needs one', () async {
+      expect(await person(['code', 'Nobody']), 1);
+      expect(err.toString(), contains('There is no active person "Nobody"'));
+      expect(await person(['code']), 64);
+      expect(await person(['code', 'a', 'b']), 64);
+      expect(out.toString(), isEmpty);
+    });
+
+    test('xpd person --help lists create, code and list', () async {
       expect(await run(['person', '--help']), 0);
-      expect(out.toString(), allOf(contains('create'), contains('list')));
+      expect(
+        out.toString(),
+        allOf(contains('create'), contains('code'), contains('list')),
+      );
     });
   });
 

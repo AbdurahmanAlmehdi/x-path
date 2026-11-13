@@ -16,9 +16,21 @@ info:
     request to a root path is not the API. A `Location` of an answer under
     `/api/v1` is under `/api/v1` too.
 
-    Every route except `/health` and `/version` needs a device token:
-    `Authorization: Bearer <token>`. Errors are always
-    `{"error": {"code": "...", "message": "..."}}`.
+    Every route except `/health`, `/version`, `/runners/pair` and
+    `POST /session` needs a device token: `Authorization: Bearer <token>`.
+    Errors are always `{"error": {"code": "...", "message": "..."}}`.
+
+    A browser signed in to the web dashboard (ADR 0018) authenticates with
+    its session cookie instead: `xp_session` on the engine machine, or
+    `__Host-xp_session` through the HTTPS public URL. The cookie is read
+    under `/api/v1` only, never at the root aliases, only without
+    `Authorization` (a request with `Authorization` is a bearer request), and
+    only for a `web` token. A request authenticated by the cookie whose
+    method is not `GET`, `HEAD` or `OPTIONS` needs the header
+    `X-XPath-CSRF: 1` and an `Origin` the engine serves (the public URL's
+    origin, or `http://127.0.0.1:<port>`, `http://localhost:<port>` or
+    `http://[::1]:<port>` with a `Host` that is one of these too), and
+    answers `403 csrf` otherwise. The engine sends no CORS headers.
 
     Every token but a runner's belongs to a person, whose role (`viewer` <
     `developer` < `releaser` < `admin`) decides what it may change
@@ -41,6 +53,7 @@ servers:
     description: Default loopback address of a local engine.
 security:
   - bearerAuth: []
+  - sessionCookie: []
 paths:
   /health:
     get:
@@ -75,8 +88,10 @@ paths:
       operationId: streamEvents
       summary: WebSocket stream of engine events.
       description: |
-        Upgrade to a WebSocket (browsers are refused: any `Origin` header is
-        rejected). Every text frame is one JSON `SequencedEvent`.
+        Upgrade to a WebSocket. A browser authenticates with its session
+        cookie, and its `Origin` must be one the engine serves; a request
+        with another `Origin`, or a cookie without one, answers `403`. Every
+        text frame is one JSON `SequencedEvent`.
 
         The first frame is always `stream.opened`; its `seq` is the head of
         the event log. With `after=<seq>` the engine then replays every
@@ -91,7 +106,10 @@ paths:
         4409 instead.
 
         On shutdown the engine closes the socket with code 1000 (normal
-        closure) and the reason `engine shutting down`.
+        closure) and the reason `engine shutting down`. When the token that
+        opened it stops working (revoked, signed out, its person removed, or
+        expired), the engine closes it with code 4401: at once, or within a
+        minute of an expiry.
       parameters:
         - name: after
           in: query
@@ -107,6 +125,8 @@ paths:
           $ref: "#/components/responses/InvalidRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "409":
           $ref: "#/components/responses/ResyncRequired"
         "426":
@@ -385,7 +405,8 @@ paths:
       operationId: streamJobLogs
       summary: WebSocket stream of a job's log lines.
       description: |
-        Upgrade to a WebSocket (browsers are refused, as for `/events`). Every
+        Upgrade to a WebSocket. A browser authenticates and is checked as for
+        `/events`, and the socket closes with code 4401 the same way. Every
         text frame is one JSON `LogFrame`. Lines are masked before they are
         stored or sent: known secret values read `***`.
 
@@ -419,6 +440,8 @@ paths:
           $ref: "#/components/responses/InvalidRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
         "409":
@@ -2738,6 +2761,162 @@ paths:
           $ref: "#/components/responses/Conflict"
         "500":
           $ref: "#/components/responses/InternalError"
+  /people/{id}/sign-in-codes:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+    post:
+      operationId: createSignInCode
+      summary: A one-time code that signs the person in to the web dashboard.
+      description: |
+        An admin's `app`, `cli` or `web` token issues one for anyone; a
+        person's own `app` or `cli` token for them (D9). An `mcp` token never
+        does. The code works once, for 10 minutes, and is in this response
+        only; issuing one ends the person's unused codes. A client opens
+        `<origin>/sign-in#code=<code>`: the fragment never reaches a server.
+        Never cached.
+      responses:
+        "201":
+          description: The code.
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+                const: no-store
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SignInCode"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /session:
+    post:
+      operationId: signIn
+      summary: Exchange a sign-in code for a browser session.
+      description: |
+        Needs no token. The `Origin` must be one the engine serves: the
+        engine machine (from a connection on the machine, with a loopback
+        `Host`), or the HTTPS public URL. Plain HTTP from another machine
+        answers `403 forbidden` with the reason, and a request without
+        `Origin` `403 csrf`. A code that is unknown, used or expired answers
+        `401`, all three alike; after 20 wrong codes within 10 minutes,
+        every code answers `429` until the oldest leaves the window.
+
+        The answer sets the session cookie, which lasts 8 hours with no
+        renewal: `xp_session; HttpOnly; SameSite=Strict; Path=/` on the
+        engine machine, `__Host-xp_session; Secure; HttpOnly;
+        SameSite=Strict; Path=/` through the public URL. Not served at the
+        root alias. Never cached.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SignInRequest"
+      responses:
+        "200":
+          description: Signed in; who, and what the session may do.
+          headers:
+            Set-Cookie:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+                const: no-store
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Me"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        "500":
+          $ref: "#/components/responses/InternalError"
+    delete:
+      operationId: signOut
+      summary: Sign the browser out.
+      description: |
+        Revokes the session's token, which closes its sockets with code
+        4401, and clears the cookie (`Max-Age=0`). Only a `web` token signs
+        out; any other answers `403`. Never cached.
+      responses:
+        "204":
+          description: Signed out.
+          headers:
+            Set-Cookie:
+              schema:
+                type: string
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /settings/public-url:
+    get:
+      operationId: getPublicUrl
+      summary: The HTTPS address browsers reach the engine at through a proxy.
+      description: |
+        Browser sign-in works on the engine machine, or through it (the
+        engine has no TLS of its own).
+      responses:
+        "200":
+          description: The public URL, if one is set.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicUrl"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/InternalError"
+    put:
+      operationId: setPublicUrl
+      summary: Set or clear the public URL. Admins only.
+      description: |
+        An `https` origin: a host, maybe a port, and no user info, path,
+        query or fragment; a trailing `/` is dropped.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetPublicUrlRequest"
+      responses:
+        "200":
+          description: The public URL now.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicUrl"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/InternalError"
   /status:
     get:
       operationId: getStatus
@@ -3135,6 +3314,14 @@ components:
       type: http
       scheme: bearer
       description: A device token created with `xpd token create`.
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: xp_session
+      description: |
+        A browser's session (ADR 0018), set by `POST /session`: `xp_session`
+        on the engine machine, `__Host-xp_session` through the public URL.
+        Read under `/api/v1` only, and only without `Authorization`.
   parameters:
     JobId:
       name: id
@@ -3279,7 +3466,8 @@ components:
       description: |
         The token is valid but may not do this: its kind (D-13) or its
         person's role (ADR 0017) does not allow it. The message says what it
-        takes.
+        takes. A browser request that fails the CSRF check answers it with
+        the code `csrf`.
       content:
         application/json:
           schema:
@@ -3343,6 +3531,16 @@ components:
         application/json:
           schema:
             $ref: "#/components/schemas/ErrorResponse"
+    RateLimited:
+      description: Too many wrong sign-in codes; try again after `Retry-After`.
+      headers:
+        Retry-After:
+          schema:
+            type: integer
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
     UpgradeRequired:
       description: The route only speaks WebSocket.
       content:
@@ -3362,6 +3560,7 @@ components:
         - invalid_request
         - unauthorized
         - forbidden
+        - csrf
         - not_found
         - conflict
         - credential_in_use
@@ -3371,6 +3570,7 @@ components:
         - workflow_invalid
         - ssh_url_required
         - upgrade_required
+        - rate_limited
         - internal
         - upstream_error
         - secrets_locked
@@ -6227,6 +6427,44 @@ components:
         url:
           type: [string, "null"]
           description: The runner URL, or null to clear it.
+    SignInCode:
+      type: object
+      required: [code, personId, expiresAt]
+      additionalProperties: false
+      properties:
+        code:
+          type: string
+          pattern: "^[0-9A-HJKMNP-TV-Z]{4}(-[0-9A-HJKMNP-TV-Z]{4}){3}$"
+          description: Crockford base32, 80 random bits. Shown this once.
+        personId:
+          type: string
+        expiresAt:
+          type: string
+          format: date-time
+    SignInRequest:
+      type: object
+      required: [code]
+      additionalProperties: false
+      properties:
+        code:
+          type: string
+          description: >-
+            The sign-in code, with or without its dashes, in any case.
+    PublicUrl:
+      type: object
+      additionalProperties: false
+      properties:
+        url:
+          type: string
+          description: The https origin. Absent when none is set.
+    SetPublicUrlRequest:
+      type: object
+      required: [url]
+      additionalProperties: false
+      properties:
+        url:
+          type: [string, "null"]
+          description: The public URL, or null to clear it.
     PairRunnerRequest:
       type: object
       required: [pairingToken]

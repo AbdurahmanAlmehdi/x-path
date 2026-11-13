@@ -17,8 +17,8 @@ class SqliteDeviceTokenRepository implements DeviceTokenRepository {
   @override
   Future<List<DeviceToken>> list() async => [
     for (final row in _database.connection.select(
-      'SELECT id, name, kind, hash, person_id, created_at, revoked_at '
-      'FROM device_token ORDER BY rowid',
+      'SELECT id, name, kind, hash, person_id, created_at, revoked_at, '
+      'expires_at FROM device_token ORDER BY rowid',
     ))
       _fromRow(row),
   ];
@@ -26,9 +26,10 @@ class SqliteDeviceTokenRepository implements DeviceTokenRepository {
   @override
   Future<void> add(DeviceToken token) async {
     final revokedAt = token.revokedAt;
+    final expiresAt = token.expiresAt;
     _database.connection.execute(
       'INSERT INTO device_token (id, name, kind, hash, person_id, created_at, '
-      'revoked_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      'revoked_at, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
       [
         token.id,
         token.name,
@@ -37,6 +38,7 @@ class SqliteDeviceTokenRepository implements DeviceTokenRepository {
         token.personId,
         toDatabaseTime(token.createdAt),
         if (revokedAt == null) null else toDatabaseTime(revokedAt),
+        if (expiresAt == null) null else toDatabaseTime(expiresAt),
       ],
     );
   }
@@ -63,6 +65,7 @@ class SqliteDeviceTokenRepository implements DeviceTokenRepository {
 
   static DeviceToken _fromRow(Row row) {
     final revokedAt = row['revoked_at'] as int?;
+    final expiresAt = row['expires_at'] as int?;
     return DeviceToken(
       id: row['id'] as String,
       name: row['name'] as String,
@@ -70,6 +73,7 @@ class SqliteDeviceTokenRepository implements DeviceTokenRepository {
       hash: row['hash'] as String,
       createdAt: fromDatabaseTime(row['created_at'] as int),
       revokedAt: revokedAt == null ? null : fromDatabaseTime(revokedAt),
+      expiresAt: expiresAt == null ? null : fromDatabaseTime(expiresAt),
       personId: row['person_id'] as String?,
     );
   }

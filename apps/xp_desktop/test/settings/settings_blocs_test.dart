@@ -142,6 +142,66 @@ void main() {
     );
   });
 
+  group('DashboardBloc', () {
+    late MockSettingsRepository settings;
+    late List<Uri> opened;
+    final url = Uri.parse('http://127.0.0.1:7480/sign-in#code=ABCD');
+
+    setUp(() {
+      settings = quietSettings();
+      opened = [];
+    });
+
+    DashboardBloc build() => DashboardBloc(
+      settings: settings,
+      openUrl: (url) async => opened.add(url),
+    );
+
+    test('events and states compare by value', () {
+      expect(const DashboardOpenRequested().props, isEmpty);
+      expect(const DashboardState(), const DashboardState());
+    });
+
+    blocTest<DashboardBloc, DashboardState>(
+      'opens the sign-in page of the dashboard in the browser',
+      setUp: () =>
+          when(settings.dashboardSignInUrl).thenAnswer((_) async => url),
+      build: build,
+      act: (bloc) => bloc.add(const DashboardOpenRequested()),
+      expect: () => const [DashboardState(opening: true), DashboardState()],
+      verify: (_) => expect(opened, [url]),
+    );
+
+    blocTest<DashboardBloc, DashboardState>(
+      'opens it once while it is being opened',
+      setUp: () =>
+          when(settings.dashboardSignInUrl).thenAnswer((_) async => url),
+      build: build,
+      act: (bloc) => bloc
+        ..add(const DashboardOpenRequested())
+        ..add(const DashboardOpenRequested()),
+      expect: () => const [DashboardState(opening: true), DashboardState()],
+      verify: (_) => expect(opened, [url]),
+    );
+
+    blocTest<DashboardBloc, DashboardState>(
+      'says why the engine refused, and opens nothing',
+      setUp: () => when(settings.dashboardSignInUrl).thenThrow(
+        const ApiException(
+          'Only an admin issues sign-in codes for others.',
+          statusCode: 403,
+        ),
+      ),
+      build: build,
+      act: (bloc) => bloc.add(const DashboardOpenRequested()),
+      expect: () => const [
+        DashboardState(opening: true),
+        DashboardState(error: 'Only an admin issues sign-in codes for others.'),
+      ],
+      verify: (_) => expect(opened, isEmpty),
+    );
+  });
+
   group('GitHubTokenBloc', () {
     late MockSettingsRepository settings;
 

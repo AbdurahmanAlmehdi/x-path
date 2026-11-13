@@ -78,6 +78,36 @@ void main() {
     expect(await repository.list(), isEmpty);
   });
 
+  test('keeps the expiry of a web token, and refuses one on others', () async {
+    final expiresAt = DateTime.utc(2026, 10, 13, 16, 30, 15, 123, 456);
+    final web = DeviceToken(
+      id: 'w',
+      name: 'Browser',
+      kind: DeviceTokenKind.web,
+      hash: 'hash-w',
+      createdAt: DateTime.utc(2026, 10, 13, 8, 30, 15, 123, 456),
+      expiresAt: expiresAt,
+      personId: _ownerId,
+    );
+    await repository.add(web);
+
+    expect(await repository.list(), [web]);
+    await expectLater(
+      repository.add(
+        DeviceToken(
+          id: 'a',
+          name: 'n',
+          kind: DeviceTokenKind.cli,
+          hash: 'h',
+          createdAt: DateTime.utc(2026),
+          expiresAt: expiresAt,
+          personId: _ownerId,
+        ),
+      ),
+      throwsA(isA<SqliteException>()),
+    );
+  });
+
   test('revokes every valid token of a person, and no other', () async {
     final at = DateTime.utc(2026, 10, 14);
     final earlier = DateTime.utc(2026, 10);

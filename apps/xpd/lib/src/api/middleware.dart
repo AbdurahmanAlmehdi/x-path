@@ -3,7 +3,9 @@ import 'dart:io';
 import 'package:shelf/shelf.dart';
 import 'package:xp_api/xp_api.dart';
 import 'package:xp_engine/xp_engine.dart';
+import 'package:xpd/src/api/legacy_alias.dart';
 import 'package:xpd/src/api/responses.dart';
+import 'package:xpd/src/api/session/session_cookie.dart';
 
 /// Turns an exception that escapes a handler into a `500 internal` response.
 ///
@@ -61,6 +63,8 @@ final _bearer = RegExp(r'^Bearer\s+(\S+)$', caseSensitive: false);
 
 const _tokenContextKey = 'xpd.deviceToken';
 
+const _cookieContextKey = 'xpd.sessionCookie';
+
 /// The device token that authenticated [request]: its kind and its person's
 /// role decide what the request may do (ADR 0017).
 ///
@@ -74,18 +78,43 @@ DeviceToken deviceTokenOf(Request request) =>
 DeviceToken? deviceTokenIfAny(Request request) =>
     request.context[_tokenContextKey] as DeviceToken?;
 
-/// Requires `Authorization: Bearer <device token>` on every request except
-/// those to [publicPaths], and hands the token to the handlers
-/// ([deviceTokenOf]).
+/// Whether the session cookie, not a bearer token, authenticated
+/// [request]: the CSRF rules apply to it (D14).
+bool authenticatedByCookie(Request request) =>
+    request.context[_cookieContextKey] == true;
+
+/// Requires a device token on every request except those to [publicPaths]
+/// and the `METHOD /path` routes of [publicRoutes], and hands the token to
+/// the handlers ([deviceTokenOf]).
+///
+/// The token is `Authorization: Bearer <device token>`, or, under `/api/v1`
+/// only and only without `Authorization`, the session cookie of a browser,
+/// which authenticates a `web` token and no other (ADR 0018, D3a). A request
+/// with `Authorization` is a bearer request: its cookie is never read.
 Middleware authMiddleware(
   TokenService tokens, {
   Set<String> publicPaths = const {},
+  Set<String> publicRoutes = const {},
 }) =>
     (inner) => (request) async {
-      if (publicPaths.contains(_pathOf(request))) {
+      final path = _pathOf(request);
+      if (publicPaths.contains(path) ||
+          publicRoutes.contains('${request.method} $path')) {
         return await inner(request);
       }
       final header = request.headers['authorization'];
+      if (header == null && isUnderApiMount(request)) {
+        for (final secret in SessionCookie.secretsOf(request)) {
+          final token = await tokens.authenticate(secret);
+          if (token != null && token.kind == DeviceTokenKind.web) {
+            return await inner(
+              request.change(
+                context: {_tokenContextKey: token, _cookieContextKey: true},
+              ),
+            );
+          }
+        }
+      }
       final secret = header == null
           ? null
           : _bearer.firstMatch(header)?.group(1);

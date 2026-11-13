@@ -45,6 +45,9 @@ class RawResponse {
   final Map<String, String> headers;
 
   Map<String, dynamic> get json => jsonDecode(body) as Map<String, dynamic>;
+
+  /// The error of an error response: its `code`, `message`, ...
+  Map<String, dynamic> get error => json['error'] as Map<String, dynamic>;
 }
 
 /// A response read to the end as bytes.
@@ -119,6 +122,9 @@ class TestEngine {
     required this.clock,
     required this.people,
     required this.tokens,
+    required this.signIn,
+    required this.signInCodes,
+    required this.publicUrl,
     required this.secret,
     required this.errors,
     required this.github,
@@ -166,6 +172,7 @@ class TestEngine {
     JobLogStore? logStore,
     int logLiveCapacity = 1024,
     bool realApprovals = false,
+    Duration socketSweep = const Duration(seconds: 60),
   }) async {
     const repo = GitHubRepo(
       id: 42,
@@ -382,9 +389,22 @@ class TestEngine {
       clock: clock,
     );
     final appStoreConnect = FakeAppStoreConnect();
+    final signInCodes = InMemorySignInCodeRepository();
+    final signIn = SignInCodeService(
+      codes: signInCodes,
+      people: people,
+      tokens: tokens,
+      clock: clock,
+    );
+    final publicUrl = PublicUrlService(
+      settings: InMemoryEngineSettingRepository(),
+    );
     final server = await XpdServer.start(
       tokens: tokens,
       people: PersonService(people: people, tokens: tokens, clock: clock),
+      signIn: signIn,
+      publicUrl: publicUrl,
+      socketSweep: socketSweep,
       events: events,
       projects: ProjectService(
         repository: projects,
@@ -481,6 +501,9 @@ class TestEngine {
       clock: clock,
       people: people,
       tokens: tokens,
+      signIn: signIn,
+      signInCodes: signInCodes,
+      publicUrl: publicUrl,
       secret: issued.secret,
       errors: errors,
       github: github,
@@ -619,6 +642,15 @@ class TestEngine {
   final InMemoryPersonRepository people;
   final TokenService tokens;
 
+  /// Issues sign-in codes and signs browsers in.
+  final SignInCodeService signIn;
+
+  /// The sign-in codes issued.
+  final InMemorySignInCodeRepository signInCodes;
+
+  /// The public URL of the engine.
+  final PublicUrlService publicUrl;
+
   /// A valid `app` token.
   final String secret;
 
@@ -737,6 +769,7 @@ class TestEngine {
     String path, {
     String? token,
     bool root = false,
+    Map<String, String> headers = const {},
   }) => request(
     path,
     token: token,
@@ -746,6 +779,7 @@ class TestEngine {
       'upgrade': 'websocket',
       'sec-websocket-version': '13',
       'sec-websocket-key': base64.encode(List.filled(16, 7)),
+      ...headers,
     },
   );
 
@@ -775,12 +809,16 @@ class TestEngine {
     String jobId, {
     int? after,
     String? token,
+    Map<String, String> headers = const {},
   }) async {
     final query = after == null ? '' : '?after=$after';
     final bearer = token ?? secret;
     final socket = await WebSocket.connect(
       'ws://127.0.0.1:${uri.port}$apiMount/jobs/$jobId/logs$query',
-      headers: {if (bearer.isNotEmpty) 'authorization': 'Bearer $bearer'},
+      headers: {
+        if (bearer.isNotEmpty) 'authorization': 'Bearer $bearer',
+        ...headers,
+      },
     );
     return JobLogStream(socket);
   }
@@ -825,15 +863,48 @@ class TestEngine {
   }
 
   /// Opens the event stream.
-  Future<EventStream> connect({int? after, String? token}) async {
+  Future<EventStream> connect({
+    int? after,
+    String? token,
+    Map<String, String> headers = const {},
+  }) async {
     final query = after == null ? '' : '?after=$after';
     final bearer = token ?? secret;
     final socket = await WebSocket.connect(
       'ws://127.0.0.1:${uri.port}$apiMount/events$query',
-      headers: {if (bearer.isNotEmpty) 'authorization': 'Bearer $bearer'},
+      headers: {
+        if (bearer.isNotEmpty) 'authorization': 'Bearer $bearer',
+        ...headers,
+      },
     );
     return EventStream(socket);
   }
+
+  /// The origin of a page this engine serves on this machine.
+  String get loopbackOrigin => 'http://127.0.0.1:${uri.port}';
+
+  /// Signs a browser in as the person [personId], from [loopbackOrigin], and
+  /// returns its session cookie, `xp_session=<secret>`.
+  Future<String> signInBrowser([String? personId]) async {
+    final code = await signIn.issue(personId ?? testOwner.id);
+    final response = await request(
+      '/session',
+      method: 'POST',
+      token: '',
+      headers: {'origin': loopbackOrigin},
+      body: jsonEncode({'code': code.code}),
+    );
+    expect(response.statusCode, 200, reason: response.body);
+    return response.headers['set-cookie']!.split(';').first;
+  }
+
+  /// The headers of a browser request with [cookie] from [loopbackOrigin],
+  /// with the CSRF header.
+  Map<String, String> browser(String cookie) => {
+    'cookie': cookie,
+    'origin': loopbackOrigin,
+    'x-xpath-csrf': '1',
+  };
 }
 
 /// The frames of one `/events` connection.

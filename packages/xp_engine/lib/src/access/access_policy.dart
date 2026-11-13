@@ -12,7 +12,9 @@ import 'package:xp_engine/src/tokens/device_token.dart';
 /// - an `mcp` token may [Permission.develop] and nothing else, so an agent
 ///   never decides or changes gates;
 /// - only `app` and `web` tokens turn gates off ([mayLoosenGates]) or make
-///   tokens ([mayCreateTokens]).
+///   tokens ([mayCreateTokens]);
+/// - a sign-in code for the web dashboard comes from an admin, or from the
+///   person's own `app` or `cli` token ([mayIssueSignInCode]).
 abstract final class AccessPolicy {
   static const Set<DeviceTokenKind> _people = {
     DeviceTokenKind.app,
@@ -62,6 +64,21 @@ abstract final class AccessPolicy {
   /// token of any role.
   static bool mayCreateTokens(DeviceToken token) =>
       _interactive.contains(token.kind) && token.role != null;
+
+  /// Whether [token] may issue a sign-in code for the person [personId]
+  /// (D9): an admin may for anyone, and a person's own `app` or `cli` token
+  /// for them, so the app and `xp dashboard` open the dashboard. An agent's
+  /// token never may, and neither may a browser for itself.
+  static bool mayIssueSignInCode(DeviceToken token, String personId) =>
+      allows(token, Permission.administer) ||
+      (_selfSignIn.contains(token.kind) &&
+          token.role != null &&
+          token.personId == personId);
+
+  static const Set<DeviceTokenKind> _selfSignIn = {
+    DeviceTokenKind.app,
+    DeviceTokenKind.cli,
+  };
 
   static bool _kindAllows(DeviceTokenKind kind, Permission permission) =>
       _people.contains(kind) ||

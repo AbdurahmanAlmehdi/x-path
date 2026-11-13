@@ -393,7 +393,34 @@ export PATH="$PWD/.fvm/flutter_sdk/bin:$HOME/.pub-cache/bin:$PATH"
 
 ### Phase 4: Browser sessions
 
-- **Status:** Not started
+- **Status:** Done
+- **Built (notes for later phases):**
+  - Engine: `signin/` has `SignInCodeService` (`issue`, `issueFor(asker, id)`, `signIn(code)` → a `web`
+    `IssuedToken`; the 20-failure window is in memory), `SignInCodeRepository` (`use` is one
+    `UPDATE … RETURNING`) and `PublicUrlService` (an `https` origin only, kept once read, key `public_url`).
+    `AccessPolicy.mayIssueSignInCode` holds D9. `TokenService.issueWeb` (8 h, name `Browser`),
+    `revocations` (ids from `revoke`, `revokeFor`, `revokeAllOf`) and expiry in `authenticate`/`listFor`
+    (`DeviceToken.expiresAt`, `isValidAt`). Migration v25 adds `device_token.expires_at` (web only) and
+    `sign_in_code`.
+  - API: new codes `csrf` (403) and `rate_limited` (429, `Retry-After`); close code `sessionEndedCloseCode`
+    (4401) in `xp_api`; models `SignInCode` (`signInUrl(origin)` puts the code in the fragment),
+    `SignInRequest`, `PublicUrl`, `SetPublicUrlRequest`.
+  - xpd: `AllowedOrigins` (D15, port from the connection's `localPort`, `fromLoopback` for D3),
+    `SessionCookie` (names and `Set-Cookie`), `authMiddleware(publicRoutes:)` reads the cookie only under
+    `/api/v1` and without `Authorization` (`authenticatedByCookie`), `csrfMiddleware` after it,
+    `socketOriginRefusal` and `TokenSockets` (shared by `/events` and job logs; `XpdServer.start(socketSweep:)`)
+    for D12. `POST /session` refuses the root alias (404); its `403` for a foreign origin carries a `hint`.
+    `SessionRoutes` also serves `POST /people/{id}/sign-in-codes`; `SettingsRoutes` the public URL.
+    `TestEngine` has `signIn`, `publicUrl`, `loopbackOrigin`, `signInBrowser()`, `browser(cookie)`.
+  - `xpd person create` keeps the id alone on stdout and tells the code on stderr; `xpd person code
+    <name or id>` prints the code on stdout.
+  - Clients: `XpClient.createSignInCode`, `publicUrl`, `setPublicUrl`, `dashboardSignInUrl()` (me → code →
+    public URL, else the client's base URL); `SettingsRepository.dashboardSignInUrl`; `xp dashboard
+    [--print]` (`XpContext.openBrowser`), `xp settings public-url [<url> | --clear]`; the Mac app's
+    Settings ▸ Web dashboard (`DashboardBloc`, `droppable`, takes `AppServices.openUrl`). No settings goldens
+    exist, so none changed.
+  - Like the Mac app's `openUrl`, `xp dashboard` hands the link (with its one-time code) to `open` /
+    `xdg-open` as an argument, as D9 asks; `--print` avoids it.
 - **Scope:**
   - Sign-in codes, with migration v25 (the `sign_in_code` table), plus what Phase 2 deferred to them:
     `POST /people/{id}/sign-in-codes`, `xpd person code <name>`, and the code `xpd person create` prints.

@@ -250,6 +250,69 @@ void main() {
     });
   });
 
+  group('issueWeb', () {
+    test('issues an 8-hour web token for the person', () async {
+      final issued = await service.issueWeb(personId: owner.id);
+
+      expect(issued.token.kind, DeviceTokenKind.web);
+      expect(issued.token.name, 'Browser');
+      expect(issued.token.personId, owner.id);
+      expect(issued.token.person, owner);
+      expect(
+        issued.token.expiresAt,
+        DateTime.utc(2026, 10, 13, 8).add(TokenService.webSessionLifetime),
+      );
+      expect(await repository.list(), [issued.token]);
+    });
+
+    test('refuses a removed or unknown person', () async {
+      await people.add(
+        personWith(PersonRole.viewer).copyWith(removedAt: clock.now()),
+      );
+
+      expect(service.issueWeb(personId: 'per_viewer'), throwsArgumentError);
+      expect(service.issueWeb(personId: 'per_nope'), throwsArgumentError);
+    });
+
+    test('stops authenticating and being listed once it expires', () async {
+      final issued = await service.issueWeb(personId: owner.id);
+      final app = await service.issue(name: 'a', kind: DeviceTokenKind.app);
+      clock.advance(const Duration(hours: 7, minutes: 59));
+
+      expect(await service.authenticate(issued.secret), isNotNull);
+      expect(await service.listFor(app.token.withPerson(owner)), hasLength(2));
+
+      clock.advance(const Duration(minutes: 1));
+
+      expect(await service.authenticate(issued.secret), isNull);
+      expect(await service.listFor(app.token.withPerson(owner)), [app.token]);
+    });
+  });
+
+  group('revocations', () {
+    test('tells the id of each token revoked, and only then', () async {
+      final revoked = <String>[];
+      service.revocations.listen(revoked.add);
+      final a = await service.issue(name: 'a', kind: DeviceTokenKind.app);
+      final b = await service.issue(name: 'b', kind: DeviceTokenKind.cli);
+      final sam = personWith(PersonRole.developer);
+      await people.add(sam);
+      final c = await service.issue(
+        name: 'c',
+        kind: DeviceTokenKind.cli,
+        personId: sam.id,
+      );
+
+      await service.revoke(a.token.id);
+      await service.revoke(a.token.id);
+      await service.revoke('tok_nope');
+      await service.revokeAllOf(owner.id);
+      await service.revokeFor(c.token.withPerson(sam), c.token.id);
+
+      expect(revoked, [a.token.id, b.token.id, c.token.id]);
+    });
+  });
+
   group('revoke', () {
     test('stops the token from authenticating, once', () async {
       final issued = await service.issue(

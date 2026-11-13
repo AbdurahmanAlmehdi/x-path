@@ -11,6 +11,7 @@ class PersonCommand extends Command<int> {
   /// Creates the command.
   new(this._context) {
     addSubcommand(PersonCreateCommand(_context));
+    addSubcommand(PersonCodeCommand(_context));
     addSubcommand(PersonListCommand(_context));
   }
 
@@ -26,7 +27,9 @@ class PersonCommand extends Command<int> {
   String get description => 'Manage the people who use the engine.';
 }
 
-/// `xpd person create`: adds a person and prints their id.
+/// `xpd person create`: adds a person, prints their id, and tells a sign-in
+/// code for the web dashboard (D8), so the first admin of a headless engine
+/// can sign in.
 class PersonCreateCommand extends XpdCommand {
   /// Creates the command.
   new(super.context) {
@@ -48,7 +51,9 @@ class PersonCreateCommand extends XpdCommand {
   String get name => 'create';
 
   @override
-  String get description => 'Add a person with a role and print their id.';
+  String get description =>
+      'Add a person with a role, print their id and a sign-in code for the '
+      'web dashboard.';
 
   @override
   Future<int> run() async {
@@ -59,14 +64,15 @@ class PersonCreateCommand extends XpdCommand {
     }
     if (role == null) usageException('--role is required.');
     try {
-      final person = await withDatabase(
-        (database) =>
-            _people(database)
-                .create(name: name, role: PersonRole.values.byName(role)),
-      );
+      final (person, code) = await withDatabase((database) async {
+        final person = await _people(database)
+            .create(name: name, role: PersonRole.values.byName(role));
+        return (person, await _signIn(database).issue(person.id));
+      });
       context.err.writeln(
         'Added ${person.name}, ${person.role.name} (${person.id}).',
       );
+      _tellCode(context, person, code);
       context.out.writeln(person.id);
       return 0;
     } on PersonException catch (error) {
@@ -75,6 +81,61 @@ class PersonCreateCommand extends XpdCommand {
     }
   }
 }
+
+/// `xpd person code <name or id>`: issues a new sign-in code for the web
+/// dashboard (D8) and prints it. The person's unused codes stop working.
+class PersonCodeCommand extends XpdCommand {
+  /// Creates the command.
+  new(super.context);
+
+  @override
+  String get name => 'code';
+
+  @override
+  String get description =>
+      'Issue a sign-in code for the web dashboard and print it. It works '
+      'once, for 10 minutes.';
+
+  @override
+  String get invocation => 'xpd person code <name or id>';
+
+  @override
+  Future<int> run() async {
+    final rest = argResults!.rest;
+    if (rest.length != 1) usageException('Give one name or person id.');
+    final wanted = rest.single.trim();
+    final issued = await withDatabase((database) async {
+      final people = await _people(database).list();
+      final person = people
+          .where((p) => !p.isRemoved)
+          .where(
+            (p) =>
+                p.id == wanted || p.name.toLowerCase() == wanted.toLowerCase(),
+          )
+          .firstOrNull;
+      if (person == null) return null;
+      return (person, await _signIn(database).issue(person.id));
+    });
+    if (issued == null) {
+      context.err.writeln(
+        'xpd: There is no active person "$wanted". See: xpd person list',
+      );
+      return 1;
+    }
+    final (person, code) = issued;
+    _tellCode(context, person, code);
+    context.out.writeln(code.code);
+    return 0;
+  }
+}
+
+/// Tells, on standard error, how [person] signs in with [code].
+void _tellCode(XpdContext context, Person person, SignInCode code) =>
+    context.err.writeln(
+      'Sign-in code for ${person.name}: ${code.code}. It works once, until '
+      '${code.expiresAt.toIso8601String()}. Enter it on the sign-in page of '
+      'the dashboard (/sign-in) on this machine, or through the public URL.',
+    );
 
 /// `xpd person list`: prints every person, one per line.
 class PersonListCommand extends XpdCommand {
@@ -106,15 +167,21 @@ class PersonListCommand extends XpdCommand {
   }
 }
 
-PersonService _people(SqliteDatabase database) {
-  final people = SqlitePersonRepository(database);
-  return PersonService(
-    people: people,
-    tokens: TokenService(
-      tokens: SqliteDeviceTokenRepository(database),
-      people: people,
-      clock: const SystemClock(),
-    ),
-    clock: const SystemClock(),
-  );
-}
+PersonService _people(SqliteDatabase database) => PersonService(
+  people: SqlitePersonRepository(database),
+  tokens: _tokens(database),
+  clock: const SystemClock(),
+);
+
+SignInCodeService _signIn(SqliteDatabase database) => SignInCodeService(
+  codes: SqliteSignInCodeRepository(database),
+  people: SqlitePersonRepository(database),
+  tokens: _tokens(database),
+  clock: const SystemClock(),
+);
+
+TokenService _tokens(SqliteDatabase database) => TokenService(
+  tokens: SqliteDeviceTokenRepository(database),
+  people: SqlitePersonRepository(database),
+  clock: const SystemClock(),
+);

@@ -29,6 +29,7 @@ const engineMigrations = <Migration>[
   Migration(version: 22, sql: _v22, foreignKeysOff: true),
   Migration(version: 23, sql: _v23, foreignKeysOff: true),
   Migration(version: 24, sql: _v24),
+  Migration(version: 25, sql: _v25),
 ];
 
 // Timestamps are integer microseconds since the Unix epoch (UTC), so that
@@ -773,4 +774,20 @@ CREATE INDEX idx_approval_due ON approval (expires_at) WHERE state = 'pending';
 const _v24 = '''
 ALTER TABLE run ADD COLUMN origin TEXT
   CHECK (origin IS NULL OR json_valid(origin));
+''';
+
+/// Browser sessions (ADR 0018): a `web` token expires (D11), and a browser
+/// signs in with a one-time code, of which only the SHA-256 is kept (D10).
+const _v25 = '''
+ALTER TABLE device_token ADD COLUMN expires_at INTEGER
+  CHECK (expires_at IS NULL OR kind = 'web');
+
+CREATE TABLE sign_in_code (
+  hash TEXT PRIMARY KEY,
+  person_id TEXT NOT NULL REFERENCES person (id),
+  created_at INTEGER NOT NULL,
+  expires_at INTEGER NOT NULL,
+  used_at INTEGER
+) STRICT;
+CREATE INDEX idx_sign_in_code_person ON sign_in_code (person_id);
 ''';

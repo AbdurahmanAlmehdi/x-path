@@ -622,6 +622,15 @@ class ServeCommand extends XpdCommand {
       );
       final server = await XpdServer.start(
         tokens: tokenService,
+        signIn: SignInCodeService(
+          codes: SqliteSignInCodeRepository(database),
+          people: personRepository,
+          tokens: tokenService,
+          clock: const SystemClock(),
+        ),
+        publicUrl: PublicUrlService(
+          settings: SqliteEngineSettingRepository(database),
+        ),
         people: PersonService(
           people: personRepository,
           tokens: tokenService,
