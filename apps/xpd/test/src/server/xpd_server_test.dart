@@ -59,7 +59,7 @@ void main() {
       expect(response.statusCode, 404);
       expect(response.json['error'], {
         'code': 'not_found',
-        'message': 'No route for GET /nope.',
+        'message': 'No route for GET /api/v1/nope.',
       });
     });
 

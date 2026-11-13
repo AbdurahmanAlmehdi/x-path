@@ -110,7 +110,10 @@ void main() {
 
       expect(response.statusCode, 201);
       final credential = NamedCredential.fromJson(response.json);
-      expect(response.headers['location'], '/credentials/${credential.id}');
+      expect(
+        response.headers['location'],
+        '/api/v1/credentials/${credential.id}',
+      );
       expect(credential.name, 'Studio Shorebird');
       expect(credential.account, 'dev@example.com');
       expect(credential.usedBy, isEmpty);
@@ -532,7 +535,7 @@ void main() {
 
       expect(first.statusCode, 201);
       final credential = Credential.fromJson(first.json);
-      expect(first.headers['location'], '/credentials/${credential.id}');
+      expect(first.headers['location'], '/api/v1/credentials/${credential.id}');
       expect(credential.name, startsWith('Shorebird API key · '));
       expect(credential.flavor, 'default');
       expect(second.statusCode, 200);

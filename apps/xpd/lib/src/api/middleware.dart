@@ -35,7 +35,7 @@ Middleware runnerRefusalMiddleware(
 ) =>
     (inner) => (request) async {
       final response = await inner(request);
-      if (request.requestedUri.path != '/runners/connect') return response;
+      if (_pathOf(request) != '/runners/connect') return response;
       final why = switch (response.statusCode) {
         401 => 'an unknown or revoked credential (401)',
         403 => 'not a runner token (403)',
@@ -45,6 +45,10 @@ Middleware runnerRefusalMiddleware(
       if (why != null) onRefused(_addressOf(request), why);
       return response;
     };
+
+/// The path of [request] within the API, whether it came under `/api/v1` or
+/// to its root alias.
+String _pathOf(Request request) => '/${request.url.path}';
 
 String _addressOf(Request request) {
   final info = request.context['shelf.io.connection_info'];
@@ -78,7 +82,7 @@ Middleware authMiddleware(
   Set<String> publicPaths = const {},
 }) =>
     (inner) => (request) async {
-      if (publicPaths.contains(request.requestedUri.path)) {
+      if (publicPaths.contains(_pathOf(request))) {
         return await inner(request);
       }
       final header = request.headers['authorization'];
@@ -100,7 +104,7 @@ Middleware authMiddleware(
 /// the upload of an artifact of a job it holds and the download of the bundle
 /// it updates itself with, and nothing else.
 bool _runnerMayReach(Request request) {
-  final path = request.requestedUri.path;
+  final path = _pathOf(request);
   return (request.method == 'GET' &&
           (path == '/runners/connect' || path == '/runners/bundle')) ||
       (request.method == 'PUT' && _artifactUpload.hasMatch(path));
@@ -129,7 +133,7 @@ Middleware runnerScopeMiddleware() =>
           '(GET /runners/connect), the runner bundle '
           '(GET /runners/bundle) and the artifact upload of a job it holds '
           '(PUT /runners/jobs/{id}/artifacts/{name}), not '
-          '${request.method} ${request.requestedUri.path}.',
+          '${request.method} ${_pathOf(request)}.',
         );
       }
       return await inner(request);

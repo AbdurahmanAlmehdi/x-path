@@ -9,6 +9,7 @@ import 'package:xpd/src/api/events_route.dart';
 import 'package:xpd/src/api/github/github_token_routes.dart';
 import 'package:xpd/src/api/jobs/job_logs_route.dart';
 import 'package:xpd/src/api/jobs/jobs_routes.dart';
+import 'package:xpd/src/api/legacy_alias.dart';
 import 'package:xpd/src/api/middleware.dart';
 import 'package:xpd/src/api/people/people_routes.dart';
 import 'package:xpd/src/api/permission_middleware.dart';
@@ -33,9 +34,11 @@ const publicPaths = {'/health', '/version', '/runners/pair'};
 /// The whole HTTP API of the engine as one shelf handler, and the routes it
 /// serves.
 ///
-/// Every route but [publicPaths] needs a device token, and every mutating
-/// route the permission `route_permissions.dart` names for it. [onError]
-/// hears about exceptions that became `500` responses.
+/// The API is served under `/api/v1`, and its root paths stay bearer-only
+/// aliases ([legacyAlias], ADR 0018). Every route but [publicPaths] needs a
+/// device token, and every mutating route the permission
+/// `route_permissions.dart` names for it. [onError] hears about exceptions
+/// that became `500` responses.
 ({Handler handler, List<ApiRoute> routes}) buildApiHandler({
   required TokenService tokens,
   required PersonService people,
@@ -101,5 +104,8 @@ const publicPaths = {'/health', '/version', '/runners/pair'};
       .addMiddleware(runnerScopeMiddleware())
       .addMiddleware(permissionMiddleware(router.routes))
       .addHandler(router.call);
-  return (handler: handler, routes: router.routes);
+  return (
+    handler: legacyAlias(handler, publicPaths: publicPaths),
+    routes: router.routes,
+  );
 }

@@ -1180,13 +1180,11 @@ void main() {
     });
 
     test('keep a path prefix of the base URL', () async {
-      engine.json(
-        'GET',
-        '/engine/projects',
-        const ProjectsResponse([]).toJson(),
-      );
+      final old = await FakeEngine.start(servesApiV1: false);
+      addTearDown(old.close);
+      old.json('GET', '/engine/projects', const ProjectsResponse([]).toJson());
       final proxied = XpClient(
-        baseUrl: engine.url.replace(path: '/engine/'),
+        baseUrl: old.url.replace(path: '/engine/'),
         token: 't',
       );
       addTearDown(proxied.close);
@@ -1214,8 +1212,75 @@ void main() {
       await shared.listProjects();
       shared.close();
 
-      expect(http.sent, 1);
+      expect(http.sent, 2, reason: 'the probe of /api/v1, then the request');
       expect(http.closed, isFalse);
+    });
+  });
+
+  group('the API path', () {
+    test('is /api/v1 on an engine that serves it, probed once', () async {
+      engine.json('GET', '/projects', const ProjectsResponse([]).toJson());
+
+      await client.listProjects();
+      await client.listProjects();
+
+      expect(engine.probes, 1);
+      expect(engine.calls, hasLength(2));
+    });
+
+    test('is the root on an engine older than /api/v1', () async {
+      for (final status in [401, 404]) {
+        final old = await FakeEngine.start(servesApiV1: false);
+        addTearDown(old.close);
+        old
+          ..json(
+            'GET',
+            '/api/v1/version',
+            const <String, Object>{},
+            status: status,
+          )
+          ..json('GET', '/projects', const ProjectsResponse([]).toJson());
+        final client = XpClient(baseUrl: old.url, token: 't');
+        addTearDown(client.close);
+
+        await client.listProjects();
+        await client.listProjects();
+
+        expect(old.calls.map((call) => call.path), [
+          '/api/v1/version',
+          '/projects',
+          '/projects',
+        ], reason: '$status');
+        expect(old.calls.first.headers, isNot(contains('authorization')));
+      }
+    });
+
+    test('is probed again after an answer that does not tell', () async {
+      final old = await FakeEngine.start(servesApiV1: false);
+      addTearDown(old.close);
+      old.error(
+        'GET',
+        '/api/v1/version',
+        ApiErrorCode.internal,
+        'The engine failed to handle the request.',
+      );
+      final client = XpClient(baseUrl: old.url, token: 't');
+      addTearDown(client.close);
+
+      await expectLater(
+        client.listProjects(),
+        throwsA(isA<ApiException>().having((e) => e.statusCode, 'status', 500)),
+      );
+      old
+        ..json('GET', '/api/v1/version', const <String, Object>{}, status: 404)
+        ..json('GET', '/projects', const ProjectsResponse([]).toJson());
+
+      expect(await client.listProjects(), isEmpty);
+      expect(old.calls.map((call) => call.path), [
+        '/api/v1/version',
+        '/api/v1/version',
+        '/projects',
+      ]);
     });
   });
 

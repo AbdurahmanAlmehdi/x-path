@@ -2,6 +2,7 @@ import 'package:test/test.dart';
 import 'package:xp_api/xp_api.dart';
 import 'package:xp_client/xp_client.dart';
 
+import '../helpers/api_probe.dart';
 import '../helpers/collector.dart';
 import '../helpers/scripted_connector.dart';
 
@@ -23,6 +24,7 @@ void main() {
     delays = [];
     client = XpClient(
       baseUrl: Uri.parse('http://engine:7480'),
+      httpClient: apiProbeOnly(),
       token: 't',
       connector: connector.call,
       delay: (duration) async => delays.add(duration),
@@ -41,7 +43,7 @@ void main() {
       follow(after: 7);
       await pumpEventQueue();
 
-      expect(connector.uris.single.path, '/jobs/job_1/logs');
+      expect(connector.uris.single.path, '/api/v1/jobs/job_1/logs');
       expect(connector.afters, ['7']);
     });
 

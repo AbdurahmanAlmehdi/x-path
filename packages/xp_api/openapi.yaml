@@ -7,6 +7,15 @@ info:
     Hand-maintained; it grows phase by phase. Every response in the test
     suite is validated against this file (tests tagged `contract`).
 
+    The API is served under `/api/v1` (ADR 0018). The root paths
+    (`/projects`, ...) are deprecated aliases of the same routes for the
+    clients made before: a request to one is the API only when it carries
+    `Authorization`, or is to `/health`, `/version` or `/runners/pair`, and
+    its answer carries `Deprecation: true`, a `Sunset` date and a `Link` to
+    the same path under `/api/v1` (`rel="successor-version"`). Any other
+    request to a root path is not the API. A `Location` of an answer under
+    `/api/v1` is under `/api/v1` too.
+
     Every route except `/health` and `/version` needs a device token:
     `Authorization: Bearer <token>`. Errors are always
     `{"error": {"code": "...", "message": "..."}}`.
@@ -28,7 +37,7 @@ info:
     name: Apache-2.0
     identifier: Apache-2.0
 servers:
-  - url: http://127.0.0.1:7480
+  - url: http://127.0.0.1:7480/api/v1
     description: Default loopback address of a local engine.
 security:
   - bearerAuth: []

@@ -10,6 +10,7 @@ export 'src/api/events_route.dart';
 export 'src/api/github/github_token_routes.dart';
 export 'src/api/jobs/job_logs_route.dart';
 export 'src/api/jobs/jobs_routes.dart';
+export 'src/api/legacy_alias.dart';
 export 'src/api/middleware.dart';
 export 'src/api/people/people_routes.dart';
 export 'src/api/permission_middleware.dart';

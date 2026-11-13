@@ -36,7 +36,7 @@ get a GUI.
    tokens. One table (`AccessPolicy`) maps each mutating action to a minimum role, and the existing token-kind rules stay
    on top of it: `mcp` and `runner` tokens never decide or change gates.
 2. **Run origin.** `RunRecord.origin` records a person or an agent. Plan 1 adds triggers.
-3. **The API under `/api/v1`.** The root paths stay as aliases for bearer clients until 1.0. The SPA owns every other path.
+3. **The API under `/api/v1`.** The root paths stay as aliases for bearer clients until 2.0, on or after 2027-11-14. The SPA owns every other path.
 4. **Browser sessions.**
    - An admin issues a one-time sign-in code, and the browser exchanges it for a `web` token in a `__Host-` cookie
      (HttpOnly, Secure, SameSite=Strict).
@@ -63,7 +63,7 @@ Where the brainstorm says otherwise, this plan wins:
 
 | # | Question | Decision | Source |
 |---|---|---|---|
-| D1 | URL space | The API moves to `/api/v1`. Root paths stay as **bearer-only** aliases with `Deprecation` and `Sunset` headers, removed at 1.0. Everything else is the SPA. | owner |
+| D1 | URL space | The API moves to `/api/v1`. Root paths stay as **bearer-only** aliases with `Deprecation` and `Sunset` headers, removed in the first major release (2.0) on or after 2027-11-14, as a `feat!` change. Everything else is the SPA. | owner (2026-11-14: 2.0, one year out) |
 | D2 | Live updates | The existing WebSockets, authenticated by the session cookie plus an exact `Origin` match. No ticket, no SSE. | owner |
 | D3 | TLS | No TLS in `xpd`. Browser sign-in works only on loopback or through the configured HTTPS public URL. Plain HTTP from another machine gets `403` with the reason. | owner |
 | D3a | Cookie attributes | Chosen by the scheme of the origin that is signing in, never by request headers. Through the HTTPS `public_url`: `__Host-xp_session; Secure; HttpOnly; SameSite=Strict; Path=/`. On a loopback origin: `xp_session; HttpOnly; SameSite=Strict; Path=/`. Safari still refuses `Secure` cookies on `http://localhost` (WebKit bug 232088), and a loopback cookie never leaves the machine. | research |
@@ -356,13 +356,27 @@ export PATH="$PWD/.fvm/flutter_sdk/bin:$HOME/.pub-cache/bin:$PATH"
 
 ### Phase 3: The API under `/api/v1`
 
-- **Status:** Not started
+- **Status:** Done
+- **Built (notes for later phases):**
+  - `legacyAlias` (`api/legacy_alias.dart`) wraps the API pipeline in `buildApiHandler`, so `XpdServer` serves one
+    handler. Under `/api/v1` the request reaches the API with `api/v1` as its handler path; middlewares and routes read
+    `request.url.path` (relative), never `requestedUri.path`. A root-relative `Location` gets the `/api/v1` prefix.
+  - A root path without `Authorization` that is not public gets a JSON `404` with `Vary: Authorization`: Phase 5's
+    `WebAssets` takes that branch (keep `/api/*` out of the SPA). Aliases carry `Deprecation: true`,
+    `Sunset` (`legacySunset`) and `Link: </api/v1/…>; rel="successor-version"`.
+  - The released versions were already past 1.0 (tags `v1.x`), so the owner moved the removal (2026-11-14): the
+    aliases go in the first major release (2.0) on or after the `Sunset` date, 2027-11-14, as a `feat!` change.
+  - `xp_client` probes `GET /api/v1/version` once without a token: `200` means `/api/v1`, `401`/`404` the root (an
+    older engine answers `401` there); any other answer or a connection failure is not remembered. Its test
+    `FakeEngine` serves `/api/v1` by default (`servesApiV1: false` for an old engine), so tests keep API paths.
+  - `TestEngine.request`, `handshake`, `download` and the socket helpers go to `/api/v1`; `root: true` (and
+    `connectRunner(root: true)`) hits the alias. `legacy_alias_contract_test.dart` checks one route per group.
 - **Scope:**
   - Mount the router at `/api/v1`, plus the bearer-only root alias dispatcher with `Deprecation` and `Sunset` headers.
   - `openapi.yaml` servers go to `/api/v1`.
   - `xp_client` moves, with a probe fallback for older engines.
   - The contract tests call `/api/v1`, plus one alias test per route group.
-  - ADR 0018 (the web dashboard: same origin, `/api/v1` with aliases until 1.0, cookie sessions, CSRF, sockets, packaging;
+  - ADR 0018 (the web dashboard: same origin, `/api/v1` with aliases until 2.0, cookie sessions, CSRF, sockets, packaging;
     it amends the "browsers are refused" rule), in the same PR.
 - **Files touched:**
   - `apps/xpd/lib/src/api/{api_handler,legacy_alias}.dart`, `apps/xpd/lib/src/server/xpd_server.dart`
@@ -575,7 +589,7 @@ NON-GOALS:
 - Mac-only parts in the web: local engine agent, CLI link, menu bar extra, Remove XPath
 - People management in the Mac app (it gets the "Open dashboard" button and the public URL field only)
 - Localization of the web app
-- Removing the root API aliases (scheduled for 1.0)
+- Removing the root API aliases (scheduled for 2.0, on or after 2027-11-14)
 
 VERIFICATION COMMAND: export PATH="$PWD/.fvm/flutter_sdk/bin:$HOME/.pub-cache/bin:$PATH" && dart analyze --fatal-infos && dart format --set-exit-if-changed . && dart run tool/check_layers.dart && (cd packages/xp_adapters && dart test test/src/sqlite/) && ! grep -rnE "kind (!=|==) DeviceTokenKind\.(app|cli)" packages/xp_engine/lib apps/xpd/lib --exclude-dir=access && (cd apps/xpd && dart test) && melos run test:coverage && melos run test:contract && (cd apps/xp_web && npm ci && npm run lint && npm run typecheck && npm run test:coverage && npm run gen:api:check && npm run build) && tool/e2e/smoke_bundle.sh && tool/e2e/web_e2e.sh && tool/e2e/quickstart_cli.sh && tool/e2e/mcp_gate_e2e.sh
 ```
@@ -598,7 +612,7 @@ VERIFICATION COMMAND: export PATH="$PWD/.fvm/flutter_sdk/bin:$HOME/.pub-cache/bi
 | Risk | Mitigation |
 |---|---|
 | A role mistake lets a viewer release | `AccessPolicy` is pure and tested across every role × kind × permission. The route table is exhaustive and closed by default. Phase 1 keeps today's owner behaviour (admin) bit-for-bit. |
-| Moving to `/api/v1` breaks an installed runner or `xp` | Bearer-only aliases until 1.0. The client probes and falls back. `quickstart_cli.sh`, `mcp_gate_e2e.sh` and an old-runner alias test cover it. |
+| Moving to `/api/v1` breaks an installed runner or `xp` | Bearer-only aliases until 2.0 (on or after 2027-11-14). The client probes and falls back. `quickstart_cli.sh`, `mcp_gate_e2e.sh` and an old-runner alias test cover it. |
 | CSRF or cross-site socket hijacking | SameSite=Strict plus `X-XPath-CSRF` plus an exact Origin set (D14, D15). Cookies are refused on aliases and on the runner socket. A test for each refusal. |
 | The cookie is not set on plain-HTTP LAN | D3 refuses sign-in with a message that names the fix (public URL behind HTTPS). The guide has the Caddy and `tailscale serve` recipes. |
 | A secret reaches the browser | The API already never returns secret values (contract tests). Uploads are write-only. A Playwright check asserts no credential bytes in any response during the admin spec. |
@@ -614,7 +628,7 @@ VERIFICATION COMMAND: export PATH="$PWD/.fvm/flutter_sdk/bin:$HOME/.pub-cache/bi
 ## Future Considerations
 
 - A git-host login (GitHub, GitLab) attached to the same `person`.
-- Removing the root aliases at 1.0.
+- Removing the root aliases in 2.0, on or after 2027-11-14.
 - Plan 1 reuses `public_url` for check-run links, `RunOrigin` for triggers, and `AccessPolicy` for `pr_from_fork` (developer).
 - People management in the Mac app, if Mac-only teams want it.
 

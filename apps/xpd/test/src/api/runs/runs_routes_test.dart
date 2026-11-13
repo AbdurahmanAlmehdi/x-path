@@ -111,7 +111,7 @@ void main() {
       final again = Run.fromJson(response.json);
       expect(again.id, isNot(first.id));
       expect(again.workflowVersionId, first.workflowVersionId);
-      expect(response.headers['location'], '/runs/${again.id}');
+      expect(response.headers['location'], '/api/v1/runs/${again.id}');
       expect(
         (await client.send('POST', '/runs/run_nope/run-again')).statusCode,
         404,

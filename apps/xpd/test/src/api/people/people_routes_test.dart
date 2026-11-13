@@ -47,7 +47,7 @@ void main() {
       final sam = Person.fromJson(response.json);
       expect(sam.name, 'Sam');
       expect(sam.role, PersonRole.developer);
-      expect(response.headers['location'], '/people/${sam.id}');
+      expect(response.headers['location'], '/api/v1/people/${sam.id}');
       expect(await engine.people.get(sam.id), sam);
     });
 

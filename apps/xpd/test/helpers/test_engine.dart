@@ -649,18 +649,25 @@ class TestEngine {
 
   Future<void> close() => server.close();
 
-  /// Sends a plain request. Sends the valid token unless [token] is given;
-  /// pass an empty string for no `Authorization` header.
+  /// Where [path] of the API is: under `/api/v1`, or at the root alias
+  /// with [root].
+  Uri at(String path, {bool root = false}) =>
+      uri.resolve(root ? path : '$apiMount$path');
+
+  /// Sends a plain request to [path] of the API (at its root alias with
+  /// [root]). Sends the valid token unless [token] is given; pass an empty
+  /// string for no `Authorization` header.
   Future<RawResponse> request(
     String path, {
     String method = 'GET',
     String? token,
     Map<String, String> headers = const {},
     String? body,
+    bool root = false,
   }) async {
     final client = HttpClient();
     try {
-      final request = await client.openUrl(method, uri.resolve(path));
+      final request = await client.openUrl(method, at(path, root: root));
       final bearer = token ?? secret;
       if (bearer.isNotEmpty) {
         request.headers.set('authorization', 'Bearer $bearer');
@@ -688,7 +695,7 @@ class TestEngine {
   Future<RawBytes> download(String path, {String? token}) async {
     final client = HttpClient();
     try {
-      final request = await client.getUrl(uri.resolve(path));
+      final request = await client.getUrl(at(path));
       final bearer = token ?? secret;
       if (bearer.isNotEmpty) {
         request.headers.set('authorization', 'Bearer $bearer');
@@ -726,9 +733,14 @@ class TestEngine {
 
   /// Like [request] but with the headers of a WebSocket handshake, so that the
   /// engine answers with the real status instead of 426.
-  Future<RawResponse> handshake(String path, {String? token}) => request(
+  Future<RawResponse> handshake(
+    String path, {
+    String? token,
+    bool root = false,
+  }) => request(
     path,
     token: token,
+    root: root,
     headers: {
       'connection': 'Upgrade',
       'upgrade': 'websocket',
@@ -767,17 +779,18 @@ class TestEngine {
     final query = after == null ? '' : '?after=$after';
     final bearer = token ?? secret;
     final socket = await WebSocket.connect(
-      'ws://127.0.0.1:${uri.port}/jobs/$jobId/logs$query',
+      'ws://127.0.0.1:${uri.port}$apiMount/jobs/$jobId/logs$query',
       headers: {if (bearer.isNotEmpty) 'authorization': 'Bearer $bearer'},
     );
     return JobLogStream(socket);
   }
 
-  /// Opens the connection of a runner with [token] as its credential.
-  Future<RunnerStream> connectRunner({String? token}) async {
+  /// Opens the connection of a runner with [token] as its credential, at
+  /// the root alias with [root], as a runner made before `/api/v1` does.
+  Future<RunnerStream> connectRunner({String? token, bool root = false}) async {
     final bearer = token ?? secret;
     final socket = await WebSocket.connect(
-      'ws://127.0.0.1:${uri.port}/runners/connect',
+      'ws://127.0.0.1:${uri.port}${root ? '' : apiMount}/runners/connect',
       headers: {if (bearer.isNotEmpty) 'authorization': 'Bearer $bearer'},
     );
     return RunnerStream(socket);
@@ -816,7 +829,7 @@ class TestEngine {
     final query = after == null ? '' : '?after=$after';
     final bearer = token ?? secret;
     final socket = await WebSocket.connect(
-      'ws://127.0.0.1:${uri.port}/events$query',
+      'ws://127.0.0.1:${uri.port}$apiMount/events$query',
       headers: {if (bearer.isNotEmpty) 'authorization': 'Bearer $bearer'},
     );
     return EventStream(socket);

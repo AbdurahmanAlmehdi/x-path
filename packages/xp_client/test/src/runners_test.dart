@@ -6,6 +6,7 @@ import 'package:test/test.dart';
 import 'package:xp_api/xp_api.dart';
 import 'package:xp_client/xp_client.dart';
 
+import '../helpers/api_probe.dart';
 import '../helpers/fake_engine.dart';
 import '../helpers/samples.dart' as sample;
 import '../helpers/scripted_connector.dart';
@@ -200,6 +201,7 @@ void main() {
       Map<String, String>? sent;
       final runner = XpClient(
         baseUrl: Uri.parse('http://engine:7480'),
+        httpClient: apiProbeOnly(),
         token: 'xpt_runner',
         connector: (uri, headers) {
           sent = headers;
@@ -213,7 +215,7 @@ void main() {
       expect(identical(channel, socket), isTrue);
       expect(
         connector.uris.single.toString(),
-        'ws://engine:7480/runners/connect',
+        'ws://engine:7480/api/v1/runners/connect',
       );
       expect(sent!['authorization'], 'Bearer xpt_runner');
     });
@@ -223,6 +225,7 @@ void main() {
         ..fail(const ApiException('No.', statusCode: 403));
       final runner = XpClient(
         baseUrl: Uri.parse('http://engine:7480'),
+        httpClient: apiProbeOnly(),
         token: 'xp_secret',
         connector: connector.call,
       );
