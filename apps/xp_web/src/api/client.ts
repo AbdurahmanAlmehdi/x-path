@@ -5,9 +5,31 @@ import type { components, paths } from './schema'
 /** Where the engine serves its API (ADR 0018). */
 export const apiBase = '/api/v1'
 
-export type Me = components['schemas']['Me']
-export type Permission = components['schemas']['Permission']
-export type ApiError = components['schemas']['ErrorResponse']['error']
+type Schemas = components['schemas']
+
+export type Me = Schemas['Me']
+export type Permission = Schemas['Permission']
+export type ApiError = Schemas['ErrorResponse']['error']
+export type Project = Schemas['Project']
+export type AppProfile = Schemas['AppProfile']
+export type Run = Schemas['Run']
+export type RunState = Schemas['RunState']
+export type RunJob = Schemas['RunJob']
+export type Job = Schemas['Job']
+export type JobState = Schemas['JobState']
+export type JobStep = Schemas['JobStep']
+export type StepState = Schemas['StepState']
+export type WorkflowSummary = Schemas['WorkflowSummary']
+export type Workflow = Schemas['Workflow']
+export type WorkflowInput = Schemas['WorkflowInput']
+export type WorkflowSchema = Schemas['WorkflowSchema']
+export type DispatchRequest = Schemas['DispatchRequest']
+export type DispatchPlan = Schemas['DispatchPlan']
+export type VersionBump = Schemas['VersionBump']
+export type Release = Schemas['Release']
+export type SequencedEvent = Schemas['SequencedEvent']
+export type LogFrame = Schemas['LogFrame']
+export type LogLineFrame = Schemas['LogLineFrame']
 
 type Listener = () => void
 
@@ -24,6 +46,14 @@ export function onSignedOut(listener: Listener): () => void {
 }
 
 /**
+ * Tells the [onSignedOut] listeners that the engine ended the session: a
+ * `401`, or a socket it closed with 4401 (D12).
+ */
+export function sessionEnded() {
+  signedOutListeners.forEach((listener) => listener())
+}
+
+/**
  * Every request carries `X-XPath-CSRF: 1`, which a page on another site
  * cannot add without a preflight the engine never answers (D14). A `401`
  * means the session is over, except for the sign-in itself, whose `401`
@@ -36,9 +66,7 @@ export const sessionMiddleware: Middleware = {
   },
   onResponse({ request, response, schemaPath }) {
     const signingIn = schemaPath === '/session' && request.method === 'POST'
-    if (response.status === 401 && !signingIn) {
-      signedOutListeners.forEach((listener) => listener())
-    }
+    if (response.status === 401 && !signingIn) sessionEnded()
     return response
   },
 }
@@ -64,4 +92,43 @@ export function errorMessage(error: unknown, status: number): string {
     return body.hint ? `${body.message} ${body.hint}` : body.message
   }
   return `The engine answered ${status}.`
+}
+
+/** A call the engine refused or failed, with what it said. */
+export class ApiFailure extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+    /** The engine's error code, or its `details.reason` when it gives one. */
+    readonly reason: string | undefined,
+  ) {
+    super(message)
+    this.name = 'ApiFailure'
+  }
+}
+
+/**
+ * The data of a call, or an [ApiFailure] with the engine's message when it
+ * answered something else. A call that never reached the engine throws as
+ * `fetch` does.
+ */
+export async function dataOf<T>(
+  call: Promise<{ data?: T; error?: unknown; response: Response }>,
+): Promise<T> {
+  const { data, error, response } = await call
+  if (data !== undefined) return data
+  const body = (error as { error?: Partial<ApiError> } | undefined)?.error
+  const reason = (body?.details as { reason?: unknown } | undefined)?.reason
+  throw new ApiFailure(
+    errorMessage(error, response.status),
+    response.status,
+    typeof reason === 'string' ? reason : body?.code,
+  )
+}
+
+/** What to tell people about a failed call. */
+export function failureMessage(failure: unknown): string {
+  return failure instanceof ApiFailure
+    ? failure.message
+    : 'The engine did not answer. Check that it is running.'
 }

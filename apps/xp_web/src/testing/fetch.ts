@@ -4,6 +4,8 @@ import { vi } from 'vitest'
 export interface SeenRequest {
   method: string
   path: string
+  /** The query, such as `?limit=1`; empty without one. */
+  search: string
   headers: Headers
   body: unknown
 }
@@ -28,6 +30,7 @@ export function stubEngine(routes: Record<string, Answer | (() => Answer)>): See
     seen.push({
       method: request.method,
       path,
+      search: url.search,
       headers: request.headers,
       body: text === '' ? undefined : JSON.parse(text),
     })

@@ -528,7 +528,38 @@ export PATH="$PWD/.fvm/flutter_sdk/bin:$HOME/.pub-cache/bin:$PATH"
 
 ### Phase 6: Projects, dispatch, runs and the job view
 
-- **Status:** Not started
+- **Status:** Done
+- **Built (notes for later phases):**
+  - `src/api/client.ts` exports the API types the screens use, `sessionEnded()` (what a `401` and a 4401 close
+    both call), `dataOf(call)` (the data, or an `ApiFailure` with `status` and `reason`: `details.reason`, else
+    the code) and `failureMessage`. Stores call `dataOf` in `try`/`catch` and keep `error`.
+  - `src/api/sockets.ts`: `followEvents(listener)` keeps one `/events` socket per tab while someone listens,
+    resumes with `after=<seq>`, and emits `{kind: 'resync'}` on 4409 or when an upgrade with a cursor is refused
+    (a browser cannot read the `409`). `followJobLog(id, after, …)` resumes after the last line, reconnects at once
+    over a `gap`, and stops at `end`. Both back off from 1 s to 30 s; a 4401 calls `sessionEnded()` and never
+    reconnects. `payloadValue(event, key)` reads a payload string. Tests drive `src/testing/sockets.ts`
+    (`stubSockets`, `FakeSocket`, `openEventFeed`).
+  - A store's `follow()` subscribes to the events it cares about and reloads through `coalesced()`
+    (`src/app/coalesce.ts`: a burst loads at most twice); views call `useFollowing(store.follow, …)`
+    (`src/ui/following.ts`). Labels and formats of states, step kinds, versions, durations and origins are in
+    `src/ui/format.ts`, as the Mac app words them; `StatusBadge.vue` draws a state.
+  - Stores: `projects/stores/{projects,project,workflows}` (`workflows` caches each project's list for the
+    names runs show), `runs/stores/{runs,run}`, `jobs/stores/{job,log}`, `dispatch/stores/dispatch`. The log
+    store grows one `shallowRef` list and `triggerRef`s it, so `LogView` reads the store, not a prop.
+  - Routes under the shell: `/projects`, `/projects/:id`, `/projects/:id/runs`, `/projects/:id/dispatch`
+    (`?workflow=` an id or a name), `/runs` (`?project=&workflow=&state=`), `/runs/:id`, `/jobs/:id`.
+  - Deviations from the Mac app: Dispatch is a page, not a sheet. It starts with the inputs of the workflow's
+    newest run on the engine, where the Mac app remembers per device. It has no branch/tag switch, and no
+    check of GitHub steps before the engine's refusal. The run page and the job page are separate (no pipeline
+    graph). Artifacts, test results, the release rail, the credentials ledger and the "needs you" count are left
+    to Phases 7 and 8.
+  - CSP: `connect-src 'self'` covers the same-origin `ws:` sockets on loopback in Chromium and in WebKit
+    (`http://localhost`); `web_assets.dart` is unchanged. `playwright.config.ts` runs `runs.spec.ts` on WebKit
+    too. `e2e/engine.ts` has `fixtureRepository(name)` (tool/e2e/build_app with a `file://` origin);
+    `runs.spec.ts` adds it as a project, dispatches `dev-build` (then cancels it) and a `count` workflow whose
+    log socket the spec drops once.
+  - `docs/guide/dashboard.md`: signing in, the first admin of a headless engine, roles, dispatch and logs, and
+    the proxy recipe (Caddy, Tailscale) with `xp settings public-url`.
 - **Scope:**
   - Projects list and project overview (apps, flavors, last runs). This mirrors `apps/xp_desktop/lib/{projects,project_overview}`.
   - Dispatch form (workflow, app, flavors, platforms, bump, inputs) from `/workflows/schema`. This mirrors `lib/dispatch`.

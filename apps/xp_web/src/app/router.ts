@@ -50,6 +50,41 @@ export function createAppRouter(history: RouterHistory = createWebHistory()): Ro
             component: () => import('@/ui/HomeView.vue'),
           },
           {
+            path: 'projects',
+            name: 'projects',
+            component: () => import('@/features/projects/views/ProjectsView.vue'),
+          },
+          {
+            path: 'projects/:id',
+            name: 'project',
+            component: () => import('@/features/projects/views/ProjectView.vue'),
+          },
+          {
+            path: 'projects/:id/runs',
+            name: 'project-runs',
+            component: () => import('@/features/runs/views/RunsView.vue'),
+          },
+          {
+            path: 'projects/:id/dispatch',
+            name: 'dispatch',
+            component: () => import('@/features/dispatch/views/DispatchView.vue'),
+          },
+          {
+            path: 'runs',
+            name: 'runs',
+            component: () => import('@/features/runs/views/RunsView.vue'),
+          },
+          {
+            path: 'runs/:id',
+            name: 'run',
+            component: () => import('@/features/runs/views/RunView.vue'),
+          },
+          {
+            path: 'jobs/:id',
+            name: 'job',
+            component: () => import('@/features/jobs/views/JobView.vue'),
+          },
+          {
             path: ':pathMatch(.*)*',
             name: 'not-found',
             component: () => import('@/ui/NotFoundView.vue'),

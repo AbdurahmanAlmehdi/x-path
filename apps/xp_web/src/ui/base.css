@@ -77,3 +77,153 @@ button:disabled {
   cursor: default;
   opacity: 0.6;
 }
+
+select,
+textarea {
+  color: var(--xp-color-text-primary);
+  background: var(--xp-color-surface-base);
+  border: var(--xp-border-width-hairline) solid var(--xp-color-border-strong);
+  border-radius: var(--xp-radius-md);
+}
+
+select {
+  height: var(--xp-size-control-md);
+  padding: 0 var(--xp-space-6);
+  font: var(--xp-type-body);
+  max-width: 100%;
+}
+
+textarea {
+  padding: var(--xp-space-6) var(--xp-space-8);
+  font: var(--xp-type-code);
+}
+
+a.button {
+  display: inline-flex;
+  align-items: center;
+  height: var(--xp-size-control-md);
+  padding: 0 var(--xp-space-12);
+  font: var(--xp-type-body-strong);
+  text-decoration: none;
+  border-radius: var(--xp-radius-md);
+}
+
+a.button.primary {
+  color: var(--xp-color-text-on-accent);
+  background: var(--xp-color-accent-default);
+}
+
+a.button.primary:hover {
+  background: var(--xp-color-accent-hover);
+}
+
+button.danger {
+  color: var(--xp-color-negative-on-negative);
+  background: var(--xp-color-negative-default);
+  border-color: var(--xp-color-negative-default);
+}
+
+/* The header of a page: its title, what it is about, and its actions. */
+.page-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--xp-space-12);
+  margin-bottom: var(--xp-space-16);
+}
+
+.page-header > * {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.page-header h1 {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--xp-space-8);
+}
+
+.muted {
+  color: var(--xp-color-text-secondary);
+}
+
+.mono {
+  font: var(--xp-type-code);
+}
+
+/* What the engine said went wrong. */
+.alert {
+  margin: 0 0 var(--xp-space-12);
+  padding: var(--xp-space-8) var(--xp-space-12);
+  border-radius: var(--xp-radius-md);
+  color: var(--xp-color-status-negative-on-container);
+  background: var(--xp-color-status-negative-container);
+}
+
+.notice {
+  margin: 0 0 var(--xp-space-12);
+  padding: var(--xp-space-8) var(--xp-space-12);
+  border-radius: var(--xp-radius-md);
+  color: var(--xp-color-status-info-on-container);
+  background: var(--xp-color-status-info-container);
+}
+
+/* A titled block of a page. */
+.panel {
+  margin-bottom: var(--xp-space-16);
+  padding: var(--xp-space-12) var(--xp-space-16);
+  background: var(--xp-color-surface-base);
+  border: var(--xp-border-width-hairline) solid var(--xp-color-border-default);
+  border-radius: var(--xp-radius-lg);
+}
+
+.panel > h2 {
+  margin: 0 0 var(--xp-space-8);
+}
+
+/* Label and value pairs. */
+.facts {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: var(--xp-space-4) var(--xp-space-16);
+  margin: 0;
+}
+
+.facts dt {
+  color: var(--xp-color-text-secondary);
+}
+
+.facts dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+/* A table that scrolls on its own on a narrow window. */
+.table-wrap {
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th {
+  text-align: left;
+  font: var(--xp-type-label);
+  color: var(--xp-color-text-tertiary);
+}
+
+th,
+td {
+  padding: var(--xp-space-6) var(--xp-space-8);
+  border-bottom: var(--xp-border-width-hairline) solid var(--xp-color-border-subtle);
+  vertical-align: top;
+}

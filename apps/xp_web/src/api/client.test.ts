@@ -2,7 +2,16 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { errorBody, meOf, stubEngine, stubUnreachableEngine } from '@/testing/fetch'
 
-import { api, apiBase, errorMessage, onSignedOut } from './client'
+import {
+  api,
+  apiBase,
+  ApiFailure,
+  dataOf,
+  errorMessage,
+  failureMessage,
+  onSignedOut,
+  sessionEnded,
+} from './client'
 
 describe('api', () => {
   const stops: Array<() => void> = []
@@ -72,6 +81,63 @@ describe('api', () => {
     stubUnreachableEngine()
 
     await expect(api.GET('/me')).rejects.toThrow('Failed to fetch')
+  })
+
+  it('tells the listeners when a socket ends the session', () => {
+    const listener = listen()
+
+    sessionEnded()
+
+    expect(listener).toHaveBeenCalledOnce()
+  })
+})
+
+describe('dataOf', () => {
+  it('is the data of a call that worked', async () => {
+    stubEngine({ 'GET /me': { status: 200, body: meOf() } })
+
+    expect((await dataOf(api.GET('/me'))).person.name).toBe('Sam')
+  })
+
+  it('throws the message, status and code of the engine', async () => {
+    stubEngine({ 'GET /projects': { status: 403, body: errorBody('forbidden', 'Not you.') } })
+
+    const failure = await dataOf(api.GET('/projects')).catch((error: unknown) => error)
+
+    expect(failure).toBeInstanceOf(ApiFailure)
+    expect(failure).toMatchObject({ message: 'Not you.', status: 403, reason: 'forbidden' })
+  })
+
+  it('takes the reason from the details when the engine gives one', async () => {
+    stubEngine({
+      'GET /projects': {
+        status: 422,
+        body: { error: { code: 'workflow_invalid', message: 'No main.', details: { reason: 'ref_unknown' } } },
+      },
+    })
+
+    await expect(dataOf(api.GET('/projects'))).rejects.toMatchObject({ reason: 'ref_unknown' })
+  })
+
+  it('has no reason when the answer is not the envelope', async () => {
+    stubEngine({ 'GET /projects': { status: 502 } })
+
+    await expect(dataOf(api.GET('/projects'))).rejects.toMatchObject({
+      message: 'The engine answered 502.',
+      reason: undefined,
+    })
+  })
+})
+
+describe('failureMessage', () => {
+  it('is the message of the engine', () => {
+    expect(failureMessage(new ApiFailure('Not you.', 403, 'forbidden'))).toBe('Not you.')
+  })
+
+  it('says the engine did not answer otherwise', () => {
+    expect(failureMessage(new TypeError('Failed to fetch'))).toBe(
+      'The engine did not answer. Check that it is running.',
+    )
   })
 })
 

@@ -36,10 +36,10 @@ describe('AppShell', () => {
 
   it('says a page is not there yet', async () => {
     stubEngine({ 'GET /me': { status: 200, body: meOf() } })
-    const app = await open('/runs/abc')
+    const app = await open('/approvals/abc')
 
     expect(app.find('h1').text()).toBe('Nothing here yet')
-    expect(app.find('main code').text()).toBe('/runs/abc')
+    expect(app.find('main code').text()).toBe('/approvals/abc')
   })
 
   it('signs out and goes to sign-in', async () => {
