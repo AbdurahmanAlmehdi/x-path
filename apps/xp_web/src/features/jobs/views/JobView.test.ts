@@ -148,4 +148,18 @@ describe('JobView', () => {
     ;({ app } = await openApp('/jobs/job_2'))
     expect(app.find('[role="alert"]').text()).toBe('Broken.')
   })
+
+  it('leads to the test results of a job that ran its tests, and to the approval it waits for', async () => {
+    engine({
+      state: 'waiting_for_approval',
+      steps: [
+        { ordinal: 0, kind: 'test', state: 'succeeded', sideEffect: false, attempts: 1 },
+        { ordinal: 1, kind: 'gate', state: 'waitingForApproval', sideEffect: false, attempts: 1 },
+      ],
+    })
+    ;({ app } = await openApp('/jobs/job_2'))
+
+    expect(app.find('a[href="/projects/prj_1/tests?job=job_2"]').text()).toBe('Test results')
+    expect(app.find('main a[href="/approvals"]').text()).toBe('Review the approval')
+  })
 })

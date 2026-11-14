@@ -1,24 +1,31 @@
-import { flushPromises, mount } from '@vue/test-utils'
+import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createMemoryHistory, type Router } from 'vue-router'
 
 import App from '@/app/App.vue'
 import { navigation } from '@/app/navigation'
 import { createAppRouter } from '@/app/router'
 import { meOf, stubEngine } from '@/testing/fetch'
+import { approvalOf } from '@/testing/fixtures'
+import { openEventFeed, stubSockets } from '@/testing/sockets'
 
 describe('AppShell', () => {
   let router: Router
+  const mounted: VueWrapper[] = []
 
   beforeEach(() => {
     setActivePinia(createPinia())
+    stubSockets()
     router = createAppRouter(createMemoryHistory())
   })
+  // The shell follows the engine's events: unmounting closes its feed.
+  afterEach(() => mounted.splice(0).forEach((app) => app.unmount()))
 
   async function open(path: string) {
     await router.push(path)
     const app = mount(App, { global: { plugins: [router] } })
+    mounted.push(app)
     await flushPromises()
     return app
   }
@@ -36,10 +43,10 @@ describe('AppShell', () => {
 
   it('says a page is not there yet', async () => {
     stubEngine({ 'GET /me': { status: 200, body: meOf() } })
-    const app = await open('/approvals/abc')
+    const app = await open('/runners/abc')
 
     expect(app.find('h1').text()).toBe('Nothing here yet')
-    expect(app.find('main code').text()).toBe('/approvals/abc')
+    expect(app.find('main code').text()).toBe('/runners/abc')
   })
 
   it('signs out and goes to sign-in', async () => {
@@ -54,5 +61,21 @@ describe('AppShell', () => {
 
     expect(seen.at(-1)).toMatchObject({ method: 'DELETE', path: '/session' })
     await vi.waitFor(() => expect(router.currentRoute.value.fullPath).toBe('/sign-in'))
+  })
+
+  it('counts the approvals that wait next to Approvals, and follows them', async () => {
+    let waiting = [approvalOf()]
+    stubEngine({
+      'GET /me': { status: 200, body: meOf() },
+      'GET /approvals': () => ({ status: 200, body: { approvals: waiting } }),
+    })
+    const app = await open('/')
+
+    expect(app.find('a[href="/approvals"] [data-testid="needs-you"]').text()).toBe('1')
+
+    waiting = []
+    openEventFeed().send('approval.decided', { approvalId: 'apr_1' })
+    await flushPromises()
+    expect(app.find('[data-testid="needs-you"]').exists()).toBe(false)
   })
 })

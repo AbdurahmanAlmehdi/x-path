@@ -70,6 +70,16 @@ export function createAppRouter(history: RouterHistory = createWebHistory()): Ro
             component: () => import('@/features/dispatch/views/DispatchView.vue'),
           },
           {
+            path: 'projects/:id/releases/:releaseId?',
+            name: 'releases',
+            component: () => import('@/features/releases/views/ReleasesView.vue'),
+          },
+          {
+            path: 'projects/:id/tests',
+            name: 'tests',
+            component: () => import('@/features/tests/views/TestsView.vue'),
+          },
+          {
             path: 'runs',
             name: 'runs',
             component: () => import('@/features/runs/views/RunsView.vue'),
@@ -83,6 +93,11 @@ export function createAppRouter(history: RouterHistory = createWebHistory()): Ro
             path: 'jobs/:id',
             name: 'job',
             component: () => import('@/features/jobs/views/JobView.vue'),
+          },
+          {
+            path: 'approvals/:id?',
+            name: 'approvals',
+            component: () => import('@/features/approvals/views/ApprovalsView.vue'),
           },
           {
             path: ':pathMatch(.*)*',

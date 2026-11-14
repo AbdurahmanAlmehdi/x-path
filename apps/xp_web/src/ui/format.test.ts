@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { runOf } from '@/testing/fixtures'
 
 import {
+  formatCountdown,
   formatDuration,
   formatTime,
   isFinished,
@@ -10,6 +11,7 @@ import {
   plainText,
   pubspecLabel,
   scopeOf,
+  shortSha,
   statusOf,
   stepKind,
   timeAgo,
@@ -74,5 +76,14 @@ describe('format', () => {
 
   it('drops the escape sequences of a terminal', () => {
     expect(plainText('\u001b[32mok\u001b[0m done')).toBe('ok done')
+  })
+
+  it('shortens a commit, and counts down to a deadline', () => {
+    const now = Date.parse('2026-11-14T12:00:00Z')
+
+    expect(shortSha('0123456789abcdef')).toBe('0123456')
+    expect(formatCountdown('2026-11-15T11:51:00Z', now)).toBe('23h 51m')
+    expect(formatCountdown('2026-11-14T12:42:30Z', now)).toBe('42m')
+    expect(formatCountdown('2026-11-14T11:00:00Z', now)).toBe('0m')
   })
 })

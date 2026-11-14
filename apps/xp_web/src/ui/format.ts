@@ -3,7 +3,7 @@ import type { JobState, Run, RunState, StepState } from '@/api/client'
 /** How a state reads, with the tone of its badge. */
 export interface StatusLabel {
   label: string
-  tone: 'neutral' | 'info' | 'attention' | 'positive' | 'negative' | 'caution'
+  tone: 'neutral' | 'info' | 'attention' | 'positive' | 'negative' | 'caution' | 'merged'
 }
 
 const states: Record<JobState | RunState | StepState, StatusLabel> = {
@@ -134,4 +134,16 @@ const ansi = new RegExp('\\u001b\\[[0-9;?]*[ -/]*[@-~]', 'g')
 /** A log line without the terminal's escape sequences. */
 export function plainText(text: string): string {
   return text.replace(ansi, '')
+}
+
+/** The short form of a commit: its first seven characters. */
+export function shortSha(sha: string): string {
+  return sha.slice(0, 7)
+}
+
+/** What is left until [deadline], for an expiry: `23h 51m`, `42m`, `0m`. */
+export function formatCountdown(deadline: string, now = Date.now()): string {
+  const minutes = Math.max(0, Math.floor((Date.parse(deadline) - now) / 60_000))
+  const hours = Math.floor(minutes / 60)
+  return hours > 0 ? `${hours}h ${minutes % 60}m` : `${minutes}m`
 }

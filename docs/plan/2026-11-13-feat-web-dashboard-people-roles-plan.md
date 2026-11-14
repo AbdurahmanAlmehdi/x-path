@@ -578,7 +578,36 @@ export PATH="$PWD/.fvm/flutter_sdk/bin:$HOME/.pub-cache/bin:$PATH"
 
 ### Phase 7: Approvals, releases and tests
 
-- **Status:** Not started
+- **Status:** Done
+- **Built (notes for later phases):**
+  - Approvals (`features/approvals`): `stores/approvals` (the inbox: Pending, Decided, Expired; the
+    picked approval, from `/approvals/:id`, is shown under its own filter and that filter follows it
+    once it is decided), `stores/approval` (one approval with its job and release, and its review:
+    Approve arms after `armingDelay` (1 s), Return never approves, ⌘↩ or Ctrl+↩ does; a `409
+    already_decided` takes the approval it carries, so the review says who won), `stores/pending`
+    (the "needs you" count). Copy and labels in `labels.ts`; `deciderOf` names the person
+    (`decidedBy.personName`), else the device. Decide buttons need `decide_approval`; a developer
+    sees the approval and "your role cannot".
+  - The shell follows the pending approvals from sign-in on (`NavItem.needsYou`), so every page has
+    the `/events` socket open; a spec that waits for that socket must start waiting after sign-in.
+  - Releases (`features/releases`): `/projects/:id/releases/:releaseId?` with `stores/releases`
+    (releases, approvals and credentials of the project, the shown release's history and notes, and
+    each command with a `notice` once it went through). Refresh, merge, rollout, new build and patch
+    moves need `develop`; store marks and texts need `release`. Like the Mac app it has no Abandon
+    button and no "Add API key" button (credentials are Phase 8).
+  - Tests (`features/tests`): `/projects/:id/tests?job=` with `stores/tests` (baselines, runs that
+    end while the page is open from `test_run.completed`, the run of a job). The job page links to
+    the test results of a job that ran `test`, and to Approvals while it waits for one; the project
+    page links to Releases and Tests.
+  - `ui/Badge.vue` draws any `StatusLabel` (tone `merged` added); `StatusBadge` uses it.
+    `ui/CopyButton.vue`; `shortSha` and `formatCountdown` in `ui/format.ts`. `a.button` without
+    `primary` now looks like a button.
+  - e2e: `approvals.spec.ts` adds a project from the fixture repository and a `gated` workflow
+    (`git.checkout`, then a `command` behind `gate: prod_release`), so a run reaches the gate with no
+    toolchain. It runs on Chromium and WebKit. The race test cuts the tab's event socket with
+    `routeWebSocket` so the `409` is what tells it.
+  - Left for later: the run page's release rail (no screen needs it yet), the needs-you bar on a
+    project or release page.
 - **Scope:**
   - Approvals inbox and detail (approve or deny with a reason, and the "already decided" race).
   - Releases list and detail (stores, builds, rollout, merge, patches, notes and texts, history).

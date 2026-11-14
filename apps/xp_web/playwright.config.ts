@@ -18,10 +18,11 @@ export default defineConfig({
     { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
     {
       // WebKit refuses `Secure` cookies on http://localhost (WebKit bug
-      // 232088), so it proves the loopback cookie has none (D3a), and that
-      // the event and log sockets connect under the dashboard's CSP.
+      // 232088), so it proves the loopback cookie has none (D3a), that the
+      // event and log sockets connect under the dashboard's CSP, and that an
+      // approval is decided there as in Chromium.
       name: 'webkit',
-      testMatch: /(signin|runs)\.spec\.ts/,
+      testMatch: /(signin|runs|approvals)\.spec\.ts/,
       use: {
         ...devices['Desktop Safari'],
         baseURL: `http://localhost:${engine.port}`,

@@ -54,6 +54,11 @@ const band = computed(() => {
   return null
 })
 
+/** Whether the job ran its tests: their results open on the Tests page. */
+const ranTests = computed(() =>
+  store.job?.steps.some((step) => step.kind === 'test' && step.state !== 'pending') ?? false,
+)
+
 function took(step: JobStep): string | null {
   if (!step.startedAt) return null
   const end = step.finishedAt ? Date.parse(step.finishedAt) : Date.now()
@@ -73,6 +78,16 @@ function took(step: JobStep): string | null {
           </p>
           <h1 class="xp-type-headline">{{ store.job.name ?? 'Job' }}</h1>
           <StatusBadge :state="store.job.state" />
+          <p v-if="ranTests" class="links">
+            <RouterLink
+              :to="{ name: 'tests', params: { id: store.job.projectId }, query: { job: store.job.id } }"
+            >
+              Test results
+            </RouterLink>
+          </p>
+          <p v-if="store.job.state === 'waiting_for_approval'" class="links">
+            <RouterLink :to="{ name: 'approvals' }">Review the approval</RouterLink>
+          </p>
         </div>
         <div v-if="session.can('develop')" class="actions">
           <button v-if="store.resumable" type="button" :disabled="store.busy !== null" @click="store.act('resume')">
@@ -110,6 +125,10 @@ function took(step: JobStep): string | null {
 <style scoped>
 .page-header h1 {
   margin-bottom: var(--xp-space-4);
+}
+
+.links {
+  margin: var(--xp-space-4) 0 0;
 }
 
 .steps {

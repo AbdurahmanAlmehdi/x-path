@@ -2,6 +2,8 @@
 export interface NavItem {
   label: string
   to: string
+  /** Whether it shows how many approvals wait ("needs you"). */
+  needsYou?: boolean
 }
 
 /** A titled group of links. */
@@ -20,7 +22,7 @@ export const navigation: NavSection[] = [
     items: [
       { label: 'Projects', to: '/projects' },
       { label: 'Runs', to: '/runs' },
-      { label: 'Approvals', to: '/approvals' },
+      { label: 'Approvals', to: '/approvals', needsYou: true },
     ],
   },
   {

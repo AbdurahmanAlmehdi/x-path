@@ -105,10 +105,18 @@ a.button {
   padding: 0 var(--xp-space-12);
   font: var(--xp-type-body-strong);
   text-decoration: none;
+  color: var(--xp-color-text-primary);
+  background: var(--xp-color-surface-raised);
+  border: var(--xp-border-width-hairline) solid var(--xp-color-border-default);
   border-radius: var(--xp-radius-md);
 }
 
+a.button:hover {
+  background: var(--xp-color-surface-hover);
+}
+
 a.button.primary {
+  border-color: var(--xp-color-accent-default);
   color: var(--xp-color-text-on-accent);
   background: var(--xp-color-accent-default);
 }

@@ -46,6 +46,8 @@ describe('ProjectView', () => {
     expect(dispatch.attributes('href')).toBe('/projects/prj_1/dispatch')
     expect(app.find('a.run').text()).toContain('Dev build')
     expect(app.find('a[href="/projects/prj_1/runs"]').text()).toBe('All runs')
+    expect(app.find('a[href="/projects/prj_1/releases"]').text()).toBe('Releases')
+    expect(app.find('a[href="/projects/prj_1/tests"]').text()).toBe('Tests')
   })
 
   it('shows no Dispatch button to a viewer', async () => {

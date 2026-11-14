@@ -2,13 +2,14 @@
 # Runs the web dashboard's Playwright specs (apps/xp_web/e2e) against a real
 # engine: builds the xpd AOT bundle (`dart build cli`) with the dashboard in
 # its web/, starts it on a free port with a throwaway data directory, and
-# runs the specs on Chromium, plus signin.spec.ts and runs.spec.ts on WebKit
-# (D3a: the loopback cookie without `Secure`; the event and log sockets
-# under the dashboard's CSP).
+# runs the specs on Chromium, plus signin.spec.ts, runs.spec.ts and
+# approvals.spec.ts on WebKit (D3a: the loopback cookie without `Secure`; the
+# event and log sockets under the dashboard's CSP; deciding a gate).
 #
 #   tool/e2e/web_e2e.sh [<spec> ...]
 #
-# A <spec> narrows the run, as Playwright filters do: `signin`, `runs`.
+# A <spec> narrows the run, as Playwright filters do: `signin`, `runs`,
+# `approvals`.
 # The specs reach the engine at $XPD_URL and make people and sign-in codes
 # with $XPD_BIN and $XPD_DATA_DIR, as `xpd person` does on the engine
 # machine, and git repositories of tool/e2e/build_app next to the data

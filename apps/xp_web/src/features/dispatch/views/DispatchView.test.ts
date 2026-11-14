@@ -110,7 +110,8 @@ describe('DispatchView', () => {
 
     expect(app.text()).toContain('Your role cannot dispatch.')
     expect(app.find('[data-testid="dispatch"]').exists()).toBe(false)
-    expect(seen.map((request) => request.path)).toEqual(['/me'])
+    // The shell asks for the approvals that wait, for its "needs you" count.
+    expect(seen.map((request) => request.path).filter((path) => path !== '/approvals')).toEqual(['/me'])
   })
 
   it('previews where each job lands, the gates and what it leaves out', async () => {

@@ -47,9 +47,12 @@ describe('createAppRouter', () => {
     await router.push('/runs/abc')
     expect(router.currentRoute.value.name).toBe('run')
 
-    await router.push('/approvals/abc')
+    await router.push('/approvals/apr_1')
+    expect(router.currentRoute.value.name).toBe('approvals')
+
+    await router.push('/runners/abc')
     expect(router.currentRoute.value.name).toBe('not-found')
-    expect(router.currentRoute.value.path).toBe('/approvals/abc')
+    expect(router.currentRoute.value.path).toBe('/runners/abc')
   })
 
   it('sends a signed-in visit of sign-in on to next', async () => {

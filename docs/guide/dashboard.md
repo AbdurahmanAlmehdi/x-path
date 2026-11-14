@@ -64,6 +64,22 @@ request; a person who is removed, or whose sign-in is revoked, is signed out at 
 **Runs** lists the runs of every project, newest first. The project, workflow and state filters
 are in the address, so a filtered list can be bookmarked or shared.
 
+## Approve a gate, follow a release
+
+**Approvals** shows how many gates wait next to its name. Pick one to see what it is bound to (the
+project, flavor, version, commit and the job that waits) and what approving does. **Approve…**
+and **Deny…** (releasers and up) open the review: Approve works a moment after it opens, and
+Return never approves; ⌘↩ or Ctrl+↩ does. The first decision counts: if someone decided first, or
+the approval expired, the review says who and how. The approval records your name.
+
+A project's **Releases** shows each production release with its App Store and Google Play lanes,
+its timeline, release notes, store texts, pull request and Shorebird patches. **Refresh** asks the
+stores at once. **Merge**, a new build of a rejected version, the rollout buttons and the patch
+moves (developers and up) each start a run that waits for a releaser's approval. Marking a store
+by hand and saving the store texts need a releaser. A project's
+**Tests** shows a test run against its baseline, new failures first; a job that ran tests links to
+its results.
+
 ## Open the dashboard from another machine
 
 The engine has no TLS of its own, and a sign-in cookie must not cross a network in the clear. So a

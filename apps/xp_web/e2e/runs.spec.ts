@@ -108,8 +108,9 @@ test('a viewer sees the project with no Dispatch button', async ({ page }) => {
 
 test('dispatching dev-build from the browser starts a run of the person', async ({ page }) => {
   const violations = watchPolicy(page)
-  const events = page.waitForEvent('websocket', (socket) => socket.url().includes('/api/v1/events'))
   await signIn(page, developer)
+  // The shell follows the events from sign-in on: wait for the socket of the project page.
+  const events = page.waitForEvent('websocket', (socket) => socket.url().includes('/api/v1/events'))
   await page.goto(`/projects/${projectId}`)
 
   // The event feed connects under the dashboard's CSP.

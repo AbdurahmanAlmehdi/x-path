@@ -2,10 +2,16 @@
 import { useRouter } from 'vue-router'
 
 import { navigation } from '@/app/navigation'
+import { usePendingApprovalsStore } from '@/features/approvals/stores/pending'
 import { useSessionStore } from '@/features/session/stores/session'
 
+import { useFollowing } from './following'
+
 const session = useSessionStore()
+const pending = usePendingApprovalsStore()
 const router = useRouter()
+
+useFollowing(pending.follow)
 
 async function signOut() {
   await session.signOut()
@@ -28,7 +34,15 @@ async function signOut() {
         <h2 class="xp-type-label">{{ section.label }}</h2>
         <ul>
           <li v-for="item in section.items" :key="item.to">
-            <RouterLink :to="item.to" class="xp-type-body">{{ item.label }}</RouterLink>
+            <RouterLink :to="item.to" class="xp-type-body">
+              {{ item.label }}
+              <span
+                v-if="item.needsYou && pending.count > 0"
+                class="needs-you xp-type-label"
+                data-testid="needs-you"
+                :aria-label="`${pending.count} waiting`"
+              >{{ pending.count }}</span>
+            </RouterLink>
           </li>
         </ul>
       </section>
@@ -98,11 +112,22 @@ async function signOut() {
 .sidebar a {
   display: flex;
   align-items: center;
+  gap: var(--xp-space-8);
   height: var(--xp-size-row-sidebar);
   padding: 0 var(--xp-space-8);
   border-radius: var(--xp-radius-md);
   color: var(--xp-color-text-primary);
   text-decoration: none;
+}
+
+.needs-you {
+  margin-left: auto;
+  min-width: 20px;
+  padding: 0 var(--xp-space-6);
+  text-align: center;
+  border-radius: var(--xp-radius-sm);
+  color: var(--xp-color-status-attention-on-container);
+  background: var(--xp-color-status-attention-container);
 }
 
 .sidebar a:hover {

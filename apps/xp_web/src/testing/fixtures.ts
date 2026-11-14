@@ -1,9 +1,12 @@
 import type {
+  Approval,
   DispatchPlan,
   Job,
   Project,
   Release,
   Run,
+  TestBaseline,
+  TestRunResponse,
   Workflow,
   WorkflowSummary,
 } from '@/api/client'
@@ -134,7 +137,7 @@ export function planOf(overrides: Partial<DispatchPlan> = {}): DispatchPlan {
   }
 }
 
-/** A release of `prj_1` in [state]. */
+/** A release of `prj_1`, live on both stores, read through their APIs. */
 export function releaseOf(overrides: Partial<Release> = {}): Release {
   return {
     id: 'rel_1',
@@ -144,7 +147,76 @@ export function releaseOf(overrides: Partial<Release> = {}): Release {
     version: '1.1.0',
     build: 6,
     state: 'live',
+    stores: [
+      { store: 'apple', state: 'live', source: 'api', changedAt: '2026-11-12T09:00:00Z' },
+      { store: 'play', state: 'live', source: 'api', changedAt: '2026-11-12T10:00:00Z' },
+    ],
+    builds: [{ build: 6, runId: 'run_1', createdAt: '2026-11-10T09:05:00Z' }],
+    mergeEnabled: false,
+    branch: 'release/1.1.0',
+    baseBranch: 'main',
+    tag: 'v1.1.0+6',
+    headSha: 'abcdef0123456789abcdef0123456789abcdef01',
     createdAt: '2026-11-10T09:00:00Z',
+    updatedAt: '2026-11-12T10:00:00Z',
     ...overrides,
-  } as unknown as Release
+  }
+}
+
+/** An approval of `prod_release` that job_2 of run_1 waits for. */
+export function approvalOf(overrides: Partial<Approval> = {}): Approval {
+  return {
+    id: 'apr_1',
+    projectId: 'prj_1',
+    action: 'prod_release',
+    sha: '0123456789abcdef0123456789abcdef01234567',
+    version: '1.2.0+8',
+    runId: 'run_1',
+    jobId: 'job_2',
+    state: 'pending',
+    createdAt: '2026-11-14T09:00:00Z',
+    expiresAt: '2026-11-15T09:00:00Z',
+    ...overrides,
+  }
+}
+
+/** The test run of job_2 on main: one new failure, one fixed, compared with job_1's baseline. */
+export function testRunOf(overrides: Partial<TestRunResponse['run']> = {}): TestRunResponse {
+  return {
+    run: {
+      id: 'tr_2',
+      jobId: 'job_2',
+      branch: 'main',
+      appPath: '.',
+      baseline: false,
+      createdAt: '2026-11-14T09:00:00Z',
+      counts: { total: 10, passed: 7, failed: 2, errored: 0, skipped: 1 },
+      diff: {
+        comparedTo: 'job_1',
+        newFailures: [{ suite: 'test/a_test.dart', name: 'a breaks' }],
+        fixed: [{ suite: 'test/c_test.dart', name: 'c works' }],
+        missing: [],
+        stillFailing: 1,
+      },
+      ...overrides,
+    },
+    total: 2,
+    offset: 0,
+    tests: [
+      { suite: 'test/a_test.dart', name: 'a breaks', status: 'failed', message: 'Expected: 1' },
+      { suite: 'test/b_test.dart', name: 'b still breaks', status: 'errored' },
+    ],
+  }
+}
+
+/** The baseline of main, from job_1. */
+export function baselineOf(overrides: Partial<TestBaseline> = {}): TestBaseline {
+  return {
+    appPath: '.',
+    branch: 'main',
+    jobId: 'job_1',
+    createdAt: '2026-11-13T09:00:00Z',
+    counts: { total: 10, passed: 8, failed: 1, errored: 0, skipped: 1 },
+    ...overrides,
+  }
 }
