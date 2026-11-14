@@ -5,6 +5,7 @@ import { runOf } from '@/testing/fixtures'
 import {
   formatCountdown,
   formatDuration,
+  formatSize,
   formatTime,
   isFinished,
   originOf,
@@ -85,5 +86,12 @@ describe('format', () => {
     expect(formatCountdown('2026-11-15T11:51:00Z', now)).toBe('23h 51m')
     expect(formatCountdown('2026-11-14T12:42:30Z', now)).toBe('42m')
     expect(formatCountdown('2026-11-14T11:00:00Z', now)).toBe('0m')
+  })
+
+  it('writes a size in bytes', () => {
+    expect(formatSize(512)).toBe('512 B')
+    expect(formatSize(1_500_000)).toBe('1.5 MB')
+    expect(formatSize(120_000_000_000)).toBe('120 GB')
+    expect(formatSize(3_000_000_000_000_000)).toBe('3000 TB')
   })
 })

@@ -49,10 +49,33 @@ export type TestBaseline = Schemas['TestBaseline']
 export type SequencedEvent = Schemas['SequencedEvent']
 export type LogFrame = Schemas['LogFrame']
 export type LogLineFrame = Schemas['LogLineFrame']
+export type Person = Schemas['Person']
+export type PersonRole = Schemas['PersonRole']
+export type SignInCode = Schemas['SignInCode']
+export type TokenInfo = Schemas['TokenInfo']
+export type CreatedToken = Schemas['CreatedToken']
+export type Runner = Schemas['Runner']
+export type PairingToken = Schemas['PairingToken']
+export type RunnerUrl = Schemas['RunnerUrl']
+export type PublicUrl = Schemas['PublicUrl']
+export type GitHubTokenStatus = Schemas['GitHubTokenStatus']
+export type StorageReport = Schemas['StorageReport']
+export type StorageCategory = Schemas['StorageCategory']
+export type RetentionSettings = Schemas['RetentionSettings']
+export type FreeSpaceResult = Schemas['FreeSpaceResult']
+export type NamedCredential = Schemas['NamedCredential']
+export type CredentialKind = Schemas['CredentialKind']
+export type CredentialStatus = Schemas['CredentialStatus']
+export type CredentialUsage = Schemas['CredentialUsage']
+export type CreateCredentialRequest = Schemas['CreateCredentialRequest']
+export type ReplaceCredentialRequest = Schemas['ReplaceCredentialRequest']
+export type AssignCredentialResponse = Schemas['AssignCredentialResponse']
+export type Finding = Schemas['Finding']
 
 type Listener = () => void
 
 const signedOutListeners = new Set<Listener>()
+const forbiddenListeners = new Set<Listener>()
 
 /**
  * Calls [listener] whenever the engine answers `401` to a request of the
@@ -73,10 +96,21 @@ export function sessionEnded() {
 }
 
 /**
+ * Calls [listener] whenever the engine answers `403` to a request: the
+ * person's role may have changed since `/me` was read (D12, D16). Returns
+ * the function that stops it.
+ */
+export function onForbidden(listener: Listener): () => void {
+  forbiddenListeners.add(listener)
+  return () => forbiddenListeners.delete(listener)
+}
+
+/**
  * Every request carries `X-XPath-CSRF: 1`, which a page on another site
  * cannot add without a preflight the engine never answers (D14). A `401`
  * means the session is over, except for the sign-in itself, whose `401`
- * is a wrong code.
+ * is a wrong code. A `403` tells the [onForbidden] listeners, so the app
+ * reads `/me` again and hides what the person may no longer do.
  */
 export const sessionMiddleware: Middleware = {
   onRequest({ request }) {
@@ -86,6 +120,7 @@ export const sessionMiddleware: Middleware = {
   onResponse({ request, response, schemaPath }) {
     const signingIn = schemaPath === '/session' && request.method === 'POST'
     if (response.status === 401 && !signingIn) sessionEnded()
+    if (response.status === 403 && !signingIn) forbiddenListeners.forEach((listener) => listener())
     return response
   },
 }
@@ -136,9 +171,22 @@ export async function dataOf<T>(
 ): Promise<T> {
   const { data, error, response } = await call
   if (data !== undefined) return data
+  throw failureOf(error, response)
+}
+
+/**
+ * Waits for a call that answers without a body, such as a `204`; throws an
+ * [ApiFailure] with the engine's message when it answered something else.
+ */
+export async function doneOf(call: Promise<{ error?: unknown; response: Response }>): Promise<void> {
+  const { error, response } = await call
+  if (!response.ok) throw failureOf(error, response)
+}
+
+function failureOf(error: unknown, response: Response): ApiFailure {
   const body = (error as { error?: Partial<ApiError> } | undefined)?.error
   const reason = (body?.details as { reason?: unknown } | undefined)?.reason
-  throw new ApiFailure(
+  return new ApiFailure(
     errorMessage(error, response.status),
     response.status,
     typeof reason === 'string' ? reason : body?.code,

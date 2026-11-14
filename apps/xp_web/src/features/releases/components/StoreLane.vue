@@ -167,6 +167,14 @@ function rollTo(event: Event) {
               : 'No Google Play service account for this flavor: the engine cannot read the review, and each mark is recorded as manual'
           }}<template v-if="status.source === 'lookup' && status.detail"> · {{ status.detail }}</template>
         </p>
+        <RouterLink
+          v-if="session.can('administer')"
+          :to="{ name: 'credentials', query: { project: release.projectId } }"
+          class="button"
+          data-testid="add-credential"
+        >
+          {{ store === 'apple' ? 'Add API key…' : 'Add service account…' }}
+        </RouterLink>
       </template>
       <p v-else-if="!manual && status.note" class="notice">{{ status.note }}</p>
 

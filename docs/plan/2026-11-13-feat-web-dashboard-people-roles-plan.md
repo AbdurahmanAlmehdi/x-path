@@ -622,7 +622,40 @@ export PATH="$PWD/.fvm/flutter_sdk/bin:$HOME/.pub-cache/bin:$PATH"
 
 ### Phase 8: Runners, storage, credentials, add project, people, tokens and settings
 
-- **Status:** Not started
+- **Status:** Done
+- **Built (notes for later phases):**
+  - Role changes: the client tells `onForbidden` listeners of any `403` (but `POST /session`'s);
+    `followForbidden()` (session store, called in `main.ts`) then runs `session.refresh()`, which reads `/me`
+    again, so a demoted person's buttons go at once. `doneOf(call)` is `dataOf` for answers without a body.
+  - Shared UI: `ui/Dialog.vue` (scrim, title as accessible name, Escape closes; the approvals review keeps its
+    own), `ui/SecretWell.vue` (a code well with a copy button), and `.form`, `.field`, `.well` in `base.css`.
+  - Secrets shown once (pairing tokens, sign-in codes, new tokens) come back from a store action
+    (`runners.pairingToken`, `people.signInCode`, `tokens.create`) and live only in the dialog's `ref`, which
+    clears it on close and unmount; stores never keep them. `CredentialForm` keeps typed secrets and the picked
+    `File`s in component state (files in a plain `Map`, never reactive), reads them only at submit
+    (`File.text()` for `.p8`, PEM, JSON and dart-define files; base64 of the bytes for keystores and
+    certificates), shows only `name · size`, and forgets everything on save, kind change and unmount. Key
+    files are file-only (no paste box, unlike the Mac app); every secret field is `type=password`
+    `autocomplete=new-password`. The GitHub token is a write-only password field in Settings.
+  - Screens (all children of the shell): `/runners` (pair dialog with the `xp runner pair` command and the
+    runner URL warning, revoke), `/storage` (report, free by category, retention), `/credentials`
+    (`?project=`: named credentials with check, rename, replace, delete, and the flavors table with a Manage
+    dialog that assigns and unassigns), `/projects/add` (git URL or engine-machine folder, the SSH URL offer
+    of a `422`, the scan review with Scan again and Remove project), `/people` (add, which issues a code at
+    once, role menu, sign-in code, remove; a refused role shows the engine's message and the menu goes back),
+    `/tokens` (new under Engine in `navigation.ts`: own tokens, an admin's everyone's; new `xp`/agent token
+    with `xp connect` or the MCP config) and `/settings` (public URL, runner URL, GitHub token).
+  - Deviations from the Mac app: the GitHub token is in Settings as the plan scopes it (the Mac app has it
+    under Credentials); no "Create certificate" for a flavor's Apple Distribution identity yet; freeing space
+    uses the report's reclaimable numbers, with no dry run. Release lanes the engine cannot read now link an
+    admin to `/credentials?project=<id>` ("Add API key…", "Add service account…").
+  - D5's store glob is `src/features/**/stores/**`, so `projects/add/stores` is held to 100% too.
+  - `web_e2e.sh` starts `xpd` with `XPD_TEST_FILE_SECRETS=1` (no Keychain), a GitHub URL nothing answers
+    at, and a `keytool` shim on `PATH` that accepts the made-up keystore. `admin.spec.ts` (Chromium) signs
+    in as `Owner`, the database's first admin and the only one any spec makes, copies a new developer's code
+    through the clipboard into a second context, demotes them mid-session, uploads a keystore (asserting the
+    request carries its base64 and no response body of the session carries its bytes or password), pairs a
+    runner, and gets the last-admin `409`.
 - **Scope:**
   - Runners list and pairing (the pairing token is shown once). Storage with free space and retention.
   - Credentials, with file upload in the browser (`.p8`, `.json`, keystore, dart-define files) and verify.

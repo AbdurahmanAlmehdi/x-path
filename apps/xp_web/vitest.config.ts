@@ -20,7 +20,7 @@ export default mergeConfig(
         thresholds: {
           lines: 90,
           'src/api/**': { lines: 100 },
-          'src/features/*/stores/**': { lines: 100 },
+          'src/features/**/stores/**': { lines: 100 },
         },
       },
     },

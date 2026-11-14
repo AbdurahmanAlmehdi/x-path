@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { onMounted } from 'vue'
 
+import { useSessionStore } from '@/features/session/stores/session'
 import { useFollowing } from '@/ui/following'
 
 import { useProjectsStore } from '../stores/projects'
 
 const projects = useProjectsStore()
+const session = useSessionStore()
 
 onMounted(() => projects.load())
 useFollowing(projects.follow)
@@ -19,13 +21,18 @@ function appCount(count: number): string {
   <section>
     <header class="page-header">
       <h1 class="xp-type-headline">Projects</h1>
+      <div class="actions">
+        <RouterLink v-if="session.can('develop')" :to="{ name: 'add-project' }" class="button primary">
+          Add project…
+        </RouterLink>
+      </div>
     </header>
     <p v-if="projects.error" class="alert" role="alert">{{ projects.error }}</p>
     <p v-if="!projects.loaded" class="muted">Loading…</p>
     <div v-else-if="projects.projects.length === 0 && !projects.error" class="panel">
       <h2 class="xp-type-title">No projects yet</h2>
       <p class="muted">
-        Add the repository of a Flutter app from the Mac app or with
+        Add the repository of a Flutter app here, from the Mac app or with
         <code>xp projects add &lt;folder or repository&gt;</code>.
       </p>
     </div>

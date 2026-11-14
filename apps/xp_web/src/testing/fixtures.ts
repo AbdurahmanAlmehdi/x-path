@@ -1,12 +1,18 @@
 import type {
   Approval,
+  Credential,
   DispatchPlan,
   Job,
+  NamedCredential,
+  Person,
   Project,
   Release,
   Run,
+  Runner,
+  StorageReport,
   TestBaseline,
   TestRunResponse,
+  TokenInfo,
   Workflow,
   WorkflowSummary,
 } from '@/api/client'
@@ -217,6 +223,99 @@ export function baselineOf(overrides: Partial<TestBaseline> = {}): TestBaseline 
     jobId: 'job_1',
     createdAt: '2026-11-13T09:00:00Z',
     counts: { total: 10, passed: 8, failed: 1, errored: 0, skipped: 1 },
+    ...overrides,
+  }
+}
+
+/** A runner online and idle, probed for Android and Flutter. */
+export function runnerOf(overrides: Partial<Runner> = {}): Runner {
+  return {
+    id: 'rnr_1',
+    name: 'mac-mini',
+    status: 'online',
+    capabilities: ['android', 'flutter'],
+    slots: 2,
+    jobIds: [],
+    os: 'macos',
+    arch: 'arm64',
+    version: '1.4.0',
+    cores: 10,
+    lastHeartbeat: '2026-11-14T09:00:00Z',
+    createdAt: '2026-11-10T09:00:00Z',
+    ...overrides,
+  }
+}
+
+/** A person of the engine. */
+export function personOf(overrides: Partial<Person> = {}): Person {
+  return {
+    id: 'per_0123456789abcdef',
+    name: 'Sam',
+    role: 'admin',
+    createdAt: '2026-11-14T09:00:00Z',
+    ...overrides,
+  }
+}
+
+/** A token of Sam's. */
+export function tokenOf(overrides: Partial<TokenInfo> = {}): TokenInfo {
+  return {
+    id: 'tok_2',
+    name: 'xp on my laptop',
+    kind: 'cli',
+    createdAt: '2026-11-14T09:00:00Z',
+    personId: 'per_0123456789abcdef',
+    ...overrides,
+  }
+}
+
+/** A named keystore, verified, used by the dev flavor of prj_1. */
+export function namedCredentialOf(overrides: Partial<NamedCredential> = {}): NamedCredential {
+  return {
+    id: 'crd_1',
+    name: 'Upload keystore',
+    kind: 'keystore',
+    status: 'verified',
+    account: 'upload',
+    usedBy: [{ projectId: 'prj_1', project: 'acme/app', app: '.', flavor: 'dev', status: 'verified' }],
+    ...overrides,
+  }
+}
+
+/** The keystore the dev flavor of prj_1 uses. */
+export function flavorCredentialOf(overrides: Partial<Credential> = {}): Credential {
+  return {
+    id: 'crd_1',
+    name: 'Upload keystore',
+    projectId: 'prj_1',
+    app: '.',
+    flavor: 'dev',
+    kind: 'keystore',
+    status: 'verified',
+    ...overrides,
+  }
+}
+
+/** What the engine keeps: artifacts and logs, some of it reclaimable. */
+export function storageReportOf(overrides: Partial<StorageReport> = {}): StorageReport {
+  return {
+    generatedAt: '2026-11-14T09:00:00Z',
+    categories: [
+      { category: 'artifacts', usedBytes: 2_000_000_000, reclaimableBytes: 1_500_000_000, items: 12 },
+      { category: 'logs', usedBytes: 50_000_000, reclaimableBytes: 0, items: 40 },
+    ],
+    flavors: [
+      {
+        projectId: 'prj_1',
+        app: '.',
+        flavor: 'dev',
+        builds: 7,
+        artifacts: 14,
+        usedBytes: 2_000_000_000,
+        reclaimableBytes: 1_500_000_000,
+      },
+    ],
+    retention: { keepPerFlavor: 5, logDays: 90 },
     ...overrides,
   }
 }

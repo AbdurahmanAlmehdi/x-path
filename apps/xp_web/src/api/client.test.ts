@@ -7,8 +7,10 @@ import {
   apiBase,
   ApiFailure,
   dataOf,
+  doneOf,
   errorMessage,
   failureMessage,
+  onForbidden,
   onSignedOut,
   sessionEnded,
 } from './client'
@@ -83,6 +85,25 @@ describe('api', () => {
     await expect(api.GET('/me')).rejects.toThrow('Failed to fetch')
   })
 
+  it('tells the forbidden listeners when the engine answers 403, until they stop', async () => {
+    stubEngine({
+      'POST /people': { status: 403, body: errorBody('forbidden', 'A viewer cannot add a person.') },
+      'POST /session': { status: 403, body: errorBody('forbidden', 'Not from here.') },
+      'GET /me': { status: 200, body: meOf() },
+    })
+    const listener = vi.fn()
+    const stop = onForbidden(listener)
+
+    await api.POST('/people', { body: { name: 'Dana', role: 'developer' } })
+    await api.POST('/session', { body: { code: 'AAAA' } })
+    await api.GET('/me')
+    expect(listener).toHaveBeenCalledOnce()
+
+    stop()
+    await api.POST('/people', { body: { name: 'Dana', role: 'developer' } })
+    expect(listener).toHaveBeenCalledOnce()
+  })
+
   it('tells the listeners when a socket ends the session', () => {
     const listener = listen()
 
@@ -126,6 +147,23 @@ describe('dataOf', () => {
       message: 'The engine answered 502.',
       reason: undefined,
     })
+  })
+})
+
+describe('doneOf', () => {
+  it('resolves when a call without a body worked', async () => {
+    stubEngine({ 'DELETE /session': { status: 204 } })
+
+    await expect(doneOf(api.DELETE('/session'))).resolves.toBeUndefined()
+  })
+
+  it('throws the message and status of the engine otherwise', async () => {
+    stubEngine({ 'DELETE /session': { status: 403, body: errorBody('forbidden', 'Not a browser.') } })
+
+    const failure = await doneOf(api.DELETE('/session')).catch((error: unknown) => error)
+
+    expect(failure).toBeInstanceOf(ApiFailure)
+    expect(failure).toMatchObject({ message: 'Not a browser.', status: 403, reason: 'forbidden' })
   })
 })
 

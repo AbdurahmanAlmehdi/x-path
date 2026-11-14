@@ -235,3 +235,41 @@ td {
   border-bottom: var(--xp-border-width-hairline) solid var(--xp-color-border-subtle);
   vertical-align: top;
 }
+
+/* A form: its fields one under the other. */
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--xp-space-12);
+}
+
+/* A labelled control of a form. */
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--xp-space-4);
+  min-width: 0;
+}
+
+.field > .xp-type-label {
+  color: var(--xp-color-text-secondary);
+}
+
+/* Something to copy, such as a secret shown once or a command. */
+.well {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--xp-space-8);
+  padding: var(--xp-space-6) var(--xp-space-6) var(--xp-space-6) var(--xp-space-10);
+  background: var(--xp-color-surface-sunken);
+  border: var(--xp-border-width-hairline) solid var(--xp-color-border-default);
+  border-radius: var(--xp-radius-md);
+}
+
+.well > code {
+  flex: 1;
+  min-width: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  user-select: all;
+}

@@ -9,7 +9,11 @@
 #   tool/e2e/web_e2e.sh [<spec> ...]
 #
 # A <spec> narrows the run, as Playwright filters do: `signin`, `runs`,
-# `approvals`.
+# `approvals`, `admin`.
+# The engine never reaches a real store, GitHub or Keychain: its secrets go
+# to the encrypted file of the data directory (XPD_TEST_FILE_SECRETS), GitHub
+# is an address nothing answers at, and a `keytool` shim accepts the made-up
+# keystore admin.spec.ts uploads.
 # The specs reach the engine at $XPD_URL and make people and sign-in codes
 # with $XPD_BIN and $XPD_DATA_DIR, as `xpd person` does on the engine
 # machine, and git repositories of tool/e2e/build_app next to the data
@@ -54,8 +58,16 @@ xpd="$work/build/bundle/bin/xpd"
 web="$("$root/tool/release/web_dist.sh")" || fail "no web dashboard"
 cp -R "$web" "$work/build/bundle/web"
 
+# `keytool` accepts any keystore: the spec's is made up.
+mkdir -p "$work/shims"
+printf '#!/bin/sh\nexit 0\n' >"$work/shims/keytool"
+chmod +x "$work/shims/keytool"
+
 data="$work/data"
-"$xpd" serve --port 0 --data-dir "$data" >"$work/server.log" 2>&1 &
+PATH="$work/shims:$PATH" \
+  XPD_TEST_FILE_SECRETS=1 \
+  XPD_TEST_GITHUB_API_URL="http://127.0.0.1:9" \
+  "$xpd" serve --port 0 --data-dir "$data" >"$work/server.log" 2>&1 &
 server_pid=$!
 
 url=""

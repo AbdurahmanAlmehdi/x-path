@@ -55,6 +55,11 @@ export function createAppRouter(history: RouterHistory = createWebHistory()): Ro
             component: () => import('@/features/projects/views/ProjectsView.vue'),
           },
           {
+            path: 'projects/add',
+            name: 'add-project',
+            component: () => import('@/features/projects/add/views/AddProjectView.vue'),
+          },
+          {
             path: 'projects/:id',
             name: 'project',
             component: () => import('@/features/projects/views/ProjectView.vue'),
@@ -98,6 +103,36 @@ export function createAppRouter(history: RouterHistory = createWebHistory()): Ro
             path: 'approvals/:id?',
             name: 'approvals',
             component: () => import('@/features/approvals/views/ApprovalsView.vue'),
+          },
+          {
+            path: 'runners',
+            name: 'runners',
+            component: () => import('@/features/runners/views/RunnersView.vue'),
+          },
+          {
+            path: 'storage',
+            name: 'storage',
+            component: () => import('@/features/storage/views/StorageView.vue'),
+          },
+          {
+            path: 'credentials',
+            name: 'credentials',
+            component: () => import('@/features/credentials/views/CredentialsView.vue'),
+          },
+          {
+            path: 'people',
+            name: 'people',
+            component: () => import('@/features/people/views/PeopleView.vue'),
+          },
+          {
+            path: 'tokens',
+            name: 'tokens',
+            component: () => import('@/features/tokens/views/TokensView.vue'),
+          },
+          {
+            path: 'settings',
+            name: 'settings',
+            component: () => import('@/features/settings/views/SettingsView.vue'),
           },
           {
             path: ':pathMatch(.*)*',

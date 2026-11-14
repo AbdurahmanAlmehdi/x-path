@@ -180,6 +180,28 @@ describe('ReleasesView', () => {
     expect(app.find('[role="status"]').text()).toBe('Store status saved')
   })
 
+  it('links an admin to the credentials of the project from a store it cannot read', async () => {
+    const reviewing = releaseOf({
+      state: 'in_review',
+      stores: [
+        { store: 'apple', state: 'in_review', source: 'api' },
+        { store: 'play', state: 'uploaded', source: 'upload' },
+      ],
+    })
+    engine({ 'GET /releases': { status: 200, body: { releases: [reviewing] } } }, [
+      'develop',
+      'decide_approval',
+      'release',
+      'administer',
+    ])
+    ;({ app } = await openApp('/projects/prj_1/releases'))
+    await flushPromises()
+
+    const links = app.findAll('[data-testid="add-credential"]')
+    expect(links.map((link) => link.text())).toEqual(['Add service account…'])
+    expect(links[0]!.attributes('href')).toBe('/credentials?project=prj_1')
+  })
+
   it('builds a rejected version again, and opens its run', async () => {
     const rejected = releaseOf({
       state: 'rejected',

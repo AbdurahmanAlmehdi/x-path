@@ -13,8 +13,8 @@ export interface NavSection {
 }
 
 /**
- * The shell's sidebar, in the order of the Mac app's. The screens come
- * phase by phase; a link to one not built yet opens the "not here" page.
+ * The shell's sidebar, in the order of the Mac app's, plus the people and
+ * tokens of the engine, which only the dashboard manages.
  */
 export const navigation: NavSection[] = [
   {
@@ -32,6 +32,7 @@ export const navigation: NavSection[] = [
       { label: 'Storage', to: '/storage' },
       { label: 'Credentials', to: '/credentials' },
       { label: 'People', to: '/people' },
+      { label: 'Tokens', to: '/tokens' },
       { label: 'Settings', to: '/settings' },
     ],
   },

@@ -1,9 +1,12 @@
+import { flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it } from 'vitest'
 
+import { api } from '@/api/client'
+
 import { errorBody, meOf, stubEngine, stubUnreachableEngine } from '@/testing/fetch'
 
-import { useSessionStore } from './session'
+import { followForbidden, useSessionStore } from './session'
 
 describe('useSessionStore', () => {
   beforeEach(() => setActivePinia(createPinia()))
@@ -137,5 +140,42 @@ describe('useSessionStore', () => {
     stubUnreachableEngine()
 
     await expect(useSessionStore().signIn('ABCD')).rejects.toThrow()
+  })
+
+  describe('refresh', () => {
+    it('reads what the session may do again after a refusal', async () => {
+      let me = meOf('developer', ['develop'])
+      stubEngine({
+        'GET /me': () => ({ status: 200, body: me }),
+        'POST /people': { status: 403, body: errorBody('forbidden', 'A viewer cannot add a person.') },
+      })
+      const session = useSessionStore()
+      await session.load()
+      const stop = followForbidden()
+
+      me = meOf('viewer', [])
+      await api.POST('/people', { body: { name: 'Dana', role: 'viewer' } })
+      await flushPromises()
+      stop()
+
+      expect(session.person?.role).toBe('viewer')
+      expect(session.can('develop')).toBe(false)
+    })
+
+    it('asks nothing while signed out, and keeps what it knew when the engine fails', async () => {
+      const seen = stubEngine({ 'GET /me': { status: 200, body: meOf() } })
+      const session = useSessionStore()
+      await session.refresh()
+      expect(seen).toHaveLength(0)
+
+      await session.load()
+      stubUnreachableEngine()
+      await session.refresh()
+      stubEngine({ 'GET /me': { status: 500, body: errorBody('internal', 'Broken.') } })
+      await session.refresh()
+
+      expect(session.status).toBe('signedIn')
+      expect(session.can('administer')).toBe(true)
+    })
   })
 })

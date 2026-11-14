@@ -147,3 +147,16 @@ export function formatCountdown(deadline: string, now = Date.now()): string {
   const hours = Math.floor(minutes / 60)
   return hours > 0 ? `${hours}h ${minutes % 60}m` : `${minutes}m`
 }
+
+/** A size in bytes as the Mac app writes it: `512 B`, `1.5 MB`, `120 GB`. */
+export function formatSize(bytes: number): string {
+  const units = ['B', 'KB', 'MB', 'GB', 'TB']
+  let value = bytes
+  let unit = 0
+  while (value >= 1000 && unit < units.length - 1) {
+    value /= 1000
+    unit++
+  }
+  const number = unit === 0 || value >= 100 ? String(Math.round(value)) : value.toFixed(1)
+  return `${number} ${units[unit]}`
+}

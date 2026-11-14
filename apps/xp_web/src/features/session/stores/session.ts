@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 
-import { api, errorMessage, type Me, type Permission } from '@/api/client'
+import { api, errorMessage, onForbidden, type Me, type Permission } from '@/api/client'
 
 /** What the app knows about the browser's session. */
 export type SessionStatus = 'unknown' | 'signedIn' | 'signedOut'
@@ -47,6 +47,22 @@ export const useSessionStore = defineStore('session', () => {
     throw new Error(errorMessage(error, response.status))
   }
 
+  /**
+   * Asks the engine again what the session may do, after it refused
+   * something: a role changes on the next request (D12), and the app hides
+   * what the person may no longer do. A `401` ends the session through the
+   * client; any other failure keeps what the app knew.
+   */
+  async function refresh(): Promise<void> {
+    if (status.value !== 'signedIn') return
+    try {
+      const { data } = await api.GET('/me')
+      if (data) signedIn(data)
+    } catch {
+      // The engine did not answer: the next refusal asks again.
+    }
+  }
+
   /** Exchanges a one-time sign-in code for the session cookie (D10). */
   async function signIn(code: string): Promise<SignInFailure> {
     const { data, error, response } = await api.POST('/session', {
@@ -71,5 +87,14 @@ export const useSessionStore = defineStore('session', () => {
     signedOut()
   }
 
-  return { me, status, person, can, load, signIn, signOut, signedOut }
+  return { me, status, person, can, load, refresh, signIn, signOut, signedOut }
 })
+
+/**
+ * Reads `/me` again whenever the engine answers `403`, so a person whose
+ * role changed sees at once what they may still do. Returns the function
+ * that stops following.
+ */
+export function followForbidden(): () => void {
+  return onForbidden(() => void useSessionStore().refresh())
+}
