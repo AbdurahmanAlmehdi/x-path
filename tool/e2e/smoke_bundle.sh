@@ -11,7 +11,13 @@
 #     (426: authenticated, but not a WebSocket upgrade),
 #   - GET /projects with the token gives the body of /api/v1/projects, and
 #     only the root alias says `Deprecation: true` (ADR 0018),
+#   - the web dashboard in the bundle's web/ is served: GET / and a deep link
+#     are index.html with the Content-Security-Policy, an asset under
+#     /assets/ is immutable, and a path under /api is never the dashboard,
 #   - SIGTERM stops it cleanly (exit 0).
+#
+# The dashboard is $XPATH_WEB_DIST when set, else built from apps/xp_web
+# (tool/release/web_dist.sh, which needs Node 24 and npm).
 #
 # Needs the repo's Dart (3.13) first on PATH, and curl. Works on macOS and
 # Linux. Exits non-zero, after printing the server log, if anything is off.
@@ -43,6 +49,8 @@ echo "Building the xpd bundle..."
   || { cat "$work/build.log" >&2; fail "dart build cli failed"; }
 xpd="$work/build/bundle/bin/xpd"
 [[ -x "$xpd" ]] || fail "no executable at $xpd"
+web="$("$root/tool/release/web_dist.sh")" || fail "no web dashboard"
+cp -R "$web" "$work/build/bundle/web"
 
 data="$work/data"
 echo "Starting $xpd on a free port..."
@@ -100,6 +108,37 @@ if grep -qi '^deprecation:' "$work/_api_v1_projects.headers"; then
   fail "GET /api/v1/projects said it is deprecated"
 fi
 
+grep -q 'xpd serves the dashboard in ' "$work/server.log" \
+  || fail "xpd did not find the dashboard in the bundle's web/"
+
+# A browser asks for a page with `Accept: text/html`.
+page() {
+  curl -sS --max-time 5 -H 'Accept: text/html' -D "$work/page.headers" \
+    -o "$work/page.html" -w '%{http_code}' "$url$1"
+}
+for path in / /runs/abc; do
+  status="$(page "$path")"
+  [[ "$status" == "200" ]] || fail "GET $path as a page answered $status"
+  grep -q '<div id="app"></div>' "$work/page.html" || fail "GET $path is not the dashboard"
+  grep -qi "^content-security-policy: default-src 'self'; script-src 'self';" "$work/page.headers" \
+    || fail "GET $path has no Content-Security-Policy"
+  grep -qi '^x-content-type-options: nosniff' "$work/page.headers" \
+    || fail "GET $path does not say nosniff"
+  grep -qi '^cache-control: no-cache' "$work/page.headers" || fail "GET $path may be cached"
+done
+asset="$(grep -Eo '/assets/[^"]+\.js' "$work/page.html" | head -1)"
+[[ -n "$asset" ]] || fail "index.html names no script under /assets/"
+status="$(curl -sS --max-time 5 -D "$work/asset.headers" -o /dev/null -w '%{http_code}' "$url$asset")"
+[[ "$status" == "200" ]] || fail "GET $asset answered $status"
+grep -qi '^cache-control: public, max-age=31536000, immutable' "$work/asset.headers" \
+  || fail "GET $asset is not immutable"
+grep -qi '^content-type: text/javascript' "$work/asset.headers" || fail "GET $asset is not JavaScript"
+for path in /api/v2/projects /assets/missing.js; do
+  status="$(page "$path")"
+  [[ "$status" == "404" ]] || fail "GET $path as a page answered $status, not 404"
+  grep -q '"error"' "$work/page.html" || fail "GET $path is not the JSON 404"
+done
+
 kill -TERM "$server_pid"
 if wait "$server_pid"; then
   server_pid=""
@@ -110,4 +149,4 @@ else
 fi
 grep -q 'shutting down' "$work/server.log" || fail "xpd did not log a graceful shutdown"
 
-echo "OK: the xpd bundle answers /health, serves /api/v1 and its root aliases, guards /events and shuts down cleanly."
+echo "OK: the xpd bundle answers /health, serves /api/v1 and its root aliases, guards /events, serves the web dashboard and shuts down cleanly."

@@ -9,9 +9,9 @@
 #             anything else: patch). Without a tag the base is the version of
 #             apps/xpd/pubspec.yaml. The build number is the commit count.
 #   bundles   writes that version into the pubspecs and packageVersion
-#             constants of its checkout only, builds the Linux bundles and
-#             archives (tool/release/bundles.sh), runs the smoke test and the
-#             install.sh test.
+#             constants of its checkout only, builds the web dashboard and
+#             the Linux bundles and archives (tool/release/bundles.sh), runs
+#             the smoke test and the install.sh test.
 #   arm64     runs the arm64 bundles on an arm64 machine.
 #   docker    builds, tests and pushes the image (linux/amd64, linux/arm64).
 #   docker-runner
@@ -23,7 +23,8 @@
 #             with a "-"); on a run again it replaces the assets.
 #   dmg       public repository with the signing secrets only: the Developer
 #             ID signed, notarized DMG (tool/release/build_mac.sh) and the
-#             macOS archives, uploaded to the same release.
+#             macOS archives, uploaded to the same release, with the web
+#             dashboard the bundles job built.
 #   cask      with the secret HOMEBREW_TAP_TOKEN only: points the Homebrew
 #             cask (Casks/xpath.rb in AbdurahmanAlmehdi/homebrew-tap) at the
 #             DMG of the release, for `brew upgrade --cask xpath`.
@@ -131,11 +132,21 @@ jobs:
           BUILD: ${{ needs.version.outputs.build }}
         run: dart run tool/release_version.dart apply "${VERSION}" "${BUILD}"
 
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: apps/xp_web/.nvmrc
+          cache: npm
+          cache-dependency-path: apps/xp_web/package-lock.json
+
+      # Builds the web dashboard once, into every engine bundle (xpd/web).
       # Also checks that the linux-x64 xpd and xp print the version.
       - name: Build the Bundles
         run: tool/release/bundles.sh
 
       - name: Smoke Test the xpd Bundle
+        env:
+          XPATH_WEB_DIST: apps/xp_web/dist
         run: tool/e2e/smoke_bundle.sh
 
       - name: Test install.sh
@@ -421,6 +432,22 @@ jobs:
           # shellcheck disable=SC2046
           security list-keychains -d user -s "${keychain}" \
             $(security list-keychains -d user | tr -d '"')
+
+      # The web dashboard the Linux bundles carry, so that the Mac app's
+      # engine serves the same files (bundles.sh reads XPATH_WEB_DIST).
+      - name: Download the Build
+        if: steps.secrets.outputs.ready == 'true'
+        uses: actions/download-artifact@v4
+        with:
+          name: release
+          path: ${{ runner.temp }}/release
+
+      - name: Take the Web Dashboard of the Build
+        if: steps.secrets.outputs.ready == 'true'
+        run: |
+          tar -xf "${RUNNER_TEMP}/release/release.tar" -C "${RUNNER_TEMP}/release"
+          test -f "${RUNNER_TEMP}/release/build/release/bundles/linux-x64/xpd/web/index.html"
+          echo "XPATH_WEB_DIST=${RUNNER_TEMP}/release/build/release/bundles/linux-x64/xpd/web" >> "$GITHUB_ENV"
 
       - name: Write the Notary Key
         if: steps.secrets.outputs.ready == 'true'

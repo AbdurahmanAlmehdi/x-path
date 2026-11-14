@@ -173,6 +173,7 @@ class TestEngine {
     int logLiveCapacity = 1024,
     bool realApprovals = false,
     Duration socketSweep = const Duration(seconds: 60),
+    String? webDirectory,
   }) async {
     const repo = GitHubRepo(
       id: 42,
@@ -405,6 +406,7 @@ class TestEngine {
       signIn: signIn,
       publicUrl: publicUrl,
       socketSweep: socketSweep,
+      webDirectory: webDirectory,
       events: events,
       projects: ProjectService(
         repository: projects,

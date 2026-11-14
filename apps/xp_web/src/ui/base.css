@@ -1,0 +1,79 @@
+@import '@design/xp-tokens.css';
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  background: var(--xp-color-surface-window);
+  color: var(--xp-color-text-primary);
+  font: var(--xp-type-body);
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+p {
+  margin: 0 0 var(--xp-space-8);
+}
+
+a {
+  color: var(--xp-color-text-link);
+}
+
+code {
+  font: var(--xp-type-code);
+}
+
+::selection {
+  background: var(--xp-color-selection-default);
+}
+
+:focus-visible {
+  outline: var(--xp-border-width-focus) solid var(--xp-color-focus-ring);
+  outline-offset: var(--xp-border-focus-offset);
+}
+
+input {
+  height: var(--xp-size-control-lg);
+  padding: 0 var(--xp-space-8);
+  color: var(--xp-color-text-primary);
+  background: var(--xp-color-surface-base);
+  border: var(--xp-border-width-hairline) solid var(--xp-color-border-strong);
+  border-radius: var(--xp-radius-md);
+}
+
+button {
+  height: var(--xp-size-control-md);
+  padding: 0 var(--xp-space-12);
+  font: var(--xp-type-body-strong);
+  color: var(--xp-color-text-primary);
+  background: var(--xp-color-surface-raised);
+  border: var(--xp-border-width-hairline) solid var(--xp-color-border-default);
+  border-radius: var(--xp-radius-md);
+  cursor: pointer;
+}
+
+button:hover {
+  background: var(--xp-color-surface-hover);
+}
+
+button.primary {
+  height: var(--xp-size-control-lg);
+  color: var(--xp-color-text-on-accent);
+  background: var(--xp-color-accent-default);
+  border-color: var(--xp-color-accent-default);
+}
+
+button.primary:hover {
+  background: var(--xp-color-accent-hover);
+}
+
+button:disabled {
+  cursor: default;
+  opacity: 0.6;
+}

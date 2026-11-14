@@ -10,6 +10,7 @@ import 'package:xpd/src/api/events_route.dart';
 import 'package:xpd/src/api/jobs/job_logs_route.dart';
 import 'package:xpd/src/api/runners/runner_connect_route.dart';
 import 'package:xpd/src/api/token_sockets.dart';
+import 'package:xpd/src/server/web_assets.dart';
 
 /// A running engine HTTP server.
 class XpdServer {
@@ -27,6 +28,8 @@ class XpdServer {
   /// Logs [EngineStarted] once the socket is bound. Loopback is the default:
   /// binding another address exposes the engine to the network. The event
   /// and log sockets of a token that expired close within [socketSweep].
+  /// The web dashboard is served from [webDirectory] ([WebAssets]); without
+  /// one, a root path that is not the API is a JSON `404`.
   static Future<XpdServer> start({
     required TokenService tokens,
     required PersonService people,
@@ -58,6 +61,7 @@ class XpdServer {
     required String engineVersion,
     String host = '127.0.0.1',
     int port = 0,
+    String? webDirectory,
     Duration socketSweep = const Duration(seconds: 60),
     void Function(Object error, StackTrace stackTrace)? onError,
     void Function(String address, String why)? onRunnerRefused,
@@ -110,6 +114,7 @@ class XpdServer {
       engineDoctor: doctor,
       secrets: secrets,
       engineVersion: engineVersion,
+      site: WebAssets(directory: webDirectory, publicUrl: publicUrl).call,
       onError: onError,
       onRunnerRefused: onRunnerRefused,
     );

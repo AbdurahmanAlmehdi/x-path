@@ -41,6 +41,7 @@ export 'src/cli/xpd_command.dart';
 export 'src/cli/xpd_context.dart';
 export 'src/credentials/credential_checks.dart';
 export 'src/run_xpd.dart';
+export 'src/server/web_assets.dart';
 export 'src/server/xpd_server.dart';
 export 'src/service/serve_environment.dart';
 export 'src/service/service_commands.dart';

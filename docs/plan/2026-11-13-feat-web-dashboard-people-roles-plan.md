@@ -458,7 +458,45 @@ export PATH="$PWD/.fvm/flutter_sdk/bin:$HOME/.pub-cache/bin:$PATH"
 
 ### Phase 5: The `xp_web` scaffold, serving and packaging
 
-- **Status:** Not started
+- **Status:** Done
+- **Built (notes for later phases):**
+  - Versions (exact, `npm view` on 2026-11-14): vue 3.5.45, pinia 4.1.0, vue-router 5.5.1, vite 8.3.8,
+    typescript 5.9.3, vue-tsc 3.3.14, @vitejs/plugin-vue 6.0.11, openapi-typescript 7.13.0, openapi-fetch 0.17.0,
+    vitest and @vitest/coverage-v8 5.1.0, jsdom 31.0.1, @vue/test-utils 2.5.1, @pinia/testing 2.0.2 (installed,
+    no test needs it yet), @playwright/test 1.65.0, eslint 10.15.0 with eslint-plugin-vue 10.12.1 and
+    @vue/eslint-config-typescript 14.9.0. `.nvmrc` is 24; `engines` asks for Node 22.12 or later (Vitest 5's
+    floor), and the local checks ran on Node 22.23.3.
+  - Layout: `src/api/client.ts` (`api`, `onSignedOut`, `errorMessage`), `src/app/{main,router,next,navigation}.ts`,
+    `src/features/session/{stores/session.ts,views/SignInView.vue}`, `src/ui/{AppShell,HomeView,NotFoundView}.vue`
+    and `base.css` (imports `@design/xp-tokens.css`, light and dark from the OS). A new screen is a child of the
+    shell route in `router.ts` (before the catch-all `not-found`) and a link in `navigation.ts`, which already
+    lists Projects, Runs, Approvals, Runners, Storage, Credentials, People and Settings.
+  - The client adds `X-XPath-CSRF: 1` to every request and turns any `401` but `POST /session`'s into
+    `onSignedOut`; `followSessionEnd(router)` (called in `main.ts`) then goes to `/sign-in?next=<path>`. It
+    reads `globalThis.fetch` on every call, so tests stub `fetch` with `src/testing/fetch.ts` (`stubEngine`,
+    `meOf`, `errorBody`; excluded from coverage). A test that navigates to a lazy route waits with `vi.waitFor`.
+  - `safeNext` (`app/next.ts`) accepts a path that starts with one `/` and has no backslash or control
+    character; `//…`, schemes, `/sign-in…` and anything else go home. vue-router keeps `/` unencoded in a query,
+    so the address reads `/sign-in?next=/runs/abc` (the same value as `%2Fruns%2Fabc`).
+  - xpd: `WebAssets` (`server/web_assets.dart`) is the new `site` of `legacyAlias` (default `notTheApi`, the JSON
+    `404`), through `buildApiHandler(site:)` and `XpdServer.start(webDirectory:)`; `TestEngine.start(webDirectory:)`
+    too. A page needs `GET`/`HEAD` with `Accept` naming `text/html`; `/api…` and a missing asset are the JSON `404`.
+    CSP `connect-src` is `'self'` plus `wss://` of the public URL; same-origin sockets on loopback rely on `'self'`,
+    which Phase 6 should prove in Chromium and WebKit. `webRoot(executable:)` (`serve_command.dart`) finds
+    `<bundle>/web` or `Contents/Resources/web`, and `xpd serve` prints `xpd serves the dashboard in <dir>`.
+  - Packaging: `tool/release/web_dist.sh` prints the built dashboard: `$XPATH_WEB_DIST`, or `apps/xp_web/dist`
+    after `npm ci && npm run build`. `bundles.sh` (every `xpd/web`), `smoke_bundle.sh` and `web_e2e.sh` use it;
+    `build_mac.sh` requires it and copies it to `Contents/Resources/web`; the `Dockerfile` refuses a bundle without
+    `xpd/web/index.html`. In `release.yml` the `bundles` job builds it once and the `dmg` job takes the Linux
+    bundle's `web/` from the `release` artifact.
+  - CI: `changes` has a `web` output (`apps/xp_web/**` or `openapi.yaml`); the `web` job runs the license check,
+    lint, typecheck, coverage, `gen:api:check`, the build, then `web_e2e.sh` (Flutter and the Playwright browsers);
+    `gate` accepts it skipped when `web == false`. `smoke` now sets up Node: it builds the dashboard into its bundle.
+  - Deviation: the npm license check is `npm run licenses` (`scripts/check-licenses.mjs`), which reads each
+    package's `license` from `package-lock.json` against an allow list, instead of a third-party checker.
+  - `tool/e2e/web_e2e.sh [<filter>…]` builds the AOT `xpd`, starts it with the dashboard and passes
+    `XPD_URL`, `XPD_BIN` and `XPD_DATA_DIR` to Playwright; `e2e/engine.ts` has `createPerson` and `signInCode`
+    (`xpd person` on the data directory). WebKit runs only `signin.spec.ts`, at `http://localhost:<port>`.
 - **Scope:**
   - Scaffold `apps/xp_web`:
     - the generated client, with a CI freshness check;

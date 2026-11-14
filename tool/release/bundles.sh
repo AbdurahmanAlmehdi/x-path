@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Builds the release bundles of XPath: the `xpd` and `xp` AOT bundles
 # (`dart build cli`, ADR 0001) for each target, the runner bundles the engine
-# hands to runners that update (D-24), and the release archives.
+# hands to runners that update (D-24), the web dashboard every engine serves
+# (ADR 0018), and the release archives.
 #
 #   tool/release/bundles.sh [--targets "<os>-<arch> ..."] [--out <dir>]
 #                           [--upload <tag>]
@@ -13,7 +14,8 @@
 #
 # Output, in <out> (default build/release):
 #
-#   bundles/<target>/xpd/      bin/xpd, lib/libsqlite3.*, runners/<os>-<arch>/xp.tar.gz
+#   bundles/<target>/xpd/      bin/xpd, lib/libsqlite3.*, runners/<os>-<arch>/xp.tar.gz,
+#                              web/ (the built apps/xp_web)
 #   bundles/<target>/xp/       bin/xp, lib/libsqlite3.*
 #   runners/<os>-<arch>/xp.tar.gz
 #                              the runner bundles, named as runners report
@@ -36,6 +38,12 @@
 # builds every target this Mac can, then uploads the macOS assets to the
 # existing GitHub Release v1.2.3 (`gh release upload --clobber`). The
 # version must be the checkout's (`dart run tool/release_version.dart apply`).
+#
+# The web dashboard is built once, here, with `npm ci && npm run build` in
+# apps/xp_web (Node 24 and npm on PATH), unless $XPATH_WEB_DIST names a
+# dist/ built before (tool/release/web_dist.sh): the macOS job of the
+# release takes the one the Linux bundles carry, so every bundle of a
+# release serves the same files.
 #
 # Needs the repo's Dart (3.13) first on PATH and `dart pub get` done.
 set -euo pipefail
@@ -156,6 +164,10 @@ check_bundle() {
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 
+web="$("$root/tool/release/web_dist.sh")" || die "no web dashboard"
+# Copied now: $XPATH_WEB_DIST may be inside $out, which is cleared below.
+cp -R "$web" "$work/web"
+
 rm -rf "$out/bundles" "$out/runners" "$out/assets"
 mkdir -p "$out/bundles" "$out/runners" "$out/assets"
 
@@ -181,8 +193,10 @@ done
 
 for target in $targets; do
   # Every engine serves the runner bundles of every target (`runners/` next
-  # to its bin and lib, see runnerBundleRoots).
+  # to its bin and lib, see runnerBundleRoots), and the web dashboard
+  # (`web/`, see webRoot).
   cp -R "$out/runners" "$out/bundles/$target/xpd/runners"
+  cp -R "$work/web" "$out/bundles/$target/xpd/web"
 
   folder="xpath-$version-$target"
   stage="$work/stage/$folder"

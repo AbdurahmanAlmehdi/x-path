@@ -14,8 +14,8 @@ final legacySunset = DateTime.utc(2027, 11, 14);
 /// Sends a request to [api] when it is under [apiMount], or when it is to a
 /// root path and carries `Authorization` or is one of [publicPaths]: the
 /// root paths stay bearer-only aliases of the API, for the clients made
-/// before it moved (ADR 0018). Every other request is not the API: it gets
-/// a JSON `404`.
+/// before it moved (ADR 0018). Every other request is not the API: [site]
+/// answers it (the web dashboard), or the JSON `404` of [notTheApi].
 ///
 /// [api] serves the paths relative to [apiMount]: under it, the request
 /// reaches [api] with [apiMount] as its handler path, and a `Location` the
@@ -23,7 +23,11 @@ final legacySunset = DateTime.utc(2027, 11, 14);
 /// it is deprecated (`Deprecation`, `Sunset`, and a `Link` to the same path
 /// under [apiMount]). Every answer to a root path varies by `Authorization`,
 /// since that header alone decides whether it is the API.
-Handler legacyAlias(Handler api, {required Set<String> publicPaths}) {
+Handler legacyAlias(
+  Handler api, {
+  required Set<String> publicPaths,
+  Handler site = notTheApi,
+}) {
   final mount = apiMount.substring(1);
   final sunset = HttpDate.format(legacySunset);
   return (request) async {
@@ -34,7 +38,7 @@ Handler legacyAlias(Handler api, {required Set<String> publicPaths}) {
     final alias =
         request.headers.containsKey('authorization') ||
         publicPaths.contains('/$path');
-    if (!alias) return _notTheApi(request).change(headers: _vary);
+    if (!alias) return (await site(request)).change(headers: _vary);
     return (await api(request)).change(
       headers: {
         ..._vary,
@@ -59,7 +63,9 @@ Response _mounted(Response response) {
   return response.change(headers: {'location': '$apiMount$location'});
 }
 
-Response _notTheApi(Request request) => errorResponse(
+/// The JSON `404` of a request that is neither the API nor a page of the
+/// web dashboard.
+Response notTheApi(Request request) => errorResponse(
   ApiErrorCode.notFound,
   'Nothing is served at /${request.url.path}. The API is under $apiMount.',
 );

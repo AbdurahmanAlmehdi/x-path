@@ -43,7 +43,8 @@ const publicPaths = {'/health', '/version', '/runners/pair'};
 /// `POST /session` needs a device token (or, under `/api/v1`, a browser's
 /// session cookie, whose requests that change something pass the CSRF
 /// check), and every mutating route the permission `route_permissions.dart`
-/// names for it. [onError] hears about exceptions that became `500`
+/// names for it. Any other request to a root path is [site]'s: the web
+/// dashboard. [onError] hears about exceptions that became `500`
 /// responses.
 ({Handler handler, List<ApiRoute> routes}) buildApiHandler({
   required TokenService tokens,
@@ -74,6 +75,7 @@ const publicPaths = {'/health', '/version', '/runners/pair'};
   required EngineDoctor engineDoctor,
   required SecretStore secrets,
   required String engineVersion,
+  Handler site = notTheApi,
   void Function(Object error, StackTrace stackTrace)? onError,
   void Function(String address, String why)? onRunnerRefused,
 }) {
@@ -123,7 +125,7 @@ const publicPaths = {'/health', '/version', '/runners/pair'};
       .addMiddleware(permissionMiddleware(router.routes))
       .addHandler(router.call);
   return (
-    handler: legacyAlias(handler, publicPaths: publicPaths),
+    handler: legacyAlias(handler, publicPaths: publicPaths, site: site),
     routes: router.routes,
   );
 }
