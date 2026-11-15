@@ -48,6 +48,13 @@ the Mac app ask for their own person), and gets a `web` token that lasts 8 hours
 `web` tokens and only under `/api/v1`; `Authorization` wins when both are sent. `xpd` has no TLS:
 sign-in works on loopback or through the configured HTTPS public URL.
 
+**Opening the dashboard signed in** (D9). `xp dashboard` and the Mac app's Open dashboard ask for a
+sign-in code for their own person and open `<origin>/sign-in#code=<code>`. They hand that link to
+`open` (macOS) or `xdg-open` (Linux) as a process argument, which bends the rule that no secret goes
+in process arguments. The owner accepted this exception (2026-11-15): the code works once, expires
+in 10 minutes, and the browser redeems it within seconds, so a reader of the process list has
+little to take. `xp dashboard --print` prints the link instead and passes no argument.
+
 **CSRF.** A request authenticated by the cookie with a method other than `GET`, `HEAD` or `OPTIONS`
 needs an `Origin` from the allowed set and the header `X-XPath-CSRF: 1`. The allowed origins are exact
 strings: the public URL's origin, and the loopback origins of the bound port when `Host` is one of
@@ -68,5 +75,8 @@ app's engine carry it as `web/` next to the engine.
   change (`feat!`), released no earlier than the `Sunset` date. A request to a root
   path without `Authorization` (other than the public ones) is no longer the API: it gets `404`
   instead of `401`.
+- `xp dashboard` and the Mac app put a one-time sign-in code in the argument of `open` or `xdg-open`
+  for a moment: an accepted exception to the rule that no secret goes in process arguments (see
+  "Opening the dashboard signed in").
 - Phase 3 of the plan builds the URL space, the aliases and the client probe. Sessions, CSRF and
   the cookie on sockets come in Phase 4, and serving and packaging the dashboard in Phase 5.

@@ -500,8 +500,9 @@ export interface paths {
          *     Names are unique regardless of case (`409 conflict`). Identical
          *     secrets under two names stay two credentials. A new credential is
          *     used by no flavor; assign it with
-         *     `PUT /projects/{id}/flavors/{flavor}/credentials/{kind}`. Only `app`
-         *     and `cli` tokens may create credentials (`403 forbidden`).
+         *     `PUT /projects/{id}/flavors/{flavor}/credentials/{kind}`. Only an
+         *     admin's `app`, `cli` or `web` token may create credentials (`403
+         *     forbidden`).
          */
         post: operations["createCredential"];
         delete?: never;
@@ -528,7 +529,7 @@ export interface paths {
          *     `POST /credentials`). The new secret is checked first and nothing
          *     changes if it is refused (`422`) or cannot be checked (`502`). The id,
          *     the name and every assignment stay; the assignments are checked
-         *     again with the new secret. Only `app` and `cli` tokens.
+         *     again with the new secret. Only an admin's `app`, `cli` or `web` token.
          */
         put: operations["replaceCredentialSecret"];
         post?: never;
@@ -537,8 +538,8 @@ export interface paths {
          * @description A credential that flavors use is not deleted unless `force=true`:
          *     the answer is `409 credential_in_use` with the flavors (`usedBy`).
          *     With `force=true` those flavors give it up (they have no credential
-         *     of the kind afterwards) and it is deleted. Only `app` and `cli`
-         *     tokens.
+         *     of the kind afterwards) and it is deleted. Only an admin's `app`,
+         *     `cli` or `web` token.
          */
         delete: operations["deleteNamedCredential"];
         options?: never;
@@ -546,7 +547,8 @@ export interface paths {
         /**
          * Rename a credential.
          * @description The id, the secret and every assignment stay. Names are unique
-         *     regardless of case (`409 conflict`). Only `app` and `cli` tokens.
+         *     regardless of case (`409 conflict`). Only an admin's `app`, `cli`
+         *     or `web` token.
          */
         patch: operations["renameCredential"];
         trace?: never;
@@ -573,7 +575,7 @@ export interface paths {
          *     with `message` and `fix`. Something that was accepted before and is
          *     refused now is announced as `credential.expired`, and a job that needs
          *     it fails preflight (the `credentials` guard check) until it is
-         *     fixed. Only `app` and `cli` tokens.
+         *     fixed. Only an admin's `app`, `cli` or `web` token.
          */
         post: operations["verifyNamedCredential"];
         delete?: never;
@@ -621,7 +623,7 @@ export interface paths {
          *     flavors keep what they have. A `github` token becomes the engine's
          *     GitHub token (`/github-token`) and no named credential.
          *
-         *     Only `app` and `cli` tokens.
+         *     Only an admin's `app`, `cli` or `web` token.
          */
         put: operations["saveCredential"];
         post?: never;
@@ -660,14 +662,15 @@ export interface paths {
          *     Each assignment is checked at once (can the credential reach the
          *     flavor's bundle id, package or app) and the result is kept with it:
          *     a refusal does not undo the assignment, it fails preflight until
-         *     fixed. Only `app` and `cli` tokens.
+         *     fixed. Only an admin's `app`, `cli` or `web` token.
          */
         put: operations["assignCredential"];
         post?: never;
         /**
          * Stop using a credential of this kind for the flavor.
          * @description The flavor has no credential of the kind afterwards; the credential
-         *     stays, with its other assignments. Only `app` and `cli` tokens.
+         *     stays, with its other assignments. Only an admin's `app`, `cli` or
+         *     `web` token.
          */
         delete: operations["unassignCredential"];
         options?: never;
@@ -735,7 +738,7 @@ export interface paths {
          *     Checks the credential and its assignments as that route does and
          *     answers with the credential as the first flavor of this project that
          *     uses it sees it. `404` when no flavor of the project uses it. Only
-         *     `app` and `cli` tokens.
+         *     an admin's `app`, `cli` or `web` token.
          */
         post: operations["verifyCredential"];
         delete?: never;
@@ -767,7 +770,7 @@ export interface paths {
          *
          *     The flavors of this project give the credential up; if no other
          *     flavor uses it, it is deleted with its secret. `404` when no flavor of
-         *     the project uses it. Only `app` and `cli` tokens.
+         *     the project uses it. Only an admin's `app`, `cli` or `web` token.
          */
         delete: operations["deleteCredential"];
         options?: never;
@@ -1182,7 +1185,7 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Approve the action. Only `app` and `cli` tokens may.
+         * Approve the action. Only a releaser's or an admin's `app`, `cli` or `web` token may.
          * @description The first decision wins: the request moves from `pending` to
          *     `approved` in one compare-and-set, and the jobs that wait for it are
          *     resumed. A request that was decided already, or expired, answers `409
@@ -1209,7 +1212,7 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Deny the action. Only `app` and `cli` tokens may.
+         * Deny the action. Only a releaser's or an admin's `app`, `cli` or `web` token may.
          * @description Like `POST /approvals/{id}/approve`: the first decision wins. The
          *     gate step of every job that waits for it fails with the reason.
          */
@@ -1238,9 +1241,10 @@ export interface paths {
         get: operations["getProjectGates"];
         /**
          * Set which actions of a project wait for an approval.
-         * @description Replaces the gates; an action left out is on. An `app` token may turn
-         *     gates on and off. A `cli` token may only turn them on: a body that
-         *     turns a gate off answers `403 forbidden`. `mcp` and `runner` tokens
+         * @description Replaces the gates; an action left out is on. A releaser's or an
+         *     admin's `app`, `cli` or `web` token may turn gates on. Turning one
+         *     off takes an admin's `app` or `web` token: any other body that turns
+         *     a gate off answers `403 forbidden`. `mcp` and `runner` tokens
          *     never change gates (D-13). Turning a gate off lets the jobs that wait
          *     at it go on.
          */
@@ -1340,14 +1344,14 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Say what a store did, by hand. Only `app` and `cli` tokens may.
+         * Say what a store did, by hand. Only a releaser's or an admin's `app`, `cli` or `web` token may.
          * @description The buttons "Apple approved" and "Apple live" (an Apple ID flavor has
          *     no review API, D-14) and "Play: live" (no service account, D-15).
          *     Apple takes `approved` or `live`, Google Play `live`. The status
          *     only moves forward, and only once the store has the build. An `mcp`
          *     or `runner` token answers `403 forbidden`: a status moves the
-         *     release toward the merge of its pull request, which only the owner
-         *     may enable (D-13).
+         *     release toward the merge of its pull request, which only a releaser
+         *     or an admin may enable (D-13).
          */
         post: operations["setReleaseStoreStatus"];
         delete?: never;
@@ -1400,8 +1404,9 @@ export interface paths {
          * Request the merge of the release pull request.
          * @description Open once every store targeted is live (`mergeEnabled`). It
          *     dispatches the `release-merge` workflow, whose merge is a gated
-         *     action (D-13): the run waits for an `app` or `cli` token to approve
-         *     it, and then merges the pull request with a merge commit (ADR 0007).
+         *     action (D-13): the run waits for a releaser or an admin to approve
+         *     it with an `app`, `cli` or `web` token, and then merges the pull
+         *     request with a merge commit (ADR 0007).
          *     Asking again while that run is under way answers with the same run.
          *     `409 conflict` unless the release is `live` and has its pull request.
          */
@@ -1431,7 +1436,8 @@ export interface paths {
          *     resumes or completes; Google Play's staged rollout takes a new
          *     `userFraction`, halts or completes. It dispatches the
          *     `release-rollout` workflow, whose change is a gated action (D-13):
-         *     the run waits for an `app` or `cli` token to approve it, and then
+         *     the run waits for a releaser or an admin to approve it with an
+         *     `app`, `cli` or `web` token, and then
          *     the engine changes the rollout with the store credentials of the
          *     app. `400 invalid_request` for a change the store cannot make,
          *     `409 conflict` before the stores approved the release.
@@ -1481,7 +1487,7 @@ export interface paths {
         };
         get?: never;
         /**
-         * Set the texts the uploads of the release send. Only `app` and `cli` tokens may.
+         * Set the texts the uploads of the release send. Only a releaser's or an admin's `app`, `cli` or `web` token may.
          * @description `whatsNew` goes to Google Play as the release notes in `en-US`;
          *     `whatToTest` (else `whatsNew`) to Firebase App Distribution's
          *     testers, when the upload step gives no release notes of its own. An
@@ -1516,7 +1522,8 @@ export interface paths {
          * @description Open once the stores approved the release, for a patch XPath
          *     published (its history has it). It dispatches the `shorebird-track`
          *     workflow, whose `shorebird.track` step waits at `gate: prod_patch`
-         *     for an `app` or `cli` token to approve it (D-13). `400
+         *     for a releaser or an admin to approve it with an `app`, `cli` or
+         *     `web` token (D-13). `400
          *     invalid_request` for a patch number that is not one, an action other
          *     than `promote` and `rollback`, or a patch the release has none of.
          */
@@ -1540,7 +1547,7 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Give the release up. Only `app` and `cli` tokens may.
+         * Give the release up. Only a releaser's or an admin's `app`, `cli` or `web` token may.
          * @description Moves a release that is not over to `abandoned`. A run that still
          *     builds it is cancelled. `409 conflict` for a release that is merged or
          *     abandoned already.
@@ -1619,10 +1626,10 @@ export interface paths {
          * Free up space, or say how much would be freed.
          * @description Without a body, or with `"dryRun": true`, it deletes nothing and says
          *     what it would. With `"dryRun": false` it deletes (D-13 lists delete
-         *     as a gated action): only `app` and `cli` tokens may, as for a
-         *     release `abandon`; the owner acting from the app or `xp` is the
-         *     approval. `mcp` and `runner` tokens may only dry-run and otherwise
-         *     get `403 forbidden`.
+         *     as a gated action): only an admin's `app`, `cli` or `web` token may;
+         *     the admin acting from the app, `xp` or the dashboard is the
+         *     approval. Every other token may only dry-run and otherwise gets
+         *     `403 forbidden`.
          *
          *     Retention never deletes the artifacts of a release that is not over
          *     (`draft` to `live`), pinned artifacts, or the newest `keepPerFlavor`
@@ -1647,7 +1654,7 @@ export interface paths {
         /** How many builds per flavor and how many days of logs are kept. */
         get: operations["getRetention"];
         /**
-         * Set the retention. Only `app` and `cli` tokens may.
+         * Set the retention. Only an admin's `app`, `cli` or `web` token may.
          * @description Replaces the settings; a field left out takes its default (5 builds,
          *     90 days). Both are at least 1. The daily log pruning uses `logDays`;
          *     artifacts are only removed by `POST /storage/free`.
@@ -1678,7 +1685,7 @@ export interface paths {
          */
         get: operations["getGitHubToken"];
         /**
-         * Check a GitHub token with GitHub, then store it. Only `app` and `cli` tokens may.
+         * Check a GitHub token with GitHub, then store it. Only an admin's `app`, `cli` or `web` token may.
          * @description The token must be accepted by GitHub (`GET /user`) before it replaces
          *     the one the engine has; otherwise nothing is stored:
          *     `422 credential_rejected` when GitHub refused it, `502
@@ -1687,7 +1694,7 @@ export interface paths {
          */
         put: operations["setGitHubToken"];
         post?: never;
-        /** Forget the GitHub token. Only `app` and `cli` tokens may. */
+        /** Forget the GitHub token. Only an admin's `app`, `cli` or `web` token may. */
         delete: operations["deleteGitHubToken"];
         options?: never;
         head?: never;
@@ -1704,7 +1711,7 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Take the token of the GitHub CLI on the engine machine. Only `app` and `cli` tokens may.
+         * Take the token of the GitHub CLI on the engine machine. Only an admin's `app`, `cli` or `web` token may.
          * @description What `xpd secrets import-gh` does, over the API: the engine runs
          *     `gh auth token` (the `gh` on its `PATH`, then
          *     `/opt/homebrew/bin/gh` and `/usr/local/bin/gh`), checks the token
@@ -2022,7 +2029,7 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Create a pairing token for a new runner. Only `app` and `cli` tokens may.
+         * Create a pairing token for a new runner. Only an admin's `app`, `cli` or `web` token may.
          * @description The token is single use and valid for 15 minutes (D-08). Only its
          *     hash is kept, so the secret is shown here and never again. An `mcp`
          *     or `runner` token answers `403 forbidden`: pairing a machine lets it
@@ -2052,7 +2059,7 @@ export interface paths {
          */
         get: operations["getRunnerUrl"];
         /**
-         * Set or clear the runner URL. Only `app` and `cli` tokens may.
+         * Set or clear the runner URL. Only an admin's `app`, `cli` or `web` token may.
          * @description An absolute `http` or `https` URL with a host and no user info, query
          *     or fragment; a trailing `/` is dropped. A plain `http` URL that is not
          *     loopback, a tailnet address (`100.64.0.0/10`) or a `*.ts.net` name is
@@ -2104,7 +2111,7 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Revoke a runner. Only `app` and `cli` tokens may.
+         * Revoke a runner. Only an admin's `app`, `cli` or `web` token may.
          * @description Its credential stops working, its connection is closed and the leases
          *     it holds end at once. Each job it held is handled by the loss rule
          *     (D-08): queued again, or `waiting_for_resume` when it has a step with

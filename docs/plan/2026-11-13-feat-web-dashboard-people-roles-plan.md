@@ -72,7 +72,7 @@ Where the brainstorm says otherwise, this plan wins:
 | D6 | Runner tokens | They belong to no person (`person_id` NULL is allowed only for `kind = 'runner'`). A runner is a machine, so removing a person never breaks a runner. | plan default; refines the brainstorm's "every kind" |
 | D7 | Upgrade | Migration creates the person `Owner` (admin), who owns every non-runner token. It can be renamed later. | plan default |
 | D8 | First admin, headless | `xpd person create --name <n> --role admin` prints a sign-in code. `xpd person code <name>` issues a new one. Both write to the database directly, like `xpd token create`. | plan default |
-| D9 | Mac or CLI owner opening the dashboard | `xp dashboard` and a Settings button in the Mac app ask for a sign-in code for **their own** person and open `<origin>/sign-in#code=…`. A fragment never reaches a server log. | plan default |
+| D9 | Mac or CLI owner opening the dashboard | `xp dashboard` and a Settings button in the Mac app ask for a sign-in code for **their own** person and open `<origin>/sign-in#code=…`. A fragment never reaches a server log. They pass that link to `open`/`xdg-open` as a process argument: an **accepted exception** to the rule that no secret goes in process arguments, since the code is single-use, expires in 10 minutes and the browser redeems it within seconds; `xp dashboard --print` avoids it. Recorded in ADR 0018. | plan default; exception accepted by the owner (2026-11-15) |
 | D10 | Sign-in code | 16 Crockford base32 characters (80 bits), shown as `XXXX-XXXX-XXXX-XXXX`. It lasts 10 minutes and works once. Issuing a code deletes the person's unused codes. Only the SHA-256 is stored, and it is the primary key. 20 failures in total per 10 minutes, then `429`. Unknown, used and expired codes all get the same `401`. It is used up atomically (`UPDATE … WHERE hash = ? AND used_at IS NULL AND expires_at > ?`, then the row count is checked). | plan default |
 | D11 | Session lifetime | A `web` token expires 8 hours after sign-in, with no sliding renewal. Signing out revokes the token on the server and clears the cookie (`Max-Age=0`). Responses under `/api/v1/session` and `/api/v1/me` are `no-store`. | plan default (within OWASP's 4–8 h absolute timeout) |
 | D12 | Revocation while signed in | The role is read with the token on every request, so a role change applies to the next request. Revoking a token, signing out, removing the person or expiry closes the affected sockets with code 4401: a push on revocation, plus a sweep every 60 s for expiry. The next REST call answers `401`, and the SPA goes to `/sign-in?next=<path>`. Every tab holds its own socket, so each tab learns on its own. | plan default |
@@ -492,6 +492,8 @@ export PATH="$PWD/.fvm/flutter_sdk/bin:$HOME/.pub-cache/bin:$PATH"
   - CI: `changes` has a `web` output (`apps/xp_web/**` or `openapi.yaml`); the `web` job runs the license check,
     lint, typecheck, coverage, `gen:api:check`, the build, then `web_e2e.sh` (Flutter and the Playwright browsers);
     `gate` accepts it skipped when `web == false`. `smoke` now sets up Node: it builds the dashboard into its bundle.
+  - The `smoke` job builds the dashboard on every code PR, by the owner's choice (2026-11-15), so every PR proves
+    that a bundled engine serves the SPA.
   - Deviation: the npm license check is `npm run licenses` (`scripts/check-licenses.mjs`), which reads each
     package's `license` from `package-lock.json` against an allow list, instead of a third-party checker.
   - `tool/e2e/web_e2e.sh [<filter>…]` builds the AOT `xpd`, starts it with the dashboard and passes
@@ -722,7 +724,35 @@ export PATH="$PWD/.fvm/flutter_sdk/bin:$HOME/.pub-cache/bin:$PATH"
 
 ### Phase 10: Reference docs and the proxy check
 
-- **Status:** Not started
+- **Status:** Done except the manual proxy check on a VM
+- **Built (notes):**
+  - Guides: `approvals.md` (roles, the token kinds that decide, the dashboard's inbox), `install.md` (every engine
+    serves the dashboard, the first admin, Docker, `Owner`, `/api/v1` and the aliases), `runners.md` (the runner URL
+    is not the public URL; what an exposed engine leaves open), and `dashboard.md` (the D9 exception, `Owner`, Docker,
+    the refusal as observed). Reference: `engine.md` (`xpd person`, `/api/v1` and the aliases, serving, sessions,
+    CSRF, sockets), `clients.md` (`xp dashboard`, `xp settings public-url`, the client's probe, the app's Open
+    dashboard, a web dashboard section) and `development.md` (`apps/xp_web`, the `web` job). README: the dashboard
+    in the clients and the guide table. ADR 0018 and D9: the accepted exception. cspell: `nosniff`.
+  - `openapi.yaml`: 28 description sentences that said "Only `app` and `cli` tokens" (or that an `app` or `cli`
+    token approves, or that only the app loosens a gate) now name the role and the `app`, `cli` and `web` kinds
+    `AccessPolicy` and `route_permissions.dart` enforce. Descriptions only; `schema.d.ts` regenerated, contract
+    tests green.
+  - Proxy check, on the build Mac: a throwaway AOT `xpd` with the dashboard, bound to the Mac's LAN address on a
+    free port, served `/sign-in` at `http://<lan-ip>:<port>`. Signing in there in Chromium and WebKit got `403
+    forbidden` with the message the guide quotes and the hint, and no cookie. Caddy is not installed there, so the
+    recipe itself was not run.
+  - Found while writing `install.md`: in Docker's bridge network the engine sees the host's browser come from
+    Docker's gateway, not loopback (`AllowedOrigins.fromLoopback`), so sign-in at `http://127.0.0.1:7480` is
+    refused and a Docker engine's dashboard needs the proxy. Documented; not run (no Docker daemon was up).
+- **Left for the owner (manual):**
+  1. On a Linux VM with a domain name: the engine bundle and Caddy with the guide's `Caddyfile`, then
+     `xp settings public-url https://<domain>`.
+  2. From another machine: open `https://<domain>`, sign in with an `xpd person code`, and check the cookie is
+     `__Host-xp_session` with `Secure`, a job's live log streams (`wss`), and sign-out works.
+  3. On that VM with `xpd serve --host 0.0.0.0`: `http://<vm-ip>:7480/sign-in` refuses with the documented
+     message (already seen on macOS).
+  4. Docker: `docker run -p 127.0.0.1:7480:7480 …`; sign-in at `http://127.0.0.1:7480` on the host is refused as
+     `install.md` says, and works through the proxy.
 - **Scope:**
   - Updates to:
     - `approvals.md` (roles)

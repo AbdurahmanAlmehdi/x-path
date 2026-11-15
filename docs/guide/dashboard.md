@@ -18,20 +18,30 @@ then asks for a new code. Sign out from the top bar.
   page.
 
 The link the app and `xp dashboard` open carries the code after `#`, which the browser never sends
-to a server, and the dashboard takes it out of the address at once.
+to a server, and the dashboard takes it out of the address at once. To open it, they pass the link
+to `open` (macOS) or `xdg-open` (Linux) as an argument, so for that moment the code is in the
+machine's process list. That is the one place XPath puts a secret in a process argument, on
+purpose: the code works once, expires in 10 minutes, and the browser uses it within seconds. On a
+shared machine, `xp dashboard --print` keeps it out of the process list.
 
 ### The first admin of a new engine
 
-An engine without the Mac app (a Linux bundle or the Docker image) starts with no one who can sign
-in. On the engine's machine, as the user that runs `xpd`:
+An engine without the Mac app (a Linux bundle or the Docker image) starts with one admin, `Owner`,
+and no sign-in code, so no one can sign in yet. On the engine's machine, as the user that runs
+`xpd`:
 
 ```sh
 xpd person create --name Sam --role admin   # prints the id, and the sign-in code on stderr
 xpd person code Sam                         # a new code, when that one has expired
 ```
 
-Then open `http://127.0.0.1:7480` on that machine and enter the code. An engine upgraded from an
-earlier version already has one admin, `Owner`, who owns every token the engine had.
+Then open `http://127.0.0.1:7480` on that machine and enter the code. `xpd person code Owner`
+gives a code for `Owner` instead. An engine upgraded from an earlier version has `Owner` too, who
+owns every token the engine had.
+
+In Docker, run them with `docker exec xpath xpd person ...`. The engine in the container sees a
+browser on the host come from Docker's network, not from its own machine, so a Docker engine's
+dashboard needs the [proxy](#behind-a-proxy) even on the same machine.
 
 ## Roles
 
@@ -70,7 +80,8 @@ are in the address, so a filtered list can be bookmarked or shared.
 project, flavor, version, commit and the job that waits) and what approving does. **Approve…**
 and **Deny…** (releasers and up) open the review: Approve works a moment after it opens, and
 Return never approves; ⌘↩ or Ctrl+↩ does. The first decision counts: if someone decided first, or
-the approval expired, the review says who and how. The approval records your name.
+the approval expired, the review says who and how. The approval records your name, and the inbox
+moves to Decided, so it stays in view.
 
 A project's **Releases** shows each production release with its App Store and Google Play lanes,
 its timeline, release notes, store texts, pull request and Shorebird patches. **Refresh** asks the
@@ -88,9 +99,10 @@ browser signs in only:
 - on the engine's own machine, at `http://127.0.0.1:7480` or `http://localhost:7480`; or
 - through the engine's **public URL**: an `https://` address of a proxy in front of the engine.
 
-A browser on another machine that opens `http://<engine-ip>:7480` gets the sign-in page, but the
-sign-in is refused with the reason: "A browser signs in only on the engine machine, or through
-the engine's HTTPS public URL".
+An engine started with `xpd serve --host` on an address other machines reach serves them the
+sign-in page at `http://<engine-ip>:7480`, but it refuses the sign-in with the reason and the fix:
+"A browser signs in only on the engine machine, or through the engine's HTTPS public URL", and to
+put an HTTPS proxy in front of the engine and set its address as the public URL.
 
 ### Behind a proxy
 

@@ -142,6 +142,7 @@
     "nocrypt",
     "nokeys",
     "noout",
+    "nosniff",
     "notarization",
     "notarized",
     "notarytool",

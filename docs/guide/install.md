@@ -1,7 +1,7 @@
 # Install XPath
 
-XPath is an engine, `xpd`, and the clients that talk to it: the Mac app, the `xp` CLI, `xp mcp` and
-runners. On a Mac you install the app, which carries the engine and `xp`. On Linux you install the
+XPath is an engine, `xpd`, and the clients that talk to it: the Mac app, the `xp` CLI, `xp mcp`,
+runners and the web dashboard that the engine serves itself. On a Mac you install the app, which carries the engine and `xp`. On Linux you install the
 engine and the CLI with one command, or run the Docker image. This page has the steps and says which
 versions have to match; [the installation reference](../reference/installation.md) has every option
 and how releases are built.
@@ -29,7 +29,9 @@ Open XPath. The first window, **Set up XPath on this Mac**, has three steps:
 3. **Check the tools** looks for Xcode, git, fvm, gh and Shorebird.
 
 The engine listens on `http://127.0.0.1:7480`. `curl -s http://127.0.0.1:7480/health` answers
-`{"status":"ok"}` while it serves. The app owns the engine's service: you need nothing else.
+`{"status":"ok"}` while it serves. The app owns the engine's service: you need nothing else. The
+same address serves the [web dashboard](dashboard.md); Settings, Web dashboard, Open dashboard
+opens it signed in.
 
 ## Install on Linux
 
@@ -73,6 +75,11 @@ docker exec xpath xpd token create --name laptop --kind cli
 - The image has no `unzip`, which the Flutter download needs, so it builds nothing itself: builds go
   to runners. `ghcr.io/abdurahmanalmehdi/xpath-runner` is a runner that builds Android and Flutter
   apps; see [The runner image](runners.md#the-runner-image).
+- The image carries the web dashboard. The engine in the container sees a browser on the host
+  come from Docker's network, not from its own machine, so it refuses a sign-in at
+  `http://127.0.0.1:7480`. To use the dashboard, put an HTTPS proxy in front of the published
+  port and set it as the public URL ([Behind a proxy](dashboard.md#behind-a-proxy)). The first
+  admin is `docker exec xpath xpd person create --name Sam --role admin`.
 
 ## Run the engine as a service
 
@@ -109,6 +116,29 @@ The token is printed once. With the app, `xpd` is
 `/Applications/XPath.app/Contents/Helpers/xpd/bin/xpd`; in Docker, run `docker exec xpath xpd ...`.
 `xp doctor` checks that `xp` reaches the engine and what the engine finds on its machine.
 
+The token belongs to a person. `xpd token create` gives it to the admin who has been one the
+longest: `Owner`, the admin every engine starts with.
+
+## Open the web dashboard
+
+Every engine serves the [web dashboard](dashboard.md) at its own address: the Mac app's engine
+from inside the app, a Linux bundle from `xpd/web` next to the engine, and the Docker image too.
+`xpd serve` prints `xpd serves the dashboard in <folder>` when it has one.
+
+- **With the app or a connected `xp`:** Settings, Web dashboard, Open dashboard, or `xp dashboard`.
+  Either opens the browser signed in as you.
+- **A new Linux engine** has its admin, `Owner`, but no sign-in code yet. On the engine machine,
+  make yourself an admin (or ask for a code for `Owner`), then open `http://127.0.0.1:7480` there
+  and enter the code it prints:
+
+  ```sh
+  xpd person create --name Sam --role admin   # the sign-in code is on stderr
+  xpd person code Owner                       # or a code for Owner, on stdout
+  ```
+
+A browser on another machine signs in only through an HTTPS proxy:
+[Open the dashboard from another machine](dashboard.md#open-the-dashboard-from-another-machine).
+
 ## Find the data directory and logs
 
 | What | Where |
@@ -131,7 +161,9 @@ The token is printed once. With the app, `xpd` is
 - **Docker:** start a container of the new tag with the same `/data` volume.
 
 Before the engine migrates its database it copies it to `xpath.db.bak-v<old version>`. Update the
-engine first; runners follow it by themselves.
+engine first; runners follow it by themselves. An engine updated from a version without people
+gets one admin, `Owner`, who owns every token it had, so everything that worked before still
+does.
 
 ## Which versions work together
 
@@ -144,6 +176,10 @@ engine first; runners follow it by themselves.
 - **The app, the CLI and `xp mcp` need an engine with the same API version.** Every 1.x release
   serves API 1 (`xpd --version` prints it), so they need not be upgraded together: an app of 1.4
   works with an engine of 1.2, and the other way round.
+- **The API moved under `/api/v1`.** A new app, `xp` or runner asks the engine once and uses
+  `/api/v1`, or the old root paths of an engine from before the move. An older client keeps
+  working against a new engine through the root paths, which stay until XPath 2.0, on or after
+  2027-11-14 ([ADR 0018](../adr/0018-web-dashboard.md)).
 - **One exception: projects that are not on GitHub** (ADR 0015). They have no GitHub repository
   id, and an app, CLI or `xp mcp` from before they were added cannot read them: the projects list
   fails to load while such a project exists. Upgrade those along with the engine before you add a
