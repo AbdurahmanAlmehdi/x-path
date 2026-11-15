@@ -205,6 +205,24 @@ void main() {
       expect(command.passThroughEnvironment, contains('NDK_HOME'));
     });
 
+    test('ignores iOS export options on Android', () async {
+      // The built-in workflows default the input for every platform.
+      final step = stepFor();
+      final android = step.decodeInput({
+        ...step.encodeInput(input()),
+        'exportOptionsPlist': 'ios/ExportOptions.plist',
+      });
+
+      await step.run(android, context);
+
+      expect(
+        context.commands.single.arguments.where(
+          (argument) => argument.startsWith('--export-options-plist'),
+        ),
+        isEmpty,
+      );
+    });
+
     test('uses the login of the machine without a token secret', () async {
       await stepFor().run(input(tokenSecret: null), context);
 
