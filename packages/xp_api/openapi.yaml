@@ -1065,7 +1065,7 @@ paths:
         First the team's distribution certificates are read: at Apple's
         limit the request is refused with `conflict`, `details.reason`
         `certificate_limit`, the `limit` and the `certificates` that could be
-        revoked. Only `app` and `cli` tokens.
+        revoked. Only an admin's `app`, `cli` or `web` token.
       requestBody:
         required: true
         content:

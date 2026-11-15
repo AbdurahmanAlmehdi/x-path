@@ -1,6 +1,8 @@
+import { readFileSync } from 'node:fs'
+
 import { expect, type Page, type Response, test } from '@playwright/test'
 
-import { signInCode } from './engine'
+import { fixtureRepository, signInCode } from './engine'
 
 // The engine's first admin: every new database has `Owner`, and no other
 // spec makes an admin, so Owner is the last admin here.
@@ -22,6 +24,25 @@ function recordResponses(page: Page): Promise<string>[] {
     bodies.push(response.body().then((body) => body.toString('utf8')).catch(() => ''))
   })
   return bodies
+}
+
+/**
+ * Calls the API as the browser's session does: with the cookie, the Origin
+ * and the CSRF header. The body is `null` for an answer without one.
+ */
+async function call(page: Page, method: string, path: string, body?: unknown) {
+  return page.evaluate(
+    async ([method, path, body]) => {
+      const response = await fetch(`/api/v1${path}`, {
+        method,
+        headers: { 'content-type': 'application/json', 'x-xpath-csrf': '1' },
+        body: body === undefined ? undefined : JSON.stringify(body),
+      })
+      const text = await response.text()
+      return { status: response.status, body: text === '' ? null : JSON.parse(text) }
+    },
+    [method, path, body] as const,
+  )
 }
 
 test('an admin manages people, credentials and runners, and a demoted person loses the button', async ({
@@ -187,5 +208,82 @@ test('an admin manages people, credentials and runners, and a demoted person los
       expect(text).not.toContain(keystoreBytes.toString('base64'))
       expect(text).not.toContain(keystorePassword)
     }
+  })
+})
+
+test("an admin has the engine create an Apple Distribution certificate, and sees the team's at Apple's limit", async ({
+  page,
+}) => {
+  test.setTimeout(90_000)
+  // The fake App Store Connect web_e2e.sh starts trusts this test key, and
+  // nothing else does. Its team has two certificates to begin with.
+  const keyFile = process.env.XPD_FAKE_ASC_KEY_FILE
+  const keyId = process.env.XPD_FAKE_ASC_KEY_ID
+  const issuerId = process.env.XPD_FAKE_ASC_ISSUER_ID
+  if (!keyFile || !keyId || !issuerId) throw new Error('Run the specs with tool/e2e/web_e2e.sh.')
+  const bodies = recordResponses(page)
+  let projectId = ''
+  let fullName = ''
+
+  await test.step('the admin adds a project, an App Store Connect key and assigns it to a flavor', async () => {
+    await page.goto(`/sign-in#code=${signInCode(owner)}`)
+    await expect(page.getByTestId('person-name')).toHaveText(owner)
+    const added = await call(page, 'POST', '/projects', { path: fixtureRepository('certificate') })
+    expect(added.status).toBe(201)
+    projectId = added.body.id
+    fullName = added.body.fullName
+    const key = await call(page, 'POST', '/credentials', {
+      name: 'E2E fake App Store Connect key',
+      kind: 'asc_key',
+      keyId,
+      issuerId,
+      privateKey: readFileSync(keyFile, 'utf8'),
+    })
+    expect(key.status).toBe(201)
+    const assigned = await call(page, 'PUT', `/projects/${projectId}/flavors/prod/credentials/asc_key`, {
+      credentialId: key.body.id,
+    })
+    expect(assigned.status).toBe(200)
+  })
+
+  const row = page.locator('[data-flavor="prod"]')
+  const dialog = page.getByRole('dialog', { name: 'Create certificate for prod' })
+  const answer = () =>
+    page.waitForResponse(
+      (response) => response.request().method() === 'POST' && response.url().includes('/distribution-certificate'),
+    )
+
+  await test.step('the engine creates the certificate and assigns the identity to the flavor', async () => {
+    await page.goto(`/credentials?project=${projectId}`)
+    await row.getByRole('button', { name: 'Create certificate…' }).click()
+    // The project is a folder here, too long for a name, so it keeps the folder's last part.
+    const name = `Apple Distribution · ${fullName.split('/').pop()} prod`
+    await expect(dialog.getByLabel('Name')).toHaveValue(name)
+    const created = answer()
+    await dialog.getByRole('button', { name: 'Create certificate', exact: true }).click()
+    expect((await created).status()).toBe(201)
+    await expect(dialog).toHaveCount(0)
+    await expect(row).toContainText(`Apple Distribution identity: ${name}`)
+    await expect(row.getByRole('button', { name: 'Create certificate…' })).toHaveCount(0)
+  })
+
+  await test.step("at Apple's limit the dialog lists the team's certificates", async () => {
+    const unassigned = await call(page, 'DELETE', `/projects/${projectId}/flavors/prod/credentials/apple_distribution`)
+    expect(unassigned.status).toBe(204)
+    await row.getByRole('button', { name: 'Create certificate…' }).click()
+    await dialog.getByLabel('Name').fill('E2E second certificate')
+    const refused = answer()
+    await dialog.getByRole('button', { name: 'Create certificate', exact: true }).click()
+    expect((await refused).status()).toBe(409)
+    const limit = dialog.getByTestId('certificate-limit')
+    await expect(limit).toContainText("The team has 3 distribution certificates, Apple's limit is 3:")
+    await expect(limit.locator('li')).toHaveCount(3)
+    await expect(limit).toContainText('Apple Distribution: Fake Team 1 · serial 5EED01')
+    await dialog.getByRole('button', { name: 'Cancel' }).click()
+    await expect(dialog).toHaveCount(0)
+  })
+
+  await test.step('no response carried a private key', async () => {
+    for (const text of await Promise.all(bodies)) expect(text).not.toContain('PRIVATE KEY')
   })
 })

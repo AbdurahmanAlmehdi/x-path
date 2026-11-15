@@ -3,15 +3,15 @@ import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import { errorBody, stubEngine, stubUnreachableEngine } from '@/testing/fetch'
-import { flavorCredentialOf } from '@/testing/fixtures'
+import { flavorCredentialOf, namedCredentialOf } from '@/testing/fixtures'
 import { openEventFeed, stubSockets } from '@/testing/sockets'
 
 import { useFlavorCredentialsStore } from './flavorCredentials'
 
 describe('useFlavorCredentialsStore', () => {
   const stops: Array<() => void> = []
-  const dev = { app: '.', appName: 'app', flavor: 'dev' }
-  const prod = { app: '.', appName: 'app', flavor: 'prod' }
+  const dev = { app: '.', appName: 'app', flavor: 'dev', hasIos: false }
+  const prod = { app: '.', appName: 'app', flavor: 'prod', hasIos: true }
 
   beforeEach(() => {
     setActivePinia(createPinia())
@@ -87,6 +87,113 @@ describe('useFlavorCredentialsStore', () => {
     expect(await store.unassign(dev, 'keystore')).toBe(true)
     expect(await store.unassign(prod, 'play_sa')).toBe(false)
     expect(store.assignError).toBe('A developer cannot unassign a credential.')
+  })
+
+  describe('creating a distribution certificate', () => {
+    const path = 'POST /projects/prj_1/flavors/prod/distribution-certificate'
+    const identity = flavorCredentialOf({ id: 'crd_9', name: 'Linux signing', flavor: 'prod', kind: 'apple_distribution' })
+
+    it('asks the engine for the flavor, trims the name, and loads the identity it assigned', async () => {
+      let created = false
+      const seen = stubEngine({
+        'GET /projects/prj_1/credentials': () => ({
+          status: 200,
+          body: { credentials: created ? [identity] : [] },
+        }),
+        [path]: () => {
+          created = true
+          return { status: 201, body: namedCredentialOf({ id: 'crd_9', kind: 'apple_distribution' }) }
+        },
+      })
+      const store = useFlavorCredentialsStore()
+      expect(await store.createCertificate(prod, 'Linux signing')).toBe(false)
+      expect(seen).toHaveLength(0)
+
+      await store.open('prj_1')
+      const creating = store.createCertificate(prod, '  Linux signing ')
+      expect(store.creating).toBe(true)
+
+      expect(await creating).toBe(true)
+      const post = seen.find((request) => request.method === 'POST')
+      expect(post?.search).toBe('?app=.')
+      expect(post?.body).toEqual({ name: 'Linux signing' })
+      expect(store.creating).toBe(false)
+      expect(store.of(prod).map((credential) => credential.name)).toEqual(['Linux signing'])
+      expect(store.certificateError).toBeNull()
+    })
+
+    it("lists the team's certificates at Apple's limit", async () => {
+      stubEngine({
+        ...list,
+        [path]: {
+          status: 409,
+          body: {
+            error: {
+              code: 'conflict',
+              message: "The team has 3 distribution certificates, Apple's limit is 3.",
+              hint: 'Revoke one in App Store Connect.',
+              details: {
+                reason: 'certificate_limit',
+                limit: 3,
+                certificates: [
+                  { id: 'a', serialNumber: '0A', name: 'Apple Distribution: Acme', expirationDate: '2027-01-02T00:00:00Z' },
+                  { id: 'b', serialNumber: '0B' },
+                ],
+              },
+            },
+          },
+        },
+      })
+      const store = useFlavorCredentialsStore()
+      await store.open('prj_1')
+
+      expect(await store.createCertificate(prod, 'Another')).toBe(false)
+
+      expect(store.certificateLimit).toEqual({
+        limit: 3,
+        certificates: [
+          { id: 'a', serialNumber: '0A', name: 'Apple Distribution: Acme', expirationDate: '2027-01-02T00:00:00Z' },
+          { id: 'b', serialNumber: '0B' },
+        ],
+      })
+      expect(store.certificateError).toBe(
+        "The team has 3 distribution certificates, Apple's limit is 3. Revoke one in App Store Connect.",
+      )
+      store.resetCertificate()
+      expect(store.certificateLimit).toBeNull()
+      expect(store.certificateError).toBeNull()
+    })
+
+    it('says what the engine said for any other refusal, and when it did not answer', async () => {
+      stubEngine({
+        ...list,
+        [path]: {
+          status: 400,
+          body: errorBody('invalid_request', 'The flavor prod has no App Store Connect API key.'),
+        },
+      })
+      const store = useFlavorCredentialsStore()
+      await store.open('prj_1')
+
+      expect(await store.createCertificate(prod, 'Linux signing')).toBe(false)
+      expect(store.certificateLimit).toBeNull()
+      expect(store.certificateError).toBe('The flavor prod has no App Store Connect API key.')
+
+      stubEngine({
+        [path]: {
+          status: 409,
+          body: { error: { code: 'conflict', message: 'At the limit.', details: { reason: 'certificate_limit', limit: 3 } } },
+        },
+      })
+      expect(await store.createCertificate(prod, 'Linux signing')).toBe(false)
+      expect(store.certificateLimit).toEqual({ limit: 3, certificates: [] })
+
+      stubUnreachableEngine()
+      expect(await store.createCertificate(prod, 'Linux signing')).toBe(false)
+      expect(store.certificateLimit).toBeNull()
+      expect(store.certificateError).toBe('The engine did not answer. Check that it is running.')
+      expect(store.creating).toBe(false)
+    })
   })
 
   it('loads again on credential events and a resync, once a project is shown', async () => {

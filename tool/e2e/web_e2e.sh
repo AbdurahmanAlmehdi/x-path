@@ -13,8 +13,11 @@
 # `approvals`, `admin`, `workflows`.
 # The engine never reaches a real store, GitHub or Keychain: its secrets go
 # to the encrypted file of the data directory (XPD_TEST_FILE_SECRETS), GitHub
-# is an address nothing answers at, and a `keytool` shim accepts the made-up
-# keystore admin.spec.ts uploads.
+# is an address nothing answers at, App Store Connect is the fake of
+# tool/e2e/fake_stores/asc (with two distribution certificates of the team
+# and the fixture app), and a `keytool` shim accepts the made-up keystore
+# admin.spec.ts uploads. The specs get the fake's test key as
+# $XPD_FAKE_ASC_KEY_FILE, $XPD_FAKE_ASC_KEY_ID and $XPD_FAKE_ASC_ISSUER_ID.
 # The specs reach the engine at $XPD_URL and make people and sign-in codes
 # with $XPD_BIN and $XPD_DATA_DIR, as `xpd person` does on the engine
 # machine, and git repositories of tool/e2e/build_app next to the data
@@ -30,12 +33,16 @@ set -euo pipefail
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 work="$(mktemp -d)"
 server_pid=""
+asc_pid=""
 
 cleanup() {
-  if [[ -n "$server_pid" ]] && kill -0 "$server_pid" 2>/dev/null; then
-    kill -TERM "$server_pid" 2>/dev/null || true
-    wait "$server_pid" 2>/dev/null || true
-  fi
+  local pid
+  for pid in "$server_pid" "$asc_pid"; do
+    if [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null; then
+      kill -TERM "$pid" 2>/dev/null || true
+      wait "$pid" 2>/dev/null || true
+    fi
+  done
   rm -rf "$work"
 }
 trap cleanup EXIT
@@ -45,6 +52,10 @@ fail() {
   if [[ -f "$work/server.log" ]]; then
     echo "--- server log ---" >&2
     cat "$work/server.log" >&2
+  fi
+  if [[ -f "$work/asc.log" ]]; then
+    echo "--- fake App Store Connect log ---" >&2
+    cat "$work/asc.log" >&2
   fi
   exit 1
 }
@@ -64,10 +75,30 @@ mkdir -p "$work/shims"
 printf '#!/bin/sh\nexit 0\n' >"$work/shims/keytool"
 chmod +x "$work/shims/keytool"
 
+# The fake App Store Connect, compiled so that $asc_pid is the server itself
+# (`dart run` leaves its VM behind when it gets a signal).
+echo "Building the fake App Store Connect..."
+(cd "$root/tool/e2e/fake_stores/asc" && dart compile exe bin/serve.dart -o "$work/fake_asc" >"$work/asc_build.log" 2>&1) \
+  || { cat "$work/asc_build.log" >&2; fail "dart compile exe of the fake App Store Connect failed"; }
+asc_key="$work/AuthKey_fake.p8"
+"$work/fake_asc" "$asc_key" --certificates=2 ly.abdurahman.xpath.buildApp >"$work/asc.log" 2>&1 &
+asc_pid=$!
+asc_url=""
+for _ in $(seq 1 300); do
+  kill -0 "$asc_pid" 2>/dev/null || fail "the fake App Store Connect exited before it was listening"
+  asc_url="$(sed -n 's/^url=//p' "$work/asc.log" | head -1)"
+  [[ -n "$asc_url" ]] && grep -q '^issuerId=' "$work/asc.log" && break
+  sleep 0.2
+done
+[[ -n "$asc_url" ]] || fail "the fake App Store Connect did not report an address within 60 s"
+asc_key_id="$(sed -n 's/^keyId=//p' "$work/asc.log" | head -1)"
+asc_issuer_id="$(sed -n 's/^issuerId=//p' "$work/asc.log" | head -1)"
+
 data="$work/data"
 PATH="$work/shims:$PATH" \
   XPD_TEST_FILE_SECRETS=1 \
   XPD_TEST_GITHUB_API_URL="http://127.0.0.1:9" \
+  XPD_TEST_ASC_URL="$asc_url" \
   "$xpd" serve --port 0 --data-dir "$data" >"$work/server.log" 2>&1 &
 server_pid=$!
 
@@ -85,7 +116,9 @@ echo "xpd is listening on $url"
 status=0
 (
   cd "$root/apps/xp_web"
-  XPD_URL="$url" XPD_BIN="$xpd" XPD_DATA_DIR="$data" npx playwright test "$@"
+  XPD_URL="$url" XPD_BIN="$xpd" XPD_DATA_DIR="$data" \
+    XPD_FAKE_ASC_KEY_FILE="$asc_key" XPD_FAKE_ASC_KEY_ID="$asc_key_id" XPD_FAKE_ASC_ISSUER_ID="$asc_issuer_id" \
+    npx playwright test "$@"
 ) || status=$?
 [[ "$status" == 0 ]] || fail "the Playwright specs failed"
 echo "OK: the web dashboard passes its specs against a real xpd."

@@ -4,6 +4,7 @@ import { projectOf } from '@/testing/fixtures'
 
 import {
   base64Of,
+  certificateName,
   flavorTargets,
   kindName,
   namedKinds,
@@ -42,15 +43,28 @@ describe('credential labels', () => {
     )
   })
 
-  it('lists the flavors of a project, default for an app without flavors', () => {
+  it('lists the flavors of a project, default for an app without flavors, and whether their app has iOS', () => {
     const project = projectOf()
-    project.profile.apps.push({ ...project.profile.apps[0]!, name: 'admin', path: 'apps/admin', flavors: [] })
+    project.profile.apps.push({
+      ...project.profile.apps[0]!,
+      name: 'admin',
+      path: 'apps/admin',
+      hasIos: false,
+      flavors: [],
+    })
 
     expect(flavorTargets(project)).toEqual([
-      { app: '.', appName: 'app', flavor: 'dev' },
-      { app: '.', appName: 'app', flavor: 'prod' },
-      { app: 'apps/admin', appName: 'admin', flavor: 'default' },
+      { app: '.', appName: 'app', flavor: 'dev', hasIos: true },
+      { app: '.', appName: 'app', flavor: 'prod', hasIos: true },
+      { app: 'apps/admin', appName: 'admin', flavor: 'default', hasIos: false },
     ])
+  })
+
+  it('names the identity the engine creates as the Mac app does, within the 80 characters of a name', () => {
+    expect(certificateName('acme/app', 'prod')).toBe('Apple Distribution · acme/app prod')
+    const folder = `/Users/sam/${'deep/'.repeat(12)}app`
+    expect(certificateName(folder, 'prod')).toBe('Apple Distribution · app prod')
+    expect(certificateName(`/x/${'a'.repeat(90)}`, 'prod')).toHaveLength(80)
   })
 
   it('encodes the bytes of a file as base64, large ones too', () => {

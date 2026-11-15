@@ -646,9 +646,17 @@ export PATH="$PWD/.fvm/flutter_sdk/bin:$HOME/.pub-cache/bin:$PATH"
     `/tokens` (new under Engine in `navigation.ts`: own tokens, an admin's everyone's; new `xp`/agent token
     with `xp connect` or the MCP config) and `/settings` (public URL, runner URL, GitHub token).
   - Deviations from the Mac app: the GitHub token is in Settings as the plan scopes it (the Mac app has it
-    under Credentials); no "Create certificate" for a flavor's Apple Distribution identity yet; freeing space
-    uses the report's reclaimable numbers, with no dry run. Release lanes the engine cannot read now link an
-    admin to `/credentials?project=<id>` ("Add API key…", "Add service account…").
+    under Credentials); freeing space uses the report's reclaimable numbers, with no dry run. Release lanes the
+    engine cannot read now link an admin to `/credentials?project=<id>` ("Add API key…", "Add service account…").
+  - Create certificate (added after Phase 8): an admin's flavors table offers "Create certificate…" for a flavor of
+    an iOS app (`AppProfile.hasIos`) with no Apple Distribution identity, as the Mac app does. Its dialog prefills
+    the Mac app's name (`Apple Distribution · <project> <flavor>`, editable; a project folder too long for the
+    80-character limit keeps its last part) and calls `createDistributionCertificate`
+    (`flavorCredentials.createCertificate`); at Apple's limit (`409`, `certificate_limit`) it lists the team's
+    certificates from `details` with its own fix, since the engine's hint names `xp` flags. The engine already took
+    `web` tokens there (`Permission.administer`); only the openapi sentence was stale. `web_e2e.sh` now starts the
+    fake App Store Connect (`fake_stores/asc/bin/serve.dart`, two certificates of the team) as `XPD_TEST_ASC_URL`,
+    and `admin.spec.ts` creates one and then meets the limit.
   - D5's store glob is `src/features/**/stores/**`, so `projects/add/stores` is held to 100% too.
   - `web_e2e.sh` starts `xpd` with `XPD_TEST_FILE_SECRETS=1` (no Keychain), a GitHub URL nothing answers
     at, and a `keytool` shim on `PATH` that accepts the made-up keystore. `admin.spec.ts` (Chromium) signs

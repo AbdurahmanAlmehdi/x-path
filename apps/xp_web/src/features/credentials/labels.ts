@@ -59,15 +59,33 @@ export interface FlavorTarget {
   app: string
   appName: string
   flavor: string
+  /** Whether its app has an iOS app, which signs with an Apple Distribution identity. */
+  hasIos: boolean
 }
 
 /** The flavors of [project], `default` for an app without flavors. */
 export function flavorTargets(project: Project): FlavorTarget[] {
-  return project.profile.apps.flatMap((app) =>
-    app.flavors.length === 0
-      ? [{ app: app.path, appName: app.name, flavor: 'default' }]
-      : app.flavors.map((flavor) => ({ app: app.path, appName: app.name, flavor: flavor.name })),
-  )
+  return project.profile.apps.flatMap((app) => {
+    const target = { app: app.path, appName: app.name, hasIos: app.hasIos }
+    return app.flavors.length === 0
+      ? [{ ...target, flavor: 'default' }]
+      : app.flavors.map((flavor) => ({ ...target, flavor: flavor.name }))
+  })
+}
+
+/** The longest name a credential may have. */
+const nameLimit = 80
+
+/**
+ * The name of the Apple Distribution identity the engine creates for
+ * [flavor] of [project], as the Mac app names it. A project on the engine's
+ * machine is named by its folder, so a name too long for a credential keeps
+ * only the folder's last part, and is cut there if it must be.
+ */
+export function certificateName(project: string, flavor: string): string {
+  const name = `Apple Distribution · ${project} ${flavor}`
+  if (name.length <= nameLimit) return name
+  return `Apple Distribution · ${project.split('/').pop()} ${flavor}`.slice(0, nameLimit)
 }
 
 /** How a secret field of a kind is filled. */

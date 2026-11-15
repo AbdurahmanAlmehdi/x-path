@@ -300,6 +300,118 @@ describe('CredentialsView', () => {
     expect(dialog().exists()).toBe(false)
   })
 
+  describe('creating a distribution certificate', () => {
+    const path = 'POST /projects/prj_1/flavors/prod/distribution-certificate'
+    const dialog = () => app!.find('[role="dialog"]')
+    const actionsOf = (flavor: string) =>
+      app!
+        .find(`[data-flavor="${flavor}"]`)
+        .findAll('button')
+        .map((each) => each.text())
+
+    async function openCreate() {
+      await app!
+        .find('[data-flavor="prod"]')
+        .findAll('button')
+        .find((each) => each.text() === 'Create certificate…')!
+        .trigger('click')
+    }
+
+    it("offers it to an iOS flavor without an identity, and lists the team's certificates at Apple's limit", async () => {
+      let attempts = 0
+      const seen = engine({
+        'GET /projects/prj_1/credentials': {
+          status: 200,
+          body: { credentials: [flavorCredentialOf({ kind: 'apple_distribution', name: 'Dev identity' })] },
+        },
+        [path]: () =>
+          ++attempts === 1
+            ? {
+                status: 409,
+                body: {
+                  error: {
+                    code: 'conflict',
+                    message: "The team has 3 distribution certificates, Apple's limit is 3.",
+                    hint: 'Revoke one with --private-key.',
+                    details: {
+                      reason: 'certificate_limit',
+                      limit: 3,
+                      certificates: [
+                        { id: 'a', serialNumber: '0A', name: 'Apple Distribution: Acme', expirationDate: '2027-01-02T00:00:00Z' },
+                        { id: 'b', serialNumber: '0B' },
+                        { id: 'c', serialNumber: '0C' },
+                      ],
+                    },
+                  },
+                },
+              }
+            : { status: 201, body: namedCredentialOf({ id: 'crd_9', name: 'Another', kind: 'apple_distribution' }) },
+      })
+      ;({ app } = await openApp('/credentials'))
+
+      expect(actionsOf('dev')).toEqual(['Manage…'])
+      expect(actionsOf('prod')).toEqual(['Manage…', 'Create certificate…'])
+      await openCreate()
+      expect(dialog().attributes('aria-label')).toBe('Create certificate for prod')
+      expect(dialog().text()).toContain("with this flavor's App Store Connect key and assigns it. Apple allows a team three.")
+      expect((dialog().find('input').element as HTMLInputElement).value).toBe('Apple Distribution · acme/app prod')
+
+      await button('Create certificate').trigger('click')
+      await flushPromises()
+      const limit = dialog().find('[data-testid="certificate-limit"]')
+      expect(limit.text()).toContain("The team has 3 distribution certificates, Apple's limit is 3:")
+      expect(limit.findAll('li').map((each) => each.text())).toEqual([
+        'Apple Distribution: Acme · serial 0A · expires 2027-01-02',
+        'A certificate · serial 0B',
+        'A certificate · serial 0C',
+      ])
+      expect(limit.text()).toContain('Revoke one in App Store Connect (Certificates, Identifiers & Profiles)')
+      expect(limit.text()).not.toContain('--private-key')
+
+      await dialog().find('input').setValue('Another')
+      await dialog().find('form').trigger('submit')
+      await flushPromises()
+
+      expect(seen.filter((request) => request.method === 'POST').map((request) => request.body)).toEqual([
+        { name: 'Apple Distribution · acme/app prod' },
+        { name: 'Another' },
+      ])
+      expect(dialog().exists()).toBe(false)
+    })
+
+    it('says why the engine refused, starts afresh, and is not offered for an app without iOS', async () => {
+      const android = projectOf({ id: 'prj_2', fullName: 'acme/other' })
+      android.profile.apps[0]!.hasIos = false
+      const seen = engine({
+        'GET /projects': { status: 200, body: { projects: [projectOf(), android] } },
+        [path]: { status: 400, body: errorBody('invalid_request', 'The flavor prod has no App Store Connect API key.') },
+      })
+      ;({ app, router } = await openApp('/credentials'))
+
+      await openCreate()
+      await dialog().find('input').setValue('  ')
+      expect(button('Create certificate').attributes('disabled')).toBeDefined()
+      await dialog().find('form').trigger('submit')
+      expect(seen.some((request) => request.method === 'POST')).toBe(false)
+
+      await dialog().find('input').setValue('Linux signing')
+      await button('Create certificate').trigger('click')
+      await flushPromises()
+      expect(dialog().find('[role="alert"]').text()).toBe('The flavor prod has no App Store Connect API key.')
+      expect(dialog().find('[data-testid="certificate-limit"]').exists()).toBe(false)
+
+      await button('Cancel').trigger('click')
+      expect(dialog().exists()).toBe(false)
+      await openCreate()
+      expect(dialog().find('[role="alert"]').exists()).toBe(false)
+      await button('Cancel').trigger('click')
+
+      await router.replace({ query: { project: 'prj_2' } })
+      await flushPromises()
+      expect(actionsOf('prod')).toEqual(['Manage…'])
+    })
+  })
+
   it('shows the flavors of the project picked, and follows the credential events', async () => {
     const seen = engine()
     ;({ app, router } = await openApp('/credentials?project=prj_2'))

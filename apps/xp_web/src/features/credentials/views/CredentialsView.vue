@@ -9,6 +9,7 @@ import Badge from '@/ui/Badge.vue'
 import Dialog from '@/ui/Dialog.vue'
 import { useFollowing } from '@/ui/following'
 
+import CreateCertificateDialog from '../components/CreateCertificateDialog.vue'
 import CredentialForm from '../components/CredentialForm.vue'
 import FlavorCredentialsDialog from '../components/FlavorCredentialsDialog.vue'
 import {
@@ -44,6 +45,7 @@ const renaming = ref<NamedCredential | null>(null)
 const newName = ref('')
 const deleting = ref<NamedCredential | null>(null)
 const managing = ref<FlavorTarget | null>(null)
+const certifying = ref<FlavorTarget | null>(null)
 
 /** The project whose flavors are shown: `?project=`, else the first. */
 const project = computed(
@@ -80,6 +82,11 @@ async function remove() {
   const credential = deleting.value
   if (!credential) return
   if (await store.remove(credential.id, credential.usedBy.length > 0)) deleting.value = null
+}
+
+/** Whether the engine can create an Apple Distribution identity for [target]: an iOS app's flavor without one, as the Mac app offers. */
+function needsCertificate(target: FlavorTarget): boolean {
+  return target.hasIos && !flavors.of(target).some((credential) => credential.kind === 'apple_distribution')
 }
 
 function flavorStatus(target: FlavorTarget) {
@@ -197,7 +204,14 @@ function flavorStatus(target: FlavorTarget) {
                 </span>
               </td>
               <td><Badge :status="flavorStatus(target)" /></td>
-              <td v-if="admin"><button type="button" @click="managing = target">Manage…</button></td>
+              <td v-if="admin">
+                <div class="actions">
+                  <button type="button" @click="managing = target">Manage…</button>
+                  <button v-if="needsCertificate(target)" type="button" @click="certifying = target">
+                    Create certificate…
+                  </button>
+                </div>
+              </td>
             </tr>
           </tbody>
         </table>
@@ -205,6 +219,12 @@ function flavorStatus(target: FlavorTarget) {
     </div>
 
     <FlavorCredentialsDialog v-if="managing" :target="managing" @close="managing = null" />
+    <CreateCertificateDialog
+      v-if="certifying && project"
+      :target="certifying"
+      :project="project.fullName"
+      @close="certifying = null"
+    />
     <Dialog v-if="renaming" :title="`Rename ${renaming.name}`" @close="renaming = null">
       <p class="muted">Its secret and the flavors that use it stay.</p>
       <form class="form" @submit.prevent="rename">
