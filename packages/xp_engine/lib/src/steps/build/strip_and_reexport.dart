@@ -180,7 +180,11 @@ class StripAndReexportStep
     // export signs again. Clearing the old IPA keeps the new one unambiguous.
     final ipaDirectory = '$app/$iosIpaDirectory';
     await files.deleteAll(ipaDirectory, extension: '.ipa');
-    final since = await files.markBuildStart();
+    final since = await files.markBuildStart(
+      app,
+      jobId: context.jobId,
+      ordinal: context.ordinal,
+    );
     final exit = await context.run(
       ProcessCommand(
         'xcodebuild',

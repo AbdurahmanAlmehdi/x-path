@@ -121,7 +121,11 @@ abstract class FlutterBuildStep<I> extends Step<I, BuildResult> {
     }
     final appDirectory = settings.appDirectory;
     await prepareOutputs(appDirectory);
-    final since = await files.markBuildStart();
+    final since = await files.markBuildStart(
+      appDirectory,
+      jobId: context.jobId,
+      ordinal: context.ordinal,
+    );
     final secretDefines = await settings.writeSecretDefines(context);
 
     final subcommand = subcommandOf(input);
