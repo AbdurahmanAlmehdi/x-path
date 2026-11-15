@@ -1,6 +1,6 @@
 ---
 name: xpath-setup
-description: Install and set up XPath, the self-hosted Flutter release tool, and fix it when it does not run. Use when installing the macOS app, the Linux engine or the Docker image, creating device tokens (xpd token create), connecting GitHub, adding store credentials (App Store Connect key, Apple ID, Google Play or Firebase service account, Android keystore, Shorebird, GitHub, Slack), pairing remote runners, finding the data directory and logs, checking health, or troubleshooting the engine. The agent never asks the user to paste a secret into the chat.
+description: Install and set up XPath, the self-hosted Flutter release tool, and fix it when it does not run. Use when installing the macOS app, the Linux engine or the Docker image, creating device tokens (xpd token create), connecting GitHub, adding store credentials (App Store Connect key, Apple ID, Google Play or Firebase service account, Android keystore, Shorebird, GitHub, Slack), pairing remote runners, adding people and roles, opening the web dashboard (sign-in codes, the HTTPS proxy and the public URL), finding the data directory and logs, checking health, or troubleshooting the engine. The agent never asks the user to paste a secret into the chat.
 license: Apache-2.0
 ---
 
@@ -23,7 +23,9 @@ put one in a command you run, a file you write or a log. Tell the user **where**
 - the GitHub token: the app, **Settings** ▸ **GitHub**, or `xpd secrets import-gh` in their own
   terminal;
 - device tokens and pairing tokens: printed once by a command the user runs in their own
-  terminal, and used by them there.
+  terminal, and used by them there;
+- sign-in codes for the web dashboard: printed by `xpd person create` or `xpd person code` in the
+  user's own terminal, and entered by them in the browser.
 
 Secrets live on the engine machine: the login Keychain on macOS (services starting with
 `ly.abdurahman.xpath`, large ones in `secrets.enc` in the data directory), an encrypted
@@ -223,6 +225,59 @@ signing material, so never `--host 0.0.0.0` over plain http):
    Mac; the runner then pairs with `http://127.0.0.1:7480`.
 
 The full recipes: `docs/guide/runners.md#reaching-the-engine` in the XPath repository.
+
+## People and the web dashboard
+
+Every engine serves a web dashboard at its own address, and each person on it has a role:
+`viewer`, `developer` (dispatch, edit workflows, add projects), `releaser` (approve gates) or
+`admin` (people, credentials, runners, settings). People sign in with a one-time code (10
+minutes, single use); a browser stays signed in for 8 hours.
+
+**With the Mac app or a connected `xp`**, the user opens it signed in: the app's **Settings** ▸
+**Web dashboard** ▸ **Open dashboard**, or `xp dashboard`. Nothing else to set up; it is reachable
+on that machine only.
+
+**A new Linux or Docker engine** has one admin, `Owner`, and no code yet. The user runs, on the
+engine machine (in Docker, `docker exec xpath xpd ...`):
+
+```sh
+xpd person create --name Sam --role admin   # the sign-in code is on stderr
+xpd person code Sam                         # a new code once that one has expired
+```
+
+The engine has no TLS of its own, so a browser signs in only on the engine's own loopback address
+or through an HTTPS **public URL**. Plain `http://<server-ip>:7480` shows the sign-in page but
+refuses the sign-in; never work around that with `--host 0.0.0.0`. For a server without a
+browser, pick one:
+
+1. **SSH tunnel** (first sign-in, nothing to install). On the user's own machine:
+   `ssh -N -L 7480:127.0.0.1:7480 user@server`, then `http://localhost:7480` there. The local port
+   must equal the engine's port, or the engine refuses the browser. Not for Docker: the container
+   sees the host as another machine, so Docker needs the public URL even on the same machine.
+2. **Public URL** (for the team, from any device). An HTTPS proxy in front of `127.0.0.1:7480`
+   that passes WebSockets, `Origin` and `Host` through:
+   - Tailscale (no domain, tailnet only): `tailscale serve --bg http://127.0.0.1:7480`, and
+     `tailscale serve status` prints `https://<machine>.<tailnet>.ts.net`;
+   - Caddy (a domain pointing at the server): `xpath.example.com { reverse_proxy 127.0.0.1:7480 }`
+     in the `Caddyfile`;
+   - nginx needs `proxy_set_header Host $host;` and the WebSocket upgrade headers.
+
+   Then an admin sets it. Before anyone has signed in, the user does this on the server with a
+   token of `Owner`'s:
+
+   ```sh
+   xpd token create --name server --kind cli   # printed once; Owner's token
+   xp connect http://127.0.0.1:7480            # asks for the token
+   xp settings public-url https://<machine>.<tailnet>.ts.net
+   ```
+
+   Everyone then opens the public URL and enters their code. The cookie there is `Secure`.
+
+Add the rest of the team once an admin is signed in: **People** in the dashboard (add a person,
+pick a role, give them their code), or `xpd person create --name <name> --role <role>` on the
+engine machine. A person can also get `xp` and `xp mcp` tokens of their own from the dashboard.
+
+The full guide: `docs/guide/dashboard.md` in the XPath repository.
 
 ## Health, data and logs
 
