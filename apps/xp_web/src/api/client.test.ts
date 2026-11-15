@@ -126,7 +126,23 @@ describe('dataOf', () => {
     const failure = await dataOf(api.GET('/projects')).catch((error: unknown) => error)
 
     expect(failure).toBeInstanceOf(ApiFailure)
-    expect(failure).toMatchObject({ message: 'Not you.', status: 403, reason: 'forbidden' })
+    expect(failure).toMatchObject({ message: 'Not you.', status: 403, reason: 'forbidden', issues: [] })
+  })
+
+  it('carries the issues of a workflow document the engine refused, with their lines', async () => {
+    const issue = { line: 3, column: 7, message: 'Unknown step type "nope".' }
+    stubEngine({
+      'POST /projects/prj_1/workflows': {
+        status: 422,
+        body: { error: { code: 'workflow_invalid', message: 'The workflow has 1 issue.', issues: [issue] } },
+      },
+    })
+
+    const failure = dataOf(
+      api.POST('/projects/{id}/workflows', { params: { path: { id: 'prj_1' } }, body: { name: 'a', yaml: 'x' } }),
+    )
+
+    await expect(failure).rejects.toMatchObject({ status: 422, reason: 'workflow_invalid', issues: [issue] })
   })
 
   it('takes the reason from the details when the engine gives one', async () => {

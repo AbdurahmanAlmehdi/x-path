@@ -54,6 +54,7 @@ function platformsOf(app: { hasAndroid: boolean; hasIos: boolean }): string {
           </span>
           <RouterLink :to="{ name: 'releases', params: { id: store.project.id } }" class="button">Releases</RouterLink>
           <RouterLink :to="{ name: 'tests', params: { id: store.project.id } }" class="button">Tests</RouterLink>
+          <RouterLink :to="{ name: 'workflows', params: { id: store.project.id } }" class="button">Workflows</RouterLink>
           <RouterLink
             v-if="session.can('develop')"
             :to="{ name: 'dispatch', params: { id: store.project.id } }"

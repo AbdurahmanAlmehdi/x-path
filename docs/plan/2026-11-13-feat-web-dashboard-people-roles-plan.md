@@ -672,7 +672,31 @@ export PATH="$PWD/.fvm/flutter_sdk/bin:$HOME/.pub-cache/bin:$PATH"
 
 ### Phase 9: Workflow builder
 
-- **Status:** Not started
+- **Status:** Done
+- **Built (notes for later phases):**
+  - Both views shipped (the YAML-only fallback was not needed). `/projects/:id/workflows/:workflowId?` (linked from
+    the project page). `stores/builder` holds the YAML as the one source of truth, as the Mac app's bloc does: a visual
+    edit writes the model back with `toYaml`, typing reads it with `parseWorkflow`, and the visual view waits (disabled,
+    last good reading) while the YAML cannot be read. The engine checks it through `POST /projects/{id}/workflows/validate`
+    400 ms after it stops changing (`timing.validateAfterMs`, 0 in tests); an older answer is dropped.
+  - `features/workflows/document.ts` ports `xp_repositories`' `WorkflowDocument` (same keys, messages, lines and
+    canonical writer), with the Mac app's test cases. Like the Mac app, a visual edit rewrites the YAML in the built-in
+    layout, so comments go; nothing expects them kept. Parsing is `yaml` 2.9.1 (ISC). One known difference: a `with`
+    key that reads as a whole number (`'1'`) goes first, as JavaScript objects order such keys.
+  - `ApiFailure` carries `issues` (the `422 workflow_invalid` list): a refused save shows the message, lists each issue
+    as "Line N", marks its line in the editor and puts the cursor there (`store.reveal`); picking an issue does too.
+  - CodeMirror 6 (`@codemirror/{state,view,commands,language,lang-yaml,lint}` and `@lezer/highlight`, exact pins, MIT)
+    lives in `components/yamlEditor.ts`, which `YamlEditor.vue` imports with `import()`; the e2e spec proves the entry
+    and its preloads hold none of it. CSP: style-mod writes a `<style>` element in a document, which `style-src 'self'`
+    blocks, but a constructable sheet in a shadow root, which the CSP does not govern; so the editor renders in a shadow
+    root and its look is a CodeMirror theme on the design tokens. `web_assets.dart` is unchanged; the spec checks the
+    header and records `securitypolicyviolation` events on Chromium and WebKit (none).
+  - Edits need `develop` (role matrix); a viewer gets a read-only editor and no New/Save. A built-in is read-only, with
+    "Copy to edit" (a `POST` with `basedOn`); the spec also shows the engine's `409` on a `PUT`. Unsaved changes ask
+    before leaving (route guards, `beforeunload`); ⌘S/Ctrl+S saves.
+  - Deviations from the Mac app: inputs are listed but edited in the YAML; no version history, compare with the
+    built-in, rename, archive, delete, import or export; undo is the editor's own (visual edits enter its history);
+    templates come from `/workflows/templates` in a dialog. Playwright runs `workflows.spec.ts` on WebKit too.
 - **Scope:**
   - The visual builder (jobs, steps, gates, `with` keys from `/workflows/schema`) and a YAML editor (CodeMirror 6, lazy loaded).
   - Both edit one document, with validation through `/workflows/validate`.

@@ -23,6 +23,10 @@ export type WorkflowSummary = Schemas['WorkflowSummary']
 export type Workflow = Schemas['Workflow']
 export type WorkflowInput = Schemas['WorkflowInput']
 export type WorkflowSchema = Schemas['WorkflowSchema']
+export type WorkflowTemplate = Schemas['WorkflowTemplate']
+export type WorkflowIssue = Schemas['WorkflowIssue']
+export type StepType = Schemas['StepType']
+export type StepKeySchema = Schemas['StepKeySchema']
 export type DispatchRequest = Schemas['DispatchRequest']
 export type DispatchPlan = Schemas['DispatchPlan']
 export type VersionBump = Schemas['VersionBump']
@@ -155,6 +159,8 @@ export class ApiFailure extends Error {
     readonly status: number,
     /** The engine's error code, or its `details.reason` when it gives one. */
     readonly reason: string | undefined,
+    /** For `workflow_invalid` about a document, its issues with their lines. */
+    readonly issues: WorkflowIssue[] = [],
   ) {
     super(message)
     this.name = 'ApiFailure'
@@ -190,6 +196,7 @@ function failureOf(error: unknown, response: Response): ApiFailure {
     errorMessage(error, response.status),
     response.status,
     typeof reason === 'string' ? reason : body?.code,
+    body?.issues ?? [],
   )
 }
 

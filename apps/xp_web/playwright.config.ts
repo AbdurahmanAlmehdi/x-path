@@ -19,10 +19,11 @@ export default defineConfig({
     {
       // WebKit refuses `Secure` cookies on http://localhost (WebKit bug
       // 232088), so it proves the loopback cookie has none (D3a), that the
-      // event and log sockets connect under the dashboard's CSP, and that an
-      // approval is decided there as in Chromium.
+      // event and log sockets connect under the dashboard's CSP, that an
+      // approval is decided there as in Chromium, and that the workflow
+      // builder's CodeMirror renders under the CSP.
       name: 'webkit',
-      testMatch: /(signin|runs|approvals)\.spec\.ts/,
+      testMatch: /(signin|runs|approvals|workflows)\.spec\.ts/,
       use: {
         ...devices['Desktop Safari'],
         baseURL: `http://localhost:${engine.port}`,

@@ -80,6 +80,11 @@ export function createAppRouter(history: RouterHistory = createWebHistory()): Ro
             component: () => import('@/features/releases/views/ReleasesView.vue'),
           },
           {
+            path: 'projects/:id/workflows/:workflowId?',
+            name: 'workflows',
+            component: () => import('@/features/workflows/views/WorkflowsView.vue'),
+          },
+          {
             path: 'projects/:id/tests',
             name: 'tests',
             component: () => import('@/features/tests/views/TestsView.vue'),
