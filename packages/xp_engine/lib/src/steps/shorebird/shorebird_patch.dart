@@ -66,7 +66,8 @@ class ShorebirdPatchInput extends Equatable {
   /// The Shorebird app id of the flavor.
   final String shorebirdAppId;
 
-  /// The export options of the iOS archive, relative to the app.
+  /// The export options of the iOS archive, relative to the app. Android
+  /// ignores it.
   final String? exportOptionsPlist;
 
   /// Whether to publish even if Shorebird reports native changes
@@ -279,7 +280,10 @@ class ShorebirdPatchStep
       '--release-version=${settings.version}',
       if (settings.flavor != null) ...['--flavor', settings.flavor!],
       if (settings.target != null) ...['--target', settings.target!],
-      if (input.exportOptionsPlist != null)
+      // Built-in workflows set it for every platform; `flutter build
+      // appbundle` refuses the option.
+      if (input.platform == ShorebirdPlatform.ios &&
+          input.exportOptionsPlist != null)
         '--export-options-plist=${input.exportOptionsPlist}',
       if (settings.obfuscate)
         '--split-debug-info=${shorebirdDebugInfoDirectory(input.platform)}',

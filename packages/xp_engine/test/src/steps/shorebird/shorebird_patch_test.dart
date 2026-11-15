@@ -186,6 +186,25 @@ void main() {
       expect(command.secretEnvironment, {'SHOREBIRD_TOKEN': 'shorebird.token'});
     });
 
+    test('ignores iOS export options on Android', () async {
+      await recordRelease();
+      // The built-in workflows default the input for every platform.
+      final step = stepFor();
+      final android = step.decodeInput({
+        ...step.encodeInput(input()),
+        'exportOptionsPlist': 'ios/ExportOptions.plist',
+      });
+
+      await step.run(android, context);
+
+      expect(
+        context.commands.single.arguments.where(
+          (argument) => argument.startsWith('--export-options-plist'),
+        ),
+        isEmpty,
+      );
+    });
+
     test(
       'takes the version from Shorebird for a release XPath did not make',
       () async {
