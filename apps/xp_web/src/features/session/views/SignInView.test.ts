@@ -1,10 +1,11 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
 import { createMemoryHistory, type Router } from 'vue-router'
 
 import { createAppRouter } from '@/app/router'
 import { errorBody, meOf, stubEngine, stubUnreachableEngine } from '@/testing/fetch'
+import { eventually } from '@/testing/wait'
 
 import SignInView from './SignInView.vue'
 
@@ -36,7 +37,7 @@ describe('SignInView', () => {
     await flushPromises()
 
     expect(seen.at(-1)?.body).toEqual({ code: 'ABCD-EFGH-JKMN-PQRS' })
-    await vi.waitFor(() => expect(router.currentRoute.value.fullPath).toBe('/runs/abc'))
+    await eventually(() => expect(router.currentRoute.value.fullPath).toBe('/runs/abc'))
   })
 
   it('takes the code from the fragment, drops it from the address and signs in', async () => {
@@ -52,7 +53,24 @@ describe('SignInView', () => {
     expect(window.location.pathname + window.location.search).toBe('/sign-in?next=%2Fruns')
     expect(window.history.state).toEqual({ kept: true })
     expect(seen.at(-1)?.body).toEqual({ code: 'ABCD-EFGH' })
-    await vi.waitFor(() => expect(router.currentRoute.value.fullPath).toBe('/runs'))
+    await eventually(() => expect(router.currentRoute.value.fullPath).toBe('/runs'))
+  })
+
+  it('drops a refused code from the fragment too, and says why', async () => {
+    const seen = stubEngine({
+      'GET /me': { status: 401 },
+      'POST /session': { status: 401, body: errorBody('unauthorized', 'No.') },
+    })
+    window.history.replaceState(null, '', '/sign-in#code=USED-CODE')
+
+    const view = await open()
+
+    expect(seen.at(-1)?.body).toEqual({ code: 'USED-CODE' })
+    expect(window.location.hash).toBe('')
+    expect(view.find('[role="alert"]').text()).toBe(
+      'That code is wrong, used or expired. Ask for a new one.',
+    )
+    expect(router.currentRoute.value.name).toBe('sign-in')
   })
 
   it('goes home after sign-in without a next, or with one to another site', async () => {
@@ -64,7 +82,7 @@ describe('SignInView', () => {
 
     await open('/sign-in?next=//evil.example')
 
-    await vi.waitFor(() => expect(router.currentRoute.value.fullPath).toBe('/'))
+    await eventually(() => expect(router.currentRoute.value.fullPath).toBe('/'))
   })
 
   it('shows why a code is refused, and stays', async () => {

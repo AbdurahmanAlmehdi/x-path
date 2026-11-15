@@ -1,14 +1,16 @@
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { createMemoryHistory, type Router } from 'vue-router'
 
-import App from '@/app/App.vue'
-import { navigation } from '@/app/navigation'
-import { createAppRouter } from '@/app/router'
-import { meOf, stubEngine } from '@/testing/fetch'
+import { errorBody, meOf, stubEngine } from '@/testing/fetch'
 import { approvalOf } from '@/testing/fixtures'
 import { openEventFeed, stubSockets } from '@/testing/sockets'
+import { eventually } from '@/testing/wait'
+
+import App from './App.vue'
+import { navigation } from './navigation'
+import { createAppRouter } from './router'
 
 describe('AppShell', () => {
   let router: Router
@@ -60,7 +62,22 @@ describe('AppShell', () => {
     await flushPromises()
 
     expect(seen.at(-1)).toMatchObject({ method: 'DELETE', path: '/session' })
-    await vi.waitFor(() => expect(router.currentRoute.value.fullPath).toBe('/sign-in'))
+    await eventually(() => expect(router.currentRoute.value.fullPath).toBe('/sign-in'))
+  })
+
+  it('stays signed in, and says why, when the engine does not end the session', async () => {
+    stubEngine({
+      'GET /me': { status: 200, body: meOf() },
+      'DELETE /session': { status: 500, body: errorBody('internal', 'Broken.') },
+    })
+    const app = await open('/')
+
+    await app.find('header button').trigger('click')
+    await flushPromises()
+
+    expect(app.find('[role="alert"]').text()).toBe('Not signed out: Broken.')
+    expect(router.currentRoute.value.fullPath).toBe('/')
+    expect(app.find('[data-testid="person-name"]').text()).toBe('Sam')
   })
 
   it('counts the approvals that wait next to Approvals, and follows them', async () => {

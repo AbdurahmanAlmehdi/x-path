@@ -108,6 +108,45 @@ void main() {
     );
   });
 
+  test('finds a token by its hash, revoked or not', () async {
+    final revoked = _token('b', revokedAt: DateTime.utc(2026, 10, 14));
+    await repository.add(_token('a'));
+    await repository.add(revoked);
+
+    expect(await repository.findByHash('hash-a'), _token('a'));
+    expect(await repository.findByHash('hash-b'), revoked);
+    expect(await repository.findByHash('hash-nope'), isNull);
+  });
+
+  test('deletes the sessions that ended before a time, and no other '
+      'token', () async {
+    final before = DateTime.utc(2026, 10, 14);
+    DeviceToken web(String id, {DateTime? expiresAt, DateTime? revokedAt}) =>
+        DeviceToken(
+          id: id,
+          name: 'Browser',
+          kind: DeviceTokenKind.web,
+          hash: 'hash-$id',
+          createdAt: DateTime.utc(2026, 10, 13),
+          expiresAt: expiresAt ?? DateTime.utc(2026, 10, 15),
+          revokedAt: revokedAt,
+          personId: _ownerId,
+        );
+    await repository.add(web('expired', expiresAt: DateTime.utc(2026, 10, 13)));
+    await repository.add(web('revoked', revokedAt: DateTime.utc(2026, 10, 13)));
+    await repository.add(web('late', revokedAt: DateTime.utc(2026, 10, 14, 1)));
+    await repository.add(web('valid'));
+    await repository.add(_token('app', revokedAt: DateTime.utc(2026, 10)));
+
+    expect(await repository.deleteEndedSessions(before: before), 2);
+
+    expect((await repository.list()).map((t) => t.id), [
+      'late',
+      'valid',
+      'app',
+    ]);
+  });
+
   test('revokes every valid token of a person, and no other', () async {
     final at = DateTime.utc(2026, 10, 14);
     final earlier = DateTime.utc(2026, 10);

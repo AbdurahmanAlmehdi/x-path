@@ -12,6 +12,7 @@ import {
   plainText,
   pubspecLabel,
   scopeOf,
+  shortName,
   shortSha,
   statusOf,
   stepKind,
@@ -83,6 +84,9 @@ describe('format', () => {
     const now = Date.parse('2026-11-14T12:00:00Z')
 
     expect(shortSha('0123456789abcdef')).toBe('0123456')
+    expect(shortName('acme/app')).toBe('app')
+    expect(shortName('/Users/sam/dev/app')).toBe('app')
+    expect(shortName('app')).toBe('app')
     expect(formatCountdown('2026-11-15T11:51:00Z', now)).toBe('23h 51m')
     expect(formatCountdown('2026-11-14T12:42:30Z', now)).toBe('42m')
     expect(formatCountdown('2026-11-14T11:00:00Z', now)).toBe('0m')

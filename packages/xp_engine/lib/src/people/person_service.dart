@@ -1,9 +1,11 @@
 import 'dart:math';
 
 import 'package:xp_api/xp_api.dart';
+import 'package:xp_engine/src/access/access_policy.dart';
 import 'package:xp_engine/src/clock/clock.dart';
 import 'package:xp_engine/src/people/person_exceptions.dart';
 import 'package:xp_engine/src/people/person_repository.dart';
+import 'package:xp_engine/src/tokens/device_token.dart';
 import 'package:xp_engine/src/tokens/token_service.dart';
 
 /// The longest name a person may have.
@@ -21,6 +23,12 @@ const maxPersonNameLength = 80;
 ///
 /// **Removal** is soft: the person stays, so approvals and runs keep their
 /// name, and every token they had is revoked.
+///
+/// **Who may.** Every change is made `by` a token, which must
+/// [Permission.administer], or `by` nobody (`null`) on the engine machine
+/// itself (`xpd person`), whose user owns the data directory. The route
+/// table checks the same before a request reaches the service; this is the
+/// second line.
 class PersonService {
   /// Creates the service.
   ///
@@ -47,66 +55,92 @@ class PersonService {
   Future<Person> get(String id) async =>
       await _people.get(id) ?? (throw PersonNotFoundException(id));
 
-  /// Adds a person called [name] with [role].
-  ///
-  /// Throws a [PersonRequestException] for a blank or too long name, and a
-  /// [PersonConflictException] if an active person has that name.
-  Future<Person> create({required String name, required PersonRole role}) =>
-      _locked(() async {
-        final trimmed = await _availableName(name);
-        final person = Person(
-          id: 'per_${_hex(8)}',
-          name: trimmed,
-          role: role,
-          createdAt: _clock.now(),
-        );
-        await _people.add(person);
-        return person;
-      });
+  /// The active person whose id is [idOrName], or else whose name is
+  /// [idOrName], ignoring case and surrounding spaces; `null` if there is
+  /// none. What `xpd person code <name or id>` finds.
+  Future<Person?> findActive(String idOrName) async {
+    final wanted = idOrName.trim();
+    final active = (await _people.list()).where((p) => !p.isRemoved);
+    return active.where((p) => p.id == wanted).firstOrNull ??
+        active
+            .where((p) => p.name.toLowerCase() == wanted.toLowerCase())
+            .firstOrNull;
+  }
 
-  /// Renames the active person [id] to [name].
+  /// Adds a person called [name] with [role], [by] an admin's token.
   ///
-  /// Throws a [PersonNotFoundException], a [PersonRequestException] and a
-  /// [PersonConflictException] as [create] does.
-  Future<Person> rename(String id, String name) => _locked(() async {
-    final person = await _requireActive(id);
-    final renamed = person.copyWith(name: await _availableName(name, id: id));
-    await _people.update(renamed);
-    return renamed;
+  /// Throws a [PersonForbiddenException] if [by] may not, a
+  /// [PersonRequestException] for a blank or too long name, and a
+  /// [PersonConflictException] if an active person has that name.
+  Future<Person> create({
+    required String name,
+    required PersonRole role,
+    required DeviceToken? by,
+  }) => _locked(() async {
+    _requireAdmin(by, 'add a person');
+    final trimmed = await _availableName(name);
+    final person = Person(
+      id: 'per_${_hex(8)}',
+      name: trimmed,
+      role: role,
+      createdAt: _clock.now(),
+    );
+    await _people.add(person);
+    return person;
   });
 
-  /// Gives the active person [id] the [role]. It applies to their next
-  /// request.
+  /// Gives the active person [id] the [name], the [role] or both, [by] an
+  /// admin's token, in one write: when one of them is refused, neither
+  /// changes. A role applies to the person's next request.
   ///
-  /// Throws a [PersonNotFoundException], and a [PersonConflictException] when
-  /// it would demote the last admin.
-  Future<Person> setRole(String id, PersonRole role) => _locked(() async {
+  /// Throws a [PersonForbiddenException] if [by] may not, a
+  /// [PersonNotFoundException], a [PersonRequestException] and a
+  /// [PersonConflictException] for the name as [create] does, and a
+  /// [PersonConflictException] when it would demote the last admin.
+  Future<Person> update(
+    String id, {
+    required DeviceToken? by,
+    String? name,
+    PersonRole? role,
+  }) => _locked(() async {
+    _requireAdmin(by, 'change a person');
     final person = await _requireActive(id);
-    if (role != PersonRole.admin) {
+    final newName = name == null ? null : await _availableName(name, id: id);
+    if (role != null && role != PersonRole.admin) {
       await _requireAnotherAdmin(person, 'demote');
     }
-    final changed = person.copyWith(role: role);
+    final changed = person.copyWith(name: newName, role: role);
     await _people.update(changed);
     return changed;
   });
 
-  /// Removes the active person [id] and revokes every token they have.
+  /// Removes the active person [id], [by] an admin's token, and revokes
+  /// every token they have.
   ///
-  /// Throws a [PersonNotFoundException], and a [PersonConflictException] for
-  /// the last admin.
-  Future<Person> remove(String id) => _locked(() async {
-    final person = await _requireActive(id);
-    await _requireAnotherAdmin(person, 'remove');
-    final removed = person.copyWith(removedAt: _clock.now());
-    await _people.update(removed);
-    await _tokens.revokeAllOf(id);
-    return removed;
-  });
+  /// Throws a [PersonForbiddenException] if [by] may not, a
+  /// [PersonNotFoundException], and a [PersonConflictException] for the
+  /// last admin.
+  Future<Person> remove(String id, {required DeviceToken? by}) =>
+      _locked(() async {
+        _requireAdmin(by, 'remove a person');
+        final person = await _requireActive(id);
+        await _requireAnotherAdmin(person, 'remove');
+        final removed = person.copyWith(removedAt: _clock.now());
+        await _people.update(removed);
+        await _tokens.revokeAllOf(id);
+        return removed;
+      });
 
   Future<T> _locked<T>(Future<T> Function() action) {
     final result = _tail.then((_) => action());
     _tail = result.then<void>((_) {}, onError: (Object _) {});
     return result;
+  }
+
+  static void _requireAdmin(DeviceToken? by, String what) {
+    if (by == null) return;
+    final refusal = AccessPolicy.refusal(by, Permission.administer, what);
+    if (refusal != null) throw PersonForbiddenException(refusal);
   }
 
   Future<Person> _requireActive(String id) async {

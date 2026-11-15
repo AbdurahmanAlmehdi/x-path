@@ -1,11 +1,12 @@
 import { flushPromises, type VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import { openApp } from '@/testing/app'
 import { type Answer, errorBody, meOf, stubEngine } from '@/testing/fetch'
 import { baselineOf, jobOf, projectOf, testRunOf } from '@/testing/fixtures'
 import { stubSockets } from '@/testing/sockets'
+import { eventually } from '@/testing/wait'
 
 describe('TestsView', () => {
   let app: VueWrapper | undefined
@@ -85,7 +86,7 @@ describe('TestsView', () => {
     await flushPromises()
 
     await app.find('[data-testid="baselines"] button').trigger('click')
-    await vi.waitFor(() => expect(router.currentRoute.value.fullPath).toBe('/projects/prj_1/tests?job=job_1'))
+    await eventually(() => expect(router.currentRoute.value.fullPath).toBe('/projects/prj_1/tests?job=job_1'))
     await flushPromises()
 
     expect(app.find('[data-testid="tests-hero"]').text()).toBe('No new failures')
@@ -95,7 +96,7 @@ describe('TestsView', () => {
     expect(app.findAll('.pick').map((pick) => pick.text())).toHaveLength(2)
 
     await app.findAll('.pick')[1]!.trigger('click')
-    await vi.waitFor(() => expect(router.currentRoute.value.fullPath).toBe('/projects/prj_1/tests?job=job_2'))
+    await eventually(() => expect(router.currentRoute.value.fullPath).toBe('/projects/prj_1/tests?job=job_2'))
   })
 
   it('says when there is no baseline yet, and when a page of tests is cut', async () => {

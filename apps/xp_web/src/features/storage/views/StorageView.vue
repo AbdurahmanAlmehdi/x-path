@@ -54,10 +54,6 @@ const retentionValid = computed(
   () => wholeNumber(keepPerFlavor.value) !== null && wholeNumber(logDays.value) !== null,
 )
 
-function projectName(id: string): string {
-  return projects.projects.find((project) => project.id === id)?.fullName ?? id
-}
-
 function openFree() {
   picked.value = reclaimable.value.map((category) => category.category)
   freeing.value = true
@@ -138,7 +134,7 @@ async function saveRetention() {
           </thead>
           <tbody>
             <tr v-for="flavor in store.report.flavors" :key="`${flavor.projectId} ${flavor.app} ${flavor.flavor}`">
-              <td>{{ projectName(flavor.projectId) }}</td>
+              <td>{{ projects.nameOf(flavor.projectId) }}</td>
               <td class="mono">{{ flavor.app }}</td>
               <td class="mono">{{ flavor.flavor || '—' }}</td>
               <td>{{ buildsLabel(flavor.builds, flavor.artifacts) }}</td>

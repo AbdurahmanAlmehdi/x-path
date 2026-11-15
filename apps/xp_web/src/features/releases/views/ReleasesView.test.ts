@@ -7,6 +7,7 @@ import { openApp } from '@/testing/app'
 import { type Answer, meOf, stubEngine } from '@/testing/fetch'
 import { approvalOf, projectOf, releaseOf, runOf } from '@/testing/fixtures'
 import { stubSockets } from '@/testing/sockets'
+import { eventually } from '@/testing/wait'
 
 describe('ReleasesView', () => {
   let app: VueWrapper | undefined
@@ -227,7 +228,7 @@ describe('ReleasesView', () => {
     await button('New build, same version…').trigger('click')
     await button('Start new build').trigger('click')
 
-    await vi.waitFor(() => expect(router.currentRoute.value.fullPath).toBe('/runs/run_9'))
+    await eventually(() => expect(router.currentRoute.value.fullPath).toBe('/runs/run_9'))
   })
 
   it('merges a release live everywhere, and opens the merge run', async () => {
@@ -242,7 +243,7 @@ describe('ReleasesView', () => {
 
     await button('Merge into main').trigger('click')
 
-    await vi.waitFor(() => expect(router.currentRoute.value.fullPath).toBe('/runs/run_8'))
+    await eventually(() => expect(router.currentRoute.value.fullPath).toBe('/runs/run_8'))
   })
 
   it('saves the store texts, and copies the notes', async () => {
@@ -295,7 +296,7 @@ describe('ReleasesView', () => {
     expect(app.text()).toContain('The notes are ready once the release is tagged.')
     expect(labels()).not.toContain('Merge into main')
     await app.find('a.pick:not(.selected)').trigger('click')
-    await vi.waitFor(() => expect(router.currentRoute.value.fullPath).toBe('/projects/prj_1/releases/rel_1'))
+    await eventually(() => expect(router.currentRoute.value.fullPath).toBe('/projects/prj_1/releases/rel_1'))
     await flushPromises()
     expect(app.find('main h1').text()).toBe('Release 1.1.0 (6)')
   })

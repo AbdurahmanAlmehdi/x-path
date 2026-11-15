@@ -40,3 +40,12 @@ class PersonRequestException extends PersonException {
   @override
   String toString() => 'PersonRequestException: $message';
 }
+
+/// The token may not change people: that takes an admin (ADR 0017).
+class PersonForbiddenException extends PersonException {
+  /// Creates the exception with a [message] that says who may.
+  const new(super.message);
+
+  @override
+  String toString() => 'PersonForbiddenException: $message';
+}

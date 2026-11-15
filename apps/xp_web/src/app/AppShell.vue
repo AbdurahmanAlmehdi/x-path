@@ -1,21 +1,30 @@
 <script setup lang="ts">
+import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 
-import { navigation } from '@/app/navigation'
-import { usePendingApprovalsStore } from '@/features/approvals/stores/pending'
+import { useApprovalsStore } from '@/features/approvals/stores/approvals'
 import { useSessionStore } from '@/features/session/stores/session'
+import { useFollowing } from '@/ui/following'
 
-import { useFollowing } from './following'
+import { navigation } from './navigation'
 
 const session = useSessionStore()
-const pending = usePendingApprovalsStore()
+const approvals = useApprovalsStore()
 const router = useRouter()
 
-useFollowing(pending.follow)
+// The "needs you" count of the Approvals link; the inbox shares this store.
+void approvals.load()
+useFollowing(approvals.follow)
+
+/** Why the engine did not end the session: the person is still signed in. */
+const signOutError = ref<string | null>(null)
+const signingOut = ref(false)
 
 async function signOut() {
-  await session.signOut()
-  await router.replace({ name: 'sign-in' })
+  signingOut.value = true
+  signOutError.value = await session.signOut()
+  signingOut.value = false
+  if (signOutError.value === null) await router.replace({ name: 'sign-in' })
 }
 </script>
 
@@ -26,9 +35,10 @@ async function signOut() {
       <div class="who">
         <span class="xp-type-body-strong" data-testid="person-name">{{ session.person?.name }}</span>
         <span class="xp-type-label role">{{ session.person?.role }}</span>
-        <button type="button" @click="signOut">Sign out</button>
+        <button type="button" :disabled="signingOut" @click="signOut">Sign out</button>
       </div>
     </header>
+    <p v-if="signOutError" class="alert sign-out-error" role="alert">Not signed out: {{ signOutError }}</p>
     <nav class="sidebar" aria-label="Main">
       <section v-for="section in navigation" :key="section.label">
         <h2 class="xp-type-label">{{ section.label }}</h2>
@@ -37,11 +47,11 @@ async function signOut() {
             <RouterLink :to="item.to" class="xp-type-body">
               {{ item.label }}
               <span
-                v-if="item.needsYou && pending.count > 0"
+                v-if="item.needsYou && approvals.pendingCount > 0"
                 class="needs-you xp-type-label"
                 data-testid="needs-you"
-                :aria-label="`${pending.count} waiting`"
-              >{{ pending.count }}</span>
+                :aria-label="`${approvals.pendingCount} waiting`"
+              >{{ approvals.pendingCount }}</span>
             </RouterLink>
           </li>
         </ul>
@@ -58,10 +68,16 @@ async function signOut() {
   min-height: 100vh;
   display: grid;
   grid-template-columns: var(--xp-size-sidebar-width) minmax(0, 1fr);
-  grid-template-rows: var(--xp-size-toolbar-height) 1fr;
+  grid-template-rows: var(--xp-size-toolbar-height) auto 1fr;
   grid-template-areas:
     'toolbar toolbar'
+    'notice notice'
     'sidebar content';
+}
+
+.sign-out-error {
+  grid-area: notice;
+  margin: var(--xp-space-8) var(--xp-space-16) 0;
 }
 
 .toolbar {
@@ -149,9 +165,10 @@ async function signOut() {
 @media (max-width: 760px) {
   .shell {
     grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: var(--xp-size-toolbar-height) auto 1fr;
+    grid-template-rows: var(--xp-size-toolbar-height) auto auto 1fr;
     grid-template-areas:
       'toolbar'
+      'notice'
       'sidebar'
       'content';
   }

@@ -141,7 +141,9 @@ void main() {
             isA<GitHubTokenForbiddenException>().having(
               (error) => error.message,
               'message',
-              contains('A ${kind.name} token cannot set the GitHub token'),
+              contains(
+                '${AccessPolicy.aTokenOf(kind)} cannot set the GitHub token',
+              ),
             ),
           ),
         );

@@ -1,7 +1,5 @@
 import 'package:args/command_runner.dart';
-import 'package:xp_adapters/xp_adapters.dart';
 import 'package:xp_api/xp_api.dart';
-import 'package:xp_engine/xp_engine.dart';
 import 'package:xpd/src/cli/xpd_command.dart';
 import 'package:xpd/src/cli/xpd_context.dart';
 
@@ -58,11 +56,9 @@ class TokenCreateCommand extends XpdCommand {
     }
     if (kind == null) usageException('--kind is required.');
     final issued = await withDatabase(
-      (database) => TokenService(
-        tokens: SqliteDeviceTokenRepository(database),
-        people: SqlitePersonRepository(database),
-        clock: const SystemClock(),
-      ).issue(name: name, kind: DeviceTokenKind.values.byName(kind)),
+      (database) =>
+          tokenServiceOf(database)
+              .issue(name: name, kind: DeviceTokenKind.values.byName(kind)),
     );
     context.err.writeln(
       'Created ${issued.token.kind.name} token "${issued.token.name}" '

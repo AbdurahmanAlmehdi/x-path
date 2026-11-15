@@ -326,7 +326,8 @@ void main() {
           isA<CredentialForbiddenException>().having(
             (e) => e.message,
             'message',
-            'A mcp token cannot add credentials: only the app or `xp` do.',
+            'An mcp token cannot add credentials: only the app, `xp` or the '
+                'web dashboard do.',
           ),
         ),
       );

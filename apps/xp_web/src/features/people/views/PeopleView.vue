@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 
-import { failureMessage, type Person, type PersonRole } from '@/api/client'
+import type { Person, PersonRole } from '@/api/client'
 import { useSessionStore } from '@/features/session/stores/session'
 import Dialog from '@/ui/Dialog.vue'
 import { formatTime, timeAgo } from '@/ui/format'
@@ -19,7 +19,6 @@ const admin = computed(() => session.can('administer'))
 const adding = ref(false)
 const name = ref('')
 const role = ref<PersonRole>('developer')
-const addError = ref<string | null>(null)
 const saving = ref(false)
 /** The person a sign-in code is shown for, and whether they were just added. */
 const coding = ref<{ person: Person; added: boolean } | null>(null)
@@ -31,23 +30,36 @@ const refused = ref(0)
 function openAdd() {
   name.value = ''
   role.value = 'developer'
-  addError.value = null
+  store.dismiss()
   adding.value = true
 }
 
 async function add() {
   if (name.value.trim() === '' || saving.value) return
   saving.value = true
-  addError.value = null
-  try {
-    const person = await store.add(name.value, role.value)
-    adding.value = false
-    coding.value = { person, added: true }
-  } catch (failure) {
-    addError.value = failureMessage(failure)
-  } finally {
-    saving.value = false
-  }
+  const person = await store.add(name.value, role.value)
+  saving.value = false
+  if (!person) return
+  adding.value = false
+  coding.value = { person, added: true }
+}
+
+function showCode(person: Person) {
+  store.dismiss()
+  coding.value = { person, added: false }
+}
+
+function confirmRemove(person: Person) {
+  store.dismiss()
+  removing.value = person
+}
+
+/** Closes a dialog, and forgets what the engine refused in it. */
+function closeDialog() {
+  adding.value = false
+  coding.value = null
+  removing.value = null
+  store.dismiss()
 }
 
 async function changeRole(person: Person, event: Event) {
@@ -74,7 +86,7 @@ async function remove(person: Person) {
       </div>
     </header>
     <p v-if="store.error" class="alert" role="alert">{{ store.error }}</p>
-    <p v-if="store.actionError && !removing" class="alert" role="alert" data-testid="people-error">
+    <p v-if="store.actionError && !adding && !coding && !removing" class="alert" role="alert" data-testid="people-error">
       {{ store.actionError }}
     </p>
     <p v-if="!store.loaded" class="muted">Loading…</p>
@@ -110,8 +122,8 @@ async function remove(person: Person) {
             <td :title="formatTime(person.createdAt)">{{ timeAgo(person.createdAt) }}</td>
             <td v-if="admin">
               <div class="actions">
-                <button type="button" @click="coding = { person, added: false }">Sign-in code…</button>
-                <button type="button" @click="removing = person">Remove…</button>
+                <button type="button" @click="showCode(person)">Sign-in code…</button>
+                <button type="button" @click="confirmRemove(person)">Remove…</button>
               </div>
             </td>
           </tr>
@@ -126,7 +138,7 @@ async function remove(person: Person) {
       </ul>
     </div>
 
-    <Dialog v-if="adding" title="Add a person" @close="adding = false">
+    <Dialog v-if="adding" title="Add a person" @close="closeDialog">
       <form class="form" @submit.prevent="add">
         <label class="field">
           <span class="xp-type-label">Name</span>
@@ -139,22 +151,22 @@ async function remove(person: Person) {
           </select>
         </label>
         <p class="muted">They sign in with a one-time code, shown next.</p>
-        <p v-if="addError" class="alert" role="alert">{{ addError }}</p>
+        <p v-if="store.actionError" class="alert" role="alert">{{ store.actionError }}</p>
       </form>
       <template #footer>
-        <button type="button" @click="adding = false">Cancel</button>
+        <button type="button" @click="closeDialog">Cancel</button>
         <button type="button" class="primary" :disabled="name.trim() === '' || saving" @click="add">Add</button>
       </template>
     </Dialog>
-    <SignInCodeDialog v-if="coding" :person="coding.person" :added="coding.added" @close="coding = null" />
-    <Dialog v-if="removing" :title="`Remove ${removing.name}?`" @close="removing = null">
+    <SignInCodeDialog v-if="coding" :person="coding.person" :added="coding.added" @close="closeDialog" />
+    <Dialog v-if="removing" :title="`Remove ${removing.name}?`" @close="closeDialog">
       <ul class="removed">
         <li>They can no longer sign in, and every token of theirs stops working at once.</li>
         <li>Approvals and runs keep their name.</li>
       </ul>
       <p v-if="store.actionError" class="alert" role="alert">{{ store.actionError }}</p>
       <template #footer>
-        <button type="button" @click="removing = null">Keep</button>
+        <button type="button" @click="closeDialog">Keep</button>
         <button type="button" class="danger" :disabled="store.changing !== null" @click="remove(removing)">
           Remove
         </button>

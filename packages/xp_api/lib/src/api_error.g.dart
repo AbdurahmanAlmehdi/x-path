@@ -30,6 +30,7 @@ const _$ApiErrorCodeEnumMap = {
   ApiErrorCode.forbidden: 'forbidden',
   ApiErrorCode.csrf: 'csrf',
   ApiErrorCode.notFound: 'not_found',
+  ApiErrorCode.methodNotAllowed: 'method_not_allowed',
   ApiErrorCode.conflict: 'conflict',
   ApiErrorCode.credentialInUse: 'credential_in_use',
   ApiErrorCode.alreadyDecided: 'already_decided',

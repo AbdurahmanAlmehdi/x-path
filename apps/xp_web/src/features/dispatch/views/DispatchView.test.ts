@@ -1,10 +1,10 @@
 import { flushPromises, type VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import type { Project, WorkflowInput } from '@/api/client'
 import { openApp } from '@/testing/app'
-import { type Answer, errorBody, meOf, stubEngine } from '@/testing/fetch'
+import { type Answer, errorBody, meOf, type SeenRequest, stubEngine } from '@/testing/fetch'
 import {
   planOf,
   projectOf,
@@ -14,6 +14,9 @@ import {
   workflowSummaryOf,
 } from '@/testing/fixtures'
 import { stubSockets } from '@/testing/sockets'
+import { eventually } from '@/testing/wait'
+
+import { typingPause, useDispatchStore } from '../stores/dispatch'
 
 const schema = {
   schema: 1,
@@ -98,10 +101,15 @@ describe('DispatchView', () => {
   async function open(path = '/projects/prj_1/dispatch') {
     let router
     ;({ app, router } = await openApp(path))
-    await vi.waitFor(() => expect(app!.find('[data-testid="dispatch"]').exists()).toBe(true))
-    await new Promise((resolve) => setTimeout(resolve))
+    // The form loads, then works out its first preview.
+    await eventually(() => expect(useDispatchStore()).toMatchObject({ loading: false, previewing: false }))
     await flushPromises()
     return { app: app!, router: router! }
+  }
+
+  /** The bodies of the previews and dispatches the engine received. */
+  function posted(seen: SeenRequest[]): unknown[] {
+    return seen.filter((request) => request.method === 'POST').map((request) => request.body)
   }
 
   it('tells a viewer their role cannot dispatch, and asks the engine nothing', async () => {
@@ -134,39 +142,45 @@ describe('DispatchView', () => {
   })
 
   it('sends the flavors, platforms, version and ref picked', async () => {
-    engine()
-    const { app } = await open()
     const seen = engine()
+    const { app } = await open()
 
     await app.findAll('input[type="checkbox"]').find((box) => box.element.parentElement?.textContent?.trim() === 'prod')!.setValue(true)
     await app.findAll('input[type="checkbox"]').find((box) => box.element.parentElement?.textContent?.trim() === 'iOS')!.setValue(false)
     await app.find('input[value="minor"]').setValue(true)
-    await vi.waitFor(() => expect(seen.filter((request) => request.method === 'POST').length).toBeGreaterThan(0))
-    await flushPromises()
-
-    expect(seen.filter((request) => request.method === 'POST').at(-1)?.body).toMatchObject({
-      flavors: ['dev', 'prod'],
-      platforms: ['android'],
-      bump: 'minor',
-    })
+    await eventually(() =>
+      expect(posted(seen)).toContainEqual(
+        expect.objectContaining({ flavors: ['dev', 'prod'], platforms: ['android'], bump: 'minor' }),
+      ),
+    )
 
     await app.find('input[aria-label="Version to release"]').setValue('2.0.0')
     await app.find('input[placeholder="branch, tag or commit"]').setValue('release/2')
-    await vi.waitFor(
-      () =>
-        expect(seen.filter((request) => request.method === 'POST').at(-1)?.body).toMatchObject({
-          ref: 'release/2',
-          version: '2.0.0',
-        }),
-      { timeout: 2000 },
+    await eventually(() =>
+      expect(posted(seen)).toContainEqual(expect.objectContaining({ ref: 'release/2', version: '2.0.0' })),
     )
+  })
+
+  it('asks for no preview once the page closes mid-typing', async () => {
+    const seen = engine()
+    const page = (await open()).app
+    seen.length = 0
+
+    await page.find('input[placeholder="branch, tag or commit"]').setValue('release/2')
+    page.unmount()
+    app = undefined
+    // Proving that nothing comes takes waiting past the pause.
+    await new Promise((resolve) => setTimeout(resolve, typingPause + 100))
+    await flushPromises()
+
+    expect(posted(seen)).toEqual([])
   })
 
   it('takes every kind of input, and says when JSON does not parse', async () => {
     engine()
     const { app } = await open()
     await app.find('select').setValue('wf_2')
-    await vi.waitFor(() => expect(app.findAll('.input')).toHaveLength(6))
+    await eventually(() => expect(app.findAll('.input')).toHaveLength(6))
     await flushPromises()
 
     expect(app.find('select').text()).toContain('custom')
@@ -187,7 +201,7 @@ describe('DispatchView', () => {
     await app.find('#input-notes').setValue('Hello')
     expect(app.find('label[for="input-notes"]').text()).toBe('notes *')
 
-    await vi.waitFor(() => expect(app.find('[data-testid="dispatch"]').text()).toBe('Dispatch 1 job'))
+    await eventually(() => expect(app.find('[data-testid="dispatch"]').text()).toBe('Dispatch 1 job'))
   })
 
   it('shows a typed JSON value as typed', async () => {
@@ -198,7 +212,7 @@ describe('DispatchView', () => {
       },
     })
     const { app } = await open()
-    await vi.waitFor(() => expect(app.findAll('.input')).toHaveLength(6))
+    await eventually(() => expect(app.findAll('.input')).toHaveLength(6))
 
     expect((app.find('#input-groups').element as HTMLTextAreaElement).value).toBe('[')
   })
@@ -214,7 +228,7 @@ describe('DispatchView', () => {
 
     await app.find('[data-testid="dispatch"]').trigger('click')
 
-    await vi.waitFor(() => expect(router.currentRoute.value.fullPath).toBe('/runs/run_7'))
+    await eventually(() => expect(router.currentRoute.value.fullPath).toBe('/runs/run_7'))
   })
 
   it('dispatches a ref the engine fetches first', async () => {
@@ -251,34 +265,32 @@ describe('DispatchView', () => {
     const apps = app.findAll('select')[1]!
     expect(apps.text()).toContain('admin (apps/admin)')
     await apps.setValue('apps/admin')
-    await vi.waitFor(() =>
-      expect(seen.filter((request) => request.method === 'POST').at(-1)?.body).toMatchObject({ app: 'apps/admin' }),
-    )
+    await eventually(() => expect(posted(seen)).toContainEqual(expect.objectContaining({ app: 'apps/admin' })))
     expect(app.findAll('fieldset legend').map((legend) => legend.text())).not.toContain('Flavors')
   })
 
   it('says when the project has no workflow, or is gone', async () => {
     engine({ 'GET /projects/prj_1/workflows': { status: 200, body: { workflows: [] } } })
     ;({ app } = await openApp('/projects/prj_1/dispatch'))
-    await vi.waitFor(() => expect(app!.text()).toContain('The project has no workflow.'))
+    await eventually(() => expect(app!.text()).toContain('The project has no workflow.'))
     app.unmount()
 
     setActivePinia(createPinia())
     engine({ 'GET /projects/prj_1': { status: 404, body: errorBody('not_found', 'No.') } })
     ;({ app } = await openApp('/projects/prj_1/dispatch'))
-    await vi.waitFor(() => expect(app!.text()).toContain('This project is no longer on the engine.'))
+    await eventually(() => expect(app!.text()).toContain('This project is no longer on the engine.'))
     app.unmount()
 
     setActivePinia(createPinia())
     engine({ 'GET /projects/prj_1': { status: 500, body: errorBody('internal', 'Broken.') } })
     ;({ app } = await openApp('/projects/prj_1/dispatch'))
-    await vi.waitFor(() => expect(app!.find('[role="alert"]').text()).toBe('Broken.'))
+    await eventually(() => expect(app!.find('[role="alert"]').text()).toBe('Broken.'))
   })
 
   it('opens on the workflow the address names', async () => {
     engine()
     const { app } = await open('/projects/prj_1/dispatch?workflow=custom')
 
-    await vi.waitFor(() => expect((app.find('select').element as HTMLSelectElement).value).toBe('wf_2'))
+    await eventually(() => expect((app.find('select').element as HTMLSelectElement).value).toBe('wf_2'))
   })
 })

@@ -1,5 +1,5 @@
 import type { CredentialKind, CredentialStatus, CredentialUsage, Project } from '@/api/client'
-import type { StatusLabel } from '@/ui/format'
+import { shortName, type StatusLabel } from '@/ui/format'
 
 const kinds: Record<CredentialKind, string> = {
   asc_key: 'App Store Connect API key',
@@ -85,7 +85,7 @@ const nameLimit = 80
 export function certificateName(project: string, flavor: string): string {
   const name = `Apple Distribution · ${project} ${flavor}`
   if (name.length <= nameLimit) return name
-  return `Apple Distribution · ${project.split('/').pop()} ${flavor}`.slice(0, nameLimit)
+  return `Apple Distribution · ${shortName(project)} ${flavor}`.slice(0, nameLimit)
 }
 
 /** How a secret field of a kind is filled. */

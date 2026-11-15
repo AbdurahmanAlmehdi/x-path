@@ -37,8 +37,6 @@ class SessionRoutes {
   final TokenService _tokens;
   final AllowedOrigins _origins;
 
-  static const _noStore = {'cache-control': 'no-store'};
-
   /// Registers the routes on [router].
   void addTo(ApiRouter router) {
     router
@@ -52,7 +50,7 @@ class SessionRoutes {
       return errorResponse(
         ApiErrorCode.notFound,
         'A browser signs in under $apiMount.',
-        headers: _noStore,
+        headers: noStore,
       );
     }
     final kind = await _origins.of(request);
@@ -60,7 +58,7 @@ class SessionRoutes {
       return errorResponse(
         ApiErrorCode.csrf,
         'Sign in from a page of the engine: the request has no Origin.',
-        headers: _noStore,
+        headers: noStore,
       );
     }
     if (kind == null ||
@@ -74,7 +72,7 @@ class SessionRoutes {
         hint:
             'Put an HTTPS proxy in front of the engine and set its address '
             "as the engine's public URL, or sign in on the engine machine.",
-        headers: _noStore,
+        headers: noStore,
       );
     }
     final SignInRequest body;
@@ -84,24 +82,27 @@ class SessionRoutes {
       return errorResponse(
         ApiErrorCode.invalidRequest,
         error.message,
-        headers: _noStore,
+        headers: noStore,
       );
     }
     final IssuedToken issued;
     try {
-      issued = await _signIn.signIn(body.code);
+      issued = await _signIn.signIn(
+        body.code,
+        address: AllowedOrigins.remoteAddressOf(request) ?? 'unknown',
+      );
     } on SignInRejectedException catch (error) {
       return errorResponse(
         ApiErrorCode.unauthorized,
         error.message,
-        headers: _noStore,
+        headers: noStore,
       );
     } on SignInRateLimitedException catch (error) {
       final seconds = (error.retryAfter.inMilliseconds / 1000).ceil();
       return errorResponse(
         ApiErrorCode.rateLimited,
         error.message,
-        headers: {..._noStore, 'retry-after': '$seconds'},
+        headers: {...noStore, 'retry-after': '$seconds'},
       );
     }
     final token = issued.token;
@@ -112,8 +113,9 @@ class SessionRoutes {
         permissions: AccessPolicy.permissionsOf(token),
       ).toJson(),
       headers: {
-        ..._noStore,
+        ...noStore,
         'set-cookie': SessionCookie.set(
+          request,
           kind,
           issued.secret,
           TokenService.webSessionLifetime,
@@ -124,37 +126,37 @@ class SessionRoutes {
 
   Future<Response> _signOut(Request request) async {
     final token = deviceTokenOf(request);
-    if (token.kind != DeviceTokenKind.web) {
+    if (!AccessPolicy.maySignOut(token)) {
       return errorResponse(
         ApiErrorCode.forbidden,
         'Only a browser session signs out; revoke a ${token.kind.name} token '
         'with DELETE /tokens/{id}.',
-        headers: _noStore,
+        headers: noStore,
       );
     }
     await _tokens.revoke(token.id);
     final cleared = SessionCookie.clear(request);
     return Response(
       204,
-      headers: {..._noStore, if (cleared.isNotEmpty) 'set-cookie': cleared},
+      headers: {...noStore, if (cleared.isNotEmpty) 'set-cookie': cleared},
     );
   }
 
   Future<Response> _issue(Request request, String id) async {
     try {
       final code = await _signIn.issueFor(deviceTokenOf(request), id);
-      return jsonResponse(code.toJson(), statusCode: 201, headers: _noStore);
+      return jsonResponse(code.toJson(), statusCode: 201, headers: noStore);
     } on SignInForbiddenException catch (error) {
       return errorResponse(
         ApiErrorCode.forbidden,
         error.message,
-        headers: _noStore,
+        headers: noStore,
       );
     } on PersonNotFoundException catch (error) {
       return errorResponse(
         ApiErrorCode.notFound,
         error.message,
-        headers: _noStore,
+        headers: noStore,
       );
     }
   }

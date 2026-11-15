@@ -42,12 +42,12 @@ export function createAppRouter(history: RouterHistory = createWebHistory()): Ro
       },
       {
         path: '/',
-        component: () => import('@/ui/AppShell.vue'),
+        component: () => import('./AppShell.vue'),
         children: [
           {
             path: '',
             name: 'home',
-            component: () => import('@/ui/HomeView.vue'),
+            component: () => import('./HomeView.vue'),
           },
           {
             path: 'projects',

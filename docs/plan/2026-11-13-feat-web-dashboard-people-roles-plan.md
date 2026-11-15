@@ -66,14 +66,14 @@ Where the brainstorm says otherwise, this plan wins:
 | D1 | URL space | The API moves to `/api/v1`. Root paths stay as **bearer-only** aliases with `Deprecation` and `Sunset` headers, removed in the first major release (2.0) on or after 2027-11-14, as a `feat!` change. Everything else is the SPA. | owner (2026-11-14: 2.0, one year out) |
 | D2 | Live updates | The existing WebSockets, authenticated by the session cookie plus an exact `Origin` match. No ticket, no SSE. | owner |
 | D3 | TLS | No TLS in `xpd`. Browser sign-in works only on loopback or through the configured HTTPS public URL. Plain HTTP from another machine gets `403` with the reason. | owner |
-| D3a | Cookie attributes | Chosen by the scheme of the origin that is signing in, never by request headers. Through the HTTPS `public_url`: `__Host-xp_session; Secure; HttpOnly; SameSite=Strict; Path=/`. On a loopback origin: `xp_session; HttpOnly; SameSite=Strict; Path=/`. Safari still refuses `Secure` cookies on `http://localhost` (WebKit bug 232088), and a loopback cookie never leaves the machine. | research |
+| D3a | Cookie attributes | Chosen by the scheme of the origin that is signing in, never by request headers. Through the HTTPS `public_url`: `__Host-xp_session; Secure; HttpOnly; SameSite=Strict; Path=/`. On a loopback origin: `xp_session_<port>; HttpOnly; SameSite=Strict; Path=/`, the port being the one the engine serves on, so two engines on one machine keep separate sessions. Safari still refuses `Secure` cookies on `http://localhost` (WebKit bug 232088), and a loopback cookie never leaves the machine. | research |
 | D4 | Packaging | `npm run build` runs once in CI, and `bundles.sh` copies `dist/` into every `xpd` bundle as `xpd/web/`. | owner |
 | D5 | TS coverage | 100% lines for `src/api/**` and every Pinia store, 90% for the rest. This mirrors the repo's 100% client and bloc, 90% glue tiers. | plan default |
 | D6 | Runner tokens | They belong to no person (`person_id` NULL is allowed only for `kind = 'runner'`). A runner is a machine, so removing a person never breaks a runner. | plan default; refines the brainstorm's "every kind" |
 | D7 | Upgrade | Migration creates the person `Owner` (admin), who owns every non-runner token. It can be renamed later. | plan default |
 | D8 | First admin, headless | `xpd person create --name <n> --role admin` prints a sign-in code. `xpd person code <name>` issues a new one. Both write to the database directly, like `xpd token create`. | plan default |
 | D9 | Mac or CLI owner opening the dashboard | `xp dashboard` and a Settings button in the Mac app ask for a sign-in code for **their own** person and open `<origin>/sign-in#code=…`. A fragment never reaches a server log. They pass that link to `open`/`xdg-open` as a process argument: an **accepted exception** to the rule that no secret goes in process arguments, since the code is single-use, expires in 10 minutes and the browser redeems it within seconds; `xp dashboard --print` avoids it. Recorded in ADR 0018. | plan default; exception accepted by the owner (2026-11-15) |
-| D10 | Sign-in code | 16 Crockford base32 characters (80 bits), shown as `XXXX-XXXX-XXXX-XXXX`. It lasts 10 minutes and works once. Issuing a code deletes the person's unused codes. Only the SHA-256 is stored, and it is the primary key. 20 failures in total per 10 minutes, then `429`. Unknown, used and expired codes all get the same `401`. It is used up atomically (`UPDATE … WHERE hash = ? AND used_at IS NULL AND expires_at > ?`, then the row count is checked). | plan default |
+| D10 | Sign-in code | 16 Crockford base32 characters (80 bits), shown as `XXXX-XXXX-XXXX-XXXX`. It lasts 10 minutes and works once. Issuing a code deletes the person's unused codes. Only the SHA-256 is stored, and it is the primary key. 20 failures per connection address (never `X-Forwarded-*`) and 200 in total per 10 minutes, then `429`; behind a same-host proxy every client shares the proxy's address. Unknown, used and expired codes all get the same `401`. It is used up atomically (`UPDATE … WHERE hash = ? AND used_at IS NULL AND expires_at > ?`, then the row count is checked). | plan default |
 | D11 | Session lifetime | A `web` token expires 8 hours after sign-in, with no sliding renewal. Signing out revokes the token on the server and clears the cookie (`Max-Age=0`). Responses under `/api/v1/session` and `/api/v1/me` are `no-store`. | plan default (within OWASP's 4–8 h absolute timeout) |
 | D12 | Revocation while signed in | The role is read with the token on every request, so a role change applies to the next request. Revoking a token, signing out, removing the person or expiry closes the affected sockets with code 4401: a push on revocation, plus a sweep every 60 s for expiry. The next REST call answers `401`, and the SPA goes to `/sign-in?next=<path>`. Every tab holds its own socket, so each tab learns on its own. | plan default |
 | D13 | People removal | Soft removal (`removed_at`) that revokes all their tokens. Approvals and run origins keep the name. The last active admin cannot be demoted or removed (`409`). | plan default |
@@ -303,7 +303,7 @@ export PATH="$PWD/.fvm/flutter_sdk/bin:$HOME/.pub-cache/bin:$PATH"
   - An approval decided by a `web` token persists and reads back with `personName`.
   - No kind check is left outside `access/`.
   - ADR 0017 names what it amends: the 1.0 non-goal on multi-user accounts, and D-13's kind rule.
-- **Validation:** `(cd packages/xp_adapters && dart test test/src/sqlite/) && melos run test:coverage:strict && ! grep -rnE "kind (!=|==) DeviceTokenKind\.(app|cli)" packages/xp_engine/lib apps/xpd/lib --exclude-dir=access`
+- **Validation:** `(cd packages/xp_adapters && dart test test/src/sqlite/) && melos run test:coverage:strict && ! grep -rnE "(!=|==) DeviceTokenKind\.|DeviceTokenKind\.[a-z]+ (!=|==)|contains\((token|by|asker|creator)\.kind\)|Set<DeviceTokenKind>" packages/xp_engine/lib apps/xpd/lib --exclude-dir=access`
 
 ### Phase 2: People, tokens, run origin and permissions over the API
 
@@ -445,7 +445,7 @@ export PATH="$PWD/.fvm/flutter_sdk/bin:$HOME/.pub-cache/bin:$PATH"
   - `apps/xp_desktop/test/settings/{settings_blocs_test,settings_page_test}.dart`, with the goldens updated on macOS
     (`flutter test --update-goldens --tags golden`)
 - **Acceptance criteria:**
-  - On loopback, a code exchanged at `/api/v1/session` sets `xp_session` (HttpOnly, SameSite=Strict, Path=/).
+  - On loopback, a code exchanged at `/api/v1/session` sets `xp_session_<port>` (HttpOnly, SameSite=Strict, Path=/).
   - Through an HTTPS `public_url`, it sets `__Host-xp_session` with `Secure`.
   - A loopback origin with a foreign `Host` (DNS rebinding) is refused.
   - The same code a second time gets `401`. The 21st bad code within 10 minutes gets `429`.
@@ -788,7 +788,7 @@ GOAL: A person signs in to the engine's own web dashboard with a one-time code, 
 
 SUCCESS CRITERIA:
 - An existing database migrates to one admin "Owner" owning every non-runner token, and the migration golden matches | verify: cd packages/xp_adapters && dart test test/src/sqlite/migrations_test.dart
-- Role checks replace every token-kind check in the engine services and xpd routes | verify: ! grep -rnE "kind (!=|==) DeviceTokenKind\.(app|cli)" packages/xp_engine/lib apps/xpd/lib --exclude-dir=access
+- Role checks replace every token-kind check in the engine services and xpd routes | verify: ! grep -rnE "(!=|==) DeviceTokenKind\.|DeviceTokenKind\.[a-z]+ (!=|==)|contains\((token|by|asker|creator)\.kind\)|Set<DeviceTokenKind>" packages/xp_engine/lib apps/xpd/lib --exclude-dir=access
 - Every mutating route has a permission in the route table (the exhaustiveness test passes) | verify: cd apps/xpd && dart test test/src/api/route_permissions_test.dart
 - The API answers under /api/v1, bearer clients still reach the root aliases with a Deprecation header, and every response matches openapi.yaml | verify: melos run test:contract
 - Sign-in, CSRF, Origin, rate limit, expiry and socket closing on revocation behave as D3, D10–D15 say | verify: cd apps/xpd && dart test test/src/api/session test/src/api/csrf_middleware_test.dart test/src/api/events_route_test.dart
@@ -811,7 +811,7 @@ NON-GOALS:
 - Localization of the web app
 - Removing the root API aliases (scheduled for 2.0, on or after 2027-11-14)
 
-VERIFICATION COMMAND: export PATH="$PWD/.fvm/flutter_sdk/bin:$HOME/.pub-cache/bin:$PATH" && dart analyze --fatal-infos && dart format --set-exit-if-changed . && dart run tool/check_layers.dart && (cd packages/xp_adapters && dart test test/src/sqlite/) && ! grep -rnE "kind (!=|==) DeviceTokenKind\.(app|cli)" packages/xp_engine/lib apps/xpd/lib --exclude-dir=access && (cd apps/xpd && dart test) && melos run test:coverage && melos run test:contract && (cd apps/xp_web && npm ci && npm run lint && npm run typecheck && npm run test:coverage && npm run gen:api:check && npm run build) && tool/e2e/smoke_bundle.sh && tool/e2e/web_e2e.sh && tool/e2e/quickstart_cli.sh && tool/e2e/mcp_gate_e2e.sh
+VERIFICATION COMMAND: export PATH="$PWD/.fvm/flutter_sdk/bin:$HOME/.pub-cache/bin:$PATH" && dart analyze --fatal-infos && dart format --set-exit-if-changed . && dart run tool/check_layers.dart && (cd packages/xp_adapters && dart test test/src/sqlite/) && ! grep -rnE "(!=|==) DeviceTokenKind\.|DeviceTokenKind\.[a-z]+ (!=|==)|contains\((token|by|asker|creator)\.kind\)|Set<DeviceTokenKind>" packages/xp_engine/lib apps/xpd/lib --exclude-dir=access && (cd apps/xpd && dart test) && melos run test:coverage && melos run test:contract && (cd apps/xp_web && npm ci && npm run lint && npm run typecheck && npm run test:coverage && npm run gen:api:check && npm run build) && tool/e2e/smoke_bundle.sh && tool/e2e/web_e2e.sh && tool/e2e/quickstart_cli.sh && tool/e2e/mcp_gate_e2e.sh
 ```
 
 ## Success Metrics

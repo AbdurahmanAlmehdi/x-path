@@ -71,17 +71,17 @@ export function storeOf(release: Release, store: ReleaseStore): StoreStatus | un
 }
 
 /** The stores of [release] in [state]. */
-export function storesIn(release: Release, state: StoreState): ReleaseStore[] {
+function storesIn(release: Release, state: StoreState): ReleaseStore[] {
   return release.stores.filter((status) => status.state === state).map((status) => status.store)
 }
 
 /** [stores] in one phrase: `App Store`, `App Store and Google Play`. */
-export function storeList(stores: ReleaseStore[]): string {
+function storeList(stores: ReleaseStore[]): string {
   return stores.length === 1 ? storeName(stores[0]!) : 'App Store and Google Play'
 }
 
 /** The `min_version_*` variable of [store] in Firebase Remote Config. */
-export function minVersionVariable(store: ReleaseStore): string {
+function minVersionVariable(store: ReleaseStore): string {
   return store === 'apple' ? 'min_version_ios' : 'min_version_android'
 }
 
@@ -152,7 +152,7 @@ export function mergeCaption(
 }
 
 /** Where a step of a lane is. */
-export type LanePhase = 'done' | 'now' | 'todo'
+type LanePhase = 'done' | 'now' | 'todo'
 
 /** One step of a store lane: `Uploaded`, `In review`, `Ready for sale`. */
 export interface LaneStep {

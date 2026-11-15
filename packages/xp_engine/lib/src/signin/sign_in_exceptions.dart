@@ -50,3 +50,9 @@ class PublicUrlInvalidException extends SignInException {
   /// Creates the exception with a [message] that says why.
   const new(super.message);
 }
+
+/// The token may not set the public URL: that takes an admin.
+class PublicUrlForbiddenException extends SignInException {
+  /// Creates the exception with a [message] that says who may.
+  const new(super.message);
+}

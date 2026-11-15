@@ -16,6 +16,7 @@ void main() {
   late Person sam;
 
   final start = DateTime.utc(2026, 11, 14, 9);
+  const here = '203.0.113.7';
 
   setUp(() async {
     codes = InMemorySignInCodeRepository();
@@ -92,14 +93,17 @@ void main() {
 
       expect(codes.codes.single.personId, sam.id);
       await expectLater(
-        service.signIn(first.code),
+        service.signIn(first.code, address: here),
         throwsA(isA<SignInRejectedException>()),
       );
       await expectLater(
-        service.signIn(ownerCode.code),
+        service.signIn(ownerCode.code, address: here),
         throwsA(isA<SignInRejectedException>()),
       );
-      expect((await service.signIn(second.code)).token.personId, sam.id);
+      expect(
+        (await service.signIn(second.code, address: here)).token.personId,
+        sam.id,
+      );
     });
 
     test('refuses a removed or unknown person', () async {
@@ -150,14 +154,14 @@ void main() {
     test('exchanges a code for a web token of its person, once', () async {
       final code = await service.issue(sam.id);
 
-      final issued = await service.signIn(code.code);
+      final issued = await service.signIn(code.code, address: here);
 
       expect(issued.token.kind, DeviceTokenKind.web);
       expect(issued.token.personId, sam.id);
       expect(await tokens.authenticate(issued.secret), isNotNull);
       expect(codes.codes.single.usedAt, start);
       await expectLater(
-        service.signIn(code.code),
+        service.signIn(code.code, address: here),
         throwsA(isA<SignInRejectedException>()),
       );
     });
@@ -172,7 +176,10 @@ void main() {
             .replaceAll('0', 'o')
             .replaceAll('1', 'l');
 
-        expect((await service.signIn(typed)).token.personId, sam.id);
+        expect(
+          (await service.signIn(typed, address: here)).token.personId,
+          sam.id,
+        );
       },
     );
 
@@ -181,7 +188,7 @@ void main() {
       clock.advance(SignInCodeService.lifetime);
 
       await expectLater(
-        service.signIn(code.code),
+        service.signIn(code.code, address: here),
         throwsA(
           isA<SignInRejectedException>().having(
             (e) => e.message,
@@ -197,7 +204,7 @@ void main() {
       await people.update(sam.copyWith(removedAt: start));
 
       await expectLater(
-        service.signIn(code.code),
+        service.signIn(code.code, address: here),
         throwsA(isA<SignInRejectedException>()),
       );
     });
@@ -205,17 +212,50 @@ void main() {
     test('refuses what cannot be a code', () async {
       for (final code in ['', 'ABCD', 'U' * 16, 'A' * 65, '!' * 16]) {
         await expectLater(
-          service.signIn(code),
+          service.signIn(code, address: here),
           throwsA(isA<SignInRejectedException>()),
           reason: code,
         );
       }
     });
 
+    test('takes a code until the last second of its lifetime', () async {
+      final code = await service.issue(sam.id);
+      clock.advance(SignInCodeService.lifetime - const Duration(seconds: 1));
+
+      expect(
+        (await service.signIn(code.code, address: here)).token.personId,
+        sam.id,
+      );
+    });
+
+    test('lets one of two concurrent uses of a code through', () async {
+      final code = await service.issue(sam.id);
+
+      final results = await Future.wait([
+        for (var i = 0; i < 2; i++)
+          service
+              .signIn(code.code, address: here)
+              .then<Object>((issued) => issued, onError: (Object e) => e),
+      ]);
+
+      expect(results.whereType<IssuedToken>(), hasLength(1));
+      expect(results.whereType<SignInRejectedException>(), hasLength(1));
+      expect(
+        (await tokenRepository.list()).where(
+          (token) => token.kind == DeviceTokenKind.web,
+        ),
+        hasLength(1),
+      );
+    });
+
     test('takes no code after 20 wrong ones in 10 minutes', () async {
       for (var i = 0; i < SignInCodeService.failureLimit; i++) {
         await expectLater(
-          service.signIn('0000-0000-0000-000$i'.substring(0, 19)),
+          service.signIn(
+            '0000-0000-0000-000$i'.substring(0, 19),
+            address: here,
+          ),
           throwsA(isA<SignInRejectedException>()),
         );
         clock.advance(const Duration(seconds: 10));
@@ -223,7 +263,7 @@ void main() {
       final code = await service.issue(sam.id);
 
       await expectLater(
-        service.signIn(code.code),
+        service.signIn(code.code, address: here),
         throwsA(
           isA<SignInRateLimitedException>().having(
             (e) => e.retryAfter,
@@ -234,7 +274,96 @@ void main() {
       );
 
       clock.advance(const Duration(minutes: 6, seconds: 40));
-      expect((await service.signIn(code.code)).token.personId, sam.id);
+      expect(
+        (await service.signIn(code.code, address: here)).token.personId,
+        sam.id,
+      );
+    });
+
+    test('still takes codes from another address after one is '
+        'limited', () async {
+      for (var i = 0; i < SignInCodeService.failureLimit; i++) {
+        await expectLater(
+          service.signIn('0000-0000-0000-0000', address: here),
+          throwsA(isA<SignInRejectedException>()),
+        );
+      }
+      final code = await service.issue(sam.id);
+
+      await expectLater(
+        service.signIn(code.code, address: here),
+        throwsA(isA<SignInRateLimitedException>()),
+      );
+      expect(
+        (await service.signIn(
+          code.code,
+          address: '198.51.100.1',
+        )).token.personId,
+        sam.id,
+      );
+    });
+
+    test('takes no code from anyone after 200 wrong ones from every '
+        'address together', () async {
+      for (var i = 0; i < SignInCodeService.globalFailureLimit; i++) {
+        await expectLater(
+          service.signIn('0000-0000-0000-0000', address: '10.0.${i ~/ 10}.1'),
+          throwsA(isA<SignInRejectedException>()),
+        );
+        if (i == 0) clock.advance(const Duration(minutes: 1));
+      }
+      final code = await service.issue(sam.id);
+
+      await expectLater(
+        service.signIn(code.code, address: '198.51.100.1'),
+        throwsA(
+          isA<SignInRateLimitedException>().having(
+            (e) => e.retryAfter,
+            'retryAfter',
+            const Duration(minutes: 9),
+          ),
+        ),
+      );
+      clock.advance(const Duration(minutes: 9));
+      expect(
+        (await service.signIn(
+          code.code,
+          address: '198.51.100.1',
+        )).token.personId,
+        sam.id,
+      );
+    });
+
+    test('counts concurrent wrong codes before any of them is '
+        'looked up', () async {
+      final results = await Future.wait([
+        for (var i = 0; i < SignInCodeService.failureLimit + 5; i++)
+          service
+              .signIn('0000-0000-0000-0000', address: here)
+              .then<Object?>((_) => null, onError: (Object e) => e),
+      ]);
+
+      expect(
+        results.whereType<SignInRejectedException>(),
+        hasLength(SignInCodeService.failureLimit),
+      );
+      expect(results.whereType<SignInRateLimitedException>(), hasLength(5));
+    });
+
+    test('does not count a good code as a wrong one', () async {
+      for (var i = 0; i < SignInCodeService.failureLimit - 1; i++) {
+        await expectLater(
+          service.signIn('0000-0000-0000-0000', address: here),
+          throwsA(isA<SignInRejectedException>()),
+        );
+      }
+      final code = await service.issue(sam.id);
+      await service.signIn(code.code, address: here);
+
+      await expectLater(
+        service.signIn('0000-0000-0000-0000', address: here),
+        throwsA(isA<SignInRejectedException>()),
+      );
     });
   });
 
@@ -244,5 +373,6 @@ void main() {
       contains('Too many wrong sign-in codes'),
     );
     expect('${const SignInForbiddenException()}', contains('Only an admin'));
+    expect('${const PublicUrlForbiddenException('no')}', 'SignInException: no');
   });
 }

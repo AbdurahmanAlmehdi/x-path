@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, watch } from 'vue'
+import { computed, onBeforeUnmount, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import type { VersionBump, WorkflowInput } from '@/api/client'
@@ -34,6 +34,8 @@ watch(
   },
   { immediate: true },
 )
+// A preview waiting for typing to pause would ask the engine after the page closed.
+onBeforeUnmount(() => form.stop())
 
 const flavorNames = computed(() =>
   (form.chosenApp?.flavors ?? []).filter((flavor) => !flavor.implicit).map((flavor) => flavor.name),

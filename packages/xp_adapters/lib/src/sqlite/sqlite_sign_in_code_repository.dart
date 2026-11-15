@@ -33,15 +33,18 @@ class SqliteSignInCodeRepository implements SignInCodeRepository {
   }
 
   @override
-  Future<void> deleteUnused(
-    String personId, {
-    required DateTime expiredBefore,
-  }) async {
+  Future<void> deleteUnusedOf(String personId) async {
     _db.execute(
-      'DELETE FROM sign_in_code '
-      'WHERE (person_id = ? AND used_at IS NULL) OR expires_at < ?',
-      [personId, toDatabaseTime(expiredBefore)],
+      'DELETE FROM sign_in_code WHERE person_id = ? AND used_at IS NULL',
+      [personId],
     );
+  }
+
+  @override
+  Future<void> deleteExpired({required DateTime before}) async {
+    _db.execute('DELETE FROM sign_in_code WHERE expires_at < ?', [
+      toDatabaseTime(before),
+    ]);
   }
 
   @override

@@ -12,21 +12,23 @@ part 'me.g.dart';
 /// token.
 @JsonEnum(valueField: 'wire')
 enum Permission {
-  /// Dispatch, run again, cancel and resume, scan, run tests, edit
-  /// workflows, pin artifacts.
+  /// Dispatch, run again, cancel and resume, add and change projects,
+  /// scan, run tests, edit workflows, pin artifacts, and ask for the gated
+  /// release actions (store refresh, a new build, merge, rollout, patch
+  /// moves), whose gates a releaser approves.
   develop('develop', PersonRole.developer),
 
   /// Approve or deny any gate. Separate from [release] because a trigger
   /// may lower one gate to developers.
   decideApproval('decide_approval', PersonRole.releaser),
 
-  /// Drive releases: merge, rollout, abandon, patch, texts, store refresh,
-  /// turning a gate on.
+  /// Drive releases: abandon one, set its texts and a store's status, and
+  /// turn a gate on.
   release('release', PersonRole.releaser),
 
-  /// Change the engine: turning a gate off, projects, credentials,
-  /// certificates, the GitHub token, runners, storage, the public URL,
-  /// people and others' tokens.
+  /// Change the engine: turning a gate off, removing projects,
+  /// credentials, certificates, the GitHub token, runners, storage, the
+  /// public URL, people, sign-in codes for others and others' tokens.
   administer('administer', PersonRole.admin);
 
   new(this.wire, this.minimumRole);

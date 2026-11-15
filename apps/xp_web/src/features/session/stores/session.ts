@@ -1,7 +1,16 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 
-import { api, errorMessage, onForbidden, type Me, type Permission } from '@/api/client'
+import {
+  api,
+  ApiFailure,
+  doneOf,
+  errorMessage,
+  failureMessage,
+  onForbidden,
+  type Me,
+  type Permission,
+} from '@/api/client'
 
 /** What the app knows about the browser's session. */
 export type SessionStatus = 'unknown' | 'signedIn' | 'signedOut'
@@ -81,10 +90,19 @@ export const useSessionStore = defineStore('session', () => {
     return errorMessage(error, response.status)
   }
 
-  /** Ends the session on the engine, then here. */
-  async function signOut(): Promise<void> {
-    await api.DELETE('/session')
+  /**
+   * Ends the session on the engine, then here: `null` when it ended, else
+   * why not. A refused or unanswered sign-out keeps the session, whose
+   * cookie still works on the engine; a `401` means it had ended already.
+   */
+  async function signOut(): Promise<string | null> {
+    try {
+      await doneOf(api.DELETE('/session'))
+    } catch (failure) {
+      if (!(failure instanceof ApiFailure && failure.status === 401)) return failureMessage(failure)
+    }
     signedOut()
+    return null
   }
 
   return { me, status, person, can, load, refresh, signIn, signOut, signedOut }

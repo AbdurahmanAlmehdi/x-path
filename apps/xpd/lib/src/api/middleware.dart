@@ -1,11 +1,34 @@
-import 'dart:io';
-
 import 'package:shelf/shelf.dart';
 import 'package:xp_api/xp_api.dart';
 import 'package:xp_engine/xp_engine.dart';
+import 'package:xpd/src/api/allowed_origins.dart';
 import 'package:xpd/src/api/legacy_alias.dart';
 import 'package:xpd/src/api/responses.dart';
 import 'package:xpd/src/api/session/session_cookie.dart';
+
+/// Refuses, with `405 method_not_allowed`, a request whose method is not in
+/// upper case, before anything else reads it.
+///
+/// `shelf_router` matches a route on the upper-cased method, while every
+/// check in front of it compares the method as sent: `patch` would reach
+/// the `PATCH` handler without the checks that `PATCH` gets. Put this
+/// middleware in front of the whole pipeline (the root aliases included),
+/// so that every check after it sees the method the router sees.
+Middleware canonicalMethodMiddleware() =>
+    (inner) => (request) {
+      final method = request.method;
+      final upper = method.toUpperCase();
+      if (method == upper) return inner(request);
+      return errorResponse(
+        ApiErrorCode.methodNotAllowed,
+        'The engine takes methods in upper case only: send $upper, not '
+        '$method.',
+        headers: const {'allow': 'GET, HEAD, POST, PUT, PATCH, DELETE'},
+      );
+    };
+
+/// The method of [request] in upper case, as `shelf_router` matches it.
+String methodOf(Request request) => request.method.toUpperCase();
 
 /// Turns an exception that escapes a handler into a `500 internal` response.
 ///
@@ -52,12 +75,8 @@ Middleware runnerRefusalMiddleware(
 /// to its root alias.
 String _pathOf(Request request) => '/${request.url.path}';
 
-String _addressOf(Request request) {
-  final info = request.context['shelf.io.connection_info'];
-  return info is HttpConnectionInfo
-      ? info.remoteAddress.address
-      : 'an unknown address';
-}
+String _addressOf(Request request) =>
+    AllowedOrigins.remoteAddressOf(request) ?? 'an unknown address';
 
 final _bearer = RegExp(r'^Bearer\s+(\S+)$', caseSensitive: false);
 
@@ -99,14 +118,14 @@ Middleware authMiddleware(
     (inner) => (request) async {
       final path = _pathOf(request);
       if (publicPaths.contains(path) ||
-          publicRoutes.contains('${request.method} $path')) {
+          publicRoutes.contains('${methodOf(request)} $path')) {
         return await inner(request);
       }
       final header = request.headers['authorization'];
       if (header == null && isUnderApiMount(request)) {
         for (final secret in SessionCookie.secretsOf(request)) {
           final token = await tokens.authenticate(secret);
-          if (token != null && token.kind == DeviceTokenKind.web) {
+          if (token != null && AccessPolicy.mayUseSessionCookie(token)) {
             return await inner(
               request.change(
                 context: {_tokenContextKey: token, _cookieContextKey: true},
@@ -134,9 +153,10 @@ Middleware authMiddleware(
 /// it updates itself with, and nothing else.
 bool _runnerMayReach(Request request) {
   final path = _pathOf(request);
-  return (request.method == 'GET' &&
+  final method = methodOf(request);
+  return (method == 'GET' &&
           (path == '/runners/connect' || path == '/runners/bundle')) ||
-      (request.method == 'PUT' && _artifactUpload.hasMatch(path));
+      (method == 'PUT' && _artifactUpload.hasMatch(path));
 }
 
 final _artifactUpload = RegExp(r'^/runners/jobs/[^/]+/artifacts/[^/]+$');
@@ -154,7 +174,7 @@ Middleware runnerScopeMiddleware() =>
     (inner) => (request) async {
       final token = request.context[_tokenContextKey];
       if (token is DeviceToken &&
-          token.kind == DeviceTokenKind.runner &&
+          AccessPolicy.isRunner(token) &&
           !_runnerMayReach(request)) {
         return errorResponse(
           ApiErrorCode.forbidden,
@@ -162,7 +182,7 @@ Middleware runnerScopeMiddleware() =>
           '(GET /runners/connect), the runner bundle '
           '(GET /runners/bundle) and the artifact upload of a job it holds '
           '(PUT /runners/jobs/{id}/artifacts/{name}), not '
-          '${request.method} ${_pathOf(request)}.',
+          '${methodOf(request)} ${_pathOf(request)}.',
         );
       }
       return await inner(request);

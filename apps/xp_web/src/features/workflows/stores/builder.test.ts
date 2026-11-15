@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { type Answer, errorBody, stubEngine, stubUnreachableEngine } from '@/testing/fetch'
 import { workflowOf, workflowSummaryOf } from '@/testing/fixtures'
+import { eventually } from '@/testing/wait'
 
 import { toYaml } from '../document'
 import { draftTemplate, timing, useWorkflowBuilderStore } from './builder'
@@ -35,7 +36,7 @@ const templates = [
   { id: 'android-firebase', title: 'Android to Firebase', description: 'Builds.', yaml: ownYaml },
 ]
 
-function engine(routes: Record<string, Answer | (() => Answer)> = {}) {
+function engine(routes: Record<string, Answer | (() => Answer | Promise<Answer>)> = {}) {
   return stubEngine({
     'GET /projects/prj_1/workflows': { status: 200, body: { workflows: summaries } },
     'GET /workflows/schema': { status: 200, body: schema },
@@ -73,7 +74,7 @@ describe('useWorkflowBuilderStore', () => {
     expect(store.dirty).toBe(false)
     expect(store.savesAsNew).toBe(false)
     expect(store.editable).toBe(true)
-    await vi.waitFor(() => expect(store.validation).toBe('valid'))
+    await eventually(() => expect(store.validation).toBe('valid'))
     expect(seen.find((request) => request.path.endsWith('/validate'))?.body).toEqual({ yaml: ownYaml })
   })
 
@@ -203,7 +204,7 @@ describe('useWorkflowBuilderStore', () => {
     })
     const store = useWorkflowBuilderStore()
     await store.start('prj_1')
-    await vi.waitFor(() => expect(store.validation).toBe('invalid'))
+    await eventually(() => expect(store.validation).toBe('invalid'))
 
     store.shapeIssues = [issue, { line: 8, column: 2, message: 'Earlier on the line.' }]
     expect(store.issues.map((each) => `${each.line}:${each.column}`)).toEqual(['1:1', '8:2', '8:19'])
@@ -213,13 +214,13 @@ describe('useWorkflowBuilderStore', () => {
     engine()
     const store = useWorkflowBuilderStore()
     await store.start('prj_1')
-    await vi.waitFor(() => expect(store.validation).toBe('valid'))
+    await eventually(() => expect(store.validation).toBe('valid'))
     store.engineIssues = [{ line: 1, column: 1, message: 'Old.' }]
 
     stubUnreachableEngine()
     store.setYaml(`${ownYaml}# more\n`)
 
-    await vi.waitFor(() => expect(store.validation).toBe('unavailable'))
+    await eventually(() => expect(store.validation).toBe('unavailable'))
     expect(store.engineIssues).toHaveLength(1)
   })
 
@@ -227,20 +228,20 @@ describe('useWorkflowBuilderStore', () => {
     engine()
     const store = useWorkflowBuilderStore()
     await store.start('prj_1')
-    await vi.waitFor(() => expect(store.validation).toBe('valid'))
+    await eventually(() => expect(store.validation).toBe('valid'))
     const pending: Array<(response: Response) => void> = []
     vi.stubGlobal('fetch', () => new Promise<Response>((resolve) => pending.push(resolve)))
     const answer = (body: unknown) =>
       new Response(JSON.stringify(body), { status: 200, headers: { 'content-type': 'application/json' } })
 
     store.setYaml(`${ownYaml}# one\n`)
-    await vi.waitFor(() => expect(pending).toHaveLength(1))
+    await eventually(() => expect(pending).toHaveLength(1))
     store.setYaml(`${ownYaml}# two\n`)
-    await vi.waitFor(() => expect(pending).toHaveLength(2))
+    await eventually(() => expect(pending).toHaveLength(2))
     pending[0]!(answer({ valid: false, issues: [{ line: 1, column: 1, message: 'Stale.' }] }))
     pending[1]!(answer({ valid: true, issues: [] }))
 
-    await vi.waitFor(() => expect(store.validation).toBe('valid'))
+    await eventually(() => expect(store.validation).toBe('valid'))
     expect(store.engineIssues).toEqual([])
   })
 
@@ -286,7 +287,7 @@ describe('useWorkflowBuilderStore', () => {
     })
     const store = useWorkflowBuilderStore()
     await store.start('prj_1')
-    await vi.waitFor(() => expect(store.validation).toBe('valid'))
+    await eventually(() => expect(store.validation).toBe('valid'))
     store.setYaml(`${ownYaml}# changed\n`)
 
     expect(await store.save()).toBe(false)
@@ -297,6 +298,60 @@ describe('useWorkflowBuilderStore', () => {
     expect(store.reveal).toMatchObject({ line: 8, column: 19 })
     expect(store.dirty).toBe(true)
     expect(store.busy).toBeNull()
+  })
+
+  it('keeps the issues of a refused save over a check of the same YAML that answers later', async () => {
+    const issue = { line: 8, column: 19, message: 'Unknown step type "x".' }
+    let answerCheck: (answer: Answer) => void = () => {}
+    let checks = 0
+    engine({
+      'POST /projects/prj_1/workflows/validate': () => {
+        checks++
+        if (checks === 1) return { status: 200, body: { valid: true, issues: [] } }
+        return new Promise<Answer>((resolve) => (answerCheck = resolve))
+      },
+      'PUT /projects/prj_1/workflows/wf_2': {
+        status: 422,
+        body: { error: { code: 'workflow_invalid', message: 'The workflow has 1 issue.', issues: [issue] } },
+      },
+    })
+    const store = useWorkflowBuilderStore()
+    await store.start('prj_1')
+    await eventually(() => expect(store.validation).toBe('valid'))
+    store.setYaml(`${ownYaml}# changed\n`)
+    await eventually(() => expect(checks).toBe(2))
+
+    expect(await store.save()).toBe(false)
+    answerCheck({ status: 200, body: { valid: true, issues: [] } })
+    await new Promise((resolve) => setTimeout(resolve, 10))
+
+    expect(store.engineIssues).toEqual([issue])
+    expect(store.validation).toBe('invalid')
+  })
+
+  it('lets a check of YAML typed during a refused save replace its issues', async () => {
+    const issue = { line: 8, column: 19, message: 'Unknown step type "x".' }
+    let answerSave: (answer: Answer) => void = () => {}
+    const seen = engine({
+      'PUT /projects/prj_1/workflows/wf_2': () => new Promise<Answer>((resolve) => (answerSave = resolve)),
+    })
+    const store = useWorkflowBuilderStore()
+    await store.start('prj_1')
+    await eventually(() => expect(store.validation).toBe('valid'))
+    store.setYaml(`${ownYaml}# changed\n`)
+    await eventually(() => expect(store.validation).toBe('valid'))
+
+    const saved = store.save()
+    store.setYaml(`${ownYaml}# changed again\n`)
+    await eventually(() => expect(seen.some((request) => request.method === 'PUT')).toBe(true))
+    answerSave({
+      status: 422,
+      body: { error: { code: 'workflow_invalid', message: 'The workflow has 1 issue.', issues: [issue] } },
+    })
+    expect(await saved).toBe(false)
+
+    await eventually(() => expect(store.validation).toBe('valid'))
+    expect(store.engineIssues).toEqual([])
   })
 
   it('says why a save was refused without issues', async () => {

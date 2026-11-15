@@ -18,8 +18,9 @@ export function filterOf(state: ApprovalState): ApprovalsFilter {
 
 /**
  * The approvals inbox: every approval of the engine, newest first, under
- * Pending, Decided and Expired, kept up to date by the approval events.
- * Deciding happens in the review of one approval.
+ * Pending, Decided and Expired, kept up to date by the approval events
+ * (the shell follows them on every page, for its count). Deciding happens
+ * in the review of one approval.
  */
 export const useApprovalsStore = defineStore('approvals', () => {
   const approvals = ref<Approval[]>([])
@@ -34,7 +35,7 @@ export const useApprovalsStore = defineStore('approvals', () => {
     approvals.value.filter((approval) => filterOf(approval.state) === filter.value),
   )
 
-  /** How many approvals wait. */
+  /** How many approvals wait: the inbox's count, and the shell's "needs you" next to Approvals. */
   const pendingCount = computed(
     () => approvals.value.filter((approval) => approval.state === 'pending').length,
   )

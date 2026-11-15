@@ -69,9 +69,10 @@ class DeviceToken extends Equatable {
     final person = this.person;
     if (person == null) return null;
     return RunOrigin(
-      kind: kind == DeviceTokenKind.mcp
-          ? RunOriginKind.agent
-          : RunOriginKind.person,
+      kind: switch (kind) {
+        DeviceTokenKind.mcp => RunOriginKind.agent,
+        _ => RunOriginKind.person,
+      },
       tokenId: id,
       personId: person.id,
       personName: person.name,

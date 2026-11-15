@@ -292,6 +292,7 @@ export const useWorkflowBuilderStore = defineStore('workflowBuilder', () => {
   }
 
   async function saving(send: () => Promise<Workflow>): Promise<boolean> {
+    const checkAtSend = check
     busy.value = 'saving'
     notice.value = null
     error.value = null
@@ -301,7 +302,11 @@ export const useWorkflowBuilderStore = defineStore('workflowBuilder', () => {
     } catch (failure) {
       busy.value = null
       error.value = failureMessage(failure)
-      if (failure instanceof ApiFailure && failure.issues.length > 0) {
+      // The issues are of the YAML sent. A check started before the save is
+      // older than them, so it is dropped; once the YAML changed, its own
+      // check has the say instead.
+      if (failure instanceof ApiFailure && failure.issues.length > 0 && check === checkAtSend) {
+        stop()
         engineIssues.value = failure.issues
         validation.value = 'invalid'
         revealIssue(issues.value[0]!)

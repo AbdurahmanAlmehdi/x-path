@@ -97,6 +97,7 @@ void main() {
       );
 
       expect(response.statusCode, 201);
+      expect(response.headers['cache-control'], 'no-store');
       final token = PairingToken.fromJson(response.json);
       expect(token.token, startsWith('xpp_'));
       expect(token.name, 'linux-box');
@@ -193,6 +194,7 @@ void main() {
         );
 
         expect(response.statusCode, 201);
+        expect(response.headers['cache-control'], 'no-store');
         final paired = PairRunnerResponse.fromJson(response.json);
         expect(paired.runner.name, 'linux-box');
         expect(paired.runner.status, RunnerStatus.offline);

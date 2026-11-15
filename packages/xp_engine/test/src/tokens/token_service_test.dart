@@ -414,7 +414,30 @@ void main() {
 
     test('anyone else sees the valid tokens of their own person', () async {
       expect(names(await service.listFor(await asker(samCli))), ['c']);
-      expect(names(await service.listFor(await asker(ownerMcp))), ['a', 'b']);
+    });
+
+    test("an agent's mcp token neither lists nor revokes tokens, even its "
+        "admin's", () async {
+      final agent = await asker(ownerMcp);
+      final refused = isA<TokenForbiddenException>()
+          .having(
+            (e) => e.message,
+            'message',
+            'An mcp token cannot list or revoke tokens: only the app, `xp` '
+                'or the web dashboard do.',
+          )
+          .having((e) => '$e', 'toString', contains('TokenForbidden'));
+
+      await expectLater(service.listFor(agent), throwsA(refused));
+      await expectLater(
+        service.revokeFor(agent, ownerApp.token.id),
+        throwsA(refused),
+      );
+      await expectLater(
+        service.revokeFor(agent, ownerMcp.token.id),
+        throwsA(refused),
+      );
+      expect(await service.authenticate(ownerApp.secret), isNotNull);
     });
 
     test('revokes a token the asker sees', () async {
@@ -439,6 +462,126 @@ void main() {
         expect(await service.authenticate(ownerApp.secret), isNotNull);
       },
     );
+  });
+
+  group('issueFor', () {
+    late Person sam;
+
+    setUp(() async {
+      sam = personWith(PersonRole.viewer);
+      await people.add(sam);
+    });
+
+    Future<DeviceToken> tokenOf(DeviceTokenKind kind, Person person) async {
+      final issued = await service.issue(
+        name: kind.name,
+        kind: kind,
+        personId: person.id,
+      );
+      return (await service.authenticate(issued.secret))!;
+    }
+
+    test('lets an app or web token of any role make a cli or mcp token for '
+        'its person', () async {
+      for (final creator in [DeviceTokenKind.app, DeviceTokenKind.web]) {
+        for (final kind in AccessPolicy.mintableKinds) {
+          final issued = await service.issueFor(
+            await tokenOf(creator, sam),
+            name: ' laptop ',
+            kind: kind,
+          );
+
+          expect(issued.token.kind, kind);
+          expect(issued.token.personId, sam.id);
+          expect(issued.token.name, 'laptop');
+          expect(await service.authenticate(issued.secret), isNotNull);
+        }
+      }
+    });
+
+    test('refuses a cli or mcp creator', () async {
+      for (final creator in [DeviceTokenKind.cli, DeviceTokenKind.mcp]) {
+        await expectLater(
+          service.issueFor(
+            await tokenOf(creator, owner),
+            name: 'n',
+            kind: DeviceTokenKind.cli,
+          ),
+          throwsA(
+            isA<TokenForbiddenException>().having(
+              (e) => e.message,
+              'message',
+              startsWith('Only the app and the web dashboard make tokens'),
+            ),
+          ),
+        );
+      }
+    });
+
+    test('makes no app, runner or web token', () async {
+      for (final kind in [
+        DeviceTokenKind.app,
+        DeviceTokenKind.runner,
+        DeviceTokenKind.web,
+      ]) {
+        await expectLater(
+          service.issueFor(
+            await tokenOf(DeviceTokenKind.app, owner),
+            name: 'n',
+            kind: kind,
+          ),
+          throwsA(isA<TokenForbiddenException>()),
+          reason: kind.name,
+        );
+      }
+      final app = await tokenOf(DeviceTokenKind.app, owner);
+      await expectLater(
+        service.issueFor(app, name: 'n', kind: DeviceTokenKind.app),
+        throwsA(
+          isA<TokenForbiddenException>().having(
+            (e) => e.message,
+            'message',
+            endsWith('An app token may not make an app token.'),
+          ),
+        ),
+      );
+    });
+  });
+
+  group('purgeEndedWebTokens', () {
+    test('deletes the web tokens that ended a day ago or more', () async {
+      final expired = await service.issueWeb(personId: owner.id);
+      final revoked = await service.issueWeb(personId: owner.id);
+      await service.revoke(revoked.token.id);
+      final app = await service.issue(name: 'app', kind: DeviceTokenKind.app);
+      await service.revoke(app.token.id);
+      clock.advance(
+        TokenService.webSessionLifetime + TokenService.endedWebTokenGrace,
+      );
+      final fresh = await service.issueWeb(personId: owner.id);
+      clock.advance(const Duration(seconds: 1));
+
+      expect(await service.purgeEndedWebTokens(), 2);
+
+      expect((await repository.list()).map((t) => t.id), [
+        app.token.id,
+        fresh.token.id,
+      ]);
+      expect(expired.token.id, isNot(fresh.token.id));
+    });
+  });
+
+  group('close', () {
+    test('ends revocations, and revoking still works after', () async {
+      final done = service.revocations.toList();
+      final issued = await service.issue(name: 'a', kind: DeviceTokenKind.app);
+
+      await service.close();
+
+      expect(await done, isEmpty);
+      expect(await service.revoke(issued.token.id), isTrue);
+      expect(await service.revokeAllOf(owner.id), 0);
+    });
   });
 
   test('IssuedToken compares by value', () async {

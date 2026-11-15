@@ -35,11 +35,7 @@ void projects.load()
 useFollowing(store.follow, workflows.follow)
 
 const title = computed(() => (store.run ? workflows.name(store.run.workflowId) : 'Run'))
-const projectName = computed(
-  () =>
-    projects.projects.find((project) => project.id === store.run?.projectId)?.fullName ??
-    store.run?.projectId,
-)
+const projectName = computed(() => (store.run ? projects.nameOf(store.run.projectId) : undefined))
 
 /** The jobs of the run by stage, in order. */
 const stages = computed(() => {

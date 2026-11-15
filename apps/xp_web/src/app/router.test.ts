@@ -5,6 +5,7 @@ import { createMemoryHistory, type Router } from 'vue-router'
 import { api } from '@/api/client'
 import { useSessionStore } from '@/features/session/stores/session'
 import { errorBody, meOf, stubEngine, stubUnreachableEngine } from '@/testing/fetch'
+import { eventually } from '@/testing/wait'
 
 import { createAppRouter, followSessionEnd } from './router'
 
@@ -88,12 +89,11 @@ describe('createAppRouter', () => {
 
       stubEngine({ 'GET /runs': { status: 401 } })
       await api.GET('/runs')
-      await router.isReady()
-      await new Promise((resolve) => setTimeout(resolve))
+      // The sign-in page may be imported for the first time here.
+      await eventually(() => expect(router.currentRoute.value.name).toBe('sign-in'))
       stop()
 
       expect(useSessionStore().status).toBe('signedOut')
-      expect(router.currentRoute.value.name).toBe('sign-in')
       expect(router.currentRoute.value.query).toEqual({ next: '/runs/abc' })
     })
 

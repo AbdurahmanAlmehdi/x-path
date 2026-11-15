@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:shelf/shelf.dart';
 import 'package:test/test.dart';
 import 'package:xp_api/xp_api.dart';
@@ -33,6 +35,145 @@ void main() {
       expect(
         routePermissions.keys.where((listed) => !served.contains(listed)),
         isEmpty,
+      );
+    });
+  });
+
+  group('every route the table gives a permission', () {
+    late TestEngine engine;
+
+    setUp(() async => engine = await TestEngine.start());
+    tearDown(() => engine.close());
+
+    final needing = [
+      for (final MapEntry(:key, :value) in routePermissions.entries)
+        if (value.permission case final permission?) (key, permission),
+    ];
+
+    for (final (route, permission) in needing) {
+      final role = permission.minimumRole;
+      final below = PersonRole.values[role.index - 1];
+      test(
+        '$route: a ${below.name} gets 403, a ${role.name} does not',
+        () async {
+          final [method, path] = route.split(' ');
+          final concrete = path.replaceAll(RegExp('<[^>]+>'), 'x1');
+          Future<RawResponse> send(PersonRole as) async {
+            final token = await engine.tokenFor(as, kind: DeviceTokenKind.app);
+            return await engine.request(
+              concrete,
+              method: method,
+              token: token,
+              body: '{}',
+            );
+          }
+
+          final refused = await send(below);
+          expect(refused.statusCode, 403, reason: refused.body);
+          expect(
+            refused.error['message'],
+            contains('takes the ${role.name} role or higher'),
+          );
+          final allowed = await send(role);
+          expect(allowed.statusCode, isNot(403), reason: allowed.body);
+        },
+      );
+    }
+  });
+
+  group('a method that is not in upper case', () {
+    late TestEngine engine;
+
+    setUp(() async => engine = await TestEngine.start());
+    tearDown(() => engine.close());
+
+    Future<void> expectRefused(RawResponse response, String why) async {
+      expect(response.statusCode, 405, reason: why);
+      expect(response.error['code'], 'method_not_allowed', reason: why);
+      expect(response.headers['allow'], contains('PATCH'), reason: why);
+    }
+
+    test('is refused before the permission check, under /api/v1 and at the '
+        'root alias, from a bearer token', () async {
+      final viewer = await engine.tokenFor(PersonRole.viewer);
+      final agent = await engine.tokenFor(
+        PersonRole.admin,
+        kind: DeviceTokenKind.mcp,
+      );
+      for (final root in [false, true]) {
+        for (final method in ['patch', 'Patch', 'pATCH']) {
+          await expectRefused(
+            await engine.rawRequest(
+              method,
+              '/people/per_viewer',
+              token: viewer,
+              root: root,
+              body: jsonEncode({'role': 'admin'}),
+            ),
+            '$method root: $root',
+          );
+        }
+        await expectRefused(
+          await engine.rawRequest(
+            'post',
+            '/people',
+            token: agent,
+            root: root,
+            body: jsonEncode({'name': 'Eve', 'role': 'admin'}),
+          ),
+          'post root: $root',
+        );
+        await expectRefused(
+          await engine.rawRequest(
+            'Put',
+            '/settings/public-url',
+            token: agent,
+            root: root,
+            body: jsonEncode({'url': 'https://evil.example'}),
+          ),
+          'Put root: $root',
+        );
+      }
+      expect((await engine.people.get('per_viewer'))!.role, PersonRole.viewer);
+      expect(await engine.people.list(), hasLength(3));
+      expect(await engine.publicUrl.origin(), isNull);
+    });
+
+    test("is refused from a browser's session cookie", () async {
+      await engine.tokenFor(PersonRole.viewer);
+      final cookie = await engine.signInBrowser('per_viewer');
+
+      for (final method in ['patch', 'Patch']) {
+        await expectRefused(
+          await engine.rawRequest(
+            method,
+            '/people/per_viewer',
+            token: '',
+            headers: engine.browser(cookie),
+            body: jsonEncode({'role': 'admin'}),
+          ),
+          method,
+        );
+      }
+      final upper = await engine.rawRequest(
+        'PATCH',
+        '/people/per_viewer',
+        token: '',
+        headers: engine.browser(cookie),
+        body: jsonEncode({'role': 'admin'}),
+      );
+      expect(upper.statusCode, 403);
+      expect((await engine.people.get('per_viewer'))!.role, PersonRole.viewer);
+    });
+
+    test('is refused on a public path too', () async {
+      await expectRefused(
+        await engine.rawRequest('get', '/health', token: ''),
+        'health',
+      );
+      await expectRefused(
+        await engine.rawRequest('post', '/session', token: ''),
+        'session',
       );
     });
   });
@@ -100,7 +241,8 @@ void main() {
       expect(response.statusCode, 403);
       expect(
         ErrorResponse.fromJson(response.json).error.message,
-        'A mcp token cannot add a person: only the app or `xp` do.',
+        'An mcp token cannot add a person: only the app, `xp` or the web '
+        'dashboard do.',
       );
     });
 
@@ -228,6 +370,14 @@ void main() {
       );
       final admin = await send(PersonRole.admin, 'POST', '/things/1/poke');
       expect(await admin.readAsString(), '1');
+    });
+
+    test('checks a lower-case method as the upper-case one the router '
+        'matches', () async {
+      final refused = await send(PersonRole.viewer, 'put', '/listed');
+
+      expect(refused.statusCode, 403);
+      expect(await refused.readAsString(), contains('cannot touch it'));
     });
 
     test('lets a listed route through with its permission', () async {

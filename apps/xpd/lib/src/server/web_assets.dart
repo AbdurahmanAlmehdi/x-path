@@ -4,6 +4,7 @@ import 'package:path/path.dart' as p;
 import 'package:shelf/shelf.dart';
 import 'package:xp_engine/xp_engine.dart';
 import 'package:xpd/src/api/legacy_alias.dart';
+import 'package:xpd/src/api/middleware.dart';
 
 /// Serves the web dashboard (`apps/xp_web`, built) from a `web` folder: its
 /// `index.html` and its hashed `assets/` (ADR 0018).
@@ -38,7 +39,7 @@ class WebAssets {
     final index = _index;
     final segments = request.url.pathSegments;
     if (index == null ||
-        !(request.method == 'GET' || request.method == 'HEAD') ||
+        !const {'GET', 'HEAD'}.contains(methodOf(request)) ||
         (segments.isNotEmpty && segments.first == 'api')) {
       return notTheApi(request);
     }
@@ -59,18 +60,8 @@ class WebAssets {
   }
 
   Future<Response> _asset(Request request, List<String> names) async {
-    final safe =
-        names.isNotEmpty &&
-        names.every(
-          (name) =>
-              name.isNotEmpty &&
-              name != '.' &&
-              name != '..' &&
-              !name.contains('/') &&
-              !name.contains(r'\'),
-        );
-    final file = File(p.joinAll([_assets, ...names]));
-    if (!safe || !p.isWithin(_assets, file.path) || !file.existsSync()) {
+    final file = File(p.normalize(p.joinAll([_assets, ...names])));
+    if (!p.isWithin(_assets, file.path) || !file.existsSync()) {
       return notTheApi(request);
     }
     return Response.ok(
@@ -110,21 +101,10 @@ class WebAssets {
       _contentTypes[p.extension(path).toLowerCase()] ??
       'application/octet-stream';
 
+  /// What the build of the dashboard puts in `assets/` (no source maps,
+  /// fonts or images); anything else is served as bytes.
   static const _contentTypes = {
     '.js': 'text/javascript; charset=utf-8',
-    '.mjs': 'text/javascript; charset=utf-8',
     '.css': 'text/css; charset=utf-8',
-    '.html': 'text/html; charset=utf-8',
-    '.json': 'application/json',
-    '.map': 'application/json',
-    '.svg': 'image/svg+xml',
-    '.png': 'image/png',
-    '.jpg': 'image/jpeg',
-    '.webp': 'image/webp',
-    '.ico': 'image/x-icon',
-    '.woff': 'font/woff',
-    '.woff2': 'font/woff2',
-    '.ttf': 'font/ttf',
-    '.txt': 'text/plain; charset=utf-8',
   };
 }

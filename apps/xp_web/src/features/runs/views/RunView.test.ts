@@ -1,11 +1,12 @@
 import { flushPromises, type VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import { openApp } from '@/testing/app'
 import { type Answer, errorBody, meOf, stubEngine } from '@/testing/fetch'
 import { projectOf, runOf, workflowSummaryOf } from '@/testing/fixtures'
 import { stubSockets } from '@/testing/sockets'
+import { eventually } from '@/testing/wait'
 
 describe('RunView', () => {
   let app: VueWrapper | undefined
@@ -100,7 +101,7 @@ describe('RunView', () => {
 
     await app.findAll('.actions button').find((button) => button.text() === 'Run again')!.trigger('click')
 
-    await vi.waitFor(() => expect(router.currentRoute.value.fullPath).toBe('/runs/run_9'))
+    await eventually(() => expect(router.currentRoute.value.fullPath).toBe('/runs/run_9'))
   })
 
   it('says why the engine refused', async () => {

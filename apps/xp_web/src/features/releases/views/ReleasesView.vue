@@ -39,7 +39,7 @@ useFollowing(board.follow, projects.follow)
 
 const project = computed(() => projects.projects.find((each) => each.id === projectId.value))
 const gone = computed(() => projects.loaded && !projects.error && !project.value)
-const name = computed(() => project.value?.fullName.split('/').at(-1) ?? projectId.value)
+const name = computed(() => projects.nameOf(projectId.value, { short: true }))
 const release = computed(() => board.release)
 const base = computed(() => release.value?.baseBranch ?? 'the base branch')
 /** The run of the newest build of the release shown. */

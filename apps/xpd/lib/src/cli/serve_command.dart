@@ -767,6 +767,7 @@ class ServeCommand extends XpdCommand {
       // Logs and job records older than 90 days go once a day (D-24).
       final housekeepingSchedule = HousekeepingSchedule(
         service: housekeeping,
+        tokens: tokenService,
         clock: const SystemClock(),
         onError: (error, stackTrace) =>
             context.err.writeln('warning: housekeeping failed: $error'),

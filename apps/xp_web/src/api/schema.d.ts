@@ -1738,19 +1738,20 @@ export interface paths {
          * The valid tokens of the person that asks; an admin's, everyone's.
          * @description Never a secret, and never a runner's token: a runner's token is
          *     revoked with the runner (D17). An admin's `app`, `cli` or `web`
-         *     token sees the tokens of every person; any other token those of its
-         *     own person.
+         *     token sees the tokens of every person; any other `app`, `cli` or
+         *     `web` token those of its own person. An `mcp` token answers `403
+         *     forbidden`: an agent neither lists nor revokes tokens.
          */
         get: operations["listTokens"];
         put?: never;
         /**
          * Make a token for `xp` or `xp mcp`. Only `app` and `web` tokens may.
-         * @description The app makes the token of the CLI or of an agent (U5b), so
-         *     connecting `xp` needs no access to the `xpd` binary. `kind` is
-         *     `cli` or `mcp`; app and runner tokens come from `xpd token create`
-         *     and pairing only. The secret is in this response only and never
-         *     again; only its hash is kept. Any other token kind answers `403
-         *     forbidden`.
+         * @description The app or the web dashboard makes the token of the CLI or of an
+         *     agent (U5b, D17), so connecting `xp` needs no access to the `xpd`
+         *     binary. `kind` is `cli` or `mcp`; app and runner tokens come from
+         *     `xpd token create` and pairing only. The secret is in this response
+         *     only and never again, and the response is never cached; only its
+         *     hash is kept. Any other token kind answers `403 forbidden`.
          */
         post: operations["createToken"];
         delete?: never;
@@ -1774,7 +1775,8 @@ export interface paths {
         /**
          * Revoke a token of the person that asks; an admin, anyone's.
          * @description The token stops working at once. A token the asker may not see
-         *     (`GET /tokens`), or one revoked already, answers `404`.
+         *     (`GET /tokens`), or one revoked already, answers `404`; an `mcp`
+         *     token answers `403 forbidden`.
          */
         delete: operations["revokeToken"];
         options?: never;
@@ -1897,12 +1899,14 @@ export interface paths {
          *     `Host`), or the HTTPS public URL. Plain HTTP from another machine
          *     answers `403 forbidden` with the reason, and a request without
          *     `Origin` `403 csrf`. A code that is unknown, used or expired answers
-         *     `401`, all three alike; after 20 wrong codes within 10 minutes,
-         *     every code answers `429` until the oldest leaves the window.
+         *     `401`, all three alike. After 20 wrong codes within 10 minutes from
+         *     one address (the connection's, never `X-Forwarded-For`), or 200 from
+         *     every address together, every code from that address (or from
+         *     anyone) answers `429` until the oldest leaves the window.
          *
          *     The answer sets the session cookie, which lasts 8 hours with no
-         *     renewal: `xp_session; HttpOnly; SameSite=Strict; Path=/` on the
-         *     engine machine, `__Host-xp_session; Secure; HttpOnly;
+         *     renewal: `xp_session_<port>; HttpOnly; SameSite=Strict; Path=/` on
+         *     the engine machine, `__Host-xp_session; Secure; HttpOnly;
          *     SameSite=Strict; Path=/` through the public URL. Not served at the
          *     root alias. Never cached.
          */
@@ -2257,7 +2261,7 @@ export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
         /** @enum {string} */
-        ErrorCode: "invalid_request" | "unauthorized" | "forbidden" | "csrf" | "not_found" | "conflict" | "credential_in_use" | "already_decided" | "resync_required" | "credential_rejected" | "workflow_invalid" | "ssh_url_required" | "upgrade_required" | "rate_limited" | "internal" | "upstream_error" | "secrets_locked";
+        ErrorCode: "invalid_request" | "unauthorized" | "forbidden" | "csrf" | "not_found" | "method_not_allowed" | "conflict" | "credential_in_use" | "already_decided" | "resync_required" | "credential_rejected" | "workflow_invalid" | "ssh_url_required" | "upgrade_required" | "rate_limited" | "internal" | "upstream_error" | "secrets_locked";
         ErrorResponse: {
             error: {
                 code: components["schemas"]["ErrorCode"];
@@ -6497,6 +6501,7 @@ export interface operations {
             /** @description The token made, with its secret. */
             201: {
                 headers: {
+                    "Cache-Control"?: "no-store";
                     [name: string]: unknown;
                 };
                 content: {
@@ -6906,9 +6911,10 @@ export interface operations {
             };
         };
         responses: {
-            /** @description The pairing token. */
+            /** @description The pairing token. Never cached. */
             201: {
                 headers: {
+                    "Cache-Control"?: "no-store";
                     [name: string]: unknown;
                 };
                 content: {
@@ -6986,9 +6992,10 @@ export interface operations {
             };
         };
         responses: {
-            /** @description The runner and its credential. */
+            /** @description The runner and its credential. Never cached. */
             201: {
                 headers: {
+                    "Cache-Control"?: "no-store";
                     [name: string]: unknown;
                 };
                 content: {

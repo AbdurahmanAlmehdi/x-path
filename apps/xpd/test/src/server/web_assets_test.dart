@@ -84,7 +84,7 @@ void main() {
     });
 
     test('lets the page open sockets to the public URL', () async {
-      await publicUrl.set('https://xpath.example.com');
+      await publicUrl.set('https://xpath.example.com', by: testOwnerToken);
 
       final response = await _get(assets, '/');
 
@@ -159,10 +159,16 @@ void main() {
         '/assets/..%2Fsecret.txt',
         '/assets/..%2F..%2Fsecret.txt',
         '/assets/..%5C..%5Csecret.txt',
-        '/assets/.%2Findex-AbC123.js',
+        '/assets/sub%2F..%2F..%2Fsecret.txt',
       ]) {
         await expectNotServed(await _get(assets, path), reason: path);
       }
+    });
+
+    test('serves an asset by a path that stays within the assets', () async {
+      final response = await _get(assets, '/assets/.%2Findex-AbC123.js');
+
+      expect(await response.readAsString(), _script);
     });
 
     test('takes a path that leaves the assets for a page', () async {

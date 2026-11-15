@@ -80,12 +80,14 @@ void main() {
     await repository.add(code('used', usedAt: _created));
     await repository.add(code('other', personId: 'per_sam'));
 
-    await repository.deleteUnused(owner, expiredBefore: _created);
+    await repository.deleteUnusedOf(owner);
     expect(rows().map((row) => row['hash']), ['used', 'other']);
 
-    await repository.deleteUnused(
-      owner,
-      expiredBefore: _created.add(const Duration(minutes: 11)),
+    await repository.deleteExpired(before: _created);
+    expect(rows().map((row) => row['hash']), ['used', 'other']);
+
+    await repository.deleteExpired(
+      before: _created.add(const Duration(minutes: 11)),
     );
     expect(rows(), isEmpty);
   });

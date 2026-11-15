@@ -210,6 +210,8 @@ describe('useReleasesStore', () => {
 
     store.select(null)
     expect(store.notice).toBeNull()
+    // Each command refreshes the releases after it answers: those reads end here, not in the next test.
+    await flushPromises()
   })
 
   it('says why the engine refused a command, and sends nothing without a release', async () => {

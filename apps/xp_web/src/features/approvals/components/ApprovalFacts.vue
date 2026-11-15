@@ -26,7 +26,7 @@ const bundleId = computed(() => flavor.value?.iosBundleId ?? flavor.value?.andro
 const waiting = computed(() => props.job?.steps.find((step) => step.state === 'waitingForApproval'))
 
 const projectLabel = computed(() =>
-  [project.value?.fullName.split('/').at(-1) ?? props.approval.projectId, app.value?.name]
+  [projects.nameOf(props.approval.projectId, { short: true }), app.value?.name]
     .filter(Boolean)
     .join(' · '),
 )

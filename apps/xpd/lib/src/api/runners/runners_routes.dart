@@ -15,7 +15,9 @@ import 'package:xpd/src/api/responses.dart';
 ///   `app` and `cli` tokens (`403` for the others): a paired runner receives
 ///   signing material.
 /// - `POST /runners/pair` needs no bearer token; the pairing token in its body
-///   is the proof, and an unknown, expired or used one answers `401`.
+///   is the proof, and an unknown, expired or used one answers `401`. It
+///   and `POST /runners/pairing-tokens` answer with a secret, which no
+///   browser or proxy keeps (`no-store`).
 /// - `PUT /runners/jobs/{id}/artifacts/{name}` is for a `runner` token that
 ///   holds the lease of the job.
 /// - `GET /runners/bundle?os=&arch=` streams the `xp` bundle of the engine's
@@ -80,13 +82,13 @@ class RunnersRoutes {
       name: body.name,
       by: deviceTokenOf(request),
     );
-    return jsonResponse(token.toJson(), statusCode: 201);
+    return jsonResponse(token.toJson(), statusCode: 201, headers: noStore);
   });
 
   Future<Response> _pair(Request request) => _guard(() async {
     final body = await readJsonBody(request, PairRunnerRequest.fromJson);
     final paired = await _runners.pair(body.pairingToken);
-    return jsonResponse(paired.toJson(), statusCode: 201);
+    return jsonResponse(paired.toJson(), statusCode: 201, headers: noStore);
   });
 
   Future<Response> _runnerUrl(Request request) =>

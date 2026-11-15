@@ -8,8 +8,11 @@ import 'package:xpd/xpd.dart';
 
 import '../../helpers/test_engine.dart';
 
-Request _request(String path, {Map<String, String>? headers}) =>
-    Request('GET', Uri.parse('http://localhost$path'), headers: headers);
+Request _request(
+  String path, {
+  Map<String, String>? headers,
+  String method = 'GET',
+}) => Request(method, Uri.parse('http://localhost$path'), headers: headers);
 
 void main() {
   group('runnerRefusalMiddleware', () {
@@ -165,12 +168,44 @@ void main() {
     });
   });
 
+  group('canonicalMethodMiddleware', () {
+    final handler = canonicalMethodMiddleware()((_) => Response.ok('seen'));
+
+    test('lets a method in upper case through', () async {
+      for (final method in ['GET', 'POST', 'PATCH', 'PROPFIND']) {
+        final response = await handler(_request('/x', method: method));
+
+        expect(await response.readAsString(), 'seen', reason: method);
+      }
+    });
+
+    test('refuses any other with 405 and the methods it serves', () async {
+      for (final method in ['get', 'Post', 'pATCH']) {
+        final response = await handler(_request('/x', method: method));
+
+        expect(response.statusCode, 405, reason: method);
+        expect(
+          response.headers['allow'],
+          'GET, HEAD, POST, PUT, PATCH, DELETE',
+        );
+        expect(
+          ErrorResponse.fromJson(
+            jsonDecode(await response.readAsString()) as Map<String, dynamic>,
+          ).error.message,
+          'The engine takes methods in upper case only: send '
+          '${method.toUpperCase()}, not $method.',
+        );
+      }
+    });
+  });
+
   group('responses', () {
     test('jsonResponse encodes the body as JSON', () async {
       final response = jsonResponse({'a': 1}, statusCode: 201);
 
       expect(response.statusCode, 201);
       expect(response.headers['content-type'], 'application/json');
+      expect(response.headers['x-content-type-options'], 'nosniff');
       expect(await response.readAsString(), '{"a":1}');
     });
 
@@ -196,6 +231,7 @@ void main() {
         expect(response.statusCode, 404);
         expect(response.headers['x-extra'], 'yes');
         expect(response.headers['content-type'], 'application/json');
+        expect(response.headers['x-content-type-options'], 'nosniff');
         expect(
           await response.readAsString(),
           '{"error":{"code":"not_found","message":"gone"}}',

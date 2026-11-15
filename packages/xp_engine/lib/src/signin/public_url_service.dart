@@ -1,6 +1,8 @@
 import 'package:xp_api/xp_api.dart';
+import 'package:xp_engine/src/access/access_policy.dart';
 import 'package:xp_engine/src/repositories/engine_setting_repository.dart';
 import 'package:xp_engine/src/signin/sign_in_exceptions.dart';
+import 'package:xp_engine/src/tokens/device_token.dart';
 
 /// The public URL: the HTTPS origin browsers reach the engine at through a
 /// proxy that terminates TLS (ADR 0018, D3). Browser sign-in works on this
@@ -26,15 +28,24 @@ class PublicUrlService {
   /// The public URL.
   Future<PublicUrl> read() async => PublicUrl(url: await origin());
 
-  /// Sets the public URL to [url], or clears it for `null` or a blank one.
+  /// Sets the public URL to [url], or clears it for `null` or a blank one,
+  /// [by] an admin's token.
   ///
   /// The URL must be an `https` origin: a host, maybe a port, and nothing
   /// else (no user info, path, query or fragment); a trailing `/` is
   /// dropped. The dashboard is served at the root of its origin, and its
   /// session cookie is a `__Host-` one.
   ///
-  /// Throws a [PublicUrlInvalidException] for a URL that is not one.
-  Future<PublicUrl> set(String? url) async {
+  /// Throws a [PublicUrlForbiddenException] if [by] may not
+  /// [Permission.administer], and a [PublicUrlInvalidException] for a URL
+  /// that is not one.
+  Future<PublicUrl> set(String? url, {required DeviceToken by}) async {
+    final refusal = AccessPolicy.refusal(
+      by,
+      Permission.administer,
+      'set the public URL',
+    );
+    if (refusal != null) throw PublicUrlForbiddenException(refusal);
     final text = url?.trim() ?? '';
     final String? origin;
     if (text.isEmpty) {

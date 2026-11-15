@@ -3,15 +3,19 @@ import 'dart:async';
 import 'package:xp_engine/src/clock/clock.dart';
 import 'package:xp_engine/src/credentials/credential_health_check.dart';
 import 'package:xp_engine/src/housekeeping/housekeeping_service.dart';
+import 'package:xp_engine/src/tokens/token_service.dart';
 
 /// Prunes the logs once a day (D-24): at the start if the last pruning was a
-/// day ago or never, and then every [interval].
+/// day ago or never, and then every [interval]. Each time, it also deletes
+/// the browser sessions' tokens that ended
+/// ([TokenService.purgeEndedWebTokens]).
 class HousekeepingSchedule {
   /// Creates the schedule.
   ///
   /// [timers] makes the periodic timer; tests pass their own.
   new({
     required this._service,
+    required this._tokens,
     required this._clock,
     this.interval = const Duration(hours: 24),
     this.onError,
@@ -25,6 +29,7 @@ class HousekeepingSchedule {
   final void Function(Object error, StackTrace stackTrace)? onError;
 
   final HousekeepingService _service;
+  final TokenService _tokens;
   final Clock _clock;
   final PeriodicTimerFactory _timers;
   Timer? _timer;
@@ -48,14 +53,19 @@ class HousekeepingSchedule {
     }
   }
 
-  /// Prunes the logs now, unless a pruning is under way.
+  /// Prunes the logs and the ended sessions' tokens now, unless a pruning
+  /// is under way. One that fails does not keep the other from running.
   Future<void> runNow() async {
     if (_running) return;
     _running = true;
     try {
-      await _service.pruneLogs();
-    } on Object catch (error, stackTrace) {
-      onError?.call(error, stackTrace);
+      for (final prune in [_service.pruneLogs, _tokens.purgeEndedWebTokens]) {
+        try {
+          await prune();
+        } on Object catch (error, stackTrace) {
+          onError?.call(error, stackTrace);
+        }
+      }
     } finally {
       _running = false;
     }

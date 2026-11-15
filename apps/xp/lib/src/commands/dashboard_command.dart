@@ -38,7 +38,9 @@ class DashboardCommand extends XpCommand {
       );
     }
     final opened = !argResults!.flag('print') && await context.openBrowser(url);
-    emit({'url': '$url', 'opened': opened}, () {
+    // The link holds a sign-in code: once the browser has it, the output
+    // (which agents and CI logs keep) does not.
+    emit({if (!opened) 'url': '$url', 'opened': opened}, () {
       if (opened) {
         return 'Opened the dashboard in the browser. Its sign-in link works '
             'once, for 10 minutes.';

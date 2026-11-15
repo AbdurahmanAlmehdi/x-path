@@ -10,6 +10,7 @@ import 'package:xp_desktop/app/bloc/engine_notices_bloc.dart';
 import 'package:xp_desktop/settings/settings.dart';
 import 'package:xp_macos_services/testing.dart';
 import 'package:xp_macos_services/xp_macos_services.dart';
+import 'package:xp_repositories/xp_repositories.dart';
 
 import '../helpers/fakes.dart';
 
@@ -199,6 +200,24 @@ void main() {
         DashboardState(error: 'Only an admin issues sign-in codes for others.'),
       ],
       verify: (_) => expect(opened, isEmpty),
+    );
+
+    blocTest<DashboardBloc, DashboardState>(
+      'says so when the browser does not open',
+      setUp: () =>
+          when(settings.dashboardSignInUrl).thenAnswer((_) async => url),
+      build: () => DashboardBloc(
+        settings: settings,
+        openUrl: (url) => openWithSystem(
+          url,
+          run: (_, _) async => ProcessResult(1, 1, '', 'no browser'),
+        ),
+      ),
+      act: (bloc) => bloc.add(const DashboardOpenRequested()),
+      expect: () => const [
+        DashboardState(opening: true),
+        DashboardState(error: unexpectedErrorMessage),
+      ],
     );
   });
 

@@ -1,7 +1,10 @@
 import 'dart:convert';
 
+import 'package:shelf/shelf.dart';
 import 'package:test/test.dart';
 import 'package:xp_api/xp_api.dart';
+import 'package:xp_engine/xp_engine.dart';
+import 'package:xpd/xpd.dart';
 
 import '../../helpers/test_engine.dart';
 
@@ -31,7 +34,7 @@ void main() {
   });
 
   test('takes the public URL as an origin of the engine', () async {
-    await engine.publicUrl.set('https://xpath.example.com');
+    await engine.publicUrl.set('https://xpath.example.com', by: testOwnerToken);
 
     final response = await addPerson({
       ...engine.browser(cookie),
@@ -42,7 +45,7 @@ void main() {
   });
 
   test('refuses it with 403 csrf without X-XPath-CSRF', () async {
-    for (final value in [null, '0']) {
+    for (final value in [null, '0', 'true', '01']) {
       final headers = {...engine.browser(cookie)}..remove('x-xpath-csrf');
       if (value != null) headers['x-xpath-csrf'] = value;
 
@@ -99,5 +102,80 @@ void main() {
       ErrorResponse.fromJson(response.json).error.code,
       ApiErrorCode.unauthorized,
     );
+  });
+
+  test('refuses PUT, PATCH and DELETE without the header, and lets them '
+      'through with it', () async {
+    final requests = [
+      ('PUT', '/settings/public-url', jsonEncode({'url': null})),
+      ('PATCH', '/people/${testOwner.id}', jsonEncode({'name': 'Abdu'})),
+      ('DELETE', '/people/per_nope', null),
+    ];
+    for (final (method, path, body) in requests) {
+      final refused = await engine.request(
+        path,
+        method: method,
+        token: '',
+        headers: {...engine.browser(cookie)}..remove('x-xpath-csrf'),
+        body: body,
+      );
+      expect(refused.statusCode, 403, reason: method);
+      expect(refused.error['code'], 'csrf', reason: method);
+
+      final allowed = await engine.request(
+        path,
+        method: method,
+        token: '',
+        headers: engine.browser(cookie),
+        body: body,
+      );
+      expect(allowed.statusCode, isNot(403), reason: method);
+    }
+    expect((await engine.people.get(testOwner.id))!.name, 'Abdu');
+  });
+
+  test('refuses a cookie request in a lower-case method with 405 before '
+      'it is read', () async {
+    for (final method in ['post', 'Post', 'patch']) {
+      final response = await engine.rawRequest(
+        method,
+        '/people',
+        token: '',
+        headers: {...engine.browser(cookie)}..remove('x-xpath-csrf'),
+        body: jsonEncode({'name': 'Kim', 'role': 'admin'}),
+      );
+
+      expect(response.statusCode, 405, reason: method);
+      expect(response.error['code'], 'method_not_allowed');
+    }
+    expect(await engine.people.list(), hasLength(1));
+  });
+
+  test('checks a lower-case method as the upper-case one it is', () async {
+    final handler = const Pipeline()
+        .addMiddleware(
+          (inner) =>
+              (request) =>
+                  inner(request.change(context: {'xpd.sessionCookie': true})),
+        )
+        .addMiddleware(
+          csrfMiddleware(
+            AllowedOrigins(
+              PublicUrlService(settings: InMemoryEngineSettingRepository()),
+            ),
+          ),
+        )
+        .addHandler((_) => Response.ok('changed'));
+
+    for (final method in ['post', 'delete']) {
+      final response = await handler(
+        Request(method, Uri.parse('http://127.0.0.1/people')),
+      );
+      expect(response.statusCode, 403, reason: method);
+    }
+    final read = await handler(
+      Request('get', Uri.parse('http://127.0.0.1/people')),
+    );
+    expect(read.statusCode, 200);
   });
 }

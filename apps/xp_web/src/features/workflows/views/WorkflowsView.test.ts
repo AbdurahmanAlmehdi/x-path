@@ -1,12 +1,13 @@
 import { flushPromises, type DOMWrapper, type VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import type { Router } from 'vue-router'
 
 import { openApp } from '@/testing/app'
 import { type Answer, errorBody, meOf, stubEngine } from '@/testing/fetch'
 import { workflowOf, workflowSummaryOf } from '@/testing/fixtures'
 import { stubSockets } from '@/testing/sockets'
+import { eventually } from '@/testing/wait'
 
 import { timing, useWorkflowBuilderStore } from '../stores/builder'
 
@@ -112,7 +113,7 @@ describe('WorkflowsView', () => {
 
   async function open(path = '/projects/prj_1/workflows') {
     ;({ app, router } = await openApp(path))
-    await vi.waitFor(() => expect(useWorkflowBuilderStore().loaded).toBe(true))
+    await eventually(() => expect(useWorkflowBuilderStore().loaded).toBe(true))
     await flushPromises()
   }
 
@@ -148,8 +149,8 @@ describe('WorkflowsView', () => {
     expect(router.currentRoute.value.fullPath).toBe('/projects/prj_1/workflows/wf_2')
     expect(app!.find('[data-testid="workflow-subtitle"]').text()).toBe('nightly · Version 1')
     expect(app!.find('nav[aria-label="Pipeline"]').text()).toContain('Nightly')
-    await vi.waitFor(() => expect(editorText()).toContain('name: Nightly'))
-    await vi.waitFor(() => expect(app!.find('[data-testid="validation"]').text()).toBe('Valid'))
+    await eventually(() => expect(editorText()).toContain('name: Nightly'))
+    await eventually(() => expect(app!.find('[data-testid="validation"]').text()).toBe('Valid'))
     expect(app!.find('a.button[href="/projects/prj_1/dispatch?workflow=wf_2"]').exists()).toBe(true)
   })
 
@@ -161,7 +162,7 @@ describe('WorkflowsView', () => {
     await type(field('Description'), 'Line')
     await app!.find('input[type="checkbox"]').setValue(true)
     expect(store().yaml).toContain('name: Renamed\ndescription: Line\nlock: project\n')
-    await vi.waitFor(() => expect(editorText()).toContain('lock: project'))
+    await eventually(() => expect(editorText()).toContain('lock: project'))
     expect(app!.find('[data-testid="workflow-subtitle"]').text()).toContain('Unsaved changes')
 
     await button('ship').trigger('click')
@@ -217,7 +218,7 @@ describe('WorkflowsView', () => {
 
     await app!.find('select[aria-label="Add step"]').setValue('command')
     expect(job().steps.map((step) => step.kind)).toEqual(['git.checkout', 'command', 'future.step', 'command'])
-    await vi.waitFor(() => expect(editorText()).toContain('- kind: future.step          - kind: command'))
+    await eventually(() => expect(editorText()).toContain('- kind: future.step          - kind: command'))
   })
 
   it('edits a step: its type, gate, if and with values by their type', async () => {
@@ -309,9 +310,10 @@ describe('WorkflowsView', () => {
       },
     })
     await open()
-    await vi.waitFor(() => expect(editorText()).toContain('name: Nightly'))
+    await eventually(() => expect(editorText()).toContain('name: Nightly'))
     store().setYaml(`${ownYaml}# changed\n`)
-    await flushPromises()
+    // The check of the typed YAML answers first; a late one would replace the issues of the save.
+    await eventually(() => expect(store().validation).toBe('valid'))
 
     await button('Save').trigger('click')
     await flushPromises()
@@ -368,7 +370,7 @@ describe('WorkflowsView', () => {
       name: 'dev-build-copy',
       basedOn: { builtin: 'dev-build', version: 1 },
     })
-    await vi.waitFor(() => expect(router.currentRoute.value.fullPath).toBe('/projects/prj_1/workflows/wf_3'))
+    await eventually(() => expect(router.currentRoute.value.fullPath).toBe('/projects/prj_1/workflows/wf_3'))
   })
 
   it('starts a new workflow from a template and saves it under a name', async () => {
@@ -396,7 +398,7 @@ describe('WorkflowsView', () => {
     await app!.find('[role="dialog"] form').trigger('submit')
     await flushPromises()
 
-    await vi.waitFor(() => expect(router.currentRoute.value.fullPath).toBe('/projects/prj_1/workflows/wf_4'))
+    await eventually(() => expect(router.currentRoute.value.fullPath).toBe('/projects/prj_1/workflows/wf_4'))
     expect(app!.find('[data-testid="workflow-subtitle"]').text()).toBe('tests · Version 1')
   })
 
@@ -432,7 +434,7 @@ describe('WorkflowsView', () => {
     await app!.find('select[aria-label="Workflow"]').setValue('wf_1')
     await flushPromises()
     await button('Discard', dialog()).trigger('click')
-    await vi.waitFor(() => expect(store().workflow?.id).toBe('wf_1'))
+    await eventually(() => expect(store().workflow?.id).toBe('wf_1'))
     expect(router.currentRoute.value.fullPath).toBe('/projects/prj_1/workflows/wf_1')
 
     const clean = new Event('beforeunload', { cancelable: true })
@@ -459,6 +461,6 @@ describe('WorkflowsView', () => {
     expect(app!.find('a.button[href*="dispatch"]').exists()).toBe(false)
     store().setYaml(`${ownYaml}# changed\n`)
     await router.push('/projects/prj_1/workflows/wf_1')
-    await vi.waitFor(() => expect(store().workflow?.id).toBe('wf_1'))
+    await eventually(() => expect(store().workflow?.id).toBe('wf_1'))
   })
 })

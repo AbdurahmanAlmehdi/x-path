@@ -68,6 +68,10 @@ class ThrowingDeviceTokenRepository implements DeviceTokenRepository {
   Future<List<DeviceToken>> list() async => throw StateError('disk on fire');
 
   @override
+  Future<DeviceToken?> findByHash(String hash) async =>
+      throw StateError('disk on fire');
+
+  @override
   Future<void> add(DeviceToken token) async {}
 
   @override
@@ -75,6 +79,9 @@ class ThrowingDeviceTokenRepository implements DeviceTokenRepository {
 
   @override
   Future<int> revokeOwnedBy(String personId, {required DateTime at}) async => 0;
+
+  @override
+  Future<int> deleteEndedSessions({required DateTime before}) async => 0;
 }
 
 /// Build number counters for any app: the first number of an app is 1.
@@ -113,6 +120,17 @@ final testOwner = Person(
   role: PersonRole.admin,
   createdAt: DateTime.utc(2026),
 );
+
+/// An `app` token of [testOwner], for the services a test calls directly
+/// as an admin.
+final DeviceToken testOwnerToken = DeviceToken(
+  id: 'tok_owner',
+  name: 'app',
+  kind: DeviceTokenKind.app,
+  hash: 'hash-owner',
+  createdAt: DateTime.utc(2026),
+  personId: testOwner.id,
+).withPerson(testOwner);
 
 /// An engine on a free loopback port with everything in memory.
 class TestEngine {
@@ -725,6 +743,60 @@ class TestEngine {
     }
   }
 
+  /// Sends [method] to [path] of the API exactly as given, over a plain
+  /// socket: `HttpClient` upper-cases every method, and this sends one in
+  /// lower or mixed case as a client may. Sends [token] as a bearer token
+  /// unless it is empty, and closes the connection after the answer.
+  Future<RawResponse> rawRequest(
+    String method,
+    String path, {
+    String? token,
+    Map<String, String> headers = const {},
+    String? body,
+    bool root = false,
+  }) async {
+    final socket = await Socket.connect(uri.host, uri.port);
+    try {
+      final bearer = token ?? secret;
+      final bytes = body == null ? const <int>[] : utf8.encode(body);
+      socket
+        ..write(
+          [
+            '$method ${at(path, root: root).path} HTTP/1.0',
+            'host: 127.0.0.1:${uri.port}',
+            if (bearer.isNotEmpty) 'authorization: Bearer $bearer',
+            for (final MapEntry(:key, :value) in headers.entries)
+              '$key: $value',
+            if (body != null) 'content-type: application/json',
+            'content-length: ${bytes.length}',
+            '',
+            '',
+          ].join('\r\n'),
+        )
+        ..add(bytes);
+      await socket.flush();
+      final text = utf8.decode(await socket.expand((chunk) => chunk).toList());
+      final split = text.indexOf('\r\n\r\n');
+      final head = text.substring(0, split).split('\r\n');
+      final received = <String, String>{};
+      for (final line in head.skip(1)) {
+        final colon = line.indexOf(':');
+        received.putIfAbsent(
+          line.substring(0, colon).trim().toLowerCase(),
+          () => line.substring(colon + 1).trim(),
+        );
+      }
+      return RawResponse(
+        int.parse(head.first.split(' ')[1]),
+        received['content-type'],
+        text.substring(split + 4),
+        received,
+      );
+    } finally {
+      socket.destroy();
+    }
+  }
+
   /// Downloads [path] as bytes, with the headers of the response.
   Future<RawBytes> download(String path, {String? token}) async {
     final client = HttpClient();
@@ -886,7 +958,7 @@ class TestEngine {
   String get loopbackOrigin => 'http://127.0.0.1:${uri.port}';
 
   /// Signs a browser in as the person [personId], from [loopbackOrigin], and
-  /// returns its session cookie, `xp_session=<secret>`.
+  /// returns its session cookie, `xp_session_<port>=<secret>`.
   Future<String> signInBrowser([String? personId]) async {
     final code = await signIn.issue(personId ?? testOwner.id);
     final response = await request(

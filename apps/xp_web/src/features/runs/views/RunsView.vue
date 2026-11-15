@@ -7,8 +7,8 @@ import { useProjectsStore } from '@/features/projects/stores/projects'
 import { useWorkflowsStore } from '@/features/projects/stores/workflows'
 import { useFollowing } from '@/ui/following'
 import { runStates, statusOf } from '@/ui/format'
+import RunList from '@/ui/RunList.vue'
 
-import RunList from '../components/RunList.vue'
 import { type RunsFilter, useRunsStore } from '../stores/runs'
 
 const route = useRoute()
@@ -113,7 +113,8 @@ function selected(event: Event): string {
       <RunList
         v-else
         :runs="runs.runs"
-        :show-project="!filter.project"
+        :workflow-name="workflows.name"
+        :project-name="filter.project ? undefined : projects.nameOf"
         :empty="filter.workflow || filter.state ? 'No run matches.' : 'Nothing has run yet. Dispatch a workflow to see its runs here.'"
       />
       <button v-if="runs.next" type="button" class="more" :disabled="runs.loadingMore" @click="runs.more()">

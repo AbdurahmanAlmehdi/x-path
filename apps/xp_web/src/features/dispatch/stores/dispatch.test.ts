@@ -339,6 +339,22 @@ describe('useDispatchStore', () => {
       expect(store.previewing).toBe(false)
     })
 
+    it('plans nothing once stopped, nor once the store is disposed', async () => {
+      const { store, seen } = await started()
+      seen.length = 0
+
+      store.setRef('feat/a')
+      store.stop()
+      expect(store.previewing).toBe(false)
+      await settle()
+      expect(seen).toHaveLength(0)
+
+      store.setRef('feat/b')
+      store.$dispose()
+      await settle()
+      expect(seen).toHaveLength(0)
+    })
+
     it('drops a plan that a newer change outran', async () => {
       let answers = 0
       const { store } = await started({

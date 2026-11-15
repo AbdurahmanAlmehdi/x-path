@@ -65,8 +65,9 @@ class PersonCreateCommand extends XpdCommand {
     if (role == null) usageException('--role is required.');
     try {
       final (person, code) = await withDatabase((database) async {
+        // The engine machine's user owns the data directory: no token.
         final person = await _people(database)
-            .create(name: name, role: PersonRole.values.byName(role));
+            .create(name: name, role: PersonRole.values.byName(role), by: null);
         return (person, await _signIn(database).issue(person.id));
       });
       context.err.writeln(
@@ -105,14 +106,7 @@ class PersonCodeCommand extends XpdCommand {
     if (rest.length != 1) usageException('Give one name or person id.');
     final wanted = rest.single.trim();
     final issued = await withDatabase((database) async {
-      final people = await _people(database).list();
-      final person = people
-          .where((p) => !p.isRemoved)
-          .where(
-            (p) =>
-                p.id == wanted || p.name.toLowerCase() == wanted.toLowerCase(),
-          )
-          .firstOrNull;
+      final person = await _people(database).findActive(wanted);
       if (person == null) return null;
       return (person, await _signIn(database).issue(person.id));
     });
@@ -169,19 +163,13 @@ class PersonListCommand extends XpdCommand {
 
 PersonService _people(SqliteDatabase database) => PersonService(
   people: SqlitePersonRepository(database),
-  tokens: _tokens(database),
+  tokens: tokenServiceOf(database),
   clock: const SystemClock(),
 );
 
 SignInCodeService _signIn(SqliteDatabase database) => SignInCodeService(
   codes: SqliteSignInCodeRepository(database),
   people: SqlitePersonRepository(database),
-  tokens: _tokens(database),
-  clock: const SystemClock(),
-);
-
-TokenService _tokens(SqliteDatabase database) => TokenService(
-  tokens: SqliteDeviceTokenRepository(database),
-  people: SqlitePersonRepository(database),
+  tokens: tokenServiceOf(database),
   clock: const SystemClock(),
 );

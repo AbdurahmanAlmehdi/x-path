@@ -2,6 +2,7 @@ import 'package:shelf/shelf.dart';
 import 'package:xp_api/xp_api.dart';
 import 'package:xp_engine/xp_engine.dart';
 import 'package:xpd/src/api/api_router.dart';
+import 'package:xpd/src/api/middleware.dart';
 import 'package:xpd/src/api/request_body.dart';
 import 'package:xpd/src/api/responses.dart';
 
@@ -27,7 +28,10 @@ class SettingsRoutes {
   Future<Response> _set(Request request) async {
     try {
       final body = await readJsonBody(request, SetPublicUrlRequest.fromJson);
-      return jsonResponse((await _publicUrl.set(body.url)).toJson());
+      final set = await _publicUrl.set(body.url, by: deviceTokenOf(request));
+      return jsonResponse(set.toJson());
+    } on PublicUrlForbiddenException catch (error) {
+      return errorResponse(ApiErrorCode.forbidden, error.message);
     } on BadRequestException catch (error) {
       return errorResponse(ApiErrorCode.invalidRequest, error.message);
     } on PublicUrlInvalidException catch (error) {

@@ -1,11 +1,12 @@
 import { flushPromises, type VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import { openApp } from '@/testing/app'
 import { type Answer, errorBody, meOf, stubEngine } from '@/testing/fetch'
 import { projectOf, runOf, workflowSummaryOf } from '@/testing/fixtures'
 import { stubSockets } from '@/testing/sockets'
+import { eventually } from '@/testing/wait'
 
 describe('RunsView', () => {
   let app: VueWrapper | undefined
@@ -57,20 +58,20 @@ describe('RunsView', () => {
     ;({ app, router } = await openApp('/runs'))
 
     await app.find('select').setValue('prj_1')
-    await vi.waitFor(() => expect(router.currentRoute.value.query).toEqual({ project: 'prj_1' }))
+    await eventually(() => expect(router.currentRoute.value.query).toEqual({ project: 'prj_1' }))
     await flushPromises()
     expect(app.findAll('select')).toHaveLength(3)
     expect(app.findAll('select option').map((option) => option.text())).toContain('Dev build')
 
     await app.findAll('select')[1]!.setValue('wf_1')
-    await vi.waitFor(() =>
+    await eventually(() =>
       expect(router.currentRoute.value.query).toEqual({ project: 'prj_1', workflow: 'wf_1' }),
     )
     await app.findAll('select')[2]!.setValue('failed')
-    await vi.waitFor(() => expect(router.currentRoute.value.query.state).toBe('failed'))
+    await eventually(() => expect(router.currentRoute.value.query.state).toBe('failed'))
 
     await app.find('select').setValue('')
-    await vi.waitFor(() => expect(router.currentRoute.value.query).toEqual({ state: 'failed' }))
+    await eventually(() => expect(router.currentRoute.value.query).toEqual({ state: 'failed' }))
   })
 
   it('shows the runs of one project, by its own address', async () => {

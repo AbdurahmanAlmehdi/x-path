@@ -37,7 +37,7 @@ export interface YamlEditorHandle {
   destroy(): void
 }
 
-export interface YamlEditorOptions {
+interface YamlEditorOptions {
   text: string
   readOnly: boolean
   /** The accessible name of the text area. */

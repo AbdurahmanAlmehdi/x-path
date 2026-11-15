@@ -28,6 +28,18 @@ describe('useProjectsStore', () => {
     expect(store.error).toBeNull()
   })
 
+  it('names a project in full or short, and by its id while unknown', async () => {
+    stubEngine({ 'GET /projects': { status: 200, body: { projects: [projectOf()] } } })
+    const store = useProjectsStore()
+    expect(store.nameOf('prj_1')).toBe('prj_1')
+
+    await store.load()
+
+    expect(store.nameOf('prj_1')).toBe('acme/app')
+    expect(store.nameOf('prj_1', { short: true })).toBe('app')
+    expect(store.nameOf('prj_9', { short: true })).toBe('prj_9')
+  })
+
   it('says why the projects could not be read', async () => {
     stubEngine({ 'GET /projects': { status: 500, body: errorBody('internal', 'Broken.') } })
     const store = useProjectsStore()

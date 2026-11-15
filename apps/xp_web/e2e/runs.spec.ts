@@ -8,6 +8,7 @@ test.describe.configure({ mode: 'serial' })
 let developer: string
 let viewer: string
 let projectId: string
+let holdWorkflowId: string
 
 /** How many lines the counting workflow writes, one every tenth of a second. */
 const lineCount = 60
@@ -27,6 +28,25 @@ stages:
               arguments:
                 - -c
                 - 'for i in $(seq 1 ${lineCount}); do echo "line $i"; sleep 0.1; done'
+`
+
+// A job that runs until it is cancelled, with no toolchain: a checkout,
+// then a command that waits. The run stays unfinished, so Cancel is there.
+const holdWorkflow = `schema: 1
+name: Hold
+stages:
+  - name: only
+    jobs:
+      hold:
+        name: hold
+        steps:
+          - kind: git.checkout
+          - kind: command
+            with:
+              executable: sh
+              arguments:
+                - -c
+                - sleep 300
 `
 
 async function signIn(page: Page, name: string) {
@@ -79,6 +99,9 @@ test.beforeAll(async ({ browser }, testInfo) => {
     yaml: countWorkflow,
   })
   expect(workflow.status).toBe(201)
+  const hold = await call(page, 'POST', `/projects/${projectId}/workflows`, { name: 'hold', yaml: holdWorkflow })
+  expect(hold.status).toBe(201)
+  holdWorkflowId = hold.body.id
   await page.close()
 })
 
@@ -106,7 +129,7 @@ test('a viewer sees the project with no Dispatch button', async ({ page }) => {
   await expect(page.getByTestId('dispatch')).toHaveCount(0)
 })
 
-test('dispatching dev-build from the browser starts a run of the person', async ({ page }) => {
+test('dispatching from the browser starts a run of the person, which they can cancel', async ({ page }) => {
   const violations = watchPolicy(page)
   await signIn(page, developer)
   // The shell follows the events from sign-in on: wait for the socket of the project page.
@@ -119,7 +142,10 @@ test('dispatching dev-build from the browser starts a run of the person', async 
   expect(feed.isClosed()).toBe(false)
 
   await page.getByRole('link', { name: 'Dispatch…' }).click()
-  await page.getByLabel('Workflow').selectOption({ label: 'Dev build (built-in)' })
+  const workflows = page.getByLabel('Workflow')
+  // The built-in workflows are on offer; running a real build is not the point here.
+  await expect(workflows.locator('option', { hasText: 'Dev build (built-in)' })).toHaveCount(1)
+  await workflows.selectOption(holdWorkflowId)
   await page.getByRole('checkbox', { name: 'Android' }).check()
   await page.getByRole('checkbox', { name: 'iOS' }).uncheck()
   await page.getByRole('checkbox', { name: 'dev' }).check()
@@ -132,10 +158,11 @@ test('dispatching dev-build from the browser starts a run of the person', async 
   await expect(page.getByTestId('run-origin')).toHaveText(developer)
   const runId = page.url().split('/').at(-1)!
   const run = await call(page, 'GET', `/runs/${runId}`)
+  expect(run.body.workflowId).toBe(holdWorkflowId)
   expect(run.body.origin).toMatchObject({ kind: 'person', personName: developer })
   expect(run.body.request.platforms).toEqual(['android'])
 
-  // The build is not the point here: stop it.
+  // The job waits until it is cancelled.
   await page.getByRole('button', { name: 'Cancel', exact: true }).click()
   await page.getByRole('button', { name: 'Cancel run' }).click()
   await expect(page.locator('h1 + .badge')).toHaveText('Cancelled')

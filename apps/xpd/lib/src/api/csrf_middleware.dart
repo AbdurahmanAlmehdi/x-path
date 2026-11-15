@@ -19,7 +19,8 @@ const _safe = {'GET', 'HEAD', 'OPTIONS'};
 /// [authMiddleware]: it reads how that one authenticated the request.
 Middleware csrfMiddleware(AllowedOrigins origins) =>
     (inner) => (request) async {
-      if (_safe.contains(request.method) || !authenticatedByCookie(request)) {
+      if (_safe.contains(methodOf(request)) ||
+          !authenticatedByCookie(request)) {
         return await inner(request);
       }
       if (request.headers[csrfHeader] != '1') {
@@ -39,21 +40,3 @@ Middleware csrfMiddleware(AllowedOrigins origins) =>
       }
       return await inner(request);
     };
-
-/// Why a WebSocket upgrade from a browser is refused, as a `403 forbidden`
-/// response, or `null` when it may open (D2, D15): a request with an
-/// `Origin` must come from one of [origins], and one authenticated by the
-/// session cookie must have an `Origin`.
-Future<Response?> socketOriginRefusal(
-  Request request,
-  AllowedOrigins origins,
-) async {
-  final origin = request.headers['origin'];
-  if (origin == null && !authenticatedByCookie(request)) return null;
-  if (origin != null && await origins.of(request) != null) return null;
-  return errorResponse(
-    ApiErrorCode.forbidden,
-    'A browser opens this socket only from a page of the engine: its Origin '
-    'is missing or not one the engine serves.',
-  );
-}

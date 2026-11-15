@@ -2,13 +2,13 @@
 import { computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
-import type { TestRef } from '@/api/client'
 import { useProjectsStore } from '@/features/projects/stores/projects'
 import { useSessionStore } from '@/features/session/stores/session'
 import { useFollowing } from '@/ui/following'
 import { formatDuration, formatTime } from '@/ui/format'
 
-import { type KnownTestRun, useTestsStore } from '../stores/tests'
+import { comparison, runLabel, testSections, testStats } from '../labels'
+import { useTestsStore } from '../stores/tests'
 
 const route = useRoute()
 const router = useRouter()
@@ -28,7 +28,7 @@ useFollowing(store.follow, projects.follow)
 
 const project = computed(() => projects.projects.find((each) => each.id === projectId.value))
 const gone = computed(() => projects.loaded && !projects.error && !project.value)
-const name = computed(() => project.value?.fullName.split('/').at(-1) ?? projectId.value)
+const name = computed(() => projects.nameOf(projectId.value, { short: true }))
 const run = computed(() => store.run?.run)
 
 const subtitle = computed(() =>
@@ -37,85 +37,10 @@ const subtitle = computed(() =>
     .join(' · '),
 )
 
-/** What a run is called in the picker: branch, app, when, baseline. */
-function runLabel(known: KnownTestRun): string {
-  return [
-    known.appPath && known.appPath !== '.' ? known.appPath : undefined,
-    known.createdAt ? formatTime(known.createdAt) : known.branch ? 'just ended' : undefined,
-    known.baseline ? 'baseline' : undefined,
-  ]
-    .filter(Boolean)
-    .join(' · ')
-}
-
-const comparison = computed(() => {
-  const shown = run.value
-  if (!shown) return ''
-  if (shown.baseline) return `This run is the baseline of ${shown.branch}`
-  if (!shown.diff.comparedTo) return 'No baseline yet, so every failure counts as new'
-  const baseline = store.comparedBaseline
-  return baseline
-    ? `Compared with the baseline of ${baseline.branch} from ${formatTime(baseline.createdAt)}`
-    : `Compared with the baseline run of ${shown.diff.comparedTo}`
-})
-
+const comparisonText = computed(() => (run.value ? comparison(run.value, store.comparedBaseline) : ''))
 const newFailures = computed(() => run.value?.diff.newFailures.length ?? 0)
-
-const stats = computed(() => {
-  const shown = run.value
-  if (!shown) return []
-  const { counts, diff } = shown
-  return [
-    [newFailures.value, 'new failures'],
-    [diff.stillFailing, 'in baseline'],
-    [diff.fixed.length, 'fixed'],
-    [counts.passed, 'passed'],
-    [counts.failed, 'failed'],
-    [counts.errored, 'errored'],
-    [counts.skipped, 'skipped'],
-    ...(diff.missing.length > 0 ? [[diff.missing.length, 'missing'] as const] : []),
-  ] as Array<readonly [number, string]>
-})
-
-const sameTest = (a: TestRef) => (b: TestRef) => a.suite === b.suite && a.name === b.name
-
-interface TestLine {
-  ref: TestRef
-  label: string
-  tone: 'negative' | 'positive' | 'neutral'
-  message?: string
-}
-
-/** The tests that changed or still fail, new failures first. */
-const sections = computed(() => {
-  const response = store.run
-  if (!response) return []
-  const { diff } = response.run
-  const failure = (ref: TestRef): TestLine => {
-    const test = response.tests.find(sameTest(ref))
-    return {
-      ref,
-      label: test?.status === 'errored' ? 'Errored' : 'Failed',
-      tone: 'negative',
-      message: test?.message,
-    }
-  }
-  const still = response.tests.filter((test) => !diff.newFailures.some(sameTest(test)))
-  return [
-    { title: 'New failures', count: diff.newFailures.length, lines: diff.newFailures.map(failure) },
-    { title: 'Failing in the baseline too', count: diff.stillFailing, lines: still.map(failure) },
-    {
-      title: 'Fixed since the baseline',
-      count: diff.fixed.length,
-      lines: diff.fixed.map((ref): TestLine => ({ ref, label: 'Fixed', tone: 'positive' })),
-    },
-    {
-      title: 'In the baseline, not in this run',
-      count: diff.missing.length,
-      lines: diff.missing.map((ref): TestLine => ({ ref, label: 'Not reported', tone: 'neutral' })),
-    },
-  ].filter((section) => section.lines.length > 0)
-})
+const stats = computed(() => (run.value ? testStats(run.value) : []))
+const sections = computed(() => (store.run ? testSections(store.run) : []))
 
 function showRun(job: string) {
   void router.replace({ query: { ...route.query, job } })
@@ -172,7 +97,7 @@ function showRun(job: string) {
             <p class="muted meta">
               <span class="mono">{{ run.branch }}</span> · {{ formatTime(run.createdAt) }}
               <template v-if="store.duration !== null"> · <span class="mono">{{ formatDuration(store.duration) }}</span></template>
-              · {{ comparison }}
+              · {{ comparisonText }}
             </p>
             <section class="panel stats">
               <div v-for="[value, label] in stats" :key="label" class="stat">

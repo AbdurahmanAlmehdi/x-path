@@ -1193,9 +1193,29 @@ void main() {
       expect(url.origin, engine.url.origin);
       expect(engine.calls.map((call) => call.path), [
         '/me',
-        '/people/per_1/sign-in-codes',
         '/settings/public-url',
+        '/people/per_1/sign-in-codes',
       ]);
+    });
+
+    test('issues no code when it cannot read the public URL', () async {
+      engine.json(
+        'GET',
+        '/settings/public-url',
+        const ErrorResponse(
+          ApiError(code: ApiErrorCode.internal, message: 'disk on fire'),
+        ).toJson(),
+        status: 500,
+      );
+
+      await expectLater(
+        client.dashboardSignInUrl(),
+        throwsA(isA<ApiException>()),
+      );
+      expect(
+        engine.calls.map((call) => call.path),
+        isNot(contains('/people/per_1/sign-in-codes')),
+      );
     });
 
     test('signs in through the public URL when one is set', () async {

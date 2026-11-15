@@ -126,6 +126,11 @@ tailscale serve --bg http://127.0.0.1:7480
 tailscale serve status        # prints https://<machine>.<tailnet>.ts.net
 ```
 
+A proxy on the engine machine must pass the browser's `Host` on (nginx: `proxy_set_header Host
+$host;`; Caddy and `tailscale serve` do by default). One that rewrites `Host` to
+`127.0.0.1:<port>` makes the engine treat public visitors as loopback and give them the cookie
+without `Secure`.
+
 Then set the public URL, as an admin:
 
 ```sh
@@ -134,7 +139,8 @@ xp settings public-url --clear       # back to the engine machine only
 ```
 
 Through the public URL the session cookie is `__Host-xp_session`, sent only over HTTPS; on the
-engine's own machine it is `xp_session`. The public URL is the one address, besides the engine's
+engine's own machine it is `xp_session_<port>` (for example `xp_session_7480`), named after the
+engine's port so two engines on one machine keep separate sessions. The public URL is the one address, besides the engine's
 own, that the engine accepts a browser from: a page of any other site cannot use your session.
 
 The public URL and the runner URL (`xp runners url`) are separate settings. They can be the same

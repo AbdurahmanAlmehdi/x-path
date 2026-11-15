@@ -44,7 +44,7 @@ be newer than a remote engine, and nothing makes their versions match, so the pr
 **Browser sessions.** A browser signs in with a one-time code that an admin issues (or that `xp` and
 the Mac app ask for their own person), and gets a `web` token that lasts 8 hours in a cookie:
 `__Host-xp_session; Secure; HttpOnly; SameSite=Strict; Path=/` through the HTTPS public URL, and
-`xp_session; HttpOnly; SameSite=Strict; Path=/` on a loopback origin. A cookie authenticates only
+`xp_session_<port>; HttpOnly; SameSite=Strict; Path=/` on a loopback origin, the port being the one the engine serves on. A cookie authenticates only
 `web` tokens and only under `/api/v1`; `Authorization` wins when both are sent. `xpd` has no TLS:
 sign-in works on loopback or through the configured HTTPS public URL.
 

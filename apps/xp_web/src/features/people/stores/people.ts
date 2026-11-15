@@ -27,7 +27,7 @@ export const usePeopleStore = defineStore('people', () => {
   const error = ref<string | null>(null)
   /** The person a change is on its way for. */
   const changing = ref<string | null>(null)
-  /** What the engine said when it refused the last change, such as the last admin's `409`. */
+  /** What the engine said when it refused the last action, such as the last admin's `409`. */
   const actionError = ref<string | null>(null)
 
   /** The people who may sign in, oldest first. */
@@ -52,44 +52,60 @@ export const usePeopleStore = defineStore('people', () => {
     return people.value.find((person) => person.id === id)?.name ?? id ?? ''
   }
 
-  /** Runs [change] for the person [id]; `true` when the engine took it. */
-  async function changed(id: string, change: () => Promise<unknown>): Promise<boolean> {
+  /**
+   * Runs [action], for the person [id] when it is about one; what the
+   * engine answered, or `null` with [actionError] saying why not.
+   */
+  async function act<T>(id: string | null, action: () => Promise<T>): Promise<T | null> {
     changing.value = id
     actionError.value = null
     try {
-      await change()
-      await load()
-      return true
+      return await action()
     } catch (failure) {
       actionError.value = failureMessage(failure)
-      return false
+      return null
     } finally {
       changing.value = null
     }
   }
 
-  /** Adds [name] with [role]. Throws the engine's refusal. */
-  async function add(name: string, role: PersonRole): Promise<Person> {
-    const person = await dataOf(api.POST('/people', { body: { name: name.trim(), role } }))
-    await load()
-    return person
+  /** Forgets the last refusal, as a dialog opens or closes. */
+  function dismiss() {
+    actionError.value = null
   }
 
-  /** Gives the person [id] the role [role]. */
-  function setRole(id: string, role: PersonRole): Promise<boolean> {
-    return changed(id, () =>
-      dataOf(api.PATCH('/people/{id}', { params: { path: { id } }, body: { role } })),
-    )
+  /** Adds [name] with [role]: the new person, or `null`. */
+  function add(name: string, role: PersonRole): Promise<Person | null> {
+    return act(null, async () => {
+      const person = await dataOf(api.POST('/people', { body: { name: name.trim(), role } }))
+      await load()
+      return person
+    })
   }
 
-  /** Removes the person [id] and revokes their tokens. */
-  function remove(id: string): Promise<boolean> {
-    return changed(id, () => doneOf(api.DELETE('/people/{id}', { params: { path: { id } } })))
+  /** Gives the person [id] the role [role]; `true` when the engine took it. */
+  async function setRole(id: string, role: PersonRole): Promise<boolean> {
+    const changed = await act(id, async () => {
+      await dataOf(api.PATCH('/people/{id}', { params: { path: { id } }, body: { role } }))
+      await load()
+      return true
+    })
+    return changed ?? false
   }
 
-  /** A one-time sign-in code for the person [id], for the caller to show once. Throws the engine's refusal. */
-  function signInCode(id: string): Promise<SignInCode> {
-    return dataOf(api.POST('/people/{id}/sign-in-codes', { params: { path: { id } } }))
+  /** Removes the person [id] and revokes their tokens; `true` when the engine took it. */
+  async function remove(id: string): Promise<boolean> {
+    const removed = await act(id, async () => {
+      await doneOf(api.DELETE('/people/{id}', { params: { path: { id } } }))
+      await load()
+      return true
+    })
+    return removed ?? false
+  }
+
+  /** A one-time sign-in code for the person [id], for the caller to show once; `null` when refused. */
+  function signInCode(id: string): Promise<SignInCode | null> {
+    return act(id, () => dataOf(api.POST('/people/{id}/sign-in-codes', { params: { path: { id } } })))
   }
 
   return {
@@ -102,6 +118,7 @@ export const usePeopleStore = defineStore('people', () => {
     removed,
     load,
     nameOf,
+    dismiss,
     add,
     setRole,
     remove,

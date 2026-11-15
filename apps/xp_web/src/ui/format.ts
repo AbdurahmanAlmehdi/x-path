@@ -136,6 +136,11 @@ export function plainText(text: string): string {
   return text.replace(ansi, '')
 }
 
+/** The last part of a project's name: `app` of `acme/app`, the folder of a local path. */
+export function shortName(fullName: string): string {
+  return fullName.split('/').at(-1) ?? fullName
+}
+
 /** The short form of a commit: its first seven characters. */
 export function shortSha(sha: string): string {
   return sha.slice(0, 7)

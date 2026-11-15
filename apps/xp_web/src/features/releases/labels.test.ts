@@ -14,7 +14,6 @@ import {
   releaseStatus,
   releaseTimeline,
   statusSource,
-  storeList,
   storeName,
   storeStatus,
   storesApproved,
@@ -33,8 +32,6 @@ describe('release labels', () => {
     expect(storesApproved('live')).toBe(true)
     expect(storesApproved('in_review')).toBe(false)
     expect(storeName('apple')).toBe('App Store')
-    expect(storeList(['play'])).toBe('Google Play')
-    expect(storeList(['apple', 'play'])).toBe('App Store and Google Play')
     expect(variableList(['apple', 'play'])).toBe('min_version_ios and min_version_android')
     const apple = (['pending', 'uploaded', 'in_review', 'rejected', 'approved', 'live'] as const).map(
       (state) => storeStatus('apple', state).label,

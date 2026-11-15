@@ -53,6 +53,7 @@ void main() {
       );
 
       expect(response.statusCode, 201, reason: response.body);
+      expect(response.headers['cache-control'], 'no-store');
       final created = CreatedToken.fromJson(response.json);
       expect(created.info.name, 'xp on MacBook');
       expect(created.info.kind, DeviceTokenKind.cli);
@@ -90,6 +91,36 @@ void main() {
 
         expect(response.statusCode, 403, reason: kind.name);
       }
+    });
+
+    test('says that the app and the dashboard make tokens', () async {
+      final response = await send(
+        'POST',
+        '/tokens',
+        kind: DeviceTokenKind.cli,
+        body: {'name': 'x', 'kind': 'mcp'},
+      );
+
+      expect(
+        errorOf(response).error.message,
+        'Only the app and the web dashboard make tokens, and only cli and mcp '
+        'ones: A cli token may not make an mcp token.',
+      );
+    });
+
+    test("lets a browser's session make a token for its person", () async {
+      final cookie = await engine.signInBrowser();
+
+      final response = await engine.request(
+        '/tokens',
+        method: 'POST',
+        token: '',
+        headers: engine.browser(cookie),
+        body: jsonEncode({'name': 'laptop', 'kind': 'cli'}),
+      );
+
+      expect(response.statusCode, 201, reason: response.body);
+      expect(CreatedToken.fromJson(response.json).info.personId, testOwner.id);
     });
 
     test('refuses a blank name and an app or runner kind', () async {
@@ -140,6 +171,28 @@ void main() {
 
       final tokens = TokensResponse.fromJson(response.json).tokens;
       expect(tokens.single.personId, 'per_developer');
+    });
+  });
+
+  group('an mcp token', () {
+    test('neither lists nor revokes tokens, even of its own person', () async {
+      final list = await send('GET', '/tokens', kind: DeviceTokenKind.mcp);
+      final app = await engine.tokens.authenticate(engine.secret);
+      final revoke = await send(
+        'DELETE',
+        '/tokens/${app!.id}',
+        kind: DeviceTokenKind.mcp,
+      );
+
+      for (final response in [list, revoke]) {
+        expect(response.statusCode, 403);
+        expect(
+          errorOf(response).error.message,
+          'An mcp token cannot list or revoke tokens: only the app, `xp` or '
+          'the web dashboard do.',
+        );
+      }
+      expect(await engine.tokens.authenticate(engine.secret), isNotNull);
     });
   });
 

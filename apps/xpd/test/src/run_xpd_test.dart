@@ -171,11 +171,11 @@ void main() {
           clock: const SystemClock(),
         );
         await expectLater(
-          service.signIn(code),
+          service.signIn(code, address: '127.0.0.1'),
           throwsA(isA<SignInRejectedException>()),
           reason: 'a new code replaces the unused one',
         );
-        return await service.signIn(again);
+        return await service.signIn(again, address: '127.0.0.1');
       });
       expect(signedIn.token.personId, sam);
       expect(signedIn.token.kind, DeviceTokenKind.web);

@@ -39,7 +39,7 @@ export interface WorkflowDocument {
 
 export type InputType = 'string' | 'boolean' | 'choice' | 'json' | 'release'
 
-export const inputTypes: InputType[] = ['string', 'boolean', 'choice', 'json', 'release']
+const inputTypes: InputType[] = ['string', 'boolean', 'choice', 'json', 'release']
 
 /** An input a dispatch can set. */
 export interface WorkflowDocumentInput {

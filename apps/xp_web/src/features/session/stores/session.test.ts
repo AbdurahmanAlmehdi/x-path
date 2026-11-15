@@ -123,6 +123,34 @@ describe('useSessionStore', () => {
       expect(session.status).toBe('signedOut')
       expect(session.person).toBeNull()
     })
+
+    it('forgets a session the engine had already ended', async () => {
+      stubEngine({
+        'POST /session': { status: 200, body: meOf() },
+        'DELETE /session': { status: 401, body: errorBody('unauthorized', 'Sign in.') },
+      })
+      const session = useSessionStore()
+      await session.signIn('ABCD')
+
+      expect(await session.signOut()).toBeNull()
+      expect(session.status).toBe('signedOut')
+    })
+
+    it('keeps the session when the engine refuses or does not answer', async () => {
+      stubEngine({
+        'POST /session': { status: 200, body: meOf() },
+        'DELETE /session': { status: 403, body: errorBody('csrf', 'Missing the CSRF header.') },
+      })
+      const session = useSessionStore()
+      await session.signIn('ABCD')
+
+      expect(await session.signOut()).toBe('Missing the CSRF header.')
+      expect(session.status).toBe('signedIn')
+
+      stubUnreachableEngine()
+      expect(await session.signOut()).toBe('The engine did not answer. Check that it is running.')
+      expect(session.person?.name).toBe('Sam')
+    })
   })
 
   it('forgets the session when told it ended', async () => {

@@ -101,6 +101,8 @@ describe('PeopleView', () => {
 
     await button('Cancel').trigger('click')
     expect(app.find('[role="dialog"]').exists()).toBe(false)
+    // The refusal went with its dialog.
+    expect(app.find('[role="alert"]').exists()).toBe(false)
   })
 
   it('issues a new code for someone, or says why not', async () => {
@@ -122,6 +124,8 @@ describe('PeopleView', () => {
     await row('Dana').findAll('button').find((each) => each.text() === 'Sign-in code…')!.trigger('click')
     await flushPromises()
     expect(app.find('[role="dialog"] [role="alert"]').text()).toBe('Not yours.')
+    await button('Done').trigger('click')
+    expect(app.find('[role="alert"]').exists()).toBe(false)
   })
 
   it('changes a role', async () => {

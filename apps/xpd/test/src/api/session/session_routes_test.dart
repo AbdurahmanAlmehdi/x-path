@@ -47,8 +47,8 @@ void main() {
       (await engine.signIn.issue(personId ?? testOwner.id)).code;
 
   group('POST /session', () {
-    test('on loopback, sets xp_session for 8 hours and answers who signed '
-        'in', () async {
+    test('on loopback, sets xp_session_<port> for 8 hours and answers who '
+        'signed in', () async {
       final response = await signIn(await codeFor());
 
       expect(response.statusCode, 200, reason: response.body);
@@ -58,8 +58,8 @@ void main() {
         cookie,
         matches(
           RegExp(
-            '^xp_session=xpt_[A-Za-z0-9_-]{43}; HttpOnly; SameSite=Strict; '
-            r'Path=/; Max-Age=28800$',
+            '^xp_session_${engine.uri.port}=xpt_[A-Za-z0-9_-]{43}; HttpOnly; '
+            r'SameSite=Strict; Path=/; Max-Age=28800$',
           ),
         ),
       );
@@ -67,14 +67,17 @@ void main() {
       expect(me.person, testOwner);
       expect(me.token.kind, DeviceTokenKind.web);
       expect(me.permissions, Permission.values);
-      final secret = cookie.split(';').first.substring('xp_session='.length);
+      final secret = cookie.split(';').first.split('=').last;
       expect(response.body, isNot(contains(secret)));
     });
 
     test(
       'through the HTTPS public URL, sets __Host-xp_session with Secure',
       () async {
-        await engine.publicUrl.set('https://xpath.example.com');
+        await engine.publicUrl.set(
+          'https://xpath.example.com',
+          by: testOwnerToken,
+        );
 
         final response = await signIn(
           await codeFor(),
@@ -253,10 +256,32 @@ void main() {
       final response = await engine.request(
         '/me',
         token: '',
-        headers: {'cookie': 'xp_session=${engine.secret}'},
+        headers: {'cookie': 'xp_session_${engine.uri.port}=${engine.secret}'},
       );
 
       expect(response.statusCode, 401);
+    });
+
+    test("is not another port's engine's session", () async {
+      final cookie = await engine.signInBrowser();
+      final other = await TestEngine.start();
+      addTearDown(other.close);
+      final secret = cookie.split('=').last;
+
+      for (final name in ['xp_session_${other.uri.port}', 'xp_session']) {
+        final response = await other.request(
+          '/me',
+          token: '',
+          headers: {'cookie': '$name=$secret'},
+        );
+        expect(response.statusCode, 401, reason: name);
+      }
+      final own = await engine.request(
+        '/me',
+        token: '',
+        headers: {'cookie': 'xp_session=$secret; $cookie'},
+      );
+      expect(own.statusCode, 200);
     });
 
     test('is ignored when the request has a bearer token', () async {
@@ -310,7 +335,8 @@ void main() {
       expect(response.headers['cache-control'], 'no-store');
       expect(
         response.headers['set-cookie'],
-        'xp_session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0',
+        'xp_session_${engine.uri.port}=; HttpOnly; SameSite=Strict; Path=/; '
+        'Max-Age=0',
       );
       final after = await engine.request(
         '/me',
@@ -321,7 +347,10 @@ void main() {
     });
 
     test('clears a __Host- cookie with Secure', () async {
-      await engine.publicUrl.set('https://xpath.example.com');
+      await engine.publicUrl.set(
+        'https://xpath.example.com',
+        by: testOwnerToken,
+      );
       final code = await engine.signIn.issue(testOwner.id);
       final signedIn = await signIn(
         code.code,

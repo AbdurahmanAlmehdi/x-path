@@ -18,10 +18,11 @@ export interface Answer {
 
 /**
  * Replaces `fetch` with an engine that answers each `METHOD /path` (the
- * path under `/api/v1`) from [routes], and `404` otherwise. Returns what
- * it received.
+ * path under `/api/v1`) from [routes], and `404` otherwise. A route that
+ * is a function may answer later, through a promise. Returns what it
+ * received.
  */
-export function stubEngine(routes: Record<string, Answer | (() => Answer)>): SeenRequest[] {
+export function stubEngine(routes: Record<string, Answer | (() => Answer | Promise<Answer>)>): SeenRequest[] {
   const seen: SeenRequest[] = []
   vi.stubGlobal('fetch', async (request: Request) => {
     const url = new URL(request.url)
@@ -35,7 +36,7 @@ export function stubEngine(routes: Record<string, Answer | (() => Answer)>): See
       body: text === '' ? undefined : JSON.parse(text),
     })
     const route = routes[`${request.method} ${path}`]
-    const answer = typeof route === 'function' ? route() : (route ?? { status: 404 })
+    const answer = typeof route === 'function' ? await route() : (route ?? { status: 404 })
     return new Response(answer.body === undefined ? null : JSON.stringify(answer.body), {
       status: answer.status,
       headers: { 'content-type': 'application/json' },

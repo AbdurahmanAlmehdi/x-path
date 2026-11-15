@@ -29,11 +29,8 @@ watch(
 )
 void store.load()
 void projects.load()
-useFollowing(store.follow, projects.follow)
-
-function projectName(projectId: string): string {
-  return projects.projects.find((each) => each.id === projectId)?.fullName.split('/').at(-1) ?? projectId
-}
+// The shell follows the approvals for its "needs you" count, in this same store.
+useFollowing(projects.follow)
 
 const empty = computed(() => (store.filter === 'pending' ? 'Nothing is waiting' : 'Nothing here'))
 
@@ -81,7 +78,7 @@ async function show(filter: ApprovalsFilter) {
                 <span class="xp-type-body-strong">{{ approvalTitle(approval) }}</span>
               </span>
               <span class="muted meta">
-                {{ projectName(approval.projectId) }} · {{ gateAction(approval.action) }} ·
+                {{ projects.nameOf(approval.projectId, { short: true }) }} · {{ gateAction(approval.action) }} ·
                 <span class="mono">{{ shortSha(approval.sha) }}</span> · {{ formatTime(approval.createdAt) }}
               </span>
               <span

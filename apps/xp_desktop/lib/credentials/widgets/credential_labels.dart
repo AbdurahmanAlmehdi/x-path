@@ -13,6 +13,23 @@ final List<CredentialKind> namedKinds = [
     if (kind.isNamed) kind,
 ];
 
+/// The name of the Apple Distribution identity the engine creates for
+/// [flavor] of [project], as the web dashboard names it too. A project on
+/// the engine's machine is named by its folder, so a name longer than a
+/// credential may be ([maxCredentialNameLength]) keeps only the folder's
+/// last part, and is cut there if it must be.
+String certificateName(AppLocalizations l10n, String project, String flavor) {
+  final name = l10n.flavorCredentialsCertificateName(project, flavor);
+  if (name.length <= maxCredentialNameLength) return name;
+  final short = l10n.flavorCredentialsCertificateName(
+    project.split('/').last,
+    flavor,
+  );
+  return short.length <= maxCredentialNameLength
+      ? short
+      : short.substring(0, maxCredentialNameLength);
+}
+
 /// The name of a credential kind.
 String credentialKindLabel(AppLocalizations l10n, CredentialKind kind) =>
     switch (kind) {

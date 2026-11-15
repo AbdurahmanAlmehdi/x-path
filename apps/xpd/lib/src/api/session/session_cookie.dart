@@ -8,24 +8,47 @@ import 'package:xpd/src/api/allowed_origins.dart';
 /// never from request headers: through the HTTPS public URL a `__Host-`
 /// cookie with `Secure`; on this machine one without `Secure`, which Safari
 /// refuses on `http://localhost`, and which never leaves the machine.
+///
+/// A browser sends a cookie to every port of a host, so the loopback cookie
+/// is named after the port the engine serves on ([loopbackName]): two
+/// engines on one machine keep their sessions apart. Any other server on
+/// `localhost` still receives it, whatever its port; only the `Origin`
+/// check and the CSRF header keep such a page from using it to change
+/// something.
 abstract final class SessionCookie {
   /// The cookie set through the public URL.
   static const secureName = '__Host-xp_session';
 
-  /// The cookie set on this machine.
-  static const loopbackName = 'xp_session';
-
-  static const List<String> _names = [secureName, loopbackName];
+  /// The cookie set on this machine by the engine that serves on [port],
+  /// for example `xp_session_7480`.
+  static String loopbackName(int port) => 'xp_session_$port';
 
   /// The `Set-Cookie` of a session with [secret] that lasts [maxAge], for a
-  /// browser that signed in from an origin of [kind].
-  static String set(OriginKind kind, String secret, Duration maxAge) =>
-      _cookie(_nameOf(kind), secret, maxAge.inSeconds, secure: _secure(kind));
+  /// browser that signed in with [request] from an origin of [kind].
+  static String set(
+    Request request,
+    OriginKind kind,
+    String secret,
+    Duration maxAge,
+  ) => switch (kind) {
+    OriginKind.public => _cookie(
+      secureName,
+      secret,
+      maxAge.inSeconds,
+      secure: true,
+    ),
+    OriginKind.loopback => _cookie(
+      loopbackName(AllowedOrigins.localPortOf(request) ?? 0),
+      secret,
+      maxAge.inSeconds,
+      secure: false,
+    ),
+  };
 
   /// The `Set-Cookie` headers that clear every session cookie [request]
   /// carries (`Max-Age=0`).
   static List<String> clear(Request request) => [
-    for (final name in _names)
+    for (final name in _names(request))
       if (_values(request).containsKey(name))
         _cookie(name, '', 0, secure: name == secureName),
   ];
@@ -34,17 +57,17 @@ abstract final class SessionCookie {
   static List<String> secretsOf(Request request) {
     final values = _values(request);
     return [
-      for (final name in _names)
+      for (final name in _names(request))
         if (values[name] case final value? when value.isNotEmpty) value,
     ];
   }
 
-  static String _nameOf(OriginKind kind) => switch (kind) {
-    OriginKind.public => secureName,
-    OriginKind.loopback => loopbackName,
-  };
-
-  static bool _secure(OriginKind kind) => kind == OriginKind.public;
+  /// The names of the session cookies of the engine [request] reached.
+  static List<String> _names(Request request) => [
+    secureName,
+    if (AllowedOrigins.localPortOf(request) case final port?)
+      loopbackName(port),
+  ];
 
   static String _cookie(
     String name,

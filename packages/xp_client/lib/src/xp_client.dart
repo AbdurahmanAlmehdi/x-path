@@ -715,10 +715,13 @@ class XpClient {
   /// The page that signs this client's own person in to the web dashboard
   /// (D9), with a new sign-in code in its fragment: on the public URL when
   /// one is set, else on the address this client reaches the engine at.
+  ///
+  /// It reads everything it needs before it issues the code, so a failure
+  /// wastes no code (issuing one deletes the person's unused codes).
   Future<Uri> dashboardSignInUrl() async {
     final me = await this.me();
-    final code = await createSignInCode(me.person.id);
     final public = (await publicUrl()).url;
+    final code = await createSignInCode(me.person.id);
     return code.signInUrl(public == null ? baseUrl : Uri.parse(public));
   }
 

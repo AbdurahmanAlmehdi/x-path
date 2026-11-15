@@ -155,6 +155,18 @@ void main() {
       expect(errorOf(response).error.message, contains('last admin'));
     });
 
+    test('keeps the name when the role change is refused', () async {
+      final response = await send(
+        'PATCH',
+        '/people/${testOwner.id}',
+        body: {'name': 'Abdu', 'role': 'releaser'},
+      );
+
+      expect(response.statusCode, 409);
+      final owner = await send('GET', '/people/${testOwner.id}');
+      expect(Person.fromJson(owner.json), testOwner);
+    });
+
     test('answers 400 for nothing to change, and 404 for no one', () async {
       final empty = await send('PATCH', '/people/${testOwner.id}', body: {});
       expect(empty.statusCode, 400);

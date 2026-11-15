@@ -20,6 +20,7 @@ class XpdServer {
     this._logRoute,
     this._runnerRoute,
     this._tokenSockets,
+    this._tokens,
     this.routes,
   ) : uri = Uri(scheme: 'http', host: _http.address.host, port: _http.port);
 
@@ -122,7 +123,15 @@ class XpdServer {
     events.append(
       EngineStarted(version: engineVersion, apiVersion: apiVersion),
     );
-    return ._(http, route, logRoute, runnerRoute, tokenSockets, api.routes);
+    return ._(
+      http,
+      route,
+      logRoute,
+      runnerRoute,
+      tokenSockets,
+      tokens,
+      api.routes,
+    );
   }
 
   final HttpServer _http;
@@ -130,6 +139,7 @@ class XpdServer {
   final JobLogsRoute _logRoute;
   final RunnerConnectRoute _runnerRoute;
   final TokenSockets _tokenSockets;
+  final TokenService _tokens;
 
   /// The address clients connect to, for example `http://127.0.0.1:7480`.
   final Uri uri;
@@ -138,10 +148,12 @@ class XpdServer {
   final List<ApiRoute> routes;
 
   /// Stops accepting connections and closes every event, log and runner
-  /// stream with code 1000 (normal closure).
+  /// stream with code 1000 (normal closure), and the stream of revoked
+  /// tokens ([TokenService.close]).
   Future<void> close() async {
     await _http.close();
     await _tokenSockets.close();
+    await _tokens.close();
     await _logRoute.closeSockets();
     await _runnerRoute.closeSockets();
     await _route.closeSockets();

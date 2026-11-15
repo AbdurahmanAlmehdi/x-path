@@ -39,6 +39,15 @@ void main() {
     expect(jsonDecode(env.logger.out), {'url': '$local', 'opened': false});
   });
 
+  test('leaves the link out of --json once the browser opened it', () async {
+    when(() => env.client.dashboardSignInUrl()).thenAnswer((_) async => local);
+
+    await env.runOk(['--json', 'dashboard']);
+
+    expect(env.opened, [local]);
+    expect(jsonDecode(env.logger.out), {'opened': true});
+  });
+
   test(
     'warns when a browser cannot sign in over plain HTTP from here',
     () async {

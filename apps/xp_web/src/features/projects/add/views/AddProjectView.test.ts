@@ -1,6 +1,6 @@
 import { flushPromises, type VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import type { Router } from 'vue-router'
 
 import { followForbidden } from '@/features/session/stores/session'
@@ -8,6 +8,7 @@ import { openApp } from '@/testing/app'
 import { type Answer, errorBody, meOf, stubEngine } from '@/testing/fetch'
 import { projectOf } from '@/testing/fixtures'
 import { stubSockets } from '@/testing/sockets'
+import { eventually } from '@/testing/wait'
 
 describe('AddProjectView', () => {
   let app: VueWrapper | undefined
@@ -74,7 +75,7 @@ describe('AddProjectView', () => {
     expect(review.text()).toContain('Note')
 
     await button('Done').trigger('click')
-    await vi.waitFor(() => expect(router.currentRoute.value.fullPath).toBe('/projects/prj_1'))
+    await eventually(() => expect(router.currentRoute.value.fullPath).toBe('/projects/prj_1'))
   })
 
   it('adds a folder of the engine machine, and offers the SSH URL of an HTTPS origin', async () => {

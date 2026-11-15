@@ -7,7 +7,8 @@ import 'package:xp_engine/xp_engine.dart';
 /// The open event and log sockets by the token that opened them, so that
 /// they close with [sessionEndedCloseCode] when the token stops working
 /// (D12): at once when it is revoked (a sign-out, a revocation, a person
-/// removed), and within [sweepEvery] of its expiry.
+/// removed), and within [sweepEvery] of its expiry. The sweep runs only
+/// while a socket of a token that expires is open.
 class TokenSockets {
   /// Creates the registry over the [tokens] whose revocations it follows.
   new({
@@ -40,7 +41,7 @@ class TokenSockets {
         final open = _sockets[id]?..remove(channel);
         if (open == null || open.isNotEmpty) return;
         _sockets.remove(id);
-        _expiry.remove(id);
+        _forget(id);
       }),
     );
   }
@@ -57,15 +58,29 @@ class TokenSockets {
     }
   }
 
+  /// Whether the expiry sweep runs: while a socket of a token that expires
+  /// is open.
+  bool get sweeping => _sweep != null;
+
   /// Stops following revocations and expiry.
   Future<void> close() async {
     _sweep?.cancel();
+    _sweep = null;
     await _revocations.cancel();
+  }
+
+  /// Stops following the expiry of the token [id], and stops the sweep when
+  /// no other token's is followed.
+  void _forget(String id) {
+    _expiry.remove(id);
+    if (_expiry.isNotEmpty) return;
+    _sweep?.cancel();
+    _sweep = null;
   }
 
   void _end(String id, String why) {
     final open = _sockets.remove(id);
-    _expiry.remove(id);
+    _forget(id);
     for (final channel in open ?? const <WebSocketChannel>{}) {
       unawaited(channel.sink.close(sessionEndedCloseCode, why));
     }

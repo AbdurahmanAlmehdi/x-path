@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { computed, ref } from 'vue'
+import { computed, onScopeDispose, ref } from 'vue'
 
 import {
   api,
@@ -336,6 +336,17 @@ export const useDispatchStore = defineStore('dispatch', () => {
     changed(typed)
   }
 
+  /**
+   * Stops the preview that waits for typing to pause, and drops an answer
+   * still on its way: the form closed.
+   */
+  function stop() {
+    generation++
+    clearTimeout(timer)
+    previewing.value = false
+  }
+  onScopeDispose(stop)
+
   /** Dispatches the run the form previews. The run, or `null` with [error] saying why not. */
   async function submit(): Promise<Run | null> {
     const owner = project.value
@@ -399,5 +410,6 @@ export const useDispatchStore = defineStore('dispatch', () => {
     setVersion,
     setInput,
     submit,
+    stop,
   }
 })

@@ -48,6 +48,19 @@ class TokenNotFoundException implements Exception {
   String toString() => 'TokenNotFoundException: $message';
 }
 
+/// The token may not do this with tokens (D17): make one of that kind, or
+/// list and revoke tokens. The message says who may.
+class TokenForbiddenException implements Exception {
+  /// Creates the exception with a [message].
+  const new(this.message);
+
+  /// What went wrong, for the owner.
+  final String message;
+
+  @override
+  String toString() => 'TokenForbiddenException: $message';
+}
+
 /// Issues device tokens and tells which token a bearer secret belongs to.
 ///
 /// Every token but a runner's belongs to a person (ADR 0017), whom
@@ -71,6 +84,10 @@ class TokenService {
   /// How long a browser session's token works (D11): there is no sliding
   /// renewal, so a browser signs in again after it.
   static const webSessionLifetime = Duration(hours: 8);
+
+  /// How long a browser session's token is kept once it expired or was
+  /// revoked, before housekeeping deletes it ([purgeEndedWebTokens]).
+  static const endedWebTokenGrace = Duration(days: 1);
 
   final DeviceTokenRepository _tokens;
   final PersonRepository _people;
@@ -96,12 +113,33 @@ class TokenService {
   }) async {
     final trimmed = name.trim();
     if (trimmed.isEmpty) throw ArgumentError.value(name, 'name', 'is blank');
-    final runner = kind == DeviceTokenKind.runner;
-    if (runner && personId != null) {
+    final hasPerson = AccessPolicy.hasPerson(kind);
+    if (!hasPerson && personId != null) {
       throw ArgumentError.value(personId, 'personId', 'a runner has no person');
     }
-    final person = runner ? null : await _ownerOf(personId);
+    final person = hasPerson ? await _ownerOf(personId) : null;
     return await _store(name: trimmed, kind: kind, person: person);
+  }
+
+  /// Creates and stores a [kind] token called [name] for the person of
+  /// [creator], who makes it from the app or the web dashboard (D17).
+  ///
+  /// Throws a [TokenForbiddenException] unless [creator] may make a [kind]
+  /// token ([AccessPolicy.mayCreateToken]), and an [ArgumentError] as
+  /// [issue] does.
+  Future<IssuedToken> issueFor(
+    DeviceToken creator, {
+    required String name,
+    required DeviceTokenKind kind,
+  }) async {
+    if (!AccessPolicy.mayCreateToken(creator, kind)) {
+      throw TokenForbiddenException(
+        'Only the app and the web dashboard make tokens, and only cli and '
+        'mcp ones: ${AccessPolicy.aTokenOf(creator.kind)} may not make '
+        '${AccessPolicy.aTokenOf(kind).toLowerCase()}.',
+      );
+    }
+    return await issue(name: name, kind: kind, personId: creator.personId);
   }
 
   /// Creates and stores the token of a browser that signed in as the person
@@ -157,17 +195,14 @@ class TokenService {
   /// `null`. A token that expired, or whose person was removed, is not
   /// valid.
   ///
-  /// Every stored hash is compared, in constant time, so the time taken does
-  /// not reveal how much of a guess was right.
+  /// The token is looked up by the SHA-256 of [secret], an indexed column:
+  /// a lookup's timing could at most tell how much of a hash a guess shares
+  /// with a stored one, which says nothing about a secret of 256 random
+  /// bits.
   Future<DeviceToken?> authenticate(String? secret) async {
     if (secret == null || !secret.startsWith(secretPrefix)) return null;
-    final hash = hashToken(secret);
-    final now = _clock.now();
-    DeviceToken? match;
-    for (final token in await _tokens.list()) {
-      final same = _constantTimeEquals(token.hash, hash);
-      if (same && token.isValidAt(now)) match = token;
-    }
+    final found = await _tokens.findByHash(hashToken(secret));
+    final match = found != null && found.isValidAt(_clock.now()) ? found : null;
     final personId = match?.personId;
     if (match == null || personId == null) return match;
     final person = await _people.get(personId);
@@ -179,7 +214,16 @@ class TokenService {
   /// those of its own person, or every person's for a token that may
   /// [Permission.administer]. Runner tokens are never among them: a runner's
   /// token is revoked with the runner.
+  ///
+  /// Throws a [TokenForbiddenException] unless [asker] may manage tokens
+  /// ([AccessPolicy.mayManageTokens]): an agent's `mcp` token may not.
   Future<List<DeviceToken>> listFor(DeviceToken asker) async {
+    if (!AccessPolicy.mayManageTokens(asker)) {
+      throw TokenForbiddenException(
+        '${AccessPolicy.aTokenOf(asker.kind)} cannot list or revoke tokens: '
+        'only the app, `xp` or the web dashboard do.',
+      );
+    }
     final everyone = AccessPolicy.allows(asker, Permission.administer);
     final now = _clock.now();
     return [
@@ -195,7 +239,8 @@ class TokenService {
   /// see ([listFor]).
   ///
   /// Throws a [TokenNotFoundException] for a token [asker] may not see, or
-  /// one that is not valid.
+  /// one that is not valid, and a [TokenForbiddenException] as [listFor]
+  /// does.
   Future<void> revokeFor(DeviceToken asker, String id) async {
     final visible = await listFor(asker);
     if (!visible.any((token) => token.id == id)) {
@@ -208,7 +253,7 @@ class TokenService {
   /// close ([revocations]). Returns whether it was valid until now.
   Future<bool> revoke(String id) async {
     final revoked = await _tokens.revoke(id, at: _clock.now());
-    if (revoked) _revocations.add(id);
+    if (revoked) _announce(id);
     return revoked;
   }
 
@@ -220,8 +265,22 @@ class TokenService {
         if (token.personId == personId && !token.isRevoked) token.id,
     ];
     final count = await _tokens.revokeOwnedBy(personId, at: _clock.now());
-    owned.forEach(_revocations.add);
+    owned.forEach(_announce);
     return count;
+  }
+
+  /// Deletes the `web` tokens that expired or were revoked more than
+  /// [endedWebTokenGrace] ago: every browser sign-in adds one, and none of
+  /// them works again. Returns how many went. Housekeeping runs it daily.
+  Future<int> purgeEndedWebTokens() => _tokens.deleteEndedSessions(
+    before: _clock.now().subtract(endedWebTokenGrace),
+  );
+
+  /// Stops telling [revocations]: the engine is shutting down.
+  Future<void> close() => _revocations.close();
+
+  void _announce(String id) {
+    if (!_revocations.isClosed) _revocations.add(id);
   }
 
   List<int> _bytes(int length) =>
@@ -232,13 +291,4 @@ class TokenService {
 
   String _hex(List<int> bytes) =>
       bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
-
-  bool _constantTimeEquals(String a, String b) {
-    if (a.length != b.length) return false;
-    var difference = 0;
-    for (var i = 0; i < a.length; i++) {
-      difference |= a.codeUnitAt(i) ^ b.codeUnitAt(i);
-    }
-    return difference == 0;
-  }
 }

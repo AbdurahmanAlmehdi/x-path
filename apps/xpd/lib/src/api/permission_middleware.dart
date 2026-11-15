@@ -13,9 +13,12 @@ const _reading = {'GET', 'HEAD', 'OPTIONS'};
 /// unless its token has the permission [table] names for the route
 /// (ADR 0017). A route missing from [table] needs [unlistedRouteAccess].
 ///
-/// The first route that matches decides, in the order the router tries
-/// them. A request no route matches goes on to the router's `404`, and one
-/// without a token (a public path) goes on as it is.
+/// The method is compared in upper case, as the router matches it, so a
+/// `patch` is checked as the `PATCH` it reaches (and
+/// [canonicalMethodMiddleware] refuses it before it gets here). The first
+/// route that matches decides, in the order the router tries them. A
+/// request no route matches goes on to the router's `404`, and one without
+/// a token (a public path) goes on as it is.
 ///
 /// Add it after [authMiddleware]: it reads the token that middleware found.
 Middleware permissionMiddleware(
@@ -33,12 +36,13 @@ Middleware permissionMiddleware(
   ];
   return (inner) => (request) async {
     final token = deviceTokenIfAny(request);
-    if (token == null || _reading.contains(request.method)) {
+    final method = methodOf(request);
+    if (token == null || _reading.contains(method)) {
       return await inner(request);
     }
     final path = '/${request.url.path}';
     final route = mutating
-        .where((r) => r.method == request.method && r.pattern.hasMatch(path))
+        .where((r) => r.method == method && r.pattern.hasMatch(path))
         .firstOrNull;
     final permission = route?.access.permission;
     if (route == null || permission == null) return await inner(request);

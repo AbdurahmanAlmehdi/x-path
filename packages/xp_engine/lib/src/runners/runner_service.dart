@@ -245,7 +245,7 @@ class RunnerService {
   ///
   /// Throws a [RunnerForbiddenException] if the token is not a runner's.
   Future<RunnerRecord> runnerFor(DeviceToken token) async {
-    if (token.kind != DeviceTokenKind.runner) {
+    if (!AccessPolicy.isRunner(token)) {
       throw RunnerForbiddenException(
         'Only a runner token connects as a runner; this is a '
         '${token.kind.name} token.',

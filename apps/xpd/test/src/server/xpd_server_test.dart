@@ -38,6 +38,15 @@ void main() {
   tearDown(() => engine.close());
 
   group('XpdServer', () {
+    test('closes the stream of revoked tokens when it closes', () async {
+      final fresh = await TestEngine.start();
+      final done = fresh.tokens.revocations.toList();
+
+      await fresh.close();
+
+      expect(await done, isEmpty);
+    });
+
     test('listens on loopback', () {
       expect(engine.uri.host, '127.0.0.1');
       expect(engine.uri.port, greaterThan(0));

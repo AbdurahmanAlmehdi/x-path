@@ -10,6 +10,10 @@ export default mergeConfig(
     test: {
       environment: 'jsdom',
       include: ['src/**/*.test.ts'],
+      // Under v8 coverage and parallel workers a test with a lazy page
+      // takes seconds; waits use `src/testing/wait.ts`, which gives up first.
+      testTimeout: 15_000,
+      hookTimeout: 15_000,
       restoreMocks: true,
       unstubGlobals: true,
       coverage: {

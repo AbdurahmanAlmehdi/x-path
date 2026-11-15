@@ -107,7 +107,8 @@ void main() {
           Permission.release,
           'abandon a release',
         ),
-        'A mcp token cannot abandon a release: only the app or `xp` do.',
+        'An mcp token cannot abandon a release: only the app, `xp` or the '
+        'web dashboard do.',
       );
     });
 
@@ -135,19 +136,26 @@ void main() {
     }
   });
 
-  group('AccessPolicy.mayCreateTokens', () {
+  group('AccessPolicy.mayCreateToken', () {
     for (final role in PersonRole.values) {
       for (final kind in DeviceTokenKind.values) {
-        final allowed = kind == _app || kind == _web;
-        test('is $allowed for a ${role.name} with a ${kind.name} token', () {
-          expect(AccessPolicy.mayCreateTokens(_token(kind, role)), allowed);
-        });
+        for (final made in DeviceTokenKind.values) {
+          final allowed =
+              (kind == _app || kind == _web) && (made == _cli || made == _mcp);
+          test('is $allowed for a ${role.name} with a ${kind.name} token '
+              'making a ${made.name} token', () {
+            expect(
+              AccessPolicy.mayCreateToken(_token(kind, role), made),
+              allowed,
+            );
+          });
+        }
       }
     }
 
     test('is false for an app token whose person was not read', () {
       expect(
-        AccessPolicy.mayCreateTokens(
+        AccessPolicy.mayCreateToken(
           DeviceToken(
             id: 'tok_1',
             name: 'n',
@@ -155,8 +163,70 @@ void main() {
             hash: 'h',
             createdAt: DateTime.utc(2026),
           ),
+          DeviceTokenKind.cli,
         ),
         isFalse,
+      );
+    });
+  });
+
+  group('AccessPolicy.mayManageTokens', () {
+    for (final role in PersonRole.values) {
+      for (final kind in DeviceTokenKind.values) {
+        final allowed = {_app, _cli, _web}.contains(kind);
+        test('is $allowed for a ${role.name} with a ${kind.name} token', () {
+          expect(AccessPolicy.mayManageTokens(_token(kind, role)), allowed);
+        });
+      }
+    }
+
+    test('is false for a cli token whose person was not read', () {
+      expect(
+        AccessPolicy.mayManageTokens(
+          DeviceToken(
+            id: 'tok_1',
+            name: 'n',
+            kind: DeviceTokenKind.cli,
+            hash: 'h',
+            createdAt: DateTime.utc(2026),
+            personId: 'per_1',
+          ),
+        ),
+        isFalse,
+      );
+    });
+  });
+
+  group('the kind rules of sessions and runners', () {
+    for (final kind in DeviceTokenKind.values) {
+      test('for a ${kind.name} token', () {
+        final token = _token(kind, PersonRole.admin);
+
+        expect(AccessPolicy.mayUseSessionCookie(token), kind == _web);
+        expect(AccessPolicy.maySignOut(token), kind == _web);
+        expect(AccessPolicy.isRunner(token), kind == DeviceTokenKind.runner);
+        expect(AccessPolicy.hasPerson(kind), kind != DeviceTokenKind.runner);
+      });
+    }
+  });
+
+  group('AccessPolicy.aTokenOf', () {
+    test('names a kind with its article', () {
+      expect(
+        [
+          for (final kind in DeviceTokenKind.values)
+            AccessPolicy.aTokenOf(kind),
+        ],
+        [
+          for (final kind in DeviceTokenKind.values)
+            switch (kind) {
+              DeviceTokenKind.app => 'An app token',
+              DeviceTokenKind.cli => 'A cli token',
+              DeviceTokenKind.mcp => 'An mcp token',
+              DeviceTokenKind.runner => 'A runner token',
+              DeviceTokenKind.web => 'A web token',
+            },
+        ],
       );
     });
   });

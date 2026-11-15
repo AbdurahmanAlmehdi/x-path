@@ -2,12 +2,14 @@ import 'package:shelf/shelf.dart';
 import 'package:xp_api/xp_api.dart';
 import 'package:xp_engine/xp_engine.dart';
 import 'package:xpd/src/api/api_router.dart';
+import 'package:xpd/src/api/middleware.dart';
 import 'package:xpd/src/api/request_body.dart';
 import 'package:xpd/src/api/responses.dart';
 
 /// The `/people` endpoints (ADR 0017): anyone lists and reads people; an
 /// admin adds, renames, changes the role of and removes them. The route
-/// table (`route_permissions.dart`) holds who may change them.
+/// table (`route_permissions.dart`) holds who may change them, and
+/// [PersonService] checks it again.
 class PeopleRoutes {
   /// Creates the routes over [_people].
   const new(this._people);
@@ -29,7 +31,11 @@ class PeopleRoutes {
 
   Future<Response> _create(Request request) => _guard(() async {
     final body = await readJsonBody(request, CreatePersonRequest.fromJson);
-    final person = await _people.create(name: body.name, role: body.role);
+    final person = await _people.create(
+      name: body.name,
+      role: body.role,
+      by: deviceTokenOf(request),
+    );
     return jsonResponse(
       person.toJson(),
       statusCode: 201,
@@ -48,13 +54,17 @@ class PeopleRoutes {
     if (name == null && role == null) {
       throw const BadRequestException('Give a "name", a "role" or both.');
     }
-    if (name != null) await _people.rename(id, name);
-    if (role != null) await _people.setRole(id, role);
-    return jsonResponse((await _people.get(id)).toJson());
+    final person = await _people.update(
+      id,
+      name: name,
+      role: role,
+      by: deviceTokenOf(request),
+    );
+    return jsonResponse(person.toJson());
   });
 
   Future<Response> _remove(Request request, String id) => _guard(() async {
-    await _people.remove(id);
+    await _people.remove(id, by: deviceTokenOf(request));
     return Response(204);
   });
 
@@ -63,6 +73,8 @@ class PeopleRoutes {
       return await action();
     } on BadRequestException catch (error) {
       return errorResponse(ApiErrorCode.invalidRequest, error.message);
+    } on PersonForbiddenException catch (error) {
+      return errorResponse(ApiErrorCode.forbidden, error.message);
     } on PersonNotFoundException catch (error) {
       return errorResponse(ApiErrorCode.notFound, error.message);
     } on PersonConflictException catch (error) {

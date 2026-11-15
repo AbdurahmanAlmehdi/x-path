@@ -37,9 +37,12 @@ abstract interface class SignInCodeRepository {
   /// Stores [code], which is new.
   Future<void> add(SignInCodeRecord code);
 
-  /// Deletes the codes of the person [personId] that were not used, and
-  /// every code that expired before [expiredBefore].
-  Future<void> deleteUnused(String personId, {required DateTime expiredBefore});
+  /// Deletes the codes of the person [personId] that were not used.
+  Future<void> deleteUnusedOf(String personId);
+
+  /// Deletes every person's codes that expired before [before], used or
+  /// not.
+  Future<void> deleteExpired({required DateTime before});
 
   /// Uses the code with [hash] up at [at], in one step: only a code that is
   /// neither used nor expired is. Returns the person it signs in, or `null`
@@ -58,14 +61,13 @@ class InMemorySignInCodeRepository implements SignInCodeRepository {
   Future<void> add(SignInCodeRecord code) async => _codes[code.hash] = code;
 
   @override
-  Future<void> deleteUnused(
-    String personId, {
-    required DateTime expiredBefore,
-  }) async => _codes.removeWhere(
-    (_, code) =>
-        (code.personId == personId && code.usedAt == null) ||
-        code.expiresAt.isBefore(expiredBefore),
+  Future<void> deleteUnusedOf(String personId) async => _codes.removeWhere(
+    (_, code) => code.personId == personId && code.usedAt == null,
   );
+
+  @override
+  Future<void> deleteExpired({required DateTime before}) async =>
+      _codes.removeWhere((_, code) => code.expiresAt.isBefore(before));
 
   @override
   Future<String?> use(String hash, {required DateTime at}) async {

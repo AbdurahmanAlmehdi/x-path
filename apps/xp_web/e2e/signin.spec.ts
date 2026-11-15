@@ -22,7 +22,7 @@ test('a signed-out deep link signs in and returns there', async ({ page, context
   await expect(page.getByTestId('person-name')).toHaveText(name)
   const [cookie] = await context.cookies()
   expect(cookie).toMatchObject({
-    name: 'xp_session',
+    name: `xp_session_${new URL(baseURL!).port}`,
     path: '/',
     httpOnly: true,
     secure: false,

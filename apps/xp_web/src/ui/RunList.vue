@@ -1,24 +1,19 @@
 <script setup lang="ts">
 import type { Run } from '@/api/client'
-import { useProjectsStore } from '@/features/projects/stores/projects'
-import { useWorkflowsStore } from '@/features/projects/stores/workflows'
-import { formatTime, originOf, scopeOf, timeAgo, versionLabel } from '@/ui/format'
-import StatusBadge from '@/ui/StatusBadge.vue'
 
+import { formatTime, originOf, scopeOf, timeAgo, versionLabel } from './format'
+import StatusBadge from './StatusBadge.vue'
+
+/** A list of runs, for the Runs pages and a project's recent runs; the page names what they ran. */
 defineProps<{
   runs: Run[]
   /** What to say when there is no run. */
   empty: string
-  /** Whether each run names its project: the list holds several. */
-  showProject?: boolean
+  /** What the workflow of an id is called. */
+  workflowName: (id: string) => string
+  /** What the project of an id is called, when each run names its project: the list holds several. */
+  projectName?: (id: string) => string
 }>()
-
-const workflows = useWorkflowsStore()
-const projects = useProjectsStore()
-
-function projectName(id: string): string {
-  return projects.projects.find((project) => project.id === id)?.fullName ?? id
-}
 </script>
 
 <template>
@@ -28,8 +23,8 @@ function projectName(id: string): string {
       <RouterLink :to="{ name: 'run', params: { id: run.id } }" class="run" :data-run="run.id">
         <StatusBadge :state="run.state" />
         <span class="what">
-          <span class="xp-type-body-strong workflow">{{ workflows.name(run.workflowId) }}</span>
-          <span v-if="showProject" class="muted project">{{ projectName(run.projectId) }}</span>
+          <span class="xp-type-body-strong workflow">{{ workflowName(run.workflowId) }}</span>
+          <span v-if="projectName" class="muted project">{{ projectName(run.projectId) }}</span>
         </span>
         <span v-if="scopeOf(run)" class="mono muted">{{ scopeOf(run) }}</span>
         <span v-if="run.version" class="mono">{{ versionLabel(run.version, run.build) }}</span>

@@ -3,8 +3,8 @@ import { computed, watch } from 'vue'
 import { useRoute } from 'vue-router'
 
 import { useSessionStore } from '@/features/session/stores/session'
-import RunList from '@/features/runs/components/RunList.vue'
 import { useFollowing } from '@/ui/following'
+import RunList from '@/ui/RunList.vue'
 
 import { useProjectStore } from '../stores/project'
 import { useWorkflowsStore } from '../stores/workflows'
@@ -105,6 +105,7 @@ function platformsOf(app: { hasAndroid: boolean; hasIos: boolean }): string {
         </header>
         <RunList
           :runs="store.runs"
+          :workflow-name="workflows.name"
           empty="Nothing has run yet. Dispatch a workflow to see its runs here."
         />
       </section>

@@ -44,8 +44,9 @@ const publicPaths = {'/health', '/version', '/runners/pair'};
 /// session cookie, whose requests that change something pass the CSRF
 /// check), and every mutating route the permission `route_permissions.dart`
 /// names for it. Any other request to a root path is [site]'s: the web
-/// dashboard. [onError] hears about exceptions that became `500`
-/// responses.
+/// dashboard. A request whose method is not in upper case is refused before
+/// any of this ([canonicalMethodMiddleware]). [onError] hears about
+/// exceptions that became `500` responses.
 ({Handler handler, List<ApiRoute> routes}) buildApiHandler({
   required TokenService tokens,
   required PersonService people,
@@ -125,7 +126,9 @@ const publicPaths = {'/health', '/version', '/runners/pair'};
       .addMiddleware(permissionMiddleware(router.routes))
       .addHandler(router.call);
   return (
-    handler: legacyAlias(handler, publicPaths: publicPaths, site: site),
+    handler: canonicalMethodMiddleware()(
+      legacyAlias(handler, publicPaths: publicPaths, site: site),
+    ),
     routes: router.routes,
   );
 }

@@ -12,9 +12,13 @@ import 'package:xp_engine/src/tokens/device_token.dart';
 /// - an `mcp` token may [Permission.develop] and nothing else, so an agent
 ///   never decides or changes gates;
 /// - only `app` and `web` tokens turn gates off ([mayLoosenGates]) or make
-///   tokens ([mayCreateTokens]);
+///   tokens ([mayCreateToken]), and only a person's `app`, `cli` and `web`
+///   tokens list and revoke tokens ([mayManageTokens]);
 /// - a sign-in code for the web dashboard comes from an admin, or from the
-///   person's own `app` or `cli` token ([mayIssueSignInCode]).
+///   person's own `app` or `cli` token ([mayIssueSignInCode]);
+/// - the session cookie of a browser carries a `web` token and no other
+///   ([mayUseSessionCookie]), and only a `web` token signs out
+///   ([maySignOut]).
 abstract final class AccessPolicy {
   static const Set<DeviceTokenKind> _people = {
     DeviceTokenKind.app,
@@ -46,8 +50,8 @@ abstract final class AccessPolicy {
     String what,
   ) {
     if (!_kindAllows(token.kind, permission)) {
-      return 'A ${token.kind.name} token cannot $what: only the app or `xp` '
-          'do.';
+      return '${aTokenOf(token.kind)} cannot $what: only the app, '
+          '`xp` or the web dashboard do.';
     }
     if (!_roleAllows(token, permission)) {
       return 'A ${token.role?.name ?? 'token without a person'} cannot '
@@ -60,10 +64,46 @@ abstract final class AccessPolicy {
   static bool mayLoosenGates(DeviceToken token) =>
       _interactive.contains(token.kind) && allows(token, Permission.administer);
 
-  /// Whether [token] may make tokens for its own person: an `app` or `web`
-  /// token of any role.
-  static bool mayCreateTokens(DeviceToken token) =>
-      _interactive.contains(token.kind) && token.role != null;
+  /// The kinds of token a person makes from the app or the dashboard
+  /// (D17): an `app` or a `runner` token comes from `xpd token create` and
+  /// pairing only.
+  static const Set<DeviceTokenKind> mintableKinds = {
+    DeviceTokenKind.cli,
+    DeviceTokenKind.mcp,
+  };
+
+  /// Whether [token] may make a [kind] token for its own person: an `app`
+  /// or `web` token of any role, and only a kind of [mintableKinds].
+  static bool mayCreateToken(DeviceToken token, DeviceTokenKind kind) =>
+      _interactive.contains(token.kind) &&
+      token.role != null &&
+      mintableKinds.contains(kind);
+
+  /// Whether [token] may list and revoke tokens (D17): a person's `app`,
+  /// `cli` or `web` token. An agent's `mcp` token never may, so it cannot
+  /// sign the app or a browser out.
+  static bool mayManageTokens(DeviceToken token) =>
+      _people.contains(token.kind) && token.role != null;
+
+  /// Whether a browser's session cookie may carry [token] (ADR 0018, D3a):
+  /// only a `web` token, the one signing in makes.
+  static bool mayUseSessionCookie(DeviceToken token) =>
+      token.kind == DeviceTokenKind.web;
+
+  /// Whether [token] may sign itself out with `DELETE /session`: only a
+  /// browser's `web` token. Other tokens are revoked with
+  /// `DELETE /tokens/{id}`.
+  static bool maySignOut(DeviceToken token) =>
+      token.kind == DeviceTokenKind.web;
+
+  /// Whether [token] is a runner's (ADR 0011): it connects as a runner and
+  /// reaches the runner routes and nothing else.
+  static bool isRunner(DeviceToken token) =>
+      token.kind == DeviceTokenKind.runner;
+
+  /// Whether a token of [kind] belongs to a person: every kind but a
+  /// runner's, which is a machine's (D6).
+  static bool hasPerson(DeviceTokenKind kind) => kind != DeviceTokenKind.runner;
 
   /// Whether [token] may issue a sign-in code for the person [personId]
   /// (D9): an admin may for anyone, and a person's own `app` or `cli` token
@@ -78,6 +118,15 @@ abstract final class AccessPolicy {
   static const Set<DeviceTokenKind> _selfSignIn = {
     DeviceTokenKind.app,
     DeviceTokenKind.cli,
+  };
+
+  /// A token of [kind], with its article, to begin a refusal: "An mcp
+  /// token", "A cli token".
+  static String aTokenOf(DeviceTokenKind kind) => switch (kind) {
+    DeviceTokenKind.app || DeviceTokenKind.mcp => 'An ${kind.name} token',
+    DeviceTokenKind.cli ||
+    DeviceTokenKind.runner ||
+    DeviceTokenKind.web => 'A ${kind.name} token',
   };
 
   static bool _kindAllows(DeviceTokenKind kind, Permission permission) =>

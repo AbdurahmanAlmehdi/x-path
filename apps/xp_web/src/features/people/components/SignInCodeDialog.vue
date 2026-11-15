@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 
-import { failureMessage, type Person, type SignInCode } from '@/api/client'
+import type { Person, SignInCode } from '@/api/client'
 import Dialog from '@/ui/Dialog.vue'
 import SecretWell from '@/ui/SecretWell.vue'
 import { formatTime } from '@/ui/format'
@@ -22,14 +22,9 @@ const people = usePeopleStore()
  * it closes. It never goes in the address bar.
  */
 const code = ref<SignInCode | null>(null)
-const error = ref<string | null>(null)
 
 onMounted(async () => {
-  try {
-    code.value = await people.signInCode(props.person.id)
-  } catch (failure) {
-    error.value = failureMessage(failure)
-  }
+  code.value = await people.signInCode(props.person.id)
 })
 onBeforeUnmount(() => {
   code.value = null
@@ -52,7 +47,7 @@ function close() {
       Give {{ person.name }} this code. It signs them in once, within 10 minutes, and is shown only now; a new
       code ends the ones before it.
     </p>
-    <p v-if="error" class="alert" role="alert">{{ error }}</p>
+    <p v-if="people.actionError" class="alert" role="alert">{{ people.actionError }}</p>
     <template v-else-if="code">
       <SecretWell label="Sign-in code" :text="code.code" copy-label="Copy code" />
       <SecretWell label="Or open this link" :text="link" copy-label="Copy link" />

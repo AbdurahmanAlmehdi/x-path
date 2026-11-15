@@ -14,14 +14,26 @@ class SqliteDeviceTokenRepository implements DeviceTokenRepository {
 
   final SqliteDatabase _database;
 
+  static const _columns =
+      'id, name, kind, hash, person_id, created_at, revoked_at, expires_at';
+
   @override
   Future<List<DeviceToken>> list() async => [
     for (final row in _database.connection.select(
-      'SELECT id, name, kind, hash, person_id, created_at, revoked_at, '
-      'expires_at FROM device_token ORDER BY rowid',
+      'SELECT $_columns FROM device_token ORDER BY rowid',
     ))
       _fromRow(row),
   ];
+
+  /// Reads the row by the `UNIQUE` index of `hash`.
+  @override
+  Future<DeviceToken?> findByHash(String hash) async {
+    final rows = _database.connection.select(
+      'SELECT $_columns FROM device_token WHERE hash = ?',
+      [hash],
+    );
+    return rows.isEmpty ? null : _fromRow(rows.single);
+  }
 
   @override
   Future<void> add(DeviceToken token) async {
@@ -59,6 +71,17 @@ class SqliteDeviceTokenRepository implements DeviceTokenRepository {
       'UPDATE device_token SET revoked_at = ? '
       'WHERE person_id = ? AND revoked_at IS NULL',
       [toDatabaseTime(at), personId],
+    );
+    return _database.connection.updatedRows;
+  }
+
+  @override
+  Future<int> deleteEndedSessions({required DateTime before}) async {
+    final at = toDatabaseTime(before);
+    _database.connection.execute(
+      'DELETE FROM device_token WHERE expires_at IS NOT NULL '
+      'AND (expires_at < ? OR revoked_at < ?)',
+      [at, at],
     );
     return _database.connection.updatedRows;
   }

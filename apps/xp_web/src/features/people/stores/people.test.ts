@@ -47,15 +47,20 @@ describe('usePeopleStore', () => {
 
     const added = await store.add(' Dana ', 'developer')
 
-    expect(added.id).toBe('per_2')
+    expect(added?.id).toBe('per_2')
     expect(seen[0]?.body).toEqual({ name: 'Dana', role: 'developer' })
     expect(store.active).toHaveLength(2)
   })
 
-  it('throws the refusal of a new person', async () => {
+  it('keeps the refusal of a new person, until dismissed', async () => {
     stubEngine({ 'POST /people': { status: 409, body: errorBody('conflict', 'Dana is taken.') } })
+    const store = usePeopleStore()
 
-    await expect(usePeopleStore().add('Dana', 'viewer')).rejects.toThrow('Dana is taken.')
+    expect(await store.add('Dana', 'viewer')).toBeNull()
+    expect(store.actionError).toBe('Dana is taken.')
+
+    store.dismiss()
+    expect(store.actionError).toBeNull()
   })
 
   it('changes a role, and keeps the last admin’s 409 for the page to show', async () => {
@@ -91,6 +96,14 @@ describe('usePeopleStore', () => {
     expect(store.active).toHaveLength(1)
   })
 
+  it('keeps the refusal of a removal', async () => {
+    stubEngine({ 'DELETE /people/per_2': { status: 404, body: errorBody('not_found', 'No such person.') } })
+    const store = usePeopleStore()
+
+    expect(await store.remove('per_2')).toBe(false)
+    expect(store.actionError).toBe('No such person.')
+  })
+
   it('hands a sign-in code to the caller and keeps none', async () => {
     stubEngine({
       'POST /people/per_2/sign-in-codes': {
@@ -102,7 +115,15 @@ describe('usePeopleStore', () => {
 
     const code = await store.signInCode('per_2')
 
-    expect(code.code).toBe('AAAA-BBBB-CCCC-DDDD')
+    expect(code?.code).toBe('AAAA-BBBB-CCCC-DDDD')
     expect(JSON.stringify(store.$state)).not.toContain('AAAA-BBBB')
+  })
+
+  it('keeps the refusal of a sign-in code', async () => {
+    stubEngine({ 'POST /people/per_2/sign-in-codes': { status: 403, body: errorBody('forbidden', 'Not yours.') } })
+    const store = usePeopleStore()
+
+    expect(await store.signInCode('per_2')).toBeNull()
+    expect(store.actionError).toBe('Not yours.')
   })
 })
