@@ -33,11 +33,18 @@ enum ApprovalState {
   bool get isSettled => this != ApprovalState.pending;
 }
 
-/// Who decided an approval: the device token that did.
-@JsonSerializable()
+/// Who decided an approval: the device token that did, and the person it
+/// belongs to.
+@JsonSerializable(includeIfNull: false)
 class DecidedBy extends Equatable {
   /// Creates the description.
-  const new({required this.tokenId, required this.name, required this.kind});
+  const new({
+    required this.tokenId,
+    required this.name,
+    required this.kind,
+    this.personId,
+    this.personName,
+  });
 
   /// Reads a description from its JSON form.
   factory DecidedBy.fromJson(Map<String, dynamic> json) =>
@@ -49,14 +56,22 @@ class DecidedBy extends Equatable {
   /// What the owner called the device or client, for example `Mac mini`.
   final String name;
 
-  /// What the token is used by. Only `app` and `cli` tokens decide.
+  /// What the token is used by. Only `app`, `cli` and `web` tokens decide.
   final DeviceTokenKind kind;
+
+  /// The person the token belongs to, for example `per_1a2b3c4d5e6f7a8b`.
+  /// Absent for approvals decided before people existed (ADR 0017).
+  final String? personId;
+
+  /// What the person was called when they decided. Kept after the person is
+  /// renamed or removed.
+  final String? personName;
 
   /// The JSON form.
   Map<String, dynamic> toJson() => _$DecidedByToJson(this);
 
   @override
-  List<Object?> get props => [tokenId, name, kind];
+  List<Object?> get props => [tokenId, name, kind, personId, personName];
 }
 
 /// A request for the owner's approval of an action (D-13), bound to the

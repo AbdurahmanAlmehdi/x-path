@@ -89,6 +89,31 @@ void main() {
     );
   });
 
+  test('GET /tokens 200, 401 and 403', () async {
+    await expectContract('GET', '/tokens', 200);
+    await expectContract('GET', '/tokens', 401, token: '');
+    await expectContract('GET', '/tokens', 403, token: mcp);
+    await expectContract('GET', '/tokens', 403, token: runner);
+  });
+
+  test('DELETE /tokens/{id} 204, 401, 403 and 404', () async {
+    final created = CreatedToken.fromJson(
+      (await engine.request(
+        '/tokens',
+        method: 'POST',
+        body: jsonEncode({'name': 'xp', 'kind': 'cli'}),
+      )).json,
+    );
+    final path = '/tokens/${created.info.id}';
+
+    final viewer = await engine.tokenFor(PersonRole.viewer);
+    await expectContract('DELETE', path, 404, token: viewer);
+    await expectContract('DELETE', path, 401, token: '');
+    await expectContract('DELETE', path, 403, token: mcp);
+    await expectContract('DELETE', path, 204);
+    await expectContract('DELETE', path, 404);
+  });
+
   test('GET /status 200, 401 and 403', () async {
     await expectContract('GET', '/status', 200, token: mcp);
     await expectContract('GET', '/status', 401, token: '');

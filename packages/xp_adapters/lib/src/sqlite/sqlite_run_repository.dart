@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:sqlite3/sqlite3.dart';
 import 'package:xp_adapters/src/sqlite/sqlite_database.dart';
 import 'package:xp_adapters/src/sqlite/timestamps.dart';
+import 'package:xp_api/xp_api.dart';
 import 'package:xp_engine/xp_engine.dart';
 
 /// Runs in the `run` table. The jobs of a run are in `job`, which names its
@@ -20,7 +21,7 @@ class SqliteRunRepository implements RunRepository {
     _db.execute(
       'INSERT INTO run (id, project_id, workflow_id, workflow_version_id, '
       'sha, ref, locks_project, lock_held, version, build, request, '
-      'created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      'created_at, origin) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
       [
         run.id,
         run.projectId,
@@ -34,13 +35,17 @@ class SqliteRunRepository implements RunRepository {
         run.build,
         jsonEncode(run.request),
         toDatabaseTime(run.createdAt),
+        switch (run.origin) {
+          final origin? => jsonEncode(origin.toJson()),
+          null => null,
+        },
       ],
     );
   }
 
   static const _columns =
       'id, project_id, workflow_id, workflow_version_id, sha, ref, '
-      'locks_project, lock_held, version, build, request, created_at';
+      'locks_project, lock_held, version, build, request, created_at, origin';
 
   @override
   Future<RunRecord?> get(String id) async {
@@ -76,6 +81,7 @@ class SqliteRunRepository implements RunRepository {
   ];
 
   static RunRecord _fromRow(Row row) {
+    final origin = row['origin'] as String?;
     return RunRecord(
       id: row['id'] as String,
       projectId: row['project_id'] as String,
@@ -89,6 +95,9 @@ class SqliteRunRepository implements RunRepository {
       build: row['build'] as int?,
       request: jsonDecode(row['request'] as String) as Map<String, dynamic>,
       createdAt: fromDatabaseTime(row['created_at'] as int),
+      origin: origin == null
+          ? null
+          : RunOrigin.fromJson(jsonDecode(origin) as Map<String, dynamic>),
     );
   }
 

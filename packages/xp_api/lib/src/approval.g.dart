@@ -10,12 +10,16 @@ DecidedBy _$DecidedByFromJson(Map<String, dynamic> json) => DecidedBy(
   tokenId: json['tokenId'] as String,
   name: json['name'] as String,
   kind: $enumDecode(_$DeviceTokenKindEnumMap, json['kind']),
+  personId: json['personId'] as String?,
+  personName: json['personName'] as String?,
 );
 
 Map<String, dynamic> _$DecidedByToJson(DecidedBy instance) => <String, dynamic>{
   'tokenId': instance.tokenId,
   'name': instance.name,
   'kind': _$DeviceTokenKindEnumMap[instance.kind]!,
+  'personId': ?instance.personId,
+  'personName': ?instance.personName,
 };
 
 const _$DeviceTokenKindEnumMap = {
@@ -23,6 +27,7 @@ const _$DeviceTokenKindEnumMap = {
   DeviceTokenKind.cli: 'cli',
   DeviceTokenKind.mcp: 'mcp',
   DeviceTokenKind.runner: 'runner',
+  DeviceTokenKind.web: 'web',
 };
 
 Approval _$ApprovalFromJson(Map<String, dynamic> json) => Approval(

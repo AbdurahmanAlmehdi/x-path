@@ -105,7 +105,7 @@ class RunnerClient {
     try {
       final query = kind == null ? '' : '?kind=$kind';
       final request = await client.putUrl(
-        engine.uri.resolve('/runners/jobs/$jobId/artifacts/$name$query'),
+        engine.at('/runners/jobs/$jobId/artifacts/$name$query'),
       );
       request.headers.set('authorization', 'Bearer ${token ?? credential}');
       if (leaseId != null) request.headers.set('x-lease-id', leaseId);

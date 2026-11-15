@@ -128,6 +128,37 @@ void main() {
       }
     });
 
+    test("a viewer's cli token gets 403 on approve and on deny", () async {
+      final viewer = Person(
+        id: 'per_viewer',
+        name: 'Vi',
+        role: PersonRole.viewer,
+        createdAt: DateTime.utc(2026),
+      );
+      await client.engine.people.add(viewer);
+      final secret = (await client.engine.tokens.issue(
+        name: 'xp',
+        kind: DeviceTokenKind.cli,
+        personId: viewer.id,
+      )).secret;
+      final id = await client.ask();
+
+      for (final action in ['approve', 'deny']) {
+        final response = await client.engine.request(
+          '/approvals/$id/$action',
+          method: 'POST',
+          token: secret,
+        );
+
+        expect(response.statusCode, 403, reason: action);
+        expect(
+          errorOf(response).error.message,
+          'A viewer cannot $action: it takes the releaser role or higher.',
+        );
+      }
+      expect((await client.read(id)).state, ApprovalState.pending);
+    });
+
     test('is 404 for an approval that does not exist', () async {
       final response = await client.send('GET', '/approvals/apr_nope');
 
@@ -170,6 +201,8 @@ void main() {
           kind == DeviceTokenKind.app ? 'test' : 'cli token',
         );
         expect(approval.decidedAt, client.engine.clock.now());
+        expect(approval.decidedBy!.personId, testOwner.id);
+        expect(approval.decidedBy!.personName, 'Owner');
         expect(await client.read(id), approval);
       });
 

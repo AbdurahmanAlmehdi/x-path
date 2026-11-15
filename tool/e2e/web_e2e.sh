@@ -1,0 +1,124 @@
+#!/usr/bin/env bash
+# Runs the web dashboard's Playwright specs (apps/xp_web/e2e) against a real
+# engine: builds the xpd AOT bundle (`dart build cli`) with the dashboard in
+# its web/, starts it on a free port with a throwaway data directory, and
+# runs the specs on Chromium, plus signin.spec.ts, runs.spec.ts,
+# approvals.spec.ts and workflows.spec.ts on WebKit (D3a: the loopback cookie
+# without `Secure`; the event and log sockets and the YAML editor under the
+# dashboard's CSP; deciding a gate).
+#
+#   tool/e2e/web_e2e.sh [<spec> ...]
+#
+# A <spec> narrows the run, as Playwright filters do: `signin`, `runs`,
+# `approvals`, `admin`, `workflows`.
+# The engine never reaches a real store, GitHub or Keychain: its secrets go
+# to the encrypted file of the data directory (XPD_TEST_FILE_SECRETS), GitHub
+# is an address nothing answers at, App Store Connect is the fake of
+# tool/e2e/fake_stores/asc (with two distribution certificates of the team
+# and the fixture app), and a `keytool` shim accepts the made-up keystore
+# admin.spec.ts uploads. The specs get the fake's test key as
+# $XPD_FAKE_ASC_KEY_FILE, $XPD_FAKE_ASC_KEY_ID and $XPD_FAKE_ASC_ISSUER_ID.
+# The specs reach the engine at $XPD_URL and make people and sign-in codes
+# with $XPD_BIN and $XPD_DATA_DIR, as `xpd person` does on the engine
+# machine, and git repositories of tool/e2e/build_app next to the data
+# directory.
+#
+# The dashboard is $XPATH_WEB_DIST when set, else built from apps/xp_web
+# (tool/release/web_dist.sh). Needs the repo's Dart (3.13) first on PATH,
+# Node 24 with `npm ci` done in apps/xp_web, and the Playwright browsers
+# (`npx playwright install chromium webkit`). Exits non-zero, after printing
+# the server log, if a spec fails.
+set -euo pipefail
+
+root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+work="$(mktemp -d)"
+server_pid=""
+asc_pid=""
+
+cleanup() {
+  local pid
+  for pid in "$server_pid" "$asc_pid"; do
+    if [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null; then
+      kill -TERM "$pid" 2>/dev/null || true
+      wait "$pid" 2>/dev/null || true
+    fi
+  done
+  rm -rf "$work"
+}
+trap cleanup EXIT
+
+fail() {
+  echo "web_e2e: $*" >&2
+  if [[ -f "$work/server.log" ]]; then
+    echo "--- server log ---" >&2
+    cat "$work/server.log" >&2
+  fi
+  if [[ -f "$work/asc.log" ]]; then
+    echo "--- fake App Store Connect log ---" >&2
+    cat "$work/asc.log" >&2
+  fi
+  exit 1
+}
+
+[[ -d "$root/apps/xp_web/node_modules" ]] || fail "run npm ci in apps/xp_web first"
+
+echo "Building the xpd bundle..."
+(cd "$root/apps/xpd" && dart build cli -t bin/xpd.dart -o "$work/build" >"$work/build.log" 2>&1) \
+  || { cat "$work/build.log" >&2; fail "dart build cli failed"; }
+xpd="$work/build/bundle/bin/xpd"
+[[ -x "$xpd" ]] || fail "no executable at $xpd"
+web="$("$root/tool/release/web_dist.sh")" || fail "no web dashboard"
+cp -R "$web" "$work/build/bundle/web"
+
+# `keytool` accepts any keystore: the spec's is made up.
+mkdir -p "$work/shims"
+printf '#!/bin/sh\nexit 0\n' >"$work/shims/keytool"
+chmod +x "$work/shims/keytool"
+
+# The fake App Store Connect, compiled so that $asc_pid is the server itself
+# (`dart run` leaves its VM behind when it gets a signal).
+echo "Building the fake App Store Connect..."
+(cd "$root/tool/e2e/fake_stores/asc" && dart compile exe bin/serve.dart -o "$work/fake_asc" >"$work/asc_build.log" 2>&1) \
+  || { cat "$work/asc_build.log" >&2; fail "dart compile exe of the fake App Store Connect failed"; }
+asc_key="$work/AuthKey_fake.p8"
+"$work/fake_asc" "$asc_key" --certificates=2 ly.abdurahman.xpath.buildApp >"$work/asc.log" 2>&1 &
+asc_pid=$!
+asc_url=""
+for _ in $(seq 1 300); do
+  kill -0 "$asc_pid" 2>/dev/null || fail "the fake App Store Connect exited before it was listening"
+  asc_url="$(sed -n 's/^url=//p' "$work/asc.log" | head -1)"
+  [[ -n "$asc_url" ]] && grep -q '^issuerId=' "$work/asc.log" && break
+  sleep 0.2
+done
+[[ -n "$asc_url" ]] || fail "the fake App Store Connect did not report an address within 60 s"
+asc_key_id="$(sed -n 's/^keyId=//p' "$work/asc.log" | head -1)"
+asc_issuer_id="$(sed -n 's/^issuerId=//p' "$work/asc.log" | head -1)"
+
+data="$work/data"
+PATH="$work/shims:$PATH" \
+  XPD_TEST_FILE_SECRETS=1 \
+  XPD_TEST_GITHUB_API_URL="http://127.0.0.1:9" \
+  XPD_TEST_ASC_URL="$asc_url" \
+  "$xpd" serve --port 0 --data-dir "$data" >"$work/server.log" 2>&1 &
+server_pid=$!
+
+url=""
+for _ in $(seq 1 300); do
+  kill -0 "$server_pid" 2>/dev/null || fail "xpd exited before it was listening"
+  url="$(grep -Eo 'http://[^ ]+' "$work/server.log" | head -1 || true)"
+  [[ -n "$url" ]] && break
+  sleep 0.2
+done
+[[ -n "$url" ]] || fail "xpd did not report an address within 60 s"
+grep -q 'xpd serves the dashboard in ' "$work/server.log" || fail "xpd did not find the dashboard"
+echo "xpd is listening on $url"
+
+status=0
+(
+  cd "$root/apps/xp_web"
+  XPD_URL="$url" XPD_BIN="$xpd" XPD_DATA_DIR="$data" \
+    XPD_FAKE_ASC_KEY_FILE="$asc_key" XPD_FAKE_ASC_KEY_ID="$asc_key_id" XPD_FAKE_ASC_ISSUER_ID="$asc_issuer_id" \
+    npx playwright test "$@"
+) || status=$?
+[[ "$status" == 0 ]] || fail "the Playwright specs failed"
+echo "OK: the web dashboard passes its specs against a real xpd."

@@ -53,10 +53,12 @@ void main() {
       );
 
       expect(response.statusCode, 201, reason: response.body);
+      expect(response.headers['cache-control'], 'no-store');
       final created = CreatedToken.fromJson(response.json);
       expect(created.info.name, 'xp on MacBook');
       expect(created.info.kind, DeviceTokenKind.cli);
       expect(created.token, startsWith('xpt_'));
+      expect(created.info.personId, testOwner.id);
       final status = await engine.request('/status', token: created.token);
       expect(StatusResponse.fromJson(status.json).token, created.info);
     });
@@ -91,6 +93,36 @@ void main() {
       }
     });
 
+    test('says that the app and the dashboard make tokens', () async {
+      final response = await send(
+        'POST',
+        '/tokens',
+        kind: DeviceTokenKind.cli,
+        body: {'name': 'x', 'kind': 'mcp'},
+      );
+
+      expect(
+        errorOf(response).error.message,
+        'Only the app and the web dashboard make tokens, and only cli and mcp '
+        'ones: A cli token may not make an mcp token.',
+      );
+    });
+
+    test("lets a browser's session make a token for its person", () async {
+      final cookie = await engine.signInBrowser();
+
+      final response = await engine.request(
+        '/tokens',
+        method: 'POST',
+        token: '',
+        headers: engine.browser(cookie),
+        body: jsonEncode({'name': 'laptop', 'kind': 'cli'}),
+      );
+
+      expect(response.statusCode, 201, reason: response.body);
+      expect(CreatedToken.fromJson(response.json).info.personId, testOwner.id);
+    });
+
     test('refuses a blank name and an app or runner kind', () async {
       for (final body in [
         {'name': ' ', 'kind': 'cli'},
@@ -106,6 +138,96 @@ void main() {
       }
       final malformed = await send('POST', '/tokens', rawBody: '[');
       expect(malformed.statusCode, 400);
+    });
+  });
+
+  group('GET /tokens', () {
+    test("lists the admin's app token everyone's valid tokens, never a "
+        "runner's or a secret", () async {
+      final sam = await engine.tokenFor(PersonRole.developer);
+
+      final response = await send('GET', '/tokens');
+
+      expect(response.statusCode, 200);
+      final tokens = TokensResponse.fromJson(response.json).tokens;
+      expect(
+        [for (final token in tokens) (token.name, token.kind)],
+        [
+          ('test', DeviceTokenKind.app),
+          ('cli token', DeviceTokenKind.cli),
+          ('mcp token', DeviceTokenKind.mcp),
+          ('cli', DeviceTokenKind.cli),
+        ],
+      );
+      expect(tokens.last.personId, 'per_developer');
+      expect(response.body, isNot(contains(sam)));
+    });
+
+    test('lists anyone else their own', () async {
+      final response = await engine.request(
+        '/tokens',
+        token: await engine.tokenFor(PersonRole.developer),
+      );
+
+      final tokens = TokensResponse.fromJson(response.json).tokens;
+      expect(tokens.single.personId, 'per_developer');
+    });
+  });
+
+  group('an mcp token', () {
+    test('neither lists nor revokes tokens, even of its own person', () async {
+      final list = await send('GET', '/tokens', kind: DeviceTokenKind.mcp);
+      final app = await engine.tokens.authenticate(engine.secret);
+      final revoke = await send(
+        'DELETE',
+        '/tokens/${app!.id}',
+        kind: DeviceTokenKind.mcp,
+      );
+
+      for (final response in [list, revoke]) {
+        expect(response.statusCode, 403);
+        expect(
+          errorOf(response).error.message,
+          'An mcp token cannot list or revoke tokens: only the app, `xp` or '
+          'the web dashboard do.',
+        );
+      }
+      expect(await engine.tokens.authenticate(engine.secret), isNotNull);
+    });
+  });
+
+  group('DELETE /tokens/{id}', () {
+    Future<String> idOf(String secret) async =>
+        (await engine.tokens.authenticate(secret))!.id;
+
+    test('revokes a token of your own person', () async {
+      final cli = secrets[DeviceTokenKind.cli]!;
+
+      final response = await send(
+        'DELETE',
+        '/tokens/${await idOf(cli)}',
+        kind: DeviceTokenKind.cli,
+      );
+
+      expect(response.statusCode, 204);
+      expect(await engine.tokens.authenticate(cli), isNull);
+    });
+
+    test("lets an admin revoke anyone's, and others only their own", () async {
+      final sam = await engine.tokenFor(PersonRole.developer);
+      final samId = await idOf(sam);
+
+      final refused = await engine.request(
+        '/tokens/${await idOf(engine.secret)}',
+        method: 'DELETE',
+        token: sam,
+      );
+      expect(refused.statusCode, 404);
+      expect(errorOf(refused).error.code, ApiErrorCode.notFound);
+
+      expect((await send('DELETE', '/tokens/$samId')).statusCode, 204);
+      expect(await engine.tokens.authenticate(sam), isNull);
+      expect((await send('DELETE', '/tokens/$samId')).statusCode, 404);
     });
   });
 

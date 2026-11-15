@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:shelf/shelf.dart';
-import 'package:shelf_router/shelf_router.dart';
 import 'package:test/test.dart';
 import 'package:xp_api/xp_api.dart';
 import 'package:xp_engine/xp_engine.dart';
@@ -112,7 +111,7 @@ void main() {
       final again = Run.fromJson(response.json);
       expect(again.id, isNot(first.id));
       expect(again.workflowVersionId, first.workflowVersionId);
-      expect(response.headers['location'], '/runs/${again.id}');
+      expect(response.headers['location'], '/api/v1/runs/${again.id}');
       expect(
         (await client.send('POST', '/runs/run_nope/run-again')).statusCode,
         404,
@@ -138,6 +137,54 @@ void main() {
         (await client.send('POST', '/runs/run_nope/rerun-failed')).statusCode,
         404,
       );
+    });
+  });
+
+  group('the origin of a run', () {
+    Future<Run> dispatchAs(String token) async {
+      final id = await client.create('flow-${++flows}', echoWorkflow);
+      final response = await engine.request(
+        '${client.base}/$id/dispatch',
+        method: 'POST',
+        token: token,
+      );
+      return Run.fromJson(response.json);
+    }
+
+    test('is the person of a cli token, and stays on the run', () async {
+      final run = await dispatchAs(await engine.tokenFor(PersonRole.developer));
+
+      expect(run.origin?.kind, RunOriginKind.person);
+      expect(run.origin?.personId, 'per_developer');
+      expect(run.origin?.personName, 'developer');
+      expect(run.origin?.tokenId, startsWith('tok_'));
+      final read = Run.fromJson(
+        (await client.send('GET', '/runs/${run.id}')).json,
+      );
+      expect(read.origin, run.origin);
+    });
+
+    test('is an agent for an mcp token', () async {
+      final run = await dispatchAs(
+        await engine.tokenFor(PersonRole.admin, kind: DeviceTokenKind.mcp),
+      );
+
+      expect(run.origin?.kind, RunOriginKind.agent);
+      expect(run.origin?.personName, 'admin');
+    });
+
+    test('is whoever ran it again', () async {
+      final first = await dispatch(echoWorkflow);
+      await client.until(first.id, {RunState.succeeded});
+
+      final again = await engine.request(
+        '/runs/${first.id}/run-again',
+        method: 'POST',
+        token: await engine.tokenFor(PersonRole.developer),
+      );
+
+      expect(first.origin?.personName, testOwner.name);
+      expect(Run.fromJson(again.json).origin?.personName, 'developer');
     });
   });
 
@@ -218,7 +265,7 @@ void main() {
         ),
         const [],
       );
-      final router = Router();
+      final router = ApiRouter();
       RunsRoutes(
         RunService(runs: runs, jobs: jobs, control: _EndedJobs()),
         _Unused<ProjectService>(),

@@ -384,6 +384,43 @@ void main() {
       ).called(1);
     });
 
+    testWidgets('names the certificate of a project in a deep folder within '
+        'the limit', (tester) async {
+      when(
+        () => credentials.createDistributionCertificate(
+          any(),
+          app: any(named: 'app'),
+          flavor: any(named: 'flavor'),
+          name: any(named: 'name'),
+        ),
+      ).thenAnswer((_) async => slackWebhook);
+      final deep = Project(
+        id: mataa.id,
+        githubRepoId: mataa.githubRepoId,
+        host: mataa.host,
+        sourceKey: mataa.sourceKey,
+        fullName: '/Users/sam/${'clients/' * 10}mataa',
+        remote: mataa.remote,
+        defaultBaseBranch: mataa.defaultBaseBranch,
+        profile: mataa.profile,
+      );
+      await open(tester, project: deep);
+
+      await tap(
+        tester,
+        find.byKey(const Key('flavorCredentials.createCertificate')),
+      );
+
+      verify(
+        () => credentials.createDistributionCertificate(
+          'prj_1',
+          app: '.',
+          flavor: 'prod',
+          name: 'Apple Distribution · mataa prod',
+        ),
+      ).called(1);
+    });
+
     testWidgets('offers no certificate once the flavor has an identity', (
       tester,
     ) async {

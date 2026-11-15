@@ -3,14 +3,27 @@ import 'dart:math';
 import 'package:xp_api/xp_api.dart';
 import 'package:xp_engine/xp_engine.dart';
 
-/// A device token of [kind] for tests.
-DeviceToken tokenOf(DeviceTokenKind kind, {String? name}) => DeviceToken(
-  id: 'tok_${kind.name}',
-  name: name ?? '${kind.name} device',
-  kind: kind,
-  hash: 'hash',
-  createdAt: DateTime.utc(2026),
-);
+import 'people.dart';
+
+/// A device token of [kind] for tests, read for a request: a runner token
+/// belongs to no person, any other to a person with [role].
+DeviceToken tokenOf(
+  DeviceTokenKind kind, {
+  String? name,
+  PersonRole role = PersonRole.admin,
+}) {
+  final token = DeviceToken(
+    id: 'tok_${kind.name}',
+    name: name ?? '${kind.name} device',
+    kind: kind,
+    hash: 'hash',
+    createdAt: DateTime.utc(2026),
+    personId: kind == DeviceTokenKind.runner ? null : 'per_${role.name}',
+  );
+  return kind == DeviceTokenKind.runner
+      ? token
+      : token.withPerson(personWith(role));
+}
 
 /// The commit gates ask about.
 const approvalSha = 'a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1';

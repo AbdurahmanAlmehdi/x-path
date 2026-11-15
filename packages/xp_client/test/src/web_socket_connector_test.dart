@@ -13,7 +13,9 @@ import '../helpers/samples.dart' as sample;
 void main() {
   late FakeEngine engine;
 
-  setUp(() async => engine = await FakeEngine.start());
+  // The connector opens the URL it is given: an engine whose API is at the
+  // root keeps the paths as they are.
+  setUp(() async => engine = await FakeEngine.start(servesApiV1: false));
   tearDown(() => engine.close());
 
   Uri wsUrl(String path) => engine.url.replace(scheme: 'ws', path: path);

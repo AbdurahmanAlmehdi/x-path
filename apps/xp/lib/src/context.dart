@@ -18,6 +18,25 @@ typedef CurrentRemote = Future<String?> Function();
 
 Future<String?> _noRemote() async => null;
 
+/// Opens [url] in the browser; whether it could.
+typedef BrowserOpener = Future<bool> Function(Uri url);
+
+Future<bool> _noBrowser(Uri url) async => false;
+
+/// Opens [url] with `open` on macOS and `xdg-open` elsewhere; whether it
+/// could.
+Future<bool> openInBrowser(Uri url) async {
+  try {
+    final result = await io.Process.run(
+      io.Platform.isMacOS ? 'open' : 'xdg-open',
+      ['$url'],
+    );
+    return result.exitCode == 0;
+  } on io.ProcessException {
+    return false;
+  }
+}
+
 /// The `origin` of the current folder, as `git remote get-url origin` says.
 Future<String?> gitOrigin() async {
   try {
@@ -50,6 +69,7 @@ class XpContext {
     this.pollInterval = const Duration(seconds: 2),
     this.ansi = false,
     this.currentRemote = _noRemote,
+    this.openBrowser = _noBrowser,
   });
 
   /// The context of the real process.
@@ -79,6 +99,7 @@ class XpContext {
       stdout: io.stdout,
       ansi: io.stdout.hasTerminal && io.stdout.supportsAnsiEscapes,
       currentRemote: gitOrigin,
+      openBrowser: openInBrowser,
     );
   }
 
@@ -121,4 +142,7 @@ class XpContext {
   /// The `origin` of the current folder, which names the project a command
   /// is about when it is left out.
   final CurrentRemote currentRemote;
+
+  /// Opens a page in the browser (`xp dashboard`).
+  final BrowserOpener openBrowser;
 }

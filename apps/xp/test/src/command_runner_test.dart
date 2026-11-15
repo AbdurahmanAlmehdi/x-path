@@ -147,6 +147,8 @@ void main() {
           'releases',
           'storage',
           'artifacts',
+          'dashboard',
+          'settings',
           'mcp',
         ]) {
           expect(usage, contains(command), reason: command);

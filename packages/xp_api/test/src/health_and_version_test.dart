@@ -28,12 +28,13 @@ void main() {
   });
 
   group('DeviceTokenKind', () {
-    test('names the four kinds of the data model', () {
+    test('names the five kinds of the data model', () {
       expect(DeviceTokenKind.values.map((k) => k.name), [
         'app',
         'cli',
         'mcp',
         'runner',
+        'web',
       ]);
     });
   });

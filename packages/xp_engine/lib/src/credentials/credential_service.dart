@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math';
 
 import 'package:xp_api/xp_api.dart';
+import 'package:xp_engine/src/access/access_policy.dart';
 import 'package:xp_engine/src/clock/clock.dart';
 import 'package:xp_engine/src/credentials/credential_exceptions.dart';
 import 'package:xp_engine/src/credentials/credential_material.dart';
@@ -853,13 +854,10 @@ class CredentialService {
   }
 
   /// Throws a [CredentialForbiddenException] unless [by] may [what]: only
-  /// `app` and `cli` tokens change credentials.
+  /// an admin changes credentials (ADR 0017).
   static void requireOwner(DeviceToken by, String what) {
-    if (by.kind != DeviceTokenKind.app && by.kind != DeviceTokenKind.cli) {
-      throw CredentialForbiddenException(
-        'A ${by.kind.name} token cannot $what: only the app or `xp` do.',
-      );
-    }
+    final refusal = AccessPolicy.refusal(by, Permission.administer, what);
+    if (refusal != null) throw CredentialForbiddenException(refusal);
   }
 
   Future<void> _requireProject(String projectId) async {

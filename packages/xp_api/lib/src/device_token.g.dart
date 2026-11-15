@@ -23,6 +23,7 @@ const _$DeviceTokenKindEnumMap = {
   DeviceTokenKind.cli: 'cli',
   DeviceTokenKind.mcp: 'mcp',
   DeviceTokenKind.runner: 'runner',
+  DeviceTokenKind.web: 'web',
 };
 
 TokenInfo _$TokenInfoFromJson(Map<String, dynamic> json) => TokenInfo(
@@ -30,6 +31,7 @@ TokenInfo _$TokenInfoFromJson(Map<String, dynamic> json) => TokenInfo(
   name: json['name'] as String,
   kind: $enumDecode(_$DeviceTokenKindEnumMap, json['kind']),
   createdAt: DateTime.parse(json['createdAt'] as String),
+  personId: json['personId'] as String?,
 );
 
 Map<String, dynamic> _$TokenInfoToJson(TokenInfo instance) => <String, dynamic>{
@@ -37,7 +39,20 @@ Map<String, dynamic> _$TokenInfoToJson(TokenInfo instance) => <String, dynamic>{
   'name': instance.name,
   'kind': _$DeviceTokenKindEnumMap[instance.kind]!,
   'createdAt': instance.createdAt.toIso8601String(),
+  'personId': ?instance.personId,
 };
+
+TokensResponse _$TokensResponseFromJson(Map<String, dynamic> json) =>
+    TokensResponse(
+      (json['tokens'] as List<dynamic>)
+          .map((e) => TokenInfo.fromJson(e as Map<String, dynamic>))
+          .toList(),
+    );
+
+Map<String, dynamic> _$TokensResponseToJson(TokensResponse instance) =>
+    <String, dynamic>{
+      'tokens': instance.tokens.map((e) => e.toJson()).toList(),
+    };
 
 CreatedToken _$CreatedTokenFromJson(Map<String, dynamic> json) => CreatedToken(
   info: TokenInfo.fromJson(json['info'] as Map<String, dynamic>),

@@ -45,6 +45,9 @@ class RawResponse {
   final Map<String, String> headers;
 
   Map<String, dynamic> get json => jsonDecode(body) as Map<String, dynamic>;
+
+  /// The error of an error response: its `code`, `message`, ...
+  Map<String, dynamic> get error => json['error'] as Map<String, dynamic>;
 }
 
 /// A response read to the end as bytes.
@@ -65,10 +68,20 @@ class ThrowingDeviceTokenRepository implements DeviceTokenRepository {
   Future<List<DeviceToken>> list() async => throw StateError('disk on fire');
 
   @override
+  Future<DeviceToken?> findByHash(String hash) async =>
+      throw StateError('disk on fire');
+
+  @override
   Future<void> add(DeviceToken token) async {}
 
   @override
   Future<bool> revoke(String id, {required DateTime at}) async => false;
+
+  @override
+  Future<int> revokeOwnedBy(String personId, {required DateTime at}) async => 0;
+
+  @override
+  Future<int> deleteEndedSessions({required DateTime before}) async => 0;
 }
 
 /// Build number counters for any app: the first number of an app is 1.
@@ -99,13 +112,37 @@ class _AutoCounters implements BuildCounterRepository {
   }
 }
 
+/// The admin every engine has, as migration v23 makes it: the person the
+/// tokens of a [TestEngine] belong to.
+final testOwner = Person(
+  id: 'per_owner',
+  name: 'Owner',
+  role: PersonRole.admin,
+  createdAt: DateTime.utc(2026),
+);
+
+/// An `app` token of [testOwner], for the services a test calls directly
+/// as an admin.
+final DeviceToken testOwnerToken = DeviceToken(
+  id: 'tok_owner',
+  name: 'app',
+  kind: DeviceTokenKind.app,
+  hash: 'hash-owner',
+  createdAt: DateTime.utc(2026),
+  personId: testOwner.id,
+).withPerson(testOwner);
+
 /// An engine on a free loopback port with everything in memory.
 class TestEngine {
   new _({
     required this.server,
     required this.events,
     required this.clock,
+    required this.people,
     required this.tokens,
+    required this.signIn,
+    required this.signInCodes,
+    required this.publicUrl,
     required this.secret,
     required this.errors,
     required this.github,
@@ -153,6 +190,8 @@ class TestEngine {
     JobLogStore? logStore,
     int logLiveCapacity = 1024,
     bool realApprovals = false,
+    Duration socketSweep = const Duration(seconds: 60),
+    String? webDirectory,
   }) async {
     const repo = GitHubRepo(
       id: 42,
@@ -165,8 +204,10 @@ class TestEngine {
     final folders = <String, Map<String, String>>{};
     final clock = ManualClock(DateTime.utc(2026, 10, 13, 9));
     final log = InMemoryEventLog(clock: clock, capacity: eventCapacity);
+    final people = InMemoryPersonRepository([testOwner]);
     final tokens = TokenService(
       tokens: repository ?? InMemoryDeviceTokenRepository(),
+      people: people,
       clock: clock,
     );
     final errors = <Object>[];
@@ -273,8 +314,8 @@ class TestEngine {
       ),
       events: events,
       clock: clock,
-      dispatch: (projectId, workflowId, request) =>
-          dispatcher.dispatch(projectId, workflowId, request),
+      dispatch: (projectId, workflowId, request, {origin}) =>
+          dispatcher.dispatch(projectId, workflowId, request, origin: origin),
     );
     dispatcher = WorkflowDispatcher(
       workflows: workflows,
@@ -367,8 +408,23 @@ class TestEngine {
       clock: clock,
     );
     final appStoreConnect = FakeAppStoreConnect();
+    final signInCodes = InMemorySignInCodeRepository();
+    final signIn = SignInCodeService(
+      codes: signInCodes,
+      people: people,
+      tokens: tokens,
+      clock: clock,
+    );
+    final publicUrl = PublicUrlService(
+      settings: InMemoryEngineSettingRepository(),
+    );
     final server = await XpdServer.start(
       tokens: tokens,
+      people: PersonService(people: people, tokens: tokens, clock: clock),
+      signIn: signIn,
+      publicUrl: publicUrl,
+      socketSweep: socketSweep,
+      webDirectory: webDirectory,
       events: events,
       projects: ProjectService(
         repository: projects,
@@ -463,7 +519,11 @@ class TestEngine {
       server: server,
       events: log,
       clock: clock,
+      people: people,
       tokens: tokens,
+      signIn: signIn,
+      signInCodes: signInCodes,
+      publicUrl: publicUrl,
       secret: issued.secret,
       errors: errors,
       github: github,
@@ -597,7 +657,19 @@ class TestEngine {
   final Map<String, Map<String, String>> folders;
   final InMemoryEventLog events;
   final ManualClock clock;
+
+  /// The people, [testOwner] first.
+  final InMemoryPersonRepository people;
   final TokenService tokens;
+
+  /// Issues sign-in codes and signs browsers in.
+  final SignInCodeService signIn;
+
+  /// The sign-in codes issued.
+  final InMemorySignInCodeRepository signInCodes;
+
+  /// The public URL of the engine.
+  final PublicUrlService publicUrl;
 
   /// A valid `app` token.
   final String secret;
@@ -607,20 +679,47 @@ class TestEngine {
 
   Uri get uri => server.uri;
 
+  /// The secret of a new [kind] token of the person with [role], called
+  /// after the role (`per_viewer`, ...), whom it adds the first time.
+  Future<String> tokenFor(
+    PersonRole role, {
+    DeviceTokenKind kind = DeviceTokenKind.cli,
+  }) async {
+    final id = 'per_${role.name}';
+    if (await people.get(id) == null) {
+      await people.add(
+        Person(id: id, name: role.name, role: role, createdAt: clock.now()),
+      );
+    }
+    final issued = await tokens.issue(
+      name: kind.name,
+      kind: kind,
+      personId: id,
+    );
+    return issued.secret;
+  }
+
   Future<void> close() => server.close();
 
-  /// Sends a plain request. Sends the valid token unless [token] is given;
-  /// pass an empty string for no `Authorization` header.
+  /// Where [path] of the API is: under `/api/v1`, or at the root alias
+  /// with [root].
+  Uri at(String path, {bool root = false}) =>
+      uri.resolve(root ? path : '$apiMount$path');
+
+  /// Sends a plain request to [path] of the API (at its root alias with
+  /// [root]). Sends the valid token unless [token] is given; pass an empty
+  /// string for no `Authorization` header.
   Future<RawResponse> request(
     String path, {
     String method = 'GET',
     String? token,
     Map<String, String> headers = const {},
     String? body,
+    bool root = false,
   }) async {
     final client = HttpClient();
     try {
-      final request = await client.openUrl(method, uri.resolve(path));
+      final request = await client.openUrl(method, at(path, root: root));
       final bearer = token ?? secret;
       if (bearer.isNotEmpty) {
         request.headers.set('authorization', 'Bearer $bearer');
@@ -644,11 +743,65 @@ class TestEngine {
     }
   }
 
+  /// Sends [method] to [path] of the API exactly as given, over a plain
+  /// socket: `HttpClient` upper-cases every method, and this sends one in
+  /// lower or mixed case as a client may. Sends [token] as a bearer token
+  /// unless it is empty, and closes the connection after the answer.
+  Future<RawResponse> rawRequest(
+    String method,
+    String path, {
+    String? token,
+    Map<String, String> headers = const {},
+    String? body,
+    bool root = false,
+  }) async {
+    final socket = await Socket.connect(uri.host, uri.port);
+    try {
+      final bearer = token ?? secret;
+      final bytes = body == null ? const <int>[] : utf8.encode(body);
+      socket
+        ..write(
+          [
+            '$method ${at(path, root: root).path} HTTP/1.0',
+            'host: 127.0.0.1:${uri.port}',
+            if (bearer.isNotEmpty) 'authorization: Bearer $bearer',
+            for (final MapEntry(:key, :value) in headers.entries)
+              '$key: $value',
+            if (body != null) 'content-type: application/json',
+            'content-length: ${bytes.length}',
+            '',
+            '',
+          ].join('\r\n'),
+        )
+        ..add(bytes);
+      await socket.flush();
+      final text = utf8.decode(await socket.expand((chunk) => chunk).toList());
+      final split = text.indexOf('\r\n\r\n');
+      final head = text.substring(0, split).split('\r\n');
+      final received = <String, String>{};
+      for (final line in head.skip(1)) {
+        final colon = line.indexOf(':');
+        received.putIfAbsent(
+          line.substring(0, colon).trim().toLowerCase(),
+          () => line.substring(colon + 1).trim(),
+        );
+      }
+      return RawResponse(
+        int.parse(head.first.split(' ')[1]),
+        received['content-type'],
+        text.substring(split + 4),
+        received,
+      );
+    } finally {
+      socket.destroy();
+    }
+  }
+
   /// Downloads [path] as bytes, with the headers of the response.
   Future<RawBytes> download(String path, {String? token}) async {
     final client = HttpClient();
     try {
-      final request = await client.getUrl(uri.resolve(path));
+      final request = await client.getUrl(at(path));
       final bearer = token ?? secret;
       if (bearer.isNotEmpty) {
         request.headers.set('authorization', 'Bearer $bearer');
@@ -686,14 +839,21 @@ class TestEngine {
 
   /// Like [request] but with the headers of a WebSocket handshake, so that the
   /// engine answers with the real status instead of 426.
-  Future<RawResponse> handshake(String path, {String? token}) => request(
+  Future<RawResponse> handshake(
+    String path, {
+    String? token,
+    bool root = false,
+    Map<String, String> headers = const {},
+  }) => request(
     path,
     token: token,
+    root: root,
     headers: {
       'connection': 'Upgrade',
       'upgrade': 'websocket',
       'sec-websocket-version': '13',
       'sec-websocket-key': base64.encode(List.filled(16, 7)),
+      ...headers,
     },
   );
 
@@ -723,21 +883,26 @@ class TestEngine {
     String jobId, {
     int? after,
     String? token,
+    Map<String, String> headers = const {},
   }) async {
     final query = after == null ? '' : '?after=$after';
     final bearer = token ?? secret;
     final socket = await WebSocket.connect(
-      'ws://127.0.0.1:${uri.port}/jobs/$jobId/logs$query',
-      headers: {if (bearer.isNotEmpty) 'authorization': 'Bearer $bearer'},
+      'ws://127.0.0.1:${uri.port}$apiMount/jobs/$jobId/logs$query',
+      headers: {
+        if (bearer.isNotEmpty) 'authorization': 'Bearer $bearer',
+        ...headers,
+      },
     );
     return JobLogStream(socket);
   }
 
-  /// Opens the connection of a runner with [token] as its credential.
-  Future<RunnerStream> connectRunner({String? token}) async {
+  /// Opens the connection of a runner with [token] as its credential, at
+  /// the root alias with [root], as a runner made before `/api/v1` does.
+  Future<RunnerStream> connectRunner({String? token, bool root = false}) async {
     final bearer = token ?? secret;
     final socket = await WebSocket.connect(
-      'ws://127.0.0.1:${uri.port}/runners/connect',
+      'ws://127.0.0.1:${uri.port}${root ? '' : apiMount}/runners/connect',
       headers: {if (bearer.isNotEmpty) 'authorization': 'Bearer $bearer'},
     );
     return RunnerStream(socket);
@@ -772,15 +937,48 @@ class TestEngine {
   }
 
   /// Opens the event stream.
-  Future<EventStream> connect({int? after, String? token}) async {
+  Future<EventStream> connect({
+    int? after,
+    String? token,
+    Map<String, String> headers = const {},
+  }) async {
     final query = after == null ? '' : '?after=$after';
     final bearer = token ?? secret;
     final socket = await WebSocket.connect(
-      'ws://127.0.0.1:${uri.port}/events$query',
-      headers: {if (bearer.isNotEmpty) 'authorization': 'Bearer $bearer'},
+      'ws://127.0.0.1:${uri.port}$apiMount/events$query',
+      headers: {
+        if (bearer.isNotEmpty) 'authorization': 'Bearer $bearer',
+        ...headers,
+      },
     );
     return EventStream(socket);
   }
+
+  /// The origin of a page this engine serves on this machine.
+  String get loopbackOrigin => 'http://127.0.0.1:${uri.port}';
+
+  /// Signs a browser in as the person [personId], from [loopbackOrigin], and
+  /// returns its session cookie, `xp_session_<port>=<secret>`.
+  Future<String> signInBrowser([String? personId]) async {
+    final code = await signIn.issue(personId ?? testOwner.id);
+    final response = await request(
+      '/session',
+      method: 'POST',
+      token: '',
+      headers: {'origin': loopbackOrigin},
+      body: jsonEncode({'code': code.code}),
+    );
+    expect(response.statusCode, 200, reason: response.body);
+    return response.headers['set-cookie']!.split(';').first;
+  }
+
+  /// The headers of a browser request with [cookie] from [loopbackOrigin],
+  /// with the CSRF header.
+  Map<String, String> browser(String cookie) => {
+    'cookie': cookie,
+    'origin': loopbackOrigin,
+    'x-xpath-csrf': '1',
+  };
 }
 
 /// The frames of one `/events` connection.

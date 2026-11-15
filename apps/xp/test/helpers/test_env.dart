@@ -144,6 +144,10 @@ class TestEnv {
       pollInterval: Duration.zero,
       ansi: ansi,
       currentRemote: () async => remote,
+      openBrowser: (url) async {
+        opened.add(url);
+        return browserOpens;
+      },
     );
     runner = XpCommandRunner(context: context);
     formatTimesInUtc = true;
@@ -163,6 +167,12 @@ class TestEnv {
 
   /// The `origin` of the folder the command runs in, if it is a clone.
   String? remote;
+
+  /// The pages opened in the browser.
+  final opened = <Uri>[];
+
+  /// Whether the browser opens a page.
+  bool browserOpens = true;
   final stdin = StreamController<List<int>>();
   final stdoutController = StreamController<List<int>>();
   StreamSink<List<int>> get stdout => stdoutController.sink;

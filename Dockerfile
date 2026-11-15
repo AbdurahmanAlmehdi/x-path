@@ -6,8 +6,9 @@
 #   docker exec xpath xpd token create --name laptop --kind cli
 #
 # The image copies the Linux bundles that tool/release/bundles.sh built
-# (build/release/bundles/linux-<arch>/), so build them first; `docker buildx
-# build --platform linux/amd64,linux/arm64` picks the bundle of each platform.
+# (build/release/bundles/linux-<arch>/, the engine with its web dashboard in
+# xpd/web), so build them first; `docker buildx build --platform
+# linux/amd64,linux/arm64` picks the bundle of each platform.
 # The engine runs as the unprivileged user `xpath` and keeps everything,
 # master.key included (D-07: a 0600 key file without a systemd credential), in
 # the volume /data. The image has git and ssh for the mirrors, but not unzip,
@@ -25,7 +26,8 @@ RUN set -eu; \
       *) echo "no XPath bundle for ${TARGETARCH}" >&2; exit 1 ;; \
     esac; \
     bundle="/bundles/linux-$arch"; \
-    if [ ! -x "$bundle/xpd/bin/xpd" ] || [ ! -x "$bundle/xp/bin/xp" ]; then \
+    if [ ! -x "$bundle/xpd/bin/xpd" ] || [ ! -x "$bundle/xp/bin/xp" ] \
+      || [ ! -f "$bundle/xpd/web/index.html" ]; then \
       echo "no bundle in build/release/bundles/linux-$arch: run tool/release/bundles.sh" >&2; \
       exit 1; \
     fi; \

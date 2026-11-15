@@ -1,6 +1,7 @@
 import 'dart:math';
 
 import 'package:xp_api/xp_api.dart';
+import 'package:xp_engine/src/access/access_policy.dart';
 import 'package:xp_engine/src/approvals/approval_exceptions.dart';
 import 'package:xp_engine/src/approvals/approval_record.dart';
 import 'package:xp_engine/src/approvals/approval_repository.dart';
@@ -31,7 +32,8 @@ typedef ResumeWaiting = Future<void> Function(String projectId);
 /// request. A gate the project turned off approves at once and leaves no
 /// request.
 ///
-/// **Deciding.** Only an `app` or a `cli` token approves or denies. The
+/// **Deciding.** Only a releaser or an admin approves or denies, with an
+/// `app`, `cli` or `web` token (ADR 0017). The
 /// decision is one compare-and-set on `state = 'pending'` in the repository,
 /// so of any number of concurrent decisions exactly one wins, and the others
 /// learn the winner ([ApprovalAlreadyDecidedException]). The jobs that wait
@@ -45,8 +47,9 @@ typedef ResumeWaiting = Future<void> Function(String projectId);
 /// expiry the owner dispatches the workflow again.
 ///
 /// **Gates.** [setGates] turns the gate of an action on or off for a project.
-/// An `app` token may do both; a `cli` token may only turn gates on
-/// (tightening); `mcp` and `runner` tokens never change them.
+/// A releaser may turn gates on (tightening); only an admin with an `app` or
+/// `web` token may turn them off; `mcp` and `runner` tokens never change
+/// them.
 class ApprovalService implements ApprovalGate {
   /// Creates the service. `resume` is told when a decision or a loosened gate
   /// lets waiting jobs go on.
@@ -154,22 +157,22 @@ class ApprovalService implements ApprovalGate {
   /// Approves the approval [id] if [approve], else denies it, as the device
   /// [by]. Returns the approval as decided.
   ///
-  /// Throws an [ApprovalForbiddenException] unless [by] is an `app` or a
-  /// `cli` token, an [ApprovalNotFoundException] if there is no such
-  /// approval, and an [ApprovalAlreadyDecidedException] (with the winning
-  /// decision) if it was decided or expired before.
+  /// Throws an [ApprovalForbiddenException] unless [by] may
+  /// [Permission.decideApproval], an [ApprovalNotFoundException] if there is
+  /// no such approval, and an [ApprovalAlreadyDecidedException] (with the
+  /// winning decision) if it was decided or expired before.
   Future<Approval> decide(
     String id, {
     required bool approve,
     required DeviceToken by,
     String? reason,
   }) async {
-    if (!_mayDecide(by.kind)) {
-      throw ApprovalForbiddenException(
-        'A ${by.kind.name} token cannot ${approve ? 'approve' : 'deny'}: only '
-        'the app or `xp approve` decide gated actions.',
-      );
-    }
+    final refusal = AccessPolicy.refusal(
+      by,
+      Permission.decideApproval,
+      approve ? 'approve' : 'deny',
+    );
+    if (refusal != null) throw ApprovalForbiddenException(refusal);
     final current = await _require(id);
     if (current.state.isSettled) {
       throw ApprovalAlreadyDecidedException(current.toApi());
@@ -178,7 +181,13 @@ class ApprovalService implements ApprovalGate {
     final decided = await _approvals.decide(
       id,
       state: approve ? ApprovalState.approved : ApprovalState.denied,
-      by: DecidedBy(tokenId: by.id, name: by.name, kind: by.kind),
+      by: DecidedBy(
+        tokenId: by.id,
+        name: by.name,
+        kind: by.kind,
+        personId: by.person?.id,
+        personName: by.person?.name,
+      ),
       at: _clock.now(),
       reason: trimmed == null || trimmed.isEmpty ? null : trimmed,
     );
@@ -262,28 +271,32 @@ class ApprovalService implements ApprovalGate {
   ///
   /// Turning a gate off loosens it, and lets the jobs that wait at it go on.
   ///
-  /// Throws an [ApprovalForbiddenException] unless [by] is an `app` token, or
-  /// a `cli` token that only tightens; a [ProjectNotFoundException]; and an
-  /// [ApprovalRequestException] for an action that is not a gate.
+  /// Throws an [ApprovalForbiddenException] unless [by] may
+  /// [Permission.release], and may also turn gates off
+  /// ([AccessPolicy.mayLoosenGates]) when [desired] does; a
+  /// [ProjectNotFoundException]; and an [ApprovalRequestException] for an
+  /// action that is not a gate.
   Future<ProjectGates> setGates(
     String projectId,
     ProjectGates desired, {
     required DeviceToken by,
   }) async {
-    if (!_mayDecide(by.kind)) {
-      throw ApprovalForbiddenException(
-        'A ${by.kind.name} token cannot change gates: only the app or '
-        '`xp` do.',
-      );
-    }
+    final refusal = AccessPolicy.refusal(
+      by,
+      Permission.release,
+      'change gates',
+    );
+    if (refusal != null) throw ApprovalForbiddenException(refusal);
     await _requireProject(projectId);
     final next = GateConfig.fromApi(desired);
     final current = await _gates.get(projectId);
     final loosened = current.loosenedBy(next);
-    if (loosened.isNotEmpty && by.kind != DeviceTokenKind.app) {
+    if (loosened.isNotEmpty && !AccessPolicy.mayLoosenGates(by)) {
       throw ApprovalForbiddenException(
-        'A ${by.kind.name} token can turn gates on but not off. Turn off '
-        '${loosened.map((action) => action.wire).join(', ')} in the app.',
+        AccessPolicy.refusal(by, Permission.administer, 'turn gates off') ??
+            'A ${by.kind.name} token can turn gates on but not off. Turn off '
+                '${loosened.map((action) => action.wire).join(', ')} in the '
+                'app.',
       );
     }
     if (next == current) return current.toApi();
@@ -301,9 +314,6 @@ class ApprovalService implements ApprovalGate {
   }
 
   // --------------------------------------------------------------- helpers
-
-  static bool _mayDecide(DeviceTokenKind kind) =>
-      kind == DeviceTokenKind.app || kind == DeviceTokenKind.cli;
 
   Future<void> _requireProject(String projectId) async {
     if (await _projects.get(projectId) == null) {

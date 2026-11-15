@@ -590,6 +590,212 @@ INSERT INTO credential_assignment (flavor_id, kind, credential_id, status)
     );
   });
 
+  group('v23 people and roles', () {
+    /// A database at version 22 with a token of each kind, a runner and a
+    /// decided approval, then migrated.
+    Database migrate() {
+      final path = '${tempDirectory().path}/xpath.db';
+      sqlite3.open(path)
+        ..execute(_golden(22))
+        ..userVersion = 22
+        ..execute('''
+INSERT INTO device_token (id, name, kind, hash, created_at, revoked_at) VALUES
+  ('tok_app', 'Mac mini', 'app', 'h1', 1, NULL),
+  ('tok_cli', 'laptop', 'cli', 'h2', 2, 5),
+  ('tok_mcp', 'agent', 'mcp', 'h3', 3, NULL),
+  ('tok_run', 'builder', 'runner', 'h4', 4, NULL);
+INSERT INTO runner (id, name, token_id) VALUES ('rnr_1', 'builder', 'tok_run');
+INSERT INTO project (id, host, source_key, github_repo_id, remote,
+  default_base_branch) VALUES ('prj_1', 'github.com', '1', 1, 'r', 'main');
+INSERT INTO approval (id, project_id, action, sha, version, state, run_id,
+  job_id, created_at, expires_at, decided_at, decided_by, decided_by_name,
+  decided_by_kind, reason)
+  VALUES ('apr_1', 'prj_1', 'prod_release', 'abc', '1.0.0+1', 'approved',
+    'run_1', 'job_1', 10, 20, 15, 'tok_cli', 'laptop', 'cli', 'ship it');
+''')
+        ..close();
+      final database = SqliteDatabase.open(path);
+      addTearDown(database.close);
+      return database.connection;
+    }
+
+    test('makes one admin Owner who owns every token but runners', () {
+      final db = migrate();
+
+      expect(db.userVersion, latest);
+      final people = db.select('SELECT id, name, role, removed_at FROM person');
+      expect(people, hasLength(1));
+      final owner = people.single;
+      expect(owner['id'], matches(RegExp(r'^per_[0-9a-f]{16}$')));
+      expect(owner['name'], 'Owner');
+      expect(owner['role'], 'admin');
+      expect(owner['removed_at'], isNull);
+      expect(
+        {
+          for (final row in db.select(
+            'SELECT id, person_id, revoked_at FROM device_token',
+          ))
+            row['id']: [row['person_id'], row['revoked_at']],
+        },
+        {
+          'tok_app': [owner['id'], null],
+          'tok_cli': [owner['id'], 5],
+          'tok_mcp': [owner['id'], null],
+          'tok_run': [null, null],
+        },
+      );
+      expect(db.select('PRAGMA foreign_key_check'), isEmpty);
+    });
+
+    test('keeps every approval, with no person for old decisions', () {
+      final db = migrate();
+
+      final row = db.select('SELECT * FROM approval').single;
+      expect(row['decided_by'], 'tok_cli');
+      expect(row['decided_by_name'], 'laptop');
+      expect(row['decided_by_kind'], 'cli');
+      expect(row['reason'], 'ship it');
+      expect(row['created_at'], 10);
+      expect(row['decided_by_person_id'], isNull);
+      expect(row['decided_by_person_name'], isNull);
+    });
+
+    test('takes web tokens and checks who owns a token', () {
+      final db = migrate();
+      final owner = db.select('SELECT id FROM person').single['id'];
+
+      db
+        ..execute(
+          'INSERT INTO device_token (id, name, kind, hash, person_id, '
+          "created_at) VALUES ('tok_web', 'Chrome', 'web', 'h5', ?, 6)",
+          [owner],
+        )
+        ..execute(
+          "UPDATE approval SET decided_by_kind = 'web' WHERE id = 'apr_1'",
+        );
+      expect(
+        () => db.execute(
+          'INSERT INTO device_token (id, name, kind, hash, created_at) '
+          "VALUES ('tok_x', 'x', 'cli', 'h6', 7)",
+        ),
+        throwsA(isA<SqliteException>()),
+        reason: 'only a runner token may belong to no person',
+      );
+      expect(
+        () => db.execute(
+          'INSERT INTO device_token (id, name, kind, hash, person_id, '
+          "created_at) VALUES ('tok_y', 'y', 'cli', 'h7', 'per_nobody', 8)",
+        ),
+        throwsA(isA<SqliteException>()),
+        reason: 'the person must exist',
+      );
+    });
+
+    test('keeps active names unique regardless of case', () {
+      final db = migrate();
+
+      expect(
+        () => db.execute(
+          'INSERT INTO person (id, name, role, created_at) '
+          "VALUES ('per_2', 'OWNER', 'viewer', 1)",
+        ),
+        throwsA(isA<SqliteException>()),
+      );
+      db
+        ..execute("UPDATE person SET removed_at = 2 WHERE name = 'Owner'")
+        ..execute(
+          'INSERT INTO person (id, name, role, created_at) '
+          "VALUES ('per_2', 'OWNER', 'viewer', 1)",
+        );
+      expect(
+        () => db.execute(
+          'INSERT INTO person (id, name, role, created_at) '
+          "VALUES ('per_3', 'Sam', 'owner', 1)",
+        ),
+        throwsA(isA<SqliteException>()),
+        reason: 'the role is checked',
+      );
+    });
+  });
+
+  test('v24 keeps every run, with no origin for the runs of before', () {
+    final path = '${tempDirectory().path}/xpath.db';
+    sqlite3.open(path)
+      ..execute(_golden(23))
+      ..userVersion = 23
+      ..execute('''
+INSERT INTO project (id, host, source_key, github_repo_id, remote,
+  default_base_branch) VALUES ('prj_1', 'github.com', '1', 1, 'r', 'main');
+INSERT INTO workflow (id, project_id, name)
+  VALUES ('wf_1', 'prj_1', 'dev');
+INSERT INTO workflow_version (id, workflow_id, version, yaml, created_at)
+  VALUES ('wfv_1', 'wf_1', 1, 'name: dev', 1);
+INSERT INTO run (id, project_id, workflow_id, workflow_version_id, sha,
+  created_at) VALUES ('run_1', 'prj_1', 'wf_1', 'wfv_1', 'abc', 2);
+''')
+      ..close();
+    final database = SqliteDatabase.open(path);
+    addTearDown(database.close);
+    final db = database.connection;
+
+    expect(db.userVersion, latest);
+    final row = db.select('SELECT id, sha, origin FROM run').single;
+    expect(row['sha'], 'abc');
+    expect(row['origin'], isNull);
+    db.execute(
+      "UPDATE run SET origin = '{\"kind\":\"person\"}' WHERE id = 'run_1'",
+    );
+    expect(
+      () => db.execute("UPDATE run SET origin = 'not json' WHERE id = 'run_1'"),
+      throwsA(isA<SqliteException>()),
+    );
+  });
+
+  test('v25 keeps every token, with no expiry, and adds sign-in codes', () {
+    final path = '${tempDirectory().path}/xpath.db';
+    sqlite3.open(path)
+      ..execute(_golden(24))
+      ..userVersion = 24
+      ..execute('''
+INSERT INTO person (id, name, role, created_at)
+  VALUES ('per_1', 'Sam', 'admin', 1);
+INSERT INTO device_token (id, name, kind, hash, person_id, created_at)
+  VALUES ('tok_1', 'Mac', 'app', 'h1', 'per_1', 1);
+''')
+      ..close();
+    final database = SqliteDatabase.open(path);
+    addTearDown(database.close);
+    final db = database.connection;
+
+    expect(db.userVersion, latest);
+    final row = db.select('SELECT id, expires_at FROM device_token').single;
+    expect(row['id'], 'tok_1');
+    expect(row['expires_at'], isNull);
+    db.execute(
+      'INSERT INTO device_token (id, name, kind, hash, person_id, created_at, '
+      "expires_at) VALUES ('tok_2', 'Browser', 'web', 'h2', 'per_1', 1, 2)",
+    );
+    expect(
+      () => db.execute(
+        "UPDATE device_token SET expires_at = 2 WHERE id = 'tok_1'",
+      ),
+      throwsA(isA<SqliteException>()),
+      reason: 'only a web token expires',
+    );
+    db.execute(
+      'INSERT INTO sign_in_code (hash, person_id, created_at, expires_at) '
+      "VALUES ('h', 'per_1', 1, 2)",
+    );
+    expect(
+      () => db.execute(
+        'INSERT INTO sign_in_code (hash, person_id, created_at, expires_at) '
+        "VALUES ('h', 'per_1', 1, 2)",
+      ),
+      throwsA(isA<SqliteException>()),
+      reason: 'the hash is the primary key',
+    );
+  });
+
   group('snapshot', () {
     for (var version = 1; version <= latest; version++) {
       test('v$version is what the first $version migration(s) build', () {

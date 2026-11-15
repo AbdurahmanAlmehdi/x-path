@@ -42,6 +42,7 @@ class RunRecord extends Equatable {
     this.version,
     this.build,
     this.request = const {},
+    this.origin,
   });
 
   /// The engine's id.
@@ -83,6 +84,9 @@ class RunRecord extends Equatable {
   /// When it was dispatched.
   final DateTime createdAt;
 
+  /// Who started it, or `null` for a run from before people (ADR 0017).
+  final RunOrigin? origin;
+
   /// This run with [lockHeld] set.
   RunRecord withLockHeld({required bool held}) => RunRecord(
     id: id,
@@ -97,6 +101,7 @@ class RunRecord extends Equatable {
     version: version,
     build: build,
     request: request,
+    origin: origin,
   );
 
   /// The API form, with its [jobs] in the order they were made.
@@ -113,6 +118,7 @@ class RunRecord extends Equatable {
     version: version,
     build: build,
     createdAt: createdAt,
+    origin: origin,
     jobs: [
       for (final job in jobs)
         RunJob(
@@ -153,6 +159,7 @@ class RunRecord extends Equatable {
     build,
     request,
     createdAt,
+    origin,
   ];
 }
 

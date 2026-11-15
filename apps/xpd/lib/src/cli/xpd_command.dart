@@ -1,5 +1,6 @@
 import 'package:args/command_runner.dart';
 import 'package:xp_adapters/xp_adapters.dart';
+import 'package:xp_engine/xp_engine.dart';
 import 'package:xpd/src/cli/xpd_context.dart';
 import 'package:xpd/src/storage/data_directory.dart';
 import 'package:xpd/src/storage/engine_database.dart';
@@ -49,3 +50,11 @@ abstract class XpdCommand extends Command<int> {
     }
   }
 }
+
+/// The tokens of the engine [database], as a command that writes to it
+/// directly (`xpd token`, `xpd person`) issues and revokes them.
+TokenService tokenServiceOf(SqliteDatabase database) => TokenService(
+  tokens: SqliteDeviceTokenRepository(database),
+  people: SqlitePersonRepository(database),
+  clock: const SystemClock(),
+);

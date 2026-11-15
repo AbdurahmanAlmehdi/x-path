@@ -1,7 +1,8 @@
 import 'package:shelf/shelf.dart';
-import 'package:shelf_router/shelf_router.dart';
 import 'package:xp_api/xp_api.dart';
 import 'package:xp_engine/xp_engine.dart';
+import 'package:xpd/src/api/api_router.dart';
+import 'package:xpd/src/api/middleware.dart';
 import 'package:xpd/src/api/request_body.dart';
 import 'package:xpd/src/api/responses.dart';
 
@@ -16,7 +17,7 @@ class WorkflowsRoutes {
   final WorkflowDispatcher _dispatcher;
 
   /// Registers the routes on [router].
-  void addTo(Router router) {
+  void addTo(ApiRouter router) {
     router
       ..get('/workflows/schema', _schema)
       ..get('/workflows/templates', _templates)
@@ -128,7 +129,12 @@ class WorkflowsRoutes {
           final plan = await _dispatcher.plan(id, workflowId, dispatch);
           return jsonResponse(plan.toJson());
         }
-        final run = await _dispatcher.dispatch(id, workflowId, dispatch);
+        final run = await _dispatcher.dispatch(
+          id,
+          workflowId,
+          dispatch,
+          origin: deviceTokenOf(request).runOrigin,
+        );
         return jsonResponse(
           run.toJson(),
           statusCode: 202,

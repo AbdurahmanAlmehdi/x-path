@@ -129,6 +129,34 @@ void main() {
       expect(Run.fromJson(run.toJson()), run);
     });
 
+    test('carries who started it', () {
+      final started = Run(
+        id: 'run_3',
+        projectId: 'prj_1',
+        workflowId: 'wf_1',
+        workflowVersionId: 'wfv_1',
+        sha: 'a' * 40,
+        state: RunState.queued,
+        locksProject: false,
+        createdAt: created,
+        jobs: const [],
+        origin: const RunOrigin(
+          kind: RunOriginKind.agent,
+          tokenId: 'tok_1',
+          personId: 'per_1',
+          personName: 'Sam',
+        ),
+      );
+
+      expect(started.toJson()['origin'], {
+        'kind': 'agent',
+        'tokenId': 'tok_1',
+        'personId': 'per_1',
+        'personName': 'Sam',
+      });
+      expect(Run.fromJson(started.toJson()), started);
+    });
+
     test('leaves out what it does not have', () {
       final bare = Run(
         id: 'run_1',

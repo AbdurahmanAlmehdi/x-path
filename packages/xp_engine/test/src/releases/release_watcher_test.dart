@@ -206,7 +206,7 @@ class _Failing extends ReleaseService {
         poller: ReleaseStatusPoller(sources: const [], clock: h.clock),
         events: h.events,
         clock: h.clock,
-        dispatch: (_, _, _) => throw UnimplementedError(),
+        dispatch: (_, _, _, {origin}) => throw UnimplementedError(),
       );
 
   @override
@@ -227,7 +227,7 @@ class _Slow extends ReleaseService {
         poller: ReleaseStatusPoller(sources: const [], clock: h.clock),
         events: h.events,
         clock: h.clock,
-        dispatch: (_, _, _) => throw UnimplementedError(),
+        dispatch: (_, _, _, {origin}) => throw UnimplementedError(),
       );
 
   final Completer<void> release = Completer<void>();

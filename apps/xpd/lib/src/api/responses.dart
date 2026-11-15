@@ -3,6 +3,13 @@ import 'dart:convert';
 import 'package:shelf/shelf.dart';
 import 'package:xp_api/xp_api.dart';
 
+/// The headers of every JSON answer: a browser must read it as JSON and
+/// nothing else.
+const _jsonHeaders = {
+  'content-type': 'application/json',
+  'x-content-type-options': 'nosniff',
+};
+
 /// A JSON response with [body] encoded as the body.
 Response jsonResponse(
   Object body, {
@@ -11,7 +18,7 @@ Response jsonResponse(
 }) => Response(
   statusCode,
   body: jsonEncode(body),
-  headers: {'content-type': 'application/json', ...headers},
+  headers: {..._jsonHeaders, ...headers},
 );
 
 /// An error response: the status of [code] and the error envelope.
@@ -33,8 +40,12 @@ Response errorResponse(
       details: details,
     ).toJson(),
   ),
-  headers: {'content-type': 'application/json', ...headers},
+  headers: {..._jsonHeaders, ...headers},
 );
+
+/// The header of an answer that carries a secret, or must not be kept for
+/// another reason: no browser or proxy stores it.
+const noStore = {'cache-control': 'no-store'};
 
 /// `503 secrets_locked`: the engine cannot read its secrets (D-10).
 Response secretsLockedResponse() => errorResponse(

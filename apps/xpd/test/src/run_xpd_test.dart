@@ -86,6 +86,118 @@ void main() {
     });
   });
 
+  group('xpd person', () {
+    Future<int> person(List<String> args) =>
+        run(['person', ...args, '--data-dir', dataDir]);
+
+    test('create prints the id alone on out and a note on err', () async {
+      final code = await person(['create', '--name', 'Sam', '--role', 'admin']);
+
+      expect(code, 0);
+      expect(out.toString(), matches(RegExp(r'^per_[0-9a-f]{16}\n$')));
+      expect(err.toString(), contains('Added Sam, admin (per_'));
+      expect(
+        err.toString(),
+        matches(
+          RegExp(r'Sign-in code for Sam: ([0-9A-Z]{4}-){3}[0-9A-Z]{4}\.'),
+        ),
+      );
+      final people = await withDatabase(
+        (database) => SqlitePersonRepository(database).list(),
+      );
+      expect(people.map((p) => (p.name, p.role)), [
+        ('Owner', PersonRole.admin),
+        ('Sam', PersonRole.admin),
+      ]);
+    });
+
+    test('create refuses a name someone has, and needs both options', () async {
+      expect(await person(['create', '-n', 'owner', '-r', 'viewer']), 1);
+      expect(err.toString(), contains('xpd: Someone is called owner'));
+      expect(await person(['create', '--role', 'viewer']), 64);
+      expect(await person(['create', '--name', 'Sam']), 64);
+      expect(await person(['create', '-n', 'Sam', '-r', 'owner']), 64);
+      expect(out.toString(), isEmpty);
+    });
+
+    test(
+      'list prints every person, oldest first, removed ones marked',
+      () async {
+        await person(['create', '--name', 'Sam', '--role', 'viewer']);
+        final sam = out.toString().trim();
+        await withDatabase(
+          (database) async => database.connection.execute(
+            'UPDATE person SET removed_at = 1 WHERE id = ?',
+            [sam],
+          ),
+        );
+        final before = out.toString().length;
+
+        expect(await person(['list']), 0);
+
+        final lines = out.toString().substring(before).trim().split('\n');
+        expect(lines, hasLength(2));
+        expect(
+          lines.first,
+          matches(RegExp(r'^per_[0-9a-f]{16}\tadmin\tOwner$')),
+        );
+        expect(lines.last, '$sam\tviewer\tSam\tremoved');
+      },
+    );
+
+    test('code prints a sign-in code that signs the person in', () async {
+      await person(['create', '--name', 'Sam', '--role', 'admin']);
+      final sam = out.toString().trim();
+      final before = out.toString().length;
+
+      expect(await person(['code', 'sam']), 0);
+
+      final code = out.toString().substring(before).trim();
+      expect(code, matches(RegExp(r'^([0-9A-Z]{4}-){3}[0-9A-Z]{4}$')));
+      expect(err.toString(), contains('Sign-in code for Sam: $code.'));
+      expect(await person(['code', sam]), 0);
+      final again = out.toString().substring(before + code.length + 1).trim();
+      final signedIn = await withDatabase((database) async {
+        final people = SqlitePersonRepository(database);
+        final tokens = TokenService(
+          tokens: SqliteDeviceTokenRepository(database),
+          people: people,
+          clock: const SystemClock(),
+        );
+        final service = SignInCodeService(
+          codes: SqliteSignInCodeRepository(database),
+          people: people,
+          tokens: tokens,
+          clock: const SystemClock(),
+        );
+        await expectLater(
+          service.signIn(code, address: '127.0.0.1'),
+          throwsA(isA<SignInRejectedException>()),
+          reason: 'a new code replaces the unused one',
+        );
+        return await service.signIn(again, address: '127.0.0.1');
+      });
+      expect(signedIn.token.personId, sam);
+      expect(signedIn.token.kind, DeviceTokenKind.web);
+    });
+
+    test('code refuses an unknown person, and needs one', () async {
+      expect(await person(['code', 'Nobody']), 1);
+      expect(err.toString(), contains('There is no active person "Nobody"'));
+      expect(await person(['code']), 64);
+      expect(await person(['code', 'a', 'b']), 64);
+      expect(out.toString(), isEmpty);
+    });
+
+    test('xpd person --help lists create, code and list', () async {
+      expect(await run(['person', '--help']), 0);
+      expect(
+        out.toString(),
+        allOf(contains('create'), contains('code'), contains('list')),
+      );
+    });
+  });
+
   group('xpd token create', () {
     Future<int> create(List<String> args) =>
         run(['token', 'create', '--data-dir', dataDir, ...args]);
@@ -106,6 +218,7 @@ void main() {
       final token = await withDatabase(
         (database) => TokenService(
           tokens: SqliteDeviceTokenRepository(database),
+          people: SqlitePersonRepository(database),
           clock: const SystemClock(),
         ).authenticate(secret),
       );
@@ -288,6 +401,7 @@ void main() {
         final secret = await withDatabase(
           (database) async => (await TokenService(
             tokens: SqliteDeviceTokenRepository(database),
+            people: SqlitePersonRepository(database),
             clock: const SystemClock(),
           ).issue(name: 'late', kind: DeviceTokenKind.app)).secret,
         );
@@ -312,6 +426,7 @@ void main() {
       final secret = await withDatabase(
         (database) async => (await TokenService(
           tokens: SqliteDeviceTokenRepository(database),
+          people: SqlitePersonRepository(database),
           clock: const SystemClock(),
         ).issue(name: 'late', kind: DeviceTokenKind.app)).secret,
       );
@@ -357,6 +472,7 @@ void main() {
       final secret = await withDatabase(
         (database) async => (await TokenService(
           tokens: SqliteDeviceTokenRepository(database),
+          people: SqlitePersonRepository(database),
           clock: const SystemClock(),
         ).issue(name: 'owner', kind: DeviceTokenKind.app)).secret,
       );
@@ -462,6 +578,7 @@ void main() {
       final secret = await withDatabase(
         (database) async => (await TokenService(
           tokens: SqliteDeviceTokenRepository(database),
+          people: SqlitePersonRepository(database),
           clock: const SystemClock(),
         ).issue(name: 'late', kind: DeviceTokenKind.app)).secret,
       );
@@ -665,6 +782,7 @@ void main() {
         await approvals.findOrCreate(approval('apr_new', 'b' * 40, now));
         final service = TokenService(
           tokens: SqliteDeviceTokenRepository(database),
+          people: SqlitePersonRepository(database),
           clock: const SystemClock(),
         );
         return {
@@ -796,6 +914,7 @@ void main() {
         );
         final service = TokenService(
           tokens: SqliteDeviceTokenRepository(database),
+          people: SqlitePersonRepository(database),
           clock: const SystemClock(),
         );
         return (
@@ -888,6 +1007,7 @@ void main() {
         );
         final service = TokenService(
           tokens: SqliteDeviceTokenRepository(database),
+          people: SqlitePersonRepository(database),
           clock: const SystemClock(),
         );
         return {
@@ -1030,6 +1150,7 @@ void main() {
       final secret = await withDatabase(
         (database) async => (await TokenService(
           tokens: SqliteDeviceTokenRepository(database),
+          people: SqlitePersonRepository(database),
           clock: const SystemClock(),
         ).issue(name: 'late', kind: DeviceTokenKind.app)).secret,
       );
@@ -1267,6 +1388,7 @@ void main() {
         final secret = await withDatabase(
           (database) async => (await TokenService(
             tokens: SqliteDeviceTokenRepository(database),
+            people: SqlitePersonRepository(database),
             clock: const SystemClock(),
           ).issue(name: 'late', kind: DeviceTokenKind.app)).secret,
         );
