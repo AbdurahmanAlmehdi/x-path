@@ -27,6 +27,9 @@ const engineMigrations = <Migration>[
   Migration(version: 20, sql: _v20, foreignKeysOff: true),
   Migration(version: 21, sql: _v21),
   Migration(version: 22, sql: _v22, foreignKeysOff: true),
+  Migration(version: 23, sql: _v23, foreignKeysOff: true),
+  Migration(version: 24, sql: _v24),
+  Migration(version: 25, sql: _v25),
 ];
 
 // Timestamps are integer microseconds since the Unix epoch (UTC), so that
@@ -678,4 +681,113 @@ FROM credential ORDER BY rowid;
 DROP TABLE credential;
 ALTER TABLE new_credential RENAME TO credential;
 CREATE UNIQUE INDEX idx_credential_name ON credential (name COLLATE NOCASE);
+''';
+
+// People and roles (ADR 0017). Every token but a runner's belongs to a
+// person, and an approval records the person who decided it. The person
+// `Owner` (an admin) is made here, on a new database too, and owns every
+// token there is but runners' (D7); `xpd token create` issues for the eldest
+// admin. Two active
+// people never share a name. SQLite cannot change a CHECK, so device_token is
+// rebuilt (foreign keys off: runner refers to it) with `web` and person_id,
+// and approval is rebuilt with `web` and the person who decided, whose id is
+// plain text like run_id (the record outlives the person).
+const _v23 = '''
+CREATE TABLE person (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL CHECK (length(name) BETWEEN 1 AND 80),
+  role TEXT NOT NULL
+    CHECK (role IN ('viewer', 'developer', 'releaser', 'admin')),
+  created_at INTEGER NOT NULL,
+  removed_at INTEGER
+) STRICT;
+CREATE UNIQUE INDEX idx_person_name ON person (name COLLATE NOCASE)
+  WHERE removed_at IS NULL;
+
+INSERT INTO person (id, name, role, created_at)
+VALUES ('per_' || lower(hex(randomblob(8))), 'Owner', 'admin',
+  CAST(strftime('%s', 'now') AS INTEGER) * 1000000);
+
+CREATE TABLE new_device_token (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  kind TEXT NOT NULL CHECK (kind IN ('app', 'cli', 'mcp', 'runner', 'web')),
+  hash TEXT NOT NULL UNIQUE,
+  person_id TEXT REFERENCES person (id),
+  created_at INTEGER NOT NULL,
+  revoked_at INTEGER,
+  CHECK (kind = 'runner' OR person_id IS NOT NULL)
+) STRICT;
+
+INSERT INTO new_device_token (id, name, kind, hash, person_id, created_at,
+  revoked_at)
+SELECT id, name, kind, hash,
+  CASE WHEN kind = 'runner' THEN NULL ELSE (SELECT id FROM person) END,
+  created_at, revoked_at
+FROM device_token ORDER BY rowid;
+
+DROP TABLE device_token;
+ALTER TABLE new_device_token RENAME TO device_token;
+CREATE INDEX idx_device_token_person ON device_token (person_id);
+
+CREATE TABLE new_approval (
+  id TEXT PRIMARY KEY,
+  project_id TEXT NOT NULL REFERENCES project (id) ON DELETE CASCADE,
+  action TEXT NOT NULL,
+  sha TEXT,
+  version TEXT,
+  run_id TEXT,
+  job_id TEXT,
+  state TEXT NOT NULL,
+  created_at INTEGER NOT NULL DEFAULT 0,
+  expires_at INTEGER,
+  decided_at INTEGER,
+  decided_by TEXT,
+  decided_by_name TEXT,
+  decided_by_kind TEXT
+    CHECK (decided_by_kind IS NULL OR decided_by_kind IN ('app', 'cli', 'web')),
+  decided_by_person_id TEXT,
+  decided_by_person_name TEXT,
+  reason TEXT
+) STRICT;
+
+INSERT INTO new_approval (id, project_id, action, sha, version, run_id,
+  job_id, state, created_at, expires_at, decided_at, decided_by,
+  decided_by_name, decided_by_kind, reason)
+SELECT id, project_id, action, sha, version, run_id, job_id, state,
+  created_at, expires_at, decided_at, decided_by, decided_by_name,
+  decided_by_kind, reason
+FROM approval ORDER BY rowid;
+
+DROP TABLE approval;
+ALTER TABLE new_approval RENAME TO approval;
+CREATE INDEX idx_approval_project ON approval (project_id, state);
+CREATE UNIQUE INDEX idx_approval_binding ON approval (
+  project_id, action, COALESCE(sha, ''), COALESCE(version, ''),
+  COALESCE(run_id, '')
+);
+CREATE INDEX idx_approval_due ON approval (expires_at) WHERE state = 'pending';
+''';
+
+/// Who started a run (ADR 0017): the JSON of a `RunOrigin`, or NULL for the
+/// runs from before.
+const _v24 = '''
+ALTER TABLE run ADD COLUMN origin TEXT
+  CHECK (origin IS NULL OR json_valid(origin));
+''';
+
+/// Browser sessions (ADR 0018): a `web` token expires (D11), and a browser
+/// signs in with a one-time code, of which only the SHA-256 is kept (D10).
+const _v25 = '''
+ALTER TABLE device_token ADD COLUMN expires_at INTEGER
+  CHECK (expires_at IS NULL OR kind = 'web');
+
+CREATE TABLE sign_in_code (
+  hash TEXT PRIMARY KEY,
+  person_id TEXT NOT NULL REFERENCES person (id),
+  created_at INTEGER NOT NULL,
+  expires_at INTEGER NOT NULL,
+  used_at INTEGER
+) STRICT;
+CREATE INDEX idx_sign_in_code_person ON sign_in_code (person_id);
 ''';

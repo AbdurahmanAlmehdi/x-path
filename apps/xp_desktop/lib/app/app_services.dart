@@ -33,6 +33,28 @@ typedef FileRevealer = Future<void> Function(String path);
 /// Opens [url] in the browser.
 typedef UrlOpener = Future<void> Function(Uri url);
 
+/// Runs [executable] with [arguments], as [Process.run] does.
+typedef ProcessRun = Future<ProcessResult> Function(
+  String executable,
+  List<String> arguments,
+);
+
+/// Opens [url] with macOS `open`, in the browser for a web address.
+///
+/// Throws a [ProcessException] when `open` fails, so that the caller says
+/// so. The exception leaves the URL out: a dashboard link holds a sign-in
+/// code.
+Future<void> openWithSystem(Uri url, {ProcessRun run = Process.run}) async {
+  final result = await run('/usr/bin/open', ['$url']);
+  if (result.exitCode == 0) return;
+  throw ProcessException(
+    '/usr/bin/open',
+    const [],
+    'It could not open the link (exit code ${result.exitCode}).',
+    result.exitCode,
+  );
+}
+
 /// Asks the user where to save the file whose bytes arrive on [content]
 /// (offering [suggestedName]) and writes it there; the path, or `null` when
 /// they cancel.
@@ -145,9 +167,7 @@ class AppServices {
       revealFile: (path) async {
         await Process.run('/usr/bin/open', ['-R', path]);
       },
-      openUrl: (url) async {
-        await Process.run('/usr/bin/open', ['$url']);
-      },
+      openUrl: openWithSystem,
       engineLog: p.join(engineDataDirectory(home), 'service-logs', 'xpd.log'),
       deviceName: Platform.localHostname.split('.').first,
       alerts: MethodChannelNeedsYouAlerts(),

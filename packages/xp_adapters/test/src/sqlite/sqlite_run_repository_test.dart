@@ -141,6 +141,30 @@ void main() {
     expect(read.locksProject, isFalse);
     expect(read.lockHeld, isFalse);
     expect(read.request, isEmpty);
+    expect(read.origin, isNull);
+  });
+
+  test('stores who started a run', () async {
+    const origin = RunOrigin(
+      kind: RunOriginKind.agent,
+      tokenId: 'tok_1',
+      personId: 'per_1',
+      personName: 'Sam',
+    );
+    await repository.create(
+      RunRecord(
+        id: 'run_3',
+        projectId: 'prj_1',
+        workflowId: 'wf_1',
+        workflowVersionId: 'wfv_1',
+        sha: 'c' * 40,
+        locksProject: false,
+        createdAt: _created,
+        origin: origin,
+      ),
+    );
+
+    expect((await repository.get('run_3'))!.origin, origin);
   });
 
   test('refuses a project or workflow version that is not there', () async {

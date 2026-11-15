@@ -3,7 +3,8 @@ import 'package:xp_repositories/src/session/engine_session.dart';
 
 /// What the settings show of the engine of an [EngineSession]: its version,
 /// its GitHub token (one, shared by every project, which adding a project
-/// needs), and the tokens it makes for `xp` and agents.
+/// needs), the tokens it makes for `xp` and agents, and the way into its
+/// web dashboard.
 class SettingsRepository {
   /// Creates the repository.
   const new(this._session);
@@ -37,4 +38,9 @@ class SettingsRepository {
     required String name,
     required DeviceTokenKind kind,
   }) => _session.call((client) => client.createToken(name: name, kind: kind));
+
+  /// The page that signs this app's own person in to the engine's web
+  /// dashboard, with a new one-time sign-in code in it (D9).
+  Future<Uri> dashboardSignInUrl() =>
+      _session.call((client) => client.dashboardSignInUrl());
 }

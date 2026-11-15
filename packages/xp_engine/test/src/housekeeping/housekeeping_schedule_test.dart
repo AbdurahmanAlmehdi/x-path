@@ -5,6 +5,7 @@ import 'package:xp_api/xp_api.dart';
 import 'package:xp_engine/xp_engine.dart';
 
 import '../../helpers/housekeeping_harness.dart';
+import '../../helpers/people.dart';
 
 class _ManualTimer implements Timer {
   new(this.callback);
@@ -28,19 +29,24 @@ void main() {
   late List<_ManualTimer> timers;
   late List<Duration> periods;
   late List<Object> errors;
+  late InMemoryDeviceTokenRepository tokenRepository;
+  late TokenService tokens;
 
-  HousekeepingSchedule schedule({HousekeepingService? service}) =>
-      HousekeepingSchedule(
-        service: service ?? h.service,
-        clock: h.clock,
-        onError: (error, _) => errors.add(error),
-        timers: (period, callback) {
-          periods.add(period);
-          final timer = _ManualTimer(callback);
-          timers.add(timer);
-          return timer;
-        },
-      );
+  HousekeepingSchedule schedule({
+    HousekeepingService? service,
+    TokenService? tokenService,
+  }) => HousekeepingSchedule(
+    service: service ?? h.service,
+    tokens: tokenService ?? tokens,
+    clock: h.clock,
+    onError: (error, _) => errors.add(error),
+    timers: (period, callback) {
+      periods.add(period);
+      final timer = _ManualTimer(callback);
+      timers.add(timer);
+      return timer;
+    },
+  );
 
   Future<void> addOldJob() async {
     await h.addBuild(id: 'old', days: 100, names: const []);
@@ -52,6 +58,12 @@ void main() {
     timers = [];
     periods = [];
     errors = [];
+    tokenRepository = InMemoryDeviceTokenRepository();
+    tokens = TokenService(
+      tokens: tokenRepository,
+      people: InMemoryPersonRepository([owner]),
+      clock: h.clock,
+    );
   });
 
   test('prunes at the start when it never did, then every day', () async {
@@ -70,6 +82,31 @@ void main() {
     await Future<void>.delayed(Duration.zero);
 
     expect(h.files.logs, isEmpty);
+  });
+
+  test('deletes the tokens of the browser sessions that ended', () async {
+    final ended = await tokens.issueWeb(personId: owner.id);
+    await tokens.revoke(ended.token.id);
+    h.clock.advance(TokenService.endedWebTokenGrace + const Duration(hours: 1));
+    final open = await tokens.issueWeb(personId: owner.id);
+
+    await schedule().start();
+
+    expect((await tokenRepository.list()).map((t) => t.id), [open.token.id]);
+  });
+
+  test('deletes the ended sessions even when pruning the logs '
+      'fails', () async {
+    await addOldJob();
+    h.files.failOn = 'logs old';
+    final ended = await tokens.issueWeb(personId: owner.id);
+    await tokens.revoke(ended.token.id);
+    h.clock.advance(TokenService.endedWebTokenGrace + const Duration(hours: 1));
+
+    await schedule().start();
+
+    expect(errors.single, isA<HousekeepingException>());
+    expect(await tokenRepository.list(), isEmpty);
   });
 
   test('does not prune at the start when it did a few hours ago', () async {

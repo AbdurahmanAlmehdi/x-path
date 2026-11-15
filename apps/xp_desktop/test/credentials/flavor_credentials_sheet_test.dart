@@ -384,6 +384,43 @@ void main() {
       ).called(1);
     });
 
+    testWidgets('names the certificate of a project in a deep folder within '
+        'the limit', (tester) async {
+      when(
+        () => credentials.createDistributionCertificate(
+          any(),
+          app: any(named: 'app'),
+          flavor: any(named: 'flavor'),
+          name: any(named: 'name'),
+        ),
+      ).thenAnswer((_) async => slackWebhook);
+      final deep = Project(
+        id: orbit.id,
+        githubRepoId: orbit.githubRepoId,
+        host: orbit.host,
+        sourceKey: orbit.sourceKey,
+        fullName: '/Users/sam/${'clients/' * 10}orbit',
+        remote: orbit.remote,
+        defaultBaseBranch: orbit.defaultBaseBranch,
+        profile: orbit.profile,
+      );
+      await open(tester, project: deep);
+
+      await tap(
+        tester,
+        find.byKey(const Key('flavorCredentials.createCertificate')),
+      );
+
+      verify(
+        () => credentials.createDistributionCertificate(
+          'prj_1',
+          app: '.',
+          flavor: 'prod',
+          name: 'Apple Distribution · orbit prod',
+        ),
+      ).called(1);
+    });
+
     testWidgets('offers no certificate once the flavor has an identity', (
       tester,
     ) async {

@@ -5,6 +5,7 @@ import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:xp_api/xp_api.dart';
 import 'package:xp_client/xp_client.dart';
 
+import '../helpers/api_probe.dart';
 import '../helpers/collector.dart';
 import '../helpers/fake_web_socket.dart';
 import '../helpers/scripted_connector.dart';
@@ -31,6 +32,7 @@ void main() {
     delays = [];
     client = XpClient(
       baseUrl: Uri.parse('http://engine:7480'),
+      httpClient: apiProbeOnly(),
       token: 't',
       connector: connector.call,
       delay: (duration) async => delays.add(duration),
@@ -58,13 +60,17 @@ void main() {
       watch();
       await pumpEventQueue();
 
-      expect(connector.uris.single.toString(), 'ws://engine:7480/events');
+      expect(
+        connector.uris.single.toString(),
+        'ws://engine:7480/api/v1/events',
+      );
     });
 
     test('uses wss for an https engine', () async {
       connector.socket();
       final secure = XpClient(
         baseUrl: Uri.parse('https://engine'),
+        httpClient: apiProbeOnly(),
         token: 't',
         connector: connector.call,
       );
@@ -350,6 +356,7 @@ void main() {
         final gate = Completer<void>();
         final patient = XpClient(
           baseUrl: Uri.parse('http://engine:7480'),
+          httpClient: apiProbeOnly(),
           token: 't',
           connector: connector.call,
           delay: (_) => gate.future,

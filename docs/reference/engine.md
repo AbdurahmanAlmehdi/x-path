@@ -14,12 +14,29 @@ dart run apps/xpd/bin/xpd.dart serve                                      # http
   SIGINT and SIGTERM close the server and its WebSocket connections cleanly. `--slots` is how many jobs run at
   once here (see Workflows and the scheduler).
 - `xpd token create --name <name> --kind app|cli|mcp|runner` creates a device token and prints it
-  once on stdout. Only its SHA-256 is stored. A running engine accepts it at once.
+  once on stdout. Only its SHA-256 is stored. A running engine accepts it at once. The token
+  belongs to the admin who has been one the longest (`Owner` on a new or upgraded database;
+  ADR 0017).
+- `xpd person create --name <name> --role viewer|developer|releaser|admin` adds a person, prints
+  its id on stdout and a sign-in code for the web dashboard on stderr. `xpd person code <name or
+  id>` prints a new code on stdout (it ends the person's unused codes), and `xpd person list`
+  prints the people, tab-separated. Like `xpd token create` they write to the database directly,
+  so they work while the engine runs; they are how a headless engine gets its first admin.
 - `xpd secrets import-gh [--data-dir <path>] [--gh <path>]` stores the token of the GitHub CLI in
   the engine's secret store (see Projects and scans).
-- Every route except `GET /health` and `GET /version` needs `Authorization: Bearer <token>`.
-- `GET /events` is a WebSocket. Each frame carries a `seq`; reconnect with `?after=<last seq>` to
-  receive what was missed. [`packages/xp_api/openapi.yaml`](../../packages/xp_api/openapi.yaml)
+- The API is under `/api/v1` (ADR 0018). Every route except `GET /health`, `GET /version`,
+  `POST /runners/pair` and `POST /session` needs `Authorization: Bearer <token>`, or, under
+  `/api/v1` only, a browser's session cookie. Every route that changes something needs the
+  permission `apps/xpd/lib/src/api/route_permissions.dart` names for it (ADR 0017); a viewer, a
+  developer, a releaser and an admin get what the [roles](../guide/dashboard.md#roles) say.
+- **The root aliases.** A root path (`/projects`, `/events`, ...) is the API only when the request
+  carries `Authorization`, or the path is `/health`, `/version` or `/runners/pair`. Those are
+  deprecated aliases for the clients made before the move: every answer carries
+  `Deprecation: true`, `Sunset` (2027-11-14) and `Link: </api/v1/...>; rel="successor-version"`,
+  and every answer to a root path `Vary: Authorization`. They are removed in XPath 2.0, on or
+  after that date. A cookie never authenticates an alias.
+- `GET /api/v1/events` is a WebSocket. Each frame carries a `seq`; reconnect with
+  `?after=<last seq>` to receive what was missed. [`packages/xp_api/openapi.yaml`](../../packages/xp_api/openapi.yaml)
   documents the API.
 
 The data directory holds the SQLite database, `xpath.db` (ADR 0002). It is
@@ -69,6 +86,43 @@ Secrets (`packages/xp_secrets`) live on the engine machine behind the `SecretSto
 - **Log masking.** `SecretMasker` replaces known secret values with `***` in process output. A
   multi-line secret is masked line by line, overlapping secrets are merged, lines shorter than 6
   characters are ignored, and `MaskingStream` masks a secret split between two chunks.
+
+### The web dashboard
+
+`xpd serve` serves the [web dashboard](../guide/dashboard.md) (`apps/xp_web`) on the API's origin
+from the first of these that has an `index.html`: `web` next to the `bin` of the engine's bundle,
+or `Contents/Resources/web` of `XPath.app` for the engine the app carries. It prints
+`xpd serves the dashboard in <folder>`. Without one (`dart run`), every path outside the API gets
+the JSON `404`.
+
+- A path under `/api` is never a page: an unknown one is the JSON `404`.
+- A `GET` or `HEAD` that accepts `text/html` gets `index.html` with `Cache-Control: no-cache`;
+  `/assets/*` (hashed names) are `public, max-age=31536000, immutable`; anything else is the
+  JSON `404`.
+- Pages carry a `Content-Security-Policy` with `default-src 'self'`, `script-src 'self'`,
+  `style-src 'self'`, `connect-src 'self'` plus `wss://` of the public URL, and
+  `frame-ancestors 'none'`, with `X-Content-Type-Options: nosniff` and
+  `Referrer-Policy: no-referrer`. `xpd` sends no CORS headers.
+
+**Sessions** (ADR 0018). `POST /api/v1/session` with a sign-in code (one use, 10 minutes, only its
+SHA-256 kept; 20 failures in 10 minutes and the next attempt gets `429`) answers with the person
+and sets the cookie of a `web` token that lasts 8 hours: `__Host-xp_session` (`Secure`) through
+the HTTPS public URL, `xp_session` on a loopback origin, both `HttpOnly; SameSite=Strict; Path=/`.
+`DELETE /api/v1/session` revokes it. The engine has no TLS, so sign-in is refused (`403`, with a
+`hint`) unless the request comes over a loopback connection to a loopback origin, or from the
+public URL's origin.
+
+- **Origins.** Exact strings: the public URL's origin (`xp settings public-url`, `https` only),
+  and `http://127.0.0.1:<port>`, `http://localhost:<port>` and `http://[::1]:<port>` when `Host`
+  is one of those too, against DNS rebinding. `X-Forwarded-*` is never read.
+- **CSRF.** A request authenticated by the cookie, other than `GET`, `HEAD` and `OPTIONS`, needs
+  an allowed `Origin` and `X-XPath-CSRF: 1`, else `403 csrf`. A request with `Authorization` is a
+  bearer request: the cookie is ignored.
+- **Sockets.** `/api/v1/events` and `/api/v1/jobs/{id}/logs` take the cookie with an allowed
+  `Origin`, and close with code 4401 when the token is revoked (sign-out, an admin, removing the
+  person) or, within 60 seconds, when it expires. `/runners/connect` never takes a cookie.
+- **Roles.** The role is read with the token on every request, so a change applies to the next
+  one. `GET /api/v1/me` answers the person and their permissions.
 
 ## Running as a service
 

@@ -40,6 +40,25 @@ void main() {
       });
       expect(DecidedBy.fromJson(decider.toJson()), decider);
     });
+
+    test('carries the person who decided, when there was one', () {
+      const byPerson = DecidedBy(
+        tokenId: 'tok_2',
+        name: 'Chrome',
+        kind: DeviceTokenKind.web,
+        personId: 'per_1',
+        personName: 'Sam',
+      );
+
+      expect(byPerson.toJson(), {
+        'tokenId': 'tok_2',
+        'name': 'Chrome',
+        'kind': 'web',
+        'personId': 'per_1',
+        'personName': 'Sam',
+      });
+      expect(DecidedBy.fromJson(byPerson.toJson()), byPerson);
+    });
   });
 
   group('Approval', () {

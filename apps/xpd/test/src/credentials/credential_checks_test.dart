@@ -11,16 +11,18 @@ import 'package:xp_fake_play/xp_fake_play.dart';
 import 'package:xpd/xpd.dart';
 
 import '../../helpers/credential_fakes.dart';
+import '../../helpers/test_engine.dart';
 
 const _bundleId = 'com.orbit.app';
 
-final _owner = DeviceToken(
+final DeviceToken _owner = DeviceToken(
   id: 'tok_app',
   name: 'Mac',
   kind: DeviceTokenKind.app,
   hash: 'h',
   createdAt: DateTime.utc(2026),
-);
+  personId: testOwner.id,
+).withPerson(testOwner);
 
 /// The whole of the credential checks against the fake stores: the real
 /// clients, the real SQLite repository and the real verifiers, with the

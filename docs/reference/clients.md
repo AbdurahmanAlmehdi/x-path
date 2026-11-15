@@ -1,6 +1,6 @@
 # Clients
 
-The `xp` command line, `xp mcp`, the client library and the desktop app. The user guide is in [docs/guide](../guide/quickstart.md); this is the reference.
+The `xp` command line, `xp mcp`, the client library, the desktop app and the web dashboard. The user guide is in [docs/guide](../guide/quickstart.md); this is the reference.
 
 ## The `xp` command line
 
@@ -43,14 +43,16 @@ the API answered, for scripts; otherwise it prints text and tables.
 | `xp runs show <run>`, `cancel <run>` | `/runs/{id}`; `show` names the approval a waiting run needs |
 | `xp jobs show <job>`, `cancel <job>`, `resume <job> [--from-step n]` | `/jobs/{id}` |
 | `xp logs <job> [-f] [--after seq]` | `/jobs/{id}/logs` (WebSocket) |
-| `xp approvals list [--project --state]`, `show <a>`, `approve <a> [--reason]`, `deny <a> [--reason]` | `/approvals`; the CLI token is a `cli` token, which may decide (D-13) |
-| `xp gates show <p>`, `tighten <p> <action>...` | `/projects/{id}/gates`; only the app loosens a gate |
+| `xp approvals list [--project --state]`, `show <a>`, `approve <a> [--reason]`, `deny <a> [--reason]` | `/approvals`; a `cli` token decides when its person is a releaser or an admin (ADR 0017) |
+| `xp gates show <p>`, `tighten <p> <action>...` | `/projects/{id}/gates`; only an admin's `app` or `web` token loosens a gate |
 | `xp releases list`, `show <r>`, `refresh <r>`, `status <r> <apple\|play> <state>`, `build <r>`, `merge <r>`, `rollout <r> --store <apple\|play> (--pause\|--resume\|--complete\|--halt\|--percent <n>)`, `abandon <r>`, `notes <r> [--format slack\|whatsapp]` | `/releases` |
 | `xp storage report`, `free [--apply] [--category c]`, `retention [--keep n] [--log-days n]` | `/storage` (`free` is a dry run unless you pass `--apply`) |
 | `xp runners pair <name>`, `revoke <runner>` | `POST /runners/pairing-tokens`, `POST /runners/{id}/revoke` (a runner is its name or id); see Runners |
 | `xp runner pair`, `start` | the runner agent of this machine (`POST /runners/pair`, `GET /runners/connect`); see The runner agent |
 | `xp runner install-service`, `uninstall-service`, `service-status` | the LaunchAgent or systemd unit of the runner of this machine, no engine call; see Running as a service |
 | `xp artifacts list <job>`, `download <a> [-o path]` | `/jobs/{id}/artifacts`, `/artifacts/{id}/download` (checks the SHA-256 the engine sends) |
+| `xp dashboard [--print]` | `GET /me`, `POST /people/{id}/sign-in-codes`, `GET /settings/public-url`; opens `<public URL or engine URL>/sign-in#code=…` in the browser, or prints it |
+| `xp settings public-url [<url> \| --clear]` | `GET` and `PUT /settings/public-url`; the HTTPS address browsers reach the engine at through a proxy |
 | `xp mcp` | see below |
 
 `xp logs` without `-f` prints the log so far and stops once the engine has been quiet for 750 ms; with `-f` it follows
@@ -93,7 +95,7 @@ when a check refuses it.
 | 70 | the engine failed (`500`) |
 | 73 | a conflict (`409`): an approval decided already, a project added already |
 | 75 | `xp runner start` switched to another version (an update or a rollback); its service manager starts it again, or `xp` started the new version itself and this is its code |
-| 77 | the token is rejected (`401`), or its kind may not do this (`403`) |
+| 77 | the token is rejected (`401`), or its kind or its person's role may not do this (`403`) |
 | 78 | not connected: `xp connect` first |
 
 **The update check.** Once a day `xp` asks GitHub for the latest release of `AbdurahmanAlmehdi/x-path` and prints a
@@ -137,10 +139,19 @@ loosening the gate, and approves with an app token.
 
 `packages/xp_client` is the Dart client of the API that `xp`, `xp mcp` and the desktop app share. It depends on
 `xp_api` only, has a method per endpoint (the ones in `openapi.yaml`: projects, scans, credentials, workflows,
-dispatch, runs, jobs, artifacts, test runs, approvals, gates, releases, storage, runners) and 100% test coverage.
+dispatch, runs, jobs, artifacts, test runs, approvals, gates, releases, storage, runners, people, tokens, sign-in
+codes, settings) and 100% test coverage.
 The runner methods are what the runner agent uses: `pairRunner` (no token), `connectRunner` (the WebSocket; the
 caller speaks the frames of `xp_api`) and `uploadRunnerArtifact` (streams the file with its SHA-256 and size).
 
+- **`/api/v1`** (ADR 0018). Before its first request the client asks `GET /api/v1/version` once, without a token:
+  `200` means the engine serves the API under `/api/v1`, and `401` or `404` that it is older and serves it at the
+  root, which the client then uses. Any other answer, or none, is not remembered, so the next request asks again.
+  A Homebrew or tarball `xp` can be newer than a remote engine, so the probe stays until the root aliases go in 2.0.
+  Sockets follow the same base path.
+- **The dashboard link.** `dashboardSignInUrl()` asks `/me`, a sign-in code for that person and the public URL, and
+  gives `<public URL, else the client's base URL>/sign-in#code=<code>`: the code is in the fragment, which no
+  server sees.
 - **Errors.** Every error is an `XpClientException`. A non-2xx answer is an `ApiException` with the status, the
   `ApiErrorCode` of the error envelope (`null` if the answer was not one) and, for `already_decided`, the approval as
   it stands. A network failure, a timeout or an answer that is not JSON is a `ConnectionException`.
@@ -266,6 +277,10 @@ sidebar mark are assets, and the icons are Phosphor's.
   GitHub CLI" (`gh auth token` on the engine machine) and "Remove token". Add project asks the engine for the token
   when it opens and after a failed add; without one (or with one GitHub refuses) it says so and "Connect GitHub…"
   opens this section with the cursor in the field.
+- **Web dashboard** (Settings): "Open dashboard" asks the engine for a sign-in code for the person the app's token
+  belongs to and opens `<public URL or engine URL>/sign-in#code=…` through `AppServices.openUrl`
+  (`DashboardBloc`, `droppable`). People, roles and the public URL are managed in the dashboard and with `xp`, not
+  in the app.
 - **Remove XPath** (Settings): a sheet with "Also delete engine data" and "Also delete Keychain items". Confirmed, it
   (1) revokes every runner of the engine on this Mac through its API while it still runs (`revokeLocalRunners`),
   (2) unregisters the engine's login item (`SMAppService.unregister`, which makes launchd stop it) and waits until
@@ -280,3 +295,33 @@ sidebar mark are assets, and the icons are Phosphor's.
   `CliLinker.unlink`, `DataWiper`, `KeychainWiper`, `RunningApp`, `AppMenu`) with fakes; no test removes anything
   real. An engine started with `--data-dir` or `XPATH_DATA_DIR` elsewhere keeps that folder. Not built (owner,
   Goal 3): Sparkle and the appcast, and the Homebrew cask with its `zap` stanza.
+
+## The web dashboard
+
+`apps/xp_web` is the browser client (ADR 0018): Vue 3 with the Composition API, TypeScript, Pinia, Vue Router and
+Vite, every dependency pinned to an exact version. `xpd` serves its build on the engine's own origin (see
+[Running the engine](engine.md#the-web-dashboard)); the user guide is [The web dashboard](../guide/dashboard.md).
+It has the screens of the desktop app but the Mac-only ones (the engine on this Mac, the `xp` link, the menu bar
+extra, Remove XPath), and adds People and Tokens.
+
+- **Layout.** `src/api` holds `schema.d.ts`, generated from `openapi.yaml` by openapi-typescript (`npm run gen:api`;
+  `npm run gen:api:check` fails on a stale one), `client.ts` on openapi-fetch, and `sockets.ts`. `src/app` has the
+  router: a signed-out page goes to `/sign-in?next=<path>`, and `next` must be a path of the same origin.
+  `src/ui` has the shared components and `base.css`, which imports the design tokens (`xp-tokens.css`) for light
+  and dark. Each screen is `src/features/<feature>/{stores,views,components}`, with one Pinia store per feature:
+  views read stores, and only stores call `src/api`.
+- **The client.** Every request carries `X-XPath-CSRF: 1`. A `401` (other than a refused sign-in) signs the tab
+  out; a `403` reads `GET /me` again, so a demoted person's buttons go at once. The screens show only what the
+  permissions of `/me` allow, and never repeat the engine's rules.
+- **Sockets.** One `/api/v1/events` socket per tab, resumed with `after=<seq>`; job logs resume after the last
+  line. Both reconnect from 1 s up to 30 s; a close with 4401 signs the tab out and never reconnects.
+- **Secrets.** A pairing token, sign-in code or new token lives only in its dialog until it closes; no store keeps
+  one. Credential files are read only when the form is sent, and every secret field is a password field.
+- **CSP.** The workflow builder's YAML editor (CodeMirror 6) loads on demand, outside the entry bundle, and draws
+  in a shadow root, so the page's `style-src 'self'` holds.
+- **Tests.** Vitest, with 100% line coverage for `src/api/**` and every store and 90% for the rest
+  (`npm run test:coverage`), plus `npm run lint`, `npm run typecheck` and `npm run licenses`. The Playwright specs
+  in `e2e/` run against a real AOT `xpd` with `tool/e2e/web_e2e.sh [<spec>...]` (`signin`, `runs`, `approvals`,
+  `admin`, `workflows`), on Chromium, and all but `admin` on WebKit too. Node 22.12 or later; `.nvmrc` names 24.
+- **Packaging.** `tool/release/web_dist.sh` builds it once; `bundles.sh` copies it into every `xpd/web`,
+  `build_mac.sh` into `Contents/Resources/web`, and the `Dockerfile` refuses a bundle without it.

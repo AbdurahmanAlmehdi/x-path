@@ -6,16 +6,21 @@ import 'package:shelf_web_socket/shelf_web_socket.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:xp_api/xp_api.dart';
 import 'package:xp_engine/xp_engine.dart';
+import 'package:xpd/src/api/allowed_origins.dart';
 import 'package:xpd/src/api/jobs/jobs_routes.dart';
+import 'package:xpd/src/api/middleware.dart';
 import 'package:xpd/src/api/responses.dart';
+import 'package:xpd/src/api/token_sockets.dart';
 
 /// WebSocket close code for a normal closure (RFC 6455).
 const _normalClosure = 1000;
 
 /// `GET /jobs/{id}/logs`: the log lines of a job over a WebSocket.
 ///
-/// Like `/events`: clients authenticate with the bearer header before the
-/// upgrade, each text frame is JSON (a `LogFrame`), and a client that saw
+/// Like `/events`: clients authenticate with the bearer header or a
+/// browser's session cookie before the upgrade, a browser's `Origin` must be
+/// one of [AllowedOrigins], the socket closes when its token stops working,
+/// each text frame is JSON (a `LogFrame`), and a client that saw
 /// line `seq` reconnects with `?after=<seq>`. The route replays the log from
 /// the cursor, then follows the job live. A client that reads too slowly gets
 /// a `gap` frame for the lines it missed (the log has them), never an
@@ -23,10 +28,17 @@ const _normalClosure = 1000;
 /// job is in, and the socket closes with code 1000.
 class JobLogsRoute {
   /// Creates the route over the jobs and their logs.
-  new({required this._jobs, required this._logs});
+  new({
+    required this._jobs,
+    required this._logs,
+    required this._origins,
+    required this._tokens,
+  });
 
   final JobControl _jobs;
   final JobLogs _logs;
+  final AllowedOrigins _origins;
+  final TokenSockets _tokens;
   final _sockets = <WebSocketChannel>{};
 
   /// Handles the request for the logs of job [id]: validates it, then
@@ -37,6 +49,9 @@ class JobLogsRoute {
         ApiErrorCode.upgradeRequired,
         'This route only speaks WebSocket.',
       );
+    }
+    if (await socketOriginRefusal(request, _origins) case final refusal?) {
+      return refusal;
     }
     final param = request.url.queryParameters['after'];
     final after = param == null ? 0 : int.tryParse(param);
@@ -53,10 +68,14 @@ class JobLogsRoute {
         'Line $after is beyond the log of job $id; reconnect without after.',
       );
     }
+    final origin = request.headers['origin'];
+    final token = deviceTokenOf(request);
     return await webSocketHandler(
-      (channel, _) => _onConnection(channel, id, after),
-      // Browsers always send Origin. No browser may talk to the engine.
-      allowedOrigins: const [],
+      (channel, _) {
+        _tokens.track(token, channel);
+        _onConnection(channel, id, after);
+      },
+      allowedOrigins: origin == null ? null : [origin],
       pingInterval: const Duration(seconds: 30),
     )(request);
   });

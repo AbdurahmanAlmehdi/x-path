@@ -11,10 +11,15 @@
 #     script that `melos run test:coverage` runs it with (100% for xp_api,
 #     xp_client, xp_engine and xp_repositories, 90% for the rest),
 #   - contract: the contract tests,
-#   - smoke: the xpd bundle smoke test,
+#   - smoke: the xpd bundle smoke test, with the web dashboard built,
 #   - runner-offline: tool/e2e/runner_offline_e2e.sh,
 #   - quickstart: tool/e2e/quickstart_cli.sh, the CLI path of
-#     docs/guide/quickstart.md.
+#     docs/guide/quickstart.md,
+#   - web: the web dashboard (apps/xp_web): npm licenses, lint, types,
+#     coverage, the generated client, the build and tool/e2e/web_e2e.sh.
+#     It runs only when `changes` finds a change in apps/xp_web or
+#     packages/xp_api/openapi.yaml (its output `web`); `gate` accepts it
+#     skipped otherwise.
 #
 # A new workspace package goes into the coverage matrix below (and into the
 # one of macos.yaml if it has macOS-only tests); `dart run
@@ -23,7 +28,8 @@
 #
 # Flutter 3.47.6 ships Dart 3.13.5; keep both in sync with .fvmrc. The
 # workspace has Flutter members, so even `dart pub get` needs the Flutter SDK.
-# Keep melos at the version of pubspec.lock.
+# Keep melos at the version of pubspec.lock. Node comes from
+# apps/xp_web/.nvmrc.
 name: gate
 
 concurrency:
@@ -46,6 +52,7 @@ jobs:
     timeout-minutes: 5
     outputs:
       code: ${{ steps.diff.outputs.code }}
+      web: ${{ steps.diff.outputs.web }}
     steps:
       - name: Git Checkout
         uses: actions/checkout@v7
@@ -61,11 +68,16 @@ jobs:
           # A push that creates a branch has no `before`: run everything.
           if ! git cat-file -e "$BASE^{commit}" 2>/dev/null; then
             echo "code=true" >> "$GITHUB_OUTPUT"
+            echo "web=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           changed=$(git diff --name-only "$BASE" HEAD -- \
             ':!docs' ':!site' ':!skills' ':!*.md')
           echo "code=$([ -n "$changed" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          # The web dashboard, and the API its client is generated from.
+          web=$(git diff --name-only "$BASE" HEAD -- \
+            apps/xp_web packages/xp_api/openapi.yaml)
+          echo "web=$([ -n "$web" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
 
   analyze:
     name: analyze
@@ -169,6 +181,15 @@ jobs:
       - *setup-flutter
       - *install-dependencies
 
+      - &setup-node
+        name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: apps/xp_web/.nvmrc
+          cache: npm
+          cache-dependency-path: apps/xp_web/package-lock.json
+
+      # Builds the web dashboard into the bundle, like tool/release/bundles.sh.
       - name: Smoke Test the xpd Bundle
         run: tool/e2e/smoke_bundle.sh
 
@@ -218,20 +239,74 @@ jobs:
       - name: CLI Quickstart E2E
         run: tool/e2e/quickstart_cli.sh
 
+  web:
+    name: web
+    needs: changes
+    if: ${{ needs.changes.outputs.web == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: apps/xp_web
+    steps:
+      - *checkout
+      - *setup-node
+
+      - name: Install Dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Check Licenses
+        run: npm run licenses
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Type Check
+        run: npm run typecheck
+
+      - name: Test with Coverage
+        run: npm run test:coverage
+
+      # Fails when openapi.yaml changed and src/api/schema.d.ts was not
+      # regenerated (`npm run gen:api`).
+      - name: Check the Generated Client
+        run: npm run gen:api:check
+
+      - name: Build
+        run: npm run build
+
+      - *setup-flutter
+
+      - name: Install Dart Dependencies
+        working-directory: .
+        run: dart pub get
+
+      - name: Install the Browsers
+        run: npx playwright install --with-deps chromium webkit
+
+      - name: Web E2E
+        working-directory: .
+        env:
+          XPATH_WEB_DIST: apps/xp_web/dist
+        run: tool/e2e/web_e2e.sh
+
   gate:
     name: gate
     if: ${{ always() }}
-    needs: [changes, analyze, coverage, contract, smoke, runner-offline, quickstart]
+    needs: [changes, analyze, coverage, contract, smoke, runner-offline, quickstart, web]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      # A job may be skipped only when `changes` passed and found docs alone.
+      # A job may be skipped only when `changes` passed and found docs alone,
+      # and `web` also when `changes` found no change to the web dashboard.
       - name: Require Every Job to Pass
         env:
           NEEDS: ${{ toJSON(needs) }}
           CODE: ${{ needs.changes.outputs.code }}
+          WEB: ${{ needs.changes.outputs.web }}
         run: |
           jq -r 'to_entries[] | "\(.key): \(.value.result)"' <<< "$NEEDS"
-          jq -e --arg code "$CODE" 'all(to_entries[]; .value.result == "success"
-            or (.value.result == "skipped" and .key != "changes" and $code == "false"))' \
+          jq -e --arg code "$CODE" --arg web "$WEB" 'all(to_entries[]; .value.result == "success"
+            or (.value.result == "skipped" and .key != "changes" and $code == "false")
+            or (.value.result == "skipped" and .key == "web" and $web == "false"))' \
             <<< "$NEEDS" > /dev/null

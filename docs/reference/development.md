@@ -9,6 +9,7 @@ The repository layout, the dependency direction, the development setup and the M
 | `apps/xpd` | Engine entrypoint (Dart). Wires the implementations and owns the HTTP handlers. |
 | `apps/xp` | The `xp` CLI and `xp mcp` (Dart). |
 | `apps/xp_desktop` | The macOS app (Flutter). |
+| `apps/xp_web` | The web dashboard (Vue and TypeScript, npm), which `xpd` serves; see [Clients](clients.md#the-web-dashboard). |
 | `packages/xp_api` | Models, error codes and events shared by every client and the engine. |
 | `packages/xp_client` | HTTP and WebSocket client for the engine API. |
 | `packages/xp_engine` | Domain and application logic. Framework-free; defines interfaces only. |
@@ -136,11 +137,13 @@ The workflows in `.github/workflows`:
   parallel: `analyze` (`dart analyze --fatal-infos`, `dart format --set-exit-if-changed .`, the layer check and
   the CI matrix check), `coverage` (one job per package, each running the `test:coverage:*` script that
   `melos run test:coverage` runs it with, so it keeps its threshold), `contract` (`melos run test:contract`),
-  `smoke` (`tool/e2e/smoke_bundle.sh`, which builds the `xpd` AOT bundle, starts it and checks `/health`, the
-  SQLite build hook, token authentication and a clean shutdown), `runner-offline`
+  `smoke` (`tool/e2e/smoke_bundle.sh`, which builds the `xpd` AOT bundle with the web dashboard, starts it and
+  checks `/health`, the SQLite build hook, token authentication, that it serves the dashboard and a clean
+  shutdown), `runner-offline`
   (`tool/e2e/runner_offline_e2e.sh`) and `quickstart` (`tool/e2e/quickstart_cli.sh`, the CLI path of the
-  quickstart page). The last job, `gate`, waits for all of them and fails unless every one
-  passed; it is the check branch protection requires. A pull request takes about as long as the slowest package.
+  quickstart page). `web` runs only when `apps/xp_web` or `openapi.yaml` changed: the npm license check, lint,
+  type check, coverage, `gen:api:check`, the build and `tool/e2e/web_e2e.sh`. The last job, `gate`, waits for all
+  of them and fails unless every one passed (`web` may be skipped); it is the check branch protection requires. A pull request takes about as long as the slowest package.
 - `macos.yaml`: on every pull request and every push to `main`, on GitHub-hosted macOS runners, only while the
   repository is public (macOS minutes are free for public repositories only; on a private one the jobs are
   skipped, which a required check counts as passed). One `coverage` job per package with tests only macOS runs

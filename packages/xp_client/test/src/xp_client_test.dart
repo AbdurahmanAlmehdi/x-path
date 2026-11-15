@@ -43,6 +43,25 @@ final _createdToken = CreatedToken(
   token: 'xpt_x',
 );
 
+final _sam = Person(
+  id: 'per_1',
+  name: 'Sam',
+  role: PersonRole.developer,
+  createdAt: DateTime.utc(2026, 11, 13),
+);
+
+final _me = Me(
+  person: _sam,
+  token: _createdToken.info,
+  permissions: const [Permission.develop],
+);
+
+final _code = SignInCode(
+  code: 'ABCD-EFGH-JKMN-PQRS',
+  personId: 'per_1',
+  expiresAt: DateTime.utc(2026, 11, 14, 9, 10),
+);
+
 void main() {
   late FakeEngine engine;
   late XpClient client;
@@ -749,6 +768,108 @@ void main() {
       ).toJson(),
     ),
     _Endpoint(
+      'listTokens',
+      method: 'GET',
+      path: '/tokens',
+      response: TokensResponse([_createdToken.info]).toJson(),
+      call: (client) => client.listTokens(),
+      expected: [_createdToken.info],
+    ),
+    _Endpoint(
+      'revokeToken',
+      method: 'DELETE',
+      path: '/tokens/tok_1',
+      status: 204,
+      response: null,
+      call: (client) async {
+        await client.revokeToken('tok_1');
+        return 'revoked';
+      },
+      expected: 'revoked',
+    ),
+    _Endpoint(
+      'me',
+      method: 'GET',
+      path: '/me',
+      response: _me.toJson(),
+      call: (client) => client.me(),
+      expected: _me,
+    ),
+    _Endpoint(
+      'listPeople',
+      method: 'GET',
+      path: '/people',
+      response: PeopleResponse([_sam]).toJson(),
+      call: (client) => client.listPeople(),
+      expected: [_sam],
+    ),
+    _Endpoint(
+      'getPerson',
+      method: 'GET',
+      path: '/people/per_1',
+      response: _sam.toJson(),
+      call: (client) => client.getPerson('per_1'),
+      expected: _sam,
+    ),
+    _Endpoint(
+      'createPerson',
+      method: 'POST',
+      path: '/people',
+      status: 201,
+      response: _sam.toJson(),
+      call: (client) =>
+          client.createPerson(name: 'Sam', role: PersonRole.developer),
+      expected: _sam,
+      body: const {'name': 'Sam', 'role': 'developer'},
+    ),
+    _Endpoint(
+      'updatePerson',
+      method: 'PATCH',
+      path: '/people/per_1',
+      response: _sam.toJson(),
+      call: (client) => client.updatePerson('per_1', role: PersonRole.admin),
+      expected: _sam,
+      body: const {'role': 'admin'},
+    ),
+    _Endpoint(
+      'removePerson',
+      method: 'DELETE',
+      path: '/people/per_1',
+      status: 204,
+      response: null,
+      call: (client) async {
+        await client.removePerson('per_1');
+        return 'removed';
+      },
+      expected: 'removed',
+    ),
+    _Endpoint(
+      'createSignInCode',
+      method: 'POST',
+      path: '/people/per_1/sign-in-codes',
+      status: 201,
+      response: _code.toJson(),
+      call: (client) => client.createSignInCode('per_1'),
+      expected: _code,
+    ),
+    _Endpoint(
+      'publicUrl',
+      method: 'GET',
+      path: '/settings/public-url',
+      response: const PublicUrl(url: 'https://xpath.example.com').toJson(),
+      call: (client) => client.publicUrl(),
+      expected: const PublicUrl(url: 'https://xpath.example.com'),
+    ),
+    _Endpoint(
+      'setPublicUrl',
+      method: 'PUT',
+      path: '/settings/public-url',
+      response: const PublicUrl().toJson(),
+      call: (client) => client.setPublicUrl(null),
+      expected: const PublicUrl(),
+      body: const {'url': null},
+    ),
+    _Endpoint(
       'status',
       method: 'GET',
       path: '/status',
@@ -1051,6 +1172,66 @@ void main() {
     }
   });
 
+  group('dashboardSignInUrl', () {
+    setUp(() {
+      engine
+        ..json('GET', '/me', _me.toJson())
+        ..json(
+          'POST',
+          '/people/per_1/sign-in-codes',
+          _code.toJson(),
+          status: 201,
+        );
+    });
+
+    test('signs this client in where it reaches the engine', () async {
+      engine.json('GET', '/settings/public-url', const PublicUrl().toJson());
+
+      final url = await client.dashboardSignInUrl();
+
+      expect(url.toString(), endsWith('/sign-in#code=ABCD-EFGH-JKMN-PQRS'));
+      expect(url.origin, engine.url.origin);
+      expect(engine.calls.map((call) => call.path), [
+        '/me',
+        '/settings/public-url',
+        '/people/per_1/sign-in-codes',
+      ]);
+    });
+
+    test('issues no code when it cannot read the public URL', () async {
+      engine.json(
+        'GET',
+        '/settings/public-url',
+        const ErrorResponse(
+          ApiError(code: ApiErrorCode.internal, message: 'disk on fire'),
+        ).toJson(),
+        status: 500,
+      );
+
+      await expectLater(
+        client.dashboardSignInUrl(),
+        throwsA(isA<ApiException>()),
+      );
+      expect(
+        engine.calls.map((call) => call.path),
+        isNot(contains('/people/per_1/sign-in-codes')),
+      );
+    });
+
+    test('signs in through the public URL when one is set', () async {
+      engine.json(
+        'GET',
+        '/settings/public-url',
+        const PublicUrl(url: 'https://xpath.example.com').toJson(),
+      );
+
+      expect(
+        await client.dashboardSignInUrl(),
+        Uri.parse('https://xpath.example.com/sign-in#code=ABCD-EFGH-JKMN-PQRS'),
+      );
+    });
+  });
+
   group('requests', () {
     test('send the token and the user agent, and ask for JSON', () async {
       engine.json('GET', '/projects', const ProjectsResponse([]).toJson());
@@ -1091,13 +1272,11 @@ void main() {
     });
 
     test('keep a path prefix of the base URL', () async {
-      engine.json(
-        'GET',
-        '/engine/projects',
-        const ProjectsResponse([]).toJson(),
-      );
+      final old = await FakeEngine.start(servesApiV1: false);
+      addTearDown(old.close);
+      old.json('GET', '/engine/projects', const ProjectsResponse([]).toJson());
       final proxied = XpClient(
-        baseUrl: engine.url.replace(path: '/engine/'),
+        baseUrl: old.url.replace(path: '/engine/'),
         token: 't',
       );
       addTearDown(proxied.close);
@@ -1125,8 +1304,75 @@ void main() {
       await shared.listProjects();
       shared.close();
 
-      expect(http.sent, 1);
+      expect(http.sent, 2, reason: 'the probe of /api/v1, then the request');
       expect(http.closed, isFalse);
+    });
+  });
+
+  group('the API path', () {
+    test('is /api/v1 on an engine that serves it, probed once', () async {
+      engine.json('GET', '/projects', const ProjectsResponse([]).toJson());
+
+      await client.listProjects();
+      await client.listProjects();
+
+      expect(engine.probes, 1);
+      expect(engine.calls, hasLength(2));
+    });
+
+    test('is the root on an engine older than /api/v1', () async {
+      for (final status in [401, 404]) {
+        final old = await FakeEngine.start(servesApiV1: false);
+        addTearDown(old.close);
+        old
+          ..json(
+            'GET',
+            '/api/v1/version',
+            const <String, Object>{},
+            status: status,
+          )
+          ..json('GET', '/projects', const ProjectsResponse([]).toJson());
+        final client = XpClient(baseUrl: old.url, token: 't');
+        addTearDown(client.close);
+
+        await client.listProjects();
+        await client.listProjects();
+
+        expect(old.calls.map((call) => call.path), [
+          '/api/v1/version',
+          '/projects',
+          '/projects',
+        ], reason: '$status');
+        expect(old.calls.first.headers, isNot(contains('authorization')));
+      }
+    });
+
+    test('is probed again after an answer that does not tell', () async {
+      final old = await FakeEngine.start(servesApiV1: false);
+      addTearDown(old.close);
+      old.error(
+        'GET',
+        '/api/v1/version',
+        ApiErrorCode.internal,
+        'The engine failed to handle the request.',
+      );
+      final client = XpClient(baseUrl: old.url, token: 't');
+      addTearDown(client.close);
+
+      await expectLater(
+        client.listProjects(),
+        throwsA(isA<ApiException>().having((e) => e.statusCode, 'status', 500)),
+      );
+      old
+        ..json('GET', '/api/v1/version', const <String, Object>{}, status: 404)
+        ..json('GET', '/projects', const ProjectsResponse([]).toJson());
+
+      expect(await client.listProjects(), isEmpty);
+      expect(old.calls.map((call) => call.path), [
+        '/api/v1/version',
+        '/api/v1/version',
+        '/projects',
+      ]);
     });
   });
 

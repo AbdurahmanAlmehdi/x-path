@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math';
 
 import 'package:xp_api/xp_api.dart';
+import 'package:xp_engine/src/access/access_policy.dart';
 import 'package:xp_engine/src/clock/clock.dart';
 import 'package:xp_engine/src/jobs/job_record.dart';
 import 'package:xp_engine/src/jobs/job_repository.dart';
@@ -30,8 +31,9 @@ import 'package:xp_engine/src/workflows/workflow_service.dart';
 typedef DispatchWorkflow = Future<Run> Function(
   String projectId,
   String workflowId,
-  DispatchRequest request,
-);
+  DispatchRequest request, {
+  RunOrigin? origin,
+});
 
 /// The built-in workflow that merges the pull request of a release.
 const releaseMergeWorkflow = 'release-merge';
@@ -753,8 +755,9 @@ class ReleaseService implements ReleaseOpener {
   /// gates ask for the owner's approval like any release.
   ///
   /// Throws a [ReleaseNotFoundException], a [ReleaseStateException] unless
-  /// the release is `rejected`, and what the dispatch throws.
-  Future<Run> newBuild(String id) async {
+  /// the release is `rejected`, and what the dispatch throws. The run
+  /// records [origin] as who started it.
+  Future<Run> newBuild(String id, {RunOrigin? origin}) async {
     final release = await sync(id);
     final branch = release.branch;
     if (release.state != ReleaseState.rejected || branch == null) {
@@ -777,6 +780,7 @@ class ReleaseService implements ReleaseOpener {
         release: release.id,
         inputs: first.inputs,
       ),
+      origin: origin,
     );
   }
 
@@ -789,8 +793,8 @@ class ReleaseService implements ReleaseOpener {
   ///
   /// Throws a [ReleaseNotFoundException], a [ReleaseStateException] unless
   /// the release is live and has its pull request, and what the dispatch
-  /// throws.
-  Future<Run> requestMerge(String id) async {
+  /// throws. The run records [origin] as who started it.
+  Future<Run> requestMerge(String id, {RunOrigin? origin}) async {
     final release = await sync(id);
     final running = release.mergeRunId;
     if (running != null) return await _runs.get(running);
@@ -805,7 +809,12 @@ class ReleaseService implements ReleaseOpener {
         'Merging opens once every store is live.',
       );
     }
-    return await _dispatchBuiltIn(release, releaseMergeWorkflow, ref: branch);
+    return await _dispatchBuiltIn(
+      release,
+      releaseMergeWorkflow,
+      ref: branch,
+      origin: origin,
+    );
   }
 
   // --------------------------------------------------------------- rollout
@@ -817,8 +826,12 @@ class ReleaseService implements ReleaseOpener {
   /// Throws a [ReleaseNotFoundException], a [ReleaseStateException] unless
   /// the stores approved the release and it went to the store of [request],
   /// a [ReleaseRequestException] for a change the store cannot make, and
-  /// what the dispatch throws.
-  Future<Run> requestRollout(String id, RolloutRequest request) async {
+  /// what the dispatch throws. The run records [origin] as who started it.
+  Future<Run> requestRollout(
+    String id,
+    RolloutRequest request, {
+    RunOrigin? origin,
+  }) async {
     if (request.problem case final problem?) {
       throw ReleaseRequestException(problem);
     }
@@ -837,6 +850,7 @@ class ReleaseService implements ReleaseOpener {
         'action': request.action.wire,
         'userFraction': ?request.userFraction,
       },
+      origin: origin,
     );
   }
 
@@ -848,12 +862,14 @@ class ReleaseService implements ReleaseOpener {
   ///
   /// Throws a [ReleaseNotFoundException], a [ReleaseStateException] unless
   /// the stores approved the release, a [ReleaseRequestException] for a
-  /// patch the release has no record of, and what the dispatch throws.
+  /// patch the release has no record of, and what the dispatch throws. The
+  /// run records [origin] as who started it.
   Future<Run> requestPatch(
     String id,
     int patchNumber,
-    PatchAction action,
-  ) async {
+    PatchAction action, {
+    RunOrigin? origin,
+  }) async {
     final release = await sync(id);
     _requireRolledOut(release, 'A patch');
     final patched = (await _releases.events(release.id)).any(
@@ -871,6 +887,7 @@ class ReleaseService implements ReleaseOpener {
       release,
       shorebirdTrackWorkflow,
       inputs: {'patchNumber': patchNumber, 'action': action.wire},
+      origin: origin,
     );
     await _releases.addEvent(
       release.id,
@@ -993,10 +1010,11 @@ class ReleaseService implements ReleaseOpener {
 
   /// Runs the built-in [workflow] of the project of [release] on its commit
   /// ([ref], else its tag or branch) for its flavor and version, with
-  /// [inputs].
+  /// [inputs], started by [origin].
   Future<Run> _dispatchBuiltIn(
     ReleaseRecord release,
     String workflow, {
+    required RunOrigin? origin,
     String? ref,
     Map<String, Object?> inputs = const {},
   }) async {
@@ -1013,15 +1031,13 @@ class ReleaseService implements ReleaseOpener {
         release: release.id,
         inputs: inputs,
       ),
+      origin: origin,
     );
   }
 
   static void _requireOwner(DeviceToken by, String what) {
-    if (by.kind != DeviceTokenKind.app && by.kind != DeviceTokenKind.cli) {
-      throw ReleaseForbiddenException(
-        'A ${by.kind.name} token cannot $what: only the app or `xp` do.',
-      );
-    }
+    final refusal = AccessPolicy.refusal(by, Permission.release, what);
+    if (refusal != null) throw ReleaseForbiddenException(refusal);
   }
 
   Future<ReleaseRecord> _require(String id) async =>

@@ -2,9 +2,10 @@
 
 XPath is an open source (Apache-2.0), self-hosted release tool for Flutter apps.
 
-A headless engine, `xpd`, owns projects, secrets, jobs and store status. Four clients talk to it
-over HTTP/JSON plus one WebSocket:
+A headless engine, `xpd`, owns projects, secrets, jobs and store status. Five clients talk to it
+over HTTP/JSON (under `/api/v1`) and WebSockets:
 
+- a web dashboard that the engine serves itself (`apps/xp_web`), with people and roles,
 - a Flutter macOS app (`apps/xp_desktop`),
 - the `xp` command-line client (`apps/xp`),
 - `xp mcp`, an MCP server for agents,
@@ -14,8 +15,8 @@ You point it at a repo, it scans the app, and from then on it builds, tests, sig
 and tracks releases to App Store Connect, Google Play, Firebase App Distribution and Shorebird.
 It writes nothing to the repo except release-model git changes.
 
-> **Status:** 1.0. The engine, the `xp` CLI, `xp mcp`, remote runners and the macOS app are
-> released together. See [CONTRIBUTING.md](CONTRIBUTING.md) and [SECURITY.md](SECURITY.md).
+> **Status:** 1.0. The engine, the `xp` CLI, `xp mcp`, remote runners, the macOS app and
+> the web dashboard are released together. See [CONTRIBUTING.md](CONTRIBUTING.md) and [SECURITY.md](SECURITY.md).
 
 ## Install
 
@@ -61,6 +62,7 @@ xp dispatch my_app test --follow
 | [Credentials](docs/guide/credentials.md) | Signing keys and store accounts, and how they reach a build. |
 | [Workflows](docs/guide/workflows.md) | The built-in workflows, your own, inputs, expressions and gates. |
 | [Runners](docs/guide/runners.md) | Other Macs and Linux machines that run jobs, and how they reach the engine. |
+| [Web dashboard](docs/guide/dashboard.md) | Signing in, roles, and using the engine from a browser, through a proxy too. |
 | [Approvals](docs/guide/approvals.md) | Gated actions and who may approve them. |
 | [Releases](docs/guide/releases.md) | A production release from build to store to merge, rollouts and patches. |
 | [MCP](docs/guide/mcp.md) | `xp mcp` and the agent skills. |
@@ -74,14 +76,14 @@ How XPath works inside, for operators and contributors:
 
 | Page | What it covers |
 |---|---|
-| [Running the engine](docs/reference/engine.md) | `xpd` as a process and as a service. |
+| [Running the engine](docs/reference/engine.md) | `xpd` as a process and as a service, `/api/v1` and its aliases, the dashboard and sessions. |
 | [Releases and installation](docs/reference/installation.md) | How XPath is released and installed. |
 | [Projects, jobs and builds](docs/reference/builds.md) | Scans, jobs, versions and guards, the toolchain, builds, Shorebird, tests. |
 | [Stores and credentials](docs/reference/stores.md) | App Store Connect, Google Play, Firebase, the Shorebird CLI, credentials. |
 | [Workflows and the scheduler](docs/reference/workflows.md) | The workflow document, the built-ins, dispatch and scheduling. |
 | [Runners](docs/reference/runners.md) | Pairing, the connection, leases, the agent and its updates. |
 | [Releases and notifications](docs/reference/releases.md) | The release state machine, its endpoints, notifications and housekeeping. |
-| [Clients](docs/reference/clients.md) | The `xp` command line, `xp mcp`, the client library and the desktop app. |
+| [Clients](docs/reference/clients.md) | The `xp` command line, `xp mcp`, the client library, the desktop app and the web dashboard. |
 | [Developing XPath](docs/reference/development.md) | The repository layout, setup, tests, CI and the website. |
 
 The API is [`packages/xp_api/openapi.yaml`](packages/xp_api/openapi.yaml); the decisions are in

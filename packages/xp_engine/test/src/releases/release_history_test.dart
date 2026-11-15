@@ -257,9 +257,16 @@ void main() {
     test('is promoted through the shorebird-track workflow', () async {
       await patched();
 
-      final run = await h.service.requestPatch(id, 2, PatchAction.promote);
+      const sam = RunOrigin(kind: RunOriginKind.person, personName: 'Sam');
+      final run = await h.service.requestPatch(
+        id,
+        2,
+        PatchAction.promote,
+        origin: sam,
+      );
 
       final call = h.dispatched.single;
+      expect(call.origin, sam);
       final workflow = (await h.workflows.list('prj_1'))
           .firstWhere((w) => w.name == 'shorebird-track');
       expect(call.workflow, workflow.id);

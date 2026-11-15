@@ -625,6 +625,106 @@ class XpClient {
     ),
   );
 
+  /// `GET /tokens`: the valid tokens of the person this client's token
+  /// belongs to, or everyone's for an admin's app token; never a secret.
+  Future<List<TokenInfo>> listTokens() async =>
+      TokensResponse.fromJson(await _json(await _send('GET', ['tokens'])))
+          .tokens;
+
+  /// `DELETE /tokens/{id}`: revokes a token of this client's person, or
+  /// anyone's for an admin.
+  Future<void> revokeToken(String id) async {
+    await _send('DELETE', ['tokens', id]);
+  }
+
+  // ---------------------------------------------------------------- people
+
+  /// `GET /me`: the person this client's token belongs to, and what it may
+  /// do.
+  Future<Me> me() async => Me.fromJson(await _json(await _send('GET', ['me'])));
+
+  /// `GET /people`: everyone, removed people included, oldest first.
+  Future<List<Person>> listPeople() async =>
+      PeopleResponse.fromJson(await _json(await _send('GET', ['people'])))
+          .people;
+
+  /// `GET /people/{id}`.
+  Future<Person> getPerson(String id) async =>
+      Person.fromJson(await _json(await _send('GET', ['people', id])));
+
+  /// `POST /people`: adds a person called [name] with [role]. Admins only.
+  Future<Person> createPerson({
+    required String name,
+    required PersonRole role,
+  }) async => Person.fromJson(
+    await _json(
+      await _send('POST', [
+        'people',
+      ], body: CreatePersonRequest(name: name, role: role).toJson()),
+    ),
+  );
+
+  /// `PATCH /people/{id}`: renames the person, changes their role, or both.
+  /// Admins only; the last admin cannot be demoted (`409`).
+  Future<Person> updatePerson(
+    String id, {
+    String? name,
+    PersonRole? role,
+  }) async => Person.fromJson(
+    await _json(
+      await _send('PATCH', [
+        'people',
+        id,
+      ], body: UpdatePersonRequest(name: name, role: role).toJson()),
+    ),
+  );
+
+  /// `DELETE /people/{id}`: removes the person and revokes their tokens.
+  /// Admins only; the last admin cannot be removed (`409`).
+  Future<void> removePerson(String id) async {
+    await _send('DELETE', ['people', id]);
+  }
+
+  // ------------------------------------------------------- web dashboard
+
+  /// `POST /people/{id}/sign-in-codes`: a one-time code that signs the
+  /// person [personId] in to the web dashboard. An admin's for anyone; this
+  /// client's own person's with an `app` or `cli` token. Shown this once.
+  Future<SignInCode> createSignInCode(String personId) async =>
+      SignInCode.fromJson(
+        await _json(await _send('POST', ['people', personId, 'sign-in-codes'])),
+      );
+
+  /// `GET /settings/public-url`: the HTTPS address browsers reach the engine
+  /// at through a proxy.
+  Future<PublicUrl> publicUrl() async => PublicUrl.fromJson(
+    await _json(await _send('GET', ['settings', 'public-url'])),
+  );
+
+  /// `PUT /settings/public-url`: sets the public URL to [url], or clears it
+  /// for `null`. Admins only.
+  Future<PublicUrl> setPublicUrl(String? url) async => PublicUrl.fromJson(
+    await _json(
+      await _send('PUT', [
+        'settings',
+        'public-url',
+      ], body: SetPublicUrlRequest(url: url).toJson()),
+    ),
+  );
+
+  /// The page that signs this client's own person in to the web dashboard
+  /// (D9), with a new sign-in code in its fragment: on the public URL when
+  /// one is set, else on the address this client reaches the engine at.
+  ///
+  /// It reads everything it needs before it issues the code, so a failure
+  /// wastes no code (issuing one deletes the person's unused codes).
+  Future<Uri> dashboardSignInUrl() async {
+    final me = await this.me();
+    final public = (await publicUrl()).url;
+    final code = await createSignInCode(me.person.id);
+    return code.signInUrl(public == null ? baseUrl : Uri.parse(public));
+  }
+
   /// `GET /status`: the token this client holds, without its secret, and
   /// whether the engine can reach its secrets.
   Future<StatusResponse> status() async =>
@@ -943,7 +1043,7 @@ class XpClient {
     final request =
         http.StreamedRequest(
             'PUT',
-            _uri(
+            await _uri(
               ['runners', 'jobs', jobId, 'artifacts', name],
               {'kind': kind.wire},
             ),
@@ -989,13 +1089,50 @@ class XpClient {
 
   // ------------------------------------------------------------- transport
 
-  Uri _uri(List<String> segments, Map<String, String> query) {
+  /// The URL of [segments] of the API: under `/api/v1`, or at the root of
+  /// an engine older than `/api/v1` (ADR 0018).
+  Future<Uri> _uri(List<String> segments, Map<String, String> query) async =>
+      _at([...await _apiPath(), ...segments], query);
+
+  Uri _at(List<String> segments, Map<String, String> query) {
     final prefix = baseUrl.pathSegments.where((segment) => segment.isNotEmpty);
     return baseUrl.replace(
       pathSegments: [...prefix, ...segments],
       queryParameters: query.isEmpty ? null : query,
     );
   }
+
+  /// Where the API is, found once: an engine that answers
+  /// `GET /api/v1/version` serves it there. An older one answers `401` (the
+  /// path is not public there) or `404`, and serves it at the root. Any other
+  /// answer, or none, is not remembered, so the next request asks again.
+  Future<List<String>> _apiPath() async {
+    final probe = _apiPathFound ??= _probeApiPath();
+    try {
+      return await probe;
+    } on Object {
+      if (identical(_apiPathFound, probe)) _apiPathFound = null;
+      rethrow;
+    }
+  }
+
+  Future<List<String>>? _apiPathFound;
+
+  Future<List<String>> _probeApiPath() async {
+    final probe = http.Request('GET', _at(_apiMount + ['version'], const {}))
+      ..headers.addAll(_headers(authenticated: false));
+    final response = await _collect(await _transmit(probe));
+    return switch (response.statusCode) {
+      200 => _apiMount,
+      HttpStatus.unauthorized || HttpStatus.notFound => const [],
+      _ => throw ApiException.fromResponse(
+        response.statusCode,
+        utf8.decode(response.bodyBytes, allowMalformed: true),
+      ),
+    };
+  }
+
+  static const _apiMount = ['api', 'v1'];
 
   Map<String, String> _headers({required bool authenticated}) => {
     HttpHeaders.userAgentHeader: clientUserAgent(),
@@ -1006,9 +1143,9 @@ class XpClient {
   Future<WebSocketChannel> _openSocket(
     List<String> segments, {
     Map<String, String> query = const {},
-  }) {
-    final uri = _uri(segments, query);
-    return _connector(
+  }) async {
+    final uri = await _uri(segments, query);
+    return await _connector(
       uri.replace(scheme: uri.scheme == 'https' ? 'wss' : 'ws'),
       _headers(authenticated: true),
     );
@@ -1051,7 +1188,7 @@ class XpClient {
     Object? body,
     bool authenticated = true,
   }) async {
-    final request = http.Request(method, _uri(segments, query))
+    final request = http.Request(method, await _uri(segments, query))
       ..headers.addAll(_headers(authenticated: authenticated));
     if (body != null) {
       request
@@ -1065,22 +1202,7 @@ class XpClient {
     http.BaseRequest request, {
     Duration? timeout,
   }) async {
-    final limit = timeout ?? requestTimeout;
-    final http.StreamedResponse response;
-    try {
-      response = await _http.send(request).timeout(limit);
-    } on TimeoutException catch (error) {
-      throw ConnectionException(
-        'The engine did not answer within ${limit.inSeconds} s.',
-        cause: error,
-      );
-    } on Object catch (error) {
-      throw ConnectionException(
-        'Cannot reach the engine at $baseUrl. Is xpd running? Its health is '
-        'at ${_uri(const ['health'], const {})}.',
-        cause: error,
-      );
-    }
+    final response = await _transmit(request, timeout: timeout);
     if (response.statusCode >= 200 && response.statusCode < 300) {
       return response;
     }
@@ -1089,6 +1211,28 @@ class XpClient {
       failed.statusCode,
       utf8.decode(failed.bodyBytes, allowMalformed: true),
     );
+  }
+
+  /// Sends [request] and returns the response, whatever its status.
+  Future<http.StreamedResponse> _transmit(
+    http.BaseRequest request, {
+    Duration? timeout,
+  }) async {
+    final limit = timeout ?? requestTimeout;
+    try {
+      return await _http.send(request).timeout(limit);
+    } on TimeoutException catch (error) {
+      throw ConnectionException(
+        'The engine did not answer within ${limit.inSeconds} s.',
+        cause: error,
+      );
+    } on Object catch (error) {
+      throw ConnectionException(
+        'Cannot reach the engine at $baseUrl. Is xpd running? Its health is '
+        'at ${_at(const ['health'], const {})}.',
+        cause: error,
+      );
+    }
   }
 
   Future<Map<String, dynamic>> _json(http.Response response) async {

@@ -418,7 +418,8 @@ class _KindRow extends StatelessWidget {
                           ProjectCertificateCreateRequested(
                             app: target.app,
                             flavor: target.flavor,
-                            name: l10n.flavorCredentialsCertificateName(
+                            name: certificateName(
+                              l10n,
                               project.fullName,
                               target.flavor,
                             ),

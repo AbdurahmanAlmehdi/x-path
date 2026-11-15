@@ -6,7 +6,10 @@ import 'package:shelf_web_socket/shelf_web_socket.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:xp_api/xp_api.dart';
 import 'package:xp_engine/xp_engine.dart';
+import 'package:xpd/src/api/allowed_origins.dart';
+import 'package:xpd/src/api/middleware.dart';
 import 'package:xpd/src/api/responses.dart';
+import 'package:xpd/src/api/token_sockets.dart';
 
 /// WebSocket close code for a normal closure (RFC 6455). The `web_socket`
 /// package does not let a sender use 1001 (going away).
@@ -14,23 +17,36 @@ const _normalClosure = 1000;
 
 /// `GET /events`: the engine event stream over a WebSocket.
 ///
-/// Clients authenticate with the bearer header before the upgrade. Each text
-/// frame is a JSON [SequencedEvent]; the first one is `stream.opened`.
+/// Clients authenticate with the bearer header, or a browser with its
+/// session cookie, before the upgrade. A browser's `Origin` must be one of
+/// [AllowedOrigins] (D2). Each text frame is a JSON [SequencedEvent]; the
+/// first one is `stream.opened`. The socket closes with
+/// [sessionEndedCloseCode] when its token stops working ([TokenSockets]).
 class EventsRoute {
   /// Creates the route over an event log.
-  new({required this._events, required this._clock});
+  new({
+    required this._events,
+    required this._clock,
+    required this._origins,
+    required this._tokens,
+  });
 
   final EventLog _events;
   final Clock _clock;
+  final AllowedOrigins _origins;
+  final TokenSockets _tokens;
   final _sockets = <WebSocketChannel>{};
 
   /// Handles the request: validates it, then upgrades.
-  FutureOr<Response> handle(Request request) {
+  Future<Response> handle(Request request) async {
     if (!_isUpgrade(request)) {
       return errorResponse(
         ApiErrorCode.upgradeRequired,
         'This route only speaks WebSocket.',
       );
+    }
+    if (await socketOriginRefusal(request, _origins) case final refusal?) {
+      return refusal;
     }
     final param = request.url.queryParameters['after'];
     final after = param == null ? null : int.tryParse(param);
@@ -47,10 +63,14 @@ class EventsRoute {
         'without after.',
       );
     }
-    return webSocketHandler(
-      (channel, _) => _onConnection(channel, after),
-      // Browsers always send Origin. No browser may talk to the engine.
-      allowedOrigins: const [],
+    final origin = request.headers['origin'];
+    final token = deviceTokenOf(request);
+    return await webSocketHandler(
+      (channel, _) {
+        _tokens.track(token, channel);
+        _onConnection(channel, after);
+      },
+      allowedOrigins: origin == null ? null : [origin],
       pingInterval: const Duration(seconds: 30),
     )(request);
   }

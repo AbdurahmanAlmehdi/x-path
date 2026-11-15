@@ -10,6 +10,11 @@ import 'package:xp_api/src/release.dart';
 /// resumed. The HTTP counterpart is `409 resync_required`.
 const eventStreamResyncCloseCode = 4409;
 
+/// WebSocket close code of an `/events` or job log stream whose token stopped
+/// working: it was revoked, its person removed, or its browser session signed
+/// out or expired (ADR 0018). The HTTP counterpart is `401 unauthorized`.
+const sessionEndedCloseCode = 4401;
+
 /// Something that happened in the engine, as streamed over `/events`.
 ///
 /// Concrete events are added phase by phase. A client that meets a type it

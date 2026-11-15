@@ -5719,6 +5719,24 @@ abstract class AppLocalizations {
   /// Section label.
   ///
   /// In en, this message translates to:
+  /// **'Web dashboard'**
+  String get settingsDashboard;
+
+  /// Lead of the web dashboard section.
+  ///
+  /// In en, this message translates to:
+  /// **'Open this engine\'s dashboard in your browser, signed in as you. The sign-in link works once, for 10 minutes.'**
+  String get settingsDashboardBody;
+
+  /// Button that opens the web dashboard in the browser, signed in.
+  ///
+  /// In en, this message translates to:
+  /// **'Open dashboard'**
+  String get settingsDashboardOpen;
+
+  /// Section label.
+  ///
+  /// In en, this message translates to:
   /// **'Runners'**
   String get settingsRunners;
 

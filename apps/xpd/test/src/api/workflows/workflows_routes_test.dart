@@ -110,7 +110,10 @@ void main() {
       expect(workflow.builtin, isFalse);
       expect(workflow.version.version, 1);
       expect(workflow.yaml, echoWorkflow);
-      expect(response.headers['location'], '${client.base}/${workflow.id}');
+      expect(
+        response.headers['location'],
+        '/api/v1${client.base}/${workflow.id}',
+      );
     });
 
     test('answers 409 for a name that is used', () async {
@@ -455,7 +458,7 @@ void main() {
 
       expect(response.statusCode, 202);
       final run = Run.fromJson(response.json);
-      expect(response.headers['location'], '/runs/${run.id}');
+      expect(response.headers['location'], '/api/v1/runs/${run.id}');
       expect(run.workflowId, id);
       expect(run.sha, 'a' * 40);
       expect(run.ref, 'main');

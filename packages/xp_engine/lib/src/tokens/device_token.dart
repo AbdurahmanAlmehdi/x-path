@@ -11,6 +11,9 @@ class DeviceToken extends Equatable {
     required this.hash,
     required this.createdAt,
     this.revokedAt,
+    this.expiresAt,
+    this.personId,
+    this.person,
   });
 
   /// Identifies the token without revealing it.
@@ -31,9 +34,81 @@ class DeviceToken extends Equatable {
   /// When the token was revoked, in UTC, or `null` while it is valid.
   final DateTime? revokedAt;
 
-  /// Whether the token no longer authenticates.
+  /// When the token stops working on its own, in UTC: a browser session's
+  /// token lasts eight hours (D11). `null` for every other token.
+  final DateTime? expiresAt;
+
+  /// The person the token belongs to. `null` only for a runner token
+  /// (ADR 0017).
+  final String? personId;
+
+  /// The person [personId] names, as they are now: the `TokenService` reads
+  /// them with the token, so a new role applies to the next request. `null`
+  /// when the token was not read for a request, and for a runner token.
+  final Person? person;
+
+  /// What [person] may do, or `null` without one.
+  PersonRole? get role => person?.role;
+
+  /// Whether the token was revoked.
   bool get isRevoked => revokedAt != null;
 
+  /// Whether the token has expired at [now].
+  bool isExpiredAt(DateTime now) {
+    final expiresAt = this.expiresAt;
+    return expiresAt != null && !now.isBefore(expiresAt);
+  }
+
+  /// Whether the token authenticates at [now]: neither revoked nor expired.
+  bool isValidAt(DateTime now) => !isRevoked && !isExpiredAt(now);
+
+  /// Who a run this token starts was started by (ADR 0017): an `mcp` token
+  /// is an agent acting for its [person], any other token its [person].
+  /// `null` without a [person] read, as for a runner token.
+  RunOrigin? get runOrigin {
+    final person = this.person;
+    if (person == null) return null;
+    return RunOrigin(
+      kind: switch (kind) {
+        DeviceTokenKind.mcp => RunOriginKind.agent,
+        _ => RunOriginKind.person,
+      },
+      tokenId: id,
+      personId: person.id,
+      personName: person.name,
+    );
+  }
+
+  /// This token as revoked at [at].
+  DeviceToken revoked(DateTime at) => _copy(revokedAt: at, person: person);
+
+  /// This token with its [person] read.
+  DeviceToken withPerson(Person person) =>
+      _copy(revokedAt: revokedAt, person: person);
+
+  DeviceToken _copy({required DateTime? revokedAt, required Person? person}) =>
+      DeviceToken(
+        id: id,
+        name: name,
+        kind: kind,
+        hash: hash,
+        createdAt: createdAt,
+        revokedAt: revokedAt,
+        expiresAt: expiresAt,
+        personId: personId,
+        person: person,
+      );
+
   @override
-  List<Object?> get props => [id, name, kind, hash, createdAt, revokedAt];
+  List<Object?> get props => [
+    id,
+    name,
+    kind,
+    hash,
+    createdAt,
+    revokedAt,
+    expiresAt,
+    personId,
+    person,
+  ];
 }

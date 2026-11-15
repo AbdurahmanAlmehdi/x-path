@@ -191,6 +191,26 @@ void main() {
         expect(await repository.get('apr_1'), decided);
       });
 
+      test('keeps the person who decided with a web token', () async {
+        const web = DecidedBy(
+          tokenId: 'tok_web',
+          name: 'Chrome',
+          kind: DeviceTokenKind.web,
+          personId: 'per_1',
+          personName: 'Sam',
+        );
+
+        final decided = await repository.decide(
+          'apr_1',
+          state: ApprovalState.denied,
+          by: web,
+          at: created,
+        );
+
+        expect(decided!.decidedBy, web);
+        expect((await repository.get('apr_1'))!.decidedBy?.personName, 'Sam');
+      });
+
       test('lets exactly one of two decisions win', () async {
         final results = await Future.wait([
           repository.decide(

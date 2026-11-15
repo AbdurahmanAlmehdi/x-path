@@ -55,6 +55,34 @@ List<String> runnerBundleRoots({
   ];
 }
 
+/// The folder `xpd serve` serves the web dashboard from (ADR 0018), the
+/// first of these that holds an `index.html`:
+///
+/// 1. `web` next to the `bin` and `lib` of the engine's own bundle, when
+///    [executable] is `<bundle>/bin/xpd`, and
+/// 2. `Contents/Resources/web` of `XPath.app`, when the engine is the one
+///    the app carries (`Contents/Helpers/xpd/bin/xpd`): `Contents/Helpers`
+///    may hold only signed code.
+///
+/// `null` when there is none, as for `dart run`: the engine then serves the
+/// API alone.
+String? webRoot({required String executable}) {
+  final binDirectory = p.dirname(executable);
+  if (executable.isEmpty || p.basename(binDirectory) != 'bin') return null;
+  final bundle = p.dirname(binDirectory);
+  final contents = p.dirname(p.dirname(bundle));
+  final roots = [
+    p.join(bundle, 'web'),
+    if (p.basename(p.dirname(bundle)) == 'Helpers' &&
+        p.basename(contents) == 'Contents')
+      p.join(contents, 'Resources', 'web'),
+  ];
+  for (final root in roots) {
+    if (File(p.join(root, 'index.html')).existsSync()) return root;
+  }
+  return null;
+}
+
 /// `xpd serve`: runs the engine until SIGINT or SIGTERM.
 class ServeCommand extends XpdCommand {
   /// Creates the command.
@@ -500,8 +528,8 @@ class ServeCommand extends XpdCommand {
         ),
         events: events,
         clock: const SystemClock(),
-        dispatch: (projectId, workflowId, request) =>
-            dispatcher.dispatch(projectId, workflowId, request),
+        dispatch: (projectId, workflowId, request, {origin}) =>
+            dispatcher.dispatch(projectId, workflowId, request, origin: origin),
       );
       dispatcher = WorkflowDispatcher(
         workflows: workflows,
@@ -562,8 +590,10 @@ class ServeCommand extends XpdCommand {
       );
       // Runners dial out (D-08): the hub holds their connections and leases,
       // places jobs on them through the scheduler, and cancels theirs.
+      final personRepository = SqlitePersonRepository(database);
       final tokenService = TokenService(
         tokens: SqliteDeviceTokenRepository(database),
+        people: personRepository,
         clock: const SystemClock(),
       );
       // The runners' comings and goings go to the engine log.
@@ -618,8 +648,23 @@ class ServeCommand extends XpdCommand {
         ),
         masker: masker,
       );
+      final web = webRoot(executable: context.executable);
       final server = await XpdServer.start(
         tokens: tokenService,
+        signIn: SignInCodeService(
+          codes: SqliteSignInCodeRepository(database),
+          people: personRepository,
+          tokens: tokenService,
+          clock: const SystemClock(),
+        ),
+        publicUrl: PublicUrlService(
+          settings: SqliteEngineSettingRepository(database),
+        ),
+        people: PersonService(
+          people: personRepository,
+          tokens: tokenService,
+          clock: const SystemClock(),
+        ),
         events: events,
         projects: projects,
         jobs: scheduler,
@@ -674,11 +719,13 @@ class ServeCommand extends XpdCommand {
         engineVersion: packageVersion,
         host: host,
         port: port,
+        webDirectory: web,
         onError: (error, stackTrace) =>
             context.err.writeln('error: $error\n$stackTrace'),
         onRunnerRefused: runnerLog.refused,
       );
       context.out.writeln('xpd listening on ${server.uri}');
+      if (web != null) context.out.writeln('xpd serves the dashboard in $web');
       // The owner hears about what matters, in the app and in Slack (D-22).
       final slackWebhook = HttpSlackWebhook();
       final notifier = Notifier(
@@ -720,6 +767,7 @@ class ServeCommand extends XpdCommand {
       // Logs and job records older than 90 days go once a day (D-24).
       final housekeepingSchedule = HousekeepingSchedule(
         service: housekeeping,
+        tokens: tokenService,
         clock: const SystemClock(),
         onError: (error, stackTrace) =>
             context.err.writeln('warning: housekeeping failed: $error'),

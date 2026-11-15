@@ -799,10 +799,11 @@ void main() {
     test('dispatches the workflow again on the release branch', () async {
       await rejected();
 
-      final run = await h.service.newBuild(id);
+      final run = await h.service.newBuild(id, origin: _sam);
 
       expect(run.id, 'run_2');
       final call = h.dispatched.single;
+      expect(call.origin, _sam);
       expect(call.project, 'prj_1');
       expect(call.workflow, 'wf_release');
       expect(call.request.release, id);
@@ -986,10 +987,12 @@ void main() {
           action: RolloutAction.fraction,
           userFraction: 0.5,
         ),
+        origin: _sam,
       );
 
       expect(run.id, 'run_2');
       final call = h.dispatched.single;
+      expect(call.origin, _sam);
       final workflow = (await h.workflows.list('prj_1'))
           .firstWhere((w) => w.name == 'release-rollout');
       final release = await h.record(id);
@@ -1071,10 +1074,11 @@ void main() {
     test('is requested through the release-merge workflow', () async {
       await live();
 
-      final run = await h.service.requestMerge(id);
+      final run = await h.service.requestMerge(id, origin: _sam);
 
       expect(run.id, 'run_2');
       final call = h.dispatched.single;
+      expect(call.origin, _sam);
       final mergeWorkflow = (await h.workflows.list('prj_1'))
           .firstWhere((w) => w.name == 'release-merge');
       expect(call.workflow, mergeWorkflow.id);
@@ -1323,3 +1327,6 @@ void main() {
     });
   });
 }
+
+/// Who the runs of the tests that ask are started by.
+const _sam = RunOrigin(kind: RunOriginKind.person, personName: 'Sam');

@@ -11,8 +11,14 @@ pubspec_overrides.yaml
 !packages/xp_engine/lib/src/steps/build/
 !packages/xp_engine/test/src/steps/build/
 
-# The signed XPath.app of tool/release/build_mac.sh.
+# The signed XPath.app of tool/release/build_mac.sh, and the built web
+# dashboard (apps/xp_web/dist).
 dist/
+
+# The web dashboard's packages and Playwright output.
+node_modules/
+playwright-report/
+test-results/
 
 # Local notes for the next agent session; never published.
 HANDOFF.md

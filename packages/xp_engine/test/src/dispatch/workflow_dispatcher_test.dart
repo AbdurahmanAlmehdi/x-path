@@ -1443,9 +1443,13 @@ stages:
       // Git reads a commit as the ref of itself.
       harness.git.refs[first.sha] = first.sha;
 
-      final second = await harness.dispatcher.again(first.id);
+      const sam = RunOrigin(kind: RunOriginKind.person, personName: 'Sam');
+      final second = await harness.dispatcher.again(first.id, origin: sam);
 
       expect(second.id, isNot(first.id));
+      expect(first.origin, isNull);
+      expect(second.origin, sam);
+      expect((await harness.runs.get(second.id))!.origin, sam);
       expect(second.workflowVersionId, first.workflowVersionId);
       expect(second.sha, first.sha);
       expect(second.request?.inputs, {'notes': 'hi'});

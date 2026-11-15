@@ -18,6 +18,12 @@ has the protocol and the details.
    usually `http://127.0.0.1:7480`: that address only works on the engine's own machine.
    [Reaching the engine](#reaching-the-engine) says how to get an address another machine can use.
 
+   The runner URL is not the dashboard's **public URL** (`xp settings public-url`): runners dial
+   the runner URL, and browsers sign in only through the public URL
+   ([The web dashboard](dashboard.md#open-the-dashboard-from-another-machine)). Setting one does
+   not set the other. They can be the same `https://` address when runners and browsers reach the
+   engine through the same proxy.
+
 2. Make a pairing token on the engine (or with Pair runner in the app):
 
    ```sh
@@ -250,8 +256,9 @@ twice (TLS inside WireGuard). WebSockets, which runners use, pass through.
 ### Cloudflare Tunnel
 
 `cloudflared` on the engine's machine maps a hostname of a domain you have on Cloudflare to the
-engine. The engine becomes reachable from the internet, protected by its bearer tokens (every
-route but `/health` and `/version` needs one).
+engine. The engine becomes reachable from the internet, protected by its tokens: every API route
+but `/health`, `/version`, runner pairing and browser sign-in needs a token or a dashboard
+session, and the dashboard's pages hold no data until someone signs in.
 
 ```sh
 cloudflared tunnel login
@@ -310,4 +317,5 @@ ship or install it.
 Do not start the engine with `--host 0.0.0.0` and send runners to it over plain `http`. The runner
 connection carries signing material (keystores, certificates, API keys) for the jobs it runs, and
 anyone on the path could read it. `xp runners url` warns when a plain `http` address leaves the
-machine and the tailnet.
+machine and the tailnet. A browser cannot sign in to the dashboard that way either: the engine
+refuses a sign-in over plain `http` from another machine.

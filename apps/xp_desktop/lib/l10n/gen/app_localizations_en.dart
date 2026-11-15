@@ -3485,6 +3485,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsUnknown => 'Unknown';
 
   @override
+  String get settingsDashboard => 'Web dashboard';
+
+  @override
+  String get settingsDashboardBody =>
+      'Open this engine\'s dashboard in your browser, signed in as you. The sign-in link works once, for 10 minutes.';
+
+  @override
+  String get settingsDashboardOpen => 'Open dashboard';
+
+  @override
   String get settingsRunners => 'Runners';
 
   @override

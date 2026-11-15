@@ -16,7 +16,8 @@
 #      Contents/Helpers/xp/{bin,lib}: the LaunchAgent plist runs
 #      Contents/Helpers/xpd/bin/xpd (BundleProgram), and the app links
 #      Contents/Helpers/xp/bin/xp into PATH. The runner archives go into
-#      Contents/Resources/runners (Helpers may hold only code).
+#      Contents/Resources/runners and the web dashboard into
+#      Contents/Resources/web (Helpers may hold only code).
 #   4. Every Mach-O inside is signed, deepest first, then the frameworks,
 #      then the app (Release entitlements), all with the Hardened Runtime.
 #      The helpers get Helpers.entitlements: the Dart AOT runtime needs
@@ -222,6 +223,10 @@ done
 if [[ -d "$bundles/xpd/runners" ]]; then
   ditto "$bundles/xpd/runners" "$app/Contents/Resources/runners"
 fi
+# So is the web dashboard the engine serves (webRoot finds it).
+[[ -f "$bundles/xpd/web/index.html" ]] \
+  || die "no web dashboard in $bundles/xpd/web; run without --reuse-bundles"
+ditto "$bundles/xpd/web" "$app/Contents/Resources/web"
 
 # Runs codesign, but stops it when it waits longer than $sign_timeout
 # seconds: that is a Keychain dialog nobody answers.

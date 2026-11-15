@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:xp_api/xp_api.dart';
 import 'package:xp_client/xp_client.dart';
+import 'package:xp_desktop/app/app_services.dart';
 import 'package:xp_desktop/l10n/l10n.dart';
 import 'package:xp_desktop/local_engine/local_engine.dart';
 import 'package:xp_desktop/settings/settings.dart';
@@ -50,6 +51,7 @@ void main() {
     LocalEngineBloc? localEngine,
     List<EngineProfile>? engineList,
     RunnersRepository? runners,
+    UrlOpener? openUrl,
   }) async {
     await tester.pumpApp(
       const SettingsPage(),
@@ -66,6 +68,7 @@ void main() {
         dataWiper: data,
         keychainWiper: keychain,
         runningApp: app,
+        openUrl: openUrl,
       ),
     );
     // Tall enough for the whole page, so every section is built.
@@ -177,6 +180,46 @@ void main() {
       'Keep XPath in the menu bar when the window closes',
       'A production job succeeded',
     ]);
+  });
+
+  group('DashboardSection', () {
+    testWidgets('opens the dashboard signed in, in the browser', (
+      tester,
+    ) async {
+      final url = Uri.parse('http://127.0.0.1:7480/sign-in#code=ABCD');
+      final opened = <Uri>[];
+      when(settings.dashboardSignInUrl).thenAnswer((_) async => url);
+      await pump(tester, openUrl: (url) async => opened.add(url));
+
+      expect(find.text('WEB DASHBOARD'), findsOne);
+      expect(find.textContaining('signed in as you'), findsOne);
+
+      await tester.tap(find.byKey(const Key('settings.openDashboard')));
+      await tester.pumpAndSettle();
+
+      expect(opened, [url]);
+    });
+
+    testWidgets('says what the engine refused', (tester) async {
+      when(settings.dashboardSignInUrl).thenThrow(
+        const ApiException('The engine is too old.', statusCode: 404),
+      );
+      await pump(tester);
+
+      await tester.tap(find.byKey(const Key('settings.openDashboard')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('The engine is too old.'), findsOne);
+    });
+
+    testWidgets('is off while the engine cannot take commands', (tester) async {
+      await pump(tester, status: EngineStatus.unreachable);
+
+      await tester.tap(find.byKey(const Key('settings.openDashboard')));
+      await tester.pumpAndSettle();
+
+      verifyNever(settings.dashboardSignInUrl);
+    });
   });
 
   group('RunnerUrlSection', () {

@@ -1454,6 +1454,13 @@ void main() {
       verify(client.deleteGitHubToken).called(1);
     });
 
+    test('opens the web dashboard signed in', () async {
+      final url = Uri.parse('http://127.0.0.1:7480/sign-in#code=ABCD');
+      when(harness.client.dashboardSignInUrl).thenAnswer((_) async => url);
+
+      expect(await repository.dashboardSignInUrl(), url);
+    });
+
     test('makes a token for xp or an agent', () async {
       final created = CreatedToken(
         info: TokenInfo(

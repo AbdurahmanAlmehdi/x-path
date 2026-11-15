@@ -22,7 +22,7 @@ class SqliteApprovalRepository implements ApprovalRepository {
   static const _columns =
       'id, project_id, action, sha, version, run_id, job_id, state, '
       'created_at, expires_at, decided_at, decided_by, decided_by_name, '
-      'decided_by_kind, reason';
+      'decided_by_kind, decided_by_person_id, decided_by_person_name, reason';
 
   @override
   Future<ApprovalRecord?> get(String id) async => _get(id);
@@ -99,7 +99,8 @@ class SqliteApprovalRepository implements ApprovalRepository {
   }) async {
     _db.execute(
       'UPDATE approval SET state = ?, decided_at = ?, decided_by = ?, '
-      'decided_by_name = ?, decided_by_kind = ?, reason = ? '
+      'decided_by_name = ?, decided_by_kind = ?, decided_by_person_id = ?, '
+      'decided_by_person_name = ?, reason = ? '
       "WHERE id = ? AND state = 'pending' AND expires_at > ?",
       [
         state.wire,
@@ -107,6 +108,8 @@ class SqliteApprovalRepository implements ApprovalRepository {
         by.tokenId,
         by.name,
         by.kind.name,
+        by.personId,
+        by.personName,
         reason,
         id,
         toDatabaseTime(at),
@@ -168,6 +171,8 @@ class SqliteApprovalRepository implements ApprovalRepository {
               kind: DeviceTokenKind.values.byName(
                 row['decided_by_kind'] as String,
               ),
+              personId: row['decided_by_person_id'] as String?,
+              personName: row['decided_by_person_name'] as String?,
             ),
       reason: row['reason'] as String?,
     );

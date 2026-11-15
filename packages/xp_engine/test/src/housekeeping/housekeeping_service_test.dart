@@ -37,8 +37,8 @@ void main() {
             isA<HousekeepingForbiddenException>().having(
               (e) => e.message,
               'message',
-              'A ${kind.name} token cannot change the retention: only the app '
-                  'or `xp` do.',
+              '${AccessPolicy.aTokenOf(kind)} cannot change the retention: '
+                  'only the app, `xp` or the web dashboard do.',
             ),
           ),
         );

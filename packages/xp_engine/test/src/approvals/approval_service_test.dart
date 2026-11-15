@@ -222,6 +222,8 @@ void main() {
           tokenId: 'tok_app',
           name: 'Mac mini',
           kind: DeviceTokenKind.app,
+          personId: 'per_admin',
+          personName: 'admin',
         ),
       );
       expect(await h.service.get(id), approval);
@@ -290,6 +292,55 @@ void main() {
         expect(h.resumed, isEmpty);
       });
     }
+
+    for (final role in [PersonRole.viewer, PersonRole.developer]) {
+      test("is forbidden to a ${role.name}'s cli token", () async {
+        final id = await ask();
+
+        await expectLater(
+          h.service.decide(
+            id,
+            approve: true,
+            by: tokenOf(DeviceTokenKind.cli, role: role),
+          ),
+          throwsA(
+            isA<ApprovalForbiddenException>().having(
+              (error) => error.message,
+              'message',
+              'A ${role.name} cannot approve: it takes the releaser role or '
+                  'higher.',
+            ),
+          ),
+        );
+        expect((await h.service.get(id)).state, ApprovalState.pending);
+      });
+    }
+
+    test("is a releaser's to make, from the dashboard too", () async {
+      final id = await ask();
+
+      final approval = await h.service.decide(
+        id,
+        approve: true,
+        by: tokenOf(
+          DeviceTokenKind.web,
+          name: 'Chrome',
+          role: PersonRole.releaser,
+        ),
+      );
+
+      expect(
+        approval.decidedBy,
+        const DecidedBy(
+          tokenId: 'tok_web',
+          name: 'Chrome',
+          kind: DeviceTokenKind.web,
+          personId: 'per_releaser',
+          personName: 'releaser',
+        ),
+      );
+      expect((await h.service.get(id)).decidedBy?.personName, 'releaser');
+    });
 
     test('is forbidden to an mcp token even for an approval that is gone', () {
       expect(
@@ -598,6 +649,60 @@ void main() {
       expect((await h.service.gates('prj_1')).gates['push'], isTrue);
       expect(await h.logged(), isEmpty);
       expect(h.resumed, isEmpty);
+    });
+
+    test('only an admin turns them off', () async {
+      await expectLater(
+        h.service.setGates(
+          'prj_1',
+          const ProjectGates({'push': false}),
+          by: tokenOf(DeviceTokenKind.web, role: PersonRole.releaser),
+        ),
+        throwsA(
+          isA<ApprovalForbiddenException>().having(
+            (error) => error.message,
+            'message',
+            'A releaser cannot turn gates off: it takes the admin role or '
+                'higher.',
+          ),
+        ),
+      );
+
+      final gates = await h.service.setGates(
+        'prj_1',
+        const ProjectGates({'push': false}),
+        by: tokenOf(DeviceTokenKind.web),
+      );
+      expect(gates.gates['push'], isFalse);
+    });
+
+    test('a releaser tightens them, and a developer does not', () async {
+      await h.service.setGates(
+        'prj_1',
+        const ProjectGates({'push': false}),
+        by: app,
+      );
+
+      final gates = await h.service.setGates(
+        'prj_1',
+        const ProjectGates({'push': true}),
+        by: tokenOf(DeviceTokenKind.cli, role: PersonRole.releaser),
+      );
+      expect(gates.gates['push'], isTrue);
+      await expectLater(
+        h.service.setGates(
+          'prj_1',
+          const ProjectGates({'push': true}),
+          by: tokenOf(DeviceTokenKind.app, role: PersonRole.developer),
+        ),
+        throwsA(
+          isA<ApprovalForbiddenException>().having(
+            (error) => error.message,
+            'message',
+            contains('A developer cannot change gates'),
+          ),
+        ),
+      );
     });
 
     test('a cli token may keep a gate off that is off', () async {

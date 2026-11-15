@@ -295,7 +295,7 @@ void main() {
 
       expect(response.statusCode, 202, reason: response.body);
       final run = Run.fromJson(response.json);
-      expect(response.headers['location'], '/runs/${run.id}');
+      expect(response.headers['location'], '/api/v1/runs/${run.id}');
       expect(run.version, '1.2.0');
       expect(run.build, 1, reason: 'the counter of the app starts at 1');
       expect(run.ref, 'release/1.2.0');
@@ -347,7 +347,7 @@ void main() {
 
       expect(response.statusCode, 202);
       final run = Run.fromJson(response.json);
-      expect(response.headers['location'], '/runs/${run.id}');
+      expect(response.headers['location'], '/api/v1/runs/${run.id}');
       final approvals = await client.engine.approvals.list();
       expect(approvals.single.action, 'merge');
       expect(approvals.single.version, '1.2.0+5');
@@ -412,7 +412,7 @@ void main() {
 
       expect(response.statusCode, 202);
       final run = Run.fromJson(response.json);
-      expect(response.headers['location'], '/runs/${run.id}');
+      expect(response.headers['location'], '/api/v1/runs/${run.id}');
       final approvals = await client.engine.approvals.list();
       expect(approvals.single.action, 'rollout');
       expect(approvals.single.version, '1.2.0+5');

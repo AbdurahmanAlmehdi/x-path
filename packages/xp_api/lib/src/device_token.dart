@@ -32,7 +32,7 @@ class CreateTokenRequest extends Equatable {
 }
 
 /// A device token as the engine describes it: never its secret.
-@JsonSerializable()
+@JsonSerializable(includeIfNull: false)
 class TokenInfo extends Equatable {
   /// Creates the description.
   const new({
@@ -40,6 +40,7 @@ class TokenInfo extends Equatable {
     required this.name,
     required this.kind,
     required this.createdAt,
+    this.personId,
   });
 
   /// Reads the description from its JSON form.
@@ -58,11 +59,38 @@ class TokenInfo extends Equatable {
   /// When it was made.
   final DateTime createdAt;
 
+  /// The person it belongs to, for example `per_1a2b3c4d5e6f7a8b`. Absent
+  /// for a runner token, which belongs to no person (ADR 0017).
+  final String? personId;
+
   /// The JSON form.
   Map<String, dynamic> toJson() => _$TokenInfoToJson(this);
 
   @override
-  List<Object?> get props => [id, name, kind, createdAt];
+  List<Object?> get props => [id, name, kind, createdAt, personId];
+}
+
+/// The body of `GET /tokens`: the valid tokens the asker may see, oldest
+/// first. A person sees their own; an admin's `app`, `cli` or `web` token
+/// sees everyone's. Runner tokens are not among them: a runner's token is
+/// revoked with the runner.
+@JsonSerializable(explicitToJson: true)
+class TokensResponse extends Equatable {
+  /// Creates the response.
+  const new(this.tokens);
+
+  /// Reads the response from its JSON form.
+  factory TokensResponse.fromJson(Map<String, dynamic> json) =>
+      _$TokensResponseFromJson(json);
+
+  /// The tokens, oldest first.
+  final List<TokenInfo> tokens;
+
+  /// The JSON form.
+  Map<String, dynamic> toJson() => _$TokensResponseToJson(this);
+
+  @override
+  List<Object?> get props => [tokens];
 }
 
 /// The answer of `POST /tokens`: the token made, with its secret. The

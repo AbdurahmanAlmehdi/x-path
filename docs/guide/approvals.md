@@ -1,8 +1,9 @@
 # Approvals
 
 Some actions change what your users get or what is on GitHub, so XPath waits for you before it does
-them. A step behind a gate stops its job until you approve or deny it in the app or with `xp`.
-Agents can ask for these actions, but never approve them.
+them. A step behind a gate stops its job until a releaser approves or denies it in the app, the
+[web dashboard](dashboard.md) or with `xp`. Agents can ask for these actions, but never approve
+them.
 
 ## What waits for approval
 
@@ -24,14 +25,23 @@ workflow with `lock: project` keeps the project, so the next release or patch qu
 
 ## Who can approve
 
-Only `app` and `cli` tokens decide: the Mac app and the `xp` command line. An `mcp` token, the one
-`xp mcp` uses, and a runner's token get `403` when they try, and no MCP tool approves or denies. So
-an agent that dispatches a production release stops at the gate and tells you; see
-[Use XPath from an agent](mcp.md).
+Two things decide: the person's role, and the kind of token they use (ADR 0017).
 
-The same rule covers actions that move a release on without a gate step: marking a store status by
-hand, abandoning a release, setting its store texts, and deleting files to free disk space. Only an
-`app` or `cli` token may do them.
+- **The role.** A `releaser` or an `admin` approves and denies. A `viewer` or a `developer` sees
+  the approval but gets `403` on approve and deny; a developer may still ask for the gated
+  release actions, which then wait for a releaser. [Roles](dashboard.md#roles) lists what each
+  role may do, and an admin sets them in the dashboard's **People**.
+- **The token.** The Mac app (`app`), the `xp` command line (`cli`) and the web dashboard (`web`)
+  decide, for the person they belong to. An `mcp` token, the one `xp mcp` uses, and a runner's
+  token get `403` whatever the role, and no MCP tool approves or denies. So an agent that
+  dispatches a production release stops at the gate and tells you; see
+  [Use XPath from an agent](mcp.md).
+
+The approval records the person who decided, next to the device.
+
+The same rules cover actions that move a release on without a gate step. Marking a store status by
+hand, abandoning a release and setting its store texts need a releaser; deleting files to free disk
+space needs an admin. `mcp` and runner tokens may do none of them.
 
 ## Approve in the app
 
@@ -46,6 +56,14 @@ The confirmation sheet is the only place the app decides. It shows what the appr
 (project, flavor, version, commit, job) and what happens if you approve. Approve takes ⌘↩ or a
 click once a one-second delay is over; Return never approves. Deny takes an optional reason.
 
+## Approve in the dashboard
+
+**Approvals** in the [web dashboard](dashboard.md) works like the app's inbox: the count of what
+waits next to its name, and Pending, Decided and Expired. **Approve…** and **Deny…** open the
+same review, with the same one-second delay, and ⌘↩ or Ctrl+↩ approves. After you decide, the
+inbox moves to Decided, so the approval stays in view. A developer or a viewer sees the approval,
+and that their role cannot decide it.
+
 ## Approve with xp
 
 ```sh
@@ -56,8 +74,9 @@ xp approvals deny apr_... --reason "Wrong commit"
 ```
 
 `xp runs show <run>` also names the approval a waiting run needs. The `xp` you approve with must be
-connected with a `cli` token (see [Install XPath](install.md)). An `xp` exit code of 77 means the
-token may not decide; 73 means the approval was decided already.
+connected with a `cli` token of a releaser or an admin (see [Install XPath](install.md)). An `xp`
+exit code of 77 means the token or its person's role may not decide; 73 means the approval was
+decided already.
 
 ## What an approval covers
 
@@ -65,8 +84,8 @@ An approval binds to one project, action, commit, version and run. If the commit
 changes, or you dispatch again, the engine asks anew. Every job of the run that waits at the same
 gate, such as each platform of a release, goes on with the one approval.
 
-- **The first decision wins.** When two devices decide at once, one wins and the other is told who
-  decided it.
+- **The first decision wins.** When two people or devices decide at once, one wins and the other
+  is told who decided it.
 - **Approved:** the jobs that wait go on.
 - **Denied:** the gate step fails with your reason, and the run fails.
 
@@ -83,6 +102,9 @@ goes ahead without asking. Turning a gate off also lets the jobs that wait at it
 
 - **In the app:** Project settings, Gates. Tick or untick each action.
 - **With xp:** read the gates, or turn gates on. The CLI cannot turn a gate off; only the app can.
+
+Turning a gate on needs a releaser; turning one off needs an admin in the app. The web dashboard
+has no gates page yet.
 
 ```sh
 xp gates show acme/app

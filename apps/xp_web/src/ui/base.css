@@ -1,0 +1,275 @@
+@import '@design/xp-tokens.css';
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  background: var(--xp-color-surface-window);
+  color: var(--xp-color-text-primary);
+  font: var(--xp-type-body);
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+p {
+  margin: 0 0 var(--xp-space-8);
+}
+
+a {
+  color: var(--xp-color-text-link);
+}
+
+code {
+  font: var(--xp-type-code);
+}
+
+::selection {
+  background: var(--xp-color-selection-default);
+}
+
+:focus-visible {
+  outline: var(--xp-border-width-focus) solid var(--xp-color-focus-ring);
+  outline-offset: var(--xp-border-focus-offset);
+}
+
+input {
+  height: var(--xp-size-control-lg);
+  padding: 0 var(--xp-space-8);
+  color: var(--xp-color-text-primary);
+  background: var(--xp-color-surface-base);
+  border: var(--xp-border-width-hairline) solid var(--xp-color-border-strong);
+  border-radius: var(--xp-radius-md);
+}
+
+button {
+  height: var(--xp-size-control-md);
+  padding: 0 var(--xp-space-12);
+  font: var(--xp-type-body-strong);
+  color: var(--xp-color-text-primary);
+  background: var(--xp-color-surface-raised);
+  border: var(--xp-border-width-hairline) solid var(--xp-color-border-default);
+  border-radius: var(--xp-radius-md);
+  cursor: pointer;
+}
+
+button:hover {
+  background: var(--xp-color-surface-hover);
+}
+
+button.primary {
+  height: var(--xp-size-control-lg);
+  color: var(--xp-color-text-on-accent);
+  background: var(--xp-color-accent-default);
+  border-color: var(--xp-color-accent-default);
+}
+
+button.primary:hover {
+  background: var(--xp-color-accent-hover);
+}
+
+button:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+select,
+textarea {
+  color: var(--xp-color-text-primary);
+  background: var(--xp-color-surface-base);
+  border: var(--xp-border-width-hairline) solid var(--xp-color-border-strong);
+  border-radius: var(--xp-radius-md);
+}
+
+select {
+  height: var(--xp-size-control-md);
+  padding: 0 var(--xp-space-6);
+  font: var(--xp-type-body);
+  max-width: 100%;
+}
+
+textarea {
+  padding: var(--xp-space-6) var(--xp-space-8);
+  font: var(--xp-type-code);
+}
+
+a.button {
+  display: inline-flex;
+  align-items: center;
+  height: var(--xp-size-control-md);
+  padding: 0 var(--xp-space-12);
+  font: var(--xp-type-body-strong);
+  text-decoration: none;
+  color: var(--xp-color-text-primary);
+  background: var(--xp-color-surface-raised);
+  border: var(--xp-border-width-hairline) solid var(--xp-color-border-default);
+  border-radius: var(--xp-radius-md);
+}
+
+a.button:hover {
+  background: var(--xp-color-surface-hover);
+}
+
+a.button.primary {
+  border-color: var(--xp-color-accent-default);
+  color: var(--xp-color-text-on-accent);
+  background: var(--xp-color-accent-default);
+}
+
+a.button.primary:hover {
+  background: var(--xp-color-accent-hover);
+}
+
+button.danger {
+  color: var(--xp-color-negative-on-negative);
+  background: var(--xp-color-negative-default);
+  border-color: var(--xp-color-negative-default);
+}
+
+/* The header of a page: its title, what it is about, and its actions. */
+.page-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--xp-space-12);
+  margin-bottom: var(--xp-space-16);
+}
+
+.page-header > * {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.page-header h1 {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--xp-space-8);
+}
+
+.muted {
+  color: var(--xp-color-text-secondary);
+}
+
+.mono {
+  font: var(--xp-type-code);
+}
+
+/* What the engine said went wrong. */
+.alert {
+  margin: 0 0 var(--xp-space-12);
+  padding: var(--xp-space-8) var(--xp-space-12);
+  border-radius: var(--xp-radius-md);
+  color: var(--xp-color-status-negative-on-container);
+  background: var(--xp-color-status-negative-container);
+}
+
+.notice {
+  margin: 0 0 var(--xp-space-12);
+  padding: var(--xp-space-8) var(--xp-space-12);
+  border-radius: var(--xp-radius-md);
+  color: var(--xp-color-status-info-on-container);
+  background: var(--xp-color-status-info-container);
+}
+
+/* A titled block of a page. */
+.panel {
+  margin-bottom: var(--xp-space-16);
+  padding: var(--xp-space-12) var(--xp-space-16);
+  background: var(--xp-color-surface-base);
+  border: var(--xp-border-width-hairline) solid var(--xp-color-border-default);
+  border-radius: var(--xp-radius-lg);
+}
+
+.panel > h2 {
+  margin: 0 0 var(--xp-space-8);
+}
+
+/* Label and value pairs. */
+.facts {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: var(--xp-space-4) var(--xp-space-16);
+  margin: 0;
+}
+
+.facts dt {
+  color: var(--xp-color-text-secondary);
+}
+
+.facts dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+/* A table that scrolls on its own on a narrow window. */
+.table-wrap {
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th {
+  text-align: left;
+  font: var(--xp-type-label);
+  color: var(--xp-color-text-tertiary);
+}
+
+th,
+td {
+  padding: var(--xp-space-6) var(--xp-space-8);
+  border-bottom: var(--xp-border-width-hairline) solid var(--xp-color-border-subtle);
+  vertical-align: top;
+}
+
+/* A form: its fields one under the other. */
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--xp-space-12);
+}
+
+/* A labelled control of a form. */
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--xp-space-4);
+  min-width: 0;
+}
+
+.field > .xp-type-label {
+  color: var(--xp-color-text-secondary);
+}
+
+/* Something to copy, such as a secret shown once or a command. */
+.well {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--xp-space-8);
+  padding: var(--xp-space-6) var(--xp-space-6) var(--xp-space-6) var(--xp-space-10);
+  background: var(--xp-color-surface-sunken);
+  border: var(--xp-border-width-hairline) solid var(--xp-color-border-default);
+  border-radius: var(--xp-radius-md);
+}
+
+.well > code {
+  flex: 1;
+  min-width: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  user-select: all;
+}

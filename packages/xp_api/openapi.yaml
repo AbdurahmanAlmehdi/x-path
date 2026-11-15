@@ -7,9 +7,41 @@ info:
     Hand-maintained; it grows phase by phase. Every response in the test
     suite is validated against this file (tests tagged `contract`).
 
-    Every route except `/health` and `/version` needs a device token:
-    `Authorization: Bearer <token>`. Errors are always
-    `{"error": {"code": "...", "message": "..."}}`.
+    The API is served under `/api/v1` (ADR 0018). The root paths
+    (`/projects`, ...) are deprecated aliases of the same routes for the
+    clients made before: a request to one is the API only when it carries
+    `Authorization`, or is to `/health`, `/version` or `/runners/pair`, and
+    its answer carries `Deprecation: true`, a `Sunset` date and a `Link` to
+    the same path under `/api/v1` (`rel="successor-version"`). Any other
+    request to a root path is not the API. A `Location` of an answer under
+    `/api/v1` is under `/api/v1` too.
+
+    Every route except `/health`, `/version`, `/runners/pair` and
+    `POST /session` needs a device token: `Authorization: Bearer <token>`.
+    Errors are always `{"error": {"code": "...", "message": "..."}}`.
+    A request whose method is not in upper case (`patch`, `Post`) answers
+    `405 method_not_allowed` before anything else reads it.
+
+    A browser signed in to the web dashboard (ADR 0018) authenticates with
+    its session cookie instead: `xp_session_<port>` on the engine machine
+    (named after the port the engine serves on, so that two engines on one
+    machine keep their sessions apart), or `__Host-xp_session` through the
+    HTTPS public URL. The cookie is read
+    under `/api/v1` only, never at the root aliases, only without
+    `Authorization` (a request with `Authorization` is a bearer request), and
+    only for a `web` token. A request authenticated by the cookie whose
+    method is not `GET`, `HEAD` or `OPTIONS` needs the header
+    `X-XPath-CSRF: 1` and an `Origin` the engine serves (the public URL's
+    origin, or `http://127.0.0.1:<port>`, `http://localhost:<port>` or
+    `http://[::1]:<port>` with a `Host` that is one of these too), and
+    answers `403 csrf` otherwise. The engine sends no CORS headers.
+
+    Every token but a runner's belongs to a person, whose role (`viewer` <
+    `developer` < `releaser` < `admin`) decides what it may change
+    (ADR 0017): any token reads; a route that changes something needs a
+    permission (`develop`, `decide_approval`, `release` or `administer`), and
+    answers `403 forbidden` otherwise. An `mcp` token may only `develop`.
+    `GET /me` says what the token that asks may do.
 
     A token of kind `runner` (a paired runner's credential) reaches only the
     three routes made for runners: `GET /runners/connect`,
@@ -21,10 +53,11 @@ info:
     name: Apache-2.0
     identifier: Apache-2.0
 servers:
-  - url: http://127.0.0.1:7480
+  - url: http://127.0.0.1:7480/api/v1
     description: Default loopback address of a local engine.
 security:
   - bearerAuth: []
+  - sessionCookie: []
 paths:
   /health:
     get:
@@ -59,8 +92,10 @@ paths:
       operationId: streamEvents
       summary: WebSocket stream of engine events.
       description: |
-        Upgrade to a WebSocket (browsers are refused: any `Origin` header is
-        rejected). Every text frame is one JSON `SequencedEvent`.
+        Upgrade to a WebSocket. A browser authenticates with its session
+        cookie, and its `Origin` must be one the engine serves; a request
+        with another `Origin`, or a cookie without one, answers `403`. Every
+        text frame is one JSON `SequencedEvent`.
 
         The first frame is always `stream.opened`; its `seq` is the head of
         the event log. With `after=<seq>` the engine then replays every
@@ -75,7 +110,10 @@ paths:
         4409 instead.
 
         On shutdown the engine closes the socket with code 1000 (normal
-        closure) and the reason `engine shutting down`.
+        closure) and the reason `engine shutting down`. When the token that
+        opened it stops working (revoked, signed out, its person removed, or
+        expired), the engine closes it with code 4401: at once, or within a
+        minute of an expiry.
       parameters:
         - name: after
           in: query
@@ -91,6 +129,8 @@ paths:
           $ref: "#/components/responses/InvalidRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "409":
           $ref: "#/components/responses/ResyncRequired"
         "426":
@@ -156,6 +196,8 @@ paths:
           $ref: "#/components/responses/InvalidRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
         "409":
@@ -211,6 +253,8 @@ paths:
           $ref: "#/components/responses/InvalidRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
         "500":
@@ -227,6 +271,8 @@ paths:
           description: The project is gone.
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
         "409":
@@ -253,6 +299,8 @@ paths:
                 $ref: "#/components/schemas/Project"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
         "502":
@@ -301,6 +349,8 @@ paths:
                 $ref: "#/components/schemas/Job"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
         "409":
@@ -344,6 +394,8 @@ paths:
           $ref: "#/components/responses/InvalidRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
         "409":
@@ -357,7 +409,8 @@ paths:
       operationId: streamJobLogs
       summary: WebSocket stream of a job's log lines.
       description: |
-        Upgrade to a WebSocket (browsers are refused, as for `/events`). Every
+        Upgrade to a WebSocket. A browser authenticates and is checked as for
+        `/events`, and the socket closes with code 4401 the same way. Every
         text frame is one JSON `LogFrame`. Lines are masked before they are
         stored or sent: known secret values read `***`.
 
@@ -391,6 +444,8 @@ paths:
           $ref: "#/components/responses/InvalidRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
         "409":
@@ -490,6 +545,8 @@ paths:
                 $ref: "#/components/schemas/Artifact"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
         "500":
@@ -510,6 +567,8 @@ paths:
                 $ref: "#/components/schemas/Artifact"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
         "500":
@@ -624,8 +683,9 @@ paths:
         Names are unique regardless of case (`409 conflict`). Identical
         secrets under two names stay two credentials. A new credential is
         used by no flavor; assign it with
-        `PUT /projects/{id}/flavors/{flavor}/credentials/{kind}`. Only `app`
-        and `cli` tokens may create credentials (`403 forbidden`).
+        `PUT /projects/{id}/flavors/{flavor}/credentials/{kind}`. Only an
+        admin's `app`, `cli` or `web` token may create credentials (`403
+        forbidden`).
       requestBody:
         required: true
         content:
@@ -683,7 +743,8 @@ paths:
       summary: Rename a credential.
       description: |
         The id, the secret and every assignment stay. Names are unique
-        regardless of case (`409 conflict`). Only `app` and `cli` tokens.
+        regardless of case (`409 conflict`). Only an admin's `app`, `cli`
+        or `web` token.
       requestBody:
         required: true
         content:
@@ -717,7 +778,7 @@ paths:
         `POST /credentials`). The new secret is checked first and nothing
         changes if it is refused (`422`) or cannot be checked (`502`). The id,
         the name and every assignment stay; the assignments are checked
-        again with the new secret. Only `app` and `cli` tokens.
+        again with the new secret. Only an admin's `app`, `cli` or `web` token.
       requestBody:
         required: true
         content:
@@ -754,8 +815,8 @@ paths:
         A credential that flavors use is not deleted unless `force=true`:
         the answer is `409 credential_in_use` with the flavors (`usedBy`).
         With `force=true` those flavors give it up (they have no credential
-        of the kind afterwards) and it is deleted. Only `app` and `cli`
-        tokens.
+        of the kind afterwards) and it is deleted. Only an admin's `app`,
+        `cli` or `web` token.
       parameters:
         - name: force
           in: query
@@ -794,7 +855,7 @@ paths:
         with `message` and `fix`. Something that was accepted before and is
         refused now is announced as `credential.expired`, and a job that needs
         it fails preflight (the `credentials` guard check) until it is
-        fixed. Only `app` and `cli` tokens.
+        fixed. Only an admin's `app`, `cli` or `web` token.
       responses:
         "200":
           description: The credential with the results of the checks.
@@ -875,7 +936,7 @@ paths:
         flavors keep what they have. A `github` token becomes the engine's
         GitHub token (`/github-token`) and no named credential.
 
-        Only `app` and `cli` tokens.
+        Only an admin's `app`, `cli` or `web` token.
       requestBody:
         required: true
         content:
@@ -941,7 +1002,7 @@ paths:
         Each assignment is checked at once (can the credential reach the
         flavor's bundle id, package or app) and the result is kept with it:
         a refusal does not undo the assignment, it fails preflight until
-        fixed. Only `app` and `cli` tokens.
+        fixed. Only an admin's `app`, `cli` or `web` token.
       requestBody:
         required: true
         content:
@@ -972,7 +1033,8 @@ paths:
       summary: Stop using a credential of this kind for the flavor.
       description: |
         The flavor has no credential of the kind afterwards; the credential
-        stays, with its other assignments. Only `app` and `cli` tokens.
+        stays, with its other assignments. Only an admin's `app`, `cli` or
+        `web` token.
       responses:
         "204":
           description: The flavor has no credential of the kind now.
@@ -1010,7 +1072,7 @@ paths:
         First the team's distribution certificates are read: at Apple's
         limit the request is refused with `conflict`, `details.reason`
         `certificate_limit`, the `limit` and the `certificates` that could be
-        revoked. Only `app` and `cli` tokens.
+        revoked. Only an admin's `app`, `cli` or `web` token.
       requestBody:
         required: true
         content:
@@ -1060,7 +1122,7 @@ paths:
         Checks the credential and its assignments as that route does and
         answers with the credential as the first flavor of this project that
         uses it sees it. `404` when no flavor of the project uses it. Only
-        `app` and `cli` tokens.
+        an admin's `app`, `cli` or `web` token.
       responses:
         "200":
           description: The credential with the result of the check.
@@ -1092,7 +1154,7 @@ paths:
 
         The flavors of this project give the credential up; if no other
         flavor uses it, it is deleted with its secret. `404` when no flavor of
-        the project uses it. Only `app` and `cli` tokens.
+        the project uses it. Only an admin's `app`, `cli` or `web` token.
       responses:
         "204":
           description: The project no longer uses the credential.
@@ -1211,6 +1273,8 @@ paths:
           $ref: "#/components/responses/InvalidRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
         "409":
@@ -1369,6 +1433,8 @@ paths:
           $ref: "#/components/responses/InvalidRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
         "409":
@@ -1402,6 +1468,8 @@ paths:
           $ref: "#/components/responses/InvalidRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
         "409":
@@ -1419,6 +1487,8 @@ paths:
           description: The workflow is gone.
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
         "409":
@@ -1483,6 +1553,8 @@ paths:
           $ref: "#/components/responses/InvalidRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
         "409":
@@ -1598,6 +1670,8 @@ paths:
                 $ref: "#/components/schemas/Run"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
         "422":
@@ -1628,6 +1702,8 @@ paths:
                 $ref: "#/components/schemas/Run"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
         "409":
@@ -1653,6 +1729,8 @@ paths:
                 $ref: "#/components/schemas/Run"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
         "409":
@@ -1721,7 +1799,7 @@ paths:
       - $ref: "#/components/parameters/ApprovalId"
     post:
       operationId: approveApproval
-      summary: Approve the action. Only `app` and `cli` tokens may.
+      summary: Approve the action. Only a releaser's or an admin's `app`, `cli` or `web` token may.
       description: |
         The first decision wins: the request moves from `pending` to
         `approved` in one compare-and-set, and the jobs that wait for it are
@@ -1758,7 +1836,7 @@ paths:
       - $ref: "#/components/parameters/ApprovalId"
     post:
       operationId: denyApproval
-      summary: Deny the action. Only `app` and `cli` tokens may.
+      summary: Deny the action. Only a releaser's or an admin's `app`, `cli` or `web` token may.
       description: |
         Like `POST /approvals/{id}/approve`: the first decision wins. The
         gate step of every job that waits for it fails with the reason.
@@ -1813,9 +1891,10 @@ paths:
       operationId: setProjectGates
       summary: Set which actions of a project wait for an approval.
       description: |
-        Replaces the gates; an action left out is on. An `app` token may turn
-        gates on and off. A `cli` token may only turn them on: a body that
-        turns a gate off answers `403 forbidden`. `mcp` and `runner` tokens
+        Replaces the gates; an action left out is on. A releaser's or an
+        admin's `app`, `cli` or `web` token may turn gates on. Turning one
+        off takes an admin's `app` or `web` token: any other body that turns
+        a gate off answers `403 forbidden`. `mcp` and `runner` tokens
         never change gates (D-13). Turning a gate off lets the jobs that wait
         at it go on.
       requestBody:
@@ -1925,6 +2004,8 @@ paths:
                 $ref: "#/components/schemas/Release"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
         "500":
@@ -1935,15 +2016,15 @@ paths:
       - $ref: "#/components/parameters/ReleaseStoreName"
     post:
       operationId: setReleaseStoreStatus
-      summary: Say what a store did, by hand. Only `app` and `cli` tokens may.
+      summary: Say what a store did, by hand. Only a releaser's or an admin's `app`, `cli` or `web` token may.
       description: |
         The buttons "Apple approved" and "Apple live" (an Apple ID flavor has
         no review API, D-14) and "Play: live" (no service account, D-15).
         Apple takes `approved` or `live`, Google Play `live`. The status
         only moves forward, and only once the store has the build. An `mcp`
         or `runner` token answers `403 forbidden`: a status moves the
-        release toward the merge of its pull request, which only the owner
-        may enable (D-13).
+        release toward the merge of its pull request, which only a releaser
+        or an admin may enable (D-13).
       requestBody:
         required: true
         content:
@@ -1991,6 +2072,8 @@ paths:
                 $ref: "#/components/schemas/Run"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
         "409":
@@ -2012,8 +2095,9 @@ paths:
       description: |
         Open once every store targeted is live (`mergeEnabled`). It
         dispatches the `release-merge` workflow, whose merge is a gated
-        action (D-13): the run waits for an `app` or `cli` token to approve
-        it, and then merges the pull request with a merge commit (ADR 0007).
+        action (D-13): the run waits for a releaser or an admin to approve
+        it with an `app`, `cli` or `web` token, and then merges the pull
+        request with a merge commit (ADR 0007).
         Asking again while that run is under way answers with the same run.
         `409 conflict` unless the release is `live` and has its pull request.
       responses:
@@ -2025,6 +2109,8 @@ paths:
                 $ref: "#/components/schemas/Run"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
         "409":
@@ -2049,7 +2135,8 @@ paths:
         resumes or completes; Google Play's staged rollout takes a new
         `userFraction`, halts or completes. It dispatches the
         `release-rollout` workflow, whose change is a gated action (D-13):
-        the run waits for an `app` or `cli` token to approve it, and then
+        the run waits for a releaser or an admin to approve it with an
+        `app`, `cli` or `web` token, and then
         the engine changes the rollout with the store credentials of the
         app. `400 invalid_request` for a change the store cannot make,
         `409 conflict` before the stores approved the release.
@@ -2111,7 +2198,7 @@ paths:
       - $ref: "#/components/parameters/ReleaseId"
     put:
       operationId: setReleaseTexts
-      summary: Set the texts the uploads of the release send. Only `app` and `cli` tokens may.
+      summary: Set the texts the uploads of the release send. Only a releaser's or an admin's `app`, `cli` or `web` token may.
       description: |
         `whatsNew` goes to Google Play as the release notes in `en-US`;
         `whatToTest` (else `whatsNew`) to Firebase App Distribution's
@@ -2155,7 +2242,8 @@ paths:
         Open once the stores approved the release, for a patch XPath
         published (its history has it). It dispatches the `shorebird-track`
         workflow, whose `shorebird.track` step waits at `gate: prod_patch`
-        for an `app` or `cli` token to approve it (D-13). `400
+        for a releaser or an admin to approve it with an `app`, `cli` or
+        `web` token (D-13). `400
         invalid_request` for a patch number that is not one, an action other
         than `promote` and `rollback`, or a patch the release has none of.
       responses:
@@ -2186,7 +2274,7 @@ paths:
       - $ref: "#/components/parameters/ReleaseId"
     post:
       operationId: abandonRelease
-      summary: Give the release up. Only `app` and `cli` tokens may.
+      summary: Give the release up. Only a releaser's or an admin's `app`, `cli` or `web` token may.
       description: |
         Moves a release that is not over to `abandoned`. A run that still
         builds it is cancelled. `409 conflict` for a release that is merged or
@@ -2278,10 +2366,10 @@ paths:
       description: |
         Without a body, or with `"dryRun": true`, it deletes nothing and says
         what it would. With `"dryRun": false` it deletes (D-13 lists delete
-        as a gated action): only `app` and `cli` tokens may, as for a
-        release `abandon`; the owner acting from the app or `xp` is the
-        approval. `mcp` and `runner` tokens may only dry-run and otherwise
-        get `403 forbidden`.
+        as a gated action): only an admin's `app`, `cli` or `web` token may;
+        the admin acting from the app, `xp` or the dashboard is the
+        approval. Every other token may only dry-run and otherwise gets
+        `403 forbidden`.
 
         Retention never deletes the artifacts of a release that is not over
         (`draft` to `live`), pinned artifacts, or the newest `keepPerFlavor`
@@ -2326,7 +2414,7 @@ paths:
           $ref: "#/components/responses/InternalError"
     put:
       operationId: setRetention
-      summary: Set the retention. Only `app` and `cli` tokens may.
+      summary: Set the retention. Only an admin's `app`, `cli` or `web` token may.
       description: |
         Replaces the settings; a field left out takes its default (5 builds,
         90 days). Both are at least 1. The daily log pruning uses `logDays`;
@@ -2378,7 +2466,7 @@ paths:
           $ref: "#/components/responses/InternalError"
     put:
       operationId: setGitHubToken
-      summary: Check a GitHub token with GitHub, then store it. Only `app` and `cli` tokens may.
+      summary: Check a GitHub token with GitHub, then store it. Only an admin's `app`, `cli` or `web` token may.
       description: |
         The token must be accepted by GitHub (`GET /user`) before it replaces
         the one the engine has; otherwise nothing is stored:
@@ -2414,7 +2502,7 @@ paths:
           $ref: "#/components/responses/InternalError"
     delete:
       operationId: deleteGitHubToken
-      summary: Forget the GitHub token. Only `app` and `cli` tokens may.
+      summary: Forget the GitHub token. Only an admin's `app`, `cli` or `web` token may.
       responses:
         "204":
           description: The engine has no GitHub token now.
@@ -2429,7 +2517,7 @@ paths:
   /github-token/import:
     post:
       operationId: importGitHubToken
-      summary: Take the token of the GitHub CLI on the engine machine. Only `app` and `cli` tokens may.
+      summary: Take the token of the GitHub CLI on the engine machine. Only an admin's `app`, `cli` or `web` token may.
       description: |
         What `xpd secrets import-gh` does, over the API: the engine runs
         `gh auth token` (the `gh` on its `PATH`, then
@@ -2458,16 +2546,38 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
   /tokens:
+    get:
+      operationId: listTokens
+      summary: The valid tokens of the person that asks; an admin's, everyone's.
+      description: |
+        Never a secret, and never a runner's token: a runner's token is
+        revoked with the runner (D17). An admin's `app`, `cli` or `web`
+        token sees the tokens of every person; any other `app`, `cli` or
+        `web` token those of its own person. An `mcp` token answers `403
+        forbidden`: an agent neither lists nor revokes tokens.
+      responses:
+        "200":
+          description: The tokens, oldest first.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TokensResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/InternalError"
     post:
       operationId: createToken
-      summary: Make a token for `xp` or `xp mcp`. Only `app` tokens may.
+      summary: Make a token for `xp` or `xp mcp`. Only `app` and `web` tokens may.
       description: |
-        The app makes the token of the CLI or of an agent (U5b), so
-        connecting `xp` needs no access to the `xpd` binary. `kind` is
-        `cli` or `mcp`; app and runner tokens come from `xpd token create`
-        and pairing only. The secret is in this response only and never
-        again; only its hash is kept. Any other token kind answers `403
-        forbidden`.
+        The app or the web dashboard makes the token of the CLI or of an
+        agent (U5b, D17), so connecting `xp` needs no access to the `xpd`
+        binary. `kind` is `cli` or `mcp`; app and runner tokens come from
+        `xpd token create` and pairing only. The secret is in this response
+        only and never again, and the response is never cached; only its
+        hash is kept. Any other token kind answers `403 forbidden`.
       requestBody:
         required: true
         content:
@@ -2477,10 +2587,348 @@ paths:
       responses:
         "201":
           description: The token made, with its secret.
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+                const: no-store
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/CreatedToken"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /tokens/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+    delete:
+      operationId: revokeToken
+      summary: Revoke a token of the person that asks; an admin, anyone's.
+      description: |
+        The token stops working at once. A token the asker may not see
+        (`GET /tokens`), or one revoked already, answers `404`; an `mcp`
+        token answers `403 forbidden`.
+      responses:
+        "204":
+          description: Revoked.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /me:
+    get:
+      operationId: getMe
+      summary: The person the token belongs to, and what it may do.
+      description: |
+        A client hides what the token may not do, and never decides it
+        itself (D16). `permissions` takes the token's kind into account: an
+        admin's `mcp` token may only `develop`. Never cached.
+      responses:
+        "200":
+          description: Who asks.
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+                const: no-store
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Me"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /people:
+    get:
+      operationId: listPeople
+      summary: Everyone who uses the engine, removed people included.
+      responses:
+        "200":
+          description: The people, oldest first.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PeopleResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/InternalError"
+    post:
+      operationId: createPerson
+      summary: Add a person with a role. Admins only.
+      description: |
+        Two active people never share a name, ignoring case (`409`).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePersonRequest"
+      responses:
+        "201":
+          description: The person added.
+          headers:
+            Location:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Person"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /people/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      operationId: getPerson
+      summary: One person, removed or not.
+      responses:
+        "200":
+          description: The person.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Person"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+    patch:
+      operationId: updatePerson
+      summary: Rename an active person or change their role. Admins only.
+      description: |
+        A new role applies to the person's next request. Demoting the last
+        admin answers `409`, as does a name another active person has.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdatePersonRequest"
+      responses:
+        "200":
+          description: The person as they are now.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Person"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "500":
+          $ref: "#/components/responses/InternalError"
+    delete:
+      operationId: removePerson
+      summary: Remove an active person and revoke their tokens. Admins only.
+      description: |
+        The person stays, marked removed, so approvals and runs keep their
+        name. Removing the last admin answers `409`.
+      responses:
+        "204":
+          description: Removed.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /people/{id}/sign-in-codes:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+    post:
+      operationId: createSignInCode
+      summary: A one-time code that signs the person in to the web dashboard.
+      description: |
+        An admin's `app`, `cli` or `web` token issues one for anyone; a
+        person's own `app` or `cli` token for them (D9). An `mcp` token never
+        does. The code works once, for 10 minutes, and is in this response
+        only; issuing one ends the person's unused codes. A client opens
+        `<origin>/sign-in#code=<code>`: the fragment never reaches a server.
+        Never cached.
+      responses:
+        "201":
+          description: The code.
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+                const: no-store
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SignInCode"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /session:
+    post:
+      operationId: signIn
+      summary: Exchange a sign-in code for a browser session.
+      description: |
+        Needs no token. The `Origin` must be one the engine serves: the
+        engine machine (from a connection on the machine, with a loopback
+        `Host`), or the HTTPS public URL. Plain HTTP from another machine
+        answers `403 forbidden` with the reason, and a request without
+        `Origin` `403 csrf`. A code that is unknown, used or expired answers
+        `401`, all three alike. After 20 wrong codes within 10 minutes from
+        one address (the connection's, never `X-Forwarded-For`), or 200 from
+        every address together, every code from that address (or from
+        anyone) answers `429` until the oldest leaves the window.
+
+        The answer sets the session cookie, which lasts 8 hours with no
+        renewal: `xp_session_<port>; HttpOnly; SameSite=Strict; Path=/` on
+        the engine machine, `__Host-xp_session; Secure; HttpOnly;
+        SameSite=Strict; Path=/` through the public URL. Not served at the
+        root alias. Never cached.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SignInRequest"
+      responses:
+        "200":
+          description: Signed in; who, and what the session may do.
+          headers:
+            Set-Cookie:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+                const: no-store
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Me"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        "500":
+          $ref: "#/components/responses/InternalError"
+    delete:
+      operationId: signOut
+      summary: Sign the browser out.
+      description: |
+        Revokes the session's token, which closes its sockets with code
+        4401, and clears the cookie (`Max-Age=0`). Only a `web` token signs
+        out; any other answers `403`. Never cached.
+      responses:
+        "204":
+          description: Signed out.
+          headers:
+            Set-Cookie:
+              schema:
+                type: string
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /settings/public-url:
+    get:
+      operationId: getPublicUrl
+      summary: The HTTPS address browsers reach the engine at through a proxy.
+      description: |
+        Browser sign-in works on the engine machine, or through it (the
+        engine has no TLS of its own).
+      responses:
+        "200":
+          description: The public URL, if one is set.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicUrl"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/InternalError"
+    put:
+      operationId: setPublicUrl
+      summary: Set or clear the public URL. Admins only.
+      description: |
+        An `https` origin: a host, maybe a port, and no user info, path,
+        query or fragment; a trailing `/` is dropped.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetPublicUrlRequest"
+      responses:
+        "200":
+          description: The public URL now.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicUrl"
         "400":
           $ref: "#/components/responses/InvalidRequest"
         "401":
@@ -2561,7 +3009,7 @@ paths:
   /runners/pairing-tokens:
     post:
       operationId: createPairingToken
-      summary: Create a pairing token for a new runner. Only `app` and `cli` tokens may.
+      summary: Create a pairing token for a new runner. Only an admin's `app`, `cli` or `web` token may.
       description: |
         The token is single use and valid for 15 minutes (D-08). Only its
         hash is kept, so the secret is shown here and never again. An `mcp`
@@ -2578,7 +3026,12 @@ paths:
               $ref: "#/components/schemas/CreatePairingTokenRequest"
       responses:
         "201":
-          description: The pairing token.
+          description: The pairing token. Never cached.
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+                const: no-store
           content:
             application/json:
               schema:
@@ -2615,7 +3068,7 @@ paths:
           $ref: "#/components/responses/InternalError"
     put:
       operationId: setRunnerUrl
-      summary: Set or clear the runner URL. Only `app` and `cli` tokens may.
+      summary: Set or clear the runner URL. Only an admin's `app`, `cli` or `web` token may.
       description: |
         An absolute `http` or `https` URL with a host and no user info, query
         or fragment; a trailing `/` is dropped. A plain `http` URL that is not
@@ -2662,7 +3115,12 @@ paths:
               $ref: "#/components/schemas/PairRunnerRequest"
       responses:
         "201":
-          description: The runner and its credential.
+          description: The runner and its credential. Never cached.
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+                const: no-store
           content:
             application/json:
               schema:
@@ -2680,7 +3138,7 @@ paths:
       - $ref: "#/components/parameters/RunnerId"
     post:
       operationId: revokeRunner
-      summary: Revoke a runner. Only `app` and `cli` tokens may.
+      summary: Revoke a runner. Only an admin's `app`, `cli` or `web` token may.
       description: |
         Its credential stops working, its connection is closed and the leases
         it holds end at once. Each job it held is handled by the loss rule
@@ -2886,6 +3344,15 @@ components:
       type: http
       scheme: bearer
       description: A device token created with `xpd token create`.
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: __Host-xp_session
+      description: |
+        A browser's session (ADR 0018), set by `POST /session`:
+        `xp_session_<port>` on the engine machine (for example
+        `xp_session_7480`), `__Host-xp_session` through the public URL.
+        Read under `/api/v1` only, and only without `Authorization`.
   parameters:
     JobId:
       name: id
@@ -3028,8 +3495,10 @@ components:
             $ref: "#/components/schemas/ErrorResponse"
     Forbidden:
       description: |
-        The token is valid but its kind may not do this (D-13). The message
-        says what the kind may do.
+        The token is valid but may not do this: its kind (D-13) or its
+        person's role (ADR 0017) does not allow it. The message says what it
+        takes. A browser request that fails the CSRF check answers it with
+        the code `csrf`.
       content:
         application/json:
           schema:
@@ -3093,6 +3562,16 @@ components:
         application/json:
           schema:
             $ref: "#/components/schemas/ErrorResponse"
+    RateLimited:
+      description: Too many wrong sign-in codes; try again after `Retry-After`.
+      headers:
+        Retry-After:
+          schema:
+            type: integer
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
     UpgradeRequired:
       description: The route only speaks WebSocket.
       content:
@@ -3112,7 +3591,9 @@ components:
         - invalid_request
         - unauthorized
         - forbidden
+        - csrf
         - not_found
+        - method_not_allowed
         - conflict
         - credential_in_use
         - already_decided
@@ -3121,6 +3602,7 @@ components:
         - workflow_invalid
         - ssh_url_required
         - upgrade_required
+        - rate_limited
         - internal
         - upstream_error
         - secrets_locked
@@ -4354,6 +4836,8 @@ components:
             $ref: "#/components/schemas/RunJob"
         request:
           $ref: "#/components/schemas/DispatchRequest"
+        origin:
+          $ref: "#/components/schemas/RunOrigin"
     RunsResponse:
       type: object
       required: [runs]
@@ -4684,10 +5168,14 @@ components:
           type: string
         kind:
           type: string
-          enum: [app, cli, mcp, runner]
+          enum: [app, cli, mcp, runner, web]
         createdAt:
           type: string
           format: date-time
+        personId:
+          type: string
+          pattern: "^per_"
+          description: The person the token belongs to. Absent for a runner token (ADR 0017).
       additionalProperties: false
     CreatedToken:
       type: object
@@ -4699,6 +5187,104 @@ components:
           type: string
           pattern: "^xpt_"
           description: The bearer secret. Shown here only, never again.
+      additionalProperties: false
+    TokensResponse:
+      type: object
+      required: [tokens]
+      properties:
+        tokens:
+          type: array
+          items:
+            $ref: "#/components/schemas/TokenInfo"
+      additionalProperties: false
+    PersonRole:
+      type: string
+      enum: [viewer, developer, releaser, admin]
+      description: Each role may do everything the roles before it may (ADR 0017).
+    Person:
+      type: object
+      required: [id, name, role, createdAt]
+      properties:
+        id:
+          type: string
+          pattern: "^per_"
+        name:
+          type: string
+        role:
+          $ref: "#/components/schemas/PersonRole"
+        createdAt:
+          type: string
+          format: date-time
+        removedAt:
+          type: string
+          format: date-time
+          description: When the person was removed; absent while they are active.
+      additionalProperties: false
+    PeopleResponse:
+      type: object
+      required: [people]
+      properties:
+        people:
+          type: array
+          items:
+            $ref: "#/components/schemas/Person"
+      additionalProperties: false
+    CreatePersonRequest:
+      type: object
+      required: [name, role]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 80
+        role:
+          $ref: "#/components/schemas/PersonRole"
+      additionalProperties: false
+    UpdatePersonRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 80
+        role:
+          $ref: "#/components/schemas/PersonRole"
+      additionalProperties: false
+    Permission:
+      type: string
+      enum: [develop, decide_approval, release, administer]
+      description: What a change needs (ADR 0017).
+    Me:
+      type: object
+      required: [person, token, permissions]
+      properties:
+        person:
+          $ref: "#/components/schemas/Person"
+        token:
+          $ref: "#/components/schemas/TokenInfo"
+        permissions:
+          type: array
+          items:
+            $ref: "#/components/schemas/Permission"
+      additionalProperties: false
+    RunOrigin:
+      type: object
+      description: |
+        Who started a run (ADR 0017): a person, or an agent through `xp mcp`
+        on behalf of a person, as they were then.
+      required: [kind]
+      properties:
+        kind:
+          type: string
+          enum: [person, agent]
+        tokenId:
+          type: string
+          pattern: "^tok_"
+        personId:
+          type: string
+          pattern: "^per_"
+        personName:
+          type: string
       additionalProperties: false
     StatusResponse:
       type: object
@@ -5243,7 +5829,14 @@ components:
           description: What the owner called the device or client.
         kind:
           type: string
-          enum: [app, cli]
+          enum: [app, cli, web]
+        personId:
+          type: string
+          pattern: "^per_"
+          description: The person the token belongs to. Absent for approvals decided before people existed (ADR 0017).
+        personName:
+          type: string
+          description: What the person was called when they decided.
     Approval:
       type: object
       required: [id, projectId, action, sha, state, createdAt, expiresAt]
@@ -5866,6 +6459,44 @@ components:
         url:
           type: [string, "null"]
           description: The runner URL, or null to clear it.
+    SignInCode:
+      type: object
+      required: [code, personId, expiresAt]
+      additionalProperties: false
+      properties:
+        code:
+          type: string
+          pattern: "^[0-9A-HJKMNP-TV-Z]{4}(-[0-9A-HJKMNP-TV-Z]{4}){3}$"
+          description: Crockford base32, 80 random bits. Shown this once.
+        personId:
+          type: string
+        expiresAt:
+          type: string
+          format: date-time
+    SignInRequest:
+      type: object
+      required: [code]
+      additionalProperties: false
+      properties:
+        code:
+          type: string
+          description: >-
+            The sign-in code, with or without its dashes, in any case.
+    PublicUrl:
+      type: object
+      additionalProperties: false
+      properties:
+        url:
+          type: string
+          description: The https origin. Absent when none is set.
+    SetPublicUrlRequest:
+      type: object
+      required: [url]
+      additionalProperties: false
+      properties:
+        url:
+          type: [string, "null"]
+          description: The public URL, or null to clear it.
     PairRunnerRequest:
       type: object
       required: [pairingToken]

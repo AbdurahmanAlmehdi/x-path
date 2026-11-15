@@ -10,6 +10,7 @@ import 'package:xp_desktop/app/bloc/engine_notices_bloc.dart';
 import 'package:xp_desktop/settings/settings.dart';
 import 'package:xp_macos_services/testing.dart';
 import 'package:xp_macos_services/xp_macos_services.dart';
+import 'package:xp_repositories/xp_repositories.dart';
 
 import '../helpers/fakes.dart';
 
@@ -138,6 +139,84 @@ void main() {
       expect: () => const [
         RunnerUrlState(command: RunnerUrlCommand.saving, url: url),
         RunnerUrlState(url: url, error: '"ftp://a" is not a runner URL.'),
+      ],
+    );
+  });
+
+  group('DashboardBloc', () {
+    late MockSettingsRepository settings;
+    late List<Uri> opened;
+    final url = Uri.parse('http://127.0.0.1:7480/sign-in#code=ABCD');
+
+    setUp(() {
+      settings = quietSettings();
+      opened = [];
+    });
+
+    DashboardBloc build() => DashboardBloc(
+      settings: settings,
+      openUrl: (url) async => opened.add(url),
+    );
+
+    test('events and states compare by value', () {
+      expect(const DashboardOpenRequested().props, isEmpty);
+      expect(const DashboardState(), const DashboardState());
+    });
+
+    blocTest<DashboardBloc, DashboardState>(
+      'opens the sign-in page of the dashboard in the browser',
+      setUp: () =>
+          when(settings.dashboardSignInUrl).thenAnswer((_) async => url),
+      build: build,
+      act: (bloc) => bloc.add(const DashboardOpenRequested()),
+      expect: () => const [DashboardState(opening: true), DashboardState()],
+      verify: (_) => expect(opened, [url]),
+    );
+
+    blocTest<DashboardBloc, DashboardState>(
+      'opens it once while it is being opened',
+      setUp: () =>
+          when(settings.dashboardSignInUrl).thenAnswer((_) async => url),
+      build: build,
+      act: (bloc) => bloc
+        ..add(const DashboardOpenRequested())
+        ..add(const DashboardOpenRequested()),
+      expect: () => const [DashboardState(opening: true), DashboardState()],
+      verify: (_) => expect(opened, [url]),
+    );
+
+    blocTest<DashboardBloc, DashboardState>(
+      'says why the engine refused, and opens nothing',
+      setUp: () => when(settings.dashboardSignInUrl).thenThrow(
+        const ApiException(
+          'Only an admin issues sign-in codes for others.',
+          statusCode: 403,
+        ),
+      ),
+      build: build,
+      act: (bloc) => bloc.add(const DashboardOpenRequested()),
+      expect: () => const [
+        DashboardState(opening: true),
+        DashboardState(error: 'Only an admin issues sign-in codes for others.'),
+      ],
+      verify: (_) => expect(opened, isEmpty),
+    );
+
+    blocTest<DashboardBloc, DashboardState>(
+      'says so when the browser does not open',
+      setUp: () =>
+          when(settings.dashboardSignInUrl).thenAnswer((_) async => url),
+      build: () => DashboardBloc(
+        settings: settings,
+        openUrl: (url) => openWithSystem(
+          url,
+          run: (_, _) async => ProcessResult(1, 1, '', 'no browser'),
+        ),
+      ),
+      act: (bloc) => bloc.add(const DashboardOpenRequested()),
+      expect: () => const [
+        DashboardState(opening: true),
+        DashboardState(error: unexpectedErrorMessage),
       ],
     );
   });
