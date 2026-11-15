@@ -237,7 +237,11 @@ class BuildIosStep extends FlutterBuildStep<BuildIosInput> {
 
     final app = settings.appDirectory;
     final debugInfo = debugInfoOf(settings);
-    final since = await files.markBuildStart();
+    final since = await files.markBuildStart(
+      app,
+      jobId: context.jobId,
+      ordinal: context.ordinal,
+    );
     final built = await scripts.run(
       'build.sh',
       arguments: [app, ...defines],

@@ -20,6 +20,9 @@ void main() {
   setUp(() => root = tempDirectory());
 
   group('the freshness marker', () {
+    Future<DateTime> mark({String jobId = 'job_1', int ordinal = 3}) =>
+        files.markBuildStart(root.path, jobId: jobId, ordinal: ordinal);
+
     test(
       'is older than a file written after it and newer than one before',
       () async {
@@ -28,7 +31,7 @@ void main() {
             DateTime.now().subtract(const Duration(days: 1)),
           );
 
-        final marker = await files.markBuildStart();
+        final marker = await mark();
         await Future<void>.delayed(const Duration(milliseconds: 50));
         final after = put('after.txt');
 
@@ -38,19 +41,28 @@ void main() {
       },
     );
 
-    test('leaves nothing behind', () async {
-      final before = Directory.systemTemp
-          .listSync()
-          .where((e) => e.path.contains('xpath-build-'))
-          .length;
+    test('lives in the build folder of the app', () async {
+      await mark();
 
-      await files.markBuildStart();
+      expect(
+        File('${root.path}/build/.xpath-build-start-job_1-3').existsSync(),
+        isTrue,
+      );
+    });
 
-      final after = Directory.systemTemp
-          .listSync()
-          .where((e) => e.path.contains('xpath-build-'))
-          .length;
-      expect(after, before);
+    test('answers the first time again for a later attempt', () async {
+      final first = await mark();
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+
+      expect(await mark(), first);
+    });
+
+    test('is new for another step or another job', () async {
+      final first = await mark();
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+
+      expect((await mark(ordinal: 4)).isAfter(first), isTrue);
+      expect((await mark(jobId: 'job_2')).isAfter(first), isTrue);
     });
   });
 

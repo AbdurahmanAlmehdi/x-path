@@ -20,14 +20,26 @@ class BuildFile extends Equatable {
 ///
 /// `xp_adapters` has the `dart:io` implementation. Paths are absolute.
 abstract interface class BuildFiles {
-  /// The freshness marker: the time, as the file system tells it, at which the
-  /// build starts (R:196, `mktemp` before the build).
+  /// The freshness marker of step [ordinal] of job [jobId], which builds the
+  /// app at [appDirectory]: the time, as the file system tells it, at which
+  /// the step first started building (R:196, `mktemp` before the build).
   ///
-  /// A file counts as made by the build only if it was written after this
-  /// time. The time comes from a file the implementation writes right now, so
-  /// it is in the same clock as the modification times of the artifacts, not
-  /// the engine's clock, and a skew between the two cannot matter.
-  Future<DateTime> markBuildStart();
+  /// A file counts as made by the step only if it was written after this
+  /// time. The first call writes a marker file in the app's `build/` folder
+  /// and answers its time. A retry or resume of the step in the same job
+  /// answers that same time, so a file an earlier attempt wrote and the build
+  /// tools then left alone (Gradle found the task up to date) still counts,
+  /// while a file from before the step's first attempt never does. The
+  /// marker goes with the job's worktree.
+  ///
+  /// The time comes from a file on the disk of the build, so it is in the
+  /// same clock as the modification times of the artifacts, not the engine's
+  /// clock, and a skew between the two cannot matter.
+  Future<DateTime> markBuildStart(
+    String appDirectory, {
+    required String jobId,
+    required int ordinal,
+  });
 
   /// The file at [path], or `null` if there is none.
   Future<BuildFile?> stat(String path);
