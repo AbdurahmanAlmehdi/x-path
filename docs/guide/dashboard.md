@@ -35,9 +35,32 @@ xpd person create --name Sam --role admin   # prints the id, and the sign-in cod
 xpd person code Sam                         # a new code, when that one has expired
 ```
 
-Then open `http://127.0.0.1:7480` on that machine and enter the code. `xpd person code Owner`
-gives a code for `Owner` instead. An engine upgraded from an earlier version has `Owner` too, who
-owns every token the engine had.
+Then sign in with the code, in one of these ways:
+
+- **On the engine machine,** when it has a desktop: open `http://127.0.0.1:7480` and enter the
+  code.
+- **Through an SSH tunnel,** for a server without a browser. On your own machine:
+
+  ```sh
+  ssh -N -L 7480:127.0.0.1:7480 you@server
+  ```
+
+  Then open `http://localhost:7480` there and enter the code. Keep the local port the same as the
+  engine's: the engine accepts a browser on the address of its own port only, so a tunnel from
+  another local port is refused.
+- **Through the public URL:** set up the [proxy](#behind-a-proxy) first, then set the public URL
+  from the server with a token of `Owner`'s (`xpd token create` makes one; see
+  [Connect the CLI](install.md#connect-the-cli)), and open the public URL from any device that
+  reaches it:
+
+  ```sh
+  xpd token create --name server --kind cli
+  xp connect http://127.0.0.1:7480                  # asks for the token
+  xp settings public-url https://<machine>.<tailnet>.ts.net
+  ```
+
+`xpd person code Owner` gives a code for `Owner` instead. An engine upgraded from an earlier
+version has `Owner` too, who owns every token the engine had.
 
 In Docker, run them with `docker exec xpath xpd person ...`. The engine in the container sees a
 browser on the host come from Docker's network, not from its own machine, so a Docker engine's
