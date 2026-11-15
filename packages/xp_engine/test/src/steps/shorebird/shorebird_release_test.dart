@@ -296,6 +296,68 @@ void main() {
       expect(result.artifacts, hasLength(1));
     });
 
+    group('on a retry', () {
+      // The first attempt builds the AAB, then fails on the APK (a DNS blip)
+      // before Shorebird registers the release.
+      Future<void> failFirstAttempt({DateTime? aabWritten}) async {
+        final first = BuildContext(
+          exit: const ProcessExit(exitCode: 70),
+          onRun: (_) => harness.files.put(
+            _aab,
+            bytes: utf8.encode('aab bytes'),
+            modified: aabWritten,
+          ),
+        );
+        final outcome = await stepFor().run(
+          input(artifact: ArtifactKind.apk),
+          first,
+        );
+        expect(outcome, isA<StepFailed>());
+        // The retry starts later; Gradle finds the bundle up to date and
+        // writes only the APK.
+        harness.files.markedAt = harness.files.markedAt.add(
+          const Duration(minutes: 2),
+        );
+        context.onRun = (_) =>
+            harness.files.put(_apk, bytes: utf8.encode('apk bytes'));
+      }
+
+      test('stores the AAB an earlier attempt of the step built', () async {
+        await failFirstAttempt();
+
+        final outcome = await stepFor().run(
+          input(artifact: ArtifactKind.apk),
+          context,
+        );
+
+        final result =
+            (outcome as StepSucceeded<ShorebirdReleaseResult>).result;
+        expect(result.artifacts.map((artifact) => artifact.name), [
+          'prod-1.2.3+45.apk',
+          'prod-1.2.3+45.aab',
+        ]);
+        expect(
+          harness.store.files['job_1/prod-1.2.3+45.aab'],
+          utf8.encode('aab bytes'),
+        );
+      });
+
+      test('still leaves out an AAB older than the first attempt', () async {
+        await failFirstAttempt(
+          aabWritten: harness.files.markedAt.subtract(const Duration(days: 1)),
+        );
+
+        final outcome = await stepFor().run(
+          input(artifact: ArtifactKind.apk),
+          context,
+        );
+
+        final result =
+            (outcome as StepSucceeded<ShorebirdReleaseResult>).result;
+        expect(result.artifacts.single.name, 'prod-1.2.3+45.apk');
+      });
+    });
+
     test('obfuscates into the debug info folder', () async {
       final outcome = await stepFor().run(input(obfuscate: true), context);
 
@@ -542,9 +604,75 @@ void main() {
       expect(done!.flutter, isNull);
     });
 
+    group('when this job released but stored no file', () {
+      ShorebirdReleaseRecord recordOf(String jobId) => ShorebirdReleaseRecord(
+        appId: 'sb-1234',
+        version: AppVersion.parse('1.2.3+45'),
+        platform: ShorebirdPlatform.android,
+        flutterVersion: '3.47.6',
+        jobId: jobId,
+        recordedAt: DateTime.utc(2026, 10, 13, 9, 5),
+      );
+
+      setUp(() => releases.answer = [release()]);
+
+      test('stores what the step built in this job', () async {
+        await records.save(recordOf('job_1'));
+        harness.files
+          ..put(_apk, bytes: utf8.encode('apk bytes'))
+          ..put(_aab, bytes: utf8.encode('aab bytes'));
+
+        final done = await stepFor().alreadyDone(
+          input(artifact: ArtifactKind.apk),
+          context,
+        );
+
+        expect(done!.artifacts.map((artifact) => artifact.name), [
+          'prod-1.2.3+45.apk',
+          'prod-1.2.3+45.aab',
+        ]);
+        expect(
+          harness.store.files['job_1/prod-1.2.3+45.aab'],
+          utf8.encode('aab bytes'),
+        );
+      });
+
+      test('takes no file from before the step first ran', () async {
+        await records.save(recordOf('job_1'));
+        harness.files.put(
+          _aab,
+          modified: harness.files.markedAt.subtract(const Duration(days: 1)),
+        );
+
+        final done = await stepFor().alreadyDone(input(), context);
+
+        expect(done!.artifacts, isEmpty);
+      });
+
+      test('takes no file when another job made the release', () async {
+        await records.save(recordOf('job_0'));
+        harness.files.put(_aab);
+
+        final done = await stepFor().alreadyDone(input(), context);
+
+        expect(done!.artifacts, isEmpty);
+        expect(harness.store.files, isEmpty);
+      });
+
+      test('takes no file when no job recorded the release', () async {
+        harness.files.put(_aab);
+
+        final done = await stepFor().alreadyDone(input(), context);
+
+        expect(done!.artifacts, isEmpty);
+      });
+    });
+
     test('does not count a stored file that changed', () async {
       await stepFor().run(input(), context);
       harness.store.files['job_1/prod-1.2.3+45.aab'] = [9];
+      // The worktree is gone too, so nothing can be stored again.
+      harness.files.files.remove(_aab);
       releases.answer = [release()];
 
       final done = await stepFor().alreadyDone(input(), context);

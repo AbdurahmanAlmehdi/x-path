@@ -44,8 +44,8 @@ final class Missing extends BuiltFile {
 ///
 /// `build/` is not cleaned between runs, so a failed build can leave the
 /// artifact of an earlier one where the new one belongs. Every candidate is
-/// compared with the freshness marker: a file written before the build started
-/// is never taken.
+/// compared with the freshness marker: a file written before the step first
+/// started in its job is never taken.
 class BuildOutputs {
   /// Creates the finder over [_files].
   const new(this._files);

@@ -2,8 +2,12 @@ import 'package:xp_engine/xp_engine.dart';
 
 /// The files of a build, in memory, with the times they were written.
 class FakeBuildFiles implements BuildFiles {
-  /// The time [markBuildStart] answers.
+  /// The time [markBuildStart] answers the first time a step asks; later
+  /// attempts of the step get the time of their first one, as on disk.
   DateTime markedAt = DateTime.utc(2026, 10, 13, 9);
+
+  /// The marker of each step: app directory, job and ordinal to its time.
+  final marks = <String, DateTime>{};
 
   /// Bytes and modification time by path.
   final files = <String, (List<int>, DateTime)>{};
@@ -19,7 +23,12 @@ class FakeBuildFiles implements BuildFiles {
       );
 
   @override
-  Future<DateTime> markBuildStart() async => markedAt;
+  Future<DateTime> markBuildStart(
+    String appDirectory, {
+    required String jobId,
+    required int ordinal,
+  }) async =>
+      marks.putIfAbsent('$appDirectory $jobId $ordinal', () => markedAt);
 
   @override
   Future<BuildFile?> stat(String path) async {

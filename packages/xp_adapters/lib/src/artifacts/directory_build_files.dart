@@ -8,22 +8,21 @@ class DirectoryBuildFiles implements BuildFiles {
   /// Creates the accessor.
   const new();
 
-  /// Writes a file to the system's temporary directory and answers the time
-  /// the file system gave it, so that the marker and the modification times
-  /// of the build output come from the same clock (R:196).
+  /// Writes a marker file to the app's `build/` folder the first time a step
+  /// asks, and answers the time the file system gave it, so that the marker
+  /// and the modification times of the build output come from the same clock
+  /// (R:196). Later attempts of the step find the file and answer its time.
   @override
-  Future<DateTime> markBuildStart() async {
+  Future<DateTime> markBuildStart(
+    String appDirectory, {
+    required String jobId,
+    required int ordinal,
+  }) async {
     final marker = File(
-      p.join(
-        Directory.systemTemp.path,
-        'xpath-build-${DateTime.now().microsecondsSinceEpoch}-$pid',
-      ),
-    )..writeAsBytesSync(const []);
-    try {
-      return marker.statSync().modified.toUtc();
-    } finally {
-      marker.deleteSync();
-    }
+      p.join(appDirectory, 'build', '.xpath-build-start-$jobId-$ordinal'),
+    );
+    if (!marker.existsSync()) marker.createSync(recursive: true);
+    return marker.statSync().modified.toUtc();
   }
 
   @override

@@ -248,6 +248,56 @@ void main() {
       );
     });
 
+    test('takes an AAB an earlier attempt built when Gradle left it', () async {
+      // The first attempt writes the AAB, then fails.
+      context = BuildContext(
+        exit: const ProcessExit(exitCode: 1),
+        onRun: (_) => harness.files.put(_aab, bytes: utf8.encode('aab')),
+      );
+      await step.run(input(artifact: ArtifactKind.aab), context);
+      // The retry starts later and Gradle finds the bundle up to date.
+      harness.files.markedAt = harness.files.markedAt.add(
+        const Duration(minutes: 5),
+      );
+      context = BuildContext();
+
+      final outcome = await step.run(
+        input(artifact: ArtifactKind.aab),
+        context,
+      );
+
+      final result = (outcome as StepSucceeded<BuildResult>).result;
+      expect(result.artifact.name, 'dev-1.2.3+45.aab');
+      expect(harness.store.files['job_1/dev-1.2.3+45.aab'], utf8.encode('aab'));
+    });
+
+    test(
+      'still refuses on a retry a file older than the first attempt',
+      () async {
+        harness.files.put(
+          _aab,
+          modified: harness.files.markedAt.subtract(const Duration(days: 2)),
+        );
+        context = BuildContext(exit: const ProcessExit(exitCode: 1));
+        await step.run(input(artifact: ArtifactKind.aab), context);
+        harness.files.markedAt = harness.files.markedAt.add(
+          const Duration(minutes: 5),
+        );
+        context = BuildContext();
+
+        final outcome = await step.run(
+          input(artifact: ArtifactKind.aab),
+          context,
+        );
+
+        expect(
+          (outcome as StepFailed).message,
+          contains('is older than this build'),
+        );
+        expect(await harness.artifacts.forJob('job_1'), isEmpty);
+      },
+    );
+
     test('keeps one artifact when it runs again', () async {
       await step.run(input(), context);
       final again = await step.run(input(), context);

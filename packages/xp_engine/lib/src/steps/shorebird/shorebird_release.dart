@@ -167,7 +167,9 @@ class ShorebirdReleaseResult extends Equatable {
 /// flags after `--`.
 ///
 /// The step has a side effect: Shorebird registers the version, and it cannot
-/// be released twice. `alreadyDone` asks Shorebird whether the release exists.
+/// be released twice. `alreadyDone` asks Shorebird whether the release exists
+/// and, when this job made it, stores the files it built that the store is
+/// missing.
 class ShorebirdReleaseStep
     extends Step<ShorebirdReleaseInput, ShorebirdReleaseResult> {
   /// Creates the step. [isMacOS] tells whether this machine runs macOS.
@@ -245,7 +247,9 @@ class ShorebirdReleaseStep
     };
   }
 
-  /// Done when Shorebird has the release for the platform.
+  /// Done when Shorebird has the release for the platform. When this job
+  /// made the release but stopped before it stored every file, the files the
+  /// step built in this job are stored now.
   @override
   Future<ShorebirdReleaseResult?> alreadyDone(
     ShorebirdReleaseInput input,
@@ -266,15 +270,18 @@ class ShorebirdReleaseStep
     if (release == null) return null;
 
     final flutter = release.flutterVersion;
-    if (flutter != null &&
-        await records.find(
-              input.shorebirdAppId,
-              settings.version,
-              input.platform,
-            ) ==
-            null) {
+    final recorded = await records.find(
+      input.shorebirdAppId,
+      settings.version,
+      input.platform,
+    );
+    if (flutter != null && recorded == null) {
       await _record(input, context, flutter);
     }
+    // Only a release this job made is known to hold the files on its disk.
+    final since = recorded?.jobId == context.jobId
+        ? await _markBuildStart(input, context)
+        : null;
     final tools = await toolchain.recorded(context.jobId);
     final stored = <ArtifactSummary>[];
     for (final (kind, name) in _expected(input)) {
@@ -285,7 +292,15 @@ class ShorebirdReleaseStep
         name: name,
         kind: kind,
       );
-      if (record != null) stored.add(ArtifactSummary.of(record));
+      if (record != null) {
+        stored.add(ArtifactSummary.of(record));
+        continue;
+      }
+      if (since == null) continue;
+      final found = await _locate(input, kind, settings.appDirectory, since);
+      if (found case Fresh(:final file)) {
+        stored.add(await _store(context, kind, name, file));
+      }
     }
     return ShorebirdReleaseResult(
       artifacts: stored,
@@ -320,7 +335,7 @@ class ShorebirdReleaseStep
     if (platform == ShorebirdPlatform.ios) {
       await files.deleteAll('$appDirectory/build/ios/ipa', extension: '.ipa');
     }
-    final since = await files.markBuildStart();
+    final since = await _markBuildStart(input, context);
     final secretDefines = await settings.writeSecretDefines(context);
 
     final exit = await context.run(
@@ -352,13 +367,7 @@ class ShorebirdReleaseStep
       final found = await _locate(input, kind, appDirectory, since);
       switch (found) {
         case Fresh(:final file):
-          final record = await recorder.record(
-            jobId: context.jobId,
-            kind: kind,
-            name: name,
-            content: files.open(file.path),
-          );
-          summaries.add(ArtifactSummary.of(record));
+          summaries.add(await _store(context, kind, name, file));
         case Stale(:final file) when index == 0:
           return StepFailed(
             '${file.path} is older than this release, so it is a '
@@ -412,6 +421,31 @@ class ShorebirdReleaseStep
       '--build-number=${settings.build}',
     ];
   }
+
+  /// The freshness marker of the step's first attempt in the job, so that a
+  /// retry still takes what an earlier attempt built.
+  Future<DateTime> _markBuildStart(
+    ShorebirdReleaseInput input,
+    StepContext context,
+  ) => files.markBuildStart(
+    input.settings.appDirectory,
+    jobId: context.jobId,
+    ordinal: context.ordinal,
+  );
+
+  Future<ArtifactSummary> _store(
+    StepContext context,
+    ArtifactKind kind,
+    String name,
+    BuildFile file,
+  ) async => ArtifactSummary.of(
+    await recorder.record(
+      jobId: context.jobId,
+      kind: kind,
+      name: name,
+      content: files.open(file.path),
+    ),
+  );
 
   Future<BuiltFile> _locate(
     ShorebirdReleaseInput input,
