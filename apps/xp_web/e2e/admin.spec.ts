@@ -256,8 +256,10 @@ test("an admin has the engine create an Apple Distribution certificate, and sees
   await test.step('the engine creates the certificate and assigns the identity to the flavor', async () => {
     await page.goto(`/credentials?project=${projectId}`)
     await row.getByRole('button', { name: 'Create certificate…' }).click()
-    // The project is a folder here, too long for a name, so it keeps the folder's last part.
-    const name = `Apple Distribution · ${fullName.split('/').pop()} prod`
+    // The project is a folder here. When its path is too long for a name
+    // (Apple takes 80 characters), the name keeps the folder's last part.
+    const full = `Apple Distribution · ${fullName} prod`
+    const name = full.length <= 80 ? full : `Apple Distribution · ${fullName.split('/').pop()} prod`
     await expect(dialog.getByLabel('Name')).toHaveValue(name)
     const created = answer()
     await dialog.getByRole('button', { name: 'Create certificate', exact: true }).click()

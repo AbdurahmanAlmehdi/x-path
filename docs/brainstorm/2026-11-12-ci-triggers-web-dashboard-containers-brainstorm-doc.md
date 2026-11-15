@@ -224,7 +224,7 @@ REA could not attach to the owner's Chrome, so how Codemagic streams logs is sti
 - **GitLab** ([commit statuses](https://docs.gitlab.com/api/commits/), [webhooks](https://docs.gitlab.com/user/project/integrations/webhooks/))
   - `POST /projects/:id/statuses/:sha` with a `name` per check. It can answer 409 while an update is in progress, so retry.
   - MR comments are notes, which can be edited.
-  - Webhooks carry the plaintext `X-Gitlab-Token`. Since 19.x they can also be signed with Standard Webhooks (`webhook-id`, `webhook-timestamp`,
+  - Webhooks carry `X-Gitlab-Token` in plain text. Since 19.x they can also be signed with Standard Webhooks (`webhook-id`, `webhook-timestamp`,
     `webhook-signature`).
   - Hooks are paused after 4 failures and disabled after 40, so acknowledge fast and queue the work.
 - **Bitbucket Cloud** ([webhooks](https://support.atlassian.com/bitbucket-cloud/docs/manage-webhooks))
@@ -244,7 +244,7 @@ REA could not attach to the owner's Chrome, so how Codemagic streams logs is sti
     (`?open-step=`).
   - Workflow settings have tabs for the editor, webhooks, scheduled builds and repository.
   - Roles are only Admin and Member ([teams](https://docs.codemagic.io/getting-started/teams)). XPath's releaser role goes beyond that.
-- **Woodpecker** (an open-source Vue 3 UI)
+- **Woodpecker** (an open source Vue 3 UI)
   - The browser session is a JWT in a cookie, with a CSRF token injected into the page. API bearer tokens skip CSRF.
   - Live events and logs come over **SSE**, sent with `x-accel-buffering: no` so reverse proxies don't buffer them
     ([router](https://github.com/woodpecker-ci/woodpecker/blob/main/server/router/api.go)).
