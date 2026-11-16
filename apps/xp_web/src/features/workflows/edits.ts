@@ -1,4 +1,13 @@
-import { emptyJob, emptyStep, type WorkflowDocument, type WorkflowJob, type WorkflowMatrixAxis, type WorkflowStage, type WorkflowStep } from './document'
+import {
+  emptyJob,
+  emptyStep,
+  type WorkflowDocument,
+  type WorkflowDocumentInput,
+  type WorkflowJob,
+  type WorkflowMatrixAxis,
+  type WorkflowStage,
+  type WorkflowStep,
+} from './document'
 
 /**
  * The edits of the visual builder, as the Mac app's `WorkflowEdits`. Each
@@ -104,6 +113,36 @@ export function removeStep(job: WorkflowJob, index: number): WorkflowJob {
 
 export function moveStep(job: WorkflowJob, index: number, delta: number): WorkflowJob {
   return { ...job, steps: moved(job.steps, index, delta) }
+}
+
+/** What the engine takes as an input's name (`workflow_parser.dart`). */
+export const inputNamePattern = /^[A-Za-z_][A-Za-z0-9_]*$/
+
+/** Adds an input without a type, with a name no other input has: `input`, else `input2`, `input3`… */
+export function addInput(document: WorkflowDocument): WorkflowDocument {
+  const used = new Set(document.inputs.map((input) => input.name))
+  let name = 'input'
+  for (let n = 2; used.has(name); n++) name = `input${n}`
+  return {
+    ...document,
+    inputs: [
+      ...document.inputs,
+      { name, type: null, description: null, options: null, defaultValue: null, required: false },
+    ],
+  }
+}
+
+/** Replaces input [index] with what [edit] makes of it. */
+export function editInput(
+  document: WorkflowDocument,
+  index: number,
+  edit: (input: WorkflowDocumentInput) => WorkflowDocumentInput,
+): WorkflowDocument {
+  return { ...document, inputs: replaced(document.inputs, index, edit(document.inputs[index]!)) }
+}
+
+export function removeInput(document: WorkflowDocument, index: number): WorkflowDocument {
+  return { ...document, inputs: removed(document.inputs, index) }
 }
 
 /** The job with the matrix axis [name] set to [axis], or without it when `null`. A new axis goes last. */

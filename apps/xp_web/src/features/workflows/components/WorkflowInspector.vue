@@ -5,13 +5,16 @@ import type { WorkflowSchema } from '@/api/client'
 
 import type { WorkflowDocument, WorkflowJob, WorkflowMatrixAxis } from '../document'
 import {
+  addInput,
   addStep,
+  editInput,
   editJob,
   editStage,
   editStep,
   moveJob,
   moveStage,
   moveStep,
+  removeInput,
   removeJob,
   removeStage,
   removeStep,
@@ -20,13 +23,14 @@ import {
 } from '../edits'
 import { fallbackAxes, fallbackPlatforms } from '../labels'
 import BoundField from './BoundField.vue'
+import InputEditor from './InputEditor.vue'
 import StepEditor from './StepEditor.vue'
 
 /**
  * The fields of what the pipeline has selected: the workflow (name,
- * description, lock), a stage (its name and place), or a job (id, name,
- * `if`, matrix, capabilities and its steps with type, gate, `if` and `with`).
- * The workflow's inputs are edited in the YAML.
+ * description, lock and its inputs), a stage (its name and place), or a job
+ * (id, name, `if`, matrix, capabilities and its steps with type, gate, `if`
+ * and `with`).
  */
 const props = defineProps<{
   document: WorkflowDocument
@@ -301,17 +305,22 @@ function onAddStep(event: Event) {
         One run at a time per project
       </label>
       <p class="muted">It also makes the production flavors the default when a dispatch names none.</p>
-      <div>
+      <div class="inputs-head">
         <span class="xp-type-label muted">Inputs</span>
-        <p v-if="document.inputs.length === 0" class="muted">No inputs</p>
-        <ul v-else class="inputs">
-          <li v-for="input in document.inputs" :key="input.name">
-            <code>{{ input.name }}</code>
-            <span v-if="input.description" class="muted"> — {{ input.description }}</span>
-          </li>
-        </ul>
-        <p class="muted">A dispatch sets them; the steps read them as inputs.&lt;name&gt;. Edit them in the YAML.</p>
+        <button type="button" :disabled="disabled" @click="emit('edit', addInput(document))">Add input</button>
       </div>
+      <p v-if="document.inputs.length === 0" class="muted">No inputs</p>
+      <InputEditor
+        v-for="(input, index) in document.inputs"
+        :key="index"
+        :input="input"
+        :index="index"
+        :others="document.inputs.filter((_, i) => i !== index).map((each) => each.name)"
+        :disabled="disabled"
+        @change="(next) => emit('edit', editInput(document, index, () => next))"
+        @remove="emit('edit', removeInput(document, index))"
+      />
+      <p class="muted">A dispatch sets them; the steps read them as inputs.&lt;name&gt;.</p>
     </div>
   </section>
 </template>
@@ -396,8 +405,10 @@ function onAddStep(event: Event) {
   max-width: 100%;
 }
 
-.inputs {
-  margin: var(--xp-space-4) 0;
-  padding-left: var(--xp-space-16);
+.inputs-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--xp-space-8);
 }
 </style>
