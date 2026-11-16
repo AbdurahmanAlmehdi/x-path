@@ -2,15 +2,19 @@ import { describe, expect, it } from 'vitest'
 
 import { emptyDocument, emptyJob, emptyStep, type WorkflowDocument } from './document'
 import {
+  addInput,
   addJob,
   addStage,
   addStep,
+  editInput,
   editJob,
   editStep,
+  inputNamePattern,
   moveJob,
   moveStage,
   moveStep,
   newStageName,
+  removeInput,
   removeJob,
   removeStage,
   removeStep,
@@ -99,5 +103,35 @@ describe('the edits of steps', () => {
     expect(withValue(values, 'c', 4)).toEqual({ a: 1, b: 2, c: 4 })
     expect(withValue(values, 'a', undefined)).toEqual({ b: 2 })
     expect(withValue(values, 'c', undefined)).toEqual(values)
+  })
+})
+
+describe('the inputs', () => {
+  it('are added under a free name, edited and removed, the document left as it was', () => {
+    const one = addInput(emptyDocument())
+    const two = addInput(one)
+    expect(two.inputs.map((input) => input.name)).toEqual(['input', 'input2'])
+    expect(two.inputs[0]).toEqual({
+      name: 'input',
+      type: null,
+      description: null,
+      options: null,
+      defaultValue: null,
+      required: false,
+    })
+    expect(addInput(two).inputs[2]!.name).toBe('input3')
+
+    const edited = editInput(two, 1, (input) => ({ ...input, name: 'track', type: 'choice', options: ['beta'] }))
+    expect(edited.inputs[1]).toMatchObject({ name: 'track', type: 'choice', options: ['beta'] })
+    expect(two.inputs[1]!.name).toBe('input2')
+
+    expect(removeInput(edited, 0).inputs.map((input) => input.name)).toEqual(['track'])
+  })
+
+  it('are named as the engine takes them', () => {
+    expect(inputNamePattern.test('track_2')).toBe(true)
+    expect(inputNamePattern.test('_x')).toBe(true)
+    expect(inputNamePattern.test('2track')).toBe(false)
+    expect(inputNamePattern.test('a-b')).toBe(false)
   })
 })

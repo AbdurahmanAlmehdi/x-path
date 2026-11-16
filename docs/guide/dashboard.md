@@ -97,6 +97,21 @@ request; a person who is removed, or whose sign-in is revoked, is signed out at 
 **Runs** lists the runs of every project, newest first. The project, workflow and state filters
 are in the address, so a filtered list can be bookmarked or shared.
 
+## Edit a workflow
+
+A project's **Workflows** shows a workflow as a pipeline next to its YAML; an edit in one shows in
+the other, and the engine checks the YAML as you type. Select the workflow itself to edit its name,
+description, lock and inputs (name, type, whether a dispatch must give it, options and default);
+select a stage or a job to edit those. **Save** (⌘S or Ctrl+S) makes a new version; runs keep the
+version they ran. A built-in workflow is read-only: **Copy to edit** makes one of your own from it.
+
+**Import…** opens a YAML file as a new workflow to save under a name, and **Export…** saves the
+YAML being edited as a file. **More** has **Versions…**, which compares any two versions and saves
+an older one again as the newest, and, for a workflow of your own, **Rename…**, **Archive** (it
+keeps its versions and runs and is no longer offered to dispatch) and **Delete…** (a workflow that
+ran cannot be deleted; archive it instead). Viewers read workflows, compare versions and export;
+changing them takes a developer.
+
 ## Approve a gate, follow a release
 
 **Approvals** shows how many gates wait next to its name. Pick one to see what it is bound to (the

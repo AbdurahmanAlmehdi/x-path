@@ -5,7 +5,9 @@ import { onBeforeRouteLeave, onBeforeRouteUpdate, useRoute, useRouter, type Rout
 import type { WorkflowTemplate } from '@/api/client'
 import { useSessionStore } from '@/features/session/stores/session'
 import Dialog from '@/ui/Dialog.vue'
+import { saveText } from '@/ui/download'
 
+import VersionsDialog from '../components/VersionsDialog.vue'
 import WorkflowGraph from '../components/WorkflowGraph.vue'
 import WorkflowInspector from '../components/WorkflowInspector.vue'
 import YamlEditor from '../components/YamlEditor.vue'
@@ -84,6 +86,11 @@ function onBeforeUnload(event: BeforeUnloadEvent) {
   if (store.dirty && canEdit.value) event.preventDefault()
 }
 
+/** Closes the More menu on a click outside it. */
+function onClick(event: MouseEvent) {
+  if (menu.value?.open && !menu.value.contains(event.target as Node)) menu.value.open = false
+}
+
 function onKeydown(event: KeyboardEvent) {
   if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 's') {
     event.preventDefault()
@@ -94,10 +101,12 @@ function onKeydown(event: KeyboardEvent) {
 onMounted(() => {
   window.addEventListener('beforeunload', onBeforeUnload)
   window.addEventListener('keydown', onKeydown)
+  window.addEventListener('click', onClick)
 })
 onBeforeUnmount(() => {
   window.removeEventListener('beforeunload', onBeforeUnload)
   window.removeEventListener('keydown', onKeydown)
+  window.removeEventListener('click', onClick)
   discarding.value?.(false)
   store.stop()
 })
@@ -127,10 +136,24 @@ function startFrom(template: WorkflowTemplate) {
   store.draft(template)
 }
 
-/** The name dialog: for a draft, or a copy of a built-in. */
-const naming = ref(false)
+/** The name dialog: saving a draft or a copy of a built-in, or renaming the open workflow. */
+const naming = ref<'save' | 'rename' | null>(null)
 const newName = ref('')
-const problem = computed(() => (newName.value === '' ? null : nameProblem(newName.value, taken.value)))
+/** The names the new name must not be; a workflow keeps its own. */
+const takenByOthers = computed(() =>
+  naming.value === 'rename' ? taken.value.filter((each) => each !== store.workflow?.name) : taken.value,
+)
+const problem = computed(() => (newName.value === '' ? null : nameProblem(newName.value, takenByOthers.value)))
+const namingTitle = computed(() => {
+  if (naming.value === 'rename') return 'Rename the workflow'
+  return store.builtin ? `Copy ${store.workflow?.name} to edit` : 'Save as a new workflow'
+})
+const canName = computed(
+  () =>
+    newName.value !== '' &&
+    problem.value === null &&
+    !(naming.value === 'rename' && newName.value === store.workflow?.name),
+)
 
 const canSave = computed(
   () => canEdit.value && !busy.value && store.loaded && (store.savesAsNew || store.dirty),
@@ -143,13 +166,67 @@ function save() {
   }
   const workflow = store.workflow
   newName.value = store.draftName ?? (workflow ? copyName(workflow.name, taken.value) : '')
-  naming.value = true
+  naming.value = 'save'
 }
 
-async function saveAs() {
-  if (newName.value === '' || problem.value !== null) return
-  naming.value = false
-  await store.saveAs(newName.value)
+async function submitName() {
+  if (!canName.value) return
+  const mode = naming.value
+  naming.value = null
+  if (mode === 'rename') await store.rename(newName.value)
+  else await store.saveAs(newName.value)
+}
+
+// ------------------------------------------------- the open workflow's own
+
+/** Whether the open workflow is one of the project's own that the person may change. */
+const canChange = computed(() => canEdit.value && store.workflow !== null && !store.builtin)
+
+/** The "More" menu of the open workflow. */
+const menu = ref<HTMLDetailsElement | null>(null)
+
+function fromMenu(action: () => void) {
+  if (menu.value) menu.value.open = false
+  action()
+}
+
+const showingVersions = ref(false)
+
+async function restore(version: number) {
+  showingVersions.value = false
+  if (!(await confirmDiscard())) return
+  await store.restoreVersion(version)
+}
+
+function startRename() {
+  newName.value = store.workflow?.name ?? ''
+  naming.value = 'rename'
+}
+
+const deleting = ref(false)
+
+async function remove() {
+  deleting.value = false
+  await store.remove()
+}
+
+// ------------------------------------------------------- import and export
+
+const importer = ref<HTMLInputElement | null>(null)
+
+async function startImport() {
+  if (await confirmDiscard()) importer.value?.click()
+}
+
+async function onImport(event: Event) {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  input.value = ''
+  if (file) store.importYaml(file.name, await file.text())
+}
+
+function exportYaml() {
+  saveText(`${store.name ?? 'workflow'}.yaml`, store.yaml, 'application/yaml')
 }
 </script>
 
@@ -175,6 +252,37 @@ async function saveAs() {
           </option>
         </select>
         <button v-if="canEdit" type="button" :disabled="busy" @click="startNew">New</button>
+        <button v-if="canEdit" type="button" :disabled="busy" @click="startImport">Import…</button>
+        <input
+          ref="importer"
+          type="file"
+          accept=".yaml,.yml,application/yaml,text/yaml"
+          aria-label="Workflow file"
+          hidden
+          @change="onImport"
+        />
+        <button type="button" :disabled="busy || !store.loaded" @click="exportYaml">Export…</button>
+        <details v-if="store.workflow" ref="menu" class="menu">
+          <summary class="button">More</summary>
+          <div class="menu-items">
+            <button type="button" :disabled="busy" @click="fromMenu(() => (showingVersions = true))">Versions…</button>
+            <template v-if="canChange">
+              <button type="button" :disabled="busy" @click="fromMenu(startRename)">Rename…</button>
+              <button
+                v-if="store.workflow.archivedAt"
+                type="button"
+                :disabled="busy"
+                @click="fromMenu(() => void store.setArchived(false))"
+              >
+                Unarchive
+              </button>
+              <button v-else type="button" :disabled="busy" @click="fromMenu(() => void store.setArchived(true))">
+                Archive
+              </button>
+              <button type="button" :disabled="busy" @click="fromMenu(() => (deleting = true))">Delete…</button>
+            </template>
+          </div>
+        </details>
         <RouterLink
           v-if="canEdit && store.workflow && !store.dirty && !store.workflow.archivedAt"
           :to="{ name: 'dispatch', params: { id: projectId }, query: { workflow: store.workflow.id } }"
@@ -268,12 +376,8 @@ async function saveAs() {
       </template>
     </Dialog>
 
-    <Dialog
-      v-if="naming"
-      :title="store.builtin ? `Copy ${store.workflow?.name} to edit` : 'Save as a new workflow'"
-      @close="naming = false"
-    >
-      <form class="form" @submit.prevent="saveAs">
+    <Dialog v-if="naming" :title="namingTitle" @close="naming = null">
+      <form class="form" @submit.prevent="submitName">
         <label class="field">
           <span class="xp-type-label">Name</span>
           <input v-model.trim="newName" type="text" class="mono" autocomplete="off" spellcheck="false" />
@@ -282,10 +386,28 @@ async function saveAs() {
         <p v-if="problem" class="alert" role="alert">{{ problem }}</p>
       </form>
       <template #footer>
-        <button type="button" @click="naming = false">Cancel</button>
-        <button type="button" class="primary" :disabled="newName === '' || problem !== null" @click="saveAs">
-          {{ store.builtin ? 'Copy' : 'Save' }}
+        <button type="button" @click="naming = null">Cancel</button>
+        <button type="button" class="primary" :disabled="!canName" @click="submitName">
+          {{ naming === 'rename' ? 'Rename' : store.builtin ? 'Copy' : 'Save' }}
         </button>
+      </template>
+    </Dialog>
+
+    <VersionsDialog
+      v-if="showingVersions"
+      :can-restore="canEdit"
+      @close="showingVersions = false"
+      @restore="restore"
+    />
+
+    <Dialog v-if="deleting" :title="`Delete ${store.workflow?.name}?`" @close="deleting = false">
+      <ul class="points">
+        <li>Its versions go with it.</li>
+        <li>A workflow that ran cannot be deleted; archive it instead.</li>
+      </ul>
+      <template #footer>
+        <button type="button" @click="deleting = false">Keep</button>
+        <button type="button" class="danger" @click="remove">Delete</button>
       </template>
     </Dialog>
 
@@ -300,6 +422,45 @@ async function saveAs() {
 </template>
 
 <style scoped>
+.menu {
+  position: relative;
+}
+
+.menu > summary {
+  list-style: none;
+  cursor: pointer;
+}
+
+.menu > summary::-webkit-details-marker {
+  display: none;
+}
+
+.menu-items {
+  position: absolute;
+  right: 0;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  gap: var(--xp-space-4);
+  min-width: 160px;
+  margin-top: var(--xp-space-4);
+  padding: var(--xp-space-6);
+  background: var(--xp-color-surface-overlay);
+  border: var(--xp-border-width-hairline) solid var(--xp-color-border-strong);
+  border-radius: var(--xp-radius-md);
+  box-shadow: var(--xp-elevation-3);
+}
+
+.menu-items button {
+  justify-content: flex-start;
+  text-align: left;
+}
+
+.points {
+  margin: 0;
+  padding-left: var(--xp-space-20);
+}
+
 .builder {
   display: grid;
   grid-template-columns: minmax(0, 5fr) minmax(0, 4fr);

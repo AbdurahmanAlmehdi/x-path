@@ -5,6 +5,7 @@ import {
   api,
   ApiFailure,
   dataOf,
+  doneOf,
   failureMessage,
   type Workflow,
   type WorkflowIssue,
@@ -29,6 +30,14 @@ export const draftTemplate: WorkflowDocument = {
   stages: [{ name: 'build', jobs: [{ ...emptyJob('build'), steps: [emptyStep('git.checkout')] }] }],
 }
 
+/** Two versions of the open workflow, read to compare. */
+export interface VersionDiff {
+  from: number
+  to: number
+  before: string
+  after: string
+}
+
 /** A line of the YAML to show, each time anew (`seq` changes). */
 export interface Reveal {
   line: number
@@ -44,7 +53,10 @@ export interface Reveal {
  * when it can, and the visual editor waits while it cannot.
  *
  * Built-in workflows are read-only (the engine answers `409`): "Copy to
- * edit" saves their YAML as a new workflow based on them.
+ * edit" saves their YAML as a new workflow based on them. A workflow of the
+ * project's own can be renamed, archived and deleted, and any of its
+ * versions saved again as the newest; every version can be compared with
+ * another. A YAML file is imported as a draft.
  */
 export const useWorkflowBuilderStore = defineStore('workflowBuilder', () => {
   const projectId = ref<string | null>(null)
@@ -72,6 +84,10 @@ export const useWorkflowBuilderStore = defineStore('workflowBuilder', () => {
   const validation = ref<Validation>('idle')
   const selection = ref<WorkflowSelection>({})
   const busy = ref<'loading' | 'saving' | null>(null)
+  /** The versions being compared; `null` while they are read. */
+  const versionDiff = shallowRef<VersionDiff | null>(null)
+  /** Why the versions could not be read. */
+  const versionError = ref<string | null>(null)
   /** Something that went well, said once. */
   const notice = ref<string | null>(null)
   const error = ref<string | null>(null)
@@ -79,6 +95,7 @@ export const useWorkflowBuilderStore = defineStore('workflowBuilder', () => {
   const reveal = ref<Reveal | null>(null)
 
   let check = 0
+  let comparing = 0
   let timer: ReturnType<typeof setTimeout> | undefined
 
   const dirty = computed(() => yaml.value !== savedYaml.value)
@@ -182,13 +199,22 @@ export const useWorkflowBuilderStore = defineStore('workflowBuilder', () => {
 
   /** Starts a new, unsaved workflow from [template], or from a blank one. */
   function draft(template: WorkflowTemplate | null = null) {
+    startDraft(template?.yaml ?? toYaml(draftTemplate), template === null || template.id === 'blank' ? null : template.id)
+  }
+
+  /** Starts a draft of the YAML file [fileName] holds, offered the name of the file. */
+  function importYaml(fileName: string, text: string) {
+    startDraft(text, fileName.replace(/\.ya?ml$/i, '') || null)
+  }
+
+  function startDraft(text: string, name: string | null) {
     workflow.value = null
-    draftName.value = template === null || template.id === 'blank' ? null : template.id
+    draftName.value = name
     savedYaml.value = ''
     selection.value = {}
     notice.value = null
     error.value = null
-    readYaml(template?.yaml ?? toYaml(draftTemplate))
+    readYaml(text)
   }
 
   /** What was typed in the YAML editor. */
@@ -319,14 +345,130 @@ export const useWorkflowBuilderStore = defineStore('workflowBuilder', () => {
     savedYaml.value = saved.yaml
     notice.value = `Saved ${saved.name}, version ${saved.version.version}.`
     try {
-      workflows.value = (
-        await dataOf(api.GET('/projects/{id}/workflows', { params: { path: { id: projectId.value! } } }))
-      ).workflows
+      await readList()
     } catch {
       // The list shows the new workflow the next time it is read.
     }
     busy.value = null
     return true
+  }
+
+  async function readList() {
+    workflows.value = (
+      await dataOf(api.GET('/projects/{id}/workflows', { params: { path: { id: projectId.value! } } }))
+    ).workflows
+  }
+
+  function readVersion(workflowId: string, version: number): Promise<Workflow> {
+    return dataOf(
+      api.GET('/projects/{id}/workflows/{workflowId}', {
+        params: { path: { id: projectId.value!, workflowId }, query: { version } },
+      }),
+    )
+  }
+
+  /** The open workflow of the project's own, which the commands below change; `null` for a draft or a built-in. */
+  function own(): Workflow | null {
+    const current = workflow.value
+    return current === null || current.builtin ? null : current
+  }
+
+  /** Runs [action] as the one command of the builder; `true` when it went through. */
+  async function command(action: () => Promise<void>): Promise<boolean> {
+    busy.value = 'saving'
+    notice.value = null
+    error.value = null
+    try {
+      await action()
+      return true
+    } catch (failure) {
+      error.value = failureMessage(failure)
+      return false
+    } finally {
+      busy.value = null
+    }
+  }
+
+  /** Reads versions [from] and [to] of the open workflow into [versionDiff]; a newer compare replaces an older one. */
+  async function compareVersions(from: number, to: number): Promise<void> {
+    const current = workflow.value
+    if (current === null) return
+    const mine = ++comparing
+    versionDiff.value = null
+    versionError.value = null
+    try {
+      const [before, after] = await Promise.all([readVersion(current.id, from), readVersion(current.id, to)])
+      if (mine === comparing) versionDiff.value = { from, to, before: before.yaml, after: after.yaml }
+    } catch (failure) {
+      if (mine === comparing) versionError.value = failureMessage(failure)
+    }
+  }
+
+  /** Saves version [version] of the open workflow again, as its newest, and opens it. */
+  function restoreVersion(version: number): Promise<boolean> {
+    const current = own()
+    if (current === null) return Promise.resolve(false)
+    return command(async () => {
+      const old = await readVersion(current.id, version)
+      const saved = await dataOf(
+        api.PUT('/projects/{id}/workflows/{workflowId}', {
+          params: { path: { id: projectId.value!, workflowId: current.id } },
+          body: { yaml: old.yaml },
+        }),
+      )
+      workflow.value = saved
+      savedYaml.value = saved.yaml
+      readYaml(saved.yaml)
+      notice.value = `Saved version ${version} again as version ${saved.version.version} of ${saved.name}.`
+      await readList()
+    })
+  }
+
+  /** Renames the open workflow; what is being typed stays, unsaved. */
+  function rename(newName: string): Promise<boolean> {
+    return update({ name: newName }, (updated) => `Renamed to ${updated.name}.`)
+  }
+
+  /** Archives the open workflow, or unarchives it. */
+  function setArchived(archived: boolean): Promise<boolean> {
+    return update({ archived }, (updated) => `${archived ? 'Archived' : 'Unarchived'} ${updated.name}.`)
+  }
+
+  function update(body: { name?: string; archived?: boolean }, said: (updated: Workflow) => string): Promise<boolean> {
+    const current = own()
+    if (current === null) return Promise.resolve(false)
+    return command(async () => {
+      const updated = await dataOf(
+        api.PATCH('/projects/{id}/workflows/{workflowId}', {
+          params: { path: { id: projectId.value!, workflowId: current.id } },
+          body,
+        }),
+      )
+      if (workflow.value?.id === current.id) workflow.value = updated
+      notice.value = said(updated)
+      await readList()
+    })
+  }
+
+  /**
+   * Deletes the open workflow (the engine refuses one that ran), then opens
+   * the first of the project's own, else the first, else a draft.
+   */
+  function remove(): Promise<boolean> {
+    const current = own()
+    if (current === null) return Promise.resolve(false)
+    return command(async () => {
+      await doneOf(
+        api.DELETE('/projects/{id}/workflows/{workflowId}', {
+          params: { path: { id: projectId.value!, workflowId: current.id } },
+        }),
+      )
+      await readList()
+      const next = workflows.value.find((each) => !each.builtin) ?? workflows.value[0]
+      if (next === undefined) draft()
+      else await read(next.id)
+      notice.value = `Deleted ${current.name}.`
+    })
   }
 
   /** Stops checking: the builder is gone. */
@@ -351,6 +493,8 @@ export const useWorkflowBuilderStore = defineStore('workflowBuilder', () => {
     validation,
     selection,
     busy,
+    versionDiff,
+    versionError,
     notice,
     error,
     reveal,
@@ -363,12 +507,18 @@ export const useWorkflowBuilderStore = defineStore('workflowBuilder', () => {
     start,
     open,
     draft,
+    importYaml,
     setYaml,
     edit,
     select,
     revealIssue,
     save,
     saveAs,
+    compareVersions,
+    restoreVersion,
+    rename,
+    setArchived,
+    remove,
     stop,
   }
 })

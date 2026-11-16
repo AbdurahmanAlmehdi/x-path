@@ -98,7 +98,8 @@ textarea {
   font: var(--xp-type-code);
 }
 
-a.button {
+a.button,
+summary.button {
   display: inline-flex;
   align-items: center;
   height: var(--xp-size-control-md);
@@ -111,7 +112,8 @@ a.button {
   border-radius: var(--xp-radius-md);
 }
 
-a.button:hover {
+a.button:hover,
+summary.button:hover {
   background: var(--xp-color-surface-hover);
 }
 

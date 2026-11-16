@@ -227,4 +227,149 @@ test('a viewer reads workflows with nothing to change them', async ({ page }) =>
   await expect(page.getByRole('button', { name: 'New' })).toHaveCount(0)
   await expect(page.getByRole('button', { name: /^Save/ })).toHaveCount(0)
   await expect(page.getByRole('button', { name: 'Add stage' })).toBeDisabled()
+  await expect(page.getByRole('button', { name: 'Add input' })).toBeDisabled()
+  await expect(page.getByRole('button', { name: 'Import…' })).toHaveCount(0)
+  await openMenu(page)
+  await expect(menu(page).getByRole('button')).toHaveText(['Versions…'])
+})
+
+const importedYaml = `schema: 1
+name: Imported
+stages:
+  - name: build
+    jobs:
+      build:
+        steps:
+          - kind: git.checkout
+`
+
+const menu = (page: Page) => page.locator('details.menu')
+
+async function openMenu(page: Page) {
+  await menu(page).locator('summary').click()
+}
+
+/** Picks [label] in the More menu of the open workflow. */
+async function more(page: Page, label: string) {
+  await openMenu(page)
+  await menu(page).getByRole('button', { name: label }).click()
+}
+
+async function openWorkflow(page: Page, name: string, subtitle: string) {
+  await page.goto(`/projects/${projectId}/workflows`)
+  await page.getByRole('combobox', { name: 'Workflow' }).selectOption({ label: name })
+  await expect(page.getByTestId('workflow-subtitle')).toHaveText(subtitle)
+}
+
+test('a YAML file imports as a draft, saves under its name, and exports again', async ({ page }) => {
+  await signIn(page, developer)
+  await page.goto(`/projects/${projectId}/workflows`)
+  await expect(page.getByTestId('validation')).toHaveText('Valid')
+
+  const chooser = page.waitForEvent('filechooser')
+  await page.getByRole('button', { name: 'Import…' }).click()
+  await (await chooser).setFiles({ name: 'imported.yaml', mimeType: 'application/yaml', buffer: Buffer.from(importedYaml) })
+
+  await expect(page.getByTestId('workflow-subtitle')).toHaveText('imported · Not saved yet')
+  await expect(page.getByRole('navigation', { name: 'Pipeline' })).toContainText('Imported')
+  await expect(page.getByTestId('validation')).toHaveText('Valid')
+  await page.getByRole('button', { name: 'Save as…' }).click()
+  const naming = page.getByRole('dialog', { name: 'Save as a new workflow' })
+  await expect(naming.getByRole('textbox', { name: 'Name' })).toHaveValue('imported')
+  await naming.getByRole('button', { name: 'Save' }).click()
+  await expect(page.getByRole('status').filter({ hasText: 'Saved imported, version 1.' })).toBeVisible()
+
+  const download = page.waitForEvent('download')
+  await page.getByRole('button', { name: 'Export…' }).click()
+  const file = await download
+  expect(file.suggestedFilename()).toBe('imported.yaml')
+  const chunks: Buffer[] = []
+  for await (const chunk of await file.createReadStream()) chunks.push(chunk as Buffer)
+  expect(Buffer.concat(chunks).toString('utf8')).toBe(importedYaml)
+})
+
+test('inputs edited in the visual view are saved, and the engine reads them', async ({ page }) => {
+  await signIn(page, developer)
+  await openWorkflow(page, 'imported', 'imported · Version 1')
+
+  const fields = page.getByTestId('workflow-fields')
+  await fields.getByRole('button', { name: 'Add input' }).click()
+  const input = fields.locator('[data-input="0"]')
+  await input.getByRole('textbox', { name: 'Input name' }).fill('2track')
+  await expect(input.getByRole('alert')).toHaveText('Letters, digits and _, starting with a letter or _.')
+  await input.getByRole('textbox', { name: 'Input name' }).fill('track')
+  await input.getByRole('combobox', { name: 'Type' }).selectOption('choice')
+  await input.getByRole('textbox', { name: 'Options' }).fill('beta, production')
+  await input.getByRole('combobox', { name: 'Default' }).selectOption('beta')
+  await input.getByRole('textbox', { name: 'Description' }).fill('Where it goes')
+
+  await expect(editor(page)).toContainText('track:')
+  await expect(editor(page)).toContainText('options: [beta, production]')
+  await expect(page.getByTestId('validation')).toHaveText('Valid')
+  await page.getByRole('button', { name: 'Save', exact: true }).click()
+  await expect(page.getByRole('status').filter({ hasText: 'Saved imported, version 2.' })).toBeVisible()
+
+  const workflows = (await call(page, 'GET', `/projects/${projectId}/workflows`)).body.workflows
+  const id = workflows.find((each: { name: string }) => each.name === 'imported').id
+  const saved = await call(page, 'GET', `/projects/${projectId}/workflows/${id}`)
+  expect(saved.body.inputs).toEqual([
+    { name: 'track', type: 'choice', description: 'Where it goes', options: ['beta', 'production'], default: 'beta', required: false },
+  ])
+})
+
+test('versions compare, and an older one is saved again as the newest', async ({ page }) => {
+  await signIn(page, developer)
+  await openWorkflow(page, 'imported', 'imported · Version 2')
+
+  await more(page, 'Versions…')
+  const versions = page.getByRole('dialog', { name: 'Versions of imported' })
+  await expect(versions.getByRole('combobox', { name: 'From' })).toHaveValue('1')
+  await expect(versions.getByRole('combobox', { name: 'To' })).toHaveValue('2')
+  await expect(versions.locator('.line.added').first()).toHaveText('+inputs:')
+  await versions.getByRole('combobox', { name: 'From' }).selectOption('2')
+  await expect(versions).toContainText('No changes.')
+  await expect(versions.getByRole('button', { name: /^Restore/ })).toHaveCount(0)
+  await versions.getByRole('combobox', { name: 'From' }).selectOption('1')
+  await versions.getByRole('button', { name: 'Restore version 1' }).click()
+
+  await expect(page.getByRole('status').filter({ hasText: 'Saved version 1 again as version 3 of imported.' })).toBeVisible()
+  await expect(page.getByTestId('workflow-subtitle')).toHaveText('imported · Version 3')
+  await expect(editor(page)).not.toContainText('inputs:')
+  await expect(page.getByTestId('workflow-fields')).toContainText('No inputs')
+})
+
+test('a workflow of your own is renamed, archived, unarchived and deleted', async ({ page }) => {
+  await signIn(page, developer)
+  await openWorkflow(page, 'imported', 'imported · Version 3')
+
+  await more(page, 'Rename…')
+  const naming = page.getByRole('dialog', { name: 'Rename the workflow' })
+  await naming.getByRole('textbox', { name: 'Name' }).fill('dev-build')
+  await expect(naming.getByRole('alert')).toHaveText('The project already has a workflow called dev-build.')
+  await naming.getByRole('textbox', { name: 'Name' }).fill('imported-2')
+  await naming.getByRole('button', { name: 'Rename' }).click()
+  await expect(page.getByRole('status').filter({ hasText: 'Renamed to imported-2.' })).toBeVisible()
+  await expect(page.getByTestId('workflow-subtitle')).toHaveText('imported-2 · Version 3')
+
+  await more(page, 'Archive')
+  await expect(page.getByRole('status').filter({ hasText: 'Archived imported-2.' })).toBeVisible()
+  await expect(page.getByText('Archived: kept with its versions and runs')).toBeVisible()
+  await expect(page.getByRole('combobox', { name: 'Workflow' }).locator('option:checked')).toHaveText('imported-2 (archived)')
+  await expect(page.getByRole('link', { name: 'Run…' })).toHaveCount(0)
+  await more(page, 'Unarchive')
+  await expect(page.getByRole('status').filter({ hasText: 'Unarchived imported-2.' })).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Run…' })).toBeVisible()
+
+  await more(page, 'Delete…')
+  const confirm = page.getByRole('dialog', { name: 'Delete imported-2?' })
+  await confirm.getByRole('button', { name: 'Keep' }).click()
+  await expect(confirm).toHaveCount(0)
+  await more(page, 'Delete…')
+  await confirm.getByRole('button', { name: 'Delete' }).click()
+  await expect(page.getByRole('status').filter({ hasText: 'Deleted imported-2.' })).toBeVisible()
+  await expect(page.getByTestId('workflow-subtitle')).toHaveText('dev-build-copy · Version 2')
+  const names = (await call(page, 'GET', `/projects/${projectId}/workflows`)).body.workflows.map(
+    (each: { name: string }) => each.name,
+  )
+  expect(names).not.toContain('imported-2')
 })
