@@ -1,9 +1,9 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 
-import { api, dataOf, failureMessage, type Approval, type ApprovalState } from '@/api/client'
+import { api, dataOf, type Approval, type ApprovalState } from '@/api/client'
+import { useLoad } from '@/api/requests'
 import { followEvents } from '@/api/sockets'
-import { coalesced } from '@/app/coalesce'
 
 /** The filters of the inbox. */
 export type ApprovalsFilter = 'pending' | 'decided' | 'expired'
@@ -24,8 +24,6 @@ export function filterOf(state: ApprovalState): ApprovalsFilter {
  */
 export const useApprovalsStore = defineStore('approvals', () => {
   const approvals = ref<Approval[]>([])
-  const loaded = ref(false)
-  const error = ref<string | null>(null)
   const filter = ref<ApprovalsFilter>('pending')
   /** The approval picked, if any: it is shown under its own filter, which follows it when it is decided. */
   const selectedId = ref<string | null>(null)
@@ -51,16 +49,9 @@ export const useApprovalsStore = defineStore('approvals', () => {
   }
 
   /** Asks the engine for the approvals. */
-  const load = coalesced(async () => {
-    try {
-      approvals.value = (await dataOf(api.GET('/approvals'))).approvals
-      error.value = null
-      followPicked()
-    } catch (failure) {
-      error.value = failureMessage(failure)
-    } finally {
-      loaded.value = true
-    }
+  const { loaded, error, load } = useLoad(async () => {
+    approvals.value = (await dataOf(api.GET('/approvals'))).approvals
+    followPicked()
   })
 
   /** Shows [id] in the detail pane, under its own filter; `null` shows the first. */

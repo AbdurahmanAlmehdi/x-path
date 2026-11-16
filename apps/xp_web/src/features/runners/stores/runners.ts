@@ -1,9 +1,9 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 
-import { api, dataOf, failureMessage, type PairingToken, type Runner } from '@/api/client'
+import { api, dataOf, type PairingToken, type Runner } from '@/api/client'
+import { useCommand, useLoad } from '@/api/requests'
 import { followEvents } from '@/api/sockets'
-import { coalesced } from '@/app/coalesce'
 
 /**
  * The runners of the engine, kept up to date by the runner events, and
@@ -13,12 +13,11 @@ import { coalesced } from '@/app/coalesce'
  */
 export const useRunnersStore = defineStore('runners', () => {
   const runners = ref<Runner[]>([])
-  const loaded = ref(false)
-  const error = ref<string | null>(null)
-  /** The runner being revoked. */
-  const revoking = ref<string | null>(null)
-  /** What the engine said when it refused a revoke. */
-  const actionError = ref<string | null>(null)
+  /**
+   * The runner being revoked ([busy]), and what the engine said when it
+   * refused a revoke ([error]).
+   */
+  const revoking = useCommand<string | null>(null)
 
   /** The runners that may run jobs, oldest first. */
   const active = computed(() => runners.value.filter((runner) => runner.status !== 'revoked'))
@@ -30,15 +29,8 @@ export const useRunnersStore = defineStore('runners', () => {
   )
 
   /** Asks the engine for the runners. */
-  const load = coalesced(async () => {
-    try {
-      runners.value = (await dataOf(api.GET('/runners'))).runners
-      error.value = null
-    } catch (failure) {
-      error.value = failureMessage(failure)
-    } finally {
-      loaded.value = true
-    }
+  const { loaded, error, load } = useLoad(async () => {
+    runners.value = (await dataOf(api.GET('/runners'))).runners
   })
 
   /** Loads again on runner events and a resync. Returns the function that stops. */
@@ -58,26 +50,20 @@ export const useRunnersStore = defineStore('runners', () => {
 
   /** Revokes the runner [id]; `true` when it went through. */
   async function revoke(id: string): Promise<boolean> {
-    revoking.value = id
-    actionError.value = null
-    try {
+    const revoked = await revoking.run(id, async () => {
       await dataOf(api.POST('/runners/{id}/revoke', { params: { path: { id } } }))
       await load()
       return true
-    } catch (failure) {
-      actionError.value = failureMessage(failure)
-      return false
-    } finally {
-      revoking.value = null
-    }
+    })
+    return revoked ?? false
   }
 
   return {
     runners,
     loaded,
     error,
-    revoking,
-    actionError,
+    revoking: revoking.busy,
+    actionError: revoking.error,
     active,
     revoked,
     busy,

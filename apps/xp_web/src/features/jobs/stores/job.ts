@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 
 import { api, ApiFailure, dataOf, failureMessage, type Job } from '@/api/client'
+import { useCommand } from '@/api/requests'
 import { followEvents, payloadValue } from '@/api/sockets'
 import { coalesced } from '@/app/coalesce'
 import { isFinished } from '@/ui/format'
@@ -14,8 +15,9 @@ export const useJobStore = defineStore('job', () => {
   const id = ref<string | null>(null)
   const job = ref<Job | null>(null)
   const missing = ref(false)
-  const error = ref<string | null>(null)
-  const busy = ref<JobAction | null>(null)
+  /** The action under way ([busy]); [error] is also why the job could not be read. */
+  const command = useCommand<JobAction | null>(null)
+  const { busy, error } = command
 
   /** Whether the job has not ended: Cancel stops it. */
   const cancellable = computed(() => (job.value ? !isFinished(job.value.state) : false))
@@ -69,21 +71,15 @@ export const useJobStore = defineStore('job', () => {
     const jobId = id.value
     if (!jobId || busy.value) return false
     const params = { params: { path: { id: jobId } } }
-    busy.value = action
-    error.value = null
-    try {
+    const done = await command.run(action, async () => {
       job.value = await dataOf(
         action === 'cancel'
           ? api.POST('/jobs/{id}/cancel', params)
           : api.POST('/jobs/{id}/resume', { ...params, body: {} }),
       )
       return true
-    } catch (failure) {
-      error.value = failureMessage(failure)
-      return false
-    } finally {
-      busy.value = null
-    }
+    })
+    return done ?? false
   }
 
   return { id, job, missing, error, busy, cancellable, resumable, open, follow, act }

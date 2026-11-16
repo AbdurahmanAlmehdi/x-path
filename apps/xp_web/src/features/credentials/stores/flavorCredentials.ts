@@ -10,6 +10,7 @@ import {
   type Credential,
   type CredentialKind,
 } from '@/api/client'
+import { useCommand } from '@/api/requests'
 import { followEvents } from '@/api/sockets'
 
 import type { FlavorTarget } from '../labels'
@@ -56,10 +57,11 @@ export const useFlavorCredentialsStore = defineStore('flavorCredentials', () => 
   const credentials = ref<Credential[]>([])
   const loaded = ref(false)
   const error = ref<string | null>(null)
-  /** Whether an assignment is on its way to the engine. */
-  const assigning = ref(false)
-  /** What the engine said when it refused the last assignment. */
-  const assignError = ref<string | null>(null)
+  /**
+   * Whether an assignment is on its way to the engine ([busy]), and what
+   * it said when it refused the last one ([error]).
+   */
+  const assignment = useCommand(false)
   /** The flavors that kept their own credential at the last assignment. */
   const kept = ref<string[]>([])
   /** Whether the engine is creating a distribution certificate. */
@@ -113,19 +115,13 @@ export const useFlavorCredentialsStore = defineStore('flavorCredentials', () => 
   async function change(send: () => Promise<void>): Promise<boolean> {
     const project = projectId.value
     if (!project) return false
-    assigning.value = true
-    assignError.value = null
     kept.value = []
-    try {
+    const done = await assignment.run(true, async () => {
       await send()
       await load(project)
       return true
-    } catch (failure) {
-      assignError.value = failureMessage(failure)
-      return false
-    } finally {
-      assigning.value = false
-    }
+    })
+    return done ?? false
   }
 
   function path(target: FlavorTarget, kind: CredentialKind) {
@@ -205,8 +201,8 @@ export const useFlavorCredentialsStore = defineStore('flavorCredentials', () => 
     credentials,
     loaded,
     error,
-    assigning,
-    assignError,
+    assigning: assignment.busy,
+    assignError: assignment.error,
     kept,
     creating,
     certificateError,

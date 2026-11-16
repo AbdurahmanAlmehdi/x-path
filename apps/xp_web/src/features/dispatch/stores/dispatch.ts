@@ -16,6 +16,7 @@ import {
   type WorkflowSchema,
   type WorkflowSummary,
 } from '@/api/client'
+import { useCommand } from '@/api/requests'
 
 /** How long typing pauses before the preview is worked out again. */
 export const typingPause = 400
@@ -69,8 +70,12 @@ export const useDispatchStore = defineStore('dispatch', () => {
   const previewing = ref(false)
   /** That the engine does not have the ref yet: the dispatch fetches it first. */
   const refNotice = ref<string | null>(null)
-  const submitting = ref(false)
-  const error = ref<string | null>(null)
+  /**
+   * Whether the dispatch is on its way ([busy]); [error] also says why the
+   * form could not load or preview.
+   */
+  const dispatching = useCommand(false)
+  const { busy: submitting, error } = dispatching
 
   let generation = 0
   let timer: ReturnType<typeof setTimeout> | undefined
@@ -352,21 +357,16 @@ export const useDispatchStore = defineStore('dispatch', () => {
     const owner = project.value
     const current = workflow.value
     if (!canDispatch.value || !owner || !current) return null
-    submitting.value = true
-    error.value = null
-    try {
-      return (await dataOf(
-        api.POST('/projects/{id}/workflows/{workflowId}/dispatch', {
-          params: { path: { id: owner.id, workflowId: current.id } },
-          body: request.value,
-        }),
-      )) as Run
-    } catch (failure) {
-      error.value = failureMessage(failure)
-      return null
-    } finally {
-      submitting.value = false
-    }
+    return dispatching.run(
+      true,
+      async () =>
+        (await dataOf(
+          api.POST('/projects/{id}/workflows/{workflowId}/dispatch', {
+            params: { path: { id: owner.id, workflowId: current.id } },
+            body: request.value,
+          }),
+        )) as Run,
+    )
   }
 
   return {

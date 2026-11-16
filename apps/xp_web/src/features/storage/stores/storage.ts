@@ -4,13 +4,12 @@ import { computed, ref } from 'vue'
 import {
   api,
   dataOf,
-  failureMessage,
   type FreeSpaceResult,
   type RetentionSettings,
   type StorageCategory,
   type StorageReport,
 } from '@/api/client'
-import { coalesced } from '@/app/coalesce'
+import { useCommand, useLoad } from '@/api/requests'
 import { formatSize } from '@/ui/format'
 
 /**
@@ -19,12 +18,11 @@ import { formatSize } from '@/ui/format'
  */
 export const useStorageStore = defineStore('storage', () => {
   const report = ref<StorageReport | null>(null)
-  const loaded = ref(false)
-  const error = ref<string | null>(null)
-  /** What is on its way to the engine. */
-  const busy = ref<'freeing' | 'savingRetention' | null>(null)
-  /** What the engine said when it refused the last command. */
-  const actionError = ref<string | null>(null)
+  /**
+   * What is on its way to the engine ([busy]), and what it said when it
+   * refused the last command ([error]).
+   */
+  const command = useCommand<'freeing' | 'savingRetention' | null>(null)
   /** What the last command did, when it went through. */
   const notice = ref<string | null>(null)
   /** What could not be deleted in the last free. */
@@ -38,66 +36,51 @@ export const useStorageStore = defineStore('storage', () => {
   )
 
   /** Measures again. */
-  const load = coalesced(async () => {
-    try {
-      report.value = await dataOf(api.GET('/storage'))
-      error.value = null
-    } catch (failure) {
-      error.value = failureMessage(failure)
-    } finally {
-      loaded.value = true
-    }
+  const { loaded, error, load } = useLoad(async () => {
+    report.value = await dataOf(api.GET('/storage'))
   })
 
-  function begin(command: 'freeing' | 'savingRetention') {
-    busy.value = command
-    actionError.value = null
+  /**
+   * Runs [send] as [kind], then measures again; `true` when it went
+   * through, with [notice] saying what it did.
+   */
+  async function run(kind: 'freeing' | 'savingRetention', send: () => Promise<string>): Promise<boolean> {
     notice.value = null
+    const done = await command.run(kind, async () => {
+      notice.value = await send()
+      await load()
+      return true
+    })
+    return done ?? false
   }
 
   /** Deletes what retention gives back in [categories]; `true` when it went through. */
-  async function free(categories: StorageCategory[]): Promise<boolean> {
-    begin('freeing')
-    try {
+  function free(categories: StorageCategory[]): Promise<boolean> {
+    return run('freeing', async () => {
       const result: FreeSpaceResult = await dataOf(
         api.POST('/storage/free', { body: { dryRun: false, categories } }),
       )
       const bytes = result.categories.reduce((sum, category) => sum + category.bytes, 0)
-      notice.value = `Freed ${formatSize(bytes)}`
       failures.value = result.failures
-      await load()
-      return true
-    } catch (failure) {
-      actionError.value = failureMessage(failure)
-      return false
-    } finally {
-      busy.value = null
-    }
+      return `Freed ${formatSize(bytes)}`
+    })
   }
 
   /** Keeps [settings] as the retention; `true` when it went through. */
-  async function saveRetention(settings: Required<RetentionSettings>): Promise<boolean> {
-    begin('savingRetention')
-    try {
+  function saveRetention(settings: Required<RetentionSettings>): Promise<boolean> {
+    return run('savingRetention', async () => {
       const now = await dataOf(api.PUT('/storage/retention', { body: settings }))
       if (report.value) report.value = { ...report.value, retention: now }
-      notice.value = 'Retention saved'
-      await load()
-      return true
-    } catch (failure) {
-      actionError.value = failureMessage(failure)
-      return false
-    } finally {
-      busy.value = null
-    }
+      return 'Retention saved'
+    })
   }
 
   return {
     report,
     loaded,
     error,
-    busy,
-    actionError,
+    busy: command.busy,
+    actionError: command.error,
     notice,
     failures,
     used,
