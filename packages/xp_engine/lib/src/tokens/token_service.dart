@@ -86,8 +86,29 @@ class TokenService {
   static const webSessionLifetime = Duration(hours: 8);
 
   /// How long a browser session's token is kept once it expired or was
-  /// revoked, before housekeeping deletes it ([purgeEndedWebTokens]).
+  /// revoked, before housekeeping deletes it ([purgeEndedTokens]).
   static const endedWebTokenGrace = Duration(days: 1);
+
+  /// How long a token of `xp` or `xp mcp` works after it was last used
+  /// (ADR 0019): each use moves its expiry to this long after, so a client
+  /// in use keeps working and a forgotten one stops.
+  static const clientTokenLifetime = Duration(days: 90);
+
+  /// How far a use must move a client token's expiry before it is written:
+  /// a token is written at most about once a day, not on every request.
+  static const clientTokenRenewalStep = Duration(days: 1);
+
+  /// How long a token of `xp` or `xp mcp` is kept once it expired or was
+  /// revoked, before housekeeping deletes it ([purgeEndedTokens]): until
+  /// then, a client that uses it hears that it expired.
+  static const endedClientTokenGrace = Duration(days: 30);
+
+  /// The kinds of the tokens of `xp` and `xp mcp`, which expire when they
+  /// are not used for [clientTokenLifetime] (ADR 0019).
+  static const Set<DeviceTokenKind> clientKinds = {
+    DeviceTokenKind.cli,
+    DeviceTokenKind.mcp,
+  };
 
   final DeviceTokenRepository _tokens;
   final PersonRepository _people;
@@ -102,7 +123,8 @@ class TokenService {
   /// Creates and stores a token called [name] for [kind], which belongs to
   /// the person [personId]. A runner token belongs to no person. Without a
   /// [personId], any other token belongs to the admin who has been one the
-  /// longest: what `xpd token create` makes.
+  /// longest: what `xpd token create` makes. A token of [clientKinds]
+  /// expires [clientTokenLifetime] from now unless it is used.
   ///
   /// Throws an [ArgumentError] if [name] is blank, if a runner token is
   /// given a person, or if there is no such active person.
@@ -118,7 +140,14 @@ class TokenService {
       throw ArgumentError.value(personId, 'personId', 'a runner has no person');
     }
     final person = hasPerson ? await _ownerOf(personId) : null;
-    return await _store(name: trimmed, kind: kind, person: person);
+    return await _store(
+      name: trimmed,
+      kind: kind,
+      person: person,
+      expiresAt: clientKinds.contains(kind)
+          ? _clock.now().add(clientTokenLifetime)
+          : null,
+    );
   }
 
   /// Creates and stores a [kind] token called [name] for the person of
@@ -193,21 +222,53 @@ class TokenService {
 
   /// The valid token that [secret] belongs to, with its person read, or
   /// `null`. A token that expired, or whose person was removed, is not
-  /// valid.
+  /// valid. A token of [clientKinds] is renewed: it then expires
+  /// [clientTokenLifetime] from now.
   ///
   /// The token is looked up by the SHA-256 of [secret], an indexed column:
   /// a lookup's timing could at most tell how much of a hash a guess shares
   /// with a stored one, which says nothing about a secret of 256 random
   /// bits.
   Future<DeviceToken?> authenticate(String? secret) async {
-    if (secret == null || !secret.startsWith(secretPrefix)) return null;
-    final found = await _tokens.findByHash(hashToken(secret));
-    final match = found != null && found.isValidAt(_clock.now()) ? found : null;
+    final now = _clock.now();
+    final found = await _find(secret);
+    final match = found != null && found.isValidAt(now) ? found : null;
     final personId = match?.personId;
     if (match == null || personId == null) return match;
     final person = await _people.get(personId);
     if (person == null || person.isRemoved) return null;
-    return match.withPerson(person);
+    return (await _renew(match, now)).withPerson(person);
+  }
+
+  /// When the token that [secret] belongs to expired, or `null` unless it is
+  /// one that expired and was not revoked: it lets a refusal say that the
+  /// token expired ([ErrorReason.tokenExpired]), which is no secret to the
+  /// one who holds [secret].
+  Future<DateTime?> expiredAt(String? secret) async {
+    final found = await _find(secret);
+    return found != null && !found.isRevoked && found.isExpiredAt(_clock.now())
+        ? found.expiresAt
+        : null;
+  }
+
+  Future<DeviceToken?> _find(String? secret) async =>
+      secret == null || !secret.startsWith(secretPrefix)
+      ? null
+      : await _tokens.findByHash(hashToken(secret));
+
+  /// [token], used at [now]: a token of [clientKinds] then expires
+  /// [clientTokenLifetime] from [now], written once that moves its expiry by
+  /// [clientTokenRenewalStep] or more.
+  Future<DeviceToken> _renew(DeviceToken token, DateTime now) async {
+    if (!clientKinds.contains(token.kind)) return token;
+    final expiresAt = now.add(clientTokenLifetime);
+    final current = token.expiresAt;
+    if (current != null &&
+        expiresAt.difference(current) < clientTokenRenewalStep) {
+      return token;
+    }
+    await _tokens.renew(token.id, expiresAt: expiresAt);
+    return token.renewed(expiresAt);
   }
 
   /// The valid tokens [asker] may see, in the order they were stored (D17):
@@ -269,12 +330,23 @@ class TokenService {
     return count;
   }
 
-  /// Deletes the `web` tokens that expired or were revoked more than
-  /// [endedWebTokenGrace] ago: every browser sign-in adds one, and none of
-  /// them works again. Returns how many went. Housekeeping runs it daily.
-  Future<int> purgeEndedWebTokens() => _tokens.deleteEndedSessions(
-    before: _clock.now().subtract(endedWebTokenGrace),
-  );
+  /// Deletes the tokens that will never work again: the `web` tokens that
+  /// expired or were revoked more than [endedWebTokenGrace] ago (every
+  /// browser sign-in adds one), and those of [clientKinds] more than
+  /// [endedClientTokenGrace] ago. Returns how many went. Housekeeping runs
+  /// it daily.
+  Future<int> purgeEndedTokens() async {
+    final now = _clock.now();
+    final web = await _tokens.deleteEnded(
+      kinds: const {DeviceTokenKind.web},
+      before: now.subtract(endedWebTokenGrace),
+    );
+    final clients = await _tokens.deleteEnded(
+      kinds: clientKinds,
+      before: now.subtract(endedClientTokenGrace),
+    );
+    return web + clients;
+  }
 
   /// Stops telling [revocations]: the engine is shutting down.
   Future<void> close() => _revocations.close();

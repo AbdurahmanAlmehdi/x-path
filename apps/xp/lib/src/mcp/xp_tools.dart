@@ -867,6 +867,16 @@ Future<McpToolResult> _guard(Future<McpToolResult> Function() body) async {
             'creates and edits projects and workflows and dispatches; it can '
             'never approve or loosen a gate.',
           )
+        : error.isUnauthorized &&
+              error.details['reason'] == ErrorReason.tokenExpired
+        ? fail(
+            apiCodeOf(error),
+            'The MCP token expired: it was not used for 90 days.',
+            'Ask the owner to make a new agent token in the app (Settings ▸ '
+                'CLI and agents), the web dashboard or with '
+                '`xpd token create --kind mcp`, and save it with '
+                '`xp connect --mcp-token <token>`.',
+          )
         : error.isUnauthorized
         ? fail(
             apiCodeOf(error),

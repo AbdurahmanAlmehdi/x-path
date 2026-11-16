@@ -16,7 +16,8 @@ dart run apps/xpd/bin/xpd.dart serve                                      # http
 - `xpd token create --name <name> --kind app|cli|mcp|runner` creates a device token and prints it
   once on stdout. Only its SHA-256 is stored. A running engine accepts it at once. The token
   belongs to the admin who has been one the longest (`Owner` on a new or upgraded database;
-  ADR 0017).
+  ADR 0017). A `cli` or `mcp` token expires 90 days after its last use (ADR 0019); `app` and
+  `runner` tokens work until they are revoked.
 - `xpd person create --name <name> --role viewer|developer|releaser|admin` adds a person, prints
   its id on stdout and a sign-in code for the web dashboard on stderr. `xpd person code <name or
   id>` prints a new code on stdout (it ends the person's unused codes), and `xpd person list`
@@ -123,6 +124,13 @@ public URL's origin.
   person) or, within 60 seconds, when it expires. `/runners/connect` never takes a cookie.
 - **Roles.** The role is read with the token on every request, so a change applies to the next
   one. `GET /api/v1/me` answers the person and their permissions.
+
+**Tokens of `xp` and `xp mcp`** (ADR 0019). A `cli` or `mcp` token expires 90 days after it was
+last used. Each request it makes moves `expires_at` on, and the engine writes the new value when
+it moves by a day or more. The engine answers an expired token with `401`, `details.reason`
+`token_expired` and `details.expiredAt`. Migration v26 gave each valid one an expiry 90 days after
+the upgrade. The daily housekeeping deletes `web` tokens a day after they expired or were
+revoked, and `cli` and `mcp` tokens 30 days after.
 
 ## Running as a service
 

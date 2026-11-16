@@ -1,3 +1,4 @@
+import 'package:xp_api/xp_api.dart';
 import 'package:xp_engine/src/tokens/device_token.dart';
 
 /// Where device tokens are kept.
@@ -21,10 +22,16 @@ abstract interface class DeviceTokenRepository {
   /// how many there were.
   Future<int> revokeOwnedBy(String personId, {required DateTime at});
 
-  /// Deletes every token that has an expiry, which only a browser session's
-  /// (`web`) token has, and that expired or was revoked before [before].
-  /// Returns how many went.
-  Future<int> deleteEndedSessions({required DateTime before});
+  /// Moves the expiry of the token [id] to [expiresAt], unless it was
+  /// revoked.
+  Future<void> renew(String id, {required DateTime expiresAt});
+
+  /// Deletes every token of [kinds] that expired or was revoked before
+  /// [before]. Returns how many went.
+  Future<int> deleteEnded({
+    required Set<DeviceTokenKind> kinds,
+    required DateTime before,
+  });
 }
 
 /// A [DeviceTokenRepository] that forgets everything on exit.
@@ -62,15 +69,23 @@ class InMemoryDeviceTokenRepository implements DeviceTokenRepository {
   }
 
   @override
-  Future<int> deleteEndedSessions({required DateTime before}) async {
+  Future<void> renew(String id, {required DateTime expiresAt}) async {
+    final index = _tokens.indexWhere((token) => token.id == id);
+    if (index < 0 || _tokens[index].isRevoked) return;
+    _tokens[index] = _tokens[index].renewed(expiresAt);
+  }
+
+  @override
+  Future<int> deleteEnded({
+    required Set<DeviceTokenKind> kinds,
+    required DateTime before,
+  }) async {
     final count = _tokens.length;
     _tokens.removeWhere(
-      (token) => switch (token.expiresAt) {
-        final expiresAt? =>
-          expiresAt.isBefore(before) ||
-              (token.revokedAt?.isBefore(before) ?? false),
-        null => false,
-      },
+      (token) =>
+          kinds.contains(token.kind) &&
+          ((token.expiresAt?.isBefore(before) ?? false) ||
+              (token.revokedAt?.isBefore(before) ?? false)),
     );
     return count - _tokens.length;
   }

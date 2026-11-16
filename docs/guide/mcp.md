@@ -19,6 +19,10 @@ xpd token create --name "Claude" --kind mcp
 With the macOS app, `xpd` is `/Applications/XPath.app/Contents/Helpers/xpd/bin/xpd`. The token is
 printed once; keep it out of chats and files you share.
 
+Like a `cli` token, an `mcp` token stops working once it goes 90 days without use, and each use
+moves that date on. If an agent you no longer use keeps its token, the token stops working on its
+own.
+
 ## Connect it
 
 Save the token with `xp connect`. It checks the engine and the token before it saves anything,

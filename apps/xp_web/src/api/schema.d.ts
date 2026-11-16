@@ -2282,7 +2282,8 @@ export interface components {
                  *     answers differently apart: `archived`, `has_runs`,
                  *     `credential_unassigned`, `production_flavor`, `ref_unknown`,
                  *     `certificate_limit` (with `limit` and `certificates`: `id`,
-                 *     `serialNumber`, `name`, `expirationDate`).
+                 *     `serialNumber`, `name`, `expirationDate`), `token_expired`
+                 *     (with `expiredAt`).
                  */
                 details?: Record<string, never>;
             };
@@ -3046,6 +3047,11 @@ export interface components {
             createdAt: string;
             /** @description The person the token belongs to. Absent for a runner token (ADR 0017). */
             personId?: string;
+            /**
+             * Format: date-time
+             * @description When the token stops working: a `web` token 8 hours after sign-in, a `cli` or `mcp` token 90 days after it was last used, each use moving it on (ADR 0019). Absent for the tokens that work until they are revoked (`app`, `runner`).
+             */
+            expiresAt?: string;
         };
         CreatedToken: {
             info: components["schemas"]["TokenInfo"];
@@ -4078,7 +4084,7 @@ export interface components {
                 "application/json": components["schemas"]["ErrorResponse"];
             };
         };
-        /** @description The bearer token is missing, unknown or revoked. */
+        /** @description The bearer token is missing, unknown, revoked or expired. For a token that expired (a `cli` or `mcp` token unused for 90 days, ADR 0019) `details.reason` is `token_expired` and `details.expiredAt` says when, until housekeeping deletes it 30 days later. */
         Unauthorized: {
             headers: {
                 "WWW-Authenticate"?: string;

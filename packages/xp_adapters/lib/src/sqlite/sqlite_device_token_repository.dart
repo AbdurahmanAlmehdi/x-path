@@ -76,12 +76,26 @@ class SqliteDeviceTokenRepository implements DeviceTokenRepository {
   }
 
   @override
-  Future<int> deleteEndedSessions({required DateTime before}) async {
-    final at = toDatabaseTime(before);
+  Future<void> renew(String id, {required DateTime expiresAt}) async {
     _database.connection.execute(
-      'DELETE FROM device_token WHERE expires_at IS NOT NULL '
+      'UPDATE device_token SET expires_at = ? '
+      'WHERE id = ? AND revoked_at IS NULL',
+      [toDatabaseTime(expiresAt), id],
+    );
+  }
+
+  @override
+  Future<int> deleteEnded({
+    required Set<DeviceTokenKind> kinds,
+    required DateTime before,
+  }) async {
+    if (kinds.isEmpty) return 0;
+    final at = toDatabaseTime(before);
+    final marks = List.filled(kinds.length, '?').join(', ');
+    _database.connection.execute(
+      'DELETE FROM device_token WHERE kind IN ($marks) '
       'AND (expires_at < ? OR revoked_at < ?)',
-      [at, at],
+      [for (final kind in kinds) kind.name, at, at],
     );
     return _database.connection.updatedRows;
   }

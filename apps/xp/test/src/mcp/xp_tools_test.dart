@@ -1188,6 +1188,27 @@ void main() {
       expect(result.text, contains('xp connect --mcp-token'));
     });
 
+    test('an expired token says so, and how to save a new one', () async {
+      when(() => client.listProjects()).thenThrow(
+        const ApiException(
+          'Expired.',
+          statusCode: 401,
+          code: ApiErrorCode.unauthorized,
+          details: {'reason': ErrorReason.tokenExpired},
+        ),
+      );
+
+      final result = await call('list_projects');
+
+      expect(result.isError, isTrue);
+      expect(
+        message(result),
+        'The MCP token expired: it was not used for 90 days.',
+      );
+      expect(result.text, contains('xpd token create --kind mcp'));
+      expect(result.text, contains('xp connect --mcp-token'));
+    });
+
     test('another engine error passes its message on', () async {
       when(() => client.listProjects()).thenThrow(
         const ApiException(

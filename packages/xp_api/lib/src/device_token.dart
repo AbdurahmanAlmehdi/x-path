@@ -41,6 +41,7 @@ class TokenInfo extends Equatable {
     required this.kind,
     required this.createdAt,
     this.personId,
+    this.expiresAt,
   });
 
   /// Reads the description from its JSON form.
@@ -63,11 +64,16 @@ class TokenInfo extends Equatable {
   /// for a runner token, which belongs to no person (ADR 0017).
   final String? personId;
 
+  /// When it stops working: a `web` token 8 hours after sign-in, a `cli` or
+  /// `mcp` token 90 days after it was last used (ADR 0019). Absent for the
+  /// tokens that work until they are revoked.
+  final DateTime? expiresAt;
+
   /// The JSON form.
   Map<String, dynamic> toJson() => _$TokenInfoToJson(this);
 
   @override
-  List<Object?> get props => [id, name, kind, createdAt, personId];
+  List<Object?> get props => [id, name, kind, createdAt, personId, expiresAt];
 }
 
 /// The body of `GET /tokens`: the valid tokens the asker may see, oldest

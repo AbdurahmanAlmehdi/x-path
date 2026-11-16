@@ -172,6 +172,9 @@ change touches:
 - Never call a real store, GitHub, Shorebird or a real Keychain from a test.
 - Never weaken a gate: only `app` and `cli` tokens decide approvals; `mcp` and `runner` tokens get
   `403`. A new route is closed to `runner` tokens unless opened on purpose (ADR 0011).
+- Tokens that expire stay that way: `web` after 8 hours (ADR 0018), `cli` and `mcp` 90 days after
+  their last use (ADR 0019). `TokenService` owns the check and the renewal (`authenticate`); a
+  route never decides on its own whether a token has expired.
 - A step with a side effect is never repeated by the engine on its own; it implements
   `alreadyDone`.
 - The engine writes nothing to a user's repository except release-model git changes.
