@@ -77,6 +77,7 @@ class TokensRoutes {
     kind: token.kind,
     createdAt: token.createdAt,
     personId: token.personId,
+    expiresAt: token.expiresAt,
   );
 
   static CreateTokenRequest _parse(Map<String, dynamic> json) {

@@ -66,6 +66,8 @@ next, or is empty.
   workflows and dispatches; it can never approve or loosen a gate."
 - `unauthorized`: "The engine rejected the MCP token." The owner makes a new one with
   `xpd token create --name <name> --kind mcp` and saves it with `xp connect --mcp-token <token>`.
+  "The MCP token expired: it was not used for 90 days." means the same fix: the token went 90
+  days without use.
 - `unreachable`: the engine is not reachable at the saved URL (or `XP_ENGINE_URL`).
 - `not_found` with the hint `See: list_projects` (or `list_workflows`): a name that matches no
   project or workflow. `ambiguous`: a bare `name` that is more than one project (use

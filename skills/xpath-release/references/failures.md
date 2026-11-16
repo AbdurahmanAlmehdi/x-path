@@ -31,7 +31,7 @@ error. `xp mcp` returns the same object with `isError`.
 | `conflict` | 409 | The action does not fit the current state: a project added already, a built-in workflow edited or deleted, a workflow name in use, a project or workflow that jobs ran deleted, `releases build` on a release that is not `rejected`, `releases merge` on one that is not `live` with a pull request, a store status before the store has the build. | Read the state; do not retry blindly. |
 | `upstream_error` | 502 | GitHub, git or a store could not be reached or failed. Adding a project without a GitHub token is also a `502`. | Check the GitHub token (skill `xpath-setup`); retry later for an outage. |
 | `forbidden` | 403 | This token kind may not do this. An `mcp` token never approves or denies, changes a gate, marks a store status, abandons a release, frees storage, changes the GitHub token or pairs a runner. | Stop and ask the owner. |
-| `unauthorized` | 401 | The token is unknown or revoked. | The owner makes a new token and runs `xp connect` again. |
+| `unauthorized` | 401 | The token is unknown or revoked, or it expired (`details.reason` `token_expired`: a `cli` or `mcp` token unused for 90 days). | The owner makes a new token and runs `xp connect` again. |
 | `not_found` | 404 | No such project, workflow, run, job, approval, release or artifact. | Check the id. |
 | `resync_required` | 409 | An event stream cannot resume from its cursor. | The client reconnects and reloads; nothing to do by hand. |
 | `upgrade_required` | 426 | A WebSocket route (`/events`, `/jobs/{id}/logs`) was called without a WebSocket upgrade. | Use `xp logs` or `get_job_log_tail`, not a plain HTTP request. |

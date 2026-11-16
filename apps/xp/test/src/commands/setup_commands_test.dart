@@ -71,6 +71,30 @@ secrets  unlocked''');
       },
     );
 
+    test('says when an expiring token expires', () async {
+      when(() => env.client.status()).thenAnswer(
+        (_) async => StatusResponse(
+          token: TokenInfo(
+            id: 'tok_1',
+            name: 'xp on MacBook',
+            kind: DeviceTokenKind.cli,
+            createdAt: DateTime.utc(2026, 10, 25),
+            expiresAt: DateTime.utc(2027, 1, 23, 9),
+          ),
+          secretsLocked: false,
+        ),
+      );
+
+      await env.runOk(['status']);
+
+      expect(
+        env.logger.out,
+        contains(
+          'token    "xp on MacBook" (cli; expires 2027-01-23 unless used)',
+        ),
+      );
+    });
+
     test('prints JSON', () async {
       await env.runOk(['status', '--json']);
 

@@ -51,6 +51,23 @@ void main() {
       },
     );
 
+    test('gives a cli or mcp token an expiry, and no other', () async {
+      final now = DateTime.utc(2026, 10, 13, 8);
+      for (final kind in DeviceTokenKind.values.where(
+        (kind) => kind != DeviceTokenKind.web,
+      )) {
+        final issued = await service.issue(name: kind.name, kind: kind);
+
+        expect(
+          issued.token.expiresAt,
+          TokenService.clientKinds.contains(kind)
+              ? now.add(TokenService.clientTokenLifetime)
+              : null,
+          reason: kind.name,
+        );
+      }
+    });
+
     test('issues a different secret and id every time', () async {
       final a = await service.issue(name: 'a', kind: DeviceTokenKind.app);
       final b = await service.issue(name: 'b', kind: DeviceTokenKind.app);
@@ -247,6 +264,92 @@ void main() {
       );
 
       expect(await service.authenticate('xpt_anything'), isNull);
+    });
+  });
+
+  group('client token expiry', () {
+    for (final kind in TokenService.clientKinds) {
+      test('a ${kind.name} token stops working 90 days after its last use, '
+          'and says so', () async {
+        final issued = await service.issue(name: 'me', kind: kind);
+        clock.advance(
+          TokenService.clientTokenLifetime - const Duration(seconds: 1),
+        );
+        expect(await service.authenticate(issued.secret), isNotNull);
+
+        clock.advance(
+          TokenService.clientTokenLifetime - const Duration(seconds: 1),
+        );
+        expect(await service.authenticate(issued.secret), isNotNull);
+        expect(await service.expiredAt(issued.secret), isNull);
+
+        clock.advance(TokenService.clientTokenLifetime);
+        expect(await service.authenticate(issued.secret), isNull);
+        expect(await service.expiredAt(issued.secret), clock.now());
+      });
+    }
+
+    test('a use writes the new expiry once it moves a day or more', () async {
+      final issued = await service.issue(name: 'me', kind: DeviceTokenKind.cli);
+      final issuedAt = clock.now();
+      Future<DateTime?> stored() async =>
+          (await repository.list()).single.expiresAt;
+
+      clock.advance(const Duration(hours: 23));
+      final early = await service.authenticate(issued.secret);
+      expect(early?.expiresAt, issuedAt.add(TokenService.clientTokenLifetime));
+      expect(await stored(), early?.expiresAt);
+
+      clock.advance(const Duration(hours: 1));
+      final renewed = await service.authenticate(issued.secret);
+      final expected = clock.now().add(TokenService.clientTokenLifetime);
+      expect(renewed?.expiresAt, expected);
+      expect(renewed?.person, owner);
+      expect(await stored(), expected);
+    });
+
+    test('a cli token without an expiry gets one when it is used', () async {
+      await repository.add(
+        DeviceToken(
+          id: 'tok_1',
+          name: 'old',
+          kind: DeviceTokenKind.cli,
+          hash: hashToken('xpt_old'),
+          createdAt: DateTime.utc(2026),
+          personId: owner.id,
+        ),
+      );
+
+      final found = await service.authenticate('xpt_old');
+
+      final expected = clock.now().add(TokenService.clientTokenLifetime);
+      expect(found?.expiresAt, expected);
+      expect((await repository.list()).single.expiresAt, expected);
+    });
+
+    test('the tokens that work until revoked are never renewed', () async {
+      final app = await service.issue(name: 'a', kind: DeviceTokenKind.app);
+      clock.advance(const Duration(days: 400));
+
+      expect((await service.authenticate(app.secret))?.expiresAt, isNull);
+      expect((await repository.list()).single.expiresAt, isNull);
+    });
+
+    test('expiredAt knows only tokens that expired and were not '
+        'revoked', () async {
+      final valid = await service.issue(name: 'v', kind: DeviceTokenKind.cli);
+      final revoked = await service.issue(name: 'r', kind: DeviceTokenKind.cli);
+      await service.revoke(revoked.token.id);
+
+      expect(await service.expiredAt(null), isNull);
+      expect(await service.expiredAt('hunter2'), isNull);
+      expect(await service.expiredAt('xpt_${'A' * 43}'), isNull);
+      expect(await service.expiredAt(valid.secret), isNull);
+
+      clock.advance(TokenService.clientTokenLifetime);
+
+      expect(await service.expiredAt(valid.secret), clock.now());
+      expect(await service.expiredAt(revoked.secret), isNull);
     });
   });
 
@@ -548,7 +651,7 @@ void main() {
     });
   });
 
-  group('purgeEndedWebTokens', () {
+  group('purgeEndedTokens', () {
     test('deletes the web tokens that ended a day ago or more', () async {
       final expired = await service.issueWeb(personId: owner.id);
       final revoked = await service.issueWeb(personId: owner.id);
@@ -561,13 +664,35 @@ void main() {
       final fresh = await service.issueWeb(personId: owner.id);
       clock.advance(const Duration(seconds: 1));
 
-      expect(await service.purgeEndedWebTokens(), 2);
+      expect(await service.purgeEndedTokens(), 2);
 
       expect((await repository.list()).map((t) => t.id), [
         app.token.id,
         fresh.token.id,
       ]);
       expect(expired.token.id, isNot(fresh.token.id));
+    });
+
+    test('deletes the cli and mcp tokens that ended 30 days ago or '
+        'more', () async {
+      final expired = await service.issue(name: 'e', kind: DeviceTokenKind.cli);
+      final revoked = await service.issue(name: 'r', kind: DeviceTokenKind.mcp);
+      await service.revoke(revoked.token.id);
+      clock.advance(TokenService.clientTokenLifetime);
+      final recent = await service.issue(name: 'n', kind: DeviceTokenKind.mcp);
+      final used = await service.issue(name: 'u', kind: DeviceTokenKind.cli);
+      clock.advance(TokenService.endedClientTokenGrace);
+      expect(await service.authenticate(used.secret), isNotNull);
+      await service.revoke(recent.token.id);
+      clock.advance(const Duration(seconds: 1));
+
+      expect(await service.purgeEndedTokens(), 2);
+
+      expect((await repository.list()).map((t) => t.id), [
+        recent.token.id,
+        used.token.id,
+      ]);
+      expect(expired.token.id, isNot(used.token.id));
     });
   });
 

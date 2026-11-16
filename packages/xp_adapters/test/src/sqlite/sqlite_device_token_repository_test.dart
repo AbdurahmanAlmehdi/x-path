@@ -78,26 +78,32 @@ void main() {
     expect(await repository.list(), isEmpty);
   });
 
-  test('keeps the expiry of a web token, and refuses one on others', () async {
+  test('keeps the expiry of a web, cli or mcp token, and refuses one on '
+      'others', () async {
     final expiresAt = DateTime.utc(2026, 10, 13, 16, 30, 15, 123, 456);
-    final web = DeviceToken(
-      id: 'w',
-      name: 'Browser',
-      kind: DeviceTokenKind.web,
-      hash: 'hash-w',
-      createdAt: DateTime.utc(2026, 10, 13, 8, 30, 15, 123, 456),
-      expiresAt: expiresAt,
-      personId: _ownerId,
-    );
-    await repository.add(web);
+    final expiring = [
+      for (final kind in TokenService.clientKinds.union({DeviceTokenKind.web}))
+        DeviceToken(
+          id: kind.name,
+          name: 'n',
+          kind: kind,
+          hash: 'hash-${kind.name}',
+          createdAt: DateTime.utc(2026, 10, 13, 8, 30, 15, 123, 456),
+          expiresAt: expiresAt,
+          personId: _ownerId,
+        ),
+    ];
+    for (final token in expiring) {
+      await repository.add(token);
+    }
 
-    expect(await repository.list(), [web]);
+    expect(await repository.list(), expiring);
     await expectLater(
       repository.add(
         DeviceToken(
           id: 'a',
           name: 'n',
-          kind: DeviceTokenKind.cli,
+          kind: DeviceTokenKind.app,
           hash: 'h',
           createdAt: DateTime.utc(2026),
           expiresAt: expiresAt,
@@ -118,33 +124,86 @@ void main() {
     expect(await repository.findByHash('hash-nope'), isNull);
   });
 
-  test('deletes the sessions that ended before a time, and no other '
-      'token', () async {
+  test('deletes the tokens of some kinds that ended before a time, and no '
+      'other token', () async {
     final before = DateTime.utc(2026, 10, 14);
-    DeviceToken web(String id, {DateTime? expiresAt, DateTime? revokedAt}) =>
-        DeviceToken(
-          id: id,
-          name: 'Browser',
-          kind: DeviceTokenKind.web,
-          hash: 'hash-$id',
-          createdAt: DateTime.utc(2026, 10, 13),
-          expiresAt: expiresAt ?? DateTime.utc(2026, 10, 15),
-          revokedAt: revokedAt,
-          personId: _ownerId,
-        );
-    await repository.add(web('expired', expiresAt: DateTime.utc(2026, 10, 13)));
-    await repository.add(web('revoked', revokedAt: DateTime.utc(2026, 10, 13)));
-    await repository.add(web('late', revokedAt: DateTime.utc(2026, 10, 14, 1)));
-    await repository.add(web('valid'));
+    DeviceToken ending(
+      String id, {
+      DeviceTokenKind kind = DeviceTokenKind.web,
+      DateTime? expiresAt,
+      DateTime? revokedAt,
+    }) => DeviceToken(
+      id: id,
+      name: 'n',
+      kind: kind,
+      hash: 'hash-$id',
+      createdAt: DateTime.utc(2026, 10, 13),
+      expiresAt: expiresAt ?? DateTime.utc(2026, 10, 15),
+      revokedAt: revokedAt,
+      personId: _ownerId,
+    );
+    await repository.add(
+      ending('expired', expiresAt: DateTime.utc(2026, 10, 13)),
+    );
+    await repository.add(
+      ending('revoked', revokedAt: DateTime.utc(2026, 10, 13)),
+    );
+    await repository.add(
+      ending('late', revokedAt: DateTime.utc(2026, 10, 14, 1)),
+    );
+    await repository.add(ending('valid'));
+    await repository.add(
+      ending(
+        'cli',
+        kind: DeviceTokenKind.cli,
+        expiresAt: DateTime.utc(2026, 10, 13),
+      ),
+    );
+    await repository.add(
+      _token('mcp', kind: DeviceTokenKind.mcp, revokedAt: DateTime.utc(2026)),
+    );
     await repository.add(_token('app', revokedAt: DateTime.utc(2026, 10)));
 
-    expect(await repository.deleteEndedSessions(before: before), 2);
+    expect(
+      await repository.deleteEnded(
+        kinds: {DeviceTokenKind.web},
+        before: before,
+      ),
+      2,
+    );
+    expect(await repository.deleteEnded(kinds: {}, before: before), 0);
+    expect(
+      await repository.deleteEnded(
+        kinds: TokenService.clientKinds,
+        before: before,
+      ),
+      2,
+      reason: 'a revoked token without an expiry ended too',
+    );
 
     expect((await repository.list()).map((t) => t.id), [
       'late',
       'valid',
       'app',
     ]);
+  });
+
+  test('renews the expiry of a valid token only', () async {
+    final renewed = DateTime.utc(2027, 1, 1, 8, 30, 15, 123, 456);
+    final valid = _token('a', kind: DeviceTokenKind.cli);
+    final revoked = _token(
+      'b',
+      kind: DeviceTokenKind.cli,
+      revokedAt: DateTime.utc(2026, 10, 14),
+    );
+    await repository.add(valid);
+    await repository.add(revoked);
+
+    await repository.renew('a', expiresAt: renewed);
+    await repository.renew('b', expiresAt: renewed);
+    await repository.renew('nope', expiresAt: renewed);
+
+    expect(await repository.list(), [valid.renewed(renewed), revoked]);
   });
 
   test('revokes every valid token of a person, and no other', () async {

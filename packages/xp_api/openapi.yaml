@@ -3547,7 +3547,10 @@ components:
           schema:
             $ref: "#/components/schemas/ErrorResponse"
     Unauthorized:
-      description: The bearer token is missing, unknown or revoked.
+      description: >-
+        The bearer token is missing, unknown, revoked or expired. For a token that expired (a
+        `cli` or `mcp` token unused for 90 days, ADR 0019) `details.reason` is `token_expired`
+        and `details.expiredAt` says when, until housekeeping deletes it 30 days later.
       headers:
         WWW-Authenticate:
           schema:
@@ -3640,7 +3643,8 @@ components:
                 answers differently apart: `archived`, `has_runs`,
                 `credential_unassigned`, `production_flavor`, `ref_unknown`,
                 `certificate_limit` (with `limit` and `certificates`: `id`,
-                `serialNumber`, `name`, `expirationDate`).
+                `serialNumber`, `name`, `expirationDate`), `token_expired`
+                (with `expiredAt`).
     AlreadyDecidedResponse:
       type: object
       required: [error, approval]
@@ -5176,6 +5180,13 @@ components:
           type: string
           pattern: "^per_"
           description: The person the token belongs to. Absent for a runner token (ADR 0017).
+        expiresAt:
+          type: string
+          format: date-time
+          description: >-
+            When the token stops working: a `web` token 8 hours after sign-in, a `cli` or
+            `mcp` token 90 days after it was last used, each use moving it on (ADR 0019).
+            Absent for the tokens that work until they are revoked (`app`, `runner`).
       additionalProperties: false
     CreatedToken:
       type: object

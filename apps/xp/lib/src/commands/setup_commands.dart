@@ -52,7 +52,7 @@ class StatusCommand extends XpCommand {
       () => [
         'engine   $url runs xpd ${version.version} ($api)',
         'health   ok',
-        'token    "${token.name}" (${token.kind.name})',
+        'token    "${token.name}" (${token.kind.name}${_expiry(token)})',
         'secrets  ${status.secretsLocked ? _locked : 'unlocked'}',
         if (project != null) 'project  ${project.fullName} (this folder)',
       ].join('\n'),
@@ -60,6 +60,13 @@ class StatusCommand extends XpCommand {
     return XpExit.ok;
   }
 }
+
+/// When [token] expires, for `xp status`: each use of a `cli` token moves
+/// its expiry on (ADR 0019).
+String _expiry(TokenInfo token) => switch (token.expiresAt) {
+  final at? => '; expires ${at.toIso8601String().substring(0, 10)} unless used',
+  null => '',
+};
 
 const _locked =
     'locked: jobs that need them wait. Unlock them in the XPath app on the '

@@ -81,7 +81,13 @@ class ThrowingDeviceTokenRepository implements DeviceTokenRepository {
   Future<int> revokeOwnedBy(String personId, {required DateTime at}) async => 0;
 
   @override
-  Future<int> deleteEndedSessions({required DateTime before}) async => 0;
+  Future<void> renew(String id, {required DateTime expiresAt}) async {}
+
+  @override
+  Future<int> deleteEnded({
+    required Set<DeviceTokenKind> kinds,
+    required DateTime before,
+  }) async => 0;
 }
 
 /// Build number counters for any app: the first number of an app is 1.

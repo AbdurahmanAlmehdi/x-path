@@ -7,8 +7,8 @@ import 'package:xp_engine/src/tokens/token_service.dart';
 
 /// Prunes the logs once a day (D-24): at the start if the last pruning was a
 /// day ago or never, and then every [interval]. Each time, it also deletes
-/// the browser sessions' tokens that ended
-/// ([TokenService.purgeEndedWebTokens]).
+/// the tokens that ended ([TokenService.purgeEndedTokens]): browser
+/// sessions', and those of `xp` and `xp mcp`.
 class HousekeepingSchedule {
   /// Creates the schedule.
   ///
@@ -53,13 +53,13 @@ class HousekeepingSchedule {
     }
   }
 
-  /// Prunes the logs and the ended sessions' tokens now, unless a pruning
+  /// Prunes the logs and the ended tokens now, unless a pruning
   /// is under way. One that fails does not keep the other from running.
   Future<void> runNow() async {
     if (_running) return;
     _running = true;
     try {
-      for (final prune in [_service.pruneLogs, _tokens.purgeEndedWebTokens]) {
+      for (final prune in [_service.pruneLogs, _tokens.purgeEndedTokens]) {
         try {
           await prune();
         } on Object catch (error, stackTrace) {

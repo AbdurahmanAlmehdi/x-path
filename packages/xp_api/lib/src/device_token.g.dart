@@ -32,6 +32,9 @@ TokenInfo _$TokenInfoFromJson(Map<String, dynamic> json) => TokenInfo(
   kind: $enumDecode(_$DeviceTokenKindEnumMap, json['kind']),
   createdAt: DateTime.parse(json['createdAt'] as String),
   personId: json['personId'] as String?,
+  expiresAt: json['expiresAt'] == null
+      ? null
+      : DateTime.parse(json['expiresAt'] as String),
 );
 
 Map<String, dynamic> _$TokenInfoToJson(TokenInfo instance) => <String, dynamic>{
@@ -40,6 +43,7 @@ Map<String, dynamic> _$TokenInfoToJson(TokenInfo instance) => <String, dynamic>{
   'kind': _$DeviceTokenKindEnumMap[instance.kind]!,
   'createdAt': instance.createdAt.toIso8601String(),
   'personId': ?instance.personId,
+  'expiresAt': ?instance.expiresAt?.toIso8601String(),
 };
 
 TokensResponse _$TokensResponseFromJson(Map<String, dynamic> json) =>

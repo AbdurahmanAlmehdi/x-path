@@ -796,6 +796,96 @@ INSERT INTO device_token (id, name, kind, hash, person_id, created_at)
     );
   });
 
+  test('v26 gives the valid cli and mcp tokens an expiry 90 days away', () {
+    final path = '${tempDirectory().path}/xpath.db';
+    sqlite3.open(path)
+      ..execute(_golden(25))
+      ..userVersion = 25
+      ..execute('''
+INSERT INTO person (id, name, role, created_at)
+  VALUES ('per_1', 'Sam', 'admin', 1);
+INSERT INTO device_token (id, name, kind, hash, person_id, created_at,
+  revoked_at, expires_at) VALUES
+  ('tok_app', 'Mac', 'app', 'h1', 'per_1', 1, NULL, NULL),
+  ('tok_cli', 'laptop', 'cli', 'h2', 'per_1', 2, NULL, NULL),
+  ('tok_mcp', 'agent', 'mcp', 'h3', 'per_1', 3, NULL, NULL),
+  ('tok_old', 'gone', 'cli', 'h4', 'per_1', 4, 5, NULL),
+  ('tok_web', 'Browser', 'web', 'h5', 'per_1', 6, NULL, 7),
+  ('tok_run', 'builder', 'runner', 'h6', NULL, 8, NULL, NULL);
+INSERT INTO runner (id, name, token_id) VALUES ('rnr_1', 'builder', 'tok_run');
+''')
+      ..close();
+    final notes = <String>[];
+    final before = DateTime.now().toUtc();
+    final database = SqliteDatabase.open(path, onNote: notes.add);
+    final after = DateTime.now().toUtc();
+    addTearDown(database.close);
+    final db = database.connection;
+
+    expect(db.userVersion, latest);
+    expect(
+      notes.single,
+      'Gave 2 token(s) of xp and xp mcp an expiry 90 days from now; each use '
+      'moves it on (ADR 0019).',
+    );
+    final expiry = {
+      for (final row in db.select(
+        'SELECT id, expires_at FROM device_token ORDER BY rowid',
+      ))
+        row['id'] as String: row['expires_at'] as int?,
+    };
+    expect(expiry.keys, [
+      'tok_app',
+      'tok_cli',
+      'tok_mcp',
+      'tok_old',
+      'tok_web',
+      'tok_run',
+    ]);
+    for (final id in ['tok_cli', 'tok_mcp']) {
+      final at = DateTime.fromMicrosecondsSinceEpoch(expiry[id]!, isUtc: true);
+      const lifetime = Duration(days: 90);
+      expect(
+        at.isBefore(before.add(lifetime).subtract(const Duration(seconds: 1))),
+        isFalse,
+        reason: id,
+      );
+      expect(at.isAfter(after.add(lifetime)), isFalse, reason: id);
+    }
+    expect(expiry['tok_app'], isNull);
+    expect(
+      expiry['tok_old'],
+      isNull,
+      reason: 'a revoked token stays as it was',
+    );
+    expect(expiry['tok_web'], 7);
+    expect(expiry['tok_run'], isNull);
+    expect(
+      db.select('SELECT token_id FROM runner').single['token_id'],
+      'tok_run',
+    );
+    expect(
+      () => db.execute(
+        "UPDATE device_token SET expires_at = 2 WHERE id = 'tok_app'",
+      ),
+      throwsA(isA<SqliteException>()),
+      reason: 'an app token never expires',
+    );
+  });
+
+  test('v26 has nothing to say without a valid cli or mcp token', () {
+    final path = '${tempDirectory().path}/xpath.db';
+    sqlite3.open(path)
+      ..execute(_golden(25))
+      ..userVersion = 25
+      ..close();
+    final notes = <String>[];
+
+    SqliteDatabase.open(path, onNote: notes.add).close();
+
+    expect(notes, isEmpty);
+  });
+
   group('snapshot', () {
     for (var version = 1; version <= latest; version++) {
       test('v$version is what the first $version migration(s) build', () {

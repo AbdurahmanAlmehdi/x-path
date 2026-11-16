@@ -27,6 +27,9 @@ folder, sealed with `$CREDENTIALS_DIRECTORY/xpath-master-key` or a 0600 `master.
 `XP_TOKEN` and `XP_MCP_TOKEN` override what was saved, so scripts need to save nothing and never touch a Keychain;
 `XP_TEST_FILE_SECRETS=1` keeps the tokens in the file store even on macOS (the end-to-end scripts use it).
 `xp mcp` uses the `mcp` token and the CLI the `cli` token: they are two tokens, one per client (D-06, D-12).
+Both expire 90 days after their last use, and each use moves that on (ADR 0019). `xp status` prints the date.
+An expired token gets `401` with `details.reason` `token_expired`. `xp` then says how to make a new token and connect
+it, and `xp mcp` says the same in its tool error.
 
 **Commands.** A project is named by its id (`prj_...`), `owner/name` or just `name`; a workflow by its id
 (`wf_...`) or its name. Every command takes `--json` (before the command: `xp --json projects list`) to print what

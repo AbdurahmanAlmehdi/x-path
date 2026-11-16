@@ -139,10 +139,20 @@ Middleware authMiddleware(
           : _bearer.firstMatch(header)?.group(1);
       final token = await tokens.authenticate(secret);
       if (token == null) {
+        final expiredAt = await tokens.expiredAt(secret);
         return errorResponse(
           ApiErrorCode.unauthorized,
-          'Missing, unknown or revoked bearer token.',
+          expiredAt == null
+              ? 'Missing, unknown or revoked bearer token.'
+              : 'The bearer token expired at '
+                    '${expiredAt.toIso8601String()}.',
           headers: const {'www-authenticate': 'Bearer'},
+          details: expiredAt == null
+              ? null
+              : {
+                  'reason': ErrorReason.tokenExpired,
+                  'expiredAt': expiredAt.toIso8601String(),
+                },
         );
       }
       return await inner(request.change(context: {_tokenContextKey: token}));

@@ -44,6 +44,10 @@ With the macOS app the engine binary is
 `$XP_CONFIG_DIR`, else `$XDG_CONFIG_HOME/xpath`, else `~/.config/xpath`); the tokens go to the OS
 secret store, never to that file.
 
+A `cli` or `mcp` token expires once it goes 90 days without use, and each use moves that date on
+(`xp status` shows it). An expired token gets `401` with the reason `token_expired`. The owner then
+makes a new token and runs `xp connect` again. Do not retry the call.
+
 Environment overrides, for scripts and CI, so nothing is saved:
 
 | Variable | Overrides |

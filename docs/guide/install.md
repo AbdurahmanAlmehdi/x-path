@@ -119,6 +119,10 @@ The token is printed once. With the app, `xpd` is
 The token belongs to a person. `xpd token create` gives it to the admin who has been one the
 longest: `Owner`, the admin every engine starts with.
 
+A `cli` token stops working once it goes 90 days without use, and each use moves that date on.
+`xp status` shows the date. If the token expires, make a new one the same way and run
+`xp connect` again.
+
 ## Open the web dashboard
 
 Every engine serves the [web dashboard](dashboard.md) at its own address: the Mac app's engine

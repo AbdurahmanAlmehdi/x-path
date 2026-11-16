@@ -95,6 +95,23 @@ void main() {
     expect((await tokenRepository.list()).map((t) => t.id), [open.token.id]);
   });
 
+  test('deletes the cli and mcp tokens that expired a while ago', () async {
+    final forgotten = await tokens.issue(
+      name: 'old',
+      kind: DeviceTokenKind.cli,
+    );
+    h.clock.advance(
+      TokenService.clientTokenLifetime + TokenService.endedClientTokenGrace,
+    );
+    final open = await tokens.issue(name: 'new', kind: DeviceTokenKind.mcp);
+    h.clock.advance(const Duration(seconds: 1));
+
+    await schedule().start();
+
+    expect((await tokenRepository.list()).map((t) => t.id), [open.token.id]);
+    expect(forgotten.token.id, isNot(open.token.id));
+  });
+
   test('deletes the ended sessions even when pruning the logs '
       'fails', () async {
     await addOldJob();

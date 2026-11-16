@@ -489,6 +489,24 @@ void main() {
         'Not allowed with this token: No.',
       );
     });
+
+    test('says how to get a new token for an expired one', () {
+      ApiException refused(String? reason) => ApiException(
+        'The bearer token expired at 2027-01-01T00:00:00.000Z.',
+        statusCode: 401,
+        code: ApiErrorCode.unauthorized,
+        details: {'reason': ?reason},
+      );
+
+      expect(
+        describeApiError(refused(ErrorReason.tokenExpired)),
+        'The bearer token expired at 2027-01-01T00:00:00.000Z. A token of xp '
+        'stops working after 90 days unused. Make a new cli token in the app '
+        '(Settings ▸ CLI and agents), the web dashboard or with xpd token '
+        'create --kind cli, then run: xp connect <url> --token <token>',
+      );
+      expect(cliHint(refused(null)), 'Run: xp connect <url> --token <token>');
+    });
   });
 }
 

@@ -79,5 +79,17 @@ void main() {
       expect(web.withPerson(owner).expiresAt, web.expiresAt);
       expect(web.revoked(at).expiresAt, web.expiresAt);
     });
+
+    test('a renewed token expires later, and keeps the rest', () {
+      final later = at.add(const Duration(days: 90));
+      final cli = token(DeviceTokenKind.cli).revoked(at).withPerson(owner);
+
+      final renewed = cli.renewed(later);
+
+      expect(renewed.expiresAt, later);
+      expect(renewed.revokedAt, at);
+      expect(renewed.person, owner);
+      expect(renewed.hash, cli.hash);
+    });
   });
 }

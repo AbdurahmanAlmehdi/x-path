@@ -75,6 +75,11 @@ xp connect http://127.0.0.1:7480   # asks for the CLI token
 MCP token" from `xp mcp`: the token is unknown or was revoked. Make a new one in the app or with
 `xpd token create`, then connect again (`xp connect --token <token>` or `--mcp-token <token>`).
 
+"The bearer token expired at ...", or "The MCP token expired" from `xp mcp`: the token went 90
+days without use. Each use moves that date on, so a token you use keeps working, and `xp status`
+shows the date. Make a new token and connect again in the same way. A revoked or expired token
+never works again.
+
 A runner's pairing token works once, within 15 minutes; a used or expired one also answers `401`.
 Make a new one with `xp runners pair <name>`.
 
