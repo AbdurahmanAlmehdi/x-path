@@ -1,8 +1,8 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 
-import { api, dataOf, doneOf, failureMessage, type CreatedToken, type TokenInfo } from '@/api/client'
-import { coalesced } from '@/app/coalesce'
+import { api, dataOf, doneOf, type CreatedToken, type TokenInfo } from '@/api/client'
+import { useCommand, useLoad } from '@/api/requests'
 
 /** The kinds of token the dashboard makes (D17). */
 export type NewTokenKind = 'cli' | 'mcp'
@@ -15,23 +15,15 @@ export type NewTokenKind = 'cli' | 'mcp'
  */
 export const useTokensStore = defineStore('tokens', () => {
   const tokens = ref<TokenInfo[]>([])
-  const loaded = ref(false)
-  const error = ref<string | null>(null)
-  /** The token being revoked. */
-  const revoking = ref<string | null>(null)
-  /** What the engine said when it refused a revoke. */
-  const actionError = ref<string | null>(null)
+  /**
+   * The token being revoked ([busy]), and what the engine said when it
+   * refused a revoke ([error]).
+   */
+  const revoking = useCommand<string | null>(null)
 
   /** Asks the engine for the tokens. */
-  const load = coalesced(async () => {
-    try {
-      tokens.value = (await dataOf(api.GET('/tokens'))).tokens
-      error.value = null
-    } catch (failure) {
-      error.value = failureMessage(failure)
-    } finally {
-      loaded.value = true
-    }
+  const { loaded, error, load } = useLoad(async () => {
+    tokens.value = (await dataOf(api.GET('/tokens'))).tokens
   })
 
   /**
@@ -46,19 +38,22 @@ export const useTokensStore = defineStore('tokens', () => {
 
   /** Revokes the token [id]; `true` when it went through. */
   async function revoke(id: string): Promise<boolean> {
-    revoking.value = id
-    actionError.value = null
-    try {
+    const revoked = await revoking.run(id, async () => {
       await doneOf(api.DELETE('/tokens/{id}', { params: { path: { id } } }))
       await load()
       return true
-    } catch (failure) {
-      actionError.value = failureMessage(failure)
-      return false
-    } finally {
-      revoking.value = null
-    }
+    })
+    return revoked ?? false
   }
 
-  return { tokens, loaded, error, revoking, actionError, load, create, revoke }
+  return {
+    tokens,
+    loaded,
+    error,
+    revoking: revoking.busy,
+    actionError: revoking.error,
+    load,
+    create,
+    revoke,
+  }
 })

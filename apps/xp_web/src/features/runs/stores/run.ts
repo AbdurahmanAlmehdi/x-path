@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 
 import { api, ApiFailure, dataOf, failureMessage, type Run } from '@/api/client'
+import { useCommand } from '@/api/requests'
 import { followEvents, payloadValue } from '@/api/sockets'
 import { coalesced } from '@/app/coalesce'
 import { isFinished } from '@/ui/format'
@@ -17,9 +18,9 @@ export const useRunStore = defineStore('run', () => {
   const id = ref<string | null>(null)
   const run = ref<Run | null>(null)
   const missing = ref(false)
-  const error = ref<string | null>(null)
-  /** The action under way, if any. */
-  const busy = ref<RunAction | null>(null)
+  /** The action under way, if any ([busy]); [error] is also why the run could not be read. */
+  const command = useCommand<RunAction | null>(null)
+  const { busy, error } = command
 
   /** Whether a job of the run has not ended: Cancel stops it. */
   const cancellable = computed(() => run.value?.jobs.some((job) => !isFinished(job.state)) ?? false)
@@ -80,9 +81,7 @@ export const useRunStore = defineStore('run', () => {
     const runId = id.value
     if (!runId || busy.value) return null
     const params = { params: { path: { id: runId } } }
-    busy.value = action
-    error.value = null
-    try {
+    return command.run(action, async () => {
       const answer = await dataOf(
         action === 'cancel'
           ? api.POST('/runs/{id}/cancel', params)
@@ -92,12 +91,7 @@ export const useRunStore = defineStore('run', () => {
       )
       if (answer.id === runId) run.value = answer
       return answer
-    } catch (failure) {
-      error.value = failureMessage(failure)
-      return null
-    } finally {
-      busy.value = null
-    }
+    })
   }
 
   return { id, run, missing, error, busy, cancellable, rerunnable, open, follow, act }

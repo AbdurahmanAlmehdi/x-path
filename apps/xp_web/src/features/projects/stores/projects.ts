@@ -1,27 +1,18 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 
-import { api, dataOf, failureMessage, type Project } from '@/api/client'
+import { api, dataOf, type Project } from '@/api/client'
+import { useLoad } from '@/api/requests'
 import { followEvents } from '@/api/sockets'
-import { coalesced } from '@/app/coalesce'
 import { shortName } from '@/ui/format'
 
 /** The projects of the engine, oldest first, kept up to date by its events. */
 export const useProjectsStore = defineStore('projects', () => {
   const projects = ref<Project[]>([])
-  const loaded = ref(false)
-  const error = ref<string | null>(null)
 
   /** Asks the engine for the projects. */
-  const load = coalesced(async () => {
-    try {
-      projects.value = (await dataOf(api.GET('/projects'))).projects
-      error.value = null
-    } catch (failure) {
-      error.value = failureMessage(failure)
-    } finally {
-      loaded.value = true
-    }
+  const { loaded, error, load } = useLoad(async () => {
+    projects.value = (await dataOf(api.GET('/projects'))).projects
   })
 
   /** What the project [id] is called: its full name, or its last part when [short]; the id while unknown. */
