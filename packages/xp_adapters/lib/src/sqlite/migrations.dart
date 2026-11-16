@@ -30,6 +30,7 @@ const engineMigrations = <Migration>[
   Migration(version: 23, sql: _v23, foreignKeysOff: true),
   Migration(version: 24, sql: _v24),
   Migration(version: 25, sql: _v25),
+  Migration(version: 26, sql: _v26, notes: _v26Notes, foreignKeysOff: true),
 ];
 
 // Timestamps are integer microseconds since the Unix epoch (UTC), so that
@@ -790,4 +791,43 @@ CREATE TABLE sign_in_code (
   used_at INTEGER
 ) STRICT;
 CREATE INDEX idx_sign_in_code_person ON sign_in_code (person_id);
+''';
+
+/// Tokens of `xp` and `xp mcp` expire (ADR 0019): 90 days after their last
+/// use, which moves the expiry on. SQLite cannot change a CHECK, so
+/// device_token is rebuilt (foreign keys off: runner refers to it) to let a
+/// `cli` or `mcp` token have an expiry, and each valid one gets one, 90 days
+/// from the upgrade: a client in use renews it, a forgotten one stops.
+const _v26 = '''
+CREATE TABLE new_device_token (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  kind TEXT NOT NULL CHECK (kind IN ('app', 'cli', 'mcp', 'runner', 'web')),
+  hash TEXT NOT NULL UNIQUE,
+  person_id TEXT REFERENCES person (id),
+  created_at INTEGER NOT NULL,
+  revoked_at INTEGER,
+  expires_at INTEGER
+    CHECK (expires_at IS NULL OR kind IN ('cli', 'mcp', 'web')),
+  CHECK (kind = 'runner' OR person_id IS NOT NULL)
+) STRICT;
+
+INSERT INTO new_device_token (id, name, kind, hash, person_id, created_at,
+  revoked_at, expires_at)
+SELECT id, name, kind, hash, person_id, created_at, revoked_at,
+  CASE WHEN kind IN ('cli', 'mcp') AND revoked_at IS NULL
+    THEN (CAST(strftime('%s', 'now') AS INTEGER) + 90 * 86400) * 1000000
+    ELSE expires_at END
+FROM device_token ORDER BY rowid;
+
+DROP TABLE device_token;
+ALTER TABLE new_device_token RENAME TO device_token;
+CREATE INDEX idx_device_token_person ON device_token (person_id);
+''';
+
+const _v26Notes = '''
+SELECT 'Gave ' || count(*) || ' token(s) of xp and xp mcp an expiry 90 days '
+  || 'from now; each use moves it on (ADR 0019).'
+FROM device_token
+WHERE kind IN ('cli', 'mcp') AND revoked_at IS NULL HAVING count(*) > 0
 ''';

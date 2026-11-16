@@ -135,6 +135,11 @@ abstract final class ErrorReason {
   /// The team has as many distribution certificates as Apple allows; the
   /// details list them (`certificates`) with the `limit`.
   static const certificateLimit = 'certificate_limit';
+
+  /// The bearer token expired: a token of `xp` or `xp mcp` that was not used
+  /// for 90 days (ADR 0019). The details say when (`expiredAt`). A new token
+  /// works; this one never will again.
+  static const tokenExpired = 'token_expired';
 }
 
 /// The body of an error: a code, a human-readable message and, where it

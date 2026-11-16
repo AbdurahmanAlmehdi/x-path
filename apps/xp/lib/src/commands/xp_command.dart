@@ -115,6 +115,11 @@ abstract class XpCommand extends Command<int> {
 /// fix: the command that fixes it. The engine names no command.
 String? cliHint(ApiException error) =>
     switch ((error.code, error.details['reason'])) {
+      (ApiErrorCode.unauthorized, ErrorReason.tokenExpired) =>
+        'A token of xp stops working after 90 days unused. Make a new cli '
+            'token in the app (Settings ▸ CLI and agents), the web dashboard '
+            'or with xpd token create --kind cli, then run: '
+            'xp connect <url> --token <token>',
       (ApiErrorCode.unauthorized, _) => 'Run: xp connect <url> --token <token>',
       (_, ErrorReason.hasRuns) =>
         'Archive it instead: xp workflows archive <project> <workflow>',

@@ -6,6 +6,7 @@ import 'dart:convert';
 import 'package:test/test.dart';
 import 'package:xp_api/testing.dart';
 import 'package:xp_api/xp_api.dart';
+import 'package:xp_engine/xp_engine.dart' show TokenService;
 
 import '../helpers/test_engine.dart';
 
@@ -118,6 +119,33 @@ void main() {
     await expectContract('GET', '/status', 200, token: mcp);
     await expectContract('GET', '/status', 401, token: '');
     await expectContract('GET', '/status', 403, token: runner);
+  });
+
+  test('401 for an expired token says so', () async {
+    engine.clock.advance(TokenService.clientTokenLifetime);
+
+    final response = await engine.request('/status', token: mcp);
+
+    expect(response.statusCode, 401);
+    contract.expectResponse(
+      method: 'GET',
+      path: '/status',
+      statusCode: response.statusCode,
+      contentType: response.contentType,
+      body: response.body,
+    );
+    final error = ApiError.fromJson(
+      response.json['error'] as Map<String, dynamic>,
+    );
+    expect(error.code, ApiErrorCode.unauthorized);
+    expect(error.details, {
+      'reason': ErrorReason.tokenExpired,
+      'expiredAt': engine.clock.now().toIso8601String(),
+    });
+    expect(
+      error.message,
+      'The bearer token expired at ${engine.clock.now().toIso8601String()}.',
+    );
   });
 
   test('GET /doctor 200, 401 and 403', () async {

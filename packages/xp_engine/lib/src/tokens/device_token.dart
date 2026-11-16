@@ -35,7 +35,8 @@ class DeviceToken extends Equatable {
   final DateTime? revokedAt;
 
   /// When the token stops working on its own, in UTC: a browser session's
-  /// token lasts eight hours (D11). `null` for every other token.
+  /// token lasts eight hours (D11), and a token of `xp` or `xp mcp` 90 days
+  /// after it was last used (ADR 0019). `null` for every other token.
   final DateTime? expiresAt;
 
   /// The person the token belongs to. `null` only for a runner token
@@ -80,24 +81,32 @@ class DeviceToken extends Equatable {
   }
 
   /// This token as revoked at [at].
-  DeviceToken revoked(DateTime at) => _copy(revokedAt: at, person: person);
+  DeviceToken revoked(DateTime at) =>
+      _copy(revokedAt: at, expiresAt: expiresAt, person: person);
 
   /// This token with its [person] read.
   DeviceToken withPerson(Person person) =>
-      _copy(revokedAt: revokedAt, person: person);
+      _copy(revokedAt: revokedAt, expiresAt: expiresAt, person: person);
 
-  DeviceToken _copy({required DateTime? revokedAt, required Person? person}) =>
-      DeviceToken(
-        id: id,
-        name: name,
-        kind: kind,
-        hash: hash,
-        createdAt: createdAt,
-        revokedAt: revokedAt,
-        expiresAt: expiresAt,
-        personId: personId,
-        person: person,
-      );
+  /// This token as renewed to expire at [expiresAt].
+  DeviceToken renewed(DateTime expiresAt) =>
+      _copy(revokedAt: revokedAt, expiresAt: expiresAt, person: person);
+
+  DeviceToken _copy({
+    required DateTime? revokedAt,
+    required DateTime? expiresAt,
+    required Person? person,
+  }) => DeviceToken(
+    id: id,
+    name: name,
+    kind: kind,
+    hash: hash,
+    createdAt: createdAt,
+    revokedAt: revokedAt,
+    expiresAt: expiresAt,
+    personId: personId,
+    person: person,
+  );
 
   @override
   List<Object?> get props => [

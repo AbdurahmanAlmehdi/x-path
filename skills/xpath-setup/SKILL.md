@@ -128,7 +128,9 @@ xp connect http://127.0.0.1:7480 --token <cli token> --mcp-token <mcp token>
 
 With the app, `xpd` is `/Applications/XPath.app/Contents/Helpers/xpd/bin/xpd`; in Docker,
 `docker exec xpath xpd ...`. The user runs these and keeps the output; the app makes its own
-`app` token during setup, and a runner gets its `runner` credential by pairing.
+`app` token during setup, and a runner gets its `runner` credential by pairing. A `cli` or `mcp`
+token expires once it goes 90 days without use, and each use moves that date on. When one
+expires, the user makes a new one and runs `xp connect` again.
 
 | Kind | Who uses it | May decide approvals |
 |---|---|---|

@@ -164,7 +164,45 @@ void main() {
 
         expect(response.statusCode, 401, reason: '$headers');
         expect(response.headers['www-authenticate'], 'Bearer');
+        expect(
+          await response.readAsString(),
+          contains('Missing, unknown or revoked bearer token.'),
+        );
       }
+    });
+
+    test('says when an expired token expired', () async {
+      final clock = ManualClock(DateTime.utc(2026, 11, 16, 9));
+      final expiring = TokenService(
+        tokens: InMemoryDeviceTokenRepository(),
+        people: InMemoryPersonRepository([testOwner]),
+        clock: clock,
+      );
+      final cli = (await expiring.issue(
+        name: 'n',
+        kind: DeviceTokenKind.cli,
+      )).secret;
+      final guarded = const Pipeline()
+          .addMiddleware(authMiddleware(expiring))
+          .addHandler((_) => Response.ok('in'));
+      clock.advance(TokenService.clientTokenLifetime);
+
+      final response = await guarded(
+        _request('/closed', headers: {'authorization': 'Bearer $cli'}),
+      );
+
+      expect(response.statusCode, 401);
+      expect(response.headers['www-authenticate'], 'Bearer');
+      final error =
+          (jsonDecode(await response.readAsString()) as Map)['error'] as Map;
+      expect(
+        error['message'],
+        'The bearer token expired at 2027-02-14T09:00:00.000Z.',
+      );
+      expect(error['details'], {
+        'reason': ErrorReason.tokenExpired,
+        'expiredAt': '2027-02-14T09:00:00.000Z',
+      });
     });
   });
 

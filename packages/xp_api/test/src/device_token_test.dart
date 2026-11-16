@@ -29,18 +29,32 @@ void main() {
     expect(TokenInfo.fromJson(info.toJson()), info);
   });
 
-  test('TokenInfo carries the person it belongs to', () {
+  test('TokenInfo carries the person it belongs to and its expiry', () {
     final owned = TokenInfo(
       id: 'tok_2',
       name: 'Chrome',
       kind: DeviceTokenKind.web,
       createdAt: DateTime.utc(2026, 11, 13),
       personId: 'per_1',
+      expiresAt: DateTime.utc(2026, 11, 13, 8),
     );
 
     expect(owned.toJson(), containsPair('personId', 'per_1'));
+    expect(
+      owned.toJson(),
+      containsPair('expiresAt', '2026-11-13T08:00:00.000Z'),
+    );
     expect(owned.toJson()['kind'], 'web');
     expect(TokenInfo.fromJson(owned.toJson()), owned);
+    expect(
+      owned,
+      isNot(
+        TokenInfo.fromJson({
+          ...owned.toJson(),
+          'expiresAt': '2026-11-14T08:00:00.000Z',
+        }),
+      ),
+    );
   });
 
   test('TokensResponse round-trips through JSON', () {
