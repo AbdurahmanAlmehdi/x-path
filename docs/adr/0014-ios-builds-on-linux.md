@@ -91,8 +91,9 @@ The Shorebird question this ADR left open is settled: a fork of Shorebird is not
 the CLI's macOS check is easy, but Shorebird's iOS `gen_snapshot` and `analyze_snapshot` are
 built from its private Dart fork, and upstream Dart's `gen_snapshot` lacks the linker flags and
 snapshot hash Shorebird's updater checks, so there is nothing to build a Linux version from.
-Shorebird iOS stays on `ios-sign` until Shorebird ships Linux support; the plan files that feature
-request. Everything else in this ADR stands.
+Shorebird iOS stays on `ios-sign` until Shorebird ships Linux support; the feature request is
+[Shorebird issue 4455](https://github.com/shorebirdtech/shorebird/issues/4455). Everything
+else in this ADR stands.
 
 ## Consequences
 

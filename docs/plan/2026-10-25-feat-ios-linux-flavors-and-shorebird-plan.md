@@ -119,7 +119,7 @@ upstream Dart's `gen_snapshot` lacks the linker flags and snapshot hash Shorebir
 checks. So a fork is not viable; Shorebird iOS stays on `ios-sign` until Shorebird ships Linux
 support, and C and D keep a Mac for it.
 
-- [ ] **S1. File the feature request** on `shorebirdtech/shorebird` (template
+- [x] **S1. File the feature request** on `shorebirdtech/shorebird` (template
       `feature_request.md`) and in Discord: `ios-release/linux-x64.zip` (and arm64) with
       `gen_snapshot_arm64` and `analyze_snapshot_arm64`, as they publish
       `android-*-release/linux-x64.zip`; Linux allowed for iOS release and patch, or an
@@ -127,6 +127,9 @@ support, and C and D keep a Mac for it.
       optional; whether Linux- and Mac-hosted output is byte-identical (a patch must match its
       release's `gen_snapshot` build). Offer the omarchy-apple-dev approach and testing; ask
       whether a modified CLI may use their API. Link the issue here.
+      Filed on 2026-11-16 as
+      [shorebirdtech/shorebird#4455](https://github.com/shorebirdtech/shorebird/issues/4455).
+      Still open: the Discord post, and asking whether a modified CLI may use their API.
 
 ## Technical Considerations
 
