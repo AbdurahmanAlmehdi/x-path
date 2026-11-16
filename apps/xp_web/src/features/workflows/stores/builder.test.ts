@@ -1,7 +1,7 @@
 import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { type Answer, errorBody, stubEngine, stubUnreachableEngine } from '@/testing/fetch'
+import { type Answer, errorBody, type SeenRequest, stubEngine, stubUnreachableEngine } from '@/testing/fetch'
 import { workflowOf, workflowSummaryOf } from '@/testing/fixtures'
 import { eventually } from '@/testing/wait'
 
@@ -36,7 +36,7 @@ const templates = [
   { id: 'android-firebase', title: 'Android to Firebase', description: 'Builds.', yaml: ownYaml },
 ]
 
-function engine(routes: Record<string, Answer | (() => Answer | Promise<Answer>)> = {}) {
+function engine(routes: Record<string, Answer | ((request: SeenRequest) => Answer | Promise<Answer>)> = {}) {
   return stubEngine({
     'GET /projects/prj_1/workflows': { status: 200, body: { workflows: summaries } },
     'GET /workflows/schema': { status: 200, body: schema },
@@ -415,5 +415,229 @@ describe('useWorkflowBuilderStore', () => {
     expect(await store.save()).toBe(true)
     expect(store.workflows).toEqual(summaries)
     expect(store.error).toBeNull()
+  })
+
+  describe('the history and the commands of a workflow of its own', () => {
+    const first = { id: 'wfv_1', version: 1, createdAt: '2026-11-14T09:00:00Z' }
+    const second = { id: 'wfv_2', version: 2, createdAt: '2026-11-14T10:00:00Z' }
+    const oldYaml = ownYaml.replace('Nightly', 'Old')
+    const twice = { ...own, version: second, versions: [first, second] }
+    /** `GET .../wf_2`: version 1 when asked for, else the newest. */
+    const versioned = (request: SeenRequest): Answer =>
+      request.search === '?version=1'
+        ? { status: 200, body: { ...twice, version: first, yaml: oldYaml } }
+        : { status: 200, body: twice }
+
+    it('compares two versions, and a newer compare replaces an older one', async () => {
+      let answerLate = () => {}
+      let calls = 0
+      engine({
+        'GET /projects/prj_1/workflows/wf_2': (request) => {
+          calls++
+          // One of the versions of the first compare answers last.
+          if (calls === 3) return new Promise((resolve) => (answerLate = () => resolve(versioned(request))))
+          return versioned(request)
+        },
+      })
+      const store = useWorkflowBuilderStore()
+      await store.start('prj_1')
+
+      const slow = store.compareVersions(1, 2)
+      expect(store.versionDiff).toBeNull()
+      await store.compareVersions(2, 2)
+      expect(store.versionDiff).toEqual({ from: 2, to: 2, before: ownYaml, after: ownYaml })
+      answerLate()
+      await slow
+      expect(store.versionDiff).toEqual({ from: 2, to: 2, before: ownYaml, after: ownYaml })
+
+      await store.compareVersions(1, 2)
+      expect(store.versionDiff).toEqual({ from: 1, to: 2, before: oldYaml, after: ownYaml })
+      expect(store.versionError).toBeNull()
+    })
+
+    it('says why the versions could not be read, and compares nothing without a workflow', async () => {
+      const seen = engine({
+        'GET /projects/prj_1/workflows/wf_2': (request) =>
+          request.search === '' ? { status: 200, body: twice } : { status: 404, body: errorBody('not_found', 'No such version.') },
+      })
+      const store = useWorkflowBuilderStore()
+      await store.start('prj_1')
+
+      await store.compareVersions(1, 2)
+      expect(store.versionDiff).toBeNull()
+      expect(store.versionError).toBe('No such version.')
+
+      store.draft()
+      const before = seen.length
+      await store.compareVersions(1, 2)
+      expect(seen).toHaveLength(before)
+    })
+
+    it('saves an older version again as the newest, and opens it', async () => {
+      const restored = { ...twice, version: { ...second, id: 'wfv_3', version: 3 }, versions: [first, second], yaml: oldYaml }
+      const seen = engine({
+        'GET /projects/prj_1/workflows/wf_2': versioned,
+        'PUT /projects/prj_1/workflows/wf_2': { status: 200, body: restored },
+      })
+      const store = useWorkflowBuilderStore()
+      await store.start('prj_1')
+      store.setYaml(`${ownYaml}# typed\n`)
+
+      expect(await store.restoreVersion(1)).toBe(true)
+
+      expect(seen.find((request) => request.method === 'PUT')?.body).toEqual({ yaml: oldYaml })
+      expect(store.workflow).toEqual(restored)
+      expect(store.yaml).toBe(oldYaml)
+      expect(store.dirty).toBe(false)
+      expect(store.document?.name).toBe('Old')
+      expect(store.notice).toBe('Saved version 1 again as version 3 of nightly.')
+      expect(seen.filter((request) => request.path === '/projects/prj_1/workflows')).toHaveLength(2)
+      expect(store.busy).toBeNull()
+    })
+
+    it('says why a version could not be saved again', async () => {
+      engine({
+        'GET /projects/prj_1/workflows/wf_2': versioned,
+        'PUT /projects/prj_1/workflows/wf_2': {
+          status: 422,
+          body: { error: { code: 'workflow_invalid', message: 'The workflow has 1 issue.', issues: [] } },
+        },
+      })
+      const store = useWorkflowBuilderStore()
+      await store.start('prj_1')
+
+      expect(await store.restoreVersion(1)).toBe(false)
+      expect(store.error).toBe('The workflow has 1 issue.')
+      expect(store.yaml).toBe(ownYaml)
+      expect(store.busy).toBeNull()
+    })
+
+    it('renames the workflow and keeps what is typed, unsaved', async () => {
+      const renamed = { ...own, name: 'nightly-2' }
+      const seen = engine({ 'PATCH /projects/prj_1/workflows/wf_2': { status: 200, body: renamed } })
+      const store = useWorkflowBuilderStore()
+      await store.start('prj_1')
+      store.setYaml(`${ownYaml}# typed\n`)
+
+      expect(await store.rename('nightly-2')).toBe(true)
+
+      expect(seen.find((request) => request.method === 'PATCH')?.body).toEqual({ name: 'nightly-2' })
+      expect(store.name).toBe('nightly-2')
+      expect(store.yaml).toBe(`${ownYaml}# typed\n`)
+      expect(store.dirty).toBe(true)
+      expect(store.notice).toBe('Renamed to nightly-2.')
+    })
+
+    it('archives and unarchives the workflow', async () => {
+      const archived = { ...own, archivedAt: '2026-11-14T11:00:00Z' }
+      let patched: unknown
+      engine({
+        'PATCH /projects/prj_1/workflows/wf_2': (request) => {
+          patched = request.body
+          return { status: 200, body: (request.body as { archived: boolean }).archived ? archived : own }
+        },
+      })
+      const store = useWorkflowBuilderStore()
+      await store.start('prj_1')
+
+      expect(await store.setArchived(true)).toBe(true)
+      expect(patched).toEqual({ archived: true })
+      expect(store.workflow?.archivedAt).toBe('2026-11-14T11:00:00Z')
+      expect(store.notice).toBe('Archived nightly.')
+
+      expect(await store.setArchived(false)).toBe(true)
+      expect(store.workflow?.archivedAt).toBeUndefined()
+      expect(store.notice).toBe('Unarchived nightly.')
+    })
+
+    it('says why a change was refused', async () => {
+      engine({
+        'PATCH /projects/prj_1/workflows/wf_2': { status: 409, body: errorBody('conflict', 'The name is in use.') },
+      })
+      const store = useWorkflowBuilderStore()
+      await store.start('prj_1')
+
+      expect(await store.rename('dev-build')).toBe(false)
+      expect(store.error).toBe('The name is in use.')
+      expect(store.name).toBe('nightly')
+      expect(store.busy).toBeNull()
+    })
+
+    it('deletes the workflow and opens the first of the rest', async () => {
+      let deleted = false
+      const seen = engine({
+        'GET /projects/prj_1/workflows': () => ({
+          status: 200,
+          body: { workflows: deleted ? [summaries[0]] : summaries },
+        }),
+        'DELETE /projects/prj_1/workflows/wf_2': () => {
+          deleted = true
+          return { status: 204 }
+        },
+      })
+      const store = useWorkflowBuilderStore()
+      await store.start('prj_1')
+
+      expect(await store.remove()).toBe(true)
+
+      expect(seen.some((request) => request.method === 'DELETE')).toBe(true)
+      expect(store.workflows).toEqual([summaries[0]])
+      expect(store.workflow?.id).toBe('wf_1')
+      expect(store.notice).toBe('Deleted nightly.')
+    })
+
+    it('starts a draft once the last workflow is deleted, and keeps one the engine refuses to delete', async () => {
+      let deletes = 0
+      engine({
+        'GET /projects/prj_1/workflows': () => ({ status: 200, body: { workflows: deletes > 1 ? [] : summaries } }),
+        'DELETE /projects/prj_1/workflows/wf_2': () =>
+          ++deletes === 1
+            ? { status: 409, body: errorBody('conflict', 'Jobs ran it; archive it instead.') }
+            : { status: 204 },
+      })
+      const store = useWorkflowBuilderStore()
+      await store.start('prj_1')
+
+      expect(await store.remove()).toBe(false)
+      expect(store.error).toBe('Jobs ran it; archive it instead.')
+      expect(store.workflow?.id).toBe('wf_2')
+
+      expect(await store.remove()).toBe(true)
+      expect(store.workflow).toBeNull()
+      expect(store.yaml).toBe(toYaml(draftTemplate))
+      expect(store.notice).toBe('Deleted nightly.')
+    })
+
+    it('changes nothing of a built-in or a draft', async () => {
+      const seen = engine()
+      const store = useWorkflowBuilderStore()
+      await store.start('prj_1', 'wf_1')
+      const before = seen.length
+
+      expect(await store.restoreVersion(1)).toBe(false)
+      expect(await store.rename('x')).toBe(false)
+      expect(await store.setArchived(true)).toBe(false)
+      expect(await store.remove()).toBe(false)
+      store.draft()
+      expect(await store.remove()).toBe(false)
+      expect(seen.filter((request) => request.path !== '/projects/prj_1/workflows/validate')).toHaveLength(before)
+    })
+
+    it('imports a YAML file as a draft offered the name of the file', async () => {
+      engine()
+      const store = useWorkflowBuilderStore()
+      await store.start('prj_1')
+
+      store.importYaml('release.yml', ownYaml)
+      expect(store.workflow).toBeNull()
+      expect(store.name).toBe('release')
+      expect(store.yaml).toBe(ownYaml)
+      expect(store.dirty).toBe(true)
+      expect(store.document?.name).toBe('Nightly')
+
+      store.importYaml('.YAML', 'stages: [\n')
+      expect(store.name).toBeNull()
+      expect(store.shapeIssues).not.toEqual([])
+    })
   })
 })

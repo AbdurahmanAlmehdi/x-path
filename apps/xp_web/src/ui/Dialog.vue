@@ -4,6 +4,8 @@ import { onMounted, ref } from 'vue'
 defineProps<{
   /** The title of the dialog, also its accessible name. */
   title: string
+  /** Whether it takes the width of a document rather than of a form. */
+  wide?: boolean
 }>()
 
 const emit = defineEmits<{ close: [] }>()
@@ -22,6 +24,7 @@ function onKeydown(event: KeyboardEvent) {
     <div
       ref="dialog"
       class="dialog"
+      :class="{ wide }"
       role="dialog"
       aria-modal="true"
       :aria-label="title"
@@ -58,6 +61,10 @@ function onKeydown(event: KeyboardEvent) {
   border: var(--xp-border-width-hairline) solid var(--xp-color-border-strong);
   border-radius: var(--xp-radius-lg);
   box-shadow: var(--xp-elevation-3);
+}
+
+.dialog.wide {
+  width: min(960px, 100%);
 }
 
 .dialog:focus {

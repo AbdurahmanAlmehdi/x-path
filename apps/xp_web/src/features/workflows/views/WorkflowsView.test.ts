@@ -1,10 +1,10 @@
 import { flushPromises, type DOMWrapper, type VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Router } from 'vue-router'
 
 import { openApp } from '@/testing/app'
-import { type Answer, errorBody, meOf, stubEngine } from '@/testing/fetch'
+import { type Answer, errorBody, meOf, type SeenRequest, stubEngine } from '@/testing/fetch'
 import { workflowOf, workflowSummaryOf } from '@/testing/fixtures'
 import { stubSockets } from '@/testing/sockets'
 import { eventually } from '@/testing/wait'
@@ -97,7 +97,10 @@ describe('WorkflowsView', () => {
     timing.validateAfterMs = 400
   })
 
-  function engine(routes: Record<string, Answer | (() => Answer)> = {}, role: 'developer' | 'viewer' = 'developer') {
+  function engine(
+    routes: Record<string, Answer | ((request: SeenRequest) => Answer)> = {},
+    role: 'developer' | 'viewer' = 'developer',
+  ) {
     return stubEngine({
       'GET /me': { status: 200, body: meOf(role, role === 'viewer' ? [] : ['develop']) },
       'GET /approvals': { status: 200, body: { approvals: [] } },
@@ -462,5 +465,360 @@ describe('WorkflowsView', () => {
     store().setYaml(`${ownYaml}# changed\n`)
     await router.push('/projects/prj_1/workflows/wf_1')
     await eventually(() => expect(store().workflow?.id).toBe('wf_1'))
+  })
+
+  /** Picks [label] in the More menu. */
+  async function more(label: string) {
+    const menu = app!.find('details.menu')
+    ;(menu.element as HTMLDetailsElement).open = true
+    await button(label, menu).trigger('click')
+    expect((menu.element as HTMLDetailsElement).open).toBe(false)
+  }
+
+  function menuItems(): string[] {
+    return app!.findAll('details.menu .menu-items button').map((each) => each.text())
+  }
+
+  const dialog = () => app!.find('[role="dialog"]')
+
+  it('edits the inputs of the workflow, and the YAML follows', async () => {
+    engine()
+    await open()
+    const inputs = () => store().document!.inputs
+    const editor = (index: number) => app!.find(`[data-input="${index}"]`)
+    const within = (index: number, label: string) =>
+      editor(index)
+        .findAll('label')
+        .find((each) => each.find('.xp-type-label').exists() && each.find('.xp-type-label').text() === label)!
+        .find('input, select, textarea') as DOMWrapper<HTMLInputElement>
+
+    expect(app!.find('[data-testid="workflow-fields"]').text()).toContain('No inputs')
+    await button('Add input').trigger('click')
+    await button('Add input').trigger('click')
+    expect(inputs().map((input) => input.name)).toEqual(['input', 'input2'])
+
+    // A name the engine does not take, or one another input has, is said and not written.
+    const name = within(1, 'Input name')
+    await name.trigger('focus')
+    await name.setValue('input')
+    expect(editor(1).find('[role="alert"]').text()).toBe('Another input is called input.')
+    await name.setValue('2x')
+    expect(editor(1).find('[role="alert"]').text()).toBe('Letters, digits and _, starting with a letter or _.')
+    expect(inputs()[1]!.name).toBe('input2')
+    await name.setValue('track')
+    await name.trigger('blur')
+    expect(inputs()[1]!.name).toBe('track')
+    expect(editor(1).find('[role="alert"]').exists()).toBe(false)
+
+    await within(1, 'Type').setValue('choice')
+    await type(within(1, 'Options'), 'internal, beta, ')
+    expect(inputs()[1]).toMatchObject({ type: 'choice', options: ['internal', 'beta'] })
+    await within(1, 'Default').setValue('beta')
+    expect(inputs()[1]!.defaultValue).toBe('beta')
+    await within(1, 'Default').setValue('')
+    expect(inputs()[1]!.defaultValue).toBeNull()
+    await type(within(1, 'Description'), 'Where it goes')
+    expect(inputs()[1]!.description).toBe('Where it goes')
+    await type(within(1, 'Description'), ' ')
+    expect(inputs()[1]!.description).toBeNull()
+
+    await within(0, 'Type').setValue('boolean')
+    await within(0, 'Default').setValue('true')
+    expect(inputs()[0]).toMatchObject({ type: 'boolean', options: null, defaultValue: true })
+    await within(0, 'Default').setValue('false')
+    expect(inputs()[0]!.defaultValue).toBe(false)
+    await editor(0).find('input[type="checkbox"]').setValue(true)
+    expect(inputs()[0]).toMatchObject({ required: true, defaultValue: null })
+    expect(editor(0).text()).not.toContain('Default')
+    await editor(0).find('input[type="checkbox"]').setValue(false)
+
+    await within(0, 'Type').setValue('json')
+    await type(within(0, 'Default'), '{a: 1}')
+    expect(inputs()[0]!.defaultValue).toEqual({ a: 1 })
+    await type(within(0, 'Default'), '')
+    expect(inputs()[0]!.defaultValue).toBeNull()
+    await within(0, 'Type').setValue('')
+    expect(inputs()[0]!.type).toBeNull()
+
+    expect(store().yaml).toContain('inputs:\n  input: {}\n  track:\n    type: choice')
+    await eventually(() => expect(editorText()).toContain('track:'))
+
+    await button('Remove input', editor(0)).trigger('click')
+    expect(inputs().map((input) => input.name)).toEqual(['track'])
+  })
+
+  it('shows a choice default that is not one of the options', async () => {
+    engine({
+      'GET /projects/prj_1/workflows/wf_2': {
+        status: 200,
+        body: {
+          ...own,
+          yaml: `schema: 1\ninputs:\n  track:\n    type: choice\n    options: [beta]\n    default: alpha\nstages: []\n`,
+        },
+      },
+    })
+    await open()
+
+    const select = app!.find('[data-input="0"] select.mono')
+    expect(select.findAll('option').map((each) => each.text())).toEqual(['None', 'beta', 'alpha'])
+    expect((select.element as HTMLSelectElement).value).toBe('alpha')
+  })
+
+  describe('the versions', () => {
+    const first = { id: 'wfv_1', version: 1, createdAt: '2026-11-14T09:00:00Z' }
+    const second = { id: 'wfv_2', version: 2, createdAt: '2026-11-14T10:00:00Z' }
+    const oldYaml = ownYaml.replace('name: Nightly', 'name: Old')
+    const twice = { ...own, version: second, versions: [first, second] }
+    const versioned = (request: SeenRequest): Answer =>
+      request.search === '?version=1'
+        ? { status: 200, body: { ...twice, version: first, yaml: oldYaml } }
+        : { status: 200, body: twice }
+
+    it('compares the one before the newest with the newest, any two, and saves an older one again', async () => {
+      const restored = { ...twice, version: { ...second, id: 'wfv_3', version: 3 }, yaml: oldYaml }
+      const seen = engine({
+        'GET /projects/prj_1/workflows/wf_2': versioned,
+        'PUT /projects/prj_1/workflows/wf_2': { status: 200, body: restored },
+      })
+      await open()
+
+      await more('Versions…')
+      expect(dialog().attributes('aria-label')).toBe('Versions of nightly')
+      await eventually(() => expect(dialog().find('[data-testid="diff"]').exists()).toBe(true))
+      expect(dialog().find('.line.removed').text()).toBe('-name: Old')
+      expect(dialog().find('.line.added').text()).toBe('+name: Nightly')
+      expect(dialog().find('select').findAll('option')[0]!.text()).toMatch(/^Version 1 · /)
+
+      await dialog().findAll('select')[0]!.setValue('2')
+      await eventually(() => expect(dialog().text()).toContain('No changes.'))
+      expect(dialog().text()).not.toContain('Restore version')
+      expect(dialog().find('[data-testid="diff"]').text()).toContain('name: Nightly')
+      await dialog().findAll('select')[1]!.setValue('1')
+      await eventually(() => expect(dialog().find('.line.removed').text()).toBe('-name: Nightly'))
+      await dialog().findAll('select')[0]!.setValue('1')
+      await dialog().findAll('select')[1]!.setValue('2')
+      await eventually(() => expect(dialog().find('.line.added').exists()).toBe(true))
+
+      await button('Restore version 1', dialog()).trigger('click')
+      await flushPromises()
+
+      expect(seen.find((request) => request.method === 'PUT')?.body).toEqual({ yaml: oldYaml })
+      expect(app!.find('[role="status"].notice').text()).toBe('Saved version 1 again as version 3 of nightly.')
+      expect(app!.find('[data-testid="workflow-subtitle"]').text()).toBe('nightly · Version 3')
+      expect(dialog().exists()).toBe(false)
+    })
+
+    it('asks before a restore drops unsaved changes, and closes', async () => {
+      const seen = engine({ 'GET /projects/prj_1/workflows/wf_2': versioned })
+      await open()
+      store().setYaml(`${ownYaml}# changed\n`)
+      await flushPromises()
+
+      await more('Versions…')
+      await eventually(() => expect(dialog().find('.line.added').exists()).toBe(true))
+      await button('Restore version 1', dialog()).trigger('click')
+      expect(dialog().attributes('aria-label')).toBe('Discard unsaved changes?')
+      await button('Keep editing', dialog()).trigger('click')
+      await flushPromises()
+      expect(seen.some((request) => request.method === 'PUT')).toBe(false)
+      expect(store().dirty).toBe(true)
+
+      // The dialog opens on the one before the newest each time, whatever was compared last.
+      await more('Versions…')
+      await dialog().findAll('select')[0]!.setValue('2')
+      await eventually(() => expect(dialog().text()).toContain('No changes.'))
+      await button('Close', dialog()).trigger('click')
+      expect(dialog().exists()).toBe(false)
+      await more('Versions…')
+      expect((dialog().findAll('select')[0]!.element as HTMLSelectElement).value).toBe('1')
+      await eventually(() => expect(dialog().find('.line.added').exists()).toBe(true))
+    })
+
+    it('says why the versions could not be read', async () => {
+      engine({
+        'GET /projects/prj_1/workflows/wf_2': (request) =>
+          request.search === '' ? { status: 200, body: twice } : { status: 500, body: errorBody('internal', 'Down.') },
+      })
+      await open()
+
+      await more('Versions…')
+      await eventually(() => expect(dialog().find('[role="alert"]').text()).toBe('Down.'))
+    })
+
+    it('lets a viewer compare versions, and nothing else', async () => {
+      engine({ 'GET /projects/prj_1/workflows/wf_2': versioned }, 'viewer')
+      await open()
+
+      expect(menuItems()).toEqual(['Versions…'])
+      expect(app!.findAll('main button').map((each) => each.text())).not.toContain('Import…')
+      expect(app!.findAll('main button').map((each) => each.text())).toContain('Export…')
+      expect(button('Add input').attributes('disabled')).toBeDefined()
+      await more('Versions…')
+      await eventually(() => expect(dialog().find('.line.added').exists()).toBe(true))
+      expect(dialog().text()).not.toContain('Restore version')
+    })
+  })
+
+  it('offers only the versions of a built-in', async () => {
+    engine()
+    await open('/projects/prj_1/workflows/wf_1')
+
+    expect(menuItems()).toEqual(['Versions…'])
+  })
+
+  it('closes the More menu on a click outside it', async () => {
+    engine()
+    await open()
+    const menu = app!.find('details.menu').element as HTMLDetailsElement
+
+    menu.open = true
+    document.body.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    expect(menu.open).toBe(false)
+    document.body.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    expect(menu.open).toBe(false)
+  })
+
+  it('renames the workflow under a name no other has', async () => {
+    const seen = engine({
+      'PATCH /projects/prj_1/workflows/wf_2': { status: 200, body: { ...own, name: 'nightly-2' } },
+    })
+    await open()
+
+    await more('Rename…')
+    expect(dialog().attributes('aria-label')).toBe('Rename the workflow')
+    const name = dialog().find('input')
+    expect((name.element as HTMLInputElement).value).toBe('nightly')
+    expect(button('Rename', dialog()).attributes('disabled')).toBeDefined()
+    await name.setValue('dev-build')
+    expect(dialog().find('[role="alert"]').text()).toBe('The project already has a workflow called dev-build.')
+    await name.setValue('nightly-2')
+    await dialog().find('form').trigger('submit')
+    await flushPromises()
+
+    expect(seen.find((request) => request.method === 'PATCH')?.body).toEqual({ name: 'nightly-2' })
+    expect(app!.find('[role="status"].notice').text()).toBe('Renamed to nightly-2.')
+    expect(app!.find('[data-testid="workflow-subtitle"]').text()).toBe('nightly-2 · Version 1')
+
+    await more('Rename…')
+    await button('Cancel', dialog()).trigger('click')
+    expect(dialog().exists()).toBe(false)
+  })
+
+  it('archives the workflow, and unarchives it', async () => {
+    const archived = { ...own, archivedAt: '2026-11-14T11:00:00Z' }
+    const seen = engine({
+      'PATCH /projects/prj_1/workflows/wf_2': (request) => ({
+        status: 200,
+        body: (request.body as { archived: boolean }).archived ? archived : own,
+      }),
+    })
+    await open()
+
+    await more('Archive')
+    await flushPromises()
+    expect(seen.find((request) => request.method === 'PATCH')?.body).toEqual({ archived: true })
+    expect(app!.find('[role="status"].notice').text()).toBe('Archived nightly.')
+    expect(app!.text()).toContain('Archived: kept with its versions and runs')
+    expect(app!.find('a.button[href*="dispatch"]').exists()).toBe(false)
+
+    await more('Unarchive')
+    await flushPromises()
+    expect(app!.find('[role="status"].notice').text()).toBe('Unarchived nightly.')
+    expect(menuItems()).toContain('Archive')
+  })
+
+  it('deletes the workflow once asked, and opens the next one', async () => {
+    let deleted = false
+    engine({
+      'GET /projects/prj_1/workflows': () => ({ status: 200, body: { workflows: deleted ? [summaries[0]] : summaries } }),
+      'DELETE /projects/prj_1/workflows/wf_2': () => {
+        deleted = true
+        return { status: 204 }
+      },
+    })
+    await open()
+
+    await more('Delete…')
+    expect(dialog().attributes('aria-label')).toBe('Delete nightly?')
+    expect(dialog().text()).toContain('archive it instead')
+    await button('Keep', dialog()).trigger('click')
+    expect(deleted).toBe(false)
+
+    await more('Delete…')
+    await button('Delete', dialog()).trigger('click')
+    await flushPromises()
+
+    expect(app!.find('[role="status"].notice').text()).toBe('Deleted nightly.')
+    await eventually(() => expect(router.currentRoute.value.fullPath).toBe('/projects/prj_1/workflows/wf_1'))
+  })
+
+  it('says why the engine refused to delete the workflow', async () => {
+    engine({
+      'DELETE /projects/prj_1/workflows/wf_2': { status: 409, body: errorBody('conflict', 'Jobs ran it; archive it instead.') },
+    })
+    await open()
+
+    await more('Delete…')
+    await button('Delete', dialog()).trigger('click')
+    await flushPromises()
+
+    expect(app!.find('[role="alert"]').text()).toBe('Jobs ran it; archive it instead.')
+    expect(store().workflow?.id).toBe('wf_2')
+  })
+
+  it('imports a YAML file as a draft, after asking to drop unsaved changes', async () => {
+    engine()
+    await open()
+    const picker = app!.find('input[type="file"]')
+    const opened = vi.spyOn(picker.element as HTMLInputElement, 'click').mockImplementation(() => {})
+
+    await button('Import…').trigger('click')
+    await flushPromises()
+    expect(opened).toHaveBeenCalledTimes(1)
+
+    Object.defineProperty(picker.element, 'files', {
+      value: [new File([ownYaml.replace('Nightly', 'Imported')], 'release.yaml')],
+      configurable: true,
+    })
+    await picker.trigger('change')
+    await eventually(() => expect(store().document?.name).toBe('Imported'))
+    expect(app!.find('[data-testid="workflow-subtitle"]').text()).toBe('release · Not saved yet')
+    expect(button('Save as…').attributes('disabled')).toBeUndefined()
+
+    await button('Import…').trigger('click')
+    expect(dialog().attributes('aria-label')).toBe('Discard unsaved changes?')
+    await button('Keep editing', dialog()).trigger('click')
+    await flushPromises()
+    expect(opened).toHaveBeenCalledTimes(1)
+
+    Object.defineProperty(picker.element, 'files', { value: [], configurable: true })
+    await picker.trigger('change')
+    expect(store().name).toBe('release')
+  })
+
+  it('exports the YAML being edited as a file named after the workflow', async () => {
+    engine()
+    await open()
+    const { createObjectURL, revokeObjectURL } = URL
+    const files: Blob[] = []
+    URL.createObjectURL = (blob: Blob) => {
+      files.push(blob)
+      return 'blob:workflow'
+    }
+    URL.revokeObjectURL = () => {}
+    const saved: string[] = []
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) {
+      saved.push(this.download)
+    })
+    try {
+      store().setYaml(`${ownYaml}# changed\n`)
+      await button('Export…').trigger('click')
+
+      expect(saved).toEqual(['nightly.yaml'])
+      expect(await files[0]!.text()).toBe(`${ownYaml}# changed\n`)
+    } finally {
+      URL.createObjectURL = createObjectURL
+      URL.revokeObjectURL = revokeObjectURL
+    }
   })
 })
