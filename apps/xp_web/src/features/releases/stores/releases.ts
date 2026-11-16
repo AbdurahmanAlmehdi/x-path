@@ -17,6 +17,7 @@ import {
   type RolloutRequest,
   type Run,
 } from '@/api/client'
+import { useCommand } from '@/api/requests'
 import { followEvents, payloadValue } from '@/api/sockets'
 import { coalesced } from '@/app/coalesce'
 
@@ -72,9 +73,8 @@ export const useReleasesStore = defineStore('releases', () => {
   const notesError = ref<string | null>(null)
   /** What happened to the release shown, oldest first. */
   const history = ref<ReleaseEvent[]>([])
-  const command = ref<ReleaseCommand | null>(null)
-  /** What the engine said when the last command failed. */
-  const commandError = ref<string | null>(null)
+  /** The command on its way ([busy]), and what the engine said when the last one failed ([error]). */
+  const command = useCommand<ReleaseCommand | null>(null)
   /** What the last command did, when it went through. */
   const notice = ref<string | null>(null)
   /** The release and commit the notes were read for. */
@@ -200,7 +200,7 @@ export const useReleasesStore = defineStore('releases', () => {
   function select(releaseId: string | null) {
     const before = release.value?.id
     selectedId.value = releaseId
-    commandError.value = null
+    command.dismiss()
     notice.value = null
     if (release.value?.id !== before) {
       history.value = []
@@ -234,21 +234,14 @@ export const useReleasesStore = defineStore('releases', () => {
     call: (id: string) => Promise<{ data?: T; error?: unknown; response: Response }>,
   ): Promise<T | null> {
     const shown = release.value
-    if (!shown || command.value) return null
-    command.value = kind
-    commandError.value = null
+    if (!shown || command.busy.value) return null
     notice.value = null
-    try {
+    return command.run(kind, async () => {
       const answer = await dataOf(call(shown.id))
       notice.value = doneNotices[kind] ?? null
       void refreshReleases()
       return answer
-    } catch (failure) {
-      commandError.value = failureMessage(failure)
-      return null
-    } finally {
-      command.value = null
-    }
+    })
   }
 
   const path = (id: string) => ({ params: { path: { id } } })
@@ -302,8 +295,8 @@ export const useReleasesStore = defineStore('releases', () => {
     notes,
     notesError,
     history,
-    command,
-    commandError,
+    command: command.busy,
+    commandError: command.error,
     notice,
     release,
     readsStore,

@@ -5,13 +5,12 @@ import {
   api,
   dataOf,
   doneOf,
-  failureMessage,
   type CreateCredentialRequest,
   type NamedCredential,
   type ReplaceCredentialRequest,
 } from '@/api/client'
+import { useCommand, useLoad } from '@/api/requests'
 import { followEvents } from '@/api/sockets'
-import { coalesced } from '@/app/coalesce'
 
 import { statusOf } from '../labels'
 
@@ -29,25 +28,17 @@ export type CredentialCommand = 'saving' | 'verifying' | 'renaming' | 'deleting'
  */
 export const useCredentialsStore = defineStore('credentials', () => {
   const credentials = ref<NamedCredential[]>([])
-  const loaded = ref(false)
-  const error = ref<string | null>(null)
-  /** What is on its way to the engine, and for which credential. */
-  const command = ref<{ kind: CredentialCommand; id?: string } | null>(null)
-  /** What the engine said when it refused the last command. */
-  const commandError = ref<string | null>(null)
+  /**
+   * What is on its way to the engine, and for which credential ([busy]),
+   * and what the engine said when it refused the last command ([error]).
+   */
+  const command = useCommand<{ kind: CredentialCommand; id?: string } | null>(null)
   /** What the last command did, when it went through. */
   const notice = ref<string | null>(null)
 
   /** Asks the engine for the credentials. */
-  const load = coalesced(async () => {
-    try {
-      credentials.value = (await dataOf(api.GET('/credentials'))).credentials
-      error.value = null
-    } catch (failure) {
-      error.value = failureMessage(failure)
-    } finally {
-      loaded.value = true
-    }
+  const { loaded, error, load } = useLoad(async () => {
+    credentials.value = (await dataOf(api.GET('/credentials'))).credentials
   })
 
   /** Loads again on credential events and a resync. Returns the function that stops. */
@@ -63,19 +54,13 @@ export const useCredentialsStore = defineStore('credentials', () => {
     id: string | undefined,
     send: () => Promise<string>,
   ): Promise<boolean> {
-    command.value = { kind, id }
-    commandError.value = null
     notice.value = null
-    try {
+    const done = await command.run({ kind, id }, async () => {
       notice.value = await send()
       await load()
       return true
-    } catch (failure) {
-      commandError.value = failureMessage(failure)
-      return false
-    } finally {
-      command.value = null
-    }
+    })
+    return done ?? false
   }
 
   /** Has the engine check [request] and store it under its name. */
@@ -135,8 +120,8 @@ export const useCredentialsStore = defineStore('credentials', () => {
     credentials,
     loaded,
     error,
-    command,
-    commandError,
+    command: command.busy,
+    commandError: command.error,
     notice,
     load,
     follow,
