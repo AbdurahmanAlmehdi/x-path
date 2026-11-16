@@ -97,4 +97,20 @@ void main() {
     }
     expect(await service.origin(), 'https://a.example');
   });
+
+  test('lets nobody set it on the engine machine, without a token', () async {
+    expect(
+      await service.set('https://a.example', by: null),
+      const PublicUrl(url: 'https://a.example'),
+    );
+    expect(await settings.read(PublicUrlService.key), 'https://a.example');
+  });
+
+  test('reads a URL another process wrote after it was first read', () async {
+    expect(await service.origin(), isNull);
+
+    await settings.write(PublicUrlService.key, 'https://b.example');
+
+    expect(await service.origin(), 'https://b.example');
+  });
 }
