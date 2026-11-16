@@ -27,19 +27,23 @@ shared machine, `xp dashboard --print` keeps it out of the process list.
 ### The first admin of a new engine
 
 An engine without the Mac app (a Linux bundle or the Docker image) starts with one admin, `Owner`,
-and no sign-in code, so no one can sign in yet. On the engine's machine, as the user that runs
-`xpd`:
+and no sign-in code, so no one can sign in yet. On a server, put the [proxy](#behind-a-proxy) in
+front of the engine first. Then, on the engine's machine, as the user that runs `xpd`:
 
 ```sh
-xpd person create --name Sam --role admin   # prints the id, and the sign-in code on stderr
-xpd person code Sam                         # a new code, when that one has expired
+xpd settings public-url https://<machine>.<tailnet>.ts.net
+xpd person create --name Sam --role admin   # prints the id, and the code and a sign-in link on stderr
+xpd person code Sam                         # a new code and link, when that one has expired
 ```
 
-Then sign in with the code, in one of these ways:
+Open the link from any device that reaches the public URL: it signs you in. Like `xpd person`,
+`xpd settings public-url` needs no token, and a running engine uses the new URL at once.
+
+Without a public URL the commands print the code only. Enter it on the sign-in page:
 
 - **On the engine machine,** when it has a desktop: open `http://127.0.0.1:7480` and enter the
   code.
-- **Through an SSH tunnel,** for a server without a browser. On your own machine:
+- **Through an SSH tunnel,** for a server without a browser or a proxy. On your own machine:
 
   ```sh
   ssh -N -L 7480:127.0.0.1:7480 you@server
@@ -48,16 +52,6 @@ Then sign in with the code, in one of these ways:
   Then open `http://localhost:7480` there and enter the code. Keep the local port the same as the
   engine's: the engine accepts a browser on the address of its own port only, so a tunnel from
   another local port is refused.
-- **Through the public URL:** set up the [proxy](#behind-a-proxy) first, then set the public URL
-  from the server with a token of `Owner`'s (`xpd token create` makes one; see
-  [Connect the CLI](install.md#connect-the-cli)), and open the public URL from any device that
-  reaches it:
-
-  ```sh
-  xpd token create --name server --kind cli
-  xp connect http://127.0.0.1:7480                  # asks for the token
-  xp settings public-url https://<machine>.<tailnet>.ts.net
-  ```
 
 `xpd person code Owner` gives a code for `Owner` instead. An engine upgraded from an earlier
 version has `Owner` too, who owns every token the engine had.
@@ -154,7 +148,8 @@ $host;`; Caddy and `tailscale serve` do by default). One that rewrites `Host` to
 `127.0.0.1:<port>` makes the engine treat public visitors as loopback and give them the cookie
 without `Secure`.
 
-Then set the public URL, as an admin:
+Then set the public URL, as an admin, or on the engine machine with `xpd settings public-url`,
+which needs no token:
 
 ```sh
 xp settings public-url https://xpath.example.com

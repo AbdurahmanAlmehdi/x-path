@@ -8,6 +8,7 @@ import 'package:xp_engine/xp_engine.dart';
 import 'package:xpd/src/cli/person_command.dart';
 import 'package:xpd/src/cli/secrets_command.dart';
 import 'package:xpd/src/cli/serve_command.dart';
+import 'package:xpd/src/cli/settings_command.dart';
 import 'package:xpd/src/cli/token_command.dart';
 import 'package:xpd/src/cli/xpd_context.dart';
 import 'package:xpd/src/service/service_commands.dart';
@@ -50,6 +51,7 @@ Future<int> runXpd(
     ..addCommand(PersonCommand(context))
     ..addCommand(SecretsCommand(context))
     ..addCommand(ServeCommand(context))
+    ..addCommand(SettingsCommand(context))
     ..addCommand(ServiceStatusCommand(context))
     ..addCommand(TokenCommand(context))
     ..addCommand(UninstallServiceCommand(context));

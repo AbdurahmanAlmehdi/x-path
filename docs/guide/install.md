@@ -128,15 +128,17 @@ from inside the app, a Linux bundle from `xpd/web` next to the engine, and the D
 - **With the app or a connected `xp`:** Settings, Web dashboard, Open dashboard, or `xp dashboard`.
   Either opens the browser signed in as you.
 - **A new Linux engine** has its admin, `Owner`, but no sign-in code yet. On the engine machine,
-  make yourself an admin (or ask for a code for `Owner`):
+  set the public URL of the [proxy](dashboard.md#behind-a-proxy) in front of it, then make
+  yourself an admin (or ask for a code for `Owner`):
 
   ```sh
-  xpd person create --name Sam --role admin   # the sign-in code is on stderr
+  xpd settings public-url https://<machine>.<tailnet>.ts.net
+  xpd person create --name Sam --role admin   # the code and a sign-in link are on stderr
   xpd person code Owner                       # or a code for Owner, on stdout
   ```
 
-  Then enter the code at `http://127.0.0.1:7480` on that machine or, for a server without a
-  browser, through an SSH tunnel or the public URL:
+  Open the sign-in link from any device that reaches the public URL. Without a public URL, enter
+  the code at `http://127.0.0.1:7480` on that machine or through an SSH tunnel:
   [The first admin of a new engine](dashboard.md#the-first-admin-of-a-new-engine).
 
 A browser on another machine signs in only through an HTTPS proxy:

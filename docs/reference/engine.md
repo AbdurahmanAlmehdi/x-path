@@ -21,7 +21,11 @@ dart run apps/xpd/bin/xpd.dart serve                                      # http
   its id on stdout and a sign-in code for the web dashboard on stderr. `xpd person code <name or
   id>` prints a new code on stdout (it ends the person's unused codes), and `xpd person list`
   prints the people, tab-separated. Like `xpd token create` they write to the database directly,
-  so they work while the engine runs; they are how a headless engine gets its first admin.
+  so they work while the engine runs; they are how a headless engine gets its first admin. With a
+  public URL set, they also print on stderr a sign-in link, `<public URL>/sign-in#code=<code>`.
+- `xpd settings public-url [<url> | --clear]` shows, sets or clears the public URL without a
+  token (what `xp settings public-url` does through the API), and prints it on stdout when one is
+  set. A running engine reads the setting on each request, so the new URL works at once.
 - `xpd secrets import-gh [--data-dir <path>] [--gh <path>]` stores the token of the GitHub CLI in
   the engine's secret store (see Projects and scans).
 - The API is under `/api/v1` (ADR 0018). Every route except `GET /health`, `GET /version`,

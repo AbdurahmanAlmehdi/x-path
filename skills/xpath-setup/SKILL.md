@@ -237,41 +237,39 @@ minutes, single use); a browser stays signed in for 8 hours.
 **Web dashboard** ▸ **Open dashboard**, or `xp dashboard`. Nothing else to set up; it is reachable
 on that machine only.
 
-**A new Linux or Docker engine** has one admin, `Owner`, and no code yet. The user runs, on the
-engine machine (in Docker, `docker exec xpath xpd ...`):
+**A new Linux or Docker engine** has one admin, `Owner`, and no code yet. The engine has no TLS
+of its own, so a browser signs in only on the engine's own loopback address or through an HTTPS
+**public URL**. Plain `http://<server-ip>:7480` shows the sign-in page but refuses the sign-in;
+never work around that with `--host 0.0.0.0`.
+
+On a server, the shortest way is the public URL. First an HTTPS proxy in front of
+`127.0.0.1:7480` that passes WebSockets, `Origin` and `Host` through:
+
+- Tailscale (no domain, tailnet only): `tailscale serve --bg http://127.0.0.1:7480`, and
+  `tailscale serve status` prints `https://<machine>.<tailnet>.ts.net`;
+- Caddy (a domain pointing at the server): `xpath.example.com { reverse_proxy 127.0.0.1:7480 }`
+  in the `Caddyfile`;
+- nginx needs `proxy_set_header Host $host;` and the WebSocket upgrade headers.
+
+Then the user runs, on the engine machine (in Docker, `docker exec xpath xpd ...`); neither command
+needs a token, and a running engine uses the new URL at once:
 
 ```sh
-xpd person create --name Sam --role admin   # the sign-in code is on stderr
-xpd person code Sam                         # a new code once that one has expired
+xpd settings public-url https://<machine>.<tailnet>.ts.net
+xpd person create --name Sam --role admin   # the code and a sign-in link are on stderr
+xpd person code Sam                         # a new code and link once that one has expired
 ```
 
-The engine has no TLS of its own, so a browser signs in only on the engine's own loopback address
-or through an HTTPS **public URL**. Plain `http://<server-ip>:7480` shows the sign-in page but
-refuses the sign-in; never work around that with `--host 0.0.0.0`. For a server without a
-browser, pick one:
+The user opens the link (`<public URL>/sign-in#code=...`) from any device that reaches the public
+URL, and is signed in. The cookie there is `Secure`.
 
-1. **SSH tunnel** (first sign-in, nothing to install). On the user's own machine:
-   `ssh -N -L 7480:127.0.0.1:7480 user@server`, then `http://localhost:7480` there. The local port
-   must equal the engine's port, or the engine refuses the browser. Not for Docker: the container
-   sees the host as another machine, so Docker needs the public URL even on the same machine.
-2. **Public URL** (for the team, from any device). An HTTPS proxy in front of `127.0.0.1:7480`
-   that passes WebSockets, `Origin` and `Host` through:
-   - Tailscale (no domain, tailnet only): `tailscale serve --bg http://127.0.0.1:7480`, and
-     `tailscale serve status` prints `https://<machine>.<tailnet>.ts.net`;
-   - Caddy (a domain pointing at the server): `xpath.example.com { reverse_proxy 127.0.0.1:7480 }`
-     in the `Caddyfile`;
-   - nginx needs `proxy_set_header Host $host;` and the WebSocket upgrade headers.
+Without a proxy, the commands print the code only, entered on the sign-in page:
 
-   Then an admin sets it. Before anyone has signed in, the user does this on the server with a
-   token of `Owner`'s:
-
-   ```sh
-   xpd token create --name server --kind cli   # printed once; Owner's token
-   xp connect http://127.0.0.1:7480            # asks for the token
-   xp settings public-url https://<machine>.<tailnet>.ts.net
-   ```
-
-   Everyone then opens the public URL and enters their code. The cookie there is `Secure`.
+- on the engine machine, at `http://127.0.0.1:7480`, when it has a desktop;
+- through an SSH tunnel, on the user's own machine: `ssh -N -L 7480:127.0.0.1:7480 user@server`,
+  then `http://localhost:7480` there. The local port must equal the engine's port, or the engine
+  refuses the browser. Not for Docker: the container sees the host as another machine, so Docker
+  needs the public URL even on the same machine.
 
 Add the rest of the team once an admin is signed in: **People** in the dashboard (add a person,
 pick a role, give them their code), or `xpd person create --name <name> --role <role>` on the
