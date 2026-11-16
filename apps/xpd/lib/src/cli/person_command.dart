@@ -64,16 +64,17 @@ class PersonCreateCommand extends XpdCommand {
     }
     if (role == null) usageException('--role is required.');
     try {
-      final (person, code) = await withDatabase((database) async {
+      final (person, code, publicUrl) = await withDatabase((database) async {
         // The engine machine's user owns the data directory: no token.
         final person = await _people(database)
             .create(name: name, role: PersonRole.values.byName(role), by: null);
-        return (person, await _signIn(database).issue(person.id));
+        final publicUrl = await _publicUrl(database);
+        return (person, await _signIn(database).issue(person.id), publicUrl);
       });
       context.err.writeln(
         'Added ${person.name}, ${person.role.name} (${person.id}).',
       );
-      _tellCode(context, person, code);
+      _tellCode(context, person, code, publicUrl);
       context.out.writeln(person.id);
       return 0;
     } on PersonException catch (error) {
@@ -108,7 +109,8 @@ class PersonCodeCommand extends XpdCommand {
     final issued = await withDatabase((database) async {
       final person = await _people(database).findActive(wanted);
       if (person == null) return null;
-      return (person, await _signIn(database).issue(person.id));
+      final publicUrl = await _publicUrl(database);
+      return (person, await _signIn(database).issue(person.id), publicUrl);
     });
     if (issued == null) {
       context.err.writeln(
@@ -116,20 +118,34 @@ class PersonCodeCommand extends XpdCommand {
       );
       return 1;
     }
-    final (person, code) = issued;
-    _tellCode(context, person, code);
+    final (person, code, publicUrl) = issued;
+    _tellCode(context, person, code, publicUrl);
     context.out.writeln(code.code);
     return 0;
   }
 }
 
-/// Tells, on standard error, how [person] signs in with [code].
-void _tellCode(XpdContext context, Person person, SignInCode code) =>
+/// Tells, on standard error, how [person] signs in with [code]: with a
+/// link on the [publicUrl] when one is set, the code in its fragment, which
+/// a browser never sends to a server.
+void _tellCode(
+  XpdContext context,
+  Person person,
+  SignInCode code,
+  String? publicUrl,
+) {
+  context.err.writeln(
+    'Sign-in code for ${person.name}: ${code.code}. It works once, until '
+    '${code.expiresAt.toIso8601String()}. Enter it on the sign-in page of '
+    'the dashboard (/sign-in) on this machine, or through the public URL.',
+  );
+  if (publicUrl != null) {
     context.err.writeln(
-      'Sign-in code for ${person.name}: ${code.code}. It works once, until '
-      '${code.expiresAt.toIso8601String()}. Enter it on the sign-in page of '
-      'the dashboard (/sign-in) on this machine, or through the public URL.',
+      'Or open the link, which signs in with it: '
+      '${code.signInUrl(Uri.parse(publicUrl))}',
     );
+  }
+}
 
 /// `xpd person list`: prints every person, one per line.
 class PersonListCommand extends XpdCommand {
@@ -173,3 +189,7 @@ SignInCodeService _signIn(SqliteDatabase database) => SignInCodeService(
   tokens: tokenServiceOf(database),
   clock: const SystemClock(),
 );
+
+Future<String?> _publicUrl(SqliteDatabase database) =>
+    PublicUrlService(settings: SqliteEngineSettingRepository(database))
+        .origin();

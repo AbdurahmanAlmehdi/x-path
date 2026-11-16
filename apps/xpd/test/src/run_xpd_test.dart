@@ -189,12 +189,118 @@ void main() {
       expect(out.toString(), isEmpty);
     });
 
+    test(
+      'create and code print a sign-in link once a public URL is set',
+      () async {
+        await person(['create', '--name', 'Sam', '--role', 'admin']);
+        expect(err.toString(), isNot(contains('Or open the link')));
+        await run([
+          'settings',
+          'public-url',
+          'https://xpath.example.com',
+          '--data-dir',
+          dataDir,
+        ]);
+        final before = out.toString().length;
+
+        expect(await person(['code', 'Sam']), 0);
+
+        final code = out.toString().substring(before).trim();
+        expect(code, matches(RegExp(r'^([0-9A-Z]{4}-){3}[0-9A-Z]{4}$')));
+        expect(
+          err.toString(),
+          contains(
+            'Or open the link, which signs in with it: '
+            'https://xpath.example.com/sign-in#code=$code\n',
+          ),
+        );
+        expect(
+          await person(['create', '--name', 'Kim', '--role', 'viewer']),
+          0,
+        );
+        expect(
+          RegExp('https://xpath.example.com/sign-in#code=')
+              .allMatches(err.toString()),
+          hasLength(2),
+        );
+      },
+    );
+
     test('xpd person --help lists create, code and list', () async {
       expect(await run(['person', '--help']), 0);
       expect(
         out.toString(),
         allOf(contains('create'), contains('code'), contains('list')),
       );
+    });
+  });
+
+  group('xpd settings public-url', () {
+    Future<int> publicUrl(List<String> args) =>
+        run(['settings', 'public-url', ...args, '--data-dir', dataDir]);
+
+    Future<String?> stored() => withDatabase(
+      (database) =>
+          SqliteEngineSettingRepository(database).read(PublicUrlService.key),
+    );
+
+    test('says when none is set, and prints nothing on out', () async {
+      expect(await publicUrl([]), 0);
+
+      expect(out.toString(), isEmpty);
+      expect(err.toString(), contains('No public URL is set'));
+    });
+
+    test('sets the https origin without a token and prints it', () async {
+      expect(await publicUrl(['https://XPath.Example.com/']), 0);
+
+      expect(out.toString(), 'https://xpath.example.com\n');
+      expect(
+        err.toString(),
+        contains('Browsers reach the engine at https://xpath.example.com.'),
+      );
+      expect(await stored(), 'https://xpath.example.com');
+      expect(await publicUrl([]), 0);
+      expect(out.toString(), 'https://xpath.example.com\n' * 2);
+    });
+
+    test('clears it', () async {
+      await publicUrl(['https://xpath.example.com']);
+
+      expect(await publicUrl(['--clear']), 0);
+
+      expect(await stored(), isNull);
+      expect(err.toString(), contains('No public URL is set'));
+    });
+
+    test(
+      'refuses a URL that is not an https origin, and keeps the old one',
+      () async {
+        await publicUrl(['https://xpath.example.com']);
+
+        expect(await publicUrl(['http://xpath.example.com']), 1);
+
+        expect(
+          err.toString(),
+          contains(
+            'xpd: "http://xpath.example.com" is '
+            'not a public URL',
+          ),
+        );
+        expect(await stored(), 'https://xpath.example.com');
+      },
+    );
+
+    test('takes one URL or --clear', () async {
+      expect(await publicUrl(['https://a.example', 'https://b.example']), 64);
+      expect(await publicUrl(['https://a.example', '--clear']), 64);
+      expect(out.toString(), isEmpty);
+      expect(File('$dataDir/$databaseFileName').existsSync(), isFalse);
+    });
+
+    test('xpd settings --help lists public-url', () async {
+      expect(await run(['settings', '--help']), 0);
+      expect(out.toString(), contains('public-url'));
     });
   });
 
