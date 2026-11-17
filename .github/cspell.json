@@ -24,8 +24,7 @@
     ".fvm/**",
     "**/pubspec.lock",
     "apps/xp_desktop/macos/**",
-    "docs/design/**",
-    "docs/plan/**"
+    "docs/design/**"
   ],
   "words": [
     "abdurahman",

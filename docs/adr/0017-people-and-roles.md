@@ -3,7 +3,8 @@
 - **Status:** Accepted
 - **Date:** 2026-11-13
 - **Phase:** Phase 1 of the web dashboard plan (amends the 1.0 non-goal on multi-user accounts and D-13)
-- **Approved by:** the owner, 2026-11-13 (the Decisions of the web dashboard plan)
+- **Approved by:** the owner, 2026-11-13 (the decisions of the web dashboard plan, kept in
+  [ADR 0018](0018-web-dashboard.md#decisions))
 
 ## Context
 

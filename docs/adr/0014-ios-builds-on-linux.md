@@ -3,7 +3,9 @@
 - **Status:** Accepted (2026-10-25, after the Phase 0 receipt below)
 - **Date:** 2026-10-22
 - **Phase:** Follow-up to D-09, D-14, D-19 and D-20
-- **Plan:** [iOS builds on Linux runners](../plan/2026-10-22-feat-ios-builds-on-linux-plan.md)
+- **Plan:** `docs/plan/2026-10-22-feat-ios-builds-on-linux-plan.md`, in git history; the open work
+  is in [issue 45](https://github.com/AbdurahmanAlmehdi/x-path/issues/45) and
+  [issue 46](https://github.com/AbdurahmanAlmehdi/x-path/issues/46)
 
 ## Context
 
@@ -81,7 +83,7 @@ ships before the planner stops narrowing flavors. Like every other edit it survi
 no migration: edits are stored as JSON, and edits stored before it leave Linux iOS builds on.
 
 Flavors and entry points then moved to Linux
-([iOS flavors on Linux](../plan/2026-10-25-feat-ios-linux-flavors-and-shorebird-plan.md)): the
+(the iOS flavors on Linux plan, now in git history): the
 pinned omarchy-apple-dev builds each flavor's own configuration, icon set, storyboards and
 entitlements, and a flavor's job is narrowed to `ios-sign` only where a Linux build would succeed
 but differ from a Mac build (a Run Script phase beyond Flutter's own, a multi-size icon set, an
@@ -112,4 +114,4 @@ from TestFlight.
 
 Passed on 2026-10-25: build 1.0.3 (10) of a real app, made, signed and uploaded on x86_64 Arch,
 reached `VALID` and installed from TestFlight, where Google and Apple sign-in work. The receipt is in
-[Phase 0 of the plan](../plan/2026-10-22-feat-ios-builds-on-linux-plan.md#phase-0-adr-and-a-spike-on-real-hardware-no-product-code).
+Phase 0 of the plan, in git history.

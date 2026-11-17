@@ -206,4 +206,6 @@ included; add real words it does not know to its `words` list.
 - `docs/reference/development.md`: "Repository layout", "Dependency direction", "Development
   setup", "Testing" and "Continuous integration"; the other `docs/reference` page of the area
   you change. A user-facing change also updates its page in `docs/guide`.
-- `docs/adr/`: the decisions; `docs/plan/` for the phases and D-numbers the code cites.
+- `docs/adr/`: the decisions. D1 to D17 in code comments are the Decisions of ADR 0018. Other plan
+  IDs in comments (`U5b`, `UX-07`, `Phase 12c` and the like) come from the build plans, which were
+  removed from `docs/plan/`; read them in git history (`git log --all -- docs/plan`).
