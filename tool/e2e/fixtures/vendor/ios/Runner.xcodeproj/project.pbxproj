@@ -43,7 +43,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				INFOPLIST_FILE = Runner/Info.plist;
-				PRODUCT_BUNDLE_IDENTIFIER = com.mataaa.vendors.dev;
+				PRODUCT_BUNDLE_IDENTIFIER = com.orbitx.vendors.dev;
 				DEVELOPMENT_TEAM = FAKETEAM01;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
@@ -53,7 +53,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				INFOPLIST_FILE = Runner/Info.plist;
-				PRODUCT_BUNDLE_IDENTIFIER = com.mataaa.vendors.dev;
+				PRODUCT_BUNDLE_IDENTIFIER = com.orbitx.vendors.dev;
 				DEVELOPMENT_TEAM = FAKETEAM01;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
@@ -63,7 +63,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				INFOPLIST_FILE = Runner/Info.plist;
-				PRODUCT_BUNDLE_IDENTIFIER = com.mataaa.vendors.dev;
+				PRODUCT_BUNDLE_IDENTIFIER = com.orbitx.vendors.dev;
 				DEVELOPMENT_TEAM = FAKETEAM01;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
@@ -73,7 +73,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				INFOPLIST_FILE = Runner/Info.plist;
-				PRODUCT_BUNDLE_IDENTIFIER = com.mataaa.vendors;
+				PRODUCT_BUNDLE_IDENTIFIER = com.orbitx.vendors;
 				DEVELOPMENT_TEAM = FAKETEAM01;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
@@ -83,7 +83,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				INFOPLIST_FILE = Runner/Info.plist;
-				PRODUCT_BUNDLE_IDENTIFIER = com.mataaa.vendors;
+				PRODUCT_BUNDLE_IDENTIFIER = com.orbitx.vendors;
 				DEVELOPMENT_TEAM = FAKETEAM01;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
@@ -93,7 +93,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				INFOPLIST_FILE = Runner/Info.plist;
-				PRODUCT_BUNDLE_IDENTIFIER = com.mataaa.vendors;
+				PRODUCT_BUNDLE_IDENTIFIER = com.orbitx.vendors;
 				DEVELOPMENT_TEAM = FAKETEAM01;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
@@ -102,7 +102,7 @@
 		0000000000000000A000000B /* Debug-dev */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				PRODUCT_BUNDLE_IDENTIFIER = com.mataaa.venders.RunnerTests;
+				PRODUCT_BUNDLE_IDENTIFIER = com.orbitx.venders.RunnerTests;
 				PRODUCT_NAME = RunnerTests;
 			};
 			name = "Debug-dev";
@@ -110,7 +110,7 @@
 		0000000000000000A000000C /* Profile-dev */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				PRODUCT_BUNDLE_IDENTIFIER = com.mataaa.venders.RunnerTests;
+				PRODUCT_BUNDLE_IDENTIFIER = com.orbitx.venders.RunnerTests;
 				PRODUCT_NAME = RunnerTests;
 			};
 			name = "Profile-dev";
@@ -118,7 +118,7 @@
 		0000000000000000A000000D /* Release-dev */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				PRODUCT_BUNDLE_IDENTIFIER = com.mataaa.venders.RunnerTests;
+				PRODUCT_BUNDLE_IDENTIFIER = com.orbitx.venders.RunnerTests;
 				PRODUCT_NAME = RunnerTests;
 			};
 			name = "Release-dev";
@@ -126,7 +126,7 @@
 		0000000000000000A000000E /* Debug-prod */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				PRODUCT_BUNDLE_IDENTIFIER = com.mataaa.venders.RunnerTests;
+				PRODUCT_BUNDLE_IDENTIFIER = com.orbitx.venders.RunnerTests;
 				PRODUCT_NAME = RunnerTests;
 			};
 			name = "Debug-prod";
@@ -134,7 +134,7 @@
 		0000000000000000A000000F /* Profile-prod */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				PRODUCT_BUNDLE_IDENTIFIER = com.mataaa.venders.RunnerTests;
+				PRODUCT_BUNDLE_IDENTIFIER = com.orbitx.venders.RunnerTests;
 				PRODUCT_NAME = RunnerTests;
 			};
 			name = "Profile-prod";
@@ -142,7 +142,7 @@
 		0000000000000000A0000010 /* Release-prod */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				PRODUCT_BUNDLE_IDENTIFIER = com.mataaa.venders.RunnerTests;
+				PRODUCT_BUNDLE_IDENTIFIER = com.orbitx.venders.RunnerTests;
 				PRODUCT_NAME = RunnerTests;
 			};
 			name = "Release-prod";

@@ -7,7 +7,7 @@ Map<String, dynamic> _json({
   Map<String, dynamic>? auth,
 }) => {
   'artifactName': artifactName,
-  'bundleId': 'com.mataa.app',
+  'bundleId': 'com.orbit.app',
   'appleAppId': '1234567890',
   'version': version,
   'auth': auth ?? {'type': 'apiKey', 'keySecret': 'asc.prod'},

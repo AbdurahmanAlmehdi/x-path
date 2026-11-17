@@ -66,7 +66,7 @@ class JobHarness {
       workflowsRepository: workflows,
       runnersRepository: runners,
       projects: projectsIn(
-        ProjectsState(loaded: true, projects: [project ?? mataa]),
+        ProjectsState(loaded: true, projects: [project ?? orbit]),
       ),
     );
     await tester.pump();

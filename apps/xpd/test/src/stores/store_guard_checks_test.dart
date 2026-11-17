@@ -7,8 +7,8 @@ import 'package:xpd/xpd.dart';
 
 import '../../helpers/job_fakes.dart';
 
-const _bundleId = 'com.mataa.app';
-const _package = 'com.mataa.app';
+const _bundleId = 'com.orbit.app';
+const _package = 'com.orbit.app';
 
 void main() {
   late ManualClock clock;

@@ -308,7 +308,7 @@ final iosArtifacts = [
     id: 'art_1',
     jobId: 'job_ios',
     kind: ArtifactKind.values.first,
-    name: 'mataa.ipa',
+    name: 'orbit.ipa',
     size: 48200000,
     sha256: 'abc',
     pinned: false,

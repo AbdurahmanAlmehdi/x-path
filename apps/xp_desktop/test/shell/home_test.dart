@@ -92,7 +92,7 @@ void main() {
         releasesRepository: releases,
         jobsRepository: jobs,
         projects: projectsIn(
-          const ProjectsState(loaded: true, projects: [mataa, captain, _shop]),
+          const ProjectsState(loaded: true, projects: [orbit, captain, _shop]),
         ),
         pendingApprovals: pendingIn(
           PendingApprovalsState(loaded: true, approvals: [pendingApproval]),
@@ -107,7 +107,7 @@ void main() {
       expect(find.text('1 needs you'), findsOneWidget);
       expect(find.text('1 running'), findsOneWidget);
 
-      await tester.tap(find.text('mataa_captain'));
+      await tester.tap(find.text('orbit_captain'));
       expect(shell.state, const ProjectDestination('prj_2'));
     },
   );
@@ -122,7 +122,7 @@ void main() {
       releasesRepository: releases,
       jobsRepository: jobs,
       projects: projectsIn(
-        const ProjectsState(loaded: true, projects: [mataa]),
+        const ProjectsState(loaded: true, projects: [orbit]),
       ),
     );
     await tester.pump();

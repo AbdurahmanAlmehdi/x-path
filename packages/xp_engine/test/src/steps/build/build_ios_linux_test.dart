@@ -12,7 +12,7 @@ const _ipa = '$appDirectory/build/ios-linux/Runner-store.ipa';
 const _signing = {
   'ASC_SIGNING_KEY': 'identity',
   'ASC_SIGNING_CERT': 'identity.certificate',
-  'ASC_PROFILE': 'identity.profile:ly.mataa',
+  'ASC_PROFILE': 'identity.profile:ly.orbit',
 };
 
 /// The checkout of a Linux runner, on fakes: the installs that setup.sh has
@@ -189,7 +189,7 @@ void main() {
     harness.files
       ..put(
         '$appDirectory/config/prod.json',
-        bytes: utf8.encode('{"API_URL": "https://api.mataa.ly", "LEVEL": 3}'),
+        bytes: utf8.encode('{"API_URL": "https://api.orbit.ly", "LEVEL": 3}'),
       )
       ..put('$appDirectory/ios/Runner/Runner.entitlements');
 
@@ -204,7 +204,7 @@ void main() {
     );
     expect(named('build.sh').arguments, [
       appDirectory,
-      'API_URL=https://api.mataa.ly',
+      'API_URL=https://api.orbit.ly',
       'LEVEL=3',
     ]);
     expect(

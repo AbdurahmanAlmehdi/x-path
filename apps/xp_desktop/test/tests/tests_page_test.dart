@@ -30,7 +30,7 @@ TestRunResponse _withDiff(TestRunDiff diff, {int total = 0}) => TestRunResponse(
   tests: const [],
 );
 
-/// The repositories behind the tests of `mataa`.
+/// The repositories behind the tests of `orbit`.
 class TestsHarness {
   new({List<TestBaseline>? baselines}) {
     when(() => tests.watchBaselines('prj_1')).thenAnswer(
@@ -67,7 +67,7 @@ class TestsHarness {
       testsRepository: tests,
       jobsRepository: jobs,
       projects: projectsIn(
-        const ProjectsState(loaded: true, projects: [mataa]),
+        const ProjectsState(loaded: true, projects: [orbit]),
       ),
     );
     for (var i = 0; i < 4; i++) {
@@ -92,7 +92,7 @@ void main() {
       final shell = ShellCubit();
       await TestsHarness().pump(tester, shell: shell);
       expect(find.text('1 new failure'), findsOneWidget);
-      expect(find.text('mataa_new_app · dev'), findsOneWidget);
+      expect(find.text('orbit_new_app · dev'), findsOneWidget);
       expect(
         find.textContaining('Compared with the baseline of main'),
         findsOne,
@@ -174,7 +174,7 @@ void main() {
       );
       await harness.pump(tester, jobId: 'job_x');
       expect(
-        find.text('mataa_new_app · apps/captain · feature/cart'),
+        find.text('orbit_new_app · apps/captain · feature/cart'),
         findsOne,
       );
       expect(

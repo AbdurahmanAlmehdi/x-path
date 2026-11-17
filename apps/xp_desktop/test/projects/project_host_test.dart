@@ -10,7 +10,7 @@ void main() {
   final l10n = lookupAppLocalizations(const Locale('en'));
 
   test('names the git host of a project, or a local repository', () {
-    expect(mataa.hostLabel(l10n), 'github.com');
+    expect(orbit.hostLabel(l10n), 'github.com');
     expect(shop.hostLabel(l10n), 'bitbucket.org');
     expect(
       const Project(

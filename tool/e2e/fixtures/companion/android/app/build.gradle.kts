@@ -10,10 +10,10 @@ if (keystorePropertiesFile.exists()) {
 }
 
 android {
-    namespace = "com.oneavant.logstockCompanionApp"
+    namespace = "com.harbor.stockroomCompanionApp"
 
     defaultConfig {
-        applicationId = "com.oneavant.logstockCompanionApp"
+        applicationId = "com.harbor.stockroomCompanionApp"
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }

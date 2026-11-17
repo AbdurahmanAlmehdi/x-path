@@ -230,7 +230,7 @@ when it is there (the fixtures are reconstructed from the documentation and say 
 ### Credentials
 
 Credentials are the engine's, with names (ADR 0013). A **named credential** (the `credential` table) has an id
-(`crd_...`, which never changes), a name that is unique regardless of case ("Personal Apple Dev Account", "Mataa Apple
+(`crd_...`, which never changes), a name that is unique regardless of case ("Personal Apple Dev Account", "Orbit Apple
 Dev Account"), a kind, its secret, the `account` it belongs to when that is not secret, and the result of its own check
 (does it authenticate). Any flavor of any project may use it: a flavor (an app path and a flavor name, `.` and
 `default` for an app without flavors) uses **at most one credential of each kind** (`credential_assignment`, only of

@@ -6,7 +6,7 @@ import 'package:xp_macos_services/xp_macos_services.dart';
 const _notice = ApprovalNotice(
   approvalId: 'apr_1',
   title: 'Submit 5.4.1 (3283) to the stores',
-  body: 'mataa_new_app · prod · 9a3bc0d · expires in 23h 51m',
+  body: 'orbit_new_app · prod · 9a3bc0d · expires in 23h 51m',
   review: 'Review…',
   later: 'Later',
 );
@@ -18,7 +18,7 @@ const _menu = MenuBarContent(
     MenuBarItem(
       approvalId: 'apr_1',
       title: 'Review: Submit 5.4.1 (3283)…',
-      detail: 'mataa_new_app · prod',
+      detail: 'orbit_new_app · prod',
     ),
   ],
   openApp: 'Open XPath',
@@ -33,10 +33,10 @@ const _engineNotice = EngineNotice(
 const _running = MenuBarRun(
   target: 'run:run_1:prj_1',
   title: 'Prod release 5.4.1',
-  detail: 'mataa · 3 of 5 jobs',
+  detail: 'orbit · 3 of 5 jobs',
 );
 
-const _project = MenuBarProject(projectId: 'prj_1', name: 'mataa');
+const _project = MenuBarProject(projectId: 'prj_1', name: 'orbit');
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -75,7 +75,7 @@ void main() {
     expect(_menu.props, hasLength(8));
     expect(_engineNotice.props, ['job:job_1', 'Job failed', 'Build prod']);
     expect(_running.props, hasLength(3));
-    expect(_project.props, ['prj_1', 'mataa']);
+    expect(_project.props, ['prj_1', 'orbit']);
     expect(const ShowNotice('runners').props, ['runners']);
     expect(const DispatchProject('prj_1').props, ['prj_1']);
     expect(const ReviewApproval('a'), const ReviewApproval('a'));
@@ -126,18 +126,18 @@ void main() {
           {
             'id': 'notice:run:run_1:prj_1',
             'title': 'Prod release 5.4.1',
-            'detail': 'mataa · 3 of 5 jobs',
+            'detail': 'orbit · 3 of 5 jobs',
           },
         ],
         'dispatch': 'Dispatch…',
         'projects': [
-          {'id': 'prj_1', 'title': 'mataa'},
+          {'id': 'prj_1', 'title': 'orbit'},
         ],
       });
       expect(calls[0].arguments, {
         'id': 'apr_1',
         'title': 'Submit 5.4.1 (3283) to the stores',
-        'body': 'mataa_new_app · prod · 9a3bc0d · expires in 23h 51m',
+        'body': 'orbit_new_app · prod · 9a3bc0d · expires in 23h 51m',
         'review': 'Review…',
         'later': 'Later',
       });
@@ -151,7 +151,7 @@ void main() {
           {
             'id': 'apr_1',
             'title': 'Review: Submit 5.4.1 (3283)…',
-            'detail': 'mataa_new_app · prod',
+            'detail': 'orbit_new_app · prod',
           },
         ],
         'running': <Object?>[],

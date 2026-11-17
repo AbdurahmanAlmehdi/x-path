@@ -24,7 +24,7 @@ void main() {
         brightness: brightness,
         projectsRepository: repository,
         projects: projectsIn(
-          const ProjectsState(loaded: true, projects: [mataa, captain]),
+          const ProjectsState(loaded: true, projects: [orbit, captain]),
         ),
       );
       // The brand image decodes on the real event loop.

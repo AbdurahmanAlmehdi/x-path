@@ -4,7 +4,7 @@ import 'package:xp_engine/xp_engine.dart';
 import 'package:xp_fake_asc/xp_fake_asc.dart';
 
 const _key = AscKey(keyId: 'K', issuerId: 'I', privateKey: 'p');
-const _bundleId = 'com.mataa.app';
+const _bundleId = 'com.orbit.app';
 
 AscAppStoreVersion _version(String name, AppVersionState state) =>
     AscAppStoreVersion(

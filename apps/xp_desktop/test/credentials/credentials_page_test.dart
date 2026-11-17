@@ -74,7 +74,7 @@ void main() {
     WidgetTester tester, {
     List<NamedCredential> list = const [],
     List<Credential> assigned = const [],
-    List<Project> projectList = const [mataa, captain],
+    List<Project> projectList = const [orbit, captain],
     String? projectId,
     EngineStatus status = EngineStatus.connected,
     FilePicker? pickFile,
@@ -157,7 +157,7 @@ void main() {
       expect(find.text('1 flavor'), findsOneWidget);
       expect(find.text('Not used'), findsOneWidget);
       expect(
-        find.byTooltip('acme/mataa_new_app · prod\nacme/mataa_new_app · dev'),
+        find.byTooltip('acme/orbit_new_app · prod\nacme/orbit_new_app · dev'),
         findsOneWidget,
       );
       expect(find.byTooltip('prj_2 · apps/captain · default'), findsOneWidget);
@@ -383,8 +383,8 @@ void main() {
         ),
         findsOneWidget,
       );
-      expect(find.text('acme/mataa_new_app · prod'), findsOneWidget);
-      expect(find.text('acme/mataa_new_app · dev'), findsOneWidget);
+      expect(find.text('acme/orbit_new_app · prod'), findsOneWidget);
+      expect(find.text('acme/orbit_new_app · dev'), findsOneWidget);
       await tester.tap(find.text('Unassign and delete'));
       await tester.pumpAndSettle();
       verify(() => credentials.deleteCredential('crd_1', force: true))
@@ -481,7 +481,7 @@ void main() {
       await choose(
         tester,
         find.byKey(const Key('credentials.project')),
-        'acme/mataa_captain',
+        'acme/orbit_captain',
       );
       expect(shell.state, const CredentialsDestination('prj_2'));
     });

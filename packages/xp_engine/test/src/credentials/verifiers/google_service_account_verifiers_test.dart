@@ -13,7 +13,7 @@ void main() {
     late FakeGooglePlay play;
     late PlayServiceAccountVerifier verifier;
     final material = _material(CredentialKind.playSa);
-    const target = CredentialTarget(androidAppId: 'com.mataa.app');
+    const target = CredentialTarget(androidAppId: 'com.orbit.app');
 
     setUp(() {
       play = FakeGooglePlay();
@@ -32,7 +32,7 @@ void main() {
         result,
         VerificationResult.verified(account: testServiceAccount.clientEmail),
       );
-      expect(play.calls, ['verifyAccess', 'releases com.mataa.app internal']);
+      expect(play.calls, ['verifyAccess', 'releases com.orbit.app internal']);
     });
 
     test(
@@ -67,7 +67,7 @@ void main() {
       final result = await verifier.verify(material, target);
 
       expect(result.status, CredentialStatus.rejected);
-      expect(result.message, contains('may not read com.mataa.app'));
+      expect(result.message, contains('may not read com.orbit.app'));
       expect(result.fix, contains('Play Console'));
     });
 
@@ -77,7 +77,7 @@ void main() {
       final result = await verifier.verify(material, target);
 
       expect(result.status, CredentialStatus.rejected);
-      expect(result.message, contains('does not know com.mataa.app'));
+      expect(result.message, contains('does not know com.orbit.app'));
     });
 
     test('cannot tell when Google is down', () async {

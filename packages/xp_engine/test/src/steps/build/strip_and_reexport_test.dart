@@ -9,7 +9,7 @@ import '../../../helpers/fake_build_directories.dart';
 
 const _archive = '$appDirectory/build/ios/archive/Runner.xcarchive';
 const _app = '$_archive/Products/Applications/Runner.app';
-const _ipa = '$appDirectory/build/ios/ipa/Mataa.ipa';
+const _ipa = '$appDirectory/build/ios/ipa/Orbit.ipa';
 
 void main() {
   late BuildHarness harness;

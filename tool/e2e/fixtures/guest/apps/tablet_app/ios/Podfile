@@ -4,9 +4,9 @@ project 'Runner', {
   'Debug-dev' => :debug,
   'Profile-dev' => :release,
   'Release-dev' => :release,
-  'Debug-oneavant' => :debug,
-  'Profile-oneavant' => :release,
-  'Release-oneavant' => :release,
+  'Debug-harbor' => :debug,
+  'Profile-harbor' => :release,
+  'Release-harbor' => :release,
 }
 
 target 'Runner' do

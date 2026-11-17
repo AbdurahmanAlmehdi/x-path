@@ -4,13 +4,13 @@ android {
     productFlavors {
         dev {
             dimension "flavor-type"
-            applicationId "com.mataaa.vendors.dev"
-            resValue "string", "app_name", "Mataa Partner Dev"
+            applicationId "com.orbitx.vendors.dev"
+            resValue "string", "app_name", "Orbit Partner Dev"
         }
         prod {
             dimension "flavor-type"
-            applicationId "com.mataaa.vendors"
-            resValue "string", "app_name", "Mataa Partner"
+            applicationId "com.orbitx.vendors"
+            resValue "string", "app_name", "Orbit Partner"
         }
     }
 }

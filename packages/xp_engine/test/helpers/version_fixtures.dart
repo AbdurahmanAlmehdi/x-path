@@ -1,8 +1,8 @@
-/// A pubspec as the Mataa customer app writes it.
+/// A pubspec as the Orbit customer app writes it.
 String pubspec(String version, {String extra = ''}) =>
     '''
-name: mataa_new_app
-description: Mataa customer app.
+name: orbit_new_app
+description: Orbit customer app.
 publish_to: none
 
 # Do not edit by hand: ./scripts/ship.sh version writes it.
@@ -13,9 +13,9 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  mataa_core:
+  orbit_core:
     git:
-      url: https://github.com/mataa/mataa_core.git
+      url: https://github.com/orbit/orbit_core.git
       ref: 0123456789abcdef
       version: ignored
 $extra''';
@@ -28,7 +28,7 @@ String plist(String shortVersion, String build) =>
 <plist version="1.0">
 <dict>
 	<key>CFBundleDisplayName</key>
-	<string>Mataa</string>
+	<string>Orbit</string>
 	<!-- bumped by XPath -->
 	<key>CFBundleShortVersionString</key>
 	<string>$shortVersion</string>

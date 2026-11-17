@@ -23,8 +23,8 @@ const _dev = CredentialFlavor(
   projectId: 'prj_1',
   appPath: '.',
   name: 'dev',
-  iosBundleId: 'com.mataa.app.dev',
-  androidAppId: 'com.mataa.app.dev',
+  iosBundleId: 'com.orbit.app.dev',
+  androidAppId: 'com.orbit.app.dev',
 );
 
 const _captain = CredentialFlavor(
@@ -467,26 +467,26 @@ void main() {
     test('keeps the id, the secret and the assignments', () async {
       final renamed = await service.rename(
         key.id,
-        ' Mataa Apple Dev Account ',
+        ' Orbit Apple Dev Account ',
         by: owner,
       );
 
       expect(renamed.id, key.id);
-      expect(renamed.name, 'Mataa Apple Dev Account');
+      expect(renamed.name, 'Orbit Apple Dev Account');
       expect(renamed.usedBy, hasLength(1));
       expect(
         (await repository.assignment(
           'flv_1',
           CredentialKind.ascKey,
         ))!.credential.name,
-        'Mataa Apple Dev Account',
+        'Orbit Apple Dev Account',
       );
       expect(
         (await logged()).last,
         CredentialRenamed(
           credentialId: key.id,
           kind: CredentialKind.ascKey,
-          name: 'Mataa Apple Dev Account',
+          name: 'Orbit Apple Dev Account',
         ),
       );
     });
@@ -638,7 +638,7 @@ void main() {
         const VerificationResult.verified(),
         const VerificationResult.verified(),
         const VerificationResult.rejected(
-          'Google Play does not know com.mataa.app.',
+          'Google Play does not know com.orbit.app.',
           fix: 'Invite the account.',
         ),
       ]);
@@ -649,13 +649,13 @@ void main() {
         const CredentialTarget(),
         const CredentialTarget(
           flavorId: 'flv_2',
-          iosBundleId: 'com.mataa.app.dev',
-          androidAppId: 'com.mataa.app.dev',
+          iosBundleId: 'com.orbit.app.dev',
+          androidAppId: 'com.orbit.app.dev',
         ),
         const CredentialTarget(
           flavorId: 'flv_1',
-          iosBundleId: 'com.mataa.app',
-          androidAppId: 'com.mataa.app',
+          iosBundleId: 'com.orbit.app',
+          androidAppId: 'com.orbit.app',
         ),
       ]);
       expect(checked.status, CredentialStatus.verified);
@@ -683,7 +683,7 @@ void main() {
             flavor: 'prod',
             kind: CredentialKind.playSa,
             message:
-                'Google Play does not know com.mataa.app. Invite the '
+                'Google Play does not know com.orbit.app. Invite the '
                 'account.',
           ),
         ),
@@ -895,7 +895,7 @@ void main() {
       expect(assigned.assignmentStatus, CredentialStatus.verified);
       expect(
         verifiers[CredentialKind.ascKey]!.targets.single.iosBundleId,
-        'com.mataa.app',
+        'com.orbit.app',
       );
       expect(
         await logged(),

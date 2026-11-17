@@ -9,7 +9,7 @@ import '../../../helpers/build_harness.dart';
 const _aab =
     '$appDirectory/build/app/outputs/bundle/prodRelease/app-prod-release.aab';
 const _apk = '$appDirectory/build/app/outputs/flutter-apk/app-prod-release.apk';
-const _ipa = '$appDirectory/build/ios/ipa/Mataa.ipa';
+const _ipa = '$appDirectory/build/ios/ipa/Orbit.ipa';
 
 void main() {
   late BuildHarness harness;

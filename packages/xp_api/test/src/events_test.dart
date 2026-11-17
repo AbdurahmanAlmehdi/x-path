@@ -111,7 +111,7 @@ void main() {
         const CredentialRenamed(
           credentialId: 'crd_2',
           kind: CredentialKind.ascKey,
-          name: 'Mataa Apple Dev Account',
+          name: 'Orbit Apple Dev Account',
         ),
         const CredentialAssigned(
           credentialId: 'crd_2',

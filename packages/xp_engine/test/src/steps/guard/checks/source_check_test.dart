@@ -38,13 +38,13 @@ void main() {
           ...customerApp('5.4.1+3283'),
           'pubspec.lock': '''
 packages:
-  mataa_core:
+  orbit_core:
     dependency: "direct main"
     description:
       path: "."
       ref: main
       resolved-ref: "0123456789abcdef"
-      url: "https://github.com/mataa/mataa_core.git"
+      url: "https://github.com/orbit/orbit_core.git"
     source: git
     version: "2.0.0"
 ''',
@@ -103,10 +103,10 @@ packages:
         files: {
           ...customerApp('5.4.1+3283'),
           'pubspec_overrides.yaml': '''
-# melos_managed_dependency_overrides: mataa_core
+# melos_managed_dependency_overrides: orbit_core
 dependency_overrides:
-  mataa_core:
-    path: ../mataa_core
+  orbit_core:
+    path: ../orbit_core
 ''',
         },
       );
@@ -187,7 +187,7 @@ dependency_overrides:
       final harness = guardRequest(
         files: {
           ...customerApp('5.4.1+3283'),
-          'pubspec.lock': _lock('mataa_core', '../mataa_core'),
+          'pubspec.lock': _lock('orbit_core', '../orbit_core'),
         },
       );
 
@@ -196,12 +196,12 @@ dependency_overrides:
       expect(result.status, GuardStatus.failed);
       expect(
         result.message,
-        'pubspec.lock resolves the path package mataa_core from '
-        '../mataa_core, outside the repository.',
+        'pubspec.lock resolves the path package orbit_core from '
+        '../orbit_core, outside the repository.',
       );
       expect(
         result.fix,
-        'Take mataa_core from git, a hosted version or a relative path '
+        'Take orbit_core from git, a hosted version or a relative path '
         'inside the repository, and run pub get. A release builds only what '
         'is in git.',
       );
@@ -229,8 +229,8 @@ dependency_overrides:
         files: {
           ...customerApp('5.4.1+3283'),
           'pubspec.lock': _lock(
-            'mataa_core',
-            '/Users/dev/mataa_core',
+            'orbit_core',
+            '/Users/dev/orbit_core',
             relative: false,
           ),
         },
@@ -241,10 +241,10 @@ dependency_overrides:
       expect(result.status, GuardStatus.failed);
       expect(
         result.message,
-        'pubspec.lock resolves the path package mataa_core from the absolute '
-        'path /Users/dev/mataa_core.',
+        'pubspec.lock resolves the path package orbit_core from the absolute '
+        'path /Users/dev/orbit_core.',
       );
-      expect(result.fix, startsWith('Take mataa_core from git'));
+      expect(result.fix, startsWith('Take orbit_core from git'));
     });
 
     test('for a relative path that starts at the root', () async {

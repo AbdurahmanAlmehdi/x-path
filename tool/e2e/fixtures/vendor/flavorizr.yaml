@@ -1,15 +1,15 @@
 flavors:
   dev:
     app:
-      name: "Mataa Partner Dev"
+      name: "Orbit Partner Dev"
     android:
-      applicationId: "com.mataaa.vendors.dev"
+      applicationId: "com.orbitx.vendors.dev"
     ios:
-      bundleId: "com.mataaa.vendors.dev"
+      bundleId: "com.orbitx.vendors.dev"
   prod:
     app:
-      name: "Mataa Partner"
+      name: "Orbit Partner"
     android:
-      applicationId: "com.mataaa.vendors"
+      applicationId: "com.orbitx.vendors"
     ios:
-      bundleId: "com.mataaa.vendors"
+      bundleId: "com.orbitx.vendors"

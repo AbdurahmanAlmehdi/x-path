@@ -5,10 +5,10 @@ if (keystorePropertiesFile.exists()) {
 }
 
 android {
-    namespace "com.mataaa.vendors"
+    namespace "com.orbitx.vendors"
 
     defaultConfig {
-        applicationId "com.mataaa.vendors"
+        applicationId "com.orbitx.vendors"
         versionCode flutterVersionCode.toInteger()
         versionName flutterVersionName
     }

@@ -43,7 +43,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				INFOPLIST_FILE = Runner/Info.plist;
-				PRODUCT_BUNDLE_IDENTIFIER = com.oneavant.logstockCompanionApp;
+				PRODUCT_BUNDLE_IDENTIFIER = com.harbor.stockroomCompanionApp;
 				DEVELOPMENT_TEAM = FAKETEAM03;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
@@ -53,7 +53,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				INFOPLIST_FILE = Runner/Info.plist;
-				PRODUCT_BUNDLE_IDENTIFIER = com.oneavant.logstockCompanionApp;
+				PRODUCT_BUNDLE_IDENTIFIER = com.harbor.stockroomCompanionApp;
 				DEVELOPMENT_TEAM = FAKETEAM03;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
@@ -63,7 +63,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				INFOPLIST_FILE = Runner/Info.plist;
-				PRODUCT_BUNDLE_IDENTIFIER = com.oneavant.logstockCompanionApp;
+				PRODUCT_BUNDLE_IDENTIFIER = com.harbor.stockroomCompanionApp;
 				DEVELOPMENT_TEAM = FAKETEAM03;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
@@ -72,7 +72,7 @@
 		0000000000000000A0000008 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				PRODUCT_BUNDLE_IDENTIFIER = com.example.logstockCompanionApp.RunnerTests;
+				PRODUCT_BUNDLE_IDENTIFIER = com.example.stockroomCompanionApp.RunnerTests;
 				PRODUCT_NAME = RunnerTests;
 			};
 			name = Debug;
@@ -80,7 +80,7 @@
 		0000000000000000A0000009 /* Profile */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				PRODUCT_BUNDLE_IDENTIFIER = com.example.logstockCompanionApp.RunnerTests;
+				PRODUCT_BUNDLE_IDENTIFIER = com.example.stockroomCompanionApp.RunnerTests;
 				PRODUCT_NAME = RunnerTests;
 			};
 			name = Profile;
@@ -88,7 +88,7 @@
 		0000000000000000A000000A /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				PRODUCT_BUNDLE_IDENTIFIER = com.example.logstockCompanionApp.RunnerTests;
+				PRODUCT_BUNDLE_IDENTIFIER = com.example.stockroomCompanionApp.RunnerTests;
 				PRODUCT_NAME = RunnerTests;
 			};
 			name = Release;

@@ -40,7 +40,7 @@ void main() {
           shell: ShellCubit(page),
           projectsRepository: projects,
           projects: projectsIn(
-            const ProjectsState(loaded: true, projects: [mataa, captain]),
+            const ProjectsState(loaded: true, projects: [orbit, captain]),
           ),
         );
         await tester.pump();

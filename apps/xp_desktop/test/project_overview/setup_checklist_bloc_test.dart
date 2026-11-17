@@ -19,19 +19,19 @@ WorkflowSummary _builtin(String id, String name) => WorkflowSummary(
   title: name,
 );
 
-/// `mataa` whose flavors have every store id.
+/// `orbit` whose flavors have every store id.
 final _withStoreIds = Project(
-  id: mataa.id,
-  host: mataa.host,
-  sourceKey: mataa.sourceKey,
-  githubRepoId: mataa.githubRepoId,
-  fullName: mataa.fullName,
-  remote: mataa.remote,
-  defaultBaseBranch: mataa.defaultBaseBranch,
+  id: orbit.id,
+  host: orbit.host,
+  sourceKey: orbit.sourceKey,
+  githubRepoId: orbit.githubRepoId,
+  fullName: orbit.fullName,
+  remote: orbit.remote,
+  defaultBaseBranch: orbit.defaultBaseBranch,
   profile: ProjectProfile(
     apps: [
       AppProfile(
-        name: 'Mataa customer app',
+        name: 'Orbit customer app',
         path: '.',
         hasIos: true,
         hasAndroid: true,
@@ -142,7 +142,7 @@ void main() {
     test('names the first flavor missing credentials or store ids', () {
       final state = SetupChecklistState(
         loaded: true,
-        project: mataa,
+        project: orbit,
         credentials: [ascKey],
       );
 
@@ -151,7 +151,7 @@ void main() {
       expect(credentials.done, isFalse);
       expect(credentials.target, (
         app: '.',
-        appName: 'Mataa customer app',
+        appName: 'Orbit customer app',
         flavor: 'dev',
       ));
       expect(state.steps[4].target?.flavor, 'prod');
@@ -195,14 +195,14 @@ void main() {
       expect(
         const SetupChecklistState(
           loaded: true,
-          project: mataa,
+          project: orbit,
           hasRelease: true,
         ).visible,
         isFalse,
       );
       expect(const SetupChecklistState().visible, isFalse);
       expect(
-        const SetupChecklistState(loaded: true, project: mataa).visible,
+        const SetupChecklistState(loaded: true, project: orbit).visible,
         isFalse,
         reason: 'the releases of the project have not arrived',
       );
@@ -210,7 +210,7 @@ void main() {
   });
 
   test('events and steps compare by value', () {
-    expect(const SetupChecklistStarted(mataa).props, [mataa]);
+    expect(const SetupChecklistStarted(orbit).props, [orbit]);
     expect(const SetupStep(SetupStepKind.engine, done: true).props, [
       SetupStepKind.engine,
       true,
@@ -257,12 +257,12 @@ void main() {
       'follows the credentials, runs and releases of a project, with the '
       "smoke build and the dry run's wait reasons",
       build: build,
-      act: (bloc) => bloc.add(const SetupChecklistStarted(mataa)),
+      act: (bloc) => bloc.add(const SetupChecklistStarted(orbit)),
       expect: () => [
-        const SetupChecklistState(project: mataa),
+        const SetupChecklistState(project: orbit),
         const SetupChecklistState(
           loaded: true,
-          project: mataa,
+          project: orbit,
           gitHubConnected: true,
           smokeWorkflowId: 'wf_smoke',
           waitReasons: ['No connected runner can do ios-sign.'],
@@ -288,7 +288,7 @@ void main() {
             .thenAnswer((_) => Stream.value(Snapshot([liveRelease])));
       },
       build: build,
-      act: (bloc) => bloc.add(const SetupChecklistStarted(mataa)),
+      act: (bloc) => bloc.add(const SetupChecklistStarted(orbit)),
       verify: (bloc) {
         expect(bloc.state.hasRun, isTrue);
         expect(bloc.state.hasRelease, isTrue);
@@ -309,12 +309,12 @@ void main() {
             .thenAnswer((_) => Stream.error(const ConnectionException('x')));
       },
       build: build,
-      act: (bloc) => bloc.add(const SetupChecklistStarted(mataa)),
+      act: (bloc) => bloc.add(const SetupChecklistStarted(orbit)),
       expect: () => [
-        const SetupChecklistState(project: mataa),
+        const SetupChecklistState(project: orbit),
         const SetupChecklistState(
           loaded: true,
-          project: mataa,
+          project: orbit,
           gitHubConnected: true,
         ),
       ],
@@ -326,7 +326,7 @@ void main() {
           when(() => workflows.listWorkflows('prj_1'))
               .thenAnswer((_) async => []),
       build: build,
-      act: (bloc) => bloc.add(const SetupChecklistStarted(mataa)),
+      act: (bloc) => bloc.add(const SetupChecklistStarted(orbit)),
       verify: (bloc) {
         expect(bloc.state.smokeWorkflowId, isNull);
         expect(bloc.state.waitReasons, isEmpty);

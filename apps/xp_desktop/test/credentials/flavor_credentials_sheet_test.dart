@@ -73,7 +73,7 @@ void main() {
   Future<void> open(
     WidgetTester tester, {
     String flavor = 'prod',
-    Project project = mataa,
+    Project project = orbit,
     EngineStatus status = EngineStatus.connected,
     List<NamedCredential> list = const [],
     List<Credential> assigned = const [],
@@ -135,7 +135,7 @@ void main() {
       await open(tester, flavor: 'dev');
       expect(find.text('Credentials of dev'), findsOneWidget);
       expect(
-        find.text('acme/mataa_new_app · Mataa customer app'),
+        find.text('acme/orbit_new_app · Orbit customer app'),
         findsOneWidget,
       );
       for (final kind in namedKinds) {
@@ -146,7 +146,7 @@ void main() {
       expect(find.text('Rejected'), findsOneWidget);
       expect(
         find.text(
-          'The key cannot see com.mataaa.dev. Give the key access to the app.',
+          'The key cannot see com.orbitx.dev. Give the key access to the app.',
         ),
         findsOneWidget,
       );
@@ -184,7 +184,7 @@ void main() {
       await open(tester);
       await tapIn(tester, CredentialKind.ascKey, 'Change…');
       expect(find.text('Team App Store key · ABC123DEF4'), findsNWidgets(2));
-      await tap(tester, find.text('Every flavor of Mataa customer app'));
+      await tap(tester, find.text('Every flavor of Orbit customer app'));
       expect(
         find.text(
           'Flavors that have their own App Store Connect API key keep '
@@ -218,7 +218,7 @@ void main() {
       await open(tester);
       await tapIn(tester, CredentialKind.ascKey, 'Change…');
       await tap(tester, find.text('Replace existing'));
-      await tap(tester, find.text('Every flavor of Mataa customer app'));
+      await tap(tester, find.text('Every flavor of Orbit customer app'));
       await tap(tester, find.text('Replace existing'));
       expect(
         find.text(
@@ -379,7 +379,7 @@ void main() {
           'prj_1',
           app: '.',
           flavor: 'prod',
-          name: 'Apple Distribution · ${mataa.fullName} prod',
+          name: 'Apple Distribution · ${orbit.fullName} prod',
         ),
       ).called(1);
     });
@@ -395,14 +395,14 @@ void main() {
         ),
       ).thenAnswer((_) async => slackWebhook);
       final deep = Project(
-        id: mataa.id,
-        githubRepoId: mataa.githubRepoId,
-        host: mataa.host,
-        sourceKey: mataa.sourceKey,
-        fullName: '/Users/sam/${'clients/' * 10}mataa',
-        remote: mataa.remote,
-        defaultBaseBranch: mataa.defaultBaseBranch,
-        profile: mataa.profile,
+        id: orbit.id,
+        githubRepoId: orbit.githubRepoId,
+        host: orbit.host,
+        sourceKey: orbit.sourceKey,
+        fullName: '/Users/sam/${'clients/' * 10}orbit',
+        remote: orbit.remote,
+        defaultBaseBranch: orbit.defaultBaseBranch,
+        profile: orbit.profile,
       );
       await open(tester, project: deep);
 
@@ -416,7 +416,7 @@ void main() {
           'prj_1',
           app: '.',
           flavor: 'prod',
-          name: 'Apple Distribution · mataa prod',
+          name: 'Apple Distribution · orbit prod',
         ),
       ).called(1);
     });
@@ -490,7 +490,7 @@ void main() {
 
     testWidgets('saves the store ids of the flavor', (tester) async {
       when(() => projects.editProject(any(), any()))
-          .thenAnswer((_) async => mataa);
+          .thenAnswer((_) async => orbit);
       await open(tester, flavor: 'dev', focusStoreIds: true);
       await tester.pumpAndSettle();
 
@@ -527,15 +527,15 @@ void main() {
       when(() => projects.editProject(any(), any())).thenThrow(
         const ApiException('Not a Firebase app id.', statusCode: 400),
       );
-      final app = mataa.profile.apps.first;
+      final app = orbit.profile.apps.first;
       final project = Project(
-        id: mataa.id,
-        githubRepoId: mataa.githubRepoId,
-        host: mataa.host,
-        sourceKey: mataa.sourceKey,
-        fullName: mataa.fullName,
-        remote: mataa.remote,
-        defaultBaseBranch: mataa.defaultBaseBranch,
+        id: orbit.id,
+        githubRepoId: orbit.githubRepoId,
+        host: orbit.host,
+        sourceKey: orbit.sourceKey,
+        fullName: orbit.fullName,
+        remote: orbit.remote,
+        defaultBaseBranch: orbit.defaultBaseBranch,
         profile: ProjectProfile(
           apps: [
             app.copyWith(
@@ -571,6 +571,6 @@ void main() {
   });
 
   test('flavorOf finds the flavor a target names, if it is there', () {
-    expect(flavorOf(mataa, (app: '.', appName: 'x', flavor: 'nope')), isNull);
+    expect(flavorOf(orbit, (app: '.', appName: 'x', flavor: 'nope')), isNull);
   });
 }

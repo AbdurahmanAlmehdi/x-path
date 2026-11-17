@@ -12,7 +12,7 @@ void main() {
   late FakeAppStoreConnect asc;
   late AscKey? connectedWith;
   late AppStoreProfiles profiles;
-  final key = AppStoreProfiles.keyFor('identity', 'com.mataa.app');
+  final key = AppStoreProfiles.keyFor('identity', 'com.orbit.app');
 
   Future<void> assign(CredentialKind kind, String secretKey) async {
     await credentials.put(
@@ -39,7 +39,7 @@ void main() {
       ..certificates.add(
         const AscCertificate(id: 'cert-1', serialNumber: '0A1B2C3D4E5F'),
       )
-      ..bundleIds['com.mataa.app'] = 'bundle-1';
+      ..bundleIds['com.orbit.app'] = 'bundle-1';
     connectedWith = null;
     profiles = AppStoreProfiles(
       credentials: credentials,
@@ -63,7 +63,7 @@ void main() {
   );
 
   test('names a profile by its identity and bundle id', () {
-    expect(key, 'identity.profile:com.mataa.app');
+    expect(key, 'identity.profile:com.orbit.app');
     expect(AppStoreProfiles.isProfileKey(key), isTrue);
     expect(AppStoreProfiles.isProfileKey('identity.certificate'), isFalse);
   });
@@ -73,14 +73,14 @@ void main() {
 
     expect(
       utf8.decode(profile),
-      'profile XPath com.mataa.app A1B2C3D4E5F bundle-1 cert-1',
+      'profile XPath com.orbit.app A1B2C3D4E5F bundle-1 cert-1',
     );
     expect(connectedWith?.keyId, 'ABC123DEF4');
     expect(asc.calls, [
       'distributionCertificates',
-      'appStoreProfiles XPath com.mataa.app A1B2C3D4E5F',
-      'bundleIdOf com.mataa.app',
-      'createAppStoreProfile XPath com.mataa.app A1B2C3D4E5F bundle-1 cert-1',
+      'appStoreProfiles XPath com.orbit.app A1B2C3D4E5F',
+      'bundleIdOf com.orbit.app',
+      'createAppStoreProfile XPath com.orbit.app A1B2C3D4E5F bundle-1 cert-1',
     ]);
   });
 
@@ -109,10 +109,10 @@ void main() {
     expect(utf8.decode(renewed), startsWith('profile XPath'));
     expect(asc.calls, [
       'distributionCertificates',
-      'appStoreProfiles XPath com.mataa.app A1B2C3D4E5F',
+      'appStoreProfiles XPath com.orbit.app A1B2C3D4E5F',
       'deleteProfile profile-4',
-      'bundleIdOf com.mataa.app',
-      'createAppStoreProfile XPath com.mataa.app A1B2C3D4E5F bundle-1 cert-1',
+      'bundleIdOf com.orbit.app',
+      'createAppStoreProfile XPath com.orbit.app A1B2C3D4E5F bundle-1 cert-1',
     ]);
     expect(asc.profiles.single.expirationDate, DateTime.utc(2027));
   });
@@ -151,7 +151,7 @@ void main() {
     await expectLater(
       profiles.profile('prj_2', key),
       refusal(
-        'No flavor of the project signs com.mataa.app with this '
+        'No flavor of the project signs com.orbit.app with this '
         'identity.',
       ),
     );
@@ -202,7 +202,7 @@ void main() {
 
     await expectLater(
       profiles.profile('prj_1', key),
-      refusal('App Store Connect has no bundle id com.mataa.app registered.'),
+      refusal('App Store Connect has no bundle id com.orbit.app registered.'),
     );
   });
 
@@ -212,7 +212,7 @@ void main() {
     await expectLater(
       profiles.profile('prj_1', key),
       refusal(
-        'App Store Connect could not make the profile of com.mataa.app: '
+        'App Store Connect could not make the profile of com.orbit.app: '
         'no role',
       ),
     );

@@ -20,7 +20,7 @@ void main() {
   });
 
   group('patterns that name the app and flavor', () {
-    const oneavant = ReleaseModel(
+    const harbor = ReleaseModel(
       branchPattern: 'release/{app}/{version}',
       tagPattern: '{app}/{flavor}/v{version}+{build}',
       patchTagPattern: '{app}/{flavor}/v{version}+{build}-p{n}',
@@ -28,43 +28,37 @@ void main() {
     const scope = TagScope(app: 'mobile', flavor: 'prod');
 
     test('fill the names in', () {
+      expect(harbor.tagName(version, 7, scope: scope), 'mobile/prod/v5.4.1+7');
       expect(
-        oneavant.tagName(version, 7, scope: scope),
-        'mobile/prod/v5.4.1+7',
-      );
-      expect(
-        oneavant.patchTagName(version, 7, 1, scope: scope),
+        harbor.patchTagName(version, 7, 1, scope: scope),
         'mobile/prod/v5.4.1+7-p1',
       );
-      expect(
-        oneavant.branchName(version, scope: scope),
-        'release/mobile/5.4.1',
-      );
+      expect(harbor.branchName(version, scope: scope), 'release/mobile/5.4.1');
     });
 
     test('need a value for each name', () {
-      expect(() => oneavant.tagName(version, 7), throwsArgumentError);
+      expect(() => harbor.tagName(version, 7), throwsArgumentError);
       expect(
-        () => oneavant.tagName(version, 7, scope: const TagScope(app: 'm')),
+        () => harbor.tagName(version, 7, scope: const TagScope(app: 'm')),
         throwsArgumentError,
       );
     });
 
     test('are read back only for their own app and flavor', () {
       expect(
-        oneavant.parseTag('mobile/prod/v5.4.1+7', scope: scope),
+        harbor.parseTag('mobile/prod/v5.4.1+7', scope: scope),
         const ReleaseTag(
           name: 'mobile/prod/v5.4.1+7',
           version: VersionName(5, 4, 1),
           build: 7,
         ),
       );
-      expect(oneavant.parseTag('mobile/dev/v5.4.1+7', scope: scope), isNull);
-      expect(oneavant.parseTag('web/prod/v5.4.1+7', scope: scope), isNull);
+      expect(harbor.parseTag('mobile/dev/v5.4.1+7', scope: scope), isNull);
+      expect(harbor.parseTag('web/prod/v5.4.1+7', scope: scope), isNull);
       // Without a scope any app and flavor matches.
-      expect(oneavant.parseTag('web/dev/v1.0.0+2')?.build, 2);
+      expect(harbor.parseTag('web/dev/v1.0.0+2')?.build, 2);
       expect(
-        oneavant
+        harbor
             .parseTag(
               'mobile/dev/v1.0.0+2',
               scope: const TagScope(app: 'mobile'),
@@ -73,7 +67,7 @@ void main() {
         2,
       );
       expect(
-        oneavant.parseTag(
+        harbor.parseTag(
           'web/dev/v1.0.0+2',
           scope: const TagScope(app: 'mobile'),
         ),

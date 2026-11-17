@@ -133,7 +133,7 @@ Release reviewRelease({
   prNumber: prNumber,
   prUrl: prNumber == null
       ? null
-      : 'https://github.com/acme/mataa_new_app/pull/$prNumber',
+      : 'https://github.com/acme/orbit_new_app/pull/$prNumber',
   mergeRunId: mergeRunId,
   mergeCommit: mergeCommit,
   message: message,

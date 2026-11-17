@@ -30,7 +30,7 @@ void main() {
       tester,
     ) async {
       await OverviewHarness().pump(tester);
-      expect(find.text('mataa_new_app'), findsOneWidget);
+      expect(find.text('orbit_new_app'), findsOneWidget);
       expect(find.text('main · 1 app'), findsOneWidget);
       expect(find.text('Building'), findsOneWidget);
       expect(find.text('5.4.1 (3283)'), findsOneWidget);
@@ -90,8 +90,8 @@ void main() {
       await OverviewHarness().pump(tester);
       await tester.tap(find.text('dev').first);
       await tester.pump();
-      expect(find.text('com.mataaa.dev'), findsOneWidget);
-      expect(find.text('com.sixdtec.mata · com.mataaa'), findsNothing);
+      expect(find.text('com.orbitx.dev'), findsOneWidget);
+      expect(find.text('com.nimbus.orbit · com.orbitx'), findsNothing);
     });
 
     testWidgets('dispatches and opens the run', (tester) async {
@@ -109,7 +109,7 @@ void main() {
         workflowsRepository: dispatch.workflows,
         runnersRepository: harness.runners,
         projects: projectsIn(
-          ProjectsState(loaded: true, projects: [mataaWithVersion]),
+          ProjectsState(loaded: true, projects: [orbitWithVersion]),
         ),
       );
       await tester.pump();
@@ -158,7 +158,7 @@ void main() {
       final projects = projectsIn(
         ProjectsState(
           loaded: true,
-          projects: [mataaWithVersion],
+          projects: [orbitWithVersion],
           error: 'Boom',
         ),
       );
@@ -186,7 +186,7 @@ void main() {
         workflowsRepository: harness.workflows,
         runnersRepository: overview.runners,
         projects: projectsIn(
-          ProjectsState(loaded: true, projects: [mataaWithVersion]),
+          ProjectsState(loaded: true, projects: [orbitWithVersion]),
         ),
       );
       await tester.pump();
@@ -264,8 +264,8 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('Copy bundle ID com.sixdtec.mata'), findsOneWidget);
-      expect(find.text('Copy bundle ID com.mataaa'), findsOneWidget);
+      expect(find.text('Copy bundle ID com.nimbus.orbit'), findsOneWidget);
+      expect(find.text('Copy bundle ID com.orbitx'), findsOneWidget);
     });
 
     testWidgets('sums up the credentials of each flavor and opens them', (
@@ -372,9 +372,9 @@ void main() {
     testWidgets('shows the host of a project on another git host', (
       tester,
     ) async {
-      await OverviewHarness().pump(tester, project: mataaOnBitbucket);
+      await OverviewHarness().pump(tester, project: orbitOnBitbucket);
 
-      expect(find.text('mataa_new_app'), findsOneWidget);
+      expect(find.text('orbit_new_app'), findsOneWidget);
       expect(find.text('bitbucket.org · main · 1 app'), findsOneWidget);
       expect(find.text('main · 1 app'), findsNothing);
     });

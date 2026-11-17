@@ -35,7 +35,7 @@ void main() {
       storage: bloc,
       connection: connectionIn(connectedTo(status: status)),
       projects: projectsIn(
-        const ProjectsState(loaded: true, projects: [mataa]),
+        const ProjectsState(loaded: true, projects: [orbit]),
       ),
     );
     await tester.pump();
@@ -56,7 +56,7 @@ void main() {
       expect(find.text('Builds past the newest 5 of each flavor'), findsOne);
       expect(find.text('Logs of jobs older than 90 days'), findsOneWidget);
       expect(find.text('Flutter SDKs'), findsOneWidget);
-      expect(find.text('mataa_new_app'), findsOneWidget);
+      expect(find.text('orbit_new_app'), findsOneWidget);
       expect(find.text('prj_9'), findsOneWidget);
       expect(find.text('18 builds · 74 files'), findsOneWidget);
       expect(find.text('1 build · 2 files'), findsOneWidget);

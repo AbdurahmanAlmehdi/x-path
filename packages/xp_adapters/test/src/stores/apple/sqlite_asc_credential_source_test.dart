@@ -56,8 +56,8 @@ void main() {
         'INSERT INTO app (id, project_id, path, framework, store_country) '
         "VALUES ('app_1', 'prj_1', '.', 'flutter', 'sa')",
       );
-    addFlavor('prod', 'com.mataa.app');
-    addFlavor('dev', 'com.mataa.app.dev');
+    addFlavor('prod', 'com.orbit.app');
+    addFlavor('dev', 'com.orbit.app.dev');
     addFlavor('android_only', null);
     secrets.values['asc.prod'] = _key.toSecret();
   });
@@ -65,24 +65,24 @@ void main() {
   test('reads the key of the flavor with the bundle id', () async {
     addCredential('cred_1', 'prod', 'asc_key', 'asc.prod');
 
-    expect(await source().forBundleId('com.mataa.app'), _key);
+    expect(await source().forBundleId('com.orbit.app'), _key);
   });
 
   test('has no key for a bundle id without a reference', () async {
     addCredential('cred_1', 'prod', 'asc_key', 'asc.prod');
 
-    expect(await source().forBundleId('com.mataa.app.dev'), isNull);
+    expect(await source().forBundleId('com.orbit.app.dev'), isNull);
     expect(await source().forBundleId('com.other'), isNull);
   });
 
   test('ignores references of other kinds (an Apple ID flavor)', () async {
     addCredential('cred_1', 'prod', 'apple_id', 'asc.prod');
 
-    expect(await source().forBundleId('com.mataa.app'), isNull);
+    expect(await source().forBundleId('com.orbit.app'), isNull);
   });
 
   test('takes the oldest reference when two flavors share the id', () async {
-    addFlavor('prod_b', 'com.mataa.app');
+    addFlavor('prod_b', 'com.orbit.app');
     secrets.values['asc.other'] = const AscKey(
       keyId: 'OTHER',
       issuerId: 'I',
@@ -91,20 +91,20 @@ void main() {
     addCredential('cred_b', 'prod', 'asc_key', 'asc.prod');
     addCredential('cred_a', 'prod_b', 'asc_key', 'asc.other');
 
-    expect((await source().forBundleId('com.mataa.app'))!.keyId, 'ABC123DEF4');
+    expect((await source().forBundleId('com.orbit.app'))!.keyId, 'ABC123DEF4');
   });
 
   test('has no key when the secret is missing or malformed', () async {
     addCredential('cred_1', 'prod', 'asc_key', 'asc.missing');
-    expect(await source().forBundleId('com.mataa.app'), isNull);
+    expect(await source().forBundleId('com.orbit.app'), isNull);
 
     secrets.values['asc.missing'] = '{"keyId": "K"}';
-    expect(await source().forBundleId('com.mataa.app'), isNull);
+    expect(await source().forBundleId('com.orbit.app'), isNull);
   });
 
   test('has no key when the secrets are locked', () async {
     addCredential('cred_1', 'prod', 'asc_key', 'asc.prod');
 
-    expect(await source(_LockedSecrets()).forBundleId('com.mataa.app'), isNull);
+    expect(await source(_LockedSecrets()).forBundleId('com.orbit.app'), isNull);
   });
 }

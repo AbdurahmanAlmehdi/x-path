@@ -39,28 +39,28 @@ void main() {
   });
 
   test("for a flavor, the key must see the flavor's app", () async {
-    const target = CredentialTarget(iosBundleId: 'com.mataa.app');
+    const target = CredentialTarget(iosBundleId: 'com.orbit.app');
 
     final missing = await verifier.verify(material, target);
-    asc.apps['com.mataa.app'] = const AscApp(
+    asc.apps['com.orbit.app'] = const AscApp(
       id: '1',
-      bundleId: 'com.mataa.app',
+      bundleId: 'com.orbit.app',
     );
     final found = await verifier.verify(material, target);
 
     expect(missing.status, CredentialStatus.rejected);
     expect(
       missing.message,
-      'The API key ABC123DEF4 sees no app with the bundle id com.mataa.app '
+      'The API key ABC123DEF4 sees no app with the bundle id com.orbit.app '
       'in App Store Connect.',
     );
     expect(missing.fix, contains('Create the app'));
     expect(found, const VerificationResult.verified(account: 'ABC123DEF4'));
     expect(asc.calls, [
       'verifyAccess',
-      'findApp com.mataa.app',
+      'findApp com.orbit.app',
       'verifyAccess',
-      'findApp com.mataa.app',
+      'findApp com.orbit.app',
     ]);
   });
 

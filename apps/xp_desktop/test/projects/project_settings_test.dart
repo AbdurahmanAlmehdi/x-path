@@ -28,7 +28,7 @@ void main() {
     approvals = quietApprovals();
     when(() => approvals.getGates('prj_1')).thenAnswer((_) async => gates);
     when(() => projects.editProject(any(), any()))
-        .thenAnswer((_) async => mataa);
+        .thenAnswer((_) async => orbit);
     when(() => approvals.setGates('prj_1', any())).thenAnswer(
       (invocation) async => invocation.positionalArguments[1] as ProjectGates,
     );
@@ -135,7 +135,7 @@ void main() {
         projectsRepository: projects,
         approvalsRepository: approvals,
         projects: projectsIn(
-          const ProjectsState(loaded: true, projects: [mataa]),
+          const ProjectsState(loaded: true, projects: [orbit]),
         ),
       );
       tester.view.physicalSize = const Size(1440, 1600);
@@ -147,8 +147,8 @@ void main() {
     ) async {
       await pump(tester);
 
-      expect(find.text('acme/mataa_new_app'), findsOneWidget);
-      expect(find.text(mataa.remote), findsOneWidget);
+      expect(find.text('acme/orbit_new_app'), findsOneWidget);
+      expect(find.text(orbit.remote), findsOneWidget);
       await tester.enterText(
         find.byKey(const Key('project.baseBranch')),
         'dev',

@@ -25,7 +25,7 @@ void main() {
       await JobHarness().pump(tester);
       expect(find.text('Prod release'), findsOneWidget);
       expect(
-        find.text('mataa_new_app · release/5.4.1 · 9a3bc0d'),
+        find.text('orbit_new_app · release/5.4.1 · 9a3bc0d'),
         findsOneWidget,
       );
       expect(find.text('Running'), findsOneWidget);
@@ -39,7 +39,7 @@ void main() {
         find.text('BUILD PROD FOR IOS · THIS MAC · STEPS'),
         findsOneWidget,
       );
-      expect(find.text('mataa.ipa'), findsOneWidget);
+      expect(find.text('orbit.ipa'), findsOneWidget);
       expect(find.text('48.2 MB'), findsOneWidget);
       expect(
         find.text('Running pod install...', findRichText: true),
@@ -535,7 +535,7 @@ void main() {
       );
       Future<void> rightClick() async {
         await tester.tapAt(
-          tester.getCenter(find.text('mataa.ipa')),
+          tester.getCenter(find.text('orbit.ipa')),
           buttons: kSecondaryButton,
         );
         await tester.pumpAndSettle();
@@ -549,11 +549,11 @@ void main() {
 
       await tester.tap(find.byTooltip('Reveal in Finder'));
       await tester.pump();
-      expect(revealed, ['/Downloads/mataa.ipa']);
+      expect(revealed, ['/Downloads/orbit.ipa']);
       await rightClick();
       await tester.tap(find.text('Show in Finder'));
       await tester.pumpAndSettle();
-      expect(revealed, ['/Downloads/mataa.ipa', '/Downloads/mataa.ipa']);
+      expect(revealed, ['/Downloads/orbit.ipa', '/Downloads/orbit.ipa']);
       String? copied;
       tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
         SystemChannels.platform,
@@ -572,7 +572,7 @@ void main() {
       );
       await tester.tap(find.byTooltip('Copy path'));
       await tester.pump();
-      expect(copied, '/Downloads/mataa.ipa');
+      expect(copied, '/Downloads/orbit.ipa');
       expect(find.text('Copied the path'), findsOneWidget);
     });
 
@@ -600,19 +600,19 @@ void main() {
           jobs: const [],
           request: const DispatchRequest(flavors: ['prod']),
         );
-        final prod = mataa.profile.apps.single.flavors.first;
+        final prod = orbit.profile.apps.single.flavors.first;
         final withAppleId = Project(
-          id: mataa.id,
-          githubRepoId: mataa.githubRepoId,
-          host: mataa.host,
-          sourceKey: mataa.sourceKey,
-          fullName: mataa.fullName,
-          remote: mataa.remote,
-          defaultBaseBranch: mataa.defaultBaseBranch,
+          id: orbit.id,
+          githubRepoId: orbit.githubRepoId,
+          host: orbit.host,
+          sourceKey: orbit.sourceKey,
+          fullName: orbit.fullName,
+          remote: orbit.remote,
+          defaultBaseBranch: orbit.defaultBaseBranch,
           profile: ProjectProfile(
             apps: [
               AppProfile(
-                name: 'Mataa customer app',
+                name: 'Orbit customer app',
                 path: '.',
                 hasIos: true,
                 hasAndroid: true,
@@ -655,7 +655,7 @@ void main() {
         await tester.tap(find.text('Google Play · prod'));
         expect(opened, [
           Uri.parse('https://appstoreconnect.apple.com/apps/1234567890'),
-          Uri.parse('https://play.google.com/store/apps/details?id=com.mataaa'),
+          Uri.parse('https://play.google.com/store/apps/details?id=com.orbitx'),
         ]);
       },
     );
@@ -675,13 +675,13 @@ void main() {
         request: DispatchRequest(flavors: flavors),
       );
       final withIds = Project(
-        id: mataa.id,
-        githubRepoId: mataa.githubRepoId,
-        host: mataa.host,
-        sourceKey: mataa.sourceKey,
-        fullName: mataa.fullName,
-        remote: mataa.remote,
-        defaultBaseBranch: mataa.defaultBaseBranch,
+        id: orbit.id,
+        githubRepoId: orbit.githubRepoId,
+        host: orbit.host,
+        sourceKey: orbit.sourceKey,
+        fullName: orbit.fullName,
+        remote: orbit.remote,
+        defaultBaseBranch: orbit.defaultBaseBranch,
         profile: const ProjectProfile(
           apps: [
             AppProfile(

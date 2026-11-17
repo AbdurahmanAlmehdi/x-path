@@ -14,10 +14,10 @@ if (keystorePropertiesFile.exists()) {
 }
 
 android {
-    namespace = "com.mataa.captain"
+    namespace = "com.orbit.captain"
 
     defaultConfig {
-        applicationId = "com.mataa.captain"
+        applicationId = "com.orbit.captain"
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }

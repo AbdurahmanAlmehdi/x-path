@@ -6,18 +6,18 @@ android.apply {
     productFlavors {
         create("dev") {
             dimension = "flavor-type"
-            applicationId = "com.oneavant.guestExperience.dev"
+            applicationId = "com.harbor.guestExperience.dev"
             resValue(type = "string", name = "app_name", value = "Dev")
         }
-        create("iniala") {
+        create("seaview") {
             dimension = "flavor-type"
-            applicationId = "com.oneavant.guestExperience.iniala"
-            resValue(type = "string", name = "app_name", value = "Iniala")
+            applicationId = "com.harbor.guestExperience.seaview"
+            resValue(type = "string", name = "app_name", value = "Seaview")
         }
-        create("oneavant") {
+        create("harbor") {
             dimension = "flavor-type"
-            applicationId = "com.oneavant.guestExperience"
-            resValue(type = "string", name = "app_name", value = "Oneavant")
+            applicationId = "com.harbor.guestExperience"
+            resValue(type = "string", name = "app_name", value = "Harbor")
         }
     }
 }

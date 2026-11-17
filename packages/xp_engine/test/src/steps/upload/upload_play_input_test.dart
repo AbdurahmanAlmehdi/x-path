@@ -3,7 +3,7 @@ import 'package:xp_engine/xp_engine.dart';
 
 Map<String, dynamic> _json({Map<String, dynamic> overrides = const {}}) => {
   'artifactName': 'prod-5.4.1+3283.aab',
-  'packageName': 'com.mataa.app',
+  'packageName': 'com.orbit.app',
   'version': '5.4.1+3283',
   'serviceAccountSecret': 'play.prod',
   ...overrides,

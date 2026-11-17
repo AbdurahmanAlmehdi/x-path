@@ -15,8 +15,8 @@ void main() {
     projectName: 'acme/shop',
     appPath: '.',
     name: 'prod',
-    iosBundleId: 'com.mataa.app',
-    androidAppId: 'com.mataa.app',
+    iosBundleId: 'com.orbit.app',
+    androidAppId: 'com.orbit.app',
   );
   const beta = CredentialFlavor(
     id: 'flv_beta',
@@ -63,8 +63,8 @@ void main() {
       ..execute(
         'INSERT INTO flavor (id, app_id, name, entrypoint, ios_bundle_id, '
         'android_app_id) VALUES '
-        "('flv_prod', 'app_1', 'prod', 'lib/main.dart', 'com.mataa.app', "
-        "'com.mataa.app'), "
+        "('flv_prod', 'app_1', 'prod', 'lib/main.dart', 'com.orbit.app', "
+        "'com.orbit.app'), "
         "('flv_beta', 'app_1', 'beta', 'lib/main.dart', NULL, NULL), "
         "('flv_dev', 'app_2', 'dev', 'lib/main_dev.dart', NULL, NULL)",
       );

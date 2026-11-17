@@ -8,13 +8,13 @@ android.apply {
     productFlavors {
         create("dev") {
             dimension = "flavor-type"
-            applicationId = "com.mataa.captain.dev"
-            resValue(type = "string", name = "app_name", value = "Mataa Captain Dev")
+            applicationId = "com.orbit.captain.dev"
+            resValue(type = "string", name = "app_name", value = "Orbit Captain Dev")
         }
         create("prod") {
             dimension = "flavor-type"
-            applicationId = "com.mataa.captain"
-            resValue(type = "string", name = "app_name", value = "Mataa Captain")
+            applicationId = "com.orbit.captain"
+            resValue(type = "string", name = "app_name", value = "Orbit Captain")
         }
     }
 }

@@ -3,20 +3,20 @@ flavors:
     app:
       name: "Dev"
     android:
-      applicationId: "com.oneavant.guestExperience.dev"
+      applicationId: "com.harbor.guestExperience.dev"
     ios:
-      bundleId: "com.oneavant.guestExperience.dev"
-  iniala:
+      bundleId: "com.harbor.guestExperience.dev"
+  seaview:
     app:
-      name: "Iniala"
+      name: "Seaview"
     android:
-      applicationId: "com.oneavant.guestExperience.iniala"
+      applicationId: "com.harbor.guestExperience.seaview"
     ios:
-      bundleId: "com.oneavant.guestExperience.iniala"
-  oneavant:
+      bundleId: "com.harbor.guestExperience.seaview"
+  harbor:
     app:
-      name: "Oneavant"
+      name: "Harbor"
     android:
-      applicationId: "com.oneavant.guestExperience"
+      applicationId: "com.harbor.guestExperience"
     ios:
-      bundleId: "com.oneavant.guestExperience"
+      bundleId: "com.harbor.guestExperience"

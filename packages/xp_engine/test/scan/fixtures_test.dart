@@ -104,16 +104,16 @@ void main() {
     test('customer keeps the prod id mismatch and literal plists', () async {
       final prod = (await profileOf('customer')).apps.single.flavors.last;
 
-      expect(prod.androidAppId, 'com.mataaa');
-      expect(prod.iosBundleId, 'com.sixdtec.mata');
+      expect(prod.androidAppId, 'com.orbitx');
+      expect(prod.iosBundleId, 'com.nimbus.orbit');
       expect(prod.versionFiles, ['pubspec.yaml', 'ios/Runner/Info.plist']);
     });
 
-    test('captain keeps com.mataaa.captain.dev', () async {
+    test('captain keeps com.orbitx.captain.dev', () async {
       final dev = (await profileOf('captain')).apps.single.flavors.first;
 
-      expect(dev.iosBundleId, 'com.mataaa.captain.dev');
-      expect(dev.androidAppId, 'com.mataa.captain.dev');
+      expect(dev.iosBundleId, 'com.orbitx.captain.dev');
+      expect(dev.androidAppId, 'com.orbit.captain.dev');
       expect(dev.versionFiles, ['pubspec.yaml']);
     });
 

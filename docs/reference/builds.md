@@ -77,8 +77,8 @@ like a typo" when they are one or two characters apart), `bundle_id_config_drift
 build files disagree), `plist_literal_version`, `version_files_out_of_sync`, `fvmrc_missing`,
 `keystore_properties_missing`, `shorebird_no_flavor_ids`.
 
-The fixtures in `tool/e2e/fixtures` are synthetic repositories shaped like the Mataa customer,
-captain and vendor apps, the oneavant companion app, the guest monorepo and the room spike, plus one
+The fixtures in `tool/e2e/fixtures` are synthetic repositories shaped like the Orbit customer,
+captain and vendor apps, the harbor companion app, the guest monorepo and the room spike, plus one
 that disagrees with itself (`drift`). They hold only the files the scanner reads, with made-up team
 and Shorebird ids. `packages/xp_engine/test/scan/fixtures_test.dart` scans each and compares the
 profile and findings with `test/scan/goldens/<name>.json`

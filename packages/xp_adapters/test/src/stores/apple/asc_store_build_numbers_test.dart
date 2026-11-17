@@ -4,7 +4,7 @@ import 'package:xp_engine/xp_engine.dart';
 import 'package:xp_fake_asc/xp_fake_asc.dart';
 
 const _key = AscKey(keyId: 'K', issuerId: 'I', privateKey: 'p');
-const _bundleId = 'com.mataa.app';
+const _bundleId = 'com.orbit.app';
 
 AscBuild _build(String number, {String? version}) => AscBuild(
   id: 'b$number',
@@ -43,7 +43,7 @@ void main() {
   test(
     'cannot be asked without an iOS bundle id (Play is not Apple)',
     () async {
-      expect(await numbers().lookup(androidAppId: 'com.mataa.app'), isNull);
+      expect(await numbers().lookup(androidAppId: 'com.orbit.app'), isNull);
       expect(credentials.lookups, isEmpty);
     },
   );

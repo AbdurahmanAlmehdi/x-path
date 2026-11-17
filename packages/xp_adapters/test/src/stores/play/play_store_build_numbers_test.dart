@@ -10,7 +10,7 @@ void main() {
   late PlayStoreBuildNumbers numbers;
 
   setUp(() {
-    credentials = FakePlayCredentialSource({'com.mataa.app': _account});
+    credentials = FakePlayCredentialSource({'com.orbit.app': _account});
     play = FakeGooglePlay();
     numbers = PlayStoreBuildNumbers(
       credentials: credentials,
@@ -25,27 +25,27 @@ void main() {
     ]);
 
     final builds = await numbers.lookup(
-      iosBundleId: 'com.mataa.ios',
-      androidAppId: 'com.mataa.app',
+      iosBundleId: 'com.orbit.ios',
+      androidAppId: 'com.orbit.app',
     );
 
     expect(builds, const StoreBuilds({3280, 3283}));
     expect(play.calls, [
-      'insertEdit com.mataa.app',
-      'bundles com.mataa.app edit-1',
-      'deleteEdit com.mataa.app edit-1',
+      'insertEdit com.orbit.app',
+      'bundles com.orbit.app edit-1',
+      'deleteEdit com.orbit.app edit-1',
     ]);
   });
 
   test('is empty for an app without bundles', () async {
     expect(
-      await numbers.lookup(androidAppId: 'com.mataa.app'),
+      await numbers.lookup(androidAppId: 'com.orbit.app'),
       const StoreBuilds({}),
     );
   });
 
   test('is null for an app without an Android application id', () async {
-    expect(await numbers.lookup(iosBundleId: 'com.mataa.ios'), isNull);
+    expect(await numbers.lookup(iosBundleId: 'com.orbit.ios'), isNull);
     expect(credentials.lookups, isEmpty);
   });
 
@@ -57,14 +57,14 @@ void main() {
   test('is null when Play refuses, and the edit is still deleted', () async {
     play.failures['bundles'] = const PlayForbiddenException('no');
 
-    expect(await numbers.lookup(androidAppId: 'com.mataa.app'), isNull);
+    expect(await numbers.lookup(androidAppId: 'com.orbit.app'), isNull);
     expect(play.deleted, ['edit-1']);
   });
 
   test('is null when no edit can be opened', () async {
     play.failures['insertEdit'] = const PlayNotFoundException('no such app');
 
-    expect(await numbers.lookup(androidAppId: 'com.mataa.app'), isNull);
+    expect(await numbers.lookup(androidAppId: 'com.orbit.app'), isNull);
     expect(play.deleted, isEmpty);
   });
 
@@ -74,7 +74,7 @@ void main() {
       ..failures['deleteEdit'] = const PlayServerException(503, 'down');
 
     expect(
-      await numbers.lookup(androidAppId: 'com.mataa.app'),
+      await numbers.lookup(androidAppId: 'com.orbit.app'),
       const StoreBuilds({5}),
     );
   });

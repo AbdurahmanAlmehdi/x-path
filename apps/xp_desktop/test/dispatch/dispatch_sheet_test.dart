@@ -29,7 +29,7 @@ void main() {
     ) async {
       await DispatchHarness().open(tester);
       expect(find.text('Dispatch'), findsOneWidget);
-      expect(find.text('mataa_new_app · Mataa customer app'), findsOneWidget);
+      expect(find.text('orbit_new_app · Orbit customer app'), findsOneWidget);
       expect(find.text('built-in · gated'), findsOneWidget);
       expect(find.text('WILL RUN · 4 JOBS IN 3 STAGES'), findsOneWidget);
       expect(find.text('This Mac'), findsOneWidget);

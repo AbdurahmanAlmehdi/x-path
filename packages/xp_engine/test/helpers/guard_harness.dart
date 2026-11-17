@@ -17,7 +17,7 @@ const mirror = GitMirror(key: '42', path: '/mirrors/42.git');
 GitTagInfo tag(String name, [String? commit]) =>
     GitTagInfo(name: name, commit: commit ?? 'f' * 40);
 
-/// The files of the Mataa customer app at version [version], with the plists
+/// The files of the Orbit customer app at version [version], with the plists
 /// that carry literal versions.
 Map<String, String> customerApp(String version, {String plistVersion = ''}) {
   final parsed = AppVersion.parse(version);
@@ -45,8 +45,8 @@ guardRequest({
   ReleaseModel model = const ReleaseModel(),
   TagScope scope = const TagScope(),
   String? releaseVersion,
-  String? iosBundleId = 'com.mataa.app',
-  String? androidAppId = 'com.mataa.app',
+  String? iosBundleId = 'com.orbit.app',
+  String? androidAppId = 'com.orbit.app',
   String? shorebirdAppId,
   List<GuardCheckName> checks = const [],
   String? flavorId,
@@ -90,11 +90,11 @@ plugins {
 }
 
 android {
-    namespace = "com.mataa.app"
+    namespace = "com.orbit.app"
     compileSdk = flutter.compileSdkVersion
 
     defaultConfig {
-        applicationId = "com.mataa.app"
+        applicationId = "com.orbit.app"
         minSdk = flutter.minSdkVersion
         // targetSdk = 21 would be an old comment.
         targetSdk = $targetSdk

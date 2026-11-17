@@ -1,4 +1,4 @@
-name: oneavant_guest_tablet
+name: harbor_guest_tablet
 description: Synthetic fixture for the XPath scanner.
 publish_to: none
 

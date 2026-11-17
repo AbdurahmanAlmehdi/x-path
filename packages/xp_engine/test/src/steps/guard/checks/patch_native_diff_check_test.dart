@@ -49,7 +49,7 @@ void main() {
       request(
         changed: [
           'lib/main.dart',
-          'android/app/src/main/kotlin/com/mataa/MainActivity.kt',
+          'android/app/src/main/kotlin/com/orbit/MainActivity.kt',
           'ios/Runner/Info.plist',
         ],
       ),
@@ -59,7 +59,7 @@ void main() {
     expect(
       result.message,
       'Native files changed since v5.4.1+3283:\n'
-      '  android/app/src/main/kotlin/com/mataa/MainActivity.kt\n'
+      '  android/app/src/main/kotlin/com/orbit/MainActivity.kt\n'
       '  ios/Runner/Info.plist',
     );
     expect(result.fix, 'This needs a full store release, not a patch.');

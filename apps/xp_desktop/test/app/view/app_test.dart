@@ -30,7 +30,7 @@ void main() {
     list = EngineList(engines: [localEngine, macMini], activeId: localEngineId);
     harnesses = {};
     projectsOf = {
-      localEngineId: [mataa],
+      localEngineId: [orbit],
       macMini.id: [captain],
     };
     when(engines.load).thenAnswer((_) async => list);
@@ -119,7 +119,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byType(AppShell), findsOneWidget);
       // In the sidebar and as the overview's title.
-      expect(find.text('mataa_new_app'), findsNWidgets(2));
+      expect(find.text('orbit_new_app'), findsNWidgets(2));
       expect(find.text('This Mac'), findsOneWidget);
     });
 
@@ -163,8 +163,8 @@ void main() {
         expect(next.read<ShellCubit>().state, const HomeDestination());
         expect(next.read<ProjectsRepository>(), isA<ProjectsRepository>());
         expect(harnesses[macMini.id]!.events.hasListener, isTrue);
-        expect(find.text('mataa_captain'), findsNWidgets(2));
-        expect(find.text('mataa_new_app'), findsNothing);
+        expect(find.text('orbit_captain'), findsNWidgets(2));
+        expect(find.text('orbit_new_app'), findsNothing);
         expect(find.text('mac-mini'), findsOneWidget);
       },
     );
@@ -177,7 +177,7 @@ void main() {
 
       await tester.tap(find.text('Show mac-mini'));
       await tester.pumpAndSettle();
-      expect(find.text('mataa_captain'), findsNWidgets(2));
+      expect(find.text('orbit_captain'), findsNWidgets(2));
     });
 
     testWidgets('reads the token again on Try again', (tester) async {

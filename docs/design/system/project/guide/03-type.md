@@ -19,7 +19,7 @@ IBM Plex Sans for UI, IBM Plex Mono for everything a machine wrote or a human co
 | mono | `type.mono` | Plex Mono | 12.5/21 | 400 | Log lines. ANSI bold = weight 600; dim = log.dim colour. |
 
 - `hero`: one per screen. A release screen: "Waiting for review" with `5.4.1 (3283)` in `type.hero-code` beside it; a job: "Failed at Upload to App Store"; an approval: "Submit 5.4.1 (3283) to App Store".
-- `code`: `5.4.1 (3283)`, `9a3bc0d`, `com.sixdtec.mata`, `v5.4.1+3283`, `6m 12s`, `38.9 GB`. Always tabular figures (Flutter: `FontFeature.tabularFigures()`; CSS: `font-variant-numeric: tabular-nums`). Never bold for emphasis; use `code-lg` for size.
+- `code`: `5.4.1 (3283)`, `9a3bc0d`, `com.nimbus.orbit`, `v5.4.1+3283`, `6m 12s`, `38.9 GB`. Always tabular figures (Flutter: `FontFeature.tabularFigures()`; CSS: `font-variant-numeric: tabular-nums`). Never bold for emphasis; use `code-lg` for size.
 - `label`: mono caps, 0.06em tracking, `color.text.secondary`. Column heads and section labels only, never sentences or buttons.
 - `mono`: logs at 12.5/21. ANSI bold = 600. Line numbers and timestamps in `color.log.dim`.
 - Longer strings: no fixed-width labels; buttons and badges grow; tables truncate cells per Formatting.

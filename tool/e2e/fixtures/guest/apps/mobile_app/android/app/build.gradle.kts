@@ -10,10 +10,10 @@ if (keystorePropertiesFile.exists()) {
 }
 
 android {
-    namespace = "com.oneavant.guestExperience"
+    namespace = "com.harbor.guestExperience"
 
     defaultConfig {
-        applicationId = "com.oneavant.guestExperience"
+        applicationId = "com.harbor.guestExperience"
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }

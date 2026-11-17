@@ -108,7 +108,7 @@ void main() {
         CredentialKind.playSa,
         CredentialStatus.verified,
         assignment: CredentialStatus.rejected,
-        assignmentMessage: 'Google Play does not know com.mataa.app.',
+        assignmentMessage: 'Google Play does not know com.orbit.app.',
         assignmentFix: 'Invite the service account.',
       ),
     );

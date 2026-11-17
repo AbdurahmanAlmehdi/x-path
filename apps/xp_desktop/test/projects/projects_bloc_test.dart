@@ -32,16 +32,16 @@ void main() {
         bloc.add(const ProjectsSubscriptionRequested());
         await Future<void>.delayed(Duration.zero);
         projects
-          ..add(const Snapshot([mataa], cached: true))
-          ..add(const Snapshot([mataa, captain]))
+          ..add(const Snapshot([orbit], cached: true))
+          ..add(const Snapshot([orbit, captain]))
           ..addError(const ApiException('Gone.', statusCode: 404));
       },
       expect: () => [
-        const ProjectsState(loaded: true, projects: [mataa], cached: true),
-        const ProjectsState(loaded: true, projects: [mataa, captain]),
+        const ProjectsState(loaded: true, projects: [orbit], cached: true),
+        const ProjectsState(loaded: true, projects: [orbit, captain]),
         const ProjectsState(
           loaded: true,
-          projects: [mataa, captain],
+          projects: [orbit, captain],
           error: 'Gone.',
         ),
       ],
@@ -50,7 +50,7 @@ void main() {
     blocTest<ProjectsBloc, ProjectsState>(
       'scans a project again and replaces it',
       build: () => ProjectsBloc(projects: repository),
-      seed: () => const ProjectsState(loaded: true, projects: [mataa, captain]),
+      seed: () => const ProjectsState(loaded: true, projects: [orbit, captain]),
       setUp: () =>
           when(() => repository.scanProject('prj_1'))
               .thenAnswer((_) async => _rescanned),
@@ -58,7 +58,7 @@ void main() {
       expect: () => [
         const ProjectsState(
           loaded: true,
-          projects: [mataa, captain],
+          projects: [orbit, captain],
           scanning: 'prj_1',
         ),
         const ProjectsState(loaded: true, projects: [_rescanned, captain]),
@@ -68,7 +68,7 @@ void main() {
     blocTest<ProjectsBloc, ProjectsState>(
       'says why a scan failed',
       build: () => ProjectsBloc(projects: repository),
-      seed: () => const ProjectsState(loaded: true, projects: [mataa]),
+      seed: () => const ProjectsState(loaded: true, projects: [orbit]),
       setUp: () =>
           when(() => repository.scanProject('prj_1'))
               .thenThrow(const ConnectionException('Connection refused.')),
@@ -77,7 +77,7 @@ void main() {
       expect: () => [
         const ProjectsState(
           loaded: true,
-          projects: [mataa],
+          projects: [orbit],
           error: 'Connection refused.',
         ),
       ],
@@ -89,7 +89,7 @@ void main() {
     });
 
     test('finds a project by id', () {
-      const state = ProjectsState(projects: [mataa, captain]);
+      const state = ProjectsState(projects: [orbit, captain]);
       expect(state.byId('prj_2'), captain);
       expect(state.byId('nope'), isNull);
       expect(state.byId(null), isNull);
@@ -97,7 +97,7 @@ void main() {
     });
 
     test('finds a project on another git host with a three-part name', () {
-      const state = ProjectsState(projects: [mataa, shop]);
+      const state = ProjectsState(projects: [orbit, shop]);
       expect(state.byId('prj_3')?.fullName, 'ws/mobile/shop_app');
       expect(state.byId('prj_3')?.isOnGitHub, isFalse);
     });
@@ -135,7 +135,7 @@ const _rescanned = Project(
   host: 'github.com',
   sourceKey: '1',
   githubRepoId: 1,
-  fullName: 'acme/mataa_new_app',
-  remote: 'git@github.com:acme/mataa_new_app.git',
+  fullName: 'acme/orbit_new_app',
+  remote: 'git@github.com:acme/orbit_new_app.git',
   defaultBaseBranch: 'main',
 );

@@ -56,7 +56,7 @@ xp credentials add --kind asc_key --name "Personal Apple Dev Account" \
 xp credentials add --kind apple_id --name "Upload Apple ID" --apple-id dev@example.com
 xp credentials add --kind play_sa --name "Play publisher" --service-account ~/keys/play.json
 xp credentials add --kind keystore --name "Upload keystore" --keystore upload.jks --key-alias upload
-xp credentials add --kind dart_defines --name "Mataa prod defines" --dart-defines env/prod.json
+xp credentials add --kind dart_defines --name "Orbit prod defines" --dart-defines env/prod.json
 printf %s "$SHOREBIRD_TOKEN" | xp credentials add --kind shorebird --name "Studio Shorebird" --token-stdin
 xp credentials assign "Personal Apple Dev Account" --project acme/app --all-flavors
 xp credentials assign "Studio Shorebird" --project acme/app --flavor prod

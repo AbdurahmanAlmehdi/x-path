@@ -7,14 +7,14 @@
       buildImplicitDependencies = "YES">
    </BuildAction>
    <LaunchAction
-      buildConfiguration = "Debug-oneavant"
+      buildConfiguration = "Debug-seaview"
       launchStyle = "0">
    </LaunchAction>
    <ProfileAction
-      buildConfiguration = "Release-oneavant">
+      buildConfiguration = "Release-seaview">
    </ProfileAction>
    <ArchiveAction
-      buildConfiguration = "Release-oneavant"
+      buildConfiguration = "Release-seaview"
       revealArchiveInOrganizer = "YES">
    </ArchiveAction>
 </Scheme>

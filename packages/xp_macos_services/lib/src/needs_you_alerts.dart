@@ -75,7 +75,7 @@ class MenuBarRun extends Equatable {
   /// The workflow and the version, for example `Prod release 5.4.1`.
   final String title;
 
-  /// The project and the progress, for example `mataa · 3 of 5 jobs`.
+  /// The project and the progress, for example `orbit · 3 of 5 jobs`.
   final String detail;
 
   @override
@@ -112,7 +112,7 @@ class MenuBarItem extends Equatable {
   /// What is asked, for example `Review: Submit 5.4.1 (3283)…`.
   final String title;
 
-  /// Where, for example `mataa_new_app · prod · 9a3bc0d · 23h 51m left`.
+  /// Where, for example `orbit_new_app · prod · 9a3bc0d · 23h 51m left`.
   final String detail;
 
   @override

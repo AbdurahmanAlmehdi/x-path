@@ -7,14 +7,14 @@
       buildImplicitDependencies = "YES">
    </BuildAction>
    <LaunchAction
-      buildConfiguration = "Debug-oneavant"
+      buildConfiguration = "Debug-harbor"
       launchStyle = "0">
    </LaunchAction>
    <ProfileAction
-      buildConfiguration = "Release-oneavant">
+      buildConfiguration = "Release-harbor">
    </ProfileAction>
    <ArchiveAction
-      buildConfiguration = "Release-oneavant"
+      buildConfiguration = "Release-harbor"
       revealArchiveInOrganizer = "YES">
    </ArchiveAction>
 </Scheme>

@@ -6,13 +6,13 @@ android.apply {
     productFlavors {
         create("dev") {
             dimension = "flavor-type"
-            applicationId = "com.oneavant.guestTablet.dev"
+            applicationId = "com.harbor.guestTablet.dev"
             resValue(type = "string", name = "app_name", value = "Dev")
         }
-        create("oneavant") {
+        create("harbor") {
             dimension = "flavor-type"
-            applicationId = "com.oneavant.guestTablet"
-            resValue(type = "string", name = "app_name", value = "Oneavant")
+            applicationId = "com.harbor.guestTablet"
+            resValue(type = "string", name = "app_name", value = "Harbor")
         }
     }
 }

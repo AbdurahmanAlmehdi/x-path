@@ -641,7 +641,7 @@ void main() {
         projectId: 'prj_1',
         appPath: '.',
         name: 'prod',
-        iosBundleId: 'com.mataa.app',
+        iosBundleId: 'com.orbit.app',
       );
       for (final kind in [
         CredentialKind.appleDistribution,
@@ -667,10 +667,10 @@ void main() {
         ..certificates.add(
           const AscCertificate(id: 'cert-1', serialNumber: 'A1B2C3D4E5F'),
         )
-        ..bundleIds['com.mataa.app'] = 'bundle-1';
+        ..bundleIds['com.orbit.app'] = 'bundle-1';
       final profile = AppStoreProfiles.keyFor(
         'apple_distribution',
-        'com.mataa.app',
+        'com.orbit.app',
       );
       final (runner, _) = await leased(
         steps: [
@@ -703,13 +703,13 @@ void main() {
 
       expect(
         runner.link.sentOf<SecretDeniedFrame>().single.reason,
-        'App Store Connect could not make the profile of com.mataa.app: down',
+        'App Store Connect could not make the profile of com.orbit.app: down',
       );
       final values = runner.link.sentOf<SecretValueFrame>();
       expect(values.map((v) => v.key), [profile, 'apple_distribution']);
       expect(
         utf8.decode(base64Decode(values.first.value)),
-        startsWith('profile XPath com.mataa.app A1B2C3D4E5F'),
+        startsWith('profile XPath com.orbit.app A1B2C3D4E5F'),
       );
       expect(h.jobs.masker.secrets, contains(testSigningKey));
     });

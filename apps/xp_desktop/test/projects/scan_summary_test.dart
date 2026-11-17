@@ -11,14 +11,14 @@ import '../helpers/fakes.dart';
 import '../helpers/pump_app.dart';
 
 Project _withFindings(List<Finding> findings) => Project(
-  id: mataa.id,
-  githubRepoId: mataa.githubRepoId,
-  host: mataa.host,
-  sourceKey: mataa.sourceKey,
-  fullName: mataa.fullName,
-  remote: mataa.remote,
-  defaultBaseBranch: mataa.defaultBaseBranch,
-  profile: mataa.profile,
+  id: orbit.id,
+  githubRepoId: orbit.githubRepoId,
+  host: orbit.host,
+  sourceKey: orbit.sourceKey,
+  fullName: orbit.fullName,
+  remote: orbit.remote,
+  defaultBaseBranch: orbit.defaultBaseBranch,
+  profile: orbit.profile,
   findings: findings,
 );
 
@@ -127,7 +127,7 @@ void main() {
       ),
     );
     await tester.pumpApp(
-      const SingleChildScrollView(child: ScanSummary(mataa)),
+      const SingleChildScrollView(child: ScanSummary(orbit)),
     );
 
     await tester.tap(find.text('Copy path'));

@@ -18,7 +18,7 @@ void main() {
       const StoragePage(),
       storage: storageIn(StorageState(loaded: true, report: storageReport)),
       projects: projectsIn(
-        const ProjectsState(loaded: true, projects: [mataa]),
+        const ProjectsState(loaded: true, projects: [orbit]),
       ),
     );
     await expectLater(

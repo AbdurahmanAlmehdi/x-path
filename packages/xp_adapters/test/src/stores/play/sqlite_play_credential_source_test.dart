@@ -57,8 +57,8 @@ void main() {
         'INSERT INTO app (id, project_id, path, framework, store_country) '
         "VALUES ('app_1', 'prj_1', '.', 'flutter', 'sa')",
       );
-    addFlavor('prod', 'com.mataa.app');
-    addFlavor('dev', 'com.mataa.app.dev');
+    addFlavor('prod', 'com.orbit.app');
+    addFlavor('dev', 'com.orbit.app.dev');
     addFlavor('ios_only', null);
     secrets.values['play.prod'] = _account.toSecret();
   });
@@ -66,13 +66,13 @@ void main() {
   test('reads the account of the flavor with the application id', () async {
     addCredential('cred_1', 'prod', 'play_sa', 'play.prod');
 
-    expect(await source().forAndroidAppId('com.mataa.app'), _account);
+    expect(await source().forAndroidAppId('com.orbit.app'), _account);
   });
 
   test('has no account for an application id without a reference', () async {
     addCredential('cred_1', 'prod', 'play_sa', 'play.prod');
 
-    expect(await source().forAndroidAppId('com.mataa.app.dev'), isNull);
+    expect(await source().forAndroidAppId('com.orbit.app.dev'), isNull);
     expect(await source().forAndroidAppId('com.other'), isNull);
   });
 
@@ -80,11 +80,11 @@ void main() {
     addCredential('cred_1', 'prod', 'firebase_sa', 'play.prod');
     addCredential('cred_2', 'prod', 'asc_key', 'play.prod');
 
-    expect(await source().forAndroidAppId('com.mataa.app'), isNull);
+    expect(await source().forAndroidAppId('com.orbit.app'), isNull);
   });
 
   test('takes the oldest reference when two flavors share the id', () async {
-    addFlavor('prod_b', 'com.mataa.app');
+    addFlavor('prod_b', 'com.orbit.app');
     secrets.values['play.other'] = const PlayServiceAccount(
       clientEmail: 'other@x',
       privateKey: 'k',
@@ -93,24 +93,24 @@ void main() {
     addCredential('cred_a', 'prod_b', 'play_sa', 'play.other');
 
     expect(
-      (await source().forAndroidAppId('com.mataa.app'))!.clientEmail,
+      (await source().forAndroidAppId('com.orbit.app'))!.clientEmail,
       'xpath@project.iam.gserviceaccount.com',
     );
   });
 
   test('has no account when the secret is missing or malformed', () async {
     addCredential('cred_1', 'prod', 'play_sa', 'play.missing');
-    expect(await source().forAndroidAppId('com.mataa.app'), isNull);
+    expect(await source().forAndroidAppId('com.orbit.app'), isNull);
 
     secrets.values['play.missing'] = '{"client_email": "a@b.c"}';
-    expect(await source().forAndroidAppId('com.mataa.app'), isNull);
+    expect(await source().forAndroidAppId('com.orbit.app'), isNull);
   });
 
   test('has no account when the secrets are locked', () async {
     addCredential('cred_1', 'prod', 'play_sa', 'play.prod');
 
     expect(
-      await source(_LockedSecrets()).forAndroidAppId('com.mataa.app'),
+      await source(_LockedSecrets()).forAndroidAppId('com.orbit.app'),
       isNull,
     );
   });

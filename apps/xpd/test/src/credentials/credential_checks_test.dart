@@ -13,7 +13,7 @@ import 'package:xpd/xpd.dart';
 import '../../helpers/credential_fakes.dart';
 import '../../helpers/test_engine.dart';
 
-const _bundleId = 'com.mataa.app';
+const _bundleId = 'com.orbit.app';
 
 final DeviceToken _owner = DeviceToken(
   id: 'tok_app',

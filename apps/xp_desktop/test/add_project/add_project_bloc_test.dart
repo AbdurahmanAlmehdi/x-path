@@ -20,11 +20,11 @@ void main() {
       build: () => AddProjectBloc(projects: projects),
       setUp: () =>
           when(() => projects.addProject('/src/app'))
-              .thenAnswer((_) async => mataa),
+              .thenAnswer((_) async => orbit),
       act: (bloc) => bloc.add(const AddProjectSubmitted(' /src/app ')),
       expect: () => [
         const AddProjectState(status: AddProjectStatus.adding),
-        const AddProjectState(status: AddProjectStatus.review, project: mataa),
+        const AddProjectState(status: AddProjectStatus.review, project: orbit),
       ],
     );
 
@@ -90,7 +90,7 @@ void main() {
       build: () => AddProjectBloc(projects: projects),
       seed: () => const AddProjectState(
         status: AddProjectStatus.review,
-        project: mataa,
+        project: orbit,
       ),
       setUp: () =>
           when(() => projects.scanProject('prj_1'))
@@ -99,7 +99,7 @@ void main() {
       expect: () => [
         const AddProjectState(
           status: AddProjectStatus.scanning,
-          project: mataa,
+          project: orbit,
         ),
         const AddProjectState(
           status: AddProjectStatus.review,
@@ -113,7 +113,7 @@ void main() {
       build: () => AddProjectBloc(projects: projects),
       seed: () => const AddProjectState(
         status: AddProjectStatus.review,
-        project: mataa,
+        project: orbit,
       ),
       setUp: () => when(() => projects.scanProject(any())).thenThrow(refused),
       act: (bloc) => bloc.add(const AddProjectRescanned()),
@@ -121,7 +121,7 @@ void main() {
       expect: () => [
         const AddProjectState(
           status: AddProjectStatus.review,
-          project: mataa,
+          project: orbit,
           error: 'Not a git repository.',
         ),
       ],
@@ -132,7 +132,7 @@ void main() {
       build: () => AddProjectBloc(projects: projects),
       seed: () => const AddProjectState(
         status: AddProjectStatus.review,
-        project: mataa,
+        project: orbit,
       ),
       setUp: () =>
           when(() => projects.removeProject('prj_1')).thenAnswer((_) async {}),
@@ -145,14 +145,14 @@ void main() {
       build: () => AddProjectBloc(projects: projects),
       seed: () => const AddProjectState(
         status: AddProjectStatus.review,
-        project: mataa,
+        project: orbit,
       ),
       setUp: () => when(() => projects.removeProject(any())).thenThrow(refused),
       act: (bloc) => bloc.add(const AddProjectDiscarded()),
       expect: () => [
         const AddProjectState(
           status: AddProjectStatus.review,
-          project: mataa,
+          project: orbit,
           error: 'Not a git repository.',
         ),
       ],

@@ -12,14 +12,14 @@ void main() {
 
     expect(
       await fake.lookup(
-        iosBundleId: 'com.mataa.app',
-        androidAppId: 'com.mataa',
+        iosBundleId: 'com.orbit.app',
+        androidAppId: 'com.orbit',
       ),
       const StoreBuilds({1}),
     );
     fake.builds = null;
     expect(await fake.lookup(), isNull);
-    expect(fake.lookups, ['com.mataa.app com.mataa', 'null null']);
+    expect(fake.lookups, ['com.orbit.app com.orbit', 'null null']);
   });
 
   group('CombinedStoreBuildNumbers', () {
@@ -37,23 +37,23 @@ void main() {
       'joins the builds of both stores, each asked for its own app',
       () async {
         final builds = await combined.lookup(
-          iosBundleId: 'com.mataa.app',
-          androidAppId: 'com.mataa.android',
+          iosBundleId: 'com.orbit.app',
+          androidAppId: 'com.orbit.android',
         );
 
         expect(builds, const StoreBuilds({3280, 3281, 3282}));
-        expect(apple.lookups, ['com.mataa.app null']);
-        expect(play.lookups, ['null com.mataa.android']);
+        expect(apple.lookups, ['com.orbit.app null']);
+        expect(play.lookups, ['null com.orbit.android']);
       },
     );
 
     test('asks only the store the app is on', () async {
       expect(
-        await combined.lookup(iosBundleId: 'com.mataa.app'),
+        await combined.lookup(iosBundleId: 'com.orbit.app'),
         const StoreBuilds({3280, 3282}),
       );
       expect(
-        await combined.lookup(androidAppId: 'com.mataa.android'),
+        await combined.lookup(androidAppId: 'com.orbit.android'),
         const StoreBuilds({3281, 3282}),
       );
       expect(apple.lookups, hasLength(1));
@@ -64,8 +64,8 @@ void main() {
       play.builds = null;
 
       final builds = await combined.lookup(
-        iosBundleId: 'com.mataa.app',
-        androidAppId: 'com.mataa.android',
+        iosBundleId: 'com.orbit.app',
+        androidAppId: 'com.orbit.android',
       );
 
       expect(
@@ -77,8 +77,8 @@ void main() {
       play.builds = const StoreBuilds({1});
       expect(
         await combined.lookup(
-          iosBundleId: 'com.mataa.app',
-          androidAppId: 'com.mataa.android',
+          iosBundleId: 'com.orbit.app',
+          androidAppId: 'com.orbit.android',
         ),
         const StoreBuilds({1}, unreadable: {'App Store Connect'}),
       );
@@ -90,8 +90,8 @@ void main() {
 
       expect(
         await combined.lookup(
-          iosBundleId: 'com.mataa.app',
-          androidAppId: 'com.mataa.android',
+          iosBundleId: 'com.orbit.app',
+          androidAppId: 'com.orbit.android',
         ),
         isNull,
       );

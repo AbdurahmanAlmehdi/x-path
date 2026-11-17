@@ -327,13 +327,13 @@ void main() {
   group('CreateCredentialRequest', () {
     test('splits the name and kind from the material', () {
       final request = CreateCredentialRequest.fromJson(const {
-        'name': ' Mataa Apple Dev Account ',
+        'name': ' Orbit Apple Dev Account ',
         'kind': 'apple_id',
         'appleId': 'dev@example.com',
         'password': 'abcd-efgh-ijkl-mnop',
       });
 
-      expect(request.name, 'Mataa Apple Dev Account');
+      expect(request.name, 'Orbit Apple Dev Account');
       expect(request.kind, CredentialKind.appleId);
       expect(request.material, {
         'appleId': 'dev@example.com',
@@ -342,7 +342,7 @@ void main() {
       expect(CreateCredentialRequest.fromJson(request.toJson()), request);
       expect(
         request.toString(),
-        'CreateCredentialRequest(Mataa Apple Dev Account, apple_id)',
+        'CreateCredentialRequest(Orbit Apple Dev Account, apple_id)',
       );
     });
 

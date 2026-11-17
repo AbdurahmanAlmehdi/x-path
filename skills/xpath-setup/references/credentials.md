@@ -21,13 +21,13 @@ xp credentials add --kind asc_key --name "Personal Apple Dev Account" \
 xp credentials add --kind apple_id --name "Upload Apple ID" --apple-id dev@example.com   # asks the password
 xp credentials add --kind play_sa --name "Play publisher" --service-account ~/keys/play.json
 xp credentials add --kind keystore --name "Upload keystore" --keystore upload.jks --key-alias upload
-xp credentials add --kind dart_defines --name "Mataa prod defines" --dart-defines env/prod.json
+xp credentials add --kind dart_defines --name "Orbit prod defines" --dart-defines env/prod.json
 printf %s "$SHOREBIRD_TOKEN" | xp credentials add --kind shorebird --name "Studio Shorebird" --token-stdin
 xp credentials assign "Personal Apple Dev Account" --project acme/shop --all-flavors
 xp credentials assign "Studio Shorebird" --project acme/shop --flavor prod
 xp credentials list                      # names, kinds, status, used by N flavors
 xp credentials show "Studio Shorebird"   # and where it is used, with each assignment's check
-xp credentials rename "Studio Shorebird" "Mataa Shorebird"
+xp credentials rename "Studio Shorebird" "Orbit Shorebird"
 xp credentials replace "Play publisher" --service-account ~/keys/play-new.json   # same name, new secret
 xp credentials verify "Personal Apple Dev Account"
 xp credentials unassign "Studio Shorebird" --project acme/shop --flavor prod

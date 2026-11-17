@@ -62,7 +62,7 @@ void main() {
 
   group('editDistance', () {
     test('counts insertions, deletions and substitutions', () {
-      expect(editDistance('com.mataa.captain', 'com.mataaa.captain'), 1);
+      expect(editDistance('com.orbit.captain', 'com.orbitx.captain'), 1);
       expect(editDistance('abc', 'abd'), 1);
       expect(editDistance('abc', 'ab'), 1);
       expect(editDistance('kitten', 'sitting'), 3);

@@ -74,7 +74,7 @@ void main() {
       const AppMenuBar(child: SizedBox()),
       shell: shell,
       projects: projectsIn(
-        const ProjectsState(loaded: true, projects: [mataa, captain]),
+        const ProjectsState(loaded: true, projects: [orbit, captain]),
       ),
     );
 
@@ -94,7 +94,7 @@ void main() {
     );
 
     items
-        .firstWhere((item) => item.label == 'acme/mataa_captain')
+        .firstWhere((item) => item.label == 'acme/orbit_captain')
         .onSelected!();
     expect(shell.state, const ProjectDestination('prj_2'));
     expect(

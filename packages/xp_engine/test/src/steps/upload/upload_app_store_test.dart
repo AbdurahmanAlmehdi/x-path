@@ -20,7 +20,7 @@ const _key = AscKey(
 UploadAppStoreInput _input({AppStoreUploadAuth? auth}) =>
     UploadAppStoreInput.fromJson({
       'artifactName': _ipaName,
-      'bundleId': 'com.mataa.app',
+      'bundleId': 'com.orbit.app',
       'appleAppId': '1234567890',
       'version': '5.4.1+3283',
       'auth': (auth ?? const ApiKeyUploadAuth('asc.prod')).toJson(),
@@ -459,7 +459,7 @@ void main() {
         '--apple-id',
         '1234567890',
         '--bundle-id',
-        'com.mataa.app',
+        'com.orbit.app',
         '--bundle-version',
         '3283',
         '--bundle-short-version-string',

@@ -138,6 +138,6 @@ const testFlavor = CredentialFlavor(
   projectId: 'prj_1',
   appPath: '.',
   name: 'prod',
-  iosBundleId: 'com.mataa.app',
-  androidAppId: 'com.mataa.app',
+  iosBundleId: 'com.orbit.app',
+  androidAppId: 'com.orbit.app',
 );

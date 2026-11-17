@@ -46,7 +46,7 @@ jobs and steps with live logs.
 | Term | Meaning |
 |---|---|
 | Engine | The background service doing the work. Local ("This Mac") or remote ("mac-mini"). |
-| Project | One git repo, e.g. `mataa_new_app`. Holds one or more apps. |
+| Project | One git repo, e.g. `orbit_new_app`. Holds one or more apps. |
 | App | One Flutter app inside a project (a monorepo can hold a phone app and a tablet app). |
 | Flavor | A build variant of an app, usually `dev` and `prod`, each with its own bundle ID and store listing. |
 | Workflow | A recipe: stages that run in order, each with jobs that run in parallel, each with steps. Built-ins: Dev build, Prod release, Shorebird patch, Tests. |
@@ -145,33 +145,33 @@ Use these so screens feel real and the numbers agree.
 **Engines:** "This Mac" (MacBook Pro, local, connected) and "mac-mini" (remote, connected).
 
 **Projects**
-- `mataa_new_app` (Mataa customer app): flavors `dev` (com.mataaa.dev) and `prod`
-  (com.sixdtec.mata / com.mataaa). Local version 5.5.0 (3284) on `dev`. Release 5.4.1 (3283):
+- `orbit_new_app` (Orbit customer app): flavors `dev` (com.orbitx.dev) and `prod`
+  (com.nimbus.orbit / com.orbitx). Local version 5.5.0 (3284) on `dev`. Release 5.4.1 (3283):
   App Store "waiting for review", Play "in review", forced update. Live: iOS 5.3.6, Android
   5.3.7. Shorebird patches on 5.3.7: p1, p2.
-- `mataa_captain` (driver app): release 1.3.7 (31) App Store "in review", Play "published".
+- `orbit_captain` (driver app): release 1.3.7 (31) App Store "in review", Play "published".
   Note: 1.3.6 (30) was rejected by the upload with "train closed" and rebuilt as 1.3.7.
-- `oneavant_guest_experience` (melos monorepo): apps `mobile_app` and `tablet_app`, flavors
-  `dev`, `iniala`, `oneavant`.
+- `harbor_guest_experience` (melos monorepo): apps `mobile_app` and `tablet_app`, flavors
+  `dev`, `seaview`, `harbor`.
 
 **Runners:** "This Mac" (macOS arm64, `ios-sign` `android` `flutter`, 1/3 slots, Xcode 27.1,
 Flutter 3.47.4); "mac-mini" (macOS arm64, `ios-sign` `android` `flutter`, idle);
 "linux-builder-01" (Ubuntu x64, `android` `flutter` `swift-linux`, 2/4 slots).
 
-**Running job:** Prod release, `mataa_new_app` prod, 5.4.1 (3283), commit `9a3bc0d` "chore(release):
+**Running job:** Prod release, `orbit_new_app` prod, 5.4.1 (3283), commit `9a3bc0d` "chore(release):
 5.4.1+3283", started by Abdurahman 14:02. Stages: Preflight (done 0:41) → Build (iOS running
 on This Mac 6:12, Android done on linux-builder-01 4:55) → Upload (waiting for approval) →
-Record. Log tail: `Running pod install...`, `Building com.sixdtec.mata for device (ios-release)...`,
+Record. Log tail: `Running pod install...`, `Building com.nimbus.orbit for device (ios-release)...`,
 `Xcode archive done. 312.4s`.
 
 **Pending approval:** "Submit 5.4.1 (3283) to App Store", requested by agent "Claude Code
 (xp mcp)" at 14:09, expires in 23h 51m, commit `9a3bc0d`.
 
-**Tests:** `mataa_new_app` dev: 1,284 passed, 27 failed (all 27 in the baseline), 0 new
+**Tests:** `orbit_new_app` dev: 1,284 passed, 27 failed (all 27 in the baseline), 0 new
 failures, 3 fixed since baseline, 2m 41s.
 
 **Storage:** 51.2 GB of artifacts, 38.9 GB reclaimable (pinned: 5.4.1 in review, 5.3.7 live).
 
-**Scan finding examples:** warning "iOS dev bundle ID `com.mataaa.captain.dev` differs from
-Android `com.mataa.captain.dev`"; error "No App Store Connect API key for team FANNAK: status
+**Scan finding examples:** warning "iOS dev bundle ID `com.orbitx.captain.dev` differs from
+Android `com.orbit.captain.dev`"; error "No App Store Connect API key for team GLOBEX: status
 will show the live version only"; info "Shorebird enabled for prod only".

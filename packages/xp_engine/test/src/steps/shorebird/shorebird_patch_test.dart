@@ -3,7 +3,7 @@ import 'package:xp_engine/xp_engine.dart';
 
 import '../../../helpers/build_harness.dart';
 
-const _ipa = '$appDirectory/build/ios/ipa/Mataa.ipa';
+const _ipa = '$appDirectory/build/ios/ipa/Orbit.ipa';
 
 void main() {
   late BuildHarness harness;

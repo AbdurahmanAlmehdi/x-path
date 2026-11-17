@@ -19,8 +19,8 @@ void main() {
   setUp(() {
     projects = MockProjectsRepository();
     shell = ShellCubit(const AddProjectDestination());
-    when(() => projects.addProject('/src/app')).thenAnswer((_) async => mataa);
-    when(() => projects.scanProject('prj_1')).thenAnswer((_) async => mataa);
+    when(() => projects.addProject('/src/app')).thenAnswer((_) async => orbit);
+    when(() => projects.scanProject('prj_1')).thenAnswer((_) async => orbit);
     when(() => projects.removeProject('prj_1')).thenAnswer((_) async {});
   });
 
@@ -132,10 +132,10 @@ void main() {
       await tester.tap(find.text('Add and scan'));
       await tester.pumpAndSettle();
       expect(
-        find.text('Review the scan of acme/mataa_new_app'),
+        find.text('Review the scan of acme/orbit_new_app'),
         findsOneWidget,
       );
-      expect(find.text('Mataa customer app'), findsOneWidget);
+      expect(find.text('Orbit customer app'), findsOneWidget);
 
       await tester.tap(find.text('Scan again'));
       await tester.pumpAndSettle();
@@ -161,7 +161,7 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('Remove project'));
       await tester.pumpAndSettle();
-      expect(find.text('Remove acme/mataa_new_app?'), findsOneWidget);
+      expect(find.text('Remove acme/orbit_new_app?'), findsOneWidget);
       await tester.tap(find.text('Keep'));
       await tester.pumpAndSettle();
       verifyNever(() => projects.removeProject(any()));

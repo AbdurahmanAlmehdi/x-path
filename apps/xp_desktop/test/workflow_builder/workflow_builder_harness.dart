@@ -199,7 +199,7 @@ Future<void> pumpBuilder(
     workflowsRepository: repository ?? workflowsRepository(),
     services: testServices(pickFile: pickFile, saveFile: saveFile),
     brightness: brightness,
-    projects: projectsIn(const ProjectsState(loaded: true, projects: [mataa])),
+    projects: projectsIn(const ProjectsState(loaded: true, projects: [orbit])),
   );
   await settle(tester);
 }

@@ -75,7 +75,7 @@ void main() {
       releasesRepository: releases,
       connection: connectionIn(connectedTo(status: status)),
       projects: projectsIn(
-        ProjectsState(loaded: true, projects: [mataaWithVersion]),
+        ProjectsState(loaded: true, projects: [orbitWithVersion]),
       ),
     );
     for (var i = 0; i < 4; i++) {

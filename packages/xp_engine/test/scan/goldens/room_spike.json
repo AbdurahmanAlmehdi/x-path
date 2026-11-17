@@ -20,8 +20,8 @@
             "name": "default",
             "implicit": true,
             "entrypoint": "lib/main.dart",
-            "iosBundleId": "com.oneavant.spike.roomSceneSpike",
-            "androidAppId": "com.oneavant.spike.room_scene_spike",
+            "iosBundleId": "com.harbor.spike.roomSceneSpike",
+            "androidAppId": "com.harbor.spike.room_scene_spike",
             "iosTeam": "FAKETEAM04",
             "infoPlist": "ios/Runner/Info.plist",
             "shorebird": false,
@@ -51,7 +51,7 @@
     {
       "severity": "warning",
       "code": "bundle_id_platform_mismatch",
-      "message": "Flavor default is com.oneavant.spike.room_scene_spike on Android and com.oneavant.spike.roomSceneSpike on iOS.",
+      "message": "Flavor default is com.harbor.spike.room_scene_spike on Android and com.harbor.spike.roomSceneSpike on iOS.",
       "fix": "Ignore this if the apps are meant to have different ids; otherwise make them agree.",
       "app": ".",
       "flavor": "default"

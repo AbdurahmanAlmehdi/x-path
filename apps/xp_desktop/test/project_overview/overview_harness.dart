@@ -15,19 +15,19 @@ import '../helpers/job_fixtures.dart';
 import '../helpers/pump_app.dart';
 import '../helpers/release_fixtures.dart';
 
-/// `mataa` with the pubspec version of `Main.dc.html`.
-final mataaWithVersion = Project(
-  id: mataa.id,
+/// `orbit` with the pubspec version of `Main.dc.html`.
+final orbitWithVersion = Project(
+  id: orbit.id,
   host: 'github.com',
-  sourceKey: '${mataa.githubRepoId}',
-  githubRepoId: mataa.githubRepoId,
-  fullName: mataa.fullName,
-  remote: mataa.remote,
-  defaultBaseBranch: mataa.defaultBaseBranch,
-  findings: mataa.findings,
+  sourceKey: '${orbit.githubRepoId}',
+  githubRepoId: orbit.githubRepoId,
+  fullName: orbit.fullName,
+  remote: orbit.remote,
+  defaultBaseBranch: orbit.defaultBaseBranch,
+  findings: orbit.findings,
   profile: ProjectProfile(
     apps: [
-      for (final app in mataa.profile.apps)
+      for (final app in orbit.profile.apps)
         AppProfile(
           name: app.name,
           path: app.path,
@@ -42,16 +42,16 @@ final mataaWithVersion = Project(
   ),
 );
 
-/// `mataaWithVersion` on Bitbucket, under a path of three segments
+/// `orbitWithVersion` on Bitbucket, under a path of three segments
 /// (ADR 0015).
-final mataaOnBitbucket = Project(
-  id: mataa.id,
+final orbitOnBitbucket = Project(
+  id: orbit.id,
   host: 'bitbucket.org',
   sourceKey: 'h0123456789abcdef',
-  fullName: 'ws/mobile/mataa_new_app',
-  remote: 'git@bitbucket.org:ws/mobile/mataa_new_app.git',
-  defaultBaseBranch: mataa.defaultBaseBranch,
-  profile: mataaWithVersion.profile,
+  fullName: 'ws/mobile/orbit_new_app',
+  remote: 'git@bitbucket.org:ws/mobile/orbit_new_app.git',
+  defaultBaseBranch: orbit.defaultBaseBranch,
+  profile: orbitWithVersion.profile,
 );
 
 /// The repositories behind an overview, with the releases the test gives.
@@ -132,7 +132,7 @@ class OverviewHarness {
           projectsIn(
             ProjectsState(
               loaded: true,
-              projects: [project ?? mataaWithVersion],
+              projects: [project ?? orbitWithVersion],
             ),
           ),
     );

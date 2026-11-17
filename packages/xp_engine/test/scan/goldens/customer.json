@@ -3,7 +3,7 @@
     "layout": "single",
     "apps": [
       {
-        "name": "mataa_app",
+        "name": "orbit_app",
         "path": ".",
         "framework": "flutter",
         "version": "5.5.0+3284",
@@ -24,8 +24,8 @@
             "name": "dev",
             "implicit": false,
             "entrypoint": "lib/main_dev.dart",
-            "iosBundleId": "com.mataaa.dev",
-            "androidAppId": "com.mataaa.dev",
+            "iosBundleId": "com.orbitx.dev",
+            "androidAppId": "com.orbitx.dev",
             "iosTeam": "FAKETEAM02",
             "iosScheme": "dev",
             "infoPlist": "ios/Runner/Info-Dev.plist",
@@ -50,8 +50,8 @@
             "name": "prod",
             "implicit": false,
             "entrypoint": "lib/main_prod.dart",
-            "iosBundleId": "com.sixdtec.mata",
-            "androidAppId": "com.mataaa",
+            "iosBundleId": "com.nimbus.orbit",
+            "androidAppId": "com.orbitx",
             "iosTeam": "FAKETEAM01",
             "iosScheme": "prod",
             "infoPlist": "ios/Runner/Info.plist",
@@ -123,7 +123,7 @@
     {
       "severity": "warning",
       "code": "bundle_id_platform_mismatch",
-      "message": "Flavor prod is com.mataaa on Android and com.sixdtec.mata on iOS.",
+      "message": "Flavor prod is com.orbitx on Android and com.nimbus.orbit on iOS.",
       "fix": "Ignore this if the apps are meant to have different ids; otherwise make them agree.",
       "app": ".",
       "flavor": "prod"

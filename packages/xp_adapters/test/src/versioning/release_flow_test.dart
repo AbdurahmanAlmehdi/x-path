@@ -12,7 +12,7 @@ import '../../helpers/git_fixture.dart';
 import '../../helpers/memory_secret_store.dart';
 
 /// The guard and version steps over real git and a real directory: a fixture
-/// repository shaped like the Mataa customer app.
+/// repository shaped like the Orbit customer app.
 class _NoProcessContext implements StepContext {
   @override
   String get jobId => 'job_1';
@@ -168,7 +168,7 @@ void main() {
     'the source guard sees pubspec_overrides.yaml (real incident)',
     () async {
       File(p.join(worktree.path, 'pubspec_overrides.yaml')).writeAsStringSync(
-        'dependency_overrides:\n  mataa_core:\n    path: ../mataa_core\n',
+        'dependency_overrides:\n  orbit_core:\n    path: ../orbit_core\n',
       );
 
       final outcome = await runGuard([GuardCheckName.source]);

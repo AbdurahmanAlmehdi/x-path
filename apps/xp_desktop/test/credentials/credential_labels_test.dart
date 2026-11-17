@@ -15,11 +15,11 @@ void main() {
     });
 
     test('keeps only the last part of a folder too long for a name', () {
-      final folder = '/Users/sam/${'work/' * 12}mataa';
+      final folder = '/Users/sam/${'work/' * 12}orbit';
 
       final name = certificateName(l10n, folder, 'prod');
 
-      expect(name, 'Apple Distribution · mataa prod');
+      expect(name, 'Apple Distribution · orbit prod');
       expect(credentialName(name), name);
     });
 

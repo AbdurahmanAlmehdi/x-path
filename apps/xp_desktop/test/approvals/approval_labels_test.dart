@@ -51,12 +51,12 @@ void main() {
     String consequence(String action) => l10n.approvalConsequence(
       _asking(action),
       flavor: 'prod',
-      bundleId: 'com.sixdtec.mata',
+      bundleId: 'com.nimbus.orbit',
     );
     expect(
       consequence('prod_release'),
       'XPath builds 5.4.1 (3283) from 9a3bc0d and releases it to the stores. '
-      'It goes out as prod · com.sixdtec.mata.',
+      'It goes out as prod · com.nimbus.orbit.',
     );
     expect(
       consequence('prod_patch'),

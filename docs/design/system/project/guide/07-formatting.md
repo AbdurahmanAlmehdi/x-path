@@ -27,7 +27,7 @@ Seven characters (`9a3bc0d`) in `type.code`. Clicking copies the full 40-charact
 
 ## Truncation
 
-- **Middle ellipsis** for identifiers whose both ends matter: branch names (`release/5.4.1…forced-update`), bundle IDs (`com.sixdtec.…captain.dev`), file paths, artifact names. Keep the first segment and the last segment whole.
+- **Middle ellipsis** for identifiers whose both ends matter: branch names (`release/5.4.1…forced-update`), bundle IDs (`com.nimbus.…captain.dev`), file paths, artifact names. Keep the first segment and the last segment whole.
 - **Tail ellipsis** for prose: commit messages, release notes, finding messages.
 - **Never truncate** versions, build numbers, SHAs, statuses or durations: their column is sized to fit.
 - The full value is always in the tooltip and on copy.
@@ -37,4 +37,4 @@ Seven characters (`9a3bc0d`) in `type.code`. Clicking copies the full 40-charact
 - Thousands separators: `1,284 passed`. Percentages without space: `20%`. Slots: `2/3`.
 - Sentence case everywhere ("Mark approved", "Free up space"); mono caps only for `type.label`.
 - An action that opens a sheet ends with an ellipsis: `Dispatch…`, `Review…`, `Deny…`.
-- Project and app names verbatim (`mataa_new_app`), in Sans.
+- Project and app names verbatim (`orbit_new_app`), in Sans.

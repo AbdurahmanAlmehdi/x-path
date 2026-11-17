@@ -127,7 +127,7 @@ stages:
     });
 
     test('is null on GitHub, and for a workflow without GitHub steps', () {
-      for (final state in [stateOf(mataa, _pushing), stateOf(shop, bumping)]) {
+      for (final state in [stateOf(orbit, _pushing), stateOf(shop, bumping)]) {
         expect(state.gitHubStep, isNull);
         expect(state.canDispatch, isTrue);
       }
@@ -135,7 +135,7 @@ stages:
   });
 
   setUpAll(() {
-    registerFallbackValue(mataa);
+    registerFallbackValue(orbit);
     registerFallbackValue(prodWorkflow);
     registerFallbackValue(const DispatchRequest());
   });
@@ -161,7 +161,7 @@ stages:
   DispatchBloc build({Duration typingPause = Duration.zero}) => DispatchBloc(
     workflows: workflows,
     releases: releases,
-    project: mataa,
+    project: orbit,
     typingPause: typingPause,
   );
 

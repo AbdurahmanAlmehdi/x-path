@@ -29,9 +29,9 @@ void main() {
     repository = InMemoryCredentialRepository([testFlavor]);
     secrets = BytesSecretStore();
     asc = FakeAppStoreConnect();
-    asc.apps['com.mataa.app'] = const AscApp(
+    asc.apps['com.orbit.app'] = const AscApp(
       id: '1',
-      bundleId: 'com.mataa.app',
+      bundleId: 'com.orbit.app',
     );
     altool = FakeProcessRunner(
       (call) => ProcessOutput(
@@ -214,7 +214,7 @@ void main() {
     expect(job.state, JobState.failed);
     expect(
       job.steps.first.message,
-      contains('sees no app with the bundle id com.mataa.app'),
+      contains('sees no app with the bundle id com.orbit.app'),
     );
     expect(build.runs, isEmpty);
   });

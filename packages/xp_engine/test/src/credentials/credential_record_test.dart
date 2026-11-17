@@ -24,8 +24,8 @@ void main() {
         null,
         '.',
         'prod',
-        'com.mataa.app',
-        'com.mataa.app',
+        'com.orbit.app',
+        'com.orbit.app',
       ]);
     });
   });
@@ -106,9 +106,9 @@ void main() {
         account: 'A',
       );
 
-      final renamed = checked.renamed('Mataa Apple Dev Account');
+      final renamed = checked.renamed('Orbit Apple Dev Account');
 
-      expect(renamed.name, 'Mataa Apple Dev Account');
+      expect(renamed.name, 'Orbit Apple Dev Account');
       expect(renamed.id, checked.id);
       expect(renamed.secretKey, checked.secretKey);
       expect(renamed.account, 'A');

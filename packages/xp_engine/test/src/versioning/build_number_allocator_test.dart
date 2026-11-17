@@ -33,8 +33,8 @@ void main() {
     mirror: mirror,
     model: model,
     scope: scope,
-    iosBundleId: 'com.mataa.app',
-    androidAppId: 'com.mataa.app',
+    iosBundleId: 'com.orbit.app',
+    androidAppId: 'com.orbit.app',
   );
 
   test('starts at 1 for an app that was never released', () async {
@@ -45,7 +45,7 @@ void main() {
     store.builds = const StoreBuilds({3279, 3282});
 
     expect(await allocate(), 3283);
-    expect(store.lookups, ['com.mataa.app com.mataa.app']);
+    expect(store.lookups, ['com.orbit.app com.orbit.app']);
   });
 
   test('continues after the highest tagged build, patches included', () async {
@@ -107,7 +107,7 @@ void main() {
       projectId: 'prj_1',
       appPath: '.',
       mirror: mirror,
-      iosBundleId: 'com.mataa.app',
+      iosBundleId: 'com.orbit.app',
     );
 
     expect(peeked, 3283);
@@ -120,7 +120,7 @@ void main() {
       projectId: 'prj_1',
       appPath: '.',
       mirror: mirror,
-      iosBundleId: 'com.mataa.app',
+      iosBundleId: 'com.orbit.app',
     );
     store.builds = const StoreBuilds({10});
 
@@ -140,8 +140,8 @@ void main() {
       projectId: 'prj_1',
       appPath: '.',
       mirror: mirror,
-      iosBundleId: 'com.mataa.app',
-      androidAppId: 'com.mataa.app',
+      iosBundleId: 'com.orbit.app',
+      androidAppId: 'com.orbit.app',
     );
     store.builds = const StoreBuilds({20});
 

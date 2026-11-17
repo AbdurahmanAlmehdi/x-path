@@ -311,7 +311,7 @@ Details:
 - README trimmed to overview, install, quickstart link and a docs index; engine internals
   (migration history etc.) move to `docs/reference/`. The site "Docs" link points at the
   guide.
-- Replace owner-specific values (`mataa_new_app`, team `AFBD5TBR5U`) in
+- Replace owner-specific values (`orbit_new_app`, team `Q7R2T9K4M1`) in
   `docs/guide/try-it-locally.md` with placeholders.
 - Fix the setup skill's Docker instructions to use `ghcr.io/abdurahmanalmehdi/xpath`.
 - `.github/ISSUE_TEMPLATE/{bug_report,feature_request}.yml` (the bug template asks for

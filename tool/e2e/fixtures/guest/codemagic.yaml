@@ -1,10 +1,10 @@
 workflows:
-  guest-ios-oneavant:
-    name: Guest iOS (OneAvant)
+  guest-ios-harbor:
+    name: Guest iOS (Harbor)
     scripts:
       - name: Resolve workspace dependencies
         script: dart pub get
-  guest-android-oneavant:
+  guest-android-harbor:
     scripts:
       - name: Build
-        script: flutter build appbundle --flavor oneavant
+        script: flutter build appbundle --flavor harbor

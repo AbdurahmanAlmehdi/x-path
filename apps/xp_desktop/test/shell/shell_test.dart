@@ -59,7 +59,7 @@ void main() {
     ShellCubit? shell,
     ProjectsState projects = const ProjectsState(
       loaded: true,
-      projects: [mataa, captain],
+      projects: [orbit, captain],
     ),
     EngineConnectionBloc? connection,
   }) => tester.pumpApp(
@@ -78,7 +78,7 @@ void main() {
         const AppShell(),
         shell: shell,
         projects: projectsIn(
-          const ProjectsState(loaded: true, projects: [mataa]),
+          const ProjectsState(loaded: true, projects: [orbit]),
         ),
         projectsRepository: repository,
         services: testServices(appMenu: menu),
@@ -99,7 +99,7 @@ void main() {
         const AppShell(),
         shell: ShellCubit(const ReleasesDestination('prj_1')),
         projects: projectsIn(
-          const ProjectsState(loaded: true, projects: [mataa, captain]),
+          const ProjectsState(loaded: true, projects: [orbit, captain]),
         ),
         projectsRepository: repository,
         workflowsRepository: DispatchHarness().workflows,
@@ -117,7 +117,7 @@ void main() {
         const AppShell(),
         shell: ShellCubit(const RunnersDestination()),
         projects: projectsIn(
-          const ProjectsState(loaded: true, projects: [mataa]),
+          const ProjectsState(loaded: true, projects: [orbit]),
         ),
         projectsRepository: repository,
       );
@@ -134,7 +134,7 @@ void main() {
         const AppShell(),
         shell: shell,
         projects: projectsIn(
-          const ProjectsState(loaded: true, projects: [mataa, captain]),
+          const ProjectsState(loaded: true, projects: [orbit, captain]),
         ),
         projectsRepository: repository,
       );
@@ -150,13 +150,13 @@ void main() {
       await press(LogicalKeyboardKey.digit9);
       expect(shell.state, ProjectDestination(captain.id));
       await press(LogicalKeyboardKey.digit1);
-      expect(shell.state, ProjectDestination(mataa.id));
+      expect(shell.state, ProjectDestination(orbit.id));
     });
 
     testWidgets('shows every project at home', (tester) async {
       await pumpShell(tester);
       expect(find.byType(HomePage), findsOneWidget);
-      expect(find.text('acme/mataa_captain'), findsOneWidget);
+      expect(find.text('acme/orbit_captain'), findsOneWidget);
       expect(find.text('2 projects'), findsOneWidget);
     });
 
@@ -211,7 +211,7 @@ void main() {
       const AppShell(),
       shell: ShellCubit(const WorkflowsDestination('prj_1')),
       projects: projectsIn(
-        const ProjectsState(loaded: true, projects: [mataa, captain]),
+        const ProjectsState(loaded: true, projects: [orbit, captain]),
       ),
       projectsRepository: repository,
       workflowsRepository: workflowsRepository(),
@@ -437,7 +437,7 @@ void main() {
         const Sidebar(),
         shell: ShellCubit(const ProjectDestination('prj_1')),
         projects: projectsIn(
-          const ProjectsState(loaded: true, projects: [mataa, captain]),
+          const ProjectsState(loaded: true, projects: [orbit, captain]),
         ),
         pendingApprovals: pendingIn(
           PendingApprovalsState(loaded: true, approvals: [pendingApproval]),
@@ -446,7 +446,7 @@ void main() {
 
       expect(find.bySemanticsLabel('Approvals, 1 needs you'), findsOneWidget);
       expect(
-        find.bySemanticsLabel(RegExp('acme/mataa_new_app, 1 app')),
+        find.bySemanticsLabel(RegExp('acme/orbit_new_app, 1 app')),
         findsOneWidget,
       );
     });
@@ -497,7 +497,7 @@ void main() {
         const Sidebar(),
         shell: shell,
         projects: projectsIn(
-          const ProjectsState(loaded: true, projects: [mataa, captain]),
+          const ProjectsState(loaded: true, projects: [orbit, captain]),
         ),
         pendingApprovals: pendingIn(
           PendingApprovalsState(
@@ -540,7 +540,7 @@ void main() {
         const Sidebar(),
         shell: shell,
         projects: projectsIn(
-          const ProjectsState(loaded: true, projects: [mataa]),
+          const ProjectsState(loaded: true, projects: [orbit]),
         ),
         runners: runnersIn(
           RunnersState(loaded: true, runners: [busyRunner, idleRunner]),
@@ -567,12 +567,12 @@ void main() {
       expect(
         find.descendant(
           of: find.byType(Sidebar),
-          matching: find.text('mataa_new_app'),
+          matching: find.text('orbit_new_app'),
         ),
         findsOneWidget,
       );
       expect(find.text('1 app · 1 warning'), findsOneWidget);
-      expect(find.text('mataa_captain'), findsOneWidget);
+      expect(find.text('orbit_captain'), findsOneWidget);
       expect(find.text('2 apps · 1 error'), findsOneWidget);
     });
 
@@ -607,7 +607,7 @@ void main() {
     testWidgets('navigates', (tester) async {
       final shell = ShellCubit(const RunnersDestination());
       await pumpShell(tester, shell: shell);
-      await tester.tap(find.text('mataa_captain'));
+      await tester.tap(find.text('orbit_captain'));
       await tester.pump();
       expect(shell.state, const ProjectDestination('prj_2'));
       await tester.tap(find.text('Credentials'));
@@ -631,7 +631,7 @@ void main() {
       addTearDown(gesture.removePointer);
       await gesture.moveTo(tester.getCenter(find.text('Credentials')));
       await tester.pump();
-      await gesture.moveTo(tester.getCenter(find.text('mataa_captain')));
+      await gesture.moveTo(tester.getCenter(find.text('orbit_captain')));
       await tester.pump();
       await gesture.moveTo(Offset.zero);
       await tester.pump();

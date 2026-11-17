@@ -66,7 +66,7 @@ What would close the gap:
 ## 4. Bitbucket repositories
 
 `xp projects add <folder>` refuses a clone whose origin is not on GitHub ("The origin of ... is
-not on GitHub."), so neither OneAvant app can be added. More than that check would have to
+not on GitHub."), so neither Harbor app can be added. More than that check would have to
 change: ADR 0009 keys the runner's source cache by GitHub repository id and has runners fetch
 over `git@github.com`, and `github.createPr` and `github.mergePr` drive the release merge.
 

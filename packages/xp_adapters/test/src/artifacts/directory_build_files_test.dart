@@ -100,25 +100,25 @@ void main() {
 
   group('files by extension', () {
     test('are listed from one directory only', () async {
-      put('ipa/Mataa.ipa');
+      put('ipa/Orbit.ipa');
       put('ipa/notes.txt');
       put('ipa/nested/Other.ipa');
 
       final listed = await files.list('${root.path}/ipa', extension: '.ipa');
 
-      expect(listed.map((f) => f.path), ['${root.path}/ipa/Mataa.ipa']);
+      expect(listed.map((f) => f.path), ['${root.path}/ipa/Orbit.ipa']);
       expect(await files.list('${root.path}/nope', extension: '.ipa'), isEmpty);
     });
 
     test('are deleted from one directory only', () async {
-      put('ipa/Mataa.ipa');
+      put('ipa/Orbit.ipa');
       put('ipa/notes.txt');
       put('ipa/nested/Other.ipa');
 
       await files.deleteAll('${root.path}/ipa', extension: '.ipa');
       await files.deleteAll('${root.path}/nope', extension: '.ipa');
 
-      expect(File('${root.path}/ipa/Mataa.ipa').existsSync(), isFalse);
+      expect(File('${root.path}/ipa/Orbit.ipa').existsSync(), isFalse);
       expect(File('${root.path}/ipa/notes.txt').existsSync(), isTrue);
       expect(File('${root.path}/ipa/nested/Other.ipa').existsSync(), isTrue);
     });

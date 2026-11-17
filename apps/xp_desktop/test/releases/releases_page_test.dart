@@ -117,7 +117,7 @@ void main() {
       expect(find.text('Copied'), findsNothing);
       await tester.tap(find.text('Copy link'));
       await tester.pump(const Duration(seconds: 2));
-      expect(clipboard.last, 'https://github.com/acme/mataa_new_app/pull/42');
+      expect(clipboard.last, 'https://github.com/acme/orbit_new_app/pull/42');
 
       await tester.tap(find.text('Open job'));
       expect(shell.state, const JobDestination('run_1', projectId: 'prj_1'));
@@ -541,7 +541,7 @@ void main() {
       tester,
     ) async {
       await ReleasesHarness(releases: const [])
-          .pump(tester, project: mataaOnBitbucket);
+          .pump(tester, project: orbitOnBitbucket);
 
       expect(
         find.text(

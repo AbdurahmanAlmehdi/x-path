@@ -8,8 +8,8 @@ import 'package:xpd/xpd.dart';
 
 import '../../helpers/job_fakes.dart';
 
-const _bundleId = 'com.mataa.app';
-const _package = 'com.mataa.app';
+const _bundleId = 'com.orbit.app';
+const _package = 'com.orbit.app';
 
 /// The rollout step (U7a) through the store adapters the engine serves with,
 /// against the fake App Store Connect and Google Play.

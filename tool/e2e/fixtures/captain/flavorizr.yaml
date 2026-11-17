@@ -1,15 +1,15 @@
 flavors:
   dev:
     app:
-      name: "Mataa Captain Dev"
+      name: "Orbit Captain Dev"
     android:
-      applicationId: "com.mataa.captain.dev"
+      applicationId: "com.orbit.captain.dev"
     ios:
-      bundleId: "com.mataaa.captain.dev"
+      bundleId: "com.orbitx.captain.dev"
   prod:
     app:
-      name: "Mataa Captain"
+      name: "Orbit Captain"
     android:
-      applicationId: "com.mataa.captain"
+      applicationId: "com.orbit.captain"
     ios:
-      bundleId: "com.mataa.captain"
+      bundleId: "com.orbit.captain"

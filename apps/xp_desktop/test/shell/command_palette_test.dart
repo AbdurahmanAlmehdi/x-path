@@ -72,7 +72,7 @@ void main() {
     workflows = MockWorkflowsRepository();
     approvals = MockApprovalsRepository();
     when(projects.watchProjects)
-        .thenAnswer((_) => Stream.value(const Snapshot([mataa, captain])));
+        .thenAnswer((_) => Stream.value(const Snapshot([orbit, captain])));
     when(() => projects.watchCredentials(any()))
         .thenAnswer((_) => const Stream.empty());
     when(releases.watchReleases)
@@ -106,20 +106,20 @@ void main() {
       expect(const CommandPaletteQueryChanged('q').props, ['q']);
       expect(CommandPaletteRunAgainRequested(failed).props, [failed]);
       expect(CommandPaletteCancelRequested(failed).props, [failed]);
-      expect(const GoToProject(mataa).props, [mataa]);
+      expect(const GoToProject(orbit).props, [orbit]);
       expect(GoToRelease(liveRelease).props, [liveRelease]);
       expect(GoToRun(failed, workflow: 'w').props, [failed, 'w']);
       expect(GoToWorkflow(_devBuild).props, [_devBuild]);
       expect(const GoToPage(RunnersDestination()).props, [
         const RunnersDestination(),
       ]);
-      expect(const DispatchEntry(mataa).props, [mataa]);
+      expect(const DispatchEntry(orbit).props, [orbit]);
       expect(RunAgainEntry(failed).props, [failed, null]);
       expect(CancelEntry(running).props, [running, null]);
       expect(ApproveEntry(pendingApproval).props, [pendingApproval]);
-      expect(const DispatchEntry(mataa).destination, isNull);
+      expect(const DispatchEntry(orbit).destination, isNull);
       expect(
-        const GoToProject(mataa).destination,
+        const GoToProject(orbit).destination,
         const ProjectDestination('prj_1'),
       );
       expect(
@@ -144,11 +144,11 @@ void main() {
         const CommandPaletteState(loading: true),
         CommandPaletteState(
           entries: [
-            const DispatchEntry(mataa),
+            const DispatchEntry(orbit),
             ApproveEntry(pendingApproval),
             CancelEntry(running, workflow: 'Dev build'),
             RunAgainEntry(failed, workflow: 'Dev build'),
-            const GoToProject(mataa),
+            const GoToProject(orbit),
             const GoToProject(captain),
             const GoToPage(ReleasesDestination('prj_1')),
             const GoToPage(RunsDestination('prj_1')),
@@ -204,12 +204,12 @@ void main() {
         final state = bloc.state.copyWith(
           entries: [
             GoToRun(failed, workflow: 'Dev'),
-            const GoToProject(mataa),
+            const GoToProject(orbit),
           ],
         );
         expect(
           state.matches(
-            (entry) => entry is GoToRun ? 'Run Dev build' : 'acme/mataa',
+            (entry) => entry is GoToRun ? 'Run Dev build' : 'acme/orbit',
           ),
           [GoToRun(failed, workflow: 'Dev')],
         );
@@ -231,7 +231,7 @@ void main() {
         workflowsRepository: flows ?? workflows,
         approvalsRepository: approvals,
         projects: projectsIn(
-          const ProjectsState(loaded: true, projects: [mataa, captain]),
+          const ProjectsState(loaded: true, projects: [orbit, captain]),
         ),
       );
       await tester.pump();
@@ -245,7 +245,7 @@ void main() {
       await open(tester);
 
       expect(find.byType(CommandPalette), findsOneWidget);
-      expect(find.text('Dispatch… acme/mataa_new_app'), findsOneWidget);
+      expect(find.text('Dispatch… acme/orbit_new_app'), findsOneWidget);
       expect(
         find.descendant(
           of: find.byType(CommandPalette),
@@ -256,7 +256,7 @@ void main() {
 
       await tester.enterText(find.byKey(const Key('palette.query')), 'go to');
       await tester.pumpAndSettle();
-      expect(find.text('Dispatch… acme/mataa_new_app'), findsNothing);
+      expect(find.text('Dispatch… acme/orbit_new_app'), findsNothing);
       await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
       await tester.sendKeyEvent(LogicalKeyboardKey.enter);
       await tester.pumpAndSettle();
@@ -333,7 +333,7 @@ void main() {
     testWidgets('dispatches for the shown project', (tester) async {
       await open(tester, flows: DispatchHarness().workflows);
 
-      await tester.tap(find.text('Dispatch… acme/mataa_new_app'));
+      await tester.tap(find.text('Dispatch… acme/orbit_new_app'));
       await tester.pumpAndSettle();
 
       expect(find.text('Dispatch 4 jobs'), findsOneWidget);
@@ -372,7 +372,7 @@ void main() {
       paletteLabel(l10n, const GoToPage(SettingsDestination())),
       'Go to Settings',
     );
-    expect(paletteKeys(const GoToProject(mataa)), isNull);
+    expect(paletteKeys(const GoToProject(orbit)), isNull);
     for (final page in [
       const HomeDestination(),
       const ProjectDestination('p'),

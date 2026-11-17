@@ -3,7 +3,7 @@
     "layout": "single",
     "apps": [
       {
-        "name": "logstock_companion_app",
+        "name": "stockroom_companion_app",
         "path": ".",
         "framework": "flutter",
         "version": "1.3.2+61",
@@ -20,8 +20,8 @@
             "name": "default",
             "implicit": true,
             "entrypoint": "lib/main.dart",
-            "iosBundleId": "com.oneavant.logstockCompanionApp",
-            "androidAppId": "com.oneavant.logstockCompanionApp",
+            "iosBundleId": "com.harbor.stockroomCompanionApp",
+            "androidAppId": "com.harbor.stockroomCompanionApp",
             "iosTeam": "FAKETEAM03",
             "infoPlist": "ios/Runner/Info.plist",
             "shorebird": false,

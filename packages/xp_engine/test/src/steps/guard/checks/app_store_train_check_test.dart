@@ -35,7 +35,7 @@ void main() {
       'App Store Connect would reject the upload (closed train, error 90186).',
     );
     expect(result.fix, 'Bump to a version higher than 5.4.0.');
-    expect(trains.lookups, ['com.mataa.app us']);
+    expect(trains.lookups, ['com.orbit.app us']);
   });
 
   test('fails when the version is below the live one', () async {

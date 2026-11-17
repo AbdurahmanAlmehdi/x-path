@@ -17,7 +17,7 @@ const _account = PlayServiceAccount(
 UploadPlayInput _input({Map<String, dynamic> overrides = const {}}) =>
     UploadPlayInput.fromJson({
       'artifactName': _aabName,
-      'packageName': 'com.mataa.app',
+      'packageName': 'com.orbit.app',
       'version': '5.4.1+3283',
       'serviceAccountSecret': 'play.prod',
       ...overrides,
@@ -106,11 +106,11 @@ void main() {
 
       expect(connectedWith, _account);
       expect(play.calls, [
-        'insertEdit com.mataa.app',
-        'uploadBundle com.mataa.app edit-1 9',
-        'updateTrack com.mataa.app edit-1 internal',
-        'commitEdit com.mataa.app edit-1',
-        'releases com.mataa.app internal',
+        'insertEdit com.orbit.app',
+        'uploadBundle com.orbit.app edit-1 9',
+        'updateTrack com.orbit.app edit-1 internal',
+        'commitEdit com.orbit.app edit-1',
+        'releases com.orbit.app internal',
       ]);
       expect(utf8.decode(play.uploads.single), 'aab bytes');
       expect(
@@ -407,7 +407,7 @@ void main() {
             lifecycleState: PlayLifecycleState.inReview,
           ),
         );
-        expect(play.calls, ['releases com.mataa.app internal']);
+        expect(play.calls, ['releases com.orbit.app internal']);
       },
     );
 

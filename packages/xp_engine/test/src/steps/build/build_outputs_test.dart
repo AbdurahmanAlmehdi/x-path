@@ -164,17 +164,17 @@ void main() {
   group('an IPA', () {
     test('is the one exported by this build', () async {
       files
-        ..put('$_app/build/ios/ipa/Mataa.ipa')
+        ..put('$_app/build/ios/ipa/Orbit.ipa')
         ..put('$_app/build/ios/ipa/readme.txt');
 
       final found = await outputs.ios(_app, since: since);
 
-      expect((found as Fresh).file.path, '$_app/build/ios/ipa/Mataa.ipa');
+      expect((found as Fresh).file.path, '$_app/build/ios/ipa/Orbit.ipa');
     });
 
     test('left by an earlier build is stale', () async {
       files.put(
-        '$_app/build/ios/ipa/Mataa.ipa',
+        '$_app/build/ios/ipa/Orbit.ipa',
         modified: since.subtract(const Duration(hours: 1)),
       );
 

@@ -153,10 +153,10 @@ void main() {
         'f',
         CredentialKind.appleDistribution,
         'id-f',
-        bundleId: 'com.mataa.app',
+        bundleId: 'com.orbit.app',
       ),
     );
-    final profile = AppStoreProfiles.keyFor('id-f', 'com.mataa.app');
+    final profile = AppStoreProfiles.keyFor('id-f', 'com.orbit.app');
 
     final granted = await grants.forSteps('prj_1', [
       step({
@@ -181,7 +181,7 @@ void main() {
     final granted = await grants.forSteps('prj_1', [
       step({
         'linuxSigning': {
-          'ASC_PROFILE': AppStoreProfiles.keyFor('id-g', 'com.mataa.app'),
+          'ASC_PROFILE': AppStoreProfiles.keyFor('id-g', 'com.orbit.app'),
         },
       }),
     ]);

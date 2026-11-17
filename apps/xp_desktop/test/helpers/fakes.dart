@@ -150,18 +150,18 @@ final macMini = EngineProfile(
   url: Uri.parse('http://mac-mini:7480'),
 );
 
-const mataa = Project(
+const orbit = Project(
   id: 'prj_1',
   host: 'github.com',
   sourceKey: '1',
   githubRepoId: 1,
-  fullName: 'acme/mataa_new_app',
-  remote: 'git@github.com:acme/mataa_new_app.git',
+  fullName: 'acme/orbit_new_app',
+  remote: 'git@github.com:acme/orbit_new_app.git',
   defaultBaseBranch: 'main',
   profile: ProjectProfile(
     apps: [
       AppProfile(
-        name: 'Mataa customer app',
+        name: 'Orbit customer app',
         path: '.',
         flutterVersion: '3.47.6',
         storeCountry: 'ly',
@@ -171,15 +171,15 @@ const mataa = Project(
           FlavorProfile(
             name: 'prod',
             entrypoint: 'lib/main_prod.dart',
-            iosBundleId: 'com.sixdtec.mata',
-            androidAppId: 'com.mataaa',
+            iosBundleId: 'com.nimbus.orbit',
+            androidAppId: 'com.orbitx',
             shorebird: true,
             prod: true,
           ),
           FlavorProfile(
             name: 'dev',
             entrypoint: 'lib/main_dev.dart',
-            iosBundleId: 'com.mataaa.dev',
+            iosBundleId: 'com.orbitx.dev',
           ),
         ],
       ),
@@ -207,8 +207,8 @@ const captain = Project(
   host: 'github.com',
   sourceKey: '2',
   githubRepoId: 2,
-  fullName: 'acme/mataa_captain',
-  remote: 'git@github.com:acme/mataa_captain.git',
+  fullName: 'acme/orbit_captain',
+  remote: 'git@github.com:acme/orbit_captain.git',
   defaultBaseBranch: 'main',
   profile: ProjectProfile(
     apps: [
@@ -249,7 +249,7 @@ const shop = Project(
   ),
 );
 
-/// The credential `prod` of `mataa` uses for its App Store Connect key.
+/// The credential `prod` of `orbit` uses for its App Store Connect key.
 final ascKey = Credential(
   id: 'crd_1',
   name: 'Team App Store key',
@@ -274,7 +274,7 @@ const devAscKey = Credential(
   kind: CredentialKind.ascKey,
   status: CredentialStatus.rejected,
   account: 'ABC123DEF4',
-  message: 'The key cannot see com.mataaa.dev.',
+  message: 'The key cannot see com.orbitx.dev.',
   fix: 'Give the key access to the app.',
   credentialStatus: CredentialStatus.verified,
   assignmentStatus: CredentialStatus.rejected,
@@ -291,7 +291,7 @@ const playKey = Credential(
   fix: 'Give it the Release manager role.',
 );
 
-/// The named App Store Connect key, used by `prod` and `dev` of `mataa`.
+/// The named App Store Connect key, used by `prod` and `dev` of `orbit`.
 final teamKey = NamedCredential(
   id: 'crd_1',
   name: 'Team App Store key',
@@ -302,18 +302,18 @@ final teamKey = NamedCredential(
   usedBy: const [
     CredentialUsage(
       projectId: 'prj_1',
-      project: 'acme/mataa_new_app',
+      project: 'acme/orbit_new_app',
       app: '.',
       flavor: 'prod',
       status: CredentialStatus.verified,
     ),
     CredentialUsage(
       projectId: 'prj_1',
-      project: 'acme/mataa_new_app',
+      project: 'acme/orbit_new_app',
       app: '.',
       flavor: 'dev',
       status: CredentialStatus.rejected,
-      message: 'The key cannot see com.mataaa.dev.',
+      message: 'The key cannot see com.orbitx.dev.',
     ),
   ],
 );

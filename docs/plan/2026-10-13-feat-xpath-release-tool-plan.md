@@ -17,7 +17,7 @@ releases to App Store Connect, Google Play, Firebase App Distribution and Shoreb
 nothing written to the repo except release-model git changes. A typed step library ports
 everything the current `ship.sh` scripts do; workflows compose those steps.
 
-It replaces the per-repo `ship.sh` scripts in the Mataa and oneavant repos once it has shipped
+It replaces the per-repo `ship.sh` scripts in the Orbit and harbor repos once it has shipped
 a real production release of each app.
 
 Sources: [brainstorm](../brainstorm/2026-10-13-x-path-brainstorm.md),
@@ -27,7 +27,7 @@ Sources: [brainstorm](../brainstorm/2026-10-13-x-path-brainstorm.md),
 ## Problem Statement
 
 - Release logic lives in bash scripts copied per repo (`ship.sh`, `lib/release.sh`,
-  `lib/common.sh`) and drifts: captain parses altool rejections, oneavant does not; captain
+  `lib/common.sh`) and drifts: captain parses altool rejections, harbor does not; captain
   hides the app-specific password from `ps`, the customer app does not.
 - Per-app assumptions (bundle IDs, plist lists, tag schemes, Firebase IDs, Flutter pins,
   secrets locations) are hardcoded in about 20 places per script.
@@ -66,7 +66,7 @@ Accepted by the owner on 2026-10-13 (grilling rounds 1 to 4, plus the post-resea
 | D-20 | Tooling: Flutter pinned per project from `.fvmrc` (fvm if present, else XPath's cache). A Shorebird patch uses the Flutter version recorded at release. Shorebird and gh managed per machine; Xcode detected only. Shorebird auth uses `sb_api_*` keys. |
 | D-21 | Tests: `flutter test --machine` results per test, `flutter analyze`, baseline = last green run on the base branch. Device integration tests out of scope. |
 | D-22 | Extras in 1.0: artifact retention + "free up space", Firebase App Distribution, R8 / dSYM / Shorebird symbol storage, release notes (Slack and WhatsApp text), macOS + Slack notifications, preflight checks (closed train, build-number reuse, Play target SDK), `min_version_*` reminder. |
-| D-23 | Distribution: Developer ID signed, notarized DMG on GitHub Releases, Sparkle 2 embedded directly, Homebrew cask in `AbdurahmanAlmehdi/homebrew-tap`. Linux: bundle tarball, install script, Docker image. Developer ID cert from team AFBD5TBR5U. |
+| D-23 | Distribution: Developer ID signed, notarized DMG on GitHub Releases, Sparkle 2 embedded directly, Homebrew cask in `AbdurahmanAlmehdi/homebrew-tap`. Linux: bundle tarball, install script, Docker image. Developer ID cert from team Q7R2T9K4M1. |
 | D-24 | Defaults: no telemetry; logs kept 90 days; light and dark themes; the app, the CLI and `xp mcp` accept an engine of the same API version (every 1.x release is API 1), so they need not be upgraded with it; engine updates only when idle and backs up the DB before migrating; a runner always runs its engine's version, updating itself between jobs, and does not check for releases itself. |
 
 ## Technical Approach
@@ -231,7 +231,7 @@ land in the phase that builds the feature. No public tag until Phase 19.
 | 9a / 9b / 9c / 9d | Toolchain / Builds / Shorebird and symbols / Tests | | |
 | 10a / 10b / 10c | ASC and Apple / Play / Firebase, Shorebird CLI, credentials | | |
 
-Mataa dev builds through `xp` can start after Phase 13, before the desktop app exists.
+Orbit dev builds through `xp` can start after Phase 13, before the desktop app exists.
 
 ### Phase 0: Spikes and ADRs
 
@@ -309,7 +309,7 @@ Mataa dev builds through `xp` can start after Phase 13, before the desktop app e
 - **Status:** Done
 - **Scope:** Detect Flutter apps (single and melos), flavors (Gradle productFlavors, flavorizr,
   xcschemes, `lib/main_*.dart`), bundle/application IDs per flavor (including mismatches such as
-  `com.mataaa.captain.dev`), literal vs `$(FLUTTER_BUILD_*)` plist versions, Shorebird app IDs,
+  `com.orbitx.captain.dev`), literal vs `$(FLUTTER_BUILD_*)` plist versions, Shorebird app IDs,
   CocoaPods vs SPM, signing teams, keystore reference, `.fvmrc`, branch layout, repo workflow
   YAML. Output a `ProjectProfile` plus findings (error, warning, info, each with a fix).
   Projects endpoints: add by path or remote, scan, edit profile, list, remove.
@@ -590,16 +590,16 @@ Mataa dev builds through `xp` can start after Phase 13, before the desktop app e
 ### Phase 19: Acceptance on real apps, docs, 1.0
 
 - **Status:** Not started
-- **Scope:** Mataa customer dev build to Firebase and TestFlight, then a real prod release
+- **Scope:** Orbit customer dev build to Firebase and TestFlight, then a real prod release
   through XPath (store approval, PR merge from the app); Android dev build on a paired Linux
-  runner while the Mac builds iOS; then captain; then oneavant companion and guest. Docs (one
+  runner while the Mac builds iOS; then captain; then harbor companion and guest. Docs (one
   page per topic under `docs/guide/`: install, projects, credentials, workflows, runners, MCP,
   approvals, releases, storage, uninstall), CONTRIBUTING, SECURITY. Repo made public, 1.0 tagged,
   `ship.sh` retirement PRs opened in each app repo.
 - **Files touched:** `docs/guide/**`, `README.md`, `CONTRIBUTING.md`, `SECURITY.md`
 - **Acceptance criteria:** every app has an XPath-produced release whose tag, manifest and store
   build match.
-- **Validation:** `manual 1. Dispatch prod-release for mataa_new_app prod, approve in the app, wait for both stores to show live, press Merge, confirm main contains the release tag. 2. Pair a Linux runner, dispatch dev-build for both platforms, confirm the Android job ran on it. 3. Repeat step 1 for captain, companion and guest; confirm each release shows "merged" and its tag matches the manifest SHA and store build.`
+- **Validation:** `manual 1. Dispatch prod-release for orbit_new_app prod, approve in the app, wait for both stores to show live, press Merge, confirm main contains the release tag. 2. Pair a Linux runner, dispatch dev-build for both platforms, confirm the Android job ran on it. 3. Repeat step 1 for captain, companion and guest; confirm each release shows "merged" and its tag matches the manifest SHA and store build.`
 
 ## Alternative Approaches Considered
 
@@ -651,11 +651,11 @@ VERIFICATION COMMAND: dart analyze --fatal-infos && dart format --set-exit-if-ch
 
 ## Dependencies & Prerequisites
 
-- Developer ID Application certificate on team AFBD5TBR5U (before Phase 18b).
-- ASC API key per team for full status (Mataa LLC has one; FANNAK after the account transfer).
+- Developer ID Application certificate on team Q7R2T9K4M1 (before Phase 18b).
+- ASC API key per team for full status (Orbit LLC has one; GLOBEX after the account transfer).
 - Google Play service account per Play developer account (none yet; manual fallback until then).
 - Firebase service-account JSON per Firebase project.
-- Shorebird `sb_api_*` key per account (oneavant has one; Mataa uses interactive login today).
+- Shorebird `sb_api_*` key per account (harbor has one; Orbit uses interactive login today).
 - GitHub token for the engine (imported from `gh` on first run).
 - Toolchain: Dart 3.13+, Flutter 3.47.x, Xcode 27.x on macOS machines.
 - Packages: shelf, shelf_router, shelf_web_socket, sqlite3 3.x (drift per ADR 0002),
@@ -672,14 +672,14 @@ VERIFICATION COMMAND: dart analyze --fatal-infos && dart format --set-exit-if-ch
 | Process-group kill unreliable on macOS | Orphaned xcodebuild/gradle after cancel | FFI `setpgid` fallback; orphan reaping on start |
 | `dart_mcp` 0.x API churn | MCP breaks on upgrade | Thin adapter in `apps/xp/lib/src/mcp`; pinned version |
 | Store API changes (ASC states, Play lifecycle) | Wrong status | Adapters isolated; fake servers in tests; manual override buttons |
-| Single 1.0 release takes long to deliver value | Late feedback | Mataa dev builds through `xp` after Phase 13 |
+| Single 1.0 release takes long to deliver value | Late feedback | Orbit dev builds through `xp` after Phase 13 |
 
 ## Resource Requirements
 
 - One developer (owner) with AI-assisted implementation, one phase per context window.
 - Machines: owner's Mac (dev + local engine), Mac mini (remote engine + `ios-sign` runner), one
   Linux machine or VM (runner: `android`, `flutter`, `swift-linux`).
-- Apple Developer Program on AFBD5TBR5U; GitHub repos `AbdurahmanAlmehdi/x-path` and
+- Apple Developer Program on Q7R2T9K4M1; GitHub repos `AbdurahmanAlmehdi/x-path` and
   `AbdurahmanAlmehdi/homebrew-tap`.
 
 ## Documentation Plan
@@ -688,21 +688,21 @@ VERIFICATION COMMAND: dart analyze --fatal-infos && dart format --set-exit-if-ch
 - `docs/guide/`: one page per topic listed in Phase 19.
 - `docs/adr/`: Phase 0 outcomes plus D-05, D-07, D-09, D-12, D-14.
 - `openapi.yaml` published with each release.
-- Mataa repos: `docs/RELEASING.md` points at XPath once Phase 19 passes.
+- Orbit repos: `docs/RELEASING.md` points at XPath once Phase 19 passes.
 
 ## References & Research
 
 ### Internal References
 
-- Guards and versioning: `mataa_new_app/scripts/lib/release.sh:25-188`
-- Worktree re-run: `mataa_new_app/scripts/lib/release.sh:196-221`
-- Manifest: `mataa_new_app/scripts/lib/release.sh:234-305`
-- altool rejection parsing: `mataa_new_app/scripts/ship.sh:752-762`, `mataa_captain/scripts/ship.sh:559-581`
-- Compiled-config check: `mataa_captain/scripts/ship.sh:430-462`
-- Multi-target config and build-number ledger: `oneavant/mobile-apps/scripts/ship.sh:216-260`, `oneavant/mobile-apps/scripts/lib/common.sh:86-137`
-- ASC auth resolution: `oneavant/mobile-apps/scripts/lib/common.sh:298-387`
-- Agora strip and re-export: `oneavant/mobile-apps/scripts/lib/common.sh:585-629`
-- Release model: `mataa_new_app/docs/RELEASING.md`
+- Guards and versioning: `orbit_new_app/scripts/lib/release.sh:25-188`
+- Worktree re-run: `orbit_new_app/scripts/lib/release.sh:196-221`
+- Manifest: `orbit_new_app/scripts/lib/release.sh:234-305`
+- altool rejection parsing: `orbit_new_app/scripts/ship.sh:752-762`, `orbit_captain/scripts/ship.sh:559-581`
+- Compiled-config check: `orbit_captain/scripts/ship.sh:430-462`
+- Multi-target config and build-number ledger: `harbor/mobile-apps/scripts/ship.sh:216-260`, `harbor/mobile-apps/scripts/lib/common.sh:86-137`
+- ASC auth resolution: `harbor/mobile-apps/scripts/lib/common.sh:298-387`
+- Agora strip and re-export: `harbor/mobile-apps/scripts/lib/common.sh:585-629`
+- Release model: `orbit_new_app/docs/RELEASING.md`
 
 ### External References
 
@@ -726,5 +726,5 @@ VERIFICATION COMMAND: dart analyze --fatal-infos && dart format --set-exit-if-ch
 
 ### Related Work
 
-- Mataa Phase 3 release scripts: Mataa-CO/mataa_new_app#73, Mataa-CO/mataa_track#28
-- Mataa release-flow audit: `mataa_new_app/plans/release-flow-audit.md` (untracked)
+- Orbit Phase 3 release scripts: Orbit-Labs/orbit_new_app#73, Orbit-Labs/orbit_track#28
+- Orbit release-flow audit: `orbit_new_app/plans/release-flow-audit.md` (untracked)

@@ -55,7 +55,7 @@ class ReviewHarness {
       jobsRepository: jobs,
       releasesRepository: releases,
       projects: projectsIn(
-        ProjectsState(loaded: true, projects: [mataaWithVersion]),
+        ProjectsState(loaded: true, projects: [orbitWithVersion]),
       ),
     );
     await tester.tap(find.text('Open'));
@@ -81,7 +81,7 @@ void main() {
     await harness.open(tester);
     expect(find.text('Submit 5.4.1 (3283) to the stores'), findsOneWidget);
     expect(find.text('expires in 23h 51m · Oct 13 14:00'), findsOneWidget);
-    expect(find.text('com.sixdtec.mata'), findsOneWidget);
+    expect(find.text('com.nimbus.orbit'), findsOneWidget);
     expect(find.text('Upload prod'), findsOneWidget);
     expect(find.text(' · Approval waits for this'), findsOneWidget);
     expect(find.text('Project gate “store submission”'), findsOneWidget);
@@ -90,7 +90,7 @@ void main() {
       findsOneWidget,
     );
     expect(
-      find.textContaining('It goes out as prod · com.sixdtec.mata'),
+      find.textContaining('It goes out as prod · com.nimbus.orbit'),
       findsOneWidget,
     );
     expect(

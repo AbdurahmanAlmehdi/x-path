@@ -4,11 +4,11 @@ plugins {
 }
 
 android {
-    namespace = "com.oneavant.spike.room_scene_spike"
+    namespace = "com.harbor.spike.room_scene_spike"
 
     defaultConfig {
         // TODO: Specify your own unique Application ID.
-        applicationId = "com.oneavant.spike.room_scene_spike"
+        applicationId = "com.harbor.spike.room_scene_spike"
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }

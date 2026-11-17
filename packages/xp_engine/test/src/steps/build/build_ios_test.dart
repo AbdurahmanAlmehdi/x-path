@@ -4,7 +4,7 @@ import 'package:xp_engine/xp_engine.dart';
 
 import '../../../helpers/build_harness.dart';
 
-const _ipa = '$appDirectory/build/ios/ipa/Mataa.ipa';
+const _ipa = '$appDirectory/build/ios/ipa/Orbit.ipa';
 
 void main() {
   late BuildHarness harness;
@@ -50,7 +50,7 @@ void main() {
       final linux = BuildIosInput(
         settings: input().settings,
         exportOptionsPlist: 'ios/ExportOptions-prod.plist',
-        linuxSigning: const {'ASC_PROFILE': 'identity.profile:ly.mataa'},
+        linuxSigning: const {'ASC_PROFILE': 'identity.profile:ly.orbit'},
       );
       expect(step.decodeInput(step.encodeInput(linux)), linux);
       expect(step.encodeInput(input()), isNot(contains('linuxSigning')));
@@ -174,7 +174,7 @@ void main() {
     () async {
       final context = BuildContext(
         onRun: (_) =>
-            harness.files.put('$appDirectory/build/ios/ipa/Mataa.ipa'),
+            harness.files.put('$appDirectory/build/ios/ipa/Orbit.ipa'),
       )..defines['defines'] = 'API_KEY=secret-value\n';
 
       final outcome = await stepFor(isMacOS: true)

@@ -3,7 +3,7 @@
     "layout": "melos",
     "apps": [
       {
-        "name": "oneavant_guest_experience",
+        "name": "harbor_guest_experience",
         "path": "apps/mobile_app",
         "framework": "flutter",
         "version": "1.0.3+33",
@@ -20,8 +20,8 @@
             "name": "dev",
             "implicit": false,
             "entrypoint": "lib/main.dart",
-            "iosBundleId": "com.oneavant.guestExperience.dev",
-            "androidAppId": "com.oneavant.guestExperience.dev",
+            "iosBundleId": "com.harbor.guestExperience.dev",
+            "androidAppId": "com.harbor.guestExperience.dev",
             "iosTeam": "FAKETEAM04",
             "iosScheme": "dev",
             "infoPlist": "apps/mobile_app/ios/Runner/Info.plist",
@@ -38,13 +38,13 @@
             ]
           },
           {
-            "name": "iniala",
+            "name": "seaview",
             "implicit": false,
             "entrypoint": "lib/main.dart",
-            "iosBundleId": "com.oneavant.guestExperience.iniala",
-            "androidAppId": "com.oneavant.guestExperience.iniala",
+            "iosBundleId": "com.harbor.guestExperience.seaview",
+            "androidAppId": "com.harbor.guestExperience.seaview",
             "iosTeam": "FAKETEAM04",
-            "iosScheme": "iniala",
+            "iosScheme": "seaview",
             "infoPlist": "apps/mobile_app/ios/Runner/Info.plist",
             "shorebird": true,
             "shorebirdAppId": "00000000-0000-4000-8000-0000000000d2",
@@ -59,13 +59,13 @@
             ]
           },
           {
-            "name": "oneavant",
+            "name": "harbor",
             "implicit": false,
             "entrypoint": "lib/main.dart",
-            "iosBundleId": "com.oneavant.guestExperience",
-            "androidAppId": "com.oneavant.guestExperience",
+            "iosBundleId": "com.harbor.guestExperience",
+            "androidAppId": "com.harbor.guestExperience",
             "iosTeam": "FAKETEAM04",
-            "iosScheme": "oneavant",
+            "iosScheme": "harbor",
             "infoPlist": "apps/mobile_app/ios/Runner/Info.plist",
             "shorebird": true,
             "shorebirdAppId": "00000000-0000-4000-8000-0000000000d3",
@@ -96,13 +96,13 @@
           "appId": "00000000-0000-4000-8000-0000000000d1",
           "flavorAppIds": {
             "dev": "00000000-0000-4000-8000-0000000000d1",
-            "iniala": "00000000-0000-4000-8000-0000000000d2",
-            "oneavant": "00000000-0000-4000-8000-0000000000d3"
+            "seaview": "00000000-0000-4000-8000-0000000000d2",
+            "harbor": "00000000-0000-4000-8000-0000000000d3"
           }
         }
       },
       {
-        "name": "oneavant_guest_tablet",
+        "name": "harbor_guest_tablet",
         "path": "apps/tablet_app",
         "framework": "flutter",
         "version": "0.4.0+7",
@@ -122,8 +122,8 @@
             "name": "dev",
             "implicit": false,
             "entrypoint": "lib/main.dart",
-            "iosBundleId": "com.oneavant.guestTablet.dev",
-            "androidAppId": "com.oneavant.guestTablet.dev",
+            "iosBundleId": "com.harbor.guestTablet.dev",
+            "androidAppId": "com.harbor.guestTablet.dev",
             "iosTeam": "FAKETEAM04",
             "iosScheme": "dev",
             "infoPlist": "apps/tablet_app/ios/Runner/Info.plist",
@@ -140,13 +140,13 @@
             ]
           },
           {
-            "name": "oneavant",
+            "name": "harbor",
             "implicit": false,
             "entrypoint": "lib/main.dart",
-            "iosBundleId": "com.oneavant.guestTablet",
-            "androidAppId": "com.oneavant.guestTablet",
+            "iosBundleId": "com.harbor.guestTablet",
+            "androidAppId": "com.harbor.guestTablet",
             "iosTeam": "FAKETEAM04",
-            "iosScheme": "oneavant",
+            "iosScheme": "harbor",
             "infoPlist": "apps/tablet_app/ios/Runner/Info.plist",
             "shorebird": true,
             "shorebirdAppId": "00000000-0000-4000-8000-0000000000e2",
@@ -177,7 +177,7 @@
           "appId": "00000000-0000-4000-8000-0000000000e1",
           "flavorAppIds": {
             "dev": "00000000-0000-4000-8000-0000000000e1",
-            "oneavant": "00000000-0000-4000-8000-0000000000e2"
+            "harbor": "00000000-0000-4000-8000-0000000000e2"
           }
         }
       }
@@ -190,8 +190,8 @@
         "path": "codemagic.yaml",
         "provider": "codemagic",
         "names": [
-          "Guest iOS (OneAvant)",
-          "guest-android-oneavant"
+          "Guest iOS (Harbor)",
+          "guest-android-harbor"
         ]
       }
     ]

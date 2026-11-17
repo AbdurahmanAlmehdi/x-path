@@ -3,13 +3,13 @@ flavors:
     app:
       name: "Dev"
     android:
-      applicationId: "com.oneavant.guestTablet.dev"
+      applicationId: "com.harbor.guestTablet.dev"
     ios:
-      bundleId: "com.oneavant.guestTablet.dev"
-  oneavant:
+      bundleId: "com.harbor.guestTablet.dev"
+  harbor:
     app:
-      name: "Oneavant"
+      name: "Harbor"
     android:
-      applicationId: "com.oneavant.guestTablet"
+      applicationId: "com.harbor.guestTablet"
     ios:
-      bundleId: "com.oneavant.guestTablet"
+      bundleId: "com.harbor.guestTablet"

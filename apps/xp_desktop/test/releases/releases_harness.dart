@@ -15,7 +15,7 @@ import '../helpers/pump_app.dart';
 import '../helpers/release_fixtures.dart';
 import '../project_overview/overview_harness.dart';
 
-/// The repositories behind the releases of `mataa`, with the releases the
+/// The repositories behind the releases of `orbit`, with the releases the
 /// test gives.
 class ReleasesHarness {
   new({
@@ -65,7 +65,7 @@ class ReleasesHarness {
         PendingApprovalsState(loaded: true, approvals: pending),
       ),
       projects: projectsIn(
-        ProjectsState(loaded: true, projects: [project ?? mataaWithVersion]),
+        ProjectsState(loaded: true, projects: [project ?? orbitWithVersion]),
       ),
     );
     for (var i = 0; i < 4; i++) {

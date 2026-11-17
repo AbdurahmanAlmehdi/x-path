@@ -85,7 +85,7 @@ void main() {
       tester,
       const SetupChecklistState(
         loaded: true,
-        project: mataa,
+        project: orbit,
         hasRelease: false,
         gitHubConnected: true,
       ),
@@ -119,7 +119,7 @@ void main() {
       tester,
       const SetupChecklistState(
         loaded: true,
-        project: mataa,
+        project: orbit,
         hasRelease: false,
         waitReasons: ['No connected runner can do ios-sign.'],
       ),
@@ -142,7 +142,7 @@ void main() {
       tester,
       const SetupChecklistState(
         loaded: true,
-        project: mataa,
+        project: orbit,
         hasRelease: false,
         smokeWorkflowId: 'wf_smoke',
       ),
@@ -193,7 +193,7 @@ void main() {
       tester,
       const SetupChecklistState(
         loaded: true,
-        project: mataa,
+        project: orbit,
         hasRelease: false,
         smokeWorkflowId: 'wf_smoke',
       ),

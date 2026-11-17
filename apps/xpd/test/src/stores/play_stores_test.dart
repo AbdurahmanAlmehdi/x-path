@@ -7,7 +7,7 @@ import 'package:xpd/xpd.dart';
 
 import '../../helpers/job_fakes.dart';
 
-const _package = 'com.mataa.app';
+const _package = 'com.orbit.app';
 
 void main() {
   late ManualClock clock;
@@ -75,7 +75,7 @@ void main() {
 
     test('knows the version codes Play has seen', () async {
       final builds = await play.buildNumbers.lookup(
-        iosBundleId: 'com.mataa.ios',
+        iosBundleId: 'com.orbit.ios',
         androidAppId: _package,
       );
 

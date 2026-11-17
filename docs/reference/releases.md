@@ -97,7 +97,7 @@ The same notice (same `kind` and subject) within 15 minutes is told once, so a f
 and at most 20 messages a minute go to Slack. The app is told even when Slack is not.
 
 **`min_version_*` reminder.** Raising `min_version_android` and `min_version_ios` in Firebase Remote Config is only
-right once the new version is approved *and available* in that store (`mataa_new_app/docs/RELEASING.md`). When a
+right once the new version is approved *and available* in that store (`orbit_new_app/docs/RELEASING.md`). When a
 store reports a release `live`, a `min_version_reminder` notification names the variable of that store
 (`min_version_ios` for the App Store, `min_version_android` for Google Play) and the version. XPath does not know
 whether a release is a forced update, so the text says "if this is a forced update"; it is a reminder only and

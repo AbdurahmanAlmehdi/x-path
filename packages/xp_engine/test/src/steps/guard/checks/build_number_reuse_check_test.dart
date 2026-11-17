@@ -28,7 +28,7 @@ void main() {
     final result = await check.run(request(tags: [tag('v5.4.0+3282')]));
 
     expect(result.status, GuardStatus.passed);
-    expect(stores.lookups, ['com.mataa.app com.mataa.app']);
+    expect(stores.lookups, ['com.orbit.app com.orbit.app']);
   });
 
   // Incident: build 3282 had been uploaded to App Store Connect by hand

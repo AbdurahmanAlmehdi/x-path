@@ -119,7 +119,7 @@ void main() {
       approvalsRepository: approvals,
       projectsRepository: quietProjects(),
       projects: projectsIn(
-        ProjectsState(loaded: true, projects: [mataaWithVersion]),
+        ProjectsState(loaded: true, projects: [orbitWithVersion]),
       ),
       pendingApprovals: pendingIn(
         PendingApprovalsState(loaded: true, approvals: pending),
@@ -182,7 +182,7 @@ void main() {
         pendingApprovals: bloc,
         notices: notices,
         projects: projectsIn(
-          ProjectsState(loaded: true, projects: [mataaWithVersion]),
+          ProjectsState(loaded: true, projects: [orbitWithVersion]),
         ),
       );
     }
@@ -208,7 +208,7 @@ void main() {
       final menu = alerts.menus.last;
       expect(menu.tooltip, 'XPath: 2 need you');
       expect(menu.items.first.title, 'Review: Approve the merge…');
-      expect(menu.items.last.detail, startsWith('mataa_new_app · 9a3bc0d · '));
+      expect(menu.items.last.detail, startsWith('orbit_new_app · 9a3bc0d · '));
       expect(menu.openApp, 'Open XPath');
 
       pending.add(const Snapshot([]));
@@ -248,7 +248,7 @@ void main() {
               kind: NotificationKind.jobFailed,
               level: NotificationLevel.error,
               title: 'Build prod failed',
-              body: 'mataa · prod',
+              body: 'orbit · prod',
               jobId: 'job_1',
             ),
           ),
@@ -298,7 +298,7 @@ void main() {
         const EngineNotice(
           target: 'job:job_1',
           title: 'Build prod failed',
-          body: 'mataa · prod',
+          body: 'orbit · prod',
         ),
         const EngineNotice(
           target: 'job:job_2',
@@ -321,7 +321,7 @@ void main() {
       final menu = alerts.menus.last;
       expect(menu.runningHeader, 'Running · 1');
       expect(menu.running.single.target, 'run:${run.id}:prj_1');
-      expect(menu.running.single.detail, startsWith('mataa_new_app · '));
+      expect(menu.running.single.detail, startsWith('orbit_new_app · '));
       expect(menu.dispatch, 'Dispatch…');
       expect(menu.projects.single.projectId, 'prj_1');
     });

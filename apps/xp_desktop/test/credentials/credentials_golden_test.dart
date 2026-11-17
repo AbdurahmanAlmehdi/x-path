@@ -37,7 +37,7 @@ void main() {
         credentialsRepository: credentials,
         projectsRepository: projects,
         projects: projectsIn(
-          const ProjectsState(loaded: true, projects: [mataa, captain]),
+          const ProjectsState(loaded: true, projects: [orbit, captain]),
         ),
       );
       await tester.pumpAndSettle();
@@ -57,8 +57,8 @@ void main() {
           label: 'Open',
           onPressed: () => showFlavorCredentialsSheet(
             context,
-            project: mataa,
-            target: (app: '.', appName: 'Mataa customer app', flavor: 'dev'),
+            project: orbit,
+            target: (app: '.', appName: 'Orbit customer app', flavor: 'dev'),
           ),
         ),
       ),
@@ -74,7 +74,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Every flavor of Mataa customer app'));
+    await tester.tap(find.text('Every flavor of Orbit customer app'));
     await tester.pumpAndSettle();
     await expectLater(
       find.byType(Dialog),
