@@ -80,7 +80,7 @@ value from stdin, or under Settings ▸ Secrets and variables ▸ Actions:
 
 | Secret | What it holds | How to make it |
 |---|---|---|
-| `MAC_DEVELOPER_ID_P12_BASE64` | The "Developer ID Application: … (Q7R2T9K4M1)" certificate and its private key, a `.p12`, in base64. | Create it in Xcode ▸ Settings ▸ Accounts ▸ the team ▸ Manage Certificates… ▸ + ▸ Developer ID Application (the Account Holder only). Export it with its key from Keychain Access ▸ My Certificates as a `.p12` with a password: `base64 -i developer-id.p12 \| gh secret set MAC_DEVELOPER_ID_P12_BASE64`. Delete the `.p12` afterwards. |
+| `MAC_DEVELOPER_ID_P12_BASE64` | The "Developer ID Application: … (AFBD5TBR5U)" certificate and its private key, a `.p12`, in base64. | Create it in Xcode ▸ Settings ▸ Accounts ▸ the team ▸ Manage Certificates… ▸ + ▸ Developer ID Application (the Account Holder only). Export it with its key from Keychain Access ▸ My Certificates as a `.p12` with a password: `base64 -i developer-id.p12 \| gh secret set MAC_DEVELOPER_ID_P12_BASE64`. Delete the `.p12` afterwards. |
 | `MAC_DEVELOPER_ID_P12_PASSWORD` | The password of that `.p12`. | The one chosen on export. |
 | `MAC_NOTARY_KEY_P8_BASE64` | An App Store Connect API key (`AuthKey_<key id>.p8`) in base64, for `notarytool`. | App Store Connect ▸ Users and Access ▸ Integrations ▸ App Store Connect API ▸ Team Keys ▸ +, access Developer. The `.p8` downloads once: `base64 -i AuthKey_<key id>.p8 \| gh secret set MAC_NOTARY_KEY_P8_BASE64`. |
 | `MAC_NOTARY_KEY_ID` | The key ID of that key. | Shown in its row. |
@@ -157,7 +157,7 @@ as executable memory, and the Hardened Runtime kills it at start (exit 137) with
 `com.apple.security.cs.allow-unsigned-executable-memory`. `libsqlite3` needs nothing: it is signed by the same team,
 so library validation passes. `spctl` rejects the app (Gatekeeper accepts only Developer ID outside the App Store),
 which does not matter for a build that never carried a quarantine flag. The identity is `$XPATH_SIGN_IDENTITY`, by default the owner's Apple Development certificate (SHA-1
-`3B9E9C2FB4D94EFC7AC367C68CF1FC077EBB799F`, team Q7R2T9K4M1); a `codesign` that waits more than 60 s (a Keychain
+`3B9E9C2FB4D94EFC7AC367C68CF1FC077EBB799F`, team AFBD5TBR5U); a `codesign` that waits more than 60 s (a Keychain
 dialog) is stopped. `--install` then quits a running XPath (SIGTERM, no Apple Event), replaces
 `/Applications/XPath.app` and makes LaunchServices forget the build-folder copies
 (`apps/xp_desktop/build/macos/Build/Products/*/XPath.app`, `dist/XPath.app`; `lsregister -u`) and register the
@@ -172,7 +172,7 @@ macOS 26 `.icon` (Icon Composer) is manual; the app uses `docs/design/brand/maco
 (`dart run tool/release_version.dart apply <version> <build>` writes it), and the script checks that before and
 after the build:
 
-- `--developer-id` signs with a "Developer ID Application: … (Q7R2T9K4M1)" identity instead (the team is
+- `--developer-id` signs with a "Developer ID Application: … (AFBD5TBR5U)" identity instead (the team is
   `$XPATH_TEAM_ID`), with a secure timestamp (`--timestamp`, which needs the network) and the Hardened Runtime. It
   is the one such identity in the keychain, or the one `$XPATH_SIGN_IDENTITY` names; an Apple Distribution or Apple
   Development identity is refused. Without one it stops before building and says how to create it: Xcode ▸

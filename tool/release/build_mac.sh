@@ -57,7 +57,7 @@
 # Signing identity without --developer-id: $XPATH_SIGN_IDENTITY, by default
 # the owner's "Apple Development: Abdurahman Ibrahem (L7UMZN6DL6)", for this
 # Mac only (Gatekeeper rejects it elsewhere). The team is $XPATH_TEAM_ID,
-# by default Q7R2T9K4M1. A codesign that waits more than 60 s (a Keychain
+# by default AFBD5TBR5U. A codesign that waits more than 60 s (a Keychain
 # dialog) is stopped.
 #
 # Needs the repo's Flutter (.fvm/flutter_sdk/bin) first on PATH and
@@ -65,7 +65,7 @@
 set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-team="${XPATH_TEAM_ID:-Q7R2T9K4M1}"
+team="${XPATH_TEAM_ID:-AFBD5TBR5U}"
 development_identity="3B9E9C2FB4D94EFC7AC367C68CF1FC077EBB799F"
 bundle_id="ly.abdurahman.xpath"
 dist="$root/dist"
