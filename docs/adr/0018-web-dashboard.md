@@ -2,8 +2,8 @@
 
 - **Status:** Accepted
 - **Date:** 2026-11-14
-- **Phase:** Phase 3 of the web dashboard plan (amends the rule that browsers are refused)
-- **Approved by:** the owner, 2026-11-12 and 2026-11-13 (the Decisions D1 to D17 of the web dashboard plan)
+- **Amends:** the rule that browsers are refused
+- **Approved by:** the owner, 2026-11-12 to 2026-11-15 (the [Decisions](#decisions) D1 to D17 below)
 
 ## Context
 
@@ -78,5 +78,29 @@ app's engine carry it as `web/` next to the engine.
 - `xp dashboard` and the Mac app put a one-time sign-in code in the argument of `open` or `xdg-open`
   for a moment: an accepted exception to the rule that no secret goes in process arguments (see
   "Opening the dashboard signed in").
-- Phase 3 of the plan builds the URL space, the aliases and the client probe. Sessions, CSRF and
-  the cookie on sockets come in Phase 4, and serving and packaging the dashboard in Phase 5.
+
+## Decisions
+
+The detailed decisions behind this ADR. Code comments cite them by number, for example `(D9)` or
+`(ADR 0018, D15)`. The people and roles they rely on are ADR 0017's.
+
+| # | Question | Decision |
+|---|---|---|
+| D1 | URL space | The API moves to `/api/v1`. Root paths stay as **bearer-only** aliases with `Deprecation` and `Sunset` headers, removed in the first major release (2.0) on or after 2027-11-14, as a `feat!` change. Everything else is the SPA. |
+| D2 | Live updates | The existing WebSockets, authenticated by the session cookie plus an exact `Origin` match. No ticket, no SSE. |
+| D3 | TLS | No TLS in `xpd`. Browser sign-in works only on loopback or through the configured HTTPS public URL. Plain HTTP from another machine gets `403` with the reason. |
+| D3a | Cookie attributes | Chosen by the scheme of the origin that is signing in, never by request headers. Through the HTTPS `public_url`: `__Host-xp_session; Secure; HttpOnly; SameSite=Strict; Path=/`. On a loopback origin: `xp_session_<port>; HttpOnly; SameSite=Strict; Path=/`, the port being the one the engine serves on, so two engines on one machine keep separate sessions. Safari still refuses `Secure` cookies on `http://localhost` (WebKit bug 232088), and a loopback cookie never leaves the machine. |
+| D4 | Packaging | `npm run build` runs once in CI, and `bundles.sh` copies `dist/` into every `xpd` bundle as `xpd/web/`. |
+| D5 | TS coverage | 100% lines for `src/api/**` and every Pinia store, 90% for the rest. This mirrors the repo's 100% client and bloc, 90% glue tiers. |
+| D6 | Runner tokens | They belong to no person (`person_id` NULL is allowed only for `kind = 'runner'`). A runner is a machine, so removing a person never breaks a runner. |
+| D7 | Upgrade | Migration creates the person `Owner` (admin), who owns every non-runner token. It can be renamed later. |
+| D8 | First admin, headless | `xpd person create --name <n> --role admin` prints a sign-in code. `xpd person code <name>` issues a new one. Both write to the database directly, like `xpd token create`. |
+| D9 | Mac or CLI owner opening the dashboard | `xp dashboard` and a Settings button in the Mac app ask for a sign-in code for **their own** person and open `<origin>/sign-in#code=…`. A fragment never reaches a server log. They pass that link to `open`/`xdg-open` as a process argument: an **accepted exception** to the rule that no secret goes in process arguments, since the code is single-use, expires in 10 minutes and the browser redeems it within seconds; `xp dashboard --print` avoids it. |
+| D10 | Sign-in code | 16 Crockford base32 characters (80 bits), shown as `XXXX-XXXX-XXXX-XXXX`. It lasts 10 minutes and works once. Issuing a code deletes the person's unused codes. Only the SHA-256 is stored, and it is the primary key. 20 failures per connection address (never `X-Forwarded-*`) and 200 in total per 10 minutes, then `429`; behind a same-host proxy every client shares the proxy's address. Unknown, used and expired codes all get the same `401`. It is used up atomically (`UPDATE … WHERE hash = ? AND used_at IS NULL AND expires_at > ?`, then the row count is checked). |
+| D11 | Session lifetime | A `web` token expires 8 hours after sign-in, with no sliding renewal. Signing out revokes the token on the server and clears the cookie (`Max-Age=0`). Responses under `/api/v1/session` and `/api/v1/me` are `no-store`. |
+| D12 | Revocation while signed in | The role is read with the token on every request, so a role change applies to the next request. Revoking a token, signing out, removing the person or expiry closes the affected sockets with code 4401: a push on revocation, plus a sweep every 60 s for expiry. The next REST call answers `401`, and the SPA goes to `/sign-in?next=<path>`. Every tab holds its own socket, so each tab learns on its own. |
+| D13 | People removal | Soft removal (`removed_at`) that revokes all their tokens. Approvals and run origins keep the name. The last active admin cannot be demoted or removed (`409`). |
+| D14 | CSRF | Any request authenticated by cookie with a method other than GET/HEAD/OPTIONS needs both of these:<br>- an `Origin` in the D15 set (an absent `Origin` is refused);<br>- the header `X-XPath-CSRF: 1`. `xpd` sends no CORS headers, so a cross-site page cannot add it without a preflight that fails.<br>Together with `SameSite=Strict`, that makes three independent layers. `POST /session` checks `Origin`, which covers login CSRF. A request with `Authorization` is bearer: the cookie is ignored and CSRF does not apply. `xpd` never sends CORS headers. GET never changes anything. |
+| D15 | Allowed origins | Exact string matches only:<br>- the configured `public_url` origin;<br>- the loopback origins of the bound port (`http://127.0.0.1:<p>`, `http://localhost:<p>`, `http://[::1]:<p>`), but only when the `Host` header is one of those too, which blocks DNS rebinding.<br>`X-Forwarded-*` is never trusted. |
+| D16 | Role-aware UI | `GET /api/v1/me` returns the person and their `permissions` (the four of ADR 0017). The SPA hides actions it may not take and never reimplements the rules. |
+| D17 | Tokens per person | Any person lists, creates (`cli`, `mcp`) and revokes their own tokens. Admins see and revoke everyone's. Creating a token needs an interactive token (`app` or `web`). `cli` and `mcp` tokens had no expiry at first; since ADR 0019 (2026-11-16) they expire 90 days after their last use. |

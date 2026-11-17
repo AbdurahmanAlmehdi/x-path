@@ -3,7 +3,8 @@
 - **Status:** Accepted
 - **Date:** 2026-10-23
 - **Phase:** Follow-up to D-05 and ADR 0009, decides R10a–R10d of the
-  [runner onboarding plan](../plan/2026-10-22-feat-remote-runner-onboarding-part-2-plan.md)
+  runner onboarding plan (`docs/plan/2026-10-22-feat-remote-runner-onboarding-part-2-plan.md`, in git
+  history)
 - **Approved by:** the owner, 2026-10-23 (Q3, Q5 and Q6 of the plan, the recommended options)
 
 ## Context

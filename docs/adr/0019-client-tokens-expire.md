@@ -2,7 +2,7 @@
 
 - **Status:** Accepted
 - **Date:** 2026-11-16
-- **Phase:** Follow-up to D17 of the web dashboard plan (`docs/plan/2026-11-13-feat-web-dashboard-people-roles-plan.md`)
+- **Phase:** Follow-up to [D17 of ADR 0018](0018-web-dashboard.md#decisions)
 - **Approved by:** the owner, 2026-11-16
 
 ## Context
