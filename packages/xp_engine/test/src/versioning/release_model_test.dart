@@ -28,18 +28,12 @@ void main() {
     const scope = TagScope(app: 'mobile', flavor: 'prod');
 
     test('fill the names in', () {
-      expect(
-        harbor.tagName(version, 7, scope: scope),
-        'mobile/prod/v5.4.1+7',
-      );
+      expect(harbor.tagName(version, 7, scope: scope), 'mobile/prod/v5.4.1+7');
       expect(
         harbor.patchTagName(version, 7, 1, scope: scope),
         'mobile/prod/v5.4.1+7-p1',
       );
-      expect(
-        harbor.branchName(version, scope: scope),
-        'release/mobile/5.4.1',
-      );
+      expect(harbor.branchName(version, scope: scope), 'release/mobile/5.4.1');
     });
 
     test('need a value for each name', () {
