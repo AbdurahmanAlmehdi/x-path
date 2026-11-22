@@ -84,6 +84,7 @@
     "entrypoints",
     "equatable",
     "errored",
+    "falak",
     "fastlane",
     "favicon",
     "flavorizr",
