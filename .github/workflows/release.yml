@@ -28,6 +28,9 @@
 #   cask      with the secret HOMEBREW_TAP_TOKEN only: points the Homebrew
 #             cask (Casks/xpath.rb in AbdurahmanAlmehdi/homebrew-tap) at the
 #             DMG of the release, for `brew upgrade --cask xpath`.
+#   engine    with the secret XPATH_DEPLOY_TOKEN only: moves the owner's
+#             engine to the release (the tag in AbdurahmanAlmehdi/xpath-deploy,
+#             which Falak deploys) and waits until it reports that version.
 #
 # A tag vX.Y.Z pushed by hand (1.0 is tagged by hand) releases that version.
 # "Run workflow" on main runs again for its HEAD, with an optional version.
@@ -554,3 +557,80 @@ jobs:
           fi
           git commit -m "xpath ${VERSION}"
           git push origin HEAD
+
+  # Commits "xpath <version>" to the deploy repository; Falak deploys on that
+  # push. The job then waits for the engine to report the version, and fails
+  # if it does not. It never rolls back (the engine may have migrated) and
+  # never moves the engine to an older version. It needs the image only, so a
+  # failed DMG does not hold it up. It skips itself, with a notice, until the
+  # secret XPATH_DEPLOY_TOKEN is set (see docs/reference/installation.md).
+  engine:
+    needs: [version, release]
+    if: ${{ needs.version.outputs.prerelease != 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+      TAG: ${{ needs.version.outputs.tag }}
+      ENGINE_URL: https://xpd.abdurahman.ly
+    steps:
+      - name: Check the Deploy Token
+        id: ready
+        env:
+          DEPLOY_TOKEN: ${{ secrets.XPATH_DEPLOY_TOKEN }}
+        run: |
+          if [ -z "${DEPLOY_TOKEN}" ]; then
+            echo "::notice title=Engine not updated for ${TAG}::Set the secret XPATH_DEPLOY_TOKEN to update the engine (docs/reference/installation.md)."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Git Checkout the Deploy Repository
+        if: steps.ready.outputs.ready == 'true'
+        uses: actions/checkout@v7
+        with:
+          repository: AbdurahmanAlmehdi/xpath-deploy
+          token: ${{ secrets.XPATH_DEPLOY_TOKEN }}
+          path: xpath-deploy
+
+      - name: Update and Push the Image Tag
+        id: bump
+        if: steps.ready.outputs.ready == 'true'
+        run: |
+          cd xpath-deploy
+          current="$(sed -n "s|^ *image: ${IMAGE}:||p" falak.yaml)"
+          if [ -z "${current}" ]; then
+            echo "::error title=Engine not updated for ${TAG}::falak.yaml has no image ${IMAGE}:<version>."
+            exit 1
+          fi
+          if [ "$(printf '%s\n%s\n' "${current}" "${VERSION}" | sort -V | tail -n1)" != "${VERSION}" ]; then
+            echo "::notice title=Engine not updated for ${TAG}::The engine is at ${current}, newer than ${VERSION}."
+            echo "wait=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "wait=true" >> "$GITHUB_OUTPUT"
+          sed -i -e "s|^\( *image: ${IMAGE}\):.*$|\1:${VERSION}|" falak.yaml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add falak.yaml
+          if git diff --cached --quiet; then
+            echo "The deploy repository is already at ${VERSION}."
+            exit 0
+          fi
+          git commit -m "xpath ${VERSION}"
+          git push origin HEAD
+
+      - name: Wait for the Engine
+        if: steps.bump.outputs.wait == 'true'
+        run: |
+          for _ in $(seq 1 90); do
+            running="$(curl -fsS --max-time 8 "${ENGINE_URL}/api/v1/version" | jq -r .version || true)"
+            if [ "${running}" = "${VERSION}" ]; then
+              echo "The engine runs ${VERSION}."
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "::error title=Engine not at ${TAG}::It reports '${running}'. See the run of the Falak project xpath. Do not roll back only the image: the engine may have migrated its database."
+          exit 1

@@ -69,6 +69,12 @@ merged pull request. Nothing is committed to `main`: the version lives in the ta
   `xpath <version>`, so `brew upgrade --cask xpath` finds it. A pre-release, a release without a DMG and a run again
   for a version older than the cask's leave the cask alone. Without the tap token below it skips itself with a
   warning.
+- **Owner's engine** (job `engine`). After the release, it writes the version into the pinned `image:` of `falak.yaml` in
+  the private repository `AbdurahmanAlmehdi/xpath-deploy` and pushes the commit `xpath <version>`. Falak deploys that
+  push to `https://xpd.abdurahman.ly`, and the job waits up to 15 minutes for `/api/v1/version` there to report the
+  version. It fails if that does not happen and never rolls back, as the engine may have migrated its database (it
+  keeps `xpath.db.bak-v<old version>`). A pre-release and a version older than the pinned one leave the engine alone.
+  Without the deploy token below it skips itself with a notice.
 - **By hand.** A tag `vX.Y.Z` pushed by hand releases that version (1.0 is tagged by hand). Actions ▸ release ▸ Run
   workflow on `main` runs again for its HEAD, optionally with the version to release. A release never comes from
   another branch.
@@ -92,6 +98,11 @@ tokens ▸ Fine-grained tokens: resource owner AbdurahmanAlmehdi, repository acc
 `AbdurahmanAlmehdi/homebrew-tap` alone, and the repository permission Contents: Read and write (Metadata: Read-only
 comes with it). Then `gh secret set HOMEBREW_TAP_TOKEN` and paste it. When it expires, the job fails at the tap
 checkout; make a new one and set the secret again.
+
+**Deploy token.** The `engine` job reads the repository secret `XPATH_DEPLOY_TOKEN`, a fine-grained personal access
+token made like the tap token, but with `AbdurahmanAlmehdi/xpath-deploy` alone and Contents: Read and write. Set it
+with `gh secret set XPATH_DEPLOY_TOKEN -R AbdurahmanAlmehdi/x-path`, which asks for it without showing it. Delete the
+secret to stop the automatic updates.
 
 **Linux install.** `tool/release/linux/install.sh` is served at `https://xpath.abdurahman.ly/install` (ADR 0005):
 
